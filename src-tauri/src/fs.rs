@@ -27,6 +27,11 @@ pub fn get_home_directory() -> Result<String, String> {
   get_home().map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+pub fn read_file_content(path: String) -> Result<String, String> {
+  read_file_impl(path).map_err(|err| err.to_string())
+}
+
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
   let target_path = match path {
     Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -69,6 +74,26 @@ fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
     path: canonical.to_string_lossy().to_string(),
     entries,
   })
+}
+
+fn read_file_impl(path: String) -> Result<String> {
+  let resolved = PathBuf::from(path);
+  if resolved.is_dir() {
+    return Err(anyhow!("Il percorso selezionato è una cartella"));
+  }
+
+  let max_size: u64 = 5 * 1024 * 1024;
+  let metadata = fs::metadata(&resolved)
+    .with_context(|| format!("Impossibile ottenere le informazioni del file {:?}", resolved))?;
+
+  if metadata.len() > max_size {
+    return Err(anyhow!("Il file è troppo grande per l’anteprima (limite 5MB)"));
+  }
+
+  let content = fs::read_to_string(&resolved)
+    .with_context(|| format!("Impossibile leggere il file {:?}", resolved))?;
+
+  Ok(content)
 }
 
 fn get_home() -> Result<String> {

@@ -8,6 +8,7 @@ interface FileExplorerProps {
   onNavigate: (path: string) => void
   onNavigateUp: () => void
   onRefresh: () => void
+  onOpenFile: (entry: DirectoryEntry) => void
 }
 
 export default function FileExplorer({
@@ -18,6 +19,7 @@ export default function FileExplorer({
   onNavigate,
   onNavigateUp,
   onRefresh,
+  onOpenFile,
 }: FileExplorerProps) {
   return (
     <aside className="file-explorer">
@@ -56,14 +58,20 @@ export default function FileExplorer({
               onClick={() => {
                 if (entry.is_dir) {
                   onNavigate(entry.path)
+                } else {
+                  onOpenFile(entry)
                 }
               }}
-              role={entry.is_dir ? 'button' : undefined}
-              tabIndex={entry.is_dir ? 0 : undefined}
+              role="button"
+              tabIndex={0}
               onKeyDown={(event) => {
-                if (entry.is_dir && (event.key === 'Enter' || event.key === ' ')) {
+                if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
-                  onNavigate(entry.path)
+                  if (entry.is_dir) {
+                    onNavigate(entry.path)
+                  } else {
+                    onOpenFile(entry)
+                  }
                 }
               }}
             >

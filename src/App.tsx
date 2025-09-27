@@ -9,6 +9,7 @@ import TerminalSidebar from './components/TerminalSidebar'
 import TerminalView from './components/TerminalView'
 import FileExplorer from './components/FileExplorer'
 import NewTerminalModal from './components/NewTerminalModal'
+import FilePreviewModal from './components/FilePreviewModal'
 
 import type {
   DirectoryEntry,
@@ -108,6 +109,10 @@ function App() {
   const [selectingDirectory, setSelectingDirectory] = useState(false)
   const [notificationGranted, setNotificationGranted] = useState(false)
   const [booting, setBooting] = useState(true)
+  const [previewFile, setPreviewFile] = useState<{ name: string; path: string } | null>(null)
+  const [previewContent, setPreviewContent] = useState('')
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const terminalsRef = useRef<TerminalInfo[]>([])
   const IDLE_TIMEOUT_MS = 2000
@@ -680,6 +685,35 @@ function App() {
     [loadDirectory, tauriAvailable],
   )
 
+  const handleOpenFilePreview = useCallback(
+    async (entry: DirectoryEntry) => {
+      if (!tauriAvailable || entry.is_dir) {
+        return
+      }
+      setPreviewFile({ name: entry.name, path: entry.path })
+      setPreviewContent('')
+      setPreviewError(null)
+      setLoadingPreview(true)
+      try {
+        const content = await invoke<string>('read_file_content', { path: entry.path })
+        setPreviewContent(content)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setPreviewError(message)
+      } finally {
+        setLoadingPreview(false)
+      }
+    },
+    [tauriAvailable],
+  )
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewFile(null)
+    setPreviewContent('')
+    setPreviewError(null)
+    setLoadingPreview(false)
+  }, [])
+
   useEffect(() => {
     const timers = idleTimersRef.current
     return () => {
@@ -760,6 +794,7 @@ function App() {
         onNavigate={handleNavigateDirectory}
         onNavigateUp={handleNavigateUp}
         onRefresh={handleRefreshExplorer}
+        onOpenFile={handleOpenFilePreview}
       />
 
       <NewTerminalModal
@@ -776,6 +811,15 @@ function App() {
         onBrowse={handleSelectDirectory}
         onCancel={handleCancelNewTerminal}
         onConfirm={handleConfirmNewTerminal}
+      />
+
+      <FilePreviewModal
+        open={previewFile !== null}
+        filename={previewFile?.name ?? null}
+        content={previewContent}
+        loading={loadingPreview}
+        error={previewError}
+        onClose={handleClosePreview}
       />
     </div>
   )

@@ -126,7 +126,8 @@ pub fn run() {
       terminal::close_terminal,
       terminal::set_terminal_color,
       fs::list_directory,
-      fs::get_home_directory
+      fs::get_home_directory,
+      fs::read_file_content
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
