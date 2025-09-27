@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-import type { GitStatusEntry, GitStatusSummary } from '../types'
+import type { GitCommitEntry, GitStatusEntry, GitStatusSummary } from '../types'
 
 type DiffView = 'worktree' | 'staged'
 
@@ -8,6 +8,9 @@ interface GitPanelProps {
   summary: GitStatusSummary | null
   loading: boolean
   error: string | null
+  history: GitCommitEntry[]
+  historyLoading: boolean
+  historyError: string | null
   selected: GitStatusEntry | null
   diffContent: string
   diffLoading: boolean
@@ -31,6 +34,9 @@ export default function GitPanel({
   summary,
   loading,
   error,
+  history,
+  historyLoading,
+  historyError,
   selected,
   diffContent,
   diffLoading,
@@ -139,7 +145,37 @@ export default function GitPanel({
             </section>
           </aside>
 
-          <section className="git-diff-column">
+          <section className="git-main-column">
+            <div className="git-history-section">
+              <header className="git-history-header">
+                <h3>Timeline</h3>
+                {historyLoading && <span className="git-history-status">Aggiornamento…</span>}
+                {historyError && !historyLoading && (
+                  <span className="git-history-error">{historyError}</span>
+                )}
+              </header>
+              <div className="git-history-list">
+                {historyLoading ? (
+                  <div className="git-empty">Caricamento commit…</div>
+                ) : history.length === 0 ? (
+                  <div className="git-empty">Nessun commit recente</div>
+                ) : (
+                  history.map((entry) => (
+                    <div key={entry.hash} className="git-history-item">
+                      <div className="git-history-dot" />
+                      <div className="git-history-content">
+                        <span className="git-history-summary">{entry.summary}</span>
+                        <span className="git-history-meta">
+                          {entry.author} • {entry.relativeTime}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="git-diff-column">
             {selected ? (
               <div className="git-diff-wrapper">
                 <div className="git-diff-toolbar">
@@ -216,6 +252,7 @@ export default function GitPanel({
               >
                 {committing ? 'Commit…' : 'Esegui commit'}
               </button>
+            </div>
             </div>
           </section>
         </div>

@@ -15,6 +15,7 @@ import GitPanel from './components/GitPanel'
 import type {
   DirectoryEntry,
   DirectoryListing,
+  GitCommitEntry,
   GitStatusEntry,
   GitStatusSummary,
   TerminalExitEvent,
@@ -127,6 +128,8 @@ function App() {
   const [diffView, setDiffView] = useState<'worktree' | 'staged'>('worktree')
   const [commitMessage, setCommitMessage] = useState('')
   const [committing, setCommitting] = useState(false)
+  const [commitHistory, setCommitHistory] = useState<GitCommitEntry[]>([])
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const terminalsRef = useRef<TerminalInfo[]>([])
   const IDLE_TIMEOUT_MS = 2000
@@ -741,23 +744,43 @@ function App() {
     }
     setLoadingGit(true)
     setGitError(null)
+    setHistoryError(null)
     try {
-      const result = await invoke<GitStatusSummary>('git_status_summary')
-      setGitSummary(result)
-      setSelectedGitPath((previous) => {
-        if (result.entries.length === 0) {
-          return null
-        }
-        if (previous && result.entries.some((entry) => entry.path === previous)) {
-          return previous
-        }
-        return result.entries[0].path
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      setGitError(message)
-      setGitSummary(null)
-      setSelectedGitPath(null)
+      const [statusResult, historyResult] = await Promise.allSettled([
+        invoke<GitStatusSummary>('git_status_summary'),
+        invoke<GitCommitEntry[]>('git_commit_history', { limit: 50 }),
+      ])
+
+      if (statusResult.status === 'fulfilled') {
+        const result = statusResult.value
+        setGitSummary(result)
+        setGitError(null)
+        setSelectedGitPath((previous) => {
+          if (result.entries.length === 0) {
+            return null
+          }
+          if (previous && result.entries.some((entry) => entry.path === previous)) {
+            return previous
+          }
+          return result.entries[0].path
+        })
+      } else {
+        const reason = statusResult.reason
+        const message = reason instanceof Error ? reason.message : String(reason)
+        setGitError(message)
+        setGitSummary(null)
+        setSelectedGitPath(null)
+      }
+
+      if (historyResult.status === 'fulfilled') {
+        setCommitHistory(historyResult.value)
+        setHistoryError(null)
+      } else {
+        const reason = historyResult.reason
+        const message = reason instanceof Error ? reason.message : String(reason)
+        setCommitHistory([])
+        setHistoryError(message)
+      }
     } finally {
       setLoadingGit(false)
     }
@@ -1009,6 +1032,9 @@ function App() {
               summary={gitSummary}
               loading={loadingGit}
               error={gitError}
+              history={commitHistory}
+              historyLoading={loadingGit}
+              historyError={historyError}
               selected={selectedGitEntry}
               diffContent={diffContent}
               diffLoading={diffLoading}

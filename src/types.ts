@@ -37,6 +37,13 @@ export interface GitStatusSummary {
   clean: boolean
 }
 
+export interface GitCommitEntry {
+  hash: string
+  summary: string
+  author: string
+  relativeTime: string
+}
+
 export interface TerminalDataEvent {
   id: string
   data: string

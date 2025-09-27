@@ -22,6 +22,14 @@ pub struct GitStatusSummary {
   pub clean: bool,
 }
 
+#[derive(Serialize, Clone)]
+pub struct GitCommitEntry {
+  pub hash: String,
+  pub summary: String,
+  pub author: String,
+  pub relative_time: String,
+}
+
 #[tauri::command]
 pub fn git_status_summary() -> Result<GitStatusSummary, String> {
   git_status_summary_impl().map_err(|err| err.to_string())
@@ -45,6 +53,11 @@ pub fn git_unstage(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn git_commit(message: String) -> Result<(), String> {
   git_commit_impl(message).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn git_commit_history(limit: Option<usize>) -> Result<Vec<GitCommitEntry>, String> {
+  git_commit_history_impl(limit).map_err(|err| err.to_string())
 }
 
 fn git_status_summary_impl() -> Result<GitStatusSummary> {
@@ -187,6 +200,35 @@ fn git_commit_impl(message: String) -> Result<()> {
   let root = git_root()?;
   run_git(&root, &["commit", "-m", &message], false)?;
   Ok(())
+}
+
+fn git_commit_history_impl(limit: Option<usize>) -> Result<Vec<GitCommitEntry>> {
+  let root = git_root()?;
+  let limit = limit.unwrap_or(50).min(200);
+  let pretty = "--pretty=format:%H%x1f%an%x1f%ad%x1f%s";
+  let limit_arg = format!("-n{limit}");
+  let args = ["log", "--date=relative", pretty, limit_arg.as_str()];
+  let output = run_git(&root, &args, false)?;
+
+  let mut entries = Vec::new();
+  for line in output.lines() {
+    if line.trim().is_empty() {
+      continue;
+    }
+    let mut parts = line.split('\x1f');
+    let hash = parts.next().unwrap_or_default().to_string();
+    let author = parts.next().unwrap_or_default().to_string();
+    let relative_time = parts.next().unwrap_or_default().to_string();
+    let summary = parts.next().unwrap_or_default().to_string();
+    entries.push(GitCommitEntry {
+      hash,
+      author,
+      relative_time,
+      summary,
+    });
+  }
+
+  Ok(entries)
 }
 
 fn git_root() -> Result<PathBuf> {

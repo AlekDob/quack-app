@@ -133,7 +133,8 @@ pub fn run() {
       git::git_diff,
       git::git_stage,
       git::git_unstage,
-      git::git_commit
+      git::git_commit,
+      git::git_commit_history
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

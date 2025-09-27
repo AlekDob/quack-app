@@ -18,4 +18,4 @@
 - [ ] Enhance UI with branch management (checkout, create, merge).
 
 ### Done
-- _pending Phase 1 completion_
+- [2024-09-27] ✅ Added commit history timeline list to Git panel.
