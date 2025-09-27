@@ -1,0 +1,48 @@
+:root {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: #dce7ff;
+  background-color: #04060f;
+  --accent-color: #ec7241;
+  --accent-surface: rgba(236, 114, 65, 0.18);
+  --accent-surface-strong: rgba(236, 114, 65, 0.32);
+  --accent-border: rgba(236, 114, 65, 0.45);
+  --accent-text: #ffe0d0;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: #04060f;
+  overflow: hidden;
+}
+
+a {
+  color: #7cc4ff;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #a0d7ff;
+}
+
+button {
+  font-family: inherit;
+}
