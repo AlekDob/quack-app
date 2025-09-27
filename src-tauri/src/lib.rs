@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 mod fs;
+mod git;
 mod terminal;
 
 #[derive(Clone)]
@@ -127,7 +128,12 @@ pub fn run() {
       terminal::set_terminal_color,
       fs::list_directory,
       fs::get_home_directory,
-      fs::read_file_content
+      fs::read_file_content,
+      git::git_status_summary,
+      git::git_diff,
+      git::git_stage,
+      git::git_unstage,
+      git::git_commit
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

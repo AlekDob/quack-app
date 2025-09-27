@@ -20,6 +20,23 @@ export interface DirectoryListing {
   entries: DirectoryEntry[]
 }
 
+export interface GitStatusEntry {
+  path: string
+  original_path: string | null
+  staged_status: string | null
+  unstaged_status: string | null
+  is_untracked: boolean
+}
+
+export interface GitStatusSummary {
+  branch: string
+  upstream: string | null
+  ahead: number | null
+  behind: number | null
+  entries: GitStatusEntry[]
+  clean: boolean
+}
+
 export interface TerminalDataEvent {
   id: string
   data: string

@@ -10,10 +10,13 @@ import TerminalView from './components/TerminalView'
 import FileExplorer from './components/FileExplorer'
 import NewTerminalModal from './components/NewTerminalModal'
 import FilePreviewModal from './components/FilePreviewModal'
+import GitPanel from './components/GitPanel'
 
 import type {
   DirectoryEntry,
   DirectoryListing,
+  GitStatusEntry,
+  GitStatusSummary,
   TerminalExitEvent,
   TerminalInfo,
 } from './types'
@@ -113,6 +116,17 @@ function App() {
   const [previewContent, setPreviewContent] = useState('')
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
+  const [rightPanelMode, setRightPanelMode] = useState<'explorer' | 'git'>('explorer')
+  const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null)
+  const [loadingGit, setLoadingGit] = useState(false)
+  const [gitError, setGitError] = useState<string | null>(null)
+  const [selectedGitPath, setSelectedGitPath] = useState<string | null>(null)
+  const [diffContent, setDiffContent] = useState('')
+  const [diffLoading, setDiffLoading] = useState(false)
+  const [diffError, setDiffError] = useState<string | null>(null)
+  const [diffView, setDiffView] = useState<'worktree' | 'staged'>('worktree')
+  const [commitMessage, setCommitMessage] = useState('')
+  const [committing, setCommitting] = useState(false)
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const terminalsRef = useRef<TerminalInfo[]>([])
   const IDLE_TIMEOUT_MS = 2000
@@ -121,6 +135,13 @@ function App() {
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
     [activeId, terminals],
   )
+
+  const selectedGitEntry = useMemo(() => {
+    if (!gitSummary || !selectedGitPath) {
+      return null
+    }
+    return gitSummary.entries.find((entry) => entry.path === selectedGitPath) ?? null
+  }, [gitSummary, selectedGitPath])
 
   useEffect(() => {
     terminalsRef.current = terminals
@@ -714,6 +735,105 @@ function App() {
     setLoadingPreview(false)
   }, [])
 
+  const refreshGitSummary = useCallback(async () => {
+    if (!tauriAvailable) {
+      return
+    }
+    setLoadingGit(true)
+    setGitError(null)
+    try {
+      const result = await invoke<GitStatusSummary>('git_status_summary')
+      setGitSummary(result)
+      setSelectedGitPath((previous) => {
+        if (result.entries.length === 0) {
+          return null
+        }
+        if (previous && result.entries.some((entry) => entry.path === previous)) {
+          return previous
+        }
+        return result.entries[0].path
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setGitError(message)
+      setGitSummary(null)
+      setSelectedGitPath(null)
+    } finally {
+      setLoadingGit(false)
+    }
+  }, [tauriAvailable])
+
+  useEffect(() => {
+    if (rightPanelMode === 'git') {
+      void refreshGitSummary()
+    }
+  }, [refreshGitSummary, rightPanelMode])
+
+  const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
+    setSelectedGitPath(entry.path)
+    if (entry.unstaged_status || entry.is_untracked) {
+      setDiffView('worktree')
+    } else if (entry.staged_status) {
+      setDiffView('staged')
+    }
+  }, [])
+
+  const handleStageEntry = useCallback(
+    async (entry: GitStatusEntry) => {
+      if (!tauriAvailable) {
+        return
+      }
+      setGitError(null)
+      try {
+        await invoke('git_stage', { path: entry.path })
+        await refreshGitSummary()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setGitError(message)
+      }
+    },
+    [refreshGitSummary, tauriAvailable],
+  )
+
+  const handleUnstageEntry = useCallback(
+    async (entry: GitStatusEntry) => {
+      if (!tauriAvailable) {
+        return
+      }
+      setGitError(null)
+      try {
+        await invoke('git_unstage', { path: entry.path })
+        await refreshGitSummary()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setGitError(message)
+      }
+    },
+    [refreshGitSummary, tauriAvailable],
+  )
+
+  const handleCommit = useCallback(async () => {
+    if (!tauriAvailable || commitMessage.trim().length === 0) {
+      return
+    }
+    setCommitting(true)
+    setGitError(null)
+    try {
+      await invoke('git_commit', { message: commitMessage })
+      setCommitMessage('')
+      await refreshGitSummary()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setGitError(message)
+    } finally {
+      setCommitting(false)
+    }
+  }, [commitMessage, refreshGitSummary, tauriAvailable])
+
+  const handleDiffViewChange = useCallback((view: 'worktree' | 'staged') => {
+    setDiffView(view)
+  }, [])
+
   useEffect(() => {
     const timers = idleTimersRef.current
     return () => {
@@ -721,6 +841,75 @@ function App() {
       timers.clear()
     }
   }, [])
+
+  useEffect(() => {
+    if (!selectedGitEntry) {
+      setDiffContent('')
+      setDiffError(null)
+      return
+    }
+    if (diffView === 'staged' && !selectedGitEntry.staged_status) {
+      if (selectedGitEntry.unstaged_status || selectedGitEntry.is_untracked) {
+        setDiffView('worktree')
+      }
+    } else if (diffView === 'worktree' && !(selectedGitEntry.unstaged_status || selectedGitEntry.is_untracked)) {
+      if (selectedGitEntry.staged_status) {
+        setDiffView('staged')
+      }
+    }
+  }, [diffView, selectedGitEntry])
+
+  useEffect(() => {
+    if (!tauriAvailable || rightPanelMode !== 'git') {
+      return
+    }
+    if (!selectedGitEntry) {
+      return
+    }
+    const showStaged = diffView === 'staged'
+    if (showStaged && !selectedGitEntry.staged_status) {
+      setDiffContent('Nessuna differenza in staging.')
+      setDiffError(null)
+      return
+    }
+    if (!showStaged && !(selectedGitEntry.unstaged_status || selectedGitEntry.is_untracked)) {
+      setDiffContent('Nessuna differenza nel working tree.')
+      setDiffError(null)
+      return
+    }
+
+    let cancelled = false
+    const fetchDiff = async () => {
+      setDiffLoading(true)
+      setDiffError(null)
+      try {
+        const diff = await invoke<string>('git_diff', {
+          path: selectedGitEntry.path,
+          staged: showStaged,
+          untracked: selectedGitEntry.is_untracked,
+        })
+        if (!cancelled) {
+          setDiffContent(diff)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : String(error)
+          setDiffError(message)
+          setDiffContent('')
+        }
+      } finally {
+        if (!cancelled) {
+          setDiffLoading(false)
+        }
+      }
+    }
+
+    void fetchDiff()
+
+    return () => {
+      cancelled = true
+    }
+  }, [diffView, rightPanelMode, selectedGitEntry, tauriAvailable])
 
   if (!tauriAvailable) {
     return (
@@ -786,16 +975,58 @@ function App() {
         </div>
       </section>
 
-      <FileExplorer
-        path={explorerPath}
-        entries={entries}
-        loading={loadingExplorer}
-        error={explorerError}
-        onNavigate={handleNavigateDirectory}
-        onNavigateUp={handleNavigateUp}
-        onRefresh={handleRefreshExplorer}
-        onOpenFile={handleOpenFilePreview}
-      />
+      <section className="right-panel">
+        <div className="right-panel-tabs">
+          <button
+            type="button"
+            className={rightPanelMode === 'explorer' ? 'active' : ''}
+            onClick={() => setRightPanelMode('explorer')}
+          >
+            File
+          </button>
+          <button
+            type="button"
+            className={rightPanelMode === 'git' ? 'active' : ''}
+            onClick={() => setRightPanelMode('git')}
+          >
+            Git
+          </button>
+        </div>
+        <div className="right-panel-content">
+          {rightPanelMode === 'explorer' ? (
+            <FileExplorer
+              path={explorerPath}
+              entries={entries}
+              loading={loadingExplorer}
+              error={explorerError}
+              onNavigate={handleNavigateDirectory}
+              onNavigateUp={handleNavigateUp}
+              onRefresh={handleRefreshExplorer}
+              onOpenFile={handleOpenFilePreview}
+            />
+          ) : (
+            <GitPanel
+              summary={gitSummary}
+              loading={loadingGit}
+              error={gitError}
+              selected={selectedGitEntry}
+              diffContent={diffContent}
+              diffLoading={diffLoading}
+              diffError={diffError}
+              diffView={diffView}
+              onDiffViewChange={handleDiffViewChange}
+              onRefresh={refreshGitSummary}
+              onSelect={handleSelectGitEntry}
+              onStage={handleStageEntry}
+              onUnstage={handleUnstageEntry}
+              commitMessage={commitMessage}
+              onCommitMessageChange={setCommitMessage}
+              onCommit={handleCommit}
+              committing={committing}
+            />
+          )}
+        </div>
+      </section>
 
       <NewTerminalModal
         open={showNewTerminalModal}
