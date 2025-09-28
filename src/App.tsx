@@ -294,7 +294,7 @@ function App() {
         path: path ?? null,
       })
       setExplorerPath(listing.path)
-      setExplorerTree((previous) => ({
+    setExplorerTree((previous) => ({
         ...previous,
         [listing.path]: listing.entries,
       }))
@@ -820,7 +820,7 @@ function App() {
 
   const handleOpenFilePreview = useCallback(
     async (entry: DirectoryEntry) => {
-      if (!tauriAvailable || entry.is_dir) {
+    if (!tauriAvailable || entry.is_dir) {
         return
       }
       setPreviewFile({ name: entry.name, path: entry.path })

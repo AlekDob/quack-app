@@ -1229,7 +1229,7 @@ button.secondary:hover {
 .explorer-header {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--panel-border);
 }
@@ -1247,30 +1247,24 @@ button.secondary:hover {
   word-break: break-all;
 }
 
-.explorer-actions {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.explorer-button {
-  flex: 1;
-  border: 1px solid rgba(var(--accent-rgb), 0.28);
-  background: rgba(18, 24, 42, 0.85);
-  color: var(--accent-text);
-  border-radius: 6px;
-  padding: 0.28rem 0.42rem;
+.explorer-search {
+  border: 1px solid rgba(130, 140, 160, 0.4);
+  background: rgba(22, 24, 30, 0.85);
+  color: #e9edf5;
+  border-radius: 7px;
+  padding: 0.35rem 0.55rem;
   font-size: 0.68rem;
-  cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  font-family: inherit;
 }
 
-.explorer-button:hover {
-  background: rgba(var(--accent-rgb), 0.22);
+.explorer-search::placeholder {
+  color: rgba(200, 205, 214, 0.55);
 }
 
-.explorer-button:disabled {
-  opacity: 0.6;
-  cursor: progress;
+.explorer-search:focus {
+  outline: none;
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
 }
 
 .explorer-content {
@@ -1298,7 +1292,7 @@ button.secondary:hover {
 .explorer-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   padding: 0.34rem 0.5rem;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -1336,12 +1330,12 @@ button.secondary:hover {
 }
 
 .explorer-expander {
-  width: 14px;
+  width: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
-  color: rgba(210, 214, 223, 0.75);
+  font-size: 0.78rem;
+  color: rgba(225, 229, 240, 0.85);
   cursor: pointer;
   transform: rotate(0deg);
   transition: transform 0.16s ease;
@@ -1382,22 +1376,80 @@ button.secondary:hover {
 }
 
 .explorer-icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
+  position: relative;
 }
 
-.explorer-icon.folder {
-  background: rgba(var(--accent-rgb), 0.55);
+.explorer-icon::before,
+.explorer-icon::after {
+  content: '';
+  position: absolute;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
 }
 
-.explorer-icon.file {
-  background: rgba(118, 192, 255, 0.6);
+.explorer-icon.folder::before {
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  height: 9px;
+  border-radius: 3px;
+  background: rgba(123, 181, 255, 0.85);
 }
 
-.explorer-icon.symlink {
-  background: rgba(244, 214, 102, 0.6);
+.explorer-icon.folder::after {
+  left: 3px;
+  top: 3px;
+  width: 9px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(123, 181, 255, 0.68);
+}
+
+.explorer-icon.file::before {
+  left: 4px;
+  right: 4px;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.explorer-icon.file::after {
+  right: 4px;
+  top: 3px;
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(45deg);
+  border-radius: 0;
+}
+
+.explorer-icon.symlink::before {
+  left: 4px;
+  right: 4px;
+  top: 7px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.explorer-icon.symlink::after {
+  top: 4px;
+  left: 5px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-left: none;
+  border-bottom: none;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  background: transparent;
 }
 
 .explorer-name {

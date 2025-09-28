@@ -1,5 +1,23 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
+const normalize = (value: string) => value.toLowerCase()
+const fuzzyMatch = (query: string, target: string) => {
+  if (!query) {
+    return true
+  }
+  const normalizedQuery = normalize(query)
+  const normalizedTarget = normalize(target)
+  let queryIndex = 0
+  let targetIndex = 0
+  while (queryIndex < normalizedQuery.length && targetIndex < normalizedTarget.length) {
+    if (normalizedQuery[queryIndex] === normalizedTarget[targetIndex]) {
+      queryIndex += 1
+    }
+    targetIndex += 1
+  }
+  return queryIndex === normalizedQuery.length
+}
+
 import type { DirectoryEntry } from '../types'
 
 interface FileExplorerProps {
@@ -10,8 +28,6 @@ interface FileExplorerProps {
   activePath: string
   activeFilePath: string | null
   onSelectDirectory: (path: string) => void
-  onNavigateUp: () => void
-  onRefresh: () => void
   onOpenFile: (entry: DirectoryEntry) => void
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>
 }
@@ -24,13 +40,12 @@ export default function FileExplorer({
   activePath,
   activeFilePath,
   onSelectDirectory,
-  onNavigateUp,
-  onRefresh,
   onOpenFile,
   onLoadChildren,
 }: FileExplorerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
+  const [query, setQuery] = useState('')
 
   const rootEntries = useMemo(() => {
     if (!rootPath) {
@@ -150,7 +165,7 @@ export default function FileExplorer({
   }, [ensureExpanded, onSelectDirectory])
 
   const renderEntries = useCallback((entries: DirectoryEntry[], depth = 0) => (
-    entries.map((entry) => {
+    entries.filter((entry) => fuzzyMatch(query, entry.name)).map((entry) => {
       const isDirectory = entry.is_dir
       const isExpanded = expanded.has(entry.path)
       const isLoadingNode = loadingNodes.has(entry.path)
@@ -208,7 +223,7 @@ export default function FileExplorer({
         </Fragment>
       )
     })
-  ), [activeFilePath, activePath, expanded, handleDirectorySelect, handleToggleDirectory, loadingNodes, onOpenFile, tree])
+  ), [activeFilePath, activePath, expanded, handleDirectorySelect, handleToggleDirectory, loadingNodes, onOpenFile, query, tree])
 
   return (
     <aside className="file-explorer">
@@ -216,24 +231,13 @@ export default function FileExplorer({
         <h2 className="explorer-title">Esplora file</h2>
         <span className="explorer-path">{activePath}</span>
         {error && <span className="explorer-error">{error}</span>}
-        <div className="explorer-actions">
-          <button
-            type="button"
-            className="explorer-button"
-            onClick={onNavigateUp}
-            disabled={loading}
-          >
-            Su
-          </button>
-          <button
-            type="button"
-            className="explorer-button"
-            onClick={onRefresh}
-            disabled={loading}
-          >
-            Aggiorna
-          </button>
-        </div>
+        <input
+          className="explorer-search"
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Cerca file o cartelle"
+        />
       </div>
 
       <div className={`explorer-content ${loading ? 'loading' : ''}`}>
