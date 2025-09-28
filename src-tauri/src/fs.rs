@@ -32,6 +32,11 @@ pub fn read_file_content(path: String) -> Result<String, String> {
   read_file_impl(path).map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+pub fn write_file_content(path: String, content: String) -> Result<(), String> {
+  write_file_impl(path, content).map_err(|err| err.to_string())
+}
+
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
   let target_path = match path {
     Some(value) if !value.trim().is_empty() => PathBuf::from(value),
@@ -94,6 +99,18 @@ fn read_file_impl(path: String) -> Result<String> {
     .with_context(|| format!("Impossibile leggere il file {:?}", resolved))?;
 
   Ok(content)
+}
+
+fn write_file_impl(path: String, content: String) -> Result<()> {
+  let resolved = PathBuf::from(path);
+  if resolved.is_dir() {
+    return Err(anyhow!("Il percorso selezionato è una cartella"));
+  }
+
+  fs::write(&resolved, content)
+    .with_context(|| format!("Impossibile scrivere il file {:?}", resolved))?;
+
+  Ok(())
 }
 
 fn get_home() -> Result<String> {

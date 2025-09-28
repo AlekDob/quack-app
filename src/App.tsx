@@ -10,7 +10,7 @@ import TerminalSidebar from './components/TerminalSidebar'
 import TerminalView from './components/TerminalView'
 import FileExplorer from './components/FileExplorer'
 import NewTerminalModal from './components/NewTerminalModal'
-import FilePreviewModal from './components/FilePreviewModal'
+import FilePreviewDrawer from './components/FilePreviewDrawer'
 import GitPanel from './components/GitPanel'
 
 import type {
@@ -102,7 +102,8 @@ function App() {
   const [terminals, setTerminals] = useState<TerminalInfo[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [explorerPath, setExplorerPath] = useState('')
-  const [entries, setEntries] = useState<DirectoryEntry[]>([])
+  const [explorerTree, setExplorerTree] = useState<Record<string, DirectoryEntry[]>>({})
+  const [explorerRoot, setExplorerRoot] = useState<string | null>(null)
   const [loadingExplorer, setLoadingExplorer] = useState(false)
   const [explorerError, setExplorerError] = useState<string | null>(null)
   const [creatingTerminal, setCreatingTerminal] = useState(false)
@@ -118,6 +119,7 @@ function App() {
   const [previewContent, setPreviewContent] = useState('')
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
+  const [formattingPreview, setFormattingPreview] = useState(false)
   const [rightPanelMode, setRightPanelMode] = useState<'explorer' | 'git'>('explorer')
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null)
   const [loadingGit, setLoadingGit] = useState(false)
@@ -281,9 +283,10 @@ function App() {
     setLoadingExplorer(true)
     setExplorerError(null)
     if (!tauriAvailable) {
-      setEntries([])
       setLoadingExplorer(false)
       setExplorerError('Avvia l’app desktop Tauri per usare il file explorer.')
+      setExplorerTree({})
+      setExplorerRoot(null)
       return
     }
     try {
@@ -291,7 +294,11 @@ function App() {
         path: path ?? null,
       })
       setExplorerPath(listing.path)
-      setEntries(listing.entries)
+      setExplorerTree((previous) => ({
+        ...previous,
+        [listing.path]: listing.entries,
+      }))
+      setExplorerRoot((current) => current ?? listing.path)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setExplorerError(message)
@@ -299,6 +306,30 @@ function App() {
       setLoadingExplorer(false)
     }
   }, [tauriAvailable])
+
+  const fetchDirectoryChildren = useCallback(
+    async (path: string) => {
+      if (!tauriAvailable) {
+        setExplorerError('Avvia l’app desktop Tauri per usare il file explorer.')
+        return []
+      }
+      try {
+        const listing = await invoke<DirectoryListing>('list_directory', {
+          path,
+        })
+        setExplorerTree((previous) => ({
+          ...previous,
+          [listing.path]: listing.entries,
+        }))
+        return listing.entries
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setExplorerError(message)
+        return []
+      }
+    },
+    [tauriAvailable],
+  )
 
   const markTerminalBusy = useCallback((id: string) => {
     setTerminals((prev) =>
@@ -809,11 +840,97 @@ function App() {
     [tauriAvailable],
   )
 
+  const handleRefreshPreview = useCallback(async () => {
+    if (!tauriAvailable || !previewFile) {
+      return
+    }
+    setPreviewError(null)
+    setLoadingPreview(true)
+    try {
+      const content = await invoke<string>('read_file_content', { path: previewFile.path })
+      setPreviewContent(content)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setPreviewError(message)
+    } finally {
+      setLoadingPreview(false)
+    }
+  }, [previewFile, tauriAvailable])
+
+  const handleFormatPreview = useCallback(async () => {
+    if (!tauriAvailable || !previewFile) {
+      return
+    }
+
+    const extension = previewFile.name.split('.').pop()?.toLowerCase() ?? ''
+    const parser = (() => {
+      if (['ts', 'tsx'].includes(extension)) {
+        return 'typescript'
+      }
+      if (['js', 'jsx', 'mjs', 'cjs'].includes(extension)) {
+        return 'babel'
+      }
+      if (extension === 'json') {
+        return 'json'
+      }
+      if (['css', 'scss', 'less'].includes(extension)) {
+        return 'css'
+      }
+      if (['html', 'htm'].includes(extension)) {
+        return 'html'
+      }
+      if (['md', 'mdx', 'markdown'].includes(extension)) {
+        return 'markdown'
+      }
+      return null
+    })()
+
+    if (!parser) {
+      setPreviewError('Formattazione non disponibile per questo tipo di file.')
+      return
+    }
+
+    setFormattingPreview(true)
+    setPreviewError(null)
+    try {
+      const prettier = await import('prettier/standalone')
+      const [babel, typescript, html, postcss, markdown] = await Promise.all([
+        import('prettier/plugins/babel'),
+        import('prettier/plugins/typescript'),
+        import('prettier/plugins/html'),
+        import('prettier/plugins/postcss'),
+        import('prettier/plugins/markdown'),
+      ])
+
+      const plugins = [
+        babel.default,
+        typescript.default,
+        html.default,
+        postcss.default,
+        markdown.default,
+      ].filter(Boolean)
+
+      const formatted = prettier.format(previewContent, {
+        parser,
+        plugins,
+      })
+
+      setPreviewContent(formatted)
+      await invoke('write_file_content', { path: previewFile.path, content: formatted })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setPreviewError(message)
+    } finally {
+      setFormattingPreview(false)
+    }
+  }, [previewContent, previewFile, tauriAvailable])
+
   const handleClosePreview = useCallback(() => {
     setPreviewFile(null)
     setPreviewContent('')
     setPreviewError(null)
     setLoadingPreview(false)
+    setFormattingPreview(false)
   }, [])
 
   const refreshGitSummary = useCallback(async () => {
@@ -1104,14 +1221,17 @@ function App() {
             </div>
             <div className="right-panel-content">
               <FileExplorer
-                path={explorerPath}
-                entries={entries}
+                rootPath={(explorerRoot ?? explorerPath) || null}
+                tree={explorerTree}
                 loading={loadingExplorer}
                 error={explorerError}
-                onNavigate={handleNavigateDirectory}
+                activePath={explorerPath}
+                activeFilePath={previewFile?.path ?? null}
+                onSelectDirectory={handleNavigateDirectory}
                 onNavigateUp={handleNavigateUp}
                 onRefresh={handleRefreshExplorer}
                 onOpenFile={handleOpenFilePreview}
+                onLoadChildren={fetchDirectoryChildren}
               />
             </div>
           </section>
@@ -1134,13 +1254,17 @@ function App() {
         onConfirm={handleConfirmNewTerminal}
       />
 
-      <FilePreviewModal
+      <FilePreviewDrawer
         open={previewFile !== null}
         filename={previewFile?.name ?? null}
+        path={previewFile?.path ?? null}
         content={previewContent}
         loading={loadingPreview}
         error={previewError}
+        formatting={formattingPreview}
         onClose={handleClosePreview}
+        onRefresh={handleRefreshPreview}
+        onFormat={handleFormatPreview}
       />
 
       {rightPanelMode === 'git' && (
