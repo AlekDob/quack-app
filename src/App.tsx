@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { dirname } from '@tauri-apps/api/path'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -130,6 +131,9 @@ function App() {
   const [committing, setCommitting] = useState(false)
   const [commitHistory, setCommitHistory] = useState<GitCommitEntry[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [rightPanelWidth, setRightPanelWidth] = useState(380)
+  const [resizingRightPanel, setResizingRightPanel] = useState(false)
+  const appShellRef = useRef<HTMLDivElement | null>(null)
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const terminalsRef = useRef<TerminalInfo[]>([])
   const IDLE_TIMEOUT_MS = 2000
@@ -146,6 +150,15 @@ function App() {
     return gitSummary.entries.find((entry) => entry.path === selectedGitPath) ?? null
   }, [gitSummary, selectedGitPath])
 
+  const gridTemplateColumns = rightPanelMode === 'explorer'
+    ? `240px 1fr 8px ${Math.round(rightPanelWidth)}px`
+    : '240px 1fr'
+
+  const handleResizerMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    setResizingRightPanel(true)
+  }, [])
+
   useEffect(() => {
     terminalsRef.current = terminals
   }, [terminals])
@@ -157,6 +170,71 @@ function App() {
     try {
       let granted = await isPermissionGranted()
       if (!granted) {
+
+  useEffect(() => {
+    if (!resizingRightPanel) {
+      return
+    }
+    const handleMouseMove = (event: MouseEvent) => {
+      event.preventDefault()
+      const container = appShellRef.current
+      if (!container) {
+        return
+      }
+      const rect = container.getBoundingClientRect()
+      const leftColumn = 240
+      const resizerWidth = 8
+      const minTerminal = 220
+      const minWidth = 220
+      const maxWidth = Math.max(minWidth, rect.width - leftColumn - resizerWidth - minTerminal)
+      if (maxWidth <= minWidth) {
+        setRightPanelWidth(minWidth)
+        return
+      }
+      const proposed = rect.right - event.clientX
+      const clamped = Math.max(minWidth, Math.min(maxWidth, proposed))
+      setRightPanelWidth(clamped)
+    }
+
+    const handleMouseUp = () => {
+      setResizingRightPanel(false)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: false })
+    window.addEventListener('mouseup', handleMouseUp)
+
+    const previousCursor = document.body.style.cursor
+    const previousSelect = document.body.style.userSelect
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = previousCursor
+      document.body.style.userSelect = previousSelect
+    }
+  }, [resizingRightPanel])
+
+  useEffect(() => {
+    const clampToViewport = () => {
+      const container = appShellRef.current
+      if (!container) {
+        return
+      }
+      const rect = container.getBoundingClientRect()
+      const leftColumn = 240
+      const resizerWidth = 8
+      const minTerminal = 220
+      const minWidth = 220
+      const maxWidth = Math.max(minWidth, rect.width - leftColumn - resizerWidth - minTerminal)
+      setRightPanelWidth((current) => Math.max(minWidth, Math.min(maxWidth, current)))
+    }
+
+    clampToViewport()
+    window.addEventListener('resize', clampToViewport)
+    return () => window.removeEventListener('resize', clampToViewport)
+  }, [])
         const permission = await requestPermission()
         granted = permission === 'granted'
       }
@@ -964,7 +1042,11 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      ref={appShellRef}
+      className={`app-shell ${resizingRightPanel ? 'resizing' : ''}`}
+      style={{ gridTemplateColumns }}
+    >
       <TerminalSidebar
         terminals={terminals}
         activeId={activeId}
@@ -997,62 +1079,44 @@ function App() {
           )}
         </div>
       </section>
-
-      <section className="right-panel">
-        <div className="right-panel-tabs">
-          <button
-            type="button"
-            className={rightPanelMode === 'explorer' ? 'active' : ''}
-            onClick={() => setRightPanelMode('explorer')}
-          >
-            File
-          </button>
-          <button
-            type="button"
-            className={rightPanelMode === 'git' ? 'active' : ''}
-            onClick={() => setRightPanelMode('git')}
-          >
-            Git
-          </button>
-        </div>
-        <div className="right-panel-content">
-          {rightPanelMode === 'explorer' ? (
-            <FileExplorer
-              path={explorerPath}
-              entries={entries}
-              loading={loadingExplorer}
-              error={explorerError}
-              onNavigate={handleNavigateDirectory}
-              onNavigateUp={handleNavigateUp}
-              onRefresh={handleRefreshExplorer}
-              onOpenFile={handleOpenFilePreview}
-            />
-          ) : (
-            <GitPanel
-              summary={gitSummary}
-              loading={loadingGit}
-              error={gitError}
-              history={commitHistory}
-              historyLoading={loadingGit}
-              historyError={historyError}
-              selected={selectedGitEntry}
-              diffContent={diffContent}
-              diffLoading={diffLoading}
-              diffError={diffError}
-              diffView={diffView}
-              onDiffViewChange={handleDiffViewChange}
-              onRefresh={refreshGitSummary}
-              onSelect={handleSelectGitEntry}
-              onStage={handleStageEntry}
-              onUnstage={handleUnstageEntry}
-              commitMessage={commitMessage}
-              onCommitMessageChange={setCommitMessage}
-              onCommit={handleCommit}
-              committing={committing}
-            />
-          )}
-        </div>
-      </section>
+      {rightPanelMode === 'explorer' && (
+        <>
+          <div
+            className={`panel-resizer ${resizingRightPanel ? 'active' : ''}`}
+            onMouseDown={handleResizerMouseDown}
+            role="presentation"
+          />
+          <section className="right-panel">
+            <div className="right-panel-tabs">
+              <button
+                type="button"
+                className="active"
+                onClick={() => setRightPanelMode('explorer')}
+              >
+                File
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightPanelMode('git')}
+              >
+                Git
+              </button>
+            </div>
+            <div className="right-panel-content">
+              <FileExplorer
+                path={explorerPath}
+                entries={entries}
+                loading={loadingExplorer}
+                error={explorerError}
+                onNavigate={handleNavigateDirectory}
+                onNavigateUp={handleNavigateUp}
+                onRefresh={handleRefreshExplorer}
+                onOpenFile={handleOpenFilePreview}
+              />
+            </div>
+          </section>
+        </>
+      )}
 
       <NewTerminalModal
         open={showNewTerminalModal}
@@ -1078,6 +1142,51 @@ function App() {
         error={previewError}
         onClose={handleClosePreview}
       />
+
+      {rightPanelMode === 'git' && (
+        <div className="git-drawer">
+          <div
+            className="git-drawer-backdrop"
+            onClick={() => setRightPanelMode('explorer')}
+            role="presentation"
+          />
+          <div className="git-drawer-panel">
+            <div className="right-panel-tabs drawer-tabs">
+              <button
+                type="button"
+                onClick={() => setRightPanelMode('explorer')}
+              >
+                File
+              </button>
+              <button type="button" className="active">
+                Git
+              </button>
+            </div>
+            <GitPanel
+              summary={gitSummary}
+              loading={loadingGit}
+              error={gitError}
+              history={commitHistory}
+              historyLoading={loadingGit}
+              historyError={historyError}
+              selected={selectedGitEntry}
+              diffContent={diffContent}
+              diffLoading={diffLoading}
+              diffError={diffError}
+              diffView={diffView}
+              onDiffViewChange={handleDiffViewChange}
+              onRefresh={refreshGitSummary}
+              onSelect={handleSelectGitEntry}
+              onStage={handleStageEntry}
+              onUnstage={handleUnstageEntry}
+              commitMessage={commitMessage}
+              onCommitMessageChange={setCommitMessage}
+              onCommit={handleCommit}
+              committing={committing}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
