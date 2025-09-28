@@ -1,15 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=General+Sans:wght@400;500;600&display=swap');
+
 :root {
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  color: #dce7ff;
-  background-color: #04060f;
-  --accent-color: #ec7241;
-  --accent-surface: rgba(236, 114, 65, 0.18);
-  --accent-surface-strong: rgba(236, 114, 65, 0.32);
-  --accent-border: rgba(236, 114, 65, 0.45);
-  --accent-text: #ffe0d0;
+  color: #e7ebf3;
+  background-color: #0f1115;
+  --accent-color: #f28c52;
+  --accent-rgb: 242, 140, 82;
+  --accent-surface: rgba(var(--accent-rgb), 0.16);
+  --accent-surface-strong: rgba(var(--accent-rgb), 0.3);
+  --accent-border: rgba(var(--accent-rgb), 0.38);
+  --accent-text: #ffecd9;
+  --panel-border: rgba(128, 132, 150, 0.32);
+  --panel-border-strong: rgba(128, 132, 150, 0.45);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -30,7 +35,7 @@ body,
 }
 
 body {
-  background-color: #04060f;
+  background-color: #0f1115;
   overflow: hidden;
 }
 

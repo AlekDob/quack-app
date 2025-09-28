@@ -52,9 +52,8 @@ export default function GitPanel({
   onCommit,
   committing,
 }: GitPanelProps) {
-  const entries = summary?.entries ?? []
-
   const groupedEntries = useMemo(() => {
+    const entries = summary?.entries ?? []
     const staged: GitStatusEntry[] = []
     const unstaged: GitStatusEntry[] = []
     for (const entry of entries) {
@@ -66,7 +65,7 @@ export default function GitPanel({
       }
     }
     return { staged, unstaged }
-  }, [entries])
+  }, [summary])
 
   return (
     <div className="git-panel">

@@ -27,7 +27,7 @@ import './App.css'
 
 const splashImage = new URL('../images/quackapp.jpeg', import.meta.url).href
 
-const COLORS = ['#ec7241', '#4ecdc4', '#ffd166', '#a78bfa', '#60a5fa', '#f97316', '#f472b6']
+const COLORS = ['#f28c52', '#ffb26f', '#ffd166', '#f77aa6', '#4dd4b3', '#8fa6ff', '#f2a57b']
 
 // eslint-disable-next-line no-control-regex
 const ANSI_REGEX = new RegExp('\\x1B\\[[0-9;?]*[ -/]*[@-~]', 'g')
@@ -170,6 +170,17 @@ function App() {
     try {
       let granted = await isPermissionGranted()
       if (!granted) {
+        const permission = await requestPermission()
+        granted = permission === 'granted'
+      }
+      setNotificationGranted(granted)
+      return granted
+    } catch (error) {
+      console.warn('Impossibile verificare i permessi di notifica', error)
+      setNotificationGranted(false)
+      return false
+    }
+  }, [tauriAvailable])
 
   useEffect(() => {
     if (!resizingRightPanel) {
@@ -235,17 +246,6 @@ function App() {
     window.addEventListener('resize', clampToViewport)
     return () => window.removeEventListener('resize', clampToViewport)
   }, [])
-        const permission = await requestPermission()
-        granted = permission === 'granted'
-      }
-      setNotificationGranted(granted)
-      return granted
-    } catch (error) {
-      console.warn('Impossibile verificare i permessi di notifica', error)
-      setNotificationGranted(false)
-      return false
-    }
-  }, [tauriAvailable])
 
   const notifyTerminalReady = useCallback(
     async (payload: { id: string; label: string }) => {

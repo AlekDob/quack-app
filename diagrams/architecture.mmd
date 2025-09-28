@@ -1,0 +1,45 @@
+graph TD
+  subgraph UI[React App]
+    TS[TerminalSidebar]
+    TV[TerminalView (xterm.js)]
+    FE[FileExplorer]
+    GP[GitPanel]
+    APP[App orchestrator]
+  end
+
+  subgraph Tauri[Tauri (Rust)]
+    CMD[Invoke Commands]
+    EVT[Emit Events]
+    PTY[terminal.rs (portable-pty)]
+    FS[fs.rs]
+    GIT[git.rs -> git CLI]
+    AXUM[Axum HTTP server 127.0.0.1:6768]
+  end
+
+  U[User] -->|input| TS
+  U -->|type| TV
+  TS --> APP
+  FE --> APP
+  GP --> APP
+  APP --> TV
+
+  TV -->|invoke write_to_terminal/resize| CMD
+  APP -->|invoke list_terminals/create/close/set_color| CMD
+  APP -->|invoke list_directory/read_file| CMD
+  APP -->|invoke git_*/diff| CMD
+
+  CMD --> PTY
+  CMD --> FS
+  CMD --> GIT
+
+  PTY -->|stdout/stderr chunks| EVT
+  EVT -->|terminal-data| TV
+  PTY -->|exit status| EVT
+  EVT -->|terminal-exit| APP
+
+  AXUM -->|POST /terminal/status {id|label,status,notify}| EVT
+  EVT -->|external-terminal-status| APP
+
+  GIT -->|spawns| git[(git binary)]
+  FS -->|reads| Disk[(local disk)]
+  PTY -->|spawns| Shell[(user shell)]

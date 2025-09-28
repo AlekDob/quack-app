@@ -52,9 +52,10 @@ export default function FileExplorer({
           <div className="empty-state">Cartella vuota</div>
         ) : (
           entries.map((entry) => (
-            <div
+            <button
               key={entry.path}
-              className={`file-row ${entry.is_dir ? 'directory' : ''}`}
+              type="button"
+              className={`file-row ${entry.is_dir ? 'directory' : 'file'}`}
               onClick={() => {
                 if (entry.is_dir) {
                   onNavigate(entry.path)
@@ -62,8 +63,6 @@ export default function FileExplorer({
                   onOpenFile(entry)
                 }
               }}
-              role="button"
-              tabIndex={0}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
@@ -75,10 +74,11 @@ export default function FileExplorer({
                 }
               }}
             >
+              <span className="file-icon" aria-hidden="true">
+                {entry.is_dir ? '📁' : entry.is_symlink ? '🔗' : '📄'}
+              </span>
               <span className="name">{entry.name}</span>
-              {entry.is_dir && <span className="badge">Cartella</span>}
-              {!entry.is_dir && entry.is_symlink && <span className="badge">Link</span>}
-            </div>
+            </button>
           ))
         )}
       </div>

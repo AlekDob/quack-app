@@ -56,15 +56,15 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
 
     terminal = new Terminal({
       convertEol: true,
-      fontFamily: 'JetBrains Mono, Menlo, monospace',
-      fontSize: 14,
+      fontFamily: '"IBM Plex Mono", "JetBrains Mono", Menlo, monospace',
+      fontSize: 13,
       cursorBlink: true,
       allowTransparency: true,
       theme: {
-        background: '#020409',
-        foreground: '#e5ecff',
-        cursor: '#ec7241',
-        selectionBackground: 'rgba(236, 114, 65, 0.3)',
+        background: '#0f1115',
+        foreground: '#f0f2f6',
+        cursor: '#f28c52',
+        selectionBackground: 'rgba(242, 140, 82, 0.38)',
       },
     })
 
@@ -113,13 +113,13 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         terminal.open(viewEntry.element)
         viewEntry.mounted = true
       }
-      const accent = terminals.find((item) => item.id === id)?.color ?? '#ec7241'
+      const accent = terminals.find((item) => item.id === id)?.color ?? '#f28c52'
       terminal.options = {
         theme: {
-          background: '#020409',
-          foreground: '#f5f8ff',
+          background: '#0f1115',
+          foreground: '#f2f4f8',
           cursor: accent,
-          cursorAccent: '#05070e',
+          cursorAccent: '#080a0d',
           selectionBackground: `${accent}55`,
         },
       }
