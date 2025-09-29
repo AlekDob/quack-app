@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MouseEvent as ReactMouseEvent } from 'react'
-import { dirname } from '@tauri-apps/api/path'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
@@ -120,7 +118,7 @@ function App() {
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [formattingPreview, setFormattingPreview] = useState(false)
-  const [rightPanelMode, setRightPanelMode] = useState<'explorer' | 'git'>('explorer')
+  const [showGitDrawer, setShowGitDrawer] = useState(false)
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null)
   const [loadingGit, setLoadingGit] = useState(false)
   const [gitError, setGitError] = useState<string | null>(null)
@@ -133,8 +131,6 @@ function App() {
   const [committing, setCommitting] = useState(false)
   const [commitHistory, setCommitHistory] = useState<GitCommitEntry[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
-  const [rightPanelWidth, setRightPanelWidth] = useState(380)
-  const [resizingRightPanel, setResizingRightPanel] = useState(false)
   const appShellRef = useRef<HTMLDivElement | null>(null)
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const terminalsRef = useRef<TerminalInfo[]>([])
@@ -152,14 +148,8 @@ function App() {
     return gitSummary.entries.find((entry) => entry.path === selectedGitPath) ?? null
   }, [gitSummary, selectedGitPath])
 
-  const gridTemplateColumns = rightPanelMode === 'explorer'
-    ? `240px 1fr 8px ${Math.round(rightPanelWidth)}px`
-    : '240px 1fr'
+  const gridTemplateColumns = '240px 1fr 300px'
 
-  const handleResizerMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    setResizingRightPanel(true)
-  }, [])
 
   useEffect(() => {
     terminalsRef.current = terminals
@@ -184,70 +174,7 @@ function App() {
     }
   }, [tauriAvailable])
 
-  useEffect(() => {
-    if (!resizingRightPanel) {
-      return
-    }
-    const handleMouseMove = (event: MouseEvent) => {
-      event.preventDefault()
-      const container = appShellRef.current
-      if (!container) {
-        return
-      }
-      const rect = container.getBoundingClientRect()
-      const leftColumn = 240
-      const resizerWidth = 8
-      const minTerminal = 220
-      const minWidth = 220
-      const maxWidth = Math.max(minWidth, rect.width - leftColumn - resizerWidth - minTerminal)
-      if (maxWidth <= minWidth) {
-        setRightPanelWidth(minWidth)
-        return
-      }
-      const proposed = rect.right - event.clientX
-      const clamped = Math.max(minWidth, Math.min(maxWidth, proposed))
-      setRightPanelWidth(clamped)
-    }
 
-    const handleMouseUp = () => {
-      setResizingRightPanel(false)
-    }
-
-    window.addEventListener('mousemove', handleMouseMove, { passive: false })
-    window.addEventListener('mouseup', handleMouseUp)
-
-    const previousCursor = document.body.style.cursor
-    const previousSelect = document.body.style.userSelect
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = previousCursor
-      document.body.style.userSelect = previousSelect
-    }
-  }, [resizingRightPanel])
-
-  useEffect(() => {
-    const clampToViewport = () => {
-      const container = appShellRef.current
-      if (!container) {
-        return
-      }
-      const rect = container.getBoundingClientRect()
-      const leftColumn = 240
-      const resizerWidth = 8
-      const minTerminal = 220
-      const minWidth = 220
-      const maxWidth = Math.max(minWidth, rect.width - leftColumn - resizerWidth - minTerminal)
-      setRightPanelWidth((current) => Math.max(minWidth, Math.min(maxWidth, current)))
-    }
-
-    clampToViewport()
-    window.addEventListener('resize', clampToViewport)
-    return () => window.removeEventListener('resize', clampToViewport)
-  }, [])
 
   const notifyTerminalReady = useCallback(
     async (payload: { id: string; label: string }) => {
@@ -784,29 +711,6 @@ function App() {
     [tauriAvailable],
   )
 
-  const handleNavigateUp = useCallback(async () => {
-    if (!explorerPath) {
-      return
-    }
-    if (!tauriAvailable) {
-      return
-    }
-    try {
-      const parent = await dirname(explorerPath)
-      if (parent && parent !== explorerPath) {
-        await loadDirectory(parent)
-      }
-    } catch (error) {
-      console.error('Impossibile risalire di cartella', error)
-    }
-  }, [explorerPath, loadDirectory, tauriAvailable])
-
-  const handleRefreshExplorer = useCallback(() => {
-    if (!tauriAvailable) {
-      return
-    }
-    void loadDirectory(explorerPath)
-  }, [explorerPath, loadDirectory, tauriAvailable])
 
   const handleNavigateDirectory = useCallback(
     (path: string) => {
@@ -910,7 +814,7 @@ function App() {
         markdown.default,
       ].filter(Boolean)
 
-      const formatted = prettier.format(previewContent, {
+      const formatted = await prettier.format(previewContent, {
         parser,
         plugins,
       })
@@ -996,10 +900,10 @@ function App() {
   }, [tauriAvailable])
 
   useEffect(() => {
-    if (rightPanelMode === 'git') {
+    if (showGitDrawer) {
       void refreshGitSummary()
     }
-  }, [refreshGitSummary, rightPanelMode])
+  }, [refreshGitSummary, showGitDrawer])
 
   const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
     setSelectedGitPath(entry.path)
@@ -1092,7 +996,7 @@ function App() {
   }, [diffView, selectedGitEntry])
 
   useEffect(() => {
-    if (!tauriAvailable || rightPanelMode !== 'git') {
+    if (!tauriAvailable || !showGitDrawer) {
       return
     }
     if (!selectedGitEntry) {
@@ -1141,7 +1045,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [diffView, rightPanelMode, selectedGitEntry, tauriAvailable])
+  }, [diffView, showGitDrawer, selectedGitEntry, tauriAvailable])
 
   if (!tauriAvailable) {
     return (
@@ -1175,7 +1079,7 @@ function App() {
   return (
     <div
       ref={appShellRef}
-      className={`app-shell ${resizingRightPanel ? 'resizing' : ''}`}
+      className="app-shell"
       style={{ gridTemplateColumns }}
     >
       <TerminalSidebar
@@ -1189,11 +1093,22 @@ function App() {
       />
 
       <section className="terminal-pane">
-        <div className="terminal-toolbar">
-          <h1>{activeTerminal?.label ?? 'Terminale'}</h1>
-          <span className="terminal-status">
-            {activeTerminal ? activeTerminal.cwd : 'Nessun terminale attivo'}
-          </span>
+        <div className="main-toolbar">
+          <div className="main-toolbar-left">
+            <h1>{activeTerminal?.label ?? 'Terminale'}</h1>
+            <span className="terminal-status">
+              {activeTerminal ? activeTerminal.cwd : 'Nessun terminale attivo'}
+            </span>
+          </div>
+          <div className="main-toolbar-right">
+            <button
+              type="button"
+              className={`git-tab-button ${showGitDrawer ? 'active' : ''}`}
+              onClick={() => setShowGitDrawer(!showGitDrawer)}
+            >
+              Git
+            </button>
+          </div>
         </div>
         <div className="terminal-container">
           {activeId ? (
@@ -1210,47 +1125,18 @@ function App() {
           )}
         </div>
       </section>
-      {rightPanelMode === 'explorer' && (
-        <>
-          <div
-            className={`panel-resizer ${resizingRightPanel ? 'active' : ''}`}
-            onMouseDown={handleResizerMouseDown}
-            role="presentation"
-          />
-          <section className="right-panel">
-            <div className="right-panel-tabs">
-              <button
-                type="button"
-                className="active"
-                onClick={() => setRightPanelMode('explorer')}
-              >
-                File
-              </button>
-              <button
-                type="button"
-                onClick={() => setRightPanelMode('git')}
-              >
-                Git
-              </button>
-            </div>
-            <div className="right-panel-content">
-              <FileExplorer
-                rootPath={(explorerRoot ?? explorerPath) || null}
-                tree={explorerTree}
-                loading={loadingExplorer}
-                error={explorerError}
-                activePath={explorerPath}
-                activeFilePath={previewFile?.path ?? null}
-                onSelectDirectory={handleNavigateDirectory}
-                onNavigateUp={handleNavigateUp}
-                onRefresh={handleRefreshExplorer}
-                onOpenFile={handleOpenFilePreview}
-                onLoadChildren={fetchDirectoryChildren}
-              />
-            </div>
-          </section>
-        </>
-      )}
+
+      <FileExplorer
+          rootPath={(explorerRoot ?? explorerPath) || null}
+          tree={explorerTree}
+          loading={loadingExplorer}
+          error={explorerError}
+          activePath={explorerPath}
+          activeFilePath={previewFile?.path ?? null}
+          onSelectDirectory={handleNavigateDirectory}
+          onOpenFile={handleOpenFilePreview}
+          onLoadChildren={fetchDirectoryChildren}
+        />
 
       <NewTerminalModal
         open={showNewTerminalModal}
@@ -1282,23 +1168,23 @@ function App() {
         onSave={handleSaveFile}
       />
 
-      {rightPanelMode === 'git' && (
+      {showGitDrawer && (
         <div className="git-drawer">
           <div
             className="git-drawer-backdrop"
-            onClick={() => setRightPanelMode('explorer')}
+            onClick={() => setShowGitDrawer(false)}
             role="presentation"
           />
           <div className="git-drawer-panel">
-            <div className="right-panel-tabs drawer-tabs">
+            <div className="git-drawer-header">
+              <h2>Git Repository</h2>
               <button
                 type="button"
-                onClick={() => setRightPanelMode('explorer')}
+                className="git-drawer-close"
+                onClick={() => setShowGitDrawer(false)}
+                aria-label="Close Git panel"
               >
-                File
-              </button>
-              <button type="button" className="active">
-                Git
+                ×
               </button>
             </div>
             <GitPanel

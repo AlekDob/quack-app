@@ -1,6 +1,7 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr 8px 320px;
+  grid-template-columns: 240px 1fr 300px;
+  grid-template-rows: auto 1fr;
   height: 100vh;
   overflow: hidden;
   background: linear-gradient(135deg, #0d1014 0%, #12161c 45%, #161b22 100%);
@@ -243,7 +244,7 @@ button.secondary:hover {
   color: var(--accent-text);
 }
 
-.panel-resizer {
+.removed-panel-resizer {
   grid-column: 3;
   cursor: col-resize;
   background: rgba(92, 112, 176, 0.32);
@@ -255,7 +256,7 @@ button.secondary:hover {
   z-index: 3;
 }
 
-.panel-resizer::before {
+.removed-panel-resizer::before {
   content: '';
   position: absolute;
   top: 0;
@@ -264,9 +265,9 @@ button.secondary:hover {
   right: -6px;
 }
 
-.panel-resizer:hover,
-.panel-resizer.active,
-.app-shell.resizing .panel-resizer {
+.removed-panel-resizer:hover,
+.removed-panel-resizer.active,
+.app-shell.resizing .removed-panel-resizer {
   background: rgba(var(--accent-rgb), 0.45);
 }
 
@@ -305,12 +306,51 @@ button.secondary:hover {
   animation: gitDrawerSlideIn 0.25s ease forwards;
 }
 
-.right-panel-tabs.drawer-tabs {
+.git-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(15, 16, 22, 0.8);
+}
+
+.git-drawer-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.git-drawer-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.git-drawer-close:hover {
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: #fff;
+}
+
+.removed-right-panel-tabs.drawer-tabs {
   padding: 0.65rem 0.9rem;
   gap: 0.6rem;
 }
 
-.right-panel-tabs.drawer-tabs button {
+.removed-right-panel-tabs.drawer-tabs button {
   flex: 0 0 auto;
   min-width: 86px;
 }
@@ -462,6 +502,7 @@ button.secondary:hover {
   background: rgba(20, 21, 26, 0.8);
   backdrop-filter: blur(14px);
   grid-column: 1;
+  grid-row: 1 / 3;
 }
 
 .sidebar-header {
@@ -669,8 +710,9 @@ button.secondary:hover {
   min-height: 0;
   overflow: hidden;
   grid-column: 2;
+  grid-row: 1 / 3;
 }
-.panel-resizer {
+.removed-panel-resizer {
   grid-column: 3;
   cursor: col-resize;
   background: rgba(92, 112, 176, 0.32);
@@ -682,7 +724,7 @@ button.secondary:hover {
   z-index: 3;
 }
 
-.panel-resizer::before {
+.removed-panel-resizer::before {
   content: '';
   position: absolute;
   top: 0;
@@ -691,12 +733,73 @@ button.secondary:hover {
   right: -6px;
 }
 
-.panel-resizer:hover,
-.panel-resizer.active,
-.app-shell.resizing .panel-resizer {
+.removed-panel-resizer:hover,
+.removed-panel-resizer.active,
+.app-shell.resizing .removed-panel-resizer {
   background: rgba(var(--accent-rgb), 0.45);
 }
 
+.main-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+
+.main-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.main-toolbar-left h1 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.main-toolbar-left .terminal-status {
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  color: #7f8bb0;
+}
+
+.main-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.git-tab-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.git-tab-button:hover {
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: #fff;
+}
+
+.git-tab-button.active {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: #fff;
+}
+
+/* Legacy terminal-toolbar styles kept for compatibility */
 .terminal-toolbar {
   display: flex;
   align-items: center;
@@ -768,20 +871,13 @@ button.secondary:hover {
   overflow-y: auto;
   background: rgba(20, 21, 26, 0.78);
   backdrop-filter: blur(14px);
-}
-
-.right-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
   border-left: 1px solid var(--panel-border);
-  background: rgba(20, 21, 26, 0.78);
-  backdrop-filter: blur(14px);
-  overflow: hidden;
-  grid-column: 4;
+  grid-column: 3;
+  grid-row: 1 / 3;
 }
 
-.right-panel-tabs {
+
+.removed-right-panel-tabs {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -789,7 +885,7 @@ button.secondary:hover {
   border-bottom: 1px solid var(--panel-border);
 }
 
-.right-panel-tabs button {
+.removed-right-panel-tabs button {
   flex: 1;
   border: 1px solid transparent;
   background: rgba(17, 22, 36, 0.85);
@@ -801,19 +897,19 @@ button.secondary:hover {
   transition: background 0.2s ease, border 0.2s ease;
 }
 
-.right-panel-tabs button.active {
+.removed-right-panel-tabs button.active {
   background: rgba(var(--accent-rgb), 0.22);
   border-color: rgba(var(--accent-rgb), 0.4);
   color: var(--accent-text);
 }
 
-.right-panel-content {
+.removed-right-panel-content {
   flex: 1;
   display: flex;
   min-height: 0;
 }
 
-.right-panel-content > * {
+.removed-right-panel-content > * {
   flex: 1;
   min-height: 0;
 }
@@ -1512,3 +1608,5 @@ button.secondary:hover {
   border-color: #4b5563;
   color: #9ca3af;
 }
+
+

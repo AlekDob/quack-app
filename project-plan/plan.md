@@ -101,14 +101,17 @@ When Jack identifies a new feature or component:
 *This section will be updated as features are planned and developed*
 
 ### 📝 Planned Micro-Projects
-- [ ] *Awaiting first feature requirements from Jack*
-- [ ] *Project will expand as needs are identified*
+- [ ] *Additional features to be identified based on user needs*
 
 ### 🚧 In Progress
-- *No active micro-projects yet*
+- 🔄 **[layout-refactoring-bottom-file-explorer](./layout-refactoring-bottom-file-explorer/)**: Major layout refactoring - moving file explorer to bottom horizontal panel
+  - *Status*: Planning Phase
+  - *Agent*: Julie (UI/UX Designer) - ready for assignment
+  - *Dependencies*: Git tab refactoring completed ✅
 
 ### ✅ Completed
 - ✅ **Project Setup**: Quack Agency team initialization complete
+- ✅ **[move-git-tab-to-top-bar](./move-git-tab-to-top-bar/)**: Git tab successfully moved to top toolbar (completed by Julie)
 
 ## Project Dependencies
 
@@ -156,6 +159,18 @@ Each significant achievement will be documented here:
 - **9/28/2025**: ✅ Quack Agency project setup completed
   - *Agents*: Jack, Mike, Scott, Julie, John
   - *Next*: Awaiting first feature requirements
+  - *Blockers*: None
+
+- **1/29/2025**: ✅ Git tab moved to top toolbar completed
+  - *Agent*: Julie (UI/UX Designer)
+  - *Achievement*: Successfully refactored UI to move Git functionality to main toolbar
+  - *Next*: Major layout refactoring for bottom file explorer
+  - *Blockers*: None
+
+- **1/29/2025**: 🔄 Layout refactoring planning completed
+  - *Agent*: Mike (Project Manager)
+  - *Achievement*: Created comprehensive plan for moving file explorer to bottom panel
+  - *Next*: Julie to implement major layout restructuring
   - *Blockers*: None
 
 ## Resource Links
