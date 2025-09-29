@@ -40,14 +40,10 @@ export default function TerminalSidebar({
             'terminal-item',
             active ? 'active' : '',
             terminal.alive ? '' : 'inactive',
-            terminal.needsAttention ? 'attention' : '',
-            terminal.alive ? (terminal.status === 'busy' ? 'busy' : 'idle') : '',
+            // Temporarily commented out status logic for Fork-style clean design
+            // terminal.needsAttention ? 'attention' : '',
+            // terminal.alive ? (terminal.status === 'busy' ? 'busy' : 'idle') : '',
           ].filter(Boolean).join(' ')
-          const statusLabel = terminal.alive
-            ? terminal.status === 'busy'
-              ? 'In esecuzione'
-              : 'Pronto'
-            : 'Terminato'
           return (
             <div
               key={terminal.id}
@@ -62,19 +58,16 @@ export default function TerminalSidebar({
                 }
               }}
             >
-              <input
-                type="color"
-                className="terminal-color"
-                value={terminal.color}
-                aria-label={`Colore per ${terminal.label}`}
-                onClick={(event) => event.stopPropagation()}
-                onChange={(event) => onColorChange(terminal.id, event.target.value)}
+              <div
+                className="terminal-dot"
+                style={{ backgroundColor: terminal.color }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  // Maybe later: open color picker on dot click
+                }}
               />
               <div className="terminal-details">
                 <span className="terminal-name">{terminal.label}</span>
-                <span className={`terminal-status-chip ${terminal.status ?? 'idle'}`}>
-                  {statusLabel}
-                </span>
               </div>
               <button
                 type="button"

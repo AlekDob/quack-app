@@ -109,6 +109,11 @@ When Jack identifies a new feature or component:
   - *Agent*: Julie (UI/UX Designer) - ready for assignment
   - *Dependencies*: Git tab refactoring completed ✅
 
+- 🆕 **[fork-style-sidebar-redesign](./fork-style-sidebar-redesign/)**: Transform terminal sidebar with Fork Git client-inspired dark mode and glass effect
+  - *Status*: Planning Phase
+  - *Agent*: Mike (Planning) → Julie (Implementation)
+  - *Dependencies*: None
+
 ### ✅ Completed
 - ✅ **Project Setup**: Quack Agency team initialization complete
 - ✅ **[move-git-tab-to-top-bar](./move-git-tab-to-top-bar/)**: Git tab successfully moved to top toolbar (completed by Julie)
