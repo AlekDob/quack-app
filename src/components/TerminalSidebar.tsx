@@ -66,6 +66,8 @@ export default function TerminalSidebar({
         />
       </div>
 
+      <div className="explorer-root-label">TERMINALI ATTIVI</div>
+
       <div className="sidebar-list">
         {filteredTerminals.map((terminal) => {
           const active = terminal.id === activeId
