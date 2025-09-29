@@ -1,4 +1,23 @@
+import { useState, useMemo } from 'react'
 import type { TerminalInfo } from '../types'
+
+const normalize = (value: string) => value.toLowerCase()
+const fuzzyMatch = (query: string, target: string) => {
+  if (!query) {
+    return true
+  }
+  const normalizedQuery = normalize(query)
+  const normalizedTarget = normalize(target)
+  let queryIndex = 0
+  let targetIndex = 0
+  while (queryIndex < normalizedQuery.length && targetIndex < normalizedTarget.length) {
+    if (normalizedQuery[queryIndex] === normalizedTarget[targetIndex]) {
+      queryIndex += 1
+    }
+    targetIndex += 1
+  }
+  return queryIndex === normalizedQuery.length
+}
 
 interface TerminalSidebarProps {
   terminals: TerminalInfo[]
@@ -19,22 +38,36 @@ export default function TerminalSidebar({
   onClose,
   onColorChange,
 }: TerminalSidebarProps) {
+  const [query, setQuery] = useState('')
+
+  const filteredTerminals = useMemo(() => {
+    return terminals.filter((terminal) => fuzzyMatch(query, terminal.label))
+  }, [terminals, query])
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-title">Quack Terminal</span>
-        <button
-          type="button"
-          className="sidebar-button"
-          onClick={onAdd}
-          disabled={creating}
-        >
-          {creating ? 'Creazione…' : 'Nuovo'}
-        </button>
+        <div className="sidebar-header-top">
+          <span className="sidebar-title">Quack Terminal</span>
+          <button
+            type="button"
+            className="sidebar-button"
+            onClick={onAdd}
+            disabled={creating}
+          >
+            {creating ? 'Creazione…' : 'Nuovo'}
+          </button>
+        </div>
+        <input
+          className="explorer-search"
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Cerca terminali"
+        />
       </div>
 
       <div className="sidebar-list">
-        {terminals.map((terminal) => {
+        {filteredTerminals.map((terminal) => {
           const active = terminal.id === activeId
           const itemClasses = [
             'terminal-item',
@@ -86,6 +119,10 @@ export default function TerminalSidebar({
 
         {terminals.length === 0 && (
           <div className="empty-state">Nessun terminale attivo</div>
+        )}
+
+        {terminals.length > 0 && filteredTerminals.length === 0 && (
+          <div className="empty-state">Nessun terminale trovato</div>
         )}
       </div>
     </aside>

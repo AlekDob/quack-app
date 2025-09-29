@@ -1,6 +1,6 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr 360px;
+  grid-template-columns: 340px 1fr 340px;
   grid-template-rows: auto 1fr;
   height: 100vh;
   overflow: hidden;
@@ -498,20 +498,64 @@ button.secondary:hover {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  border-right: 1px solid var(--panel-border);
-  background: rgba(24, 26, 33, 0.75);
-  backdrop-filter: blur(18px);
+  border-right: 1px solid rgba(65, 75, 95, 0.4);
+  /* Fork-inspired sophisticated gradient */
+  background: linear-gradient(
+    170deg,
+    rgba(15, 17, 22, 0.95) 0%,
+    rgba(20, 24, 31, 0.92) 25%,
+    rgba(25, 28, 36, 0.88) 65%,
+    rgba(30, 34, 42, 0.85) 100%
+  );
+  backdrop-filter: blur(24px) saturate(1.1);
+  box-shadow:
+    inset 1px 0 0 rgba(80, 90, 110, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    2px 0 12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(40, 45, 55, 0.6);
+  position: relative;
   grid-column: 1;
   grid-row: 1 / 3;
 }
 
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(120, 130, 150, 0.4) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
 .sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  min-height: 56px;
+  border-bottom: 1px solid rgba(65, 75, 95, 0.35);
+  /* Subtle gradient for depth */
+  background: linear-gradient(180deg,
+    rgba(25, 28, 36, 0.6) 0%,
+    rgba(20, 24, 31, 0.4) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 1px 2px rgba(0, 0, 0, 0.1);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.sidebar-header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.65rem 0.9rem;
-  border-bottom: 1px solid var(--panel-border);
 }
 
 .sidebar-title {
@@ -522,24 +566,39 @@ button.secondary:hover {
 }
 
 .sidebar-button {
-  border: 1px solid rgba(var(--accent-rgb), 0.25);
-  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  background: linear-gradient(145deg,
+    rgba(var(--accent-rgb), 0.12) 0%,
+    rgba(var(--accent-rgb), 0.06) 100%
+  );
   color: var(--accent-text);
-  border-radius: 6px;
-  padding: 0.25rem 0.6rem;
+  border-radius: 7px;
+  padding: 0.3rem 0.7rem;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0.9;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: progress;
+  filter: saturate(0.6);
 }
 
 .sidebar-button:not(:disabled):hover {
-  background: rgba(var(--accent-rgb), 0.26);
+  background: linear-gradient(145deg,
+    rgba(var(--accent-rgb), 0.18) 0%,
+    rgba(var(--accent-rgb), 0.12) 100%
+  );
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(-0.5px);
 }
 
 .sidebar-list {
@@ -554,44 +613,136 @@ button.secondary:hover {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.35rem 0.45rem;
-  border-radius: 6px;
-  background: rgba(16, 22, 40, 0.35);
-  border: 1px solid transparent;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  /* Fork-style subtle depth */
+  background: linear-gradient(
+    145deg,
+    rgba(18, 22, 30, 0.65) 0%,
+    rgba(22, 26, 35, 0.55) 50%,
+    rgba(16, 20, 28, 0.7) 100%
+  );
+  border: 1px solid rgba(50, 58, 70, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  transition: border 0.2s ease, background 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.terminal-item:hover {
+  background: linear-gradient(
+    145deg,
+    rgba(28, 32, 42, 0.75) 0%,
+    rgba(32, 36, 47, 0.65) 50%,
+    rgba(26, 30, 40, 0.8) 100%
+  );
+  border-color: rgba(80, 88, 105, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+  transform: translateY(-0.5px);
 }
 
 .terminal-item.active {
-  border-color: var(--accent-border);
-  background: var(--accent-surface);
+  border-color: rgba(var(--accent-rgb), 0.6);
+  background: linear-gradient(
+    145deg,
+    rgba(var(--accent-rgb), 0.15) 0%,
+    rgba(var(--accent-rgb), 0.08) 50%,
+    rgba(var(--accent-rgb), 0.12) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(var(--accent-rgb), 0.15),
+    0 0 0 1px rgba(var(--accent-rgb), 0.3);
 }
 
 .terminal-item.inactive {
-  opacity: 0.6;
+  opacity: 0.55;
+  filter: saturate(0.7);
 }
 
 .terminal-item.busy {
-  border-color: rgba(250, 204, 21, 0.25);
+  border-color: rgba(250, 204, 21, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.15),
+    0 0 8px rgba(250, 204, 21, 0.2);
 }
 
 .terminal-item.attention:not(.active) {
-  border-color: rgba(52, 211, 153, 0.4);
+  border-color: rgba(52, 211, 153, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.15),
+    0 0 12px rgba(52, 211, 153, 0.25);
+  animation: terminalAttentionGlow 2s ease-in-out infinite;
+}
+
+@keyframes terminalAttentionGlow {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+      0 1px 3px rgba(0, 0, 0, 0.15),
+      0 0 12px rgba(52, 211, 153, 0.25);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+      0 2px 6px rgba(0, 0, 0, 0.2),
+      0 0 20px rgba(52, 211, 153, 0.4);
+  }
 }
 
 .terminal-dot {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
+  position: relative;
+  /* Subtle inner shadow for depth */
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.1),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.terminal-dot::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  right: 1px;
+  height: 40%;
+  border-radius: 50%;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 .terminal-dot:hover {
-  transform: scale(1.1);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.15),
+    0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 /* Keep terminal-color for backwards compatibility but hide it */
@@ -753,8 +904,10 @@ button.secondary:hover {
   align-items: center;
   justify-content: space-between;
   padding: 0.85rem 1.25rem;
+  min-height: 56px;
   border-bottom: 1px solid var(--panel-border);
   background: var(--panel-bg);
+  box-sizing: border-box;
 }
 
 .main-toolbar-left {
@@ -1334,9 +1487,12 @@ button.secondary:hover {
 .explorer-header {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 0.3rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.85rem 1rem;
+  min-height: 56px;
   border-bottom: 1px solid var(--panel-border);
+  box-sizing: border-box;
 }
 
 .explorer-title {
@@ -1377,6 +1533,8 @@ button.secondary:hover {
   padding: 0.45rem 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .explorer-root-label {
