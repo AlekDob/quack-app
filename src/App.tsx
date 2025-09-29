@@ -534,7 +534,6 @@ function App() {
 
     const bootstrap = async () => {
       try {
-        await loadDirectory()
         const existing = await invoke<TerminalInfo[]>('list_terminals')
         if (existing.length > 0) {
           const withState = existing.map((terminal) => ({
@@ -544,6 +543,7 @@ function App() {
           }))
           setTerminals(withState)
           setActiveId(withState[0].id)
+          await loadDirectory(withState[0].cwd)
         } else {
           const initial = await invoke<TerminalInfo>('create_terminal', {
             label: 'Terminal 1',
@@ -925,6 +925,20 @@ function App() {
     }
   }, [previewContent, previewFile, tauriAvailable])
 
+  const handleSaveFile = useCallback(async (content: string) => {
+    if (!tauriAvailable || !previewFile) {
+      return
+    }
+    setPreviewError(null)
+    try {
+      await invoke('write_file_content', { path: previewFile.path, content })
+      setPreviewContent(content)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setPreviewError(message)
+    }
+  }, [previewFile, tauriAvailable])
+
   const handleClosePreview = useCallback(() => {
     setPreviewFile(null)
     setPreviewContent('')
@@ -1265,6 +1279,7 @@ function App() {
         onClose={handleClosePreview}
         onRefresh={handleRefreshPreview}
         onFormat={handleFormatPreview}
+        onSave={handleSaveFile}
       />
 
       {rightPanelMode === 'git' && (
