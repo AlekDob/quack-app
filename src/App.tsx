@@ -148,7 +148,7 @@ function App() {
     return gitSummary.entries.find((entry) => entry.path === selectedGitPath) ?? null
   }, [gitSummary, selectedGitPath])
 
-  const gridTemplateColumns = '240px 1fr 300px'
+  const gridTemplateColumns = '240px 1fr 360px'
 
 
   useEffect(() => {
