@@ -10,6 +10,7 @@ import FileExplorer from './components/FileExplorer'
 import NewTerminalModal from './components/NewTerminalModal'
 import FilePreviewDrawer from './components/FilePreviewDrawer'
 import GitPanel from './components/GitPanel'
+import ToolBar from './components/ToolBar'
 
 import type {
   DirectoryEntry,
@@ -851,6 +852,24 @@ function App() {
     setFormattingPreview(false)
   }, [])
 
+  const handleExecuteAICommand = useCallback(
+    async (command: string, label: string) => {
+      if (!tauriAvailable || !activeId) {
+        return
+      }
+      try {
+        await invoke('write_to_terminal', {
+          id: activeId,
+          data: command + '\n',
+        })
+        console.log(`Comando AI eseguito: ${label} -> ${command}`)
+      } catch (error) {
+        console.error('Errore durante l\'esecuzione del comando AI', error)
+      }
+    },
+    [activeId, tauriAvailable],
+  )
+
   const refreshGitSummary = useCallback(async () => {
     if (!tauriAvailable) {
       return
@@ -1124,6 +1143,7 @@ function App() {
             </div>
           )}
         </div>
+        <ToolBar onExecuteCommand={handleExecuteAICommand} />
       </section>
 
       <FileExplorer

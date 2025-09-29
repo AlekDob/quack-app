@@ -866,7 +866,7 @@ button.secondary:hover {
   flex-direction: column;
   background: rgba(17, 18, 22, 0.72);
   backdrop-filter: blur(14px);
-  min-width: 0;
+  min-width: 600px;
   min-height: 0;
   overflow: hidden;
   grid-column: 2;
@@ -1024,6 +1024,85 @@ button.secondary:hover {
   color: #a3aab6;
   font-size: 0.95rem;
   line-height: 1.4;
+}
+
+/* AI ToolBar Styles */
+.ai-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--panel-border);
+  background: linear-gradient(180deg,
+    rgba(20, 24, 31, 0.95) 0%,
+    rgba(25, 28, 36, 0.90) 100%
+  );
+  backdrop-filter: blur(12px);
+}
+
+.ai-toolbar-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-tool-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  background: linear-gradient(145deg,
+    rgba(var(--accent-rgb), 0.08) 0%,
+    rgba(var(--accent-rgb), 0.04) 100%
+  );
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 64px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.ai-tool-button:hover:not(.disabled) {
+  background: linear-gradient(145deg,
+    rgba(var(--accent-rgb), 0.15) 0%,
+    rgba(var(--accent-rgb), 0.08) 100%
+  );
+  border-color: rgba(var(--accent-rgb), 0.4);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.ai-tool-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: saturate(0.7);
+}
+
+.ai-tool-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.ai-tool-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.9;
 }
 
 .file-explorer {
