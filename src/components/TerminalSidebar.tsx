@@ -36,7 +36,7 @@ export default function TerminalSidebar({
   onAdd,
   onSelect,
   onClose,
-  onColorChange,
+  onColorChange: _onColorChange,
 }: TerminalSidebarProps) {
   const [query, setQuery] = useState('')
 

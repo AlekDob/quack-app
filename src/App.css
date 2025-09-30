@@ -7,6 +7,9 @@
   background: linear-gradient(135deg, #0d1014 0%, #12161c 45%, #161b22 100%);
   color: #eef0f5;
   position: relative;
+  /* macOS rounded corners support */
+  border-radius: 10px;
+  -webkit-app-region: no-drag;
 }
 
 .app-shell.resizing {
