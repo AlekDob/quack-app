@@ -188,9 +188,14 @@ export default function FileExplorer({
             type="button"
             className={rowClass}
             style={{ paddingLeft: `${paddingLeft}px` }}
+            draggable={true}
+            onDragStart={(event) => {
+              event.dataTransfer.setData('text/plain', entry.path)
+              event.dataTransfer.effectAllowed = 'copy'
+            }}
             onClick={() => {
               if (isDirectory) {
-                handleDirectorySelect(entry)
+                void handleToggleDirectory(entry)
               } else {
                 onOpenFile(entry)
               }

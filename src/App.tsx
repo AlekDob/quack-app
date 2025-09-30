@@ -222,11 +222,11 @@ function App() {
         path: path ?? null,
       })
       setExplorerPath(listing.path)
-    setExplorerTree((previous) => ({
+      setExplorerTree((previous) => ({
         ...previous,
         [listing.path]: listing.entries,
       }))
-      setExplorerRoot((current) => current ?? listing.path)
+      setExplorerRoot(listing.path)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setExplorerError(message)

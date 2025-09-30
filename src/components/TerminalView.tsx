@@ -257,13 +257,45 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     }
   }, [reportResize, tauriAvailable])
 
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const path = event.dataTransfer.getData('text/plain')
+      if (!path || !activeId) {
+        return
+      }
+      const terminal = terminalMapRef.current.get(activeId)
+      if (!terminal) {
+        return
+      }
+      // Aggiungi il path al terminale, con escape per spazi
+      const escapedPath = path.includes(' ') ? `"${path}"` : path
+      terminal.write(escapedPath)
+      onUserInput(activeId, escapedPath)
+      void invoke('write_to_terminal', { id: activeId, data: escapedPath })
+    },
+    [activeId, onUserInput],
+  )
+
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }, [])
+
   if (!tauriAvailable) {
     return (
       <div className="terminal-surface terminal-placeholder">
-        Avvia l’app desktop Tauri per utilizzare il terminale integrato.
+        Avvia l'app desktop Tauri per utilizzare il terminale integrato.
       </div>
     )
   }
 
-  return <div ref={containerRef} className="terminal-surface" />
+  return (
+    <div
+      ref={containerRef}
+      className="terminal-surface"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    />
+  )
 }
