@@ -188,6 +188,7 @@ export default function FileExplorer({
             type="button"
             className={rowClass}
             style={{ paddingLeft: `${paddingLeft}px` }}
+            title={entry.name}
             draggable={true}
             onDragStart={(event) => {
               event.dataTransfer.setData('text/plain', entry.path)

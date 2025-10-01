@@ -230,24 +230,47 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     }
 
     let resizeTimeout: ReturnType<typeof setTimeout> | null = null
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+    let isScrolling = false
+    let lastWidth = 0
+    let lastHeight = 0
+    let lastRows = 0
+    let lastCols = 0
 
     const handleResize = () => {
       const active = activeRef.current
       if (!active) {
         return
       }
+
+      // Non fare resize se stiamo scrollando
+      if (isScrolling) {
+        return
+      }
+
       const fitAddon = fitMapRef.current.get(active)
       const terminal = terminalMapRef.current.get(active)
       const containerEl = containerRef.current
       if (!fitAddon || !terminal || !containerEl) {
         return
       }
+
       const rect = containerEl.getBoundingClientRect()
       if (rect.width <= 0 || rect.height <= 0) {
         return
       }
 
-      // Debounce per evitare troppi resize consecutivi
+      // Threshold: resize solo se le dimensioni cambiano di più di 10px
+      const widthDiff = Math.abs(rect.width - lastWidth)
+      const heightDiff = Math.abs(rect.height - lastHeight)
+      if (widthDiff < 10 && heightDiff < 10) {
+        return
+      }
+
+      lastWidth = rect.width
+      lastHeight = rect.height
+
+      // Debounce aumentato a 150ms
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
@@ -257,21 +280,45 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             fitAddon.fit()
-            void reportResize(active, terminal)
+
+            // Report resize solo se rows/cols sono cambiati
+            const currentRows = terminal.rows
+            const currentCols = terminal.cols
+            if (currentRows !== lastRows || currentCols !== lastCols) {
+              lastRows = currentRows
+              lastCols = currentCols
+              void reportResize(active, terminal)
+            }
           })
         })
-      }, 50)
+      }, 150)
+    }
+
+    // Gestione scroll - disabilita resize durante scroll
+    const handleScroll = () => {
+      isScrolling = true
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout)
+      }
+      scrollTimeout = setTimeout(() => {
+        isScrolling = false
+      }, 200)
     }
 
     const observer = new ResizeObserver(handleResize)
     observer.observe(container)
+    container.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('resize', handleResize)
 
     return () => {
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout)
+      }
       observer.disconnect()
+      container.removeEventListener('scroll', handleScroll)
       window.removeEventListener('resize', handleResize)
     }
   }, [reportResize, tauriAvailable])

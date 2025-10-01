@@ -1016,13 +1016,11 @@ button.secondary:hover {
 
 .terminal-instance .xterm {
   width: 100% !important;
-  height: 100% !important;
+  max-height: 100% !important;
 }
 
 .terminal-instance .xterm-viewport {
   width: 100% !important;
-  overflow-y: scroll !important;
-  overflow-x: hidden !important;
 }
 
 .terminal-instance .xterm-screen {
