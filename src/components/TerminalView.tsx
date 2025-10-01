@@ -126,9 +126,12 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
 
       terminal.focus()
 
+      // Aspetta che il DOM sia completamente renderizzato prima del fit
       requestAnimationFrame(() => {
-        fitAddon?.fit()
-        void reportResize(id, terminal)
+        requestAnimationFrame(() => {
+          fitAddon?.fit()
+          void reportResize(id, terminal)
+        })
       })
     },
     [ensureTerminal, reportResize, tauriAvailable, terminals],
@@ -226,6 +229,8 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       return undefined
     }
 
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null
+
     const handleResize = () => {
       const active = activeRef.current
       if (!active) {
@@ -241,10 +246,21 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       if (rect.width <= 0 || rect.height <= 0) {
         return
       }
-      requestAnimationFrame(() => {
-        fitAddon.fit()
-        void reportResize(active, terminal)
-      })
+
+      // Debounce per evitare troppi resize consecutivi
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+
+      resizeTimeout = setTimeout(() => {
+        // Double RAF per dare tempo al layout di stabilizzarsi
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            fitAddon.fit()
+            void reportResize(active, terminal)
+          })
+        })
+      }, 50)
     }
 
     const observer = new ResizeObserver(handleResize)
@@ -252,6 +268,9 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     window.addEventListener('resize', handleResize)
 
     return () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
       observer.disconnect()
       window.removeEventListener('resize', handleResize)
     }

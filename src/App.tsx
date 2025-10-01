@@ -22,6 +22,12 @@ import type {
   TerminalInfo,
 } from './types'
 
+interface TerminalMetadata {
+  label: string
+  color: string
+  cwd: string
+}
+
 import './App.css'
 
 const splashImage = new URL('../images/quackapp.jpeg', import.meta.url).href
@@ -46,6 +52,34 @@ const chunkContainsPrompt = (text: string): boolean => {
     return false
   }
   return PROMPT_REGEX.test(lines[lines.length - 1])
+}
+
+const STORAGE_KEY = 'quack-terminals'
+
+const saveTerminalsToStorage = (terminals: TerminalInfo[]) => {
+  try {
+    const metadata: TerminalMetadata[] = terminals.map((t) => ({
+      label: t.label,
+      color: t.color,
+      cwd: t.cwd,
+    }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(metadata))
+  } catch (error) {
+    console.warn('Impossibile salvare i terminali', error)
+  }
+}
+
+const loadTerminalsFromStorage = (): TerminalMetadata[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (!stored) {
+      return []
+    }
+    return JSON.parse(stored)
+  } catch (error) {
+    console.warn('Impossibile caricare i terminali salvati', error)
+    return []
+  }
 }
 
 const playQuackSound = () => {
@@ -154,6 +188,12 @@ function App() {
 
   useEffect(() => {
     terminalsRef.current = terminals
+    if (terminals.length > 0) {
+      saveTerminalsToStorage(terminals)
+    } else {
+      // Se non ci sono terminali, pulisci lo storage
+      localStorage.removeItem(STORAGE_KEY)
+    }
   }, [terminals])
 
   const ensureNotificationPermission = useCallback(async (): Promise<boolean> => {
@@ -462,17 +502,51 @@ function App() {
 
     const bootstrap = async () => {
       try {
-        const existing = await invoke<TerminalInfo[]>('list_terminals')
-        if (existing.length > 0) {
-          const withState = existing.map((terminal) => ({
-            ...terminal,
-            status: terminal.status ?? 'idle',
-            needsAttention: false,
-          }))
-          setTerminals(withState)
-          setActiveId(withState[0].id)
-          await loadDirectory(withState[0].cwd)
+        // Prova a caricare i terminali salvati
+        const savedMetadata = loadTerminalsFromStorage()
+
+        if (savedMetadata.length > 0) {
+          // Ricrea i terminali dai metadata salvati
+          const recreated: TerminalInfo[] = []
+          for (const metadata of savedMetadata) {
+            try {
+              const terminal = await invoke<TerminalInfo>('create_terminal', {
+                label: metadata.label,
+                color: metadata.color,
+                cwd: metadata.cwd,
+              })
+              recreated.push({
+                ...terminal,
+                status: 'idle' as const,
+                needsAttention: false,
+              })
+            } catch (error) {
+              console.warn(`Impossibile ricreare il terminale ${metadata.label}`, error)
+            }
+          }
+
+          if (recreated.length > 0) {
+            setTerminals(recreated)
+            setActiveId(recreated[0].id)
+            await loadDirectory(recreated[0].cwd)
+          } else {
+            // Fallback: crea un terminale di default
+            const initial = await invoke<TerminalInfo>('create_terminal', {
+              label: 'Terminal 1',
+              color: COLORS[0],
+              cwd: null,
+            })
+            const initialWithState = {
+              ...initial,
+              status: 'idle' as const,
+              needsAttention: false,
+            }
+            setTerminals([initialWithState])
+            setActiveId(initialWithState.id)
+            await loadDirectory(initialWithState.cwd)
+          }
         } else {
+          // Nessun terminale salvato, crea uno di default
           const initial = await invoke<TerminalInfo>('create_terminal', {
             label: 'Terminal 1',
             color: COLORS[0],
@@ -488,7 +562,7 @@ function App() {
           await loadDirectory(initialWithState.cwd)
         }
       } catch (error) {
-        console.error('Errore durante l’inizializzazione', error)
+        console.error('Errore durante l\'inizializzazione', error)
       } finally {
         setBooting(false)
       }

@@ -1003,21 +1003,30 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .terminal-instance {
   flex: 1;
   display: flex;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.terminal-instance .xterm,
+.terminal-instance .xterm {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .terminal-instance .xterm-viewport {
   width: 100% !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
 }
 
-.terminal-instance .xterm-viewport {
-  overflow: hidden !important;
+.terminal-instance .xterm-screen {
+  width: 100% !important;
 }
 
 .terminal-placeholder {
