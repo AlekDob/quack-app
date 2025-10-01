@@ -60,6 +60,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       fontSize: 13,
       cursorBlink: true,
       allowTransparency: true,
+      scrollOnUserInput: false, // Disabilita auto-scroll su input
       theme: {
         background: '#0f1115',
         foreground: '#f0f2f6',
@@ -72,9 +73,19 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     const linksAddon = new WebLinksAddon()
     terminal.loadAddon(fitAddon)
     terminal.loadAddon(linksAddon)
+
     terminal.onData((chunk) => {
       onUserInput(id, chunk)
       void invoke('write_to_terminal', { id, data: chunk })
+    })
+
+    // Smart auto-scroll: scroll solo se già al bottom
+    terminal.onWriteParsed(() => {
+      const buffer = terminal.buffer.active
+      const isAtBottom = buffer.viewportY === buffer.baseY
+      if (isAtBottom) {
+        terminal.scrollToBottom()
+      }
     })
 
     terminalMapRef.current.set(id, terminal)

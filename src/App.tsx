@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
+import { Store } from '@tauri-apps/plugin-store'
 
 import TerminalSidebar from './components/TerminalSidebar'
 import TerminalView from './components/TerminalView'
@@ -54,28 +55,28 @@ const chunkContainsPrompt = (text: string): boolean => {
   return PROMPT_REGEX.test(lines[lines.length - 1])
 }
 
-const STORAGE_KEY = 'quack-terminals'
+const STORAGE_KEY = 'terminals'
 
-const saveTerminalsToStorage = (terminals: TerminalInfo[]) => {
+const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
   try {
+    const store = await Store.load('quack-terminals.json')
     const metadata: TerminalMetadata[] = terminals.map((t) => ({
       label: t.label,
       color: t.color,
       cwd: t.cwd,
     }))
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(metadata))
+    await store.set(STORAGE_KEY, metadata)
+    await store.save()
   } catch (error) {
     console.warn('Impossibile salvare i terminali', error)
   }
 }
 
-const loadTerminalsFromStorage = (): TerminalMetadata[] => {
+const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) {
-      return []
-    }
-    return JSON.parse(stored)
+    const store = await Store.load('quack-terminals.json')
+    const stored = await store.get<TerminalMetadata[]>(STORAGE_KEY)
+    return stored ?? []
   } catch (error) {
     console.warn('Impossibile caricare i terminali salvati', error)
     return []
@@ -189,10 +190,18 @@ function App() {
   useEffect(() => {
     terminalsRef.current = terminals
     if (terminals.length > 0) {
-      saveTerminalsToStorage(terminals)
+      void saveTerminalsToStorage(terminals)
     } else {
       // Se non ci sono terminali, pulisci lo storage
-      localStorage.removeItem(STORAGE_KEY)
+      void (async () => {
+        try {
+          const store = await Store.load('quack-terminals.json')
+          await store.delete(STORAGE_KEY)
+          await store.save()
+        } catch {
+          // Ignora errori
+        }
+      })()
     }
   }, [terminals])
 
@@ -503,7 +512,7 @@ function App() {
     const bootstrap = async () => {
       try {
         // Prova a caricare i terminali salvati
-        const savedMetadata = loadTerminalsFromStorage()
+        const savedMetadata = await loadTerminalsFromStorage()
 
         if (savedMetadata.length > 0) {
           // Ricrea i terminali dai metadata salvati
