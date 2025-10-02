@@ -299,7 +299,7 @@ button.secondary:hover {
   backdrop-filter: blur(6px);
   pointer-events: auto;
   opacity: 0;
-  animation: gitDrawerFade 0.25s ease forwards;
+  animation: gitDrawerFade 0.3s ease forwards;
 }
 
 .git-drawer-panel {
@@ -312,9 +312,9 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  transform: translateX(24px);
+  transform: translateX(100%);
   opacity: 0;
-  animation: gitDrawerSlideIn 0.25s ease forwards;
+  animation: gitDrawerSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .git-drawer-header {
@@ -832,17 +832,45 @@ button.secondary:hover {
 */
 
 @keyframes gitDrawerSlideIn {
-  from {
-    transform: translateX(36px);
+  0% {
+    transform: translateX(100%);
     opacity: 0;
   }
-  to {
+  60% {
+    transform: translateX(-8px);
+    opacity: 1;
+  }
+  100% {
     transform: translateX(0);
     opacity: 1;
   }
 }
 
 @keyframes gitDrawerFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes savedCommandsDrawerSlideIn {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  60% {
+    transform: translateX(-8px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes savedCommandsDrawerFade {
   from {
     opacity: 0;
   }
@@ -2474,23 +2502,37 @@ button.secondary:hover {
 
 .saved-commands-drawer {
   position: fixed;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 420px;
-  background: rgba(18, 21, 28, 0.94);
-  backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-  z-index: 120;
+  inset: 0;
   display: flex;
-  flex-direction: column;
-  padding: 1.5rem 1.75rem;
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 950;
 }
 
-.saved-commands-drawer.open {
-  transform: translateX(0);
+.saved-commands-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 16, 0.65);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  opacity: 0;
+  animation: savedCommandsDrawerFade 0.3s ease forwards;
+}
+
+.saved-commands-drawer-panel {
+  position: relative;
+  height: 100%;
+  width: clamp(380px, 40vw, 650px);
+  background: #181a21;
+  border-left: 1px solid var(--panel-border-strong);
+  box-shadow: -18px 0 48px rgba(6, 8, 18, 0.45);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  transform: translateX(100%);
+  opacity: 0;
+  animation: savedCommandsDrawerSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1)
+    forwards;
 }
 
 .saved-commands-drawer-body {
@@ -2498,7 +2540,42 @@ button.secondary:hover {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
+  padding: 1.5rem 1.75rem;
+}
+
+.saved-commands-drawer-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.saved-commands-drawer-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.saved-commands-drawer-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.saved-commands-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.saved-commands-section h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.saved-commands-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .saved-command-card-actions {
@@ -2575,15 +2652,39 @@ button.secondary:hover {
 .saved-command-title {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.9rem;
+  gap: 0.5rem;
+  font-size: 0.925rem;
   font-weight: 600;
+  color: #fff;
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-command-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .saved-command-code {
-  padding: 0.35rem 0.5rem;
-  font-size: 0.74rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.78rem;
   border-radius: 6px;
+  background: rgba(10, 13, 18, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
 .saved-command-card {
@@ -2648,39 +2749,73 @@ button.secondary:hover {
 }
 
 .saved-commands-drawer-header {
-  position: relative;
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: #181a21;
+}
+
+.saved-commands-drawer-header h2 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.saved-commands-drawer-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #9ca3af;
+  line-height: 1.4;
 }
 
 .saved-commands-close {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(12, 16, 24, 0.65);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
-  transition:
-    border 0.18s ease,
-    transform 0.18s ease;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .saved-commands-close:hover {
-  border-color: rgba(248, 113, 113, 0.75);
-  color: #f87171;
-  transform: translateY(-1px);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: #fff;
 }
 
-.saved-commands-close svg {
-  width: 12px;
-  height: 12px;
+.saved-commands-drawer-footer {
+  padding: 1.25rem 1.75rem;
+  border-top: 1px solid var(--panel-border);
+  background: #181a21;
+}
+
+.saved-commands-drawer-footer button {
+  width: 100%;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.saved-commands-drawer-footer button:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }

@@ -18,6 +18,7 @@ import GitPanel from "./components/GitPanel";
 import ToolBar from "./components/ToolBar";
 import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
+import SavedCommandModal from "./components/SavedCommandModal";
 
 import type {
   DirectoryEntry,
@@ -219,6 +220,10 @@ function App() {
   const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
   const [activeProcesses, setActiveProcesses] = useState<ProcessInfo[]>([]);
   const [savedCommandsDrawerOpen, setSavedCommandsDrawerOpen] = useState(false);
+  const [savedCommandModalOpen, setSavedCommandModalOpen] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(
+    null
+  );
 
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
@@ -1589,10 +1594,12 @@ function App() {
           )
         }
         onEdit={(command) => {
-          console.log("Edit command:", command);
+          setEditingCommand(command);
+          setSavedCommandModalOpen(true);
         }}
         onCreate={() => {
-          console.log("Create command");
+          setEditingCommand(null);
+          setSavedCommandModalOpen(true);
         }}
         onDelete={async (command) => {
           await invoke("delete_command", { id: command.id });
@@ -1653,6 +1660,28 @@ function App() {
           </div>
         </div>
       )}
+
+      <SavedCommandModal
+        open={savedCommandModalOpen}
+        command={editingCommand}
+        onClose={() => {
+          setSavedCommandModalOpen(false);
+          setEditingCommand(null);
+        }}
+        onSaved={(command) => {
+          setSavedCommands((prev) => {
+            const index = prev.findIndex((c) => c.id === command.id);
+            if (index >= 0) {
+              const updated = [...prev];
+              updated[index] = command;
+              return updated;
+            }
+            return [...prev, command];
+          });
+          setSavedCommandModalOpen(false);
+          setEditingCommand(null);
+        }}
+      />
     </div>
   );
 }

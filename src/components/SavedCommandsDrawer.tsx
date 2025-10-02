@@ -103,113 +103,114 @@ export default function SavedCommandsDrawer({
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
+  if (!open) {
+    return null;
+  }
+
   return (
-    <div className={`saved-commands-drawer ${open ? "open" : ""}`}>
-      <header className="saved-commands-drawer-header">
-        <button
-          type="button"
-          className="saved-commands-close"
-          title="Close"
-          onClick={onClose}
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path
-              d="M6 6l8 8M14 6l-8 8"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-        <div>
-          <h2>Saved Commands</h2>
-          <p>Organize frequent commands and launch them instantly.</p>
-          <button type="button" className="ghost" onClick={onCreate}>
-            + New
-          </button>
-        </div>
-      </header>
-      <div className="saved-commands-drawer-body">
-        {(["dev", "build", "test", "custom"] as SavedCommandCategory[]).map(
-          (category) => {
-            const items = grouped[category];
-            if (items.length === 0) {
-              return null;
-            }
-            return (
-              <section key={category} className="saved-commands-section">
-                <h3>{CATEGORY_LABELS[category]}</h3>
-                <div className="saved-commands-list">
-                  {items.map((command) => (
-                    <article
-                      key={command.id}
-                      className="saved-command-card compact"
-                    >
-                      <div className="saved-command-top">
-                        <div className="saved-command-title">
-                          <span
-                            className="command-color-dot"
-                            style={{ backgroundColor: command.color }}
-                          />
-                          <strong>{command.name}</strong>
-                        </div>
-                        <div className="saved-command-icon-actions">
-                          <button
-                            type="button"
-                            className="icon"
-                            title="Launch in new terminal"
-                            onClick={() => onLaunch(command, true)}
-                          >
-                            {icons.launch}
-                          </button>
-                          <button
-                            type="button"
-                            className="icon"
-                            title="Send to active terminal"
-                            onClick={() => onLaunch(command, false)}
-                          >
-                            {icons.send}
-                          </button>
-                          <button
-                            type="button"
-                            className="icon"
-                            title="Edit command"
-                            onClick={() => onEdit(command)}
-                          >
-                            {icons.edit}
-                          </button>
-                          <button
-                            type="button"
-                            className="icon danger"
-                            title="Delete command"
-                            onClick={() => onDelete(command)}
-                          >
-                            {icons.delete}
-                          </button>
-                        </div>
-                      </div>
-                      <pre
-                        className="saved-command-code"
-                        title={command.command}
-                      >
-                        {command.command}
-                      </pre>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            );
-          }
-        )}
-        {commands.length === 0 && (
-          <div className="saved-commands-empty">
-            <div>🦆 No saved commands yet.</div>
-            <button type="button" className="ghost" onClick={onCreate}>
-              Create your first command
-            </button>
+    <div className="saved-commands-drawer">
+      <div className="saved-commands-drawer-backdrop" onClick={onClose} />
+      <div className="saved-commands-drawer-panel">
+        <header className="saved-commands-drawer-header">
+          <div>
+            <h2>Saved Commands</h2>
+            <p>Organize frequent commands and launch them instantly.</p>
           </div>
-        )}
+          <button
+            type="button"
+            className="saved-commands-close"
+            title="Close"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </header>
+        <div className="saved-commands-drawer-body">
+          {(["dev", "build", "test", "custom"] as SavedCommandCategory[]).map(
+            (category) => {
+              const items = grouped[category];
+              if (items.length === 0) {
+                return null;
+              }
+              return (
+                <section key={category} className="saved-commands-section">
+                  <h3>{CATEGORY_LABELS[category]}</h3>
+                  <div className="saved-commands-list">
+                    {items.map((command) => (
+                      <article
+                        key={command.id}
+                        className="saved-command-card compact"
+                      >
+                        <div className="saved-command-top">
+                          <div className="saved-command-title">
+                            <span
+                              className="command-color-dot"
+                              style={{ backgroundColor: command.color }}
+                            />
+                            <strong>{command.name}</strong>
+                          </div>
+                          <div className="saved-command-icon-actions">
+                            <button
+                              type="button"
+                              className="icon"
+                              title="Launch in new terminal"
+                              onClick={() => onLaunch(command, true)}
+                            >
+                              {icons.launch}
+                            </button>
+                            <button
+                              type="button"
+                              className="icon"
+                              title="Send to active terminal"
+                              onClick={() => onLaunch(command, false)}
+                            >
+                              {icons.send}
+                            </button>
+                            <button
+                              type="button"
+                              className="icon"
+                              title="Edit command"
+                              onClick={() => onEdit(command)}
+                            >
+                              {icons.edit}
+                            </button>
+                            <button
+                              type="button"
+                              className="icon danger"
+                              title="Delete command"
+                              onClick={() => onDelete(command)}
+                            >
+                              {icons.delete}
+                            </button>
+                          </div>
+                        </div>
+                        <pre
+                          className="saved-command-code"
+                          title={command.command}
+                        >
+                          {command.command}
+                        </pre>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              );
+            }
+          )}
+          {commands.length === 0 && (
+            <div className="saved-commands-empty">
+              <div>🦆 No saved commands yet.</div>
+              <button type="button" className="ghost" onClick={onCreate}>
+                Create your first command
+              </button>
+            </div>
+          )}
+        </div>
+        <footer className="saved-commands-drawer-footer">
+          <button type="button" className="primary" onClick={onCreate}>
+            + New Command
+          </button>
+        </footer>
       </div>
     </div>
   );
