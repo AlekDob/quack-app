@@ -167,6 +167,15 @@ function App() {
   const [committing, setCommitting] = useState(false)
   const [commitHistory, setCommitHistory] = useState<GitCommitEntry[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('sidebar.collapsed.groups')
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+  const [editingTerminal, setEditingTerminal] = useState<TerminalInfo | null>(null)
   const appShellRef = useRef<HTMLDivElement | null>(null)
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const terminalsRef = useRef<TerminalInfo[]>([])
@@ -618,11 +627,34 @@ function App() {
     }
   }, [markTerminalIdle, tauriAvailable])
 
+  const handleToggleGroup = useCallback((cwd: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(cwd)) {
+        next.delete(cwd)
+      } else {
+        next.add(cwd)
+      }
+      localStorage.setItem('sidebar.collapsed.groups', JSON.stringify(Array.from(next)))
+      return next
+    })
+  }, [])
+
+  const handleEditTerminal = useCallback((terminal: TerminalInfo) => {
+    setEditingTerminal(terminal)
+    setNewTerminalName(terminal.label)
+    setNewTerminalColor(terminal.color)
+    setNewTerminalPath(terminal.cwd)
+    setNewTerminalError(null)
+    setShowNewTerminalModal(true)
+  }, [])
+
   const handleOpenNewTerminalModal = useCallback(() => {
     if (!tauriAvailable) {
-      setExplorerError('Terminali disponibili solo tramite l’app desktop.')
+      setExplorerError('Terminali disponibili solo tramite l\'app desktop.')
       return
     }
+    setEditingTerminal(null)
     setNewTerminalError(null)
     const index = terminals.length
     const defaultColor = COLORS[index % COLORS.length]
@@ -640,6 +672,7 @@ function App() {
     setShowNewTerminalModal(false)
     setNewTerminalError(null)
     setSelectingDirectory(false)
+    setEditingTerminal(null)
   }, [creatingTerminal])
 
   const handleSelectDirectory = useCallback(async () => {
@@ -690,30 +723,58 @@ function App() {
 
     setCreatingTerminal(true)
     setNewTerminalError(null)
+
     try {
-      const created = await invoke<TerminalInfo>('create_terminal', {
-        label: trimmedName,
-        color: newTerminalColor,
-        cwd: trimmedPath,
-      })
-      const createdWithState: TerminalInfo = {
-        ...created,
-        status: 'idle',
-        needsAttention: false,
+      if (editingTerminal) {
+        // Update existing terminal
+        await invoke('update_terminal', {
+          id: editingTerminal.id,
+          label: trimmedName,
+          color: newTerminalColor,
+          cwd: trimmedPath,
+        })
+
+        setTerminals((prev) =>
+          prev.map((t) =>
+            t.id === editingTerminal.id
+              ? { ...t, label: trimmedName, color: newTerminalColor, cwd: trimmedPath }
+              : t,
+          ),
+        )
+
+        // If cwd changed and this is active terminal, reload directory
+        if (trimmedPath !== editingTerminal.cwd && editingTerminal.id === activeId) {
+          await loadDirectory(trimmedPath)
+        }
+
+        setShowNewTerminalModal(false)
+        setEditingTerminal(null)
+      } else {
+        // Create new terminal
+        const created = await invoke<TerminalInfo>('create_terminal', {
+          label: trimmedName,
+          color: newTerminalColor,
+          cwd: trimmedPath,
+        })
+        const createdWithState: TerminalInfo = {
+          ...created,
+          status: 'idle',
+          needsAttention: false,
+        }
+        setTerminals((prev) => [...prev, createdWithState])
+        setActiveId(createdWithState.id)
+        clearTerminalAttention(createdWithState.id)
+        setShowNewTerminalModal(false)
+        await loadDirectory(createdWithState.cwd)
       }
-      setTerminals((prev) => [...prev, createdWithState])
-      setActiveId(createdWithState.id)
-      clearTerminalAttention(createdWithState.id)
-      setShowNewTerminalModal(false)
-      await loadDirectory(createdWithState.cwd)
     } catch (error) {
-      console.error('Impossibile creare il terminale', error)
+      console.error('Impossibile salvare il terminale', error)
       const message = error instanceof Error ? error.message : String(error)
       setNewTerminalError(message)
     } finally {
       setCreatingTerminal(false)
     }
-  }, [clearTerminalAttention, creatingTerminal, loadDirectory, newTerminalColor, newTerminalName, newTerminalPath, tauriAvailable])
+  }, [activeId, clearTerminalAttention, creatingTerminal, editingTerminal, loadDirectory, newTerminalColor, newTerminalName, newTerminalPath, tauriAvailable])
 
   const handleSelectTerminal = useCallback(
     (id: string) => {
@@ -1188,10 +1249,13 @@ function App() {
         terminals={terminals}
         activeId={activeId}
         creating={creatingTerminal}
+        collapsedGroups={collapsedGroups}
         onAdd={handleOpenNewTerminalModal}
         onSelect={handleSelectTerminal}
         onClose={handleCloseTerminal}
         onColorChange={handleColorChange}
+        onEdit={handleEditTerminal}
+        onToggleGroup={handleToggleGroup}
       />
 
       <section className="terminal-pane">
@@ -1243,6 +1307,7 @@ function App() {
 
       <NewTerminalModal
         open={showNewTerminalModal}
+        isEditing={editingTerminal !== null}
         name={newTerminalName}
         path={newTerminalPath}
         color={newTerminalColor}

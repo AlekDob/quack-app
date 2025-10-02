@@ -1,5 +1,6 @@
 interface NewTerminalModalProps {
   open: boolean
+  isEditing?: boolean
   name: string
   path: string
   color: string
@@ -16,6 +17,7 @@ interface NewTerminalModalProps {
 
 export default function NewTerminalModal({
   open,
+  isEditing = false,
   name,
   path,
   color,
@@ -36,7 +38,7 @@ export default function NewTerminalModal({
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel">
-        <h2>Crea nuovo terminale</h2>
+        <h2>{isEditing ? '✏️ Modifica terminale' : 'Crea nuovo terminale'}</h2>
 
         <label className="modal-field">
           <span>Nome terminale</span>
@@ -97,7 +99,7 @@ export default function NewTerminalModal({
             onClick={onConfirm}
             disabled={!name.trim() || !path.trim() || creating}
           >
-            {creating ? 'Creazione…' : 'Crea terminale'}
+            {creating ? (isEditing ? 'Salvataggio…' : 'Creazione…') : (isEditing ? 'Salva modifiche' : 'Crea terminale')}
           </button>
         </div>
       </div>

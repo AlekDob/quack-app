@@ -127,6 +127,7 @@ pub fn run() {
       terminal::resize_terminal,
       terminal::close_terminal,
       terminal::set_terminal_color,
+      terminal::update_terminal,
       fs::list_directory,
       fs::get_home_directory,
       fs::read_file_content,

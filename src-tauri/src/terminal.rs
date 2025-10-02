@@ -110,6 +110,16 @@ pub fn set_terminal_color(id: String, color: String) -> Result<TerminalInfo, Str
   set_terminal_color_impl(&id, color).map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+pub fn update_terminal(
+  id: String,
+  label: Option<String>,
+  color: Option<String>,
+  cwd: Option<String>,
+) -> Result<TerminalInfo, String> {
+  update_terminal_impl(&id, label, color, cwd).map_err(|err| err.to_string())
+}
+
 fn create_terminal_impl(
   app: &AppHandle,
   color: Option<String>,
@@ -242,6 +252,40 @@ fn set_terminal_color_impl(id: &str, color: String) -> Result<TerminalInfo> {
     .get_mut(id)
     .ok_or_else(|| anyhow!("Terminale non trovato"))?;
   session.color = color;
+  Ok(compile_info(id, session))
+}
+
+fn update_terminal_impl(
+  id: &str,
+  label: Option<String>,
+  color: Option<String>,
+  cwd: Option<String>,
+) -> Result<TerminalInfo> {
+  let mut registry = REGISTRY
+    .lock()
+    .map_err(|_| anyhow!("Errore di sincronizzazione"))?;
+
+  let session = registry
+    .sessions
+    .get_mut(id)
+    .ok_or_else(|| anyhow!("Terminale non trovato"))?;
+
+  // Update label if provided
+  if let Some(new_label) = label {
+    session.label = new_label;
+  }
+
+  // Update color if provided
+  if let Some(new_color) = color {
+    session.color = new_color;
+  }
+
+  // Update cwd if provided and valid
+  if let Some(cwd_input) = cwd {
+    let new_cwd = resolve_cwd(Some(cwd_input))?;
+    session.cwd = new_cwd;
+  }
+
   Ok(compile_info(id, session))
 }
 

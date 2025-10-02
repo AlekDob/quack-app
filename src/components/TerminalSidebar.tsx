@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type MouseEvent } from 'react'
+import TerminalGroup from './TerminalGroup'
+import ContextMenu from './ContextMenu'
 import type { TerminalInfo } from '../types'
 
 const normalize = (value: string) => value.toLowerCase()
@@ -23,26 +25,86 @@ interface TerminalSidebarProps {
   terminals: TerminalInfo[]
   activeId: string | null
   creating: boolean
+  collapsedGroups: Set<string>
   onAdd: () => void
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onColorChange: (id: string, color: string) => void
+  onEdit: (terminal: TerminalInfo) => void
+  onToggleGroup: (cwd: string) => void
 }
 
 export default function TerminalSidebar({
   terminals,
   activeId,
   creating,
+  collapsedGroups,
   onAdd,
   onSelect,
   onClose,
   onColorChange: _onColorChange,
+  onEdit,
+  onToggleGroup,
 }: TerminalSidebarProps) {
   const [query, setQuery] = useState('')
+  const [contextMenu, setContextMenu] = useState<{
+    position: { x: number; y: number }
+    terminal: TerminalInfo
+  } | null>(null)
 
   const filteredTerminals = useMemo(() => {
     return terminals.filter((terminal) => fuzzyMatch(query, terminal.label))
   }, [terminals, query])
+
+  // Group terminals by cwd
+  const { groups, ungrouped } = useMemo(() => {
+    const groupMap: Record<string, TerminalInfo[]> = {}
+    const ungroupedList: TerminalInfo[] = []
+
+    filteredTerminals.forEach((terminal) => {
+      const cwdKey = terminal.cwd
+      if (!groupMap[cwdKey]) {
+        groupMap[cwdKey] = []
+      }
+      groupMap[cwdKey].push(terminal)
+    })
+
+    // Separate grouped (2+ terminals) from ungrouped (1 terminal)
+    const groupedEntries: [string, TerminalInfo[]][] = []
+    Object.entries(groupMap).forEach(([cwd, terms]) => {
+      if (terms.length > 1) {
+        groupedEntries.push([cwd, terms])
+      } else {
+        ungroupedList.push(...terms)
+      }
+    })
+
+    // Sort groups: active group first, then by recent activity
+    groupedEntries.sort(([cwdA, termsA], [cwdB, termsB]) => {
+      const hasActiveA = termsA.some(t => t.id === activeId)
+      const hasActiveB = termsB.some(t => t.id === activeId)
+      if (hasActiveA && !hasActiveB) return -1
+      if (!hasActiveA && hasActiveB) return 1
+      return 0 // Keep order for rest
+    })
+
+    return {
+      groups: groupedEntries,
+      ungrouped: ungroupedList,
+    }
+  }, [filteredTerminals, activeId])
+
+  const handleContextMenu = (event: MouseEvent, terminal: TerminalInfo) => {
+    event.preventDefault()
+    setContextMenu({
+      position: { x: event.clientX, y: event.clientY },
+      terminal,
+    })
+  }
+
+  const closeContextMenu = () => {
+    setContextMenu(null)
+  }
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -69,21 +131,36 @@ export default function TerminalSidebar({
       <div className="explorer-root-label">TERMINALI ATTIVI</div>
 
       <div className="sidebar-list">
-        {filteredTerminals.map((terminal) => {
+        {/* Render grouped terminals */}
+        {groups.map(([cwd, groupTerminals]) => (
+          <TerminalGroup
+            key={cwd}
+            cwd={cwd}
+            terminals={groupTerminals}
+            isCollapsed={collapsedGroups.has(cwd)}
+            activeId={activeId}
+            onToggle={() => onToggleGroup(cwd)}
+            onSelect={onSelect}
+            onClose={onClose}
+            onContextMenu={handleContextMenu}
+          />
+        ))}
+
+        {/* Render ungrouped terminals */}
+        {ungrouped.map((terminal) => {
           const active = terminal.id === activeId
           const itemClasses = [
             'terminal-item',
+            'terminal-item-ungrouped',
             active ? 'active' : '',
             terminal.alive ? '' : 'inactive',
-            // Temporarily commented out status logic for Fork-style clean design
-            // terminal.needsAttention ? 'attention' : '',
-            // terminal.alive ? (terminal.status === 'busy' ? 'busy' : 'idle') : '',
           ].filter(Boolean).join(' ')
           return (
             <div
               key={terminal.id}
               className={itemClasses}
               onClick={() => onSelect(terminal.id)}
+              onContextMenu={(event) => handleContextMenu(event, terminal)}
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
@@ -96,10 +173,6 @@ export default function TerminalSidebar({
               <div
                 className="terminal-dot"
                 style={{ backgroundColor: terminal.color }}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  // Maybe later: open color picker on dot click
-                }}
               />
               <div className="terminal-details">
                 <span className="terminal-name">{terminal.label}</span>
@@ -120,13 +193,30 @@ export default function TerminalSidebar({
         })}
 
         {terminals.length === 0 && (
-          <div className="empty-state">Nessun terminale attivo</div>
+          <div className="empty-state">
+            <div>🦆 Quack quack!</div>
+            <div>Nessun terminale attivo</div>
+          </div>
         )}
 
         {terminals.length > 0 && filteredTerminals.length === 0 && (
           <div className="empty-state">Nessun terminale trovato</div>
         )}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          position={contextMenu.position}
+          terminal={contextMenu.terminal}
+          onEdit={() => onEdit(contextMenu.terminal)}
+          onClose={closeContextMenu}
+          onCopyPath={() => {
+            // Copy handled inside ContextMenu
+          }}
+          onCloseTerminal={() => onClose(contextMenu.terminal.id)}
+        />
+      )}
     </aside>
   )
 }
