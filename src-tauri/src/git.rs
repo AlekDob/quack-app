@@ -10,6 +10,8 @@ pub struct GitStatusEntry {
   pub staged_status: Option<String>,
   pub unstaged_status: Option<String>,
   pub is_untracked: bool,
+  pub additions: Option<i32>,
+  pub deletions: Option<i32>,
 }
 
 #[derive(Serialize, Clone)]
@@ -31,37 +33,44 @@ pub struct GitCommitEntry {
 }
 
 #[tauri::command]
-pub fn git_status_summary() -> Result<GitStatusSummary, String> {
-  git_status_summary_impl().map_err(|err| err.to_string())
+pub fn git_status_summary(root_path: Option<String>) -> Result<GitStatusSummary, String> {
+  git_status_summary_impl(root_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
-pub fn git_diff(path: String, staged: Option<bool>, untracked: Option<bool>) -> Result<String, String> {
-  git_diff_impl(path, staged.unwrap_or(false), untracked.unwrap_or(false)).map_err(|err| err.to_string())
+pub fn git_diff(path: String, staged: Option<bool>, untracked: Option<bool>, root_path: Option<String>) -> Result<String, String> {
+  git_diff_impl(path, staged.unwrap_or(false), untracked.unwrap_or(false), root_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
-pub fn git_stage(path: String) -> Result<(), String> {
-  git_stage_impl(path).map_err(|err| err.to_string())
+pub fn git_stage(path: String, root_path: Option<String>) -> Result<(), String> {
+  git_stage_impl(path, root_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
-pub fn git_unstage(path: String) -> Result<(), String> {
-  git_unstage_impl(path).map_err(|err| err.to_string())
+pub fn git_unstage(path: String, root_path: Option<String>) -> Result<(), String> {
+  git_unstage_impl(path, root_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
-pub fn git_commit(message: String) -> Result<(), String> {
-  git_commit_impl(message).map_err(|err| err.to_string())
+pub fn git_commit(message: String, root_path: Option<String>) -> Result<(), String> {
+  git_commit_impl(message, root_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
-pub fn git_commit_history(limit: Option<usize>) -> Result<Vec<GitCommitEntry>, String> {
-  git_commit_history_impl(limit).map_err(|err| err.to_string())
+pub fn git_commit_history(limit: Option<usize>, root_path: Option<String>) -> Result<Vec<GitCommitEntry>, String> {
+  git_commit_history_impl(limit, root_path).map_err(|err| err.to_string())
 }
 
-fn git_status_summary_impl() -> Result<GitStatusSummary> {
-  let root = git_root()?;
+#[tauri::command]
+pub fn git_repository_root(root_path: Option<String>) -> Result<String, String> {
+  let starting_path = root_path.map(PathBuf::from);
+  git_root(starting_path).map(|path| path.to_string_lossy().to_string()).map_err(|err| err.to_string())
+}
+
+fn git_status_summary_impl(root_path: Option<String>) -> Result<GitStatusSummary> {
+  let starting_path = root_path.map(PathBuf::from);
+  let root = git_root(starting_path)?;
   let output = run_git(&root, &["status", "--porcelain=1", "--branch"], false)?;
   let mut branch = String::from("sconosciuto");
   let mut upstream = None;
@@ -111,6 +120,8 @@ fn git_status_summary_impl() -> Result<GitStatusSummary> {
         staged_status: None,
         unstaged_status: Some(String::from("Untracked")),
         is_untracked: true,
+        additions: None,
+        deletions: None,
       });
       continue;
     }
@@ -135,16 +146,25 @@ fn git_status_summary_impl() -> Result<GitStatusSummary> {
     let staged_status = status_label(index_status);
     let unstaged_status = status_label(worktree_status);
 
-    entries.push(GitStatusEntry {
+      entries.push(GitStatusEntry {
       path,
       original_path,
       staged_status: staged_status.map(String::from),
       unstaged_status: unstaged_status.map(String::from),
       is_untracked: false,
+        additions: None,
+        deletions: None,
     });
   }
 
   let clean = entries.is_empty();
+
+  for entry in entries.iter_mut() {
+    if let Ok(Some(counts)) = compute_entry_counts(&root, entry) {
+      entry.additions = counts.additions;
+      entry.deletions = counts.deletions;
+    }
+  }
 
   Ok(GitStatusSummary {
     branch,
@@ -156,8 +176,9 @@ fn git_status_summary_impl() -> Result<GitStatusSummary> {
   })
 }
 
-fn git_diff_impl(path: String, staged: bool, untracked: bool) -> Result<String> {
-  let root = git_root()?;
+fn git_diff_impl(path: String, staged: bool, untracked: bool, root_path: Option<String>) -> Result<String> {
+  let starting_path = root_path.map(PathBuf::from);
+  let root = git_root(starting_path)?;
   let mut args = vec!["diff", "--no-color"]; // baseline args
   if staged {
     args.push("--cached");
@@ -180,30 +201,34 @@ fn git_diff_impl(path: String, staged: bool, untracked: bool) -> Result<String> 
   }
 }
 
-fn git_stage_impl(path: String) -> Result<()> {
-  let root = git_root()?;
+fn git_stage_impl(path: String, root_path: Option<String>) -> Result<()> {
+  let starting_path = root_path.map(PathBuf::from);
+  let root = git_root(starting_path)?;
   run_git(&root, &["add", "--", &path], false)?;
   Ok(())
 }
 
-fn git_unstage_impl(path: String) -> Result<()> {
-  let root = git_root()?;
+fn git_unstage_impl(path: String, root_path: Option<String>) -> Result<()> {
+  let starting_path = root_path.map(PathBuf::from);
+  let root = git_root(starting_path)?;
   run_git(&root, &["reset", "HEAD", "--", &path], false)?;
   Ok(())
 }
 
-fn git_commit_impl(message: String) -> Result<()> {
+fn git_commit_impl(message: String, root_path: Option<String>) -> Result<()> {
   if message.trim().is_empty() {
     return Err(anyhow!("Il messaggio di commit non può essere vuoto."));
   }
 
-  let root = git_root()?;
+  let starting_path = root_path.map(PathBuf::from);
+  let root = git_root(starting_path)?;
   run_git(&root, &["commit", "-m", &message], false)?;
   Ok(())
 }
 
-fn git_commit_history_impl(limit: Option<usize>) -> Result<Vec<GitCommitEntry>> {
-  let root = git_root()?;
+fn git_commit_history_impl(limit: Option<usize>, root_path: Option<String>) -> Result<Vec<GitCommitEntry>> {
+  let starting_path = root_path.map(PathBuf::from);
+  let root = git_root(starting_path)?;
   let limit = limit.unwrap_or(50).min(200);
   let pretty = "--pretty=format:%H%x1f%an%x1f%ad%x1f%s";
   let limit_arg = format!("-n{limit}");
@@ -231,8 +256,132 @@ fn git_commit_history_impl(limit: Option<usize>) -> Result<Vec<GitCommitEntry>> 
   Ok(entries)
 }
 
-fn git_root() -> Result<PathBuf> {
-  let mut dir = env::current_dir().context("Impossibile determinare la directory corrente")?;
+#[derive(Clone, Default)]
+struct DiffCounts {
+  additions: Option<i32>,
+  deletions: Option<i32>,
+}
+
+impl DiffCounts {
+  fn merge(&mut self, other: DiffCounts) {
+    self.additions = merge_counts(self.additions, other.additions);
+    self.deletions = merge_counts(self.deletions, other.deletions);
+  }
+
+  fn has_values(&self) -> bool {
+    self.additions.is_some() || self.deletions.is_some()
+  }
+}
+
+fn merge_counts(current: Option<i32>, incoming: Option<i32>) -> Option<i32> {
+  match (current, incoming) {
+    (_, None) => None,
+    (None, Some(value)) => Some(value),
+    (Some(existing), Some(value)) => Some(existing + value),
+  }
+}
+
+fn compute_entry_counts(root: &PathBuf, entry: &GitStatusEntry) -> Result<Option<DiffCounts>> {
+  if entry.is_untracked {
+    return diff_numstat_untracked(root, &entry.path);
+  }
+
+  let mut combined = DiffCounts::default();
+  let mut has_any = false;
+
+  if let Some(counts) = diff_numstat_for_path(root, &entry.path, false)? {
+    combined.merge(counts);
+    has_any = true;
+  }
+
+  if entry.staged_status.is_some() {
+    if let Some(counts) = diff_numstat_for_path(root, &entry.path, true)? {
+      combined.merge(counts);
+      has_any = true;
+    }
+  }
+
+  if has_any && combined.has_values() {
+    Ok(Some(combined))
+  } else {
+    Ok(None)
+  }
+}
+
+fn diff_numstat_for_path(root: &PathBuf, path: &str, staged: bool) -> Result<Option<DiffCounts>> {
+  let mut args = vec!["diff", "--numstat", "--no-color"];
+  if staged {
+    args.push("--cached");
+  }
+  args.push("--");
+  args.push(path);
+
+  let output = run_git(root, &args, true)?;
+  Ok(parse_numstat_output(&output))
+}
+
+fn diff_numstat_untracked(root: &PathBuf, path: &str) -> Result<Option<DiffCounts>> {
+  let args = [
+    "diff",
+    "--numstat",
+    "--no-color",
+    "--no-index",
+    "--",
+    "/dev/null",
+    path,
+  ];
+  let output = run_git(root, &args, true)?;
+  Ok(parse_numstat_output(&output))
+}
+
+fn parse_numstat_output(output: &str) -> Option<DiffCounts> {
+  let mut counts = DiffCounts::default();
+  let mut found = false;
+
+  for line in output.lines() {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+      continue;
+    }
+    if let Some((additions, deletions)) = parse_numstat_line(trimmed) {
+      counts.additions = merge_counts(counts.additions, additions);
+      counts.deletions = merge_counts(counts.deletions, deletions);
+      found = true;
+    }
+  }
+
+  if found {
+    Some(counts)
+  } else {
+    None
+  }
+}
+
+fn parse_numstat_line(line: &str) -> Option<(Option<i32>, Option<i32>)> {
+  let parts: Vec<&str> = line.splitn(3, '\t').collect();
+  if parts.len() < 3 {
+    return None;
+  }
+  let additions = parse_numstat_value(parts[0]);
+  let deletions = parse_numstat_value(parts[1]);
+  Some((additions, deletions))
+}
+
+fn parse_numstat_value(value: &str) -> Option<i32> {
+  if value == "-" {
+    None
+  } else {
+    value.parse::<i32>().ok()
+  }
+}
+
+fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
+  let mut dir = if let Some(path) = starting_path {
+    path
+  } else {
+    env::current_dir().context("Impossibile determinare la directory corrente")?
+  };
+
   loop {
     if dir.join(".git").exists() {
       return Ok(dir);

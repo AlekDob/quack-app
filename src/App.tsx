@@ -1032,9 +1032,10 @@ function App() {
     setGitError(null)
     setHistoryError(null)
     try {
+      const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined
       const [statusResult, historyResult] = await Promise.allSettled([
-        invoke<GitStatusSummary>('git_status_summary'),
-        invoke<GitCommitEntry[]>('git_commit_history', { limit: 50 }),
+        invoke<GitStatusSummary>('git_status_summary', { rootPath }),
+        invoke<GitCommitEntry[]>('git_commit_history', { limit: 50, rootPath }),
       ])
 
       if (statusResult.status === 'fulfilled') {
@@ -1070,7 +1071,7 @@ function App() {
     } finally {
       setLoadingGit(false)
     }
-  }, [tauriAvailable])
+  }, [activeTerminal, explorerPath, tauriAvailable])
 
   useEffect(() => {
     if (showGitDrawer) {
@@ -1094,14 +1095,15 @@ function App() {
       }
       setGitError(null)
       try {
-        await invoke('git_stage', { path: entry.path })
+        const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined
+        await invoke('git_stage', { path: entry.path, rootPath })
         await refreshGitSummary()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setGitError(message)
       }
     },
-    [refreshGitSummary, tauriAvailable],
+    [activeTerminal, explorerPath, refreshGitSummary, tauriAvailable],
   )
 
   const handleUnstageEntry = useCallback(
@@ -1111,14 +1113,15 @@ function App() {
       }
       setGitError(null)
       try {
-        await invoke('git_unstage', { path: entry.path })
+        const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined
+        await invoke('git_unstage', { path: entry.path, rootPath })
         await refreshGitSummary()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setGitError(message)
       }
     },
-    [refreshGitSummary, tauriAvailable],
+    [activeTerminal, explorerPath, refreshGitSummary, tauriAvailable],
   )
 
   const handleCommit = useCallback(async () => {
@@ -1128,7 +1131,8 @@ function App() {
     setCommitting(true)
     setGitError(null)
     try {
-      await invoke('git_commit', { message: commitMessage })
+      const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined
+      await invoke('git_commit', { message: commitMessage, rootPath })
       setCommitMessage('')
       await refreshGitSummary()
     } catch (error) {
@@ -1137,7 +1141,7 @@ function App() {
     } finally {
       setCommitting(false)
     }
-  }, [commitMessage, refreshGitSummary, tauriAvailable])
+  }, [activeTerminal, commitMessage, explorerPath, refreshGitSummary, tauriAvailable])
 
   const handleDiffViewChange = useCallback((view: 'worktree' | 'staged') => {
     setDiffView(view)
@@ -1192,10 +1196,12 @@ function App() {
       setDiffLoading(true)
       setDiffError(null)
       try {
+        const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined
         const diff = await invoke<string>('git_diff', {
           path: selectedGitEntry.path,
           staged: showStaged,
           untracked: selectedGitEntry.is_untracked,
+          rootPath,
         })
         if (!cancelled) {
           setDiffContent(diff)
@@ -1218,7 +1224,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [diffView, showGitDrawer, selectedGitEntry, tauriAvailable])
+  }, [activeTerminal, diffView, explorerPath, selectedGitEntry, showGitDrawer, tauriAvailable])
 
   if (!tauriAvailable) {
     return (

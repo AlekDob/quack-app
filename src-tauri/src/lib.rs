@@ -137,7 +137,8 @@ pub fn run() {
       git::git_stage,
       git::git_unstage,
       git::git_commit,
-      git::git_commit_history
+      git::git_commit_history,
+      git::git_repository_root
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

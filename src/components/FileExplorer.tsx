@@ -1,6 +1,24 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 const normalize = (value: string) => value.toLowerCase()
+const normalizePathValue = (value: string) => value.replace(/\\/g, '/').replace(/\//g, '/')
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '')
+const concatPath = (base: string, relative: string) => {
+  const normalizedBase = normalizePathValue(base)
+  const normalizedRelative = normalizePathValue(relative)
+  const trimmedBase = normalizedBase.endsWith('/') ? stripTrailingSlash(normalizedBase) : normalizedBase
+  const trimmedRelative = normalizedRelative.replace(/^\/+/, '')
+
+  if (!trimmedBase) {
+    return trimmedRelative
+  }
+
+  if (trimmedBase === '/') {
+    return `/${trimmedRelative}`
+  }
+
+  return `${trimmedBase}/${trimmedRelative}`
+}
 const fuzzyMatch = (query: string, target: string) => {
   if (!query) {
     return true
@@ -18,7 +36,7 @@ const fuzzyMatch = (query: string, target: string) => {
   return queryIndex === normalizedQuery.length
 }
 
-import type { DirectoryEntry } from '../types'
+import type { DirectoryEntry, GitStatusEntry } from '../types'
 
 interface FileExplorerProps {
   rootPath: string | null
@@ -30,6 +48,8 @@ interface FileExplorerProps {
   onSelectDirectory: (path: string) => void
   onOpenFile: (entry: DirectoryEntry) => void
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>
+  modifiedEntries: GitStatusEntry[] | null
+  gitRootPath: string | null
 }
 
 export default function FileExplorer({
@@ -42,6 +62,8 @@ export default function FileExplorer({
   onSelectDirectory,
   onOpenFile,
   onLoadChildren,
+  modifiedEntries,
+  gitRootPath,
 }: FileExplorerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())

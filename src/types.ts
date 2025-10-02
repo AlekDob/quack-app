@@ -26,6 +26,8 @@ export interface GitStatusEntry {
   staged_status: string | null
   unstaged_status: string | null
   is_untracked: boolean
+  additions: number | null
+  deletions: number | null
 }
 
 export interface GitStatusSummary {
