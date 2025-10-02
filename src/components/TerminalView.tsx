@@ -244,10 +244,9 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     let scrollTimeout: ReturnType<typeof setTimeout> | null = null
     let isScrolling = false
     let isResizing = false
-    let lastWidth = 0
-    let lastHeight = 0
     let lastRows = 0
     let lastCols = 0
+    let observer: ResizeObserver | null = null
 
     const handleResize = () => {
       const active = activeRef.current
@@ -272,17 +271,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         return
       }
 
-      // Threshold aumentato: resize solo se le dimensioni cambiano di più di 20px
-      const widthDiff = Math.abs(rect.width - lastWidth)
-      const heightDiff = Math.abs(rect.height - lastHeight)
-      if (widthDiff < 20 && heightDiff < 20) {
-        return
-      }
-
-      lastWidth = rect.width
-      lastHeight = rect.height
-
-      // Debounce aumentato a 300ms per stabilità
+      // Debounce
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
@@ -291,27 +280,32 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         // Previeni re-entry
         isResizing = true
 
-        // Double RAF per dare tempo al layout di stabilizzarsi
+        // DISCONNETTI l'observer prima del fit per evitare loop
+        if (observer) {
+          observer.disconnect()
+        }
+
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            fitAddon.fit()
+          fitAddon.fit()
 
-            // Report resize solo se rows/cols sono cambiati
-            const currentRows = terminal.rows
-            const currentCols = terminal.cols
-            if (currentRows !== lastRows || currentCols !== lastCols) {
-              lastRows = currentRows
-              lastCols = currentCols
-              void reportResize(active, terminal)
+          // Report resize solo se rows/cols sono cambiati
+          const currentRows = terminal.rows
+          const currentCols = terminal.cols
+          if (currentRows !== lastRows || currentCols !== lastCols) {
+            lastRows = currentRows
+            lastCols = currentCols
+            void reportResize(active, terminal)
+          }
+
+          // RICONNETTI l'observer dopo il fit
+          setTimeout(() => {
+            if (observer && containerEl) {
+              observer.observe(containerEl)
             }
-
-            // Sblocca resize dopo 100ms
-            setTimeout(() => {
-              isResizing = false
-            }, 100)
-          })
+            isResizing = false
+          }, 150)
         })
-      }, 300)
+      }, 200)
     }
 
     // Gestione scroll - disabilita resize durante scroll
@@ -325,7 +319,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       }, 200)
     }
 
-    const observer = new ResizeObserver(handleResize)
+    observer = new ResizeObserver(handleResize)
     observer.observe(container)
     container.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('resize', handleResize)
@@ -337,7 +331,9 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       if (scrollTimeout) {
         clearTimeout(scrollTimeout)
       }
-      observer.disconnect()
+      if (observer) {
+        observer.disconnect()
+      }
       container.removeEventListener('scroll', handleScroll)
       window.removeEventListener('resize', handleResize)
     }
