@@ -1027,6 +1027,7 @@ button.secondary:hover {
   width: 100% !important;
 }
 
+
 .terminal-placeholder {
   margin: auto;
   text-align: center;
@@ -2010,12 +2011,12 @@ button.secondary:hover {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: transparent;
   border: none;
   border-radius: 8px;
   color: #f0f2f6;
-  font-size: 13px;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease;

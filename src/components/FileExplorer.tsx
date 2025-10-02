@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import FileContextMenu from './FileContextMenu'
 
 const normalize = (value: string) => value.toLowerCase()
 const normalizePathValue = (value: string) => value.replace(/\\/g, '/').replace(/\//g, '/')
@@ -68,6 +69,10 @@ export default function FileExplorer({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
+  const [contextMenu, setContextMenu] = useState<{
+    position: { x: number; y: number }
+    entry: DirectoryEntry
+  } | null>(null)
 
   const rootEntries = useMemo(() => {
     if (!rootPath) {
@@ -143,6 +148,19 @@ export default function FileExplorer({
     }
   }, [activePath, ensureExpanded, tree])
 
+  const handleContextMenu = useCallback((event: MouseEvent, entry: DirectoryEntry) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setContextMenu({
+      position: { x: event.clientX, y: event.clientY },
+      entry,
+    })
+  }, [])
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
   const handleToggleDirectory = useCallback(async (entry: DirectoryEntry) => {
     if (!entry.is_dir) {
       return
@@ -203,11 +221,6 @@ export default function FileExplorer({
             className={rowClass}
             style={{ paddingLeft: `${paddingLeft}px` }}
             title={entry.name}
-            draggable={true}
-            onDragStart={(event) => {
-              event.dataTransfer.setData('text/plain', entry.path)
-              event.dataTransfer.effectAllowed = 'copy'
-            }}
             onClick={() => {
               if (isDirectory) {
                 onSelectDirectory(entry.path)
@@ -216,6 +229,7 @@ export default function FileExplorer({
                 onOpenFile(entry)
               }
             }}
+            onContextMenu={(event) => handleContextMenu(event, entry)}
           >
             <span
               className={`explorer-expander ${
@@ -244,7 +258,7 @@ export default function FileExplorer({
         </Fragment>
       )
     })
-  ), [activeFilePath, activePath, expanded, handleToggleDirectory, loadingNodes, onOpenFile, onSelectDirectory, query, tree])
+  ), [activeFilePath, activePath, expanded, handleContextMenu, handleToggleDirectory, loadingNodes, onOpenFile, onSelectDirectory, query, tree])
 
   return (
     <aside className="file-explorer">
@@ -273,6 +287,15 @@ export default function FileExplorer({
           </div>
         )}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <FileContextMenu
+          position={contextMenu.position}
+          entry={contextMenu.entry}
+          onClose={closeContextMenu}
+        />
+      )}
     </aside>
   )
 }

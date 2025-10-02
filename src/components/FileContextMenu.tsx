@@ -1,23 +1,18 @@
 import { useEffect, useRef } from 'react'
-import type { TerminalInfo } from '../types'
+import { createPortal } from 'react-dom'
+import type { DirectoryEntry } from '../types'
 
-interface ContextMenuProps {
+interface FileContextMenuProps {
   position: { x: number; y: number }
-  terminal: TerminalInfo
-  onEdit: () => void
+  entry: DirectoryEntry
   onClose: () => void
-  onCopyPath?: () => void
-  onCloseTerminal?: () => void
 }
 
-export default function ContextMenu({
+export default function FileContextMenu({
   position,
-  terminal,
-  onEdit,
+  entry,
   onClose,
-  onCopyPath,
-  onCloseTerminal,
-}: ContextMenuProps) {
+}: FileContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,19 +39,14 @@ export default function ContextMenu({
 
   const handleCopyPath = async () => {
     try {
-      await navigator.clipboard.writeText(terminal.cwd)
+      await navigator.clipboard.writeText(entry.path)
       onClose()
     } catch (error) {
       console.error('Failed to copy path:', error)
     }
   }
 
-  const handleCloseTerminal = () => {
-    onCloseTerminal?.()
-    onClose()
-  }
-
-  return (
+  const menu = (
     <div
       ref={menuRef}
       className="context-menu"
@@ -68,35 +58,12 @@ export default function ContextMenu({
       <button
         type="button"
         className="context-menu-item"
-        onClick={() => {
-          onEdit()
-          onClose()
-        }}
+        onClick={handleCopyPath}
       >
-        <span>Modifica terminale</span>
+        <span>Copia percorso</span>
       </button>
-
-      {onCopyPath && (
-        <button
-          type="button"
-          className="context-menu-item"
-          onClick={handleCopyPath}
-        >
-          <span>Copia percorso</span>
-        </button>
-      )}
-
-      <div className="context-menu-separator" />
-
-      {onCloseTerminal && (
-        <button
-          type="button"
-          className="context-menu-item context-menu-item-danger"
-          onClick={handleCloseTerminal}
-        >
-          <span>Chiudi terminale</span>
-        </button>
-      )}
     </div>
   )
+
+  return createPortal(menu, document.body)
 }
