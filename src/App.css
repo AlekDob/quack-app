@@ -923,6 +923,36 @@ button.secondary:hover {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dev-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff9500 0%, #ff6b00 100%);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(255, 149, 0, 0.3);
+  text-transform: uppercase;
+  animation: dev-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dev-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
 }
 
 .main-toolbar-left .terminal-status {

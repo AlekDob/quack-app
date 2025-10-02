@@ -1277,7 +1277,10 @@ function App() {
       <section className="terminal-pane">
         <div className="main-toolbar">
           <div className="main-toolbar-left">
-            <h1>{activeTerminal?.label ?? 'Terminale'}</h1>
+            <h1>
+              {activeTerminal?.label ?? 'Terminale'}
+              {import.meta.env.DEV && <span className="dev-badge">DEV</span>}
+            </h1>
             <span className="terminal-status">
               {activeTerminal ? activeTerminal.cwd : 'Nessun terminale attivo'}
             </span>

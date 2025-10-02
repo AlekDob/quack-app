@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 mod fs;
 mod git;
@@ -95,6 +95,34 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+
+        // Cambia il titolo della finestra e aggiungi badge nell'icona del Dock in dev mode
+        if let Some(window) = app.get_webview_window("main") {
+          let _ = window.set_title("🦆 Quack [DEV MODE]");
+
+          #[cfg(target_os = "macos")]
+          {
+            use cocoa::appkit::NSApp;
+            use cocoa::base::{id, nil};
+            use cocoa::foundation::{NSAutoreleasePool, NSString};
+            use objc::{msg_send, sel, sel_impl};
+
+            // Proteggiamo il codice unsafe con std::panic::catch_unwind
+            let _ = std::panic::catch_unwind(|| {
+              unsafe {
+                let _pool = NSAutoreleasePool::new(nil);
+                let app: id = NSApp();
+                if app != nil {
+                  let badge_text = NSString::alloc(nil).init_str("DEV");
+                  let dock_tile: id = msg_send![app, dockTile];
+                  if dock_tile != nil && badge_text as id != nil {
+                    let _: () = msg_send![dock_tile, setBadgeLabel: badge_text];
+                  }
+                }
+              }
+            });
+          }
+        }
       }
 
       let app_handle = app.handle().clone();
