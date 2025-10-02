@@ -43,7 +43,11 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(135deg, rgba(12, 15, 18, 0.95) 0%, rgba(9, 11, 14, 0.96) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(12, 15, 18, 0.95) 0%,
+    rgba(9, 11, 14, 0.96) 100%
+  );
   color: #edf0f6;
   padding: 2rem;
   text-align: center;
@@ -82,7 +86,7 @@
   background: rgba(var(--accent-rgb), 0.15);
   border: 1px solid var(--accent-surface-strong);
   color: var(--accent-text);
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.85rem;
 }
 
@@ -125,7 +129,7 @@
   color: #a8b6dd;
 }
 
-.modal-field input[type='text'] {
+.modal-field input[type="text"] {
   border: 1px solid rgba(var(--accent-rgb), 0.25);
   border-radius: 10px;
   padding: 0.55rem 0.8rem;
@@ -135,14 +139,14 @@
   font-family: inherit;
 }
 
-.modal-field input[type='text']:focus {
+.modal-field input[type="text"]:focus {
   outline: none;
   border-color: var(--accent-color);
   box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.22);
 }
 
 .modal-selected-path {
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.8rem;
   color: var(--accent-text);
   background: rgba(var(--accent-rgb), 0.12);
@@ -165,7 +169,9 @@
   border-radius: 12px;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.18s ease, border 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    border 0.18s ease;
 }
 
 .modal-color-swatch:hover {
@@ -189,7 +195,7 @@
   background: rgba(18, 26, 46, 0.8);
 }
 
-.modal-color-picker input[type='color'] {
+.modal-color-picker input[type="color"] {
   appearance: none;
   border: none;
   width: 28px;
@@ -199,12 +205,12 @@
   cursor: pointer;
 }
 
-.modal-color-picker input[type='color']::-webkit-color-swatch {
+.modal-color-picker input[type="color"]::-webkit-color-swatch {
   border-radius: 10px;
   border: none;
 }
 
-.modal-color-picker input[type='color']::-webkit-color-swatch-wrapper {
+.modal-color-picker input[type="color"]::-webkit-color-swatch-wrapper {
   padding: 0;
 }
 
@@ -220,7 +226,9 @@
   padding: 0.55rem 1rem;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 button.secondary {
@@ -260,7 +268,7 @@ button.secondary:hover {
 }
 
 .removed-panel-resizer::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   bottom: 0;
@@ -298,7 +306,7 @@ button.secondary:hover {
   position: relative;
   height: 100%;
   width: clamp(420px, 62vw, 1100px);
-  background: #181A21;
+  background: #181a21;
   border-left: 1px solid var(--panel-border-strong);
   box-shadow: -18px 0 48px rgba(6, 8, 18, 0.45);
   display: flex;
@@ -315,7 +323,7 @@ button.secondary:hover {
   justify-content: space-between;
   padding: 0.85rem 1.25rem;
   border-bottom: 1px solid var(--panel-border);
-  background: #181A21;
+  background: #181a21;
 }
 
 .git-drawer-header h2 {
@@ -429,7 +437,7 @@ button.secondary:hover {
 .preview-path {
   font-size: 0.68rem;
   color: #8d93a2;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
 }
 
 .preview-status {
@@ -457,7 +465,9 @@ button.secondary:hover {
   padding: 0.32rem 0.7rem;
   font-size: 0.74rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 .preview-action:disabled,
@@ -488,7 +498,7 @@ button.secondary:hover {
 
 .preview-code {
   margin: 0;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.78rem;
   line-height: 1.5;
   color: #e5ecff;
@@ -522,13 +532,14 @@ button.secondary:hover {
 }
 
 .sidebar::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     transparent 0%,
     rgba(120, 130, 150, 0.4) 50%,
     transparent 100%
@@ -544,7 +555,8 @@ button.secondary:hover {
   min-height: 56px;
   border-bottom: 1px solid rgba(65, 75, 95, 0.35);
   /* Subtle gradient for depth */
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     rgba(25, 28, 36, 0.6) 0%,
     rgba(20, 24, 31, 0.4) 100%
   );
@@ -570,7 +582,8 @@ button.secondary:hover {
 
 .sidebar-button {
   border: 1px solid rgba(var(--accent-rgb), 0.35);
-  background: linear-gradient(145deg,
+  background: linear-gradient(
+    145deg,
     rgba(var(--accent-rgb), 0.12) 0%,
     rgba(var(--accent-rgb), 0.06) 100%
   );
@@ -593,7 +606,8 @@ button.secondary:hover {
 }
 
 .sidebar-button:not(:disabled):hover {
-  background: linear-gradient(145deg,
+  background: linear-gradient(
+    145deg,
     rgba(var(--accent-rgb), 0.18) 0%,
     rgba(var(--accent-rgb), 0.12) 100%
   );
@@ -691,7 +705,8 @@ button.secondary:hover {
 }
 
 @keyframes terminalAttentionGlow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
       inset 0 -1px 0 rgba(0, 0, 0, 0.1),
@@ -724,14 +739,15 @@ button.secondary:hover {
 }
 
 .terminal-dot::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 1px;
   left: 1px;
   right: 1px;
   height: 40%;
   border-radius: 50%;
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     rgba(255, 255, 255, 0.15) 0%,
     transparent 100%
   );
@@ -888,7 +904,7 @@ button.secondary:hover {
 }
 
 .removed-panel-resizer::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   bottom: 0;
@@ -945,7 +961,8 @@ button.secondary:hover {
 }
 
 @keyframes dev-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
@@ -956,7 +973,7 @@ button.secondary:hover {
 }
 
 .main-toolbar-left .terminal-status {
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.75rem;
   color: #7f8bb0;
 }
@@ -1010,7 +1027,7 @@ button.secondary:hover {
 }
 
 .terminal-toolbar .terminal-status {
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.75rem;
   color: #7f8bb0;
 }
@@ -1060,7 +1077,6 @@ button.secondary:hover {
   width: 100% !important;
 }
 
-
 .terminal-placeholder {
   margin: auto;
   text-align: center;
@@ -1077,9 +1093,10 @@ button.secondary:hover {
   justify-content: space-between;
   padding: 0.75rem 1.25rem;
   border-top: 1px solid var(--panel-border);
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     rgba(20, 24, 31, 0.95) 0%,
-    rgba(25, 28, 36, 0.90) 100%
+    rgba(25, 28, 36, 0.9) 100%
   );
   backdrop-filter: blur(12px);
 }
@@ -1106,7 +1123,8 @@ button.secondary:hover {
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
   border: 1px solid rgba(var(--accent-rgb), 0.25);
-  background: linear-gradient(145deg,
+  background: linear-gradient(
+    145deg,
     rgba(var(--accent-rgb), 0.08) 0%,
     rgba(var(--accent-rgb), 0.04) 100%
   );
@@ -1120,7 +1138,8 @@ button.secondary:hover {
 }
 
 .ai-tool-button:hover:not(.disabled) {
-  background: linear-gradient(145deg,
+  background: linear-gradient(
+    145deg,
     rgba(var(--accent-rgb), 0.15) 0%,
     rgba(var(--accent-rgb), 0.08) 100%
   );
@@ -1154,13 +1173,12 @@ button.secondary:hover {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  background: #181A21;
+  background: #181a21;
   backdrop-filter: blur(14px);
   border-left: 1px solid var(--panel-border);
   grid-column: 3;
   grid-row: 1 / 3;
 }
-
 
 .removed-right-panel-tabs {
   display: flex;
@@ -1179,7 +1197,9 @@ button.secondary:hover {
   padding: 0.35rem 0.5rem;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 .removed-right-panel-tabs button.active {
@@ -1246,7 +1266,9 @@ button.secondary:hover {
   padding: 0.3rem 0.6rem;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 .git-refresh:disabled {
@@ -1308,7 +1330,9 @@ button.secondary:hover {
   background: rgba(30, 32, 36, 0.55);
   color: #e0e3eb;
   cursor: pointer;
-  transition: border 0.2s ease, background 0.2s ease;
+  transition:
+    border 0.2s ease,
+    background 0.2s ease;
 }
 
 .git-status-item:hover,
@@ -1400,13 +1424,17 @@ button.secondary:hover {
 }
 
 .git-history-list::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0.3rem;
   top: 0;
   bottom: 0;
   width: 2px;
-  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.4), rgba(40, 52, 90, 0.4));
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent-rgb), 0.4),
+    rgba(40, 52, 90, 0.4)
+  );
 }
 
 .git-history-item {
@@ -1513,7 +1541,6 @@ button.secondary:hover {
   color: var(--accent-text);
 }
 
-
 .git-diff-buttons {
   display: flex;
   gap: 0.4rem;
@@ -1527,7 +1554,9 @@ button.secondary:hover {
   padding: 0.3rem 0.55rem;
   font-size: 0.7rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 .git-diff-buttons button:hover {
@@ -1542,7 +1571,7 @@ button.secondary:hover {
 
 .git-diff-code {
   margin: 0;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.75rem;
   line-height: 1.5;
   color: #f1f5ff;
@@ -1595,7 +1624,9 @@ button.secondary:hover {
   padding: 0.4rem 0.9rem;
   font-size: 0.74rem;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 .git-commit-button:disabled {
@@ -1625,7 +1656,7 @@ button.secondary:hover {
 }
 
 .explorer-path {
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.62rem;
   color: #9aa1af;
   word-break: break-all;
@@ -1688,7 +1719,10 @@ button.secondary:hover {
   border: 1px solid transparent;
   background: rgba(28, 30, 36, 0.72);
   color: #e1e4ec;
-  transition: border 0.18s ease, background 0.18s ease, color 0.18s ease;
+  transition:
+    border 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
   width: 100%;
   text-align: left;
   font: inherit;
@@ -1732,7 +1766,7 @@ button.secondary:hover {
 }
 
 .explorer-expander::before {
-  content: '▸';
+  content: "▸";
   display: inline-block;
 }
 
@@ -1752,7 +1786,7 @@ button.secondary:hover {
 }
 
 .explorer-expander.loading::before {
-  content: '⟳';
+  content: "⟳";
   transform: none;
 }
 
@@ -1774,7 +1808,7 @@ button.secondary:hover {
 
 .explorer-icon::before,
 .explorer-icon::after {
-  content: '';
+  content: "";
   position: absolute;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.85);
@@ -1934,7 +1968,7 @@ button.secondary:hover {
 
 .group-chevron {
   font-size: 10px;
-  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0.6;
 }
 
@@ -1964,7 +1998,7 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  animation: expandGroup 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+  animation: expandGroup 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes expandGroup {
@@ -1981,7 +2015,8 @@ button.secondary:hover {
 .terminal-item-grouped {
   position: relative;
   padding-left: 16px !important;
-  animation: slideInItem calc(0.2s + var(--item-index, 0) * 0.04s) cubic-bezier(0.4, 0.0, 0.2, 1);
+  animation: slideInItem calc(0.2s + var(--item-index, 0) * 0.04s)
+    cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes slideInItem {
@@ -1996,7 +2031,7 @@ button.secondary:hover {
 }
 
 .terminal-item-grouped::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 6px;
   top: 0;
@@ -2025,7 +2060,7 @@ button.secondary:hover {
   border-radius: 12px;
   padding: 6px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-  animation: contextMenuIn 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  animation: contextMenuIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes contextMenuIn {
@@ -2090,4 +2125,562 @@ button.secondary:hover {
   margin-bottom: 0.5rem;
 }
 
+.saved-commands {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(17, 20, 28, 0.75),
+    rgba(12, 14, 20, 0.6)
+  );
+  position: relative;
+}
 
+.saved-commands-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.saved-commands-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #f7f8fc;
+}
+
+.saved-commands-title .ghost {
+  font-size: 0.85rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 6px;
+}
+
+.saved-commands-description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.saved-commands-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.saved-commands-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.saved-commands-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.saved-commands-category-header {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.42);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.saved-commands-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.saved-command-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(12, 16, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.saved-command-item.error {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.saved-command-item:hover {
+  border-color: rgba(78, 205, 196, 0.4);
+  background: rgba(17, 24, 36, 0.85);
+}
+
+.saved-command-item .ghost {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.saved-command-item:hover .ghost {
+  opacity: 1;
+}
+
+.saved-command-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.saved-command-name {
+  font-weight: 500;
+  color: #f1f3f9;
+}
+
+.saved-commands-empty {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.saved-commands-empty .ghost {
+  padding: 0.25rem 0.75rem;
+}
+
+.processes-drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 360px;
+  background: rgba(18, 21, 28, 0.92);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+}
+
+.processes-drawer.open {
+  transform: translateX(0);
+}
+
+.processes-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.processes-drawer-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.processes-drawer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.processes-drawer-body {
+  flex: 1;
+  padding: 1rem 1.2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.processes-empty {
+  text-align: center;
+  padding: 2rem 0.5rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.process-card {
+  background: rgba(12, 16, 24, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.process-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.process-card-status {
+  font-size: 1.15rem;
+}
+
+.process-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.process-card-command {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+  word-break: break-word;
+}
+
+.process-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.process-port-link {
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(78, 205, 196, 0.35);
+  background: rgba(78, 205, 196, 0.12);
+  color: #4ecdc4;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.process-port-link:hover {
+  background: rgba(78, 205, 196, 0.2);
+  transform: translateY(-1px);
+}
+
+.process-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.saved-command-color-picker {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 12, 18, 0.6);
+}
+
+.saved-commands-dock {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.processes-toggle {
+  align-self: flex-start;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 20, 28, 0.65);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
+}
+
+.processes-toggle:hover {
+  border-color: rgba(78, 205, 196, 0.4);
+  color: #4ecdc4;
+}
+
+.processes-toggle.active {
+  background: rgba(78, 205, 196, 0.18);
+  border-color: rgba(78, 205, 196, 0.55);
+  color: #4ecdc4;
+}
+
+.processes-icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(16, 22, 30, 0.75);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border 0.2s ease,
+    background 0.2s ease;
+}
+
+.processes-icon-button:hover {
+  border-color: rgba(78, 205, 196, 0.55);
+  color: #4ecdc4;
+  transform: translateY(-1px);
+}
+
+.processes-icon-button.active {
+  background: rgba(78, 205, 196, 0.18);
+  border-color: rgba(78, 205, 196, 0.6);
+  color: #4ecdc4;
+  box-shadow: 0 6px 16px rgba(78, 205, 196, 0.25);
+}
+
+.bottom-dock {
+  position: absolute;
+  left: 1.5rem;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  pointer-events: none;
+}
+
+.bottom-dock > * {
+  pointer-events: auto;
+}
+
+.bottom-dock .saved-commands {
+  max-width: 360px;
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+}
+
+.saved-commands-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 420px;
+  background: rgba(18, 21, 28, 0.94);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.75rem;
+}
+
+.saved-commands-drawer.open {
+  transform: translateX(0);
+}
+
+.saved-commands-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.saved-command-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.saved-command-card.compact {
+  padding: 0.55rem 0.65rem;
+  gap: 0.45rem;
+  transition:
+    border 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.saved-command-card.compact:hover {
+  border-color: rgba(78, 205, 196, 0.4);
+  background: rgba(22, 26, 34, 0.78);
+  box-shadow: 0 12px 28px rgba(12, 16, 24, 0.45);
+}
+
+.saved-command-card.compact:hover .saved-command-code {
+  border-color: rgba(78, 205, 196, 0.35);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.saved-command-icon-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.saved-command-icon-actions .icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size: 0.9rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 16, 24, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.18s ease,
+    border 0.18s ease,
+    background 0.18s ease;
+}
+
+.saved-command-icon-actions .icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.saved-command-icon-actions .icon:hover {
+  transform: translateY(-1px);
+  border-color: rgba(78, 205, 196, 0.55);
+  color: #4ecdc4;
+}
+
+.saved-command-icon-actions .icon.danger:hover {
+  border-color: rgba(248, 113, 113, 0.75);
+  color: #f87171;
+}
+
+.saved-command-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.saved-command-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.saved-command-code {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.74rem;
+  border-radius: 6px;
+}
+
+.saved-command-card {
+  background: rgba(12, 16, 24, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  box-shadow: 0 12px 24px rgba(8, 12, 20, 0.35);
+}
+
+.saved-command-card.compact {
+  padding: 0.55rem 0.65rem;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(16, 20, 28, 0.7);
+  transition:
+    border 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.saved-command-card.compact:hover {
+  border-color: rgba(78, 205, 196, 0.5);
+  background: rgba(24, 28, 38, 0.82);
+  box-shadow: 0 14px 30px rgba(12, 16, 24, 0.55);
+}
+
+.saved-commands-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.saved-commands-actions .icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 16, 24, 0.65);
+  cursor: pointer;
+  transition:
+    border 0.18s ease,
+    transform 0.18s ease;
+}
+
+.saved-commands-actions .icon:hover {
+  border-color: rgba(248, 113, 113, 0.75);
+  color: #f87171;
+  transform: translateY(-1px);
+}
+
+.saved-commands-actions .icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.saved-commands-drawer-header {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.saved-commands-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 16, 24, 0.65);
+  cursor: pointer;
+  transition:
+    border 0.18s ease,
+    transform 0.18s ease;
+}
+
+.saved-commands-close:hover {
+  border-color: rgba(248, 113, 113, 0.75);
+  color: #f87171;
+  transform: translateY(-1px);
+}
+
+.saved-commands-close svg {
+  width: 12px;
+  height: 12px;
+}

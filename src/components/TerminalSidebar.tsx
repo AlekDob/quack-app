@@ -1,37 +1,40 @@
-import { useState, useMemo, type MouseEvent } from 'react'
-import TerminalGroup from './TerminalGroup'
-import ContextMenu from './ContextMenu'
-import type { TerminalInfo } from '../types'
+import { useState, useMemo, type MouseEvent } from "react";
+import TerminalGroup from "./TerminalGroup";
+import ContextMenu from "./ContextMenu";
+import type { TerminalInfo } from "../types";
 
-const normalize = (value: string) => value.toLowerCase()
+const normalize = (value: string) => value.toLowerCase();
 const fuzzyMatch = (query: string, target: string) => {
   if (!query) {
-    return true
+    return true;
   }
-  const normalizedQuery = normalize(query)
-  const normalizedTarget = normalize(target)
-  let queryIndex = 0
-  let targetIndex = 0
-  while (queryIndex < normalizedQuery.length && targetIndex < normalizedTarget.length) {
+  const normalizedQuery = normalize(query);
+  const normalizedTarget = normalize(target);
+  let queryIndex = 0;
+  let targetIndex = 0;
+  while (
+    queryIndex < normalizedQuery.length &&
+    targetIndex < normalizedTarget.length
+  ) {
     if (normalizedQuery[queryIndex] === normalizedTarget[targetIndex]) {
-      queryIndex += 1
+      queryIndex += 1;
     }
-    targetIndex += 1
+    targetIndex += 1;
   }
-  return queryIndex === normalizedQuery.length
-}
+  return queryIndex === normalizedQuery.length;
+};
 
 interface TerminalSidebarProps {
-  terminals: TerminalInfo[]
-  activeId: string | null
-  creating: boolean
-  collapsedGroups: Set<string>
-  onAdd: () => void
-  onSelect: (id: string) => void
-  onClose: (id: string) => void
-  onColorChange: (id: string, color: string) => void
-  onEdit: (terminal: TerminalInfo) => void
-  onToggleGroup: (cwd: string) => void
+  terminals: TerminalInfo[];
+  activeId: string | null;
+  creating: boolean;
+  collapsedGroups: Set<string>;
+  onAdd: () => void;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onColorChange: (id: string, color: string) => void;
+  onEdit: (terminal: TerminalInfo) => void;
+  onToggleGroup: (cwd: string) => void;
 }
 
 export default function TerminalSidebar({
@@ -46,66 +49,66 @@ export default function TerminalSidebar({
   onEdit,
   onToggleGroup,
 }: TerminalSidebarProps) {
-  void _onColorChange
-  const [query, setQuery] = useState('')
+  void _onColorChange;
+  const [query, setQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<{
-    position: { x: number; y: number }
-    terminal: TerminalInfo
-  } | null>(null)
+    position: { x: number; y: number };
+    terminal: TerminalInfo;
+  } | null>(null);
 
   const filteredTerminals = useMemo(() => {
-    return terminals.filter((terminal) => fuzzyMatch(query, terminal.label))
-  }, [terminals, query])
+    return terminals.filter((terminal) => fuzzyMatch(query, terminal.label));
+  }, [terminals, query]);
 
   // Group terminals by cwd
   const { groups, ungrouped } = useMemo(() => {
-    const groupMap: Record<string, TerminalInfo[]> = {}
-    const ungroupedList: TerminalInfo[] = []
+    const groupMap: Record<string, TerminalInfo[]> = {};
+    const ungroupedList: TerminalInfo[] = [];
 
     filteredTerminals.forEach((terminal) => {
-      const cwdKey = terminal.cwd
+      const cwdKey = terminal.cwd;
       if (!groupMap[cwdKey]) {
-        groupMap[cwdKey] = []
+        groupMap[cwdKey] = [];
       }
-      groupMap[cwdKey].push(terminal)
-    })
+      groupMap[cwdKey].push(terminal);
+    });
 
     // Separate grouped (2+ terminals) from ungrouped (1 terminal)
-    const groupedEntries: [string, TerminalInfo[]][] = []
+    const groupedEntries: [string, TerminalInfo[]][] = [];
     Object.entries(groupMap).forEach(([cwd, terms]) => {
       if (terms.length > 1) {
-        groupedEntries.push([cwd, terms])
+        groupedEntries.push([cwd, terms]);
       } else {
-        ungroupedList.push(...terms)
+        ungroupedList.push(...terms);
       }
-    })
+    });
 
     // Sort groups: active group first, then by recent activity
     groupedEntries.sort(([, termsA], [, termsB]) => {
-      const hasActiveA = termsA.some(t => t.id === activeId)
-      const hasActiveB = termsB.some(t => t.id === activeId)
-      if (hasActiveA && !hasActiveB) return -1
-      if (!hasActiveA && hasActiveB) return 1
-      return 0 // Keep order for rest
-    })
+      const hasActiveA = termsA.some((t) => t.id === activeId);
+      const hasActiveB = termsB.some((t) => t.id === activeId);
+      if (hasActiveA && !hasActiveB) return -1;
+      if (!hasActiveA && hasActiveB) return 1;
+      return 0; // Keep order for rest
+    });
 
     return {
       groups: groupedEntries,
       ungrouped: ungroupedList,
-    }
-  }, [filteredTerminals, activeId])
+    };
+  }, [filteredTerminals, activeId]);
 
   const handleContextMenu = (event: MouseEvent, terminal: TerminalInfo) => {
-    event.preventDefault()
+    event.preventDefault();
     setContextMenu({
       position: { x: event.clientX, y: event.clientY },
       terminal,
-    })
-  }
+    });
+  };
 
   const closeContextMenu = () => {
-    setContextMenu(null)
-  }
+    setContextMenu(null);
+  };
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -117,7 +120,7 @@ export default function TerminalSidebar({
             onClick={onAdd}
             disabled={creating}
           >
-            {creating ? 'Creazione…' : 'Nuovo'}
+            {creating ? "Creazione…" : "Nuovo"}
           </button>
         </div>
         <input
@@ -129,7 +132,9 @@ export default function TerminalSidebar({
         />
       </div>
 
-      <div className="explorer-root-label sidebar-terminals-label">TERMINALI ATTIVI</div>
+      <div className="explorer-root-label sidebar-terminals-label">
+        TERMINALI ATTIVI
+      </div>
 
       <div className="sidebar-list">
         {/* Render grouped terminals */}
@@ -149,13 +154,15 @@ export default function TerminalSidebar({
 
         {/* Render ungrouped terminals */}
         {ungrouped.map((terminal) => {
-          const active = terminal.id === activeId
+          const active = terminal.id === activeId;
           const itemClasses = [
-            'terminal-item',
-            'terminal-item-ungrouped',
-            active ? 'active' : '',
-            terminal.alive ? '' : 'inactive',
-          ].filter(Boolean).join(' ')
+            "terminal-item",
+            "terminal-item-ungrouped",
+            active ? "active" : "",
+            terminal.alive ? "" : "inactive",
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
             <div
               key={terminal.id}
@@ -165,9 +172,9 @@ export default function TerminalSidebar({
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onSelect(terminal.id)
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(terminal.id);
                 }
               }}
             >
@@ -183,14 +190,14 @@ export default function TerminalSidebar({
                 className="terminal-close"
                 aria-label={`Chiudi ${terminal.label}`}
                 onClick={(event) => {
-                  event.stopPropagation()
-                  onClose(terminal.id)
+                  event.stopPropagation();
+                  onClose(terminal.id);
                 }}
               >
                 ×
               </button>
             </div>
-          )
+          );
         })}
 
         {terminals.length === 0 && (
@@ -219,5 +226,5 @@ export default function TerminalSidebar({
         />
       )}
     </aside>
-  )
+  );
 }

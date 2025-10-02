@@ -96,6 +96,7 @@ dependencies = [
  "objc",
  "once_cell",
  "portable-pty",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

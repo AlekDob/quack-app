@@ -1,59 +1,80 @@
 export interface TerminalInfo {
-  id: string
-  label: string
-  color: string
-  cwd: string
-  alive: boolean
-  status?: 'idle' | 'busy'
-  needsAttention?: boolean
+  id: string;
+  label: string;
+  color: string;
+  cwd: string;
+  alive: boolean;
+  status?: "idle" | "busy";
+  needsAttention?: boolean;
+}
+
+export type SavedCommandCategory = "dev" | "build" | "test" | "custom";
+
+export interface SavedCommand {
+  id: string;
+  name: string;
+  command: string;
+  cwd?: string;
+  color: string;
+  category: SavedCommandCategory;
+}
+
+export interface ProcessInfo {
+  terminalId: string;
+  terminalLabel: string;
+  command?: string;
+  pid?: number;
+  port?: number;
+  uptimeSeconds: number;
+  status: "running" | "idle";
 }
 
 export interface DirectoryEntry {
-  name: string
-  path: string
-  is_dir: boolean
-  is_symlink: boolean
+  name: string;
+  path: string;
+  is_dir: boolean;
+  is_symlink: boolean;
 }
 
 export interface DirectoryListing {
-  path: string
-  entries: DirectoryEntry[]
+  path: string;
+  entries: DirectoryEntry[];
 }
 
 export interface GitStatusEntry {
-  path: string
-  original_path: string | null
-  staged_status: string | null
-  unstaged_status: string | null
-  is_untracked: boolean
-  additions: number | null
-  deletions: number | null
+  path: string;
+  original_path: string | null;
+  staged_status: string | null;
+  unstaged_status: string | null;
+  is_untracked: boolean;
+  additions: number | null;
+  deletions: number | null;
 }
 
 export interface GitStatusSummary {
-  branch: string
-  upstream: string | null
-  ahead: number | null
-  behind: number | null
-  entries: GitStatusEntry[]
-  clean: boolean
+  branch: string;
+  upstream: string | null;
+  ahead: number | null;
+  behind: number | null;
+  entries: GitStatusEntry[];
+  clean: boolean;
 }
 
 export interface GitCommitEntry {
-  hash: string
-  summary: string
-  author: string
-  relativeTime: string
+  hash: string;
+  summary: string;
+  author: string;
+  relativeTime: string;
 }
 
 export interface TerminalDataEvent {
-  id: string
-  data: string
+  id: string;
+  data: string;
 }
 
 export interface TerminalExitEvent {
-  id: string
-  code: number
-  success: boolean
-  message: string | null
+  id: string;
+  code: number;
+  success: boolean;
+  message: string | null;
 }
