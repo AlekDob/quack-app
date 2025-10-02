@@ -60,7 +60,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       fontSize: 13,
       cursorBlink: true,
       allowTransparency: true,
-      scrollOnUserInput: false, // Disabilita auto-scroll su input
+      scrollOnUserInput: true,
       theme: {
         background: '#0f1115',
         foreground: '#f0f2f6',
@@ -243,6 +243,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     let resizeTimeout: ReturnType<typeof setTimeout> | null = null
     let scrollTimeout: ReturnType<typeof setTimeout> | null = null
     let isScrolling = false
+    let isResizing = false
     let lastWidth = 0
     let lastHeight = 0
     let lastRows = 0
@@ -254,8 +255,8 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         return
       }
 
-      // Non fare resize se stiamo scrollando
-      if (isScrolling) {
+      // Non fare resize se stiamo scrollando o se siamo già in resize
+      if (isScrolling || isResizing) {
         return
       }
 
@@ -271,22 +272,25 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         return
       }
 
-      // Threshold: resize solo se le dimensioni cambiano di più di 10px
+      // Threshold aumentato: resize solo se le dimensioni cambiano di più di 20px
       const widthDiff = Math.abs(rect.width - lastWidth)
       const heightDiff = Math.abs(rect.height - lastHeight)
-      if (widthDiff < 10 && heightDiff < 10) {
+      if (widthDiff < 20 && heightDiff < 20) {
         return
       }
 
       lastWidth = rect.width
       lastHeight = rect.height
 
-      // Debounce aumentato a 150ms
+      // Debounce aumentato a 300ms per stabilità
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
 
       resizeTimeout = setTimeout(() => {
+        // Previeni re-entry
+        isResizing = true
+
         // Double RAF per dare tempo al layout di stabilizzarsi
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
@@ -300,9 +304,14 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
               lastCols = currentCols
               void reportResize(active, terminal)
             }
+
+            // Sblocca resize dopo 100ms
+            setTimeout(() => {
+              isResizing = false
+            }, 100)
           })
         })
-      }, 150)
+      }, 300)
     }
 
     // Gestione scroll - disabilita resize durante scroll

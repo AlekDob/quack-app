@@ -1021,6 +1021,8 @@ button.secondary:hover {
   display: flex;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .terminal-surface {
@@ -1041,6 +1043,7 @@ button.secondary:hover {
   display: flex;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
