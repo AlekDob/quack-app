@@ -80,7 +80,7 @@ export default function TerminalSidebar({
     })
 
     // Sort groups: active group first, then by recent activity
-    groupedEntries.sort(([cwdA, termsA], [cwdB, termsB]) => {
+    groupedEntries.sort(([_cwdA, termsA], [_cwdB, termsB]) => {
       const hasActiveA = termsA.some(t => t.id === activeId)
       const hasActiveB = termsB.some(t => t.id === activeId)
       if (hasActiveA && !hasActiveB) return -1
