@@ -156,14 +156,6 @@ export default function FileExplorer({
     }
   }, [ensureExpanded, expanded, onLoadChildren, tree])
 
-  const handleDirectorySelect = useCallback((entry: DirectoryEntry) => {
-    if (!entry.is_dir) {
-      return
-    }
-    ensureExpanded(entry.path)
-    onSelectDirectory(entry.path)
-  }, [ensureExpanded, onSelectDirectory])
-
   const renderEntries = useCallback((entries: DirectoryEntry[], depth = 0) => (
     entries.filter((entry) => fuzzyMatch(query, entry.name)).map((entry) => {
       const isDirectory = entry.is_dir
@@ -196,6 +188,7 @@ export default function FileExplorer({
             }}
             onClick={() => {
               if (isDirectory) {
+                onSelectDirectory(entry.path)
                 void handleToggleDirectory(entry)
               } else {
                 onOpenFile(entry)
@@ -229,7 +222,7 @@ export default function FileExplorer({
         </Fragment>
       )
     })
-  ), [activeFilePath, activePath, expanded, handleDirectorySelect, handleToggleDirectory, loadingNodes, onOpenFile, query, tree])
+  ), [activeFilePath, activePath, expanded, handleToggleDirectory, loadingNodes, onOpenFile, onSelectDirectory, query, tree])
 
   return (
     <aside className="file-explorer">

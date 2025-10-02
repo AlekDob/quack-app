@@ -1634,6 +1634,10 @@ button.secondary:hover {
   letter-spacing: 0.01em;
   text-transform: uppercase;
 }
+.sidebar-terminals-label {
+  margin-top: 0.75rem;
+  margin-left: 1rem;
+}
 
 .explorer-tree {
   display: flex;

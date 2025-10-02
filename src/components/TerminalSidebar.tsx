@@ -46,6 +46,7 @@ export default function TerminalSidebar({
   onEdit,
   onToggleGroup,
 }: TerminalSidebarProps) {
+  void _onColorChange
   const [query, setQuery] = useState('')
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number }
@@ -80,7 +81,7 @@ export default function TerminalSidebar({
     })
 
     // Sort groups: active group first, then by recent activity
-    groupedEntries.sort(([_cwdA, termsA], [_cwdB, termsB]) => {
+    groupedEntries.sort(([, termsA], [, termsB]) => {
       const hasActiveA = termsA.some(t => t.id === activeId)
       const hasActiveB = termsB.some(t => t.id === activeId)
       if (hasActiveA && !hasActiveB) return -1
@@ -128,7 +129,7 @@ export default function TerminalSidebar({
         />
       </div>
 
-      <div className="explorer-root-label">TERMINALI ATTIVI</div>
+      <div className="explorer-root-label sidebar-terminals-label">TERMINALI ATTIVI</div>
 
       <div className="sidebar-list">
         {/* Render grouped terminals */}

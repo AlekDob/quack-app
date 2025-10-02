@@ -149,6 +149,7 @@ function App() {
   const [selectingDirectory, setSelectingDirectory] = useState(false)
   const [notificationGranted, setNotificationGranted] = useState(false)
   const [booting, setBooting] = useState(true)
+  const [hasBootstrapped, setHasBootstrapped] = useState(false)
   const [previewFile, setPreviewFile] = useState<{ name: string; path: string } | null>(null)
   const [previewContent, setPreviewContent] = useState('')
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -198,6 +199,13 @@ function App() {
 
   useEffect(() => {
     terminalsRef.current = terminals
+  }, [terminals])
+
+  useEffect(() => {
+    if (!tauriAvailable || !hasBootstrapped) {
+      return
+    }
+
     if (terminals.length > 0) {
       void saveTerminalsToStorage(terminals)
     } else {
@@ -212,7 +220,7 @@ function App() {
         }
       })()
     }
-  }, [terminals])
+  }, [hasBootstrapped, tauriAvailable, terminals])
 
   const ensureNotificationPermission = useCallback(async (): Promise<boolean> => {
     if (!tauriAvailable) {
@@ -512,6 +520,7 @@ function App() {
   useEffect(() => {
     if (!tauriAvailable) {
       setBooting(false)
+      setHasBootstrapped(true)
       setExplorerError('Esegui l’app tramite Tauri per attivare i terminali.')
       return
     }
@@ -583,6 +592,7 @@ function App() {
         console.error('Errore durante l\'inizializzazione', error)
       } finally {
         setBooting(false)
+        setHasBootstrapped(true)
       }
     }
 
