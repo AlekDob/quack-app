@@ -16,8 +16,6 @@ import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer from "./components/FilePreviewDrawer";
 import GitPanel from "./components/GitPanel";
 import ToolBar from "./components/ToolBar";
-import SavedCommands from "./components/SavedCommands";
-import SavedCommandModal from "./components/SavedCommandModal";
 import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 
@@ -221,9 +219,6 @@ function App() {
   const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
   const [activeProcesses, setActiveProcesses] = useState<ProcessInfo[]>([]);
   const [savedCommandsDrawerOpen, setSavedCommandsDrawerOpen] = useState(false);
-  const [savedCommandModalOpen, setSavedCommandModalOpen] = useState(false);
-  const [editingSavedCommand, setEditingSavedCommand] =
-    useState<SavedCommand | null>(null);
 
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
@@ -251,12 +246,8 @@ function App() {
   }, []);
 
   const loadActiveProcesses = useCallback(async () => {
-    try {
-      const processes = await invoke<ProcessInfo[]>("get_active_processes");
-      setActiveProcesses(processes);
-    } catch (error) {
-      console.warn("Impossibile caricare i processi attivi", error);
-    }
+    // TODO: Implementare get_active_processes nel backend
+    setActiveProcesses([]);
   }, []);
 
   useEffect(() => {
@@ -1210,28 +1201,6 @@ function App() {
     [activeId, markTerminalBusy, tauriAvailable]
   );
 
-  const handleSavedCommandSaved = useCallback((next: SavedCommand) => {
-    setSavedCommands((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === next.id);
-      if (existingIndex === -1) {
-        return [...prev, next];
-      }
-      const copy = [...prev];
-      copy[existingIndex] = next;
-      return copy;
-    });
-  }, []);
-
-  const handleCreateSavedCommand = useCallback(() => {
-    setEditingSavedCommand(null);
-    setSavedCommandModalOpen(true);
-  }, []);
-
-  const handleEditSavedCommand = useCallback((command: SavedCommand) => {
-    setEditingSavedCommand(command);
-    setSavedCommandModalOpen(true);
-  }, []);
-
   const refreshGitSummary = useCallback(async () => {
     if (!tauriAvailable) {
       return;
@@ -1575,6 +1544,8 @@ function App() {
         onSelectDirectory={handleNavigateDirectory}
         onOpenFile={handleOpenFilePreview}
         onLoadChildren={fetchDirectoryChildren}
+        modifiedEntries={gitSummary?.entries ?? null}
+        gitRootPath={explorerRoot}
       />
 
       <NewTerminalModal
@@ -1618,12 +1589,10 @@ function App() {
           )
         }
         onEdit={(command) => {
-          setEditingSavedCommand(command);
-          setSavedCommandModalOpen(true);
+          console.log("Edit command:", command);
         }}
         onCreate={() => {
-          setEditingSavedCommand(null);
-          setSavedCommandModalOpen(true);
+          console.log("Create command");
         }}
         onDelete={async (command) => {
           await invoke("delete_command", { id: command.id });
@@ -1641,6 +1610,49 @@ function App() {
         onRefresh={loadActiveProcesses}
         onFocusTerminal={handleSelectTerminal}
       />
+
+      {showGitDrawer && (
+        <div className="git-drawer">
+          <div
+            className="git-drawer-backdrop"
+            onClick={() => setShowGitDrawer(false)}
+          />
+          <div className="git-drawer-panel">
+            <header className="git-drawer-header">
+              <h2>Git</h2>
+              <button
+                type="button"
+                className="git-drawer-close"
+                onClick={() => setShowGitDrawer(false)}
+              >
+                ✕
+              </button>
+            </header>
+            <GitPanel
+              summary={gitSummary}
+              loading={loadingGit}
+              error={gitError}
+              history={commitHistory}
+              historyLoading={loadingGit}
+              historyError={historyError}
+              selected={selectedGitEntry}
+              diffContent={diffContent}
+              diffLoading={diffLoading}
+              diffError={diffError}
+              diffView={diffView}
+              onDiffViewChange={handleDiffViewChange}
+              onRefresh={refreshGitSummary}
+              onSelect={handleSelectGitEntry}
+              onStage={handleStageEntry}
+              onUnstage={handleUnstageEntry}
+              commitMessage={commitMessage}
+              onCommitMessageChange={setCommitMessage}
+              onCommit={handleCommit}
+              committing={committing}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
