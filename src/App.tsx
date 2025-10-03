@@ -1618,48 +1618,46 @@ function App() {
         onFocusTerminal={handleSelectTerminal}
       />
 
-      {showGitDrawer && (
-        <div className="git-drawer">
-          <div
-            className="git-drawer-backdrop"
-            onClick={() => setShowGitDrawer(false)}
+      <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
+        <div
+          className="git-drawer-backdrop"
+          onClick={() => setShowGitDrawer(false)}
+        />
+        <div className="git-drawer-panel">
+          <header className="git-drawer-header">
+            <h2>Git</h2>
+            <button
+              type="button"
+              className="git-drawer-close"
+              onClick={() => setShowGitDrawer(false)}
+            >
+              ✕
+            </button>
+          </header>
+          <GitPanel
+            summary={gitSummary}
+            loading={loadingGit}
+            error={gitError}
+            history={commitHistory}
+            historyLoading={loadingGit}
+            historyError={historyError}
+            selected={selectedGitEntry}
+            diffContent={diffContent}
+            diffLoading={diffLoading}
+            diffError={diffError}
+            diffView={diffView}
+            onDiffViewChange={handleDiffViewChange}
+            onRefresh={refreshGitSummary}
+            onSelect={handleSelectGitEntry}
+            onStage={handleStageEntry}
+            onUnstage={handleUnstageEntry}
+            commitMessage={commitMessage}
+            onCommitMessageChange={setCommitMessage}
+            onCommit={handleCommit}
+            committing={committing}
           />
-          <div className="git-drawer-panel">
-            <header className="git-drawer-header">
-              <h2>Git</h2>
-              <button
-                type="button"
-                className="git-drawer-close"
-                onClick={() => setShowGitDrawer(false)}
-              >
-                ✕
-              </button>
-            </header>
-            <GitPanel
-              summary={gitSummary}
-              loading={loadingGit}
-              error={gitError}
-              history={commitHistory}
-              historyLoading={loadingGit}
-              historyError={historyError}
-              selected={selectedGitEntry}
-              diffContent={diffContent}
-              diffLoading={diffLoading}
-              diffError={diffError}
-              diffView={diffView}
-              onDiffViewChange={handleDiffViewChange}
-              onRefresh={refreshGitSummary}
-              onSelect={handleSelectGitEntry}
-              onStage={handleStageEntry}
-              onUnstage={handleUnstageEntry}
-              commitMessage={commitMessage}
-              onCommitMessageChange={setCommitMessage}
-              onCommit={handleCommit}
-              committing={committing}
-            />
-          </div>
         </div>
-      )}
+      </div>
 
       <SavedCommandModal
         open={savedCommandModalOpen}

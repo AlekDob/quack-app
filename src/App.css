@@ -290,6 +290,13 @@ button.secondary:hover {
   justify-content: flex-end;
   pointer-events: none;
   z-index: 1200;
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
+}
+
+.git-drawer.open {
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .git-drawer-backdrop {
@@ -298,7 +305,12 @@ button.secondary:hover {
   background: rgba(5, 8, 16, 0.65);
   backdrop-filter: blur(6px);
   pointer-events: auto;
-  animation: drawerFadeIn 0.3s ease forwards;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.git-drawer.open .git-drawer-backdrop {
+  opacity: 1;
 }
 
 .git-drawer-panel {
@@ -311,7 +323,12 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  animation: drawerSlideIn 0.3s ease forwards;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.git-drawer.open .git-drawer-panel {
+  transform: translateX(0);
 }
 
 .git-drawer-header {
@@ -828,24 +845,7 @@ button.secondary:hover {
 }
 */
 
-/* Animazioni universali per tutti i drawer */
-@keyframes drawerSlideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-@keyframes drawerFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
+/* Animazioni universali per tutti i drawer - gestite con transition CSS */
 
 .terminal-name {
   font-size: 0.8rem;
@@ -2262,7 +2262,14 @@ button.secondary:hover {
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
-  z-index: 900;
+  z-index: 1100;
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
+}
+
+.processes-drawer.open {
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .processes-drawer-backdrop {
@@ -2271,7 +2278,12 @@ button.secondary:hover {
   background: rgba(5, 8, 16, 0.65);
   backdrop-filter: blur(6px);
   pointer-events: auto;
-  animation: drawerFadeIn 0.3s ease forwards;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.processes-drawer.open .processes-drawer-backdrop {
+  opacity: 1;
 }
 
 .processes-drawer-panel {
@@ -2284,7 +2296,12 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  animation: drawerSlideIn 0.3s ease forwards;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.processes-drawer.open .processes-drawer-panel {
+  transform: translateX(0);
 }
 
 .processes-drawer-header {
@@ -2546,6 +2563,13 @@ button.secondary:hover {
   justify-content: flex-end;
   pointer-events: none;
   z-index: 950;
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
+}
+
+.saved-commands-drawer.open {
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .saved-commands-drawer-backdrop {
@@ -2554,7 +2578,12 @@ button.secondary:hover {
   background: rgba(5, 8, 16, 0.65);
   backdrop-filter: blur(6px);
   pointer-events: auto;
-  animation: drawerFadeIn 0.3s ease forwards;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.saved-commands-drawer.open .saved-commands-drawer-backdrop {
+  opacity: 1;
 }
 
 .saved-commands-drawer-panel {
@@ -2567,7 +2596,12 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  animation: drawerSlideIn 0.3s ease forwards;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.saved-commands-drawer.open .saved-commands-drawer-panel {
+  transform: translateX(0);
 }
 
 .saved-commands-drawer-body {

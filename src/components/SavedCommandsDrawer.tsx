@@ -103,12 +103,8 @@ export default function SavedCommandsDrawer({
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="saved-commands-drawer">
+    <div className={`saved-commands-drawer ${open ? "open" : ""}`}>
       <div className="saved-commands-drawer-backdrop" onClick={onClose} />
       <div className="saved-commands-drawer-panel">
         <header className="saved-commands-drawer-header">

@@ -46,12 +46,8 @@ export default function ProcessesDrawer({
     }
   };
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="processes-drawer">
+    <div className={`processes-drawer ${open ? "open" : ""}`}>
       <div className="processes-drawer-backdrop" onClick={onClose} />
       <div className="processes-drawer-panel">
         <header className="processes-drawer-header">
