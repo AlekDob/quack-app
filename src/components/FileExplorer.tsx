@@ -85,8 +85,8 @@ export default function FileExplorer({
     position: { x: number; y: number };
     entry: DirectoryEntry;
   } | null>(null);
-  const prefetchQueueRef = useRef<Set<string>>(new Set());
   const prefetchedDirectoriesRef = useRef<Set<string>>(new Set());
+  const loadingNodesRef = useRef<Set<string>>(new Set());
 
   const rootEntries = useMemo(() => {
     if (!rootPath) {
@@ -118,56 +118,34 @@ export default function FileExplorer({
     return map;
   }, [modifiedEntries, gitRootPath]);
 
-  // Raccoglie tutti i file modificati dall'intero albero (ricorsivamente)
-  const collectAllModifiedFiles = useCallback(
-    (
-      entries: DirectoryEntry[]
-    ): Array<{
-      entry: DirectoryEntry;
-      gitEntry: GitStatusEntry;
-      displayPath: string;
-    }> => {
-      const result: Array<{
+  const allModifiedFiles = useMemo(() => {
+    if (!modifiedEntries || !gitRootPath) {
+      return [] as Array<{
         entry: DirectoryEntry;
         gitEntry: GitStatusEntry;
         displayPath: string;
-      }> = [];
-
-      for (const entry of entries) {
-        const gitEntry = modifiedFilesMap.get(entry.path);
-
-        if (gitEntry && !entry.is_dir) {
-          // Calcola il path relativo per il display
-          let displayPath = entry.path;
-          if (rootPath && entry.path.startsWith(rootPath)) {
-            displayPath = entry.path.substring(rootPath.length);
-            if (displayPath.startsWith("/")) {
-              displayPath = displayPath.substring(1);
-            }
-          }
-
-          result.push({ entry, gitEntry, displayPath });
-        }
-
-        // Ricorsione nelle sottodirectory
-        if (entry.is_dir && tree[entry.path]) {
-          const childModified = collectAllModifiedFiles(tree[entry.path]);
-          result.push(...childModified);
-        }
-      }
-
-      return result;
-    },
-    [modifiedFilesMap, tree, rootPath]
-  );
-
-  // Lista globale di tutti i file modificati
-  const allModifiedFiles = useMemo(() => {
-    if (!rootEntries || modifiedFilesMap.size === 0) {
-      return [];
+      }>;
     }
-    return collectAllModifiedFiles(rootEntries);
-  }, [rootEntries, modifiedFilesMap, collectAllModifiedFiles]);
+
+    return modifiedEntries.map((gitEntry) => {
+        const fullPath = concatPath(gitRootPath, gitEntry.path);
+        const displayPath = gitEntry.path;
+        const name = displayPath.split("/").filter(Boolean).pop() ?? displayPath;
+
+        const entry: DirectoryEntry = {
+          name,
+          path: fullPath,
+          is_dir: false,
+          is_symlink: false,
+        };
+
+        return {
+          entry,
+          gitEntry,
+          displayPath,
+        };
+      });
+  }, [gitRootPath, modifiedEntries]);
 
   useEffect(() => {
     if (!rootPath) {
@@ -193,6 +171,16 @@ export default function FileExplorer({
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    loadingNodesRef.current = loadingNodes;
+  }, [loadingNodes]);
+
+  useEffect(() => {
+    for (const key of Object.keys(tree)) {
+      prefetchedDirectoriesRef.current.add(key);
+    }
+  }, [tree]);
 
   useEffect(() => {
     if (!activePath) {
@@ -228,16 +216,29 @@ export default function FileExplorer({
     }
   }, [activePath, ensureExpanded, tree]);
 
-  useEffect(() => {
-    if (prefetchQueueRef.current.size === 0) {
-      return;
-    }
-    const targets = Array.from(prefetchQueueRef.current);
-    prefetchQueueRef.current.clear();
+  const handleContextMenu = useCallback(
+    (event: MouseEvent, entry: DirectoryEntry) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({
+        position: { x: event.clientX, y: event.clientY },
+        entry,
+      });
+    },
+    []
+  );
 
-    for (const path of targets) {
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const prefetchDirectory = useCallback(
+    (path: string) => {
       if (prefetchedDirectoriesRef.current.has(path)) {
-        continue;
+        return;
+      }
+      if (loadingNodesRef.current.has(path)) {
+        return;
       }
       prefetchedDirectoriesRef.current.add(path);
       setLoadingNodes((prev) => {
@@ -256,39 +257,8 @@ export default function FileExplorer({
             return next;
           });
         });
-    }
-  });
-
-  const handleContextMenu = useCallback(
-    (event: MouseEvent, entry: DirectoryEntry) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setContextMenu({
-        position: { x: event.clientX, y: event.clientY },
-        entry,
-      });
     },
-    []
-  );
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
-  const schedulePrefetch = useCallback(
-    (path: string) => {
-      if (prefetchedDirectoriesRef.current.has(path)) {
-        return;
-      }
-      if (prefetchQueueRef.current.has(path)) {
-        return;
-      }
-      if (loadingNodes.has(path)) {
-        return;
-      }
-      prefetchQueueRef.current.add(path);
-    },
-    [loadingNodes]
+    [onLoadChildren]
   );
 
   const handleToggleDirectory = useCallback(
@@ -348,7 +318,7 @@ export default function FileExplorer({
           const isActiveFile = activeFilePath === entry.path;
           const childEntries = isDirectory ? tree[entry.path] : undefined;
           if (isDirectory && !childEntries) {
-            schedulePrefetch(entry.path);
+            prefetchDirectory(entry.path);
           }
           const fileCount = childEntries
             ? childEntries.reduce(
@@ -435,6 +405,7 @@ export default function FileExplorer({
       loadingNodes,
       modifiedFilesMap,
       onOpenFile,
+      prefetchDirectory,
       query,
       tree,
     ]
