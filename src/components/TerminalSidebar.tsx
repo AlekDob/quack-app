@@ -35,6 +35,8 @@ interface TerminalSidebarProps {
   onColorChange: (id: string, color: string) => void;
   onEdit: (terminal: TerminalInfo) => void;
   onToggleGroup: (cwd: string) => void;
+  onToggleProcesses: () => void;
+  processesOpen: boolean;
 }
 
 export default function TerminalSidebar({
@@ -48,6 +50,8 @@ export default function TerminalSidebar({
   onColorChange: _onColorChange,
   onEdit,
   onToggleGroup,
+  onToggleProcesses,
+  processesOpen,
 }: TerminalSidebarProps) {
   void _onColorChange;
   const [query, setQuery] = useState("");
@@ -211,6 +215,17 @@ export default function TerminalSidebar({
           <div className="empty-state">Nessun terminale trovato</div>
         )}
       </div>
+
+  <div className="sidebar-footer">
+    <button
+      type="button"
+      className={`sidebar-footer-button ${processesOpen ? "active" : ""}`}
+      onClick={onToggleProcesses}
+    >
+      <span className="sidebar-footer-dot" aria-hidden="true" />
+      Processes
+    </button>
+  </div>
 
       {/* Context menu */}
       {contextMenu && (

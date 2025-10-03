@@ -1580,6 +1580,10 @@ function App() {
         onColorChange={handleColorChange}
         onEdit={handleEditTerminal}
         onToggleGroup={handleToggleGroup}
+        onToggleProcesses={() =>
+          setShowProcessesDrawer((value) => !value)
+        }
+        processesOpen={showProcessesDrawer}
       />
 
       <section className="terminal-pane">
@@ -1616,13 +1620,6 @@ function App() {
                 onClick={() => setShowGitDrawer(!showGitDrawer)}
               >
                 Git
-              </button>
-              <button
-                type="button"
-                className={`git-tab-button ${showProcessesDrawer ? "active" : ""}`}
-                onClick={() => setShowProcessesDrawer(!showProcessesDrawer)}
-              >
-                Processes
               </button>
             </div>
           </div>
