@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent,
 } from "react";
@@ -59,7 +60,6 @@ interface FileExplorerProps {
   error: string | null;
   activePath: string;
   activeFilePath: string | null;
-  onSelectDirectory: (path: string) => void;
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
   modifiedEntries: GitStatusEntry[] | null;
@@ -73,7 +73,6 @@ export default function FileExplorer({
   error,
   activePath,
   activeFilePath,
-  onSelectDirectory,
   onOpenFile,
   onLoadChildren,
   modifiedEntries,
@@ -86,6 +85,8 @@ export default function FileExplorer({
     position: { x: number; y: number };
     entry: DirectoryEntry;
   } | null>(null);
+  const prefetchQueueRef = useRef<Set<string>>(new Set());
+  const prefetchedDirectoriesRef = useRef<Set<string>>(new Set());
 
   const rootEntries = useMemo(() => {
     if (!rootPath) {
@@ -227,6 +228,37 @@ export default function FileExplorer({
     }
   }, [activePath, ensureExpanded, tree]);
 
+  useEffect(() => {
+    if (prefetchQueueRef.current.size === 0) {
+      return;
+    }
+    const targets = Array.from(prefetchQueueRef.current);
+    prefetchQueueRef.current.clear();
+
+    for (const path of targets) {
+      if (prefetchedDirectoriesRef.current.has(path)) {
+        continue;
+      }
+      prefetchedDirectoriesRef.current.add(path);
+      setLoadingNodes((prev) => {
+        const next = new Set(prev);
+        next.add(path);
+        return next;
+      });
+      void onLoadChildren(path)
+        .catch(() => {
+          prefetchedDirectoriesRef.current.delete(path);
+        })
+        .finally(() => {
+          setLoadingNodes((prev) => {
+            const next = new Set(prev);
+            next.delete(path);
+            return next;
+          });
+        });
+    }
+  });
+
   const handleContextMenu = useCallback(
     (event: MouseEvent, entry: DirectoryEntry) => {
       event.preventDefault();
@@ -242,6 +274,22 @@ export default function FileExplorer({
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
   }, []);
+
+  const schedulePrefetch = useCallback(
+    (path: string) => {
+      if (prefetchedDirectoriesRef.current.has(path)) {
+        return;
+      }
+      if (prefetchQueueRef.current.has(path)) {
+        return;
+      }
+      if (loadingNodes.has(path)) {
+        return;
+      }
+      prefetchQueueRef.current.add(path);
+    },
+    [loadingNodes]
+  );
 
   const handleToggleDirectory = useCallback(
     async (entry: DirectoryEntry) => {
@@ -298,6 +346,21 @@ export default function FileExplorer({
           const isLoadingNode = loadingNodes.has(entry.path);
           const isActiveDirectory = activePath === entry.path;
           const isActiveFile = activeFilePath === entry.path;
+          const childEntries = isDirectory ? tree[entry.path] : undefined;
+          if (isDirectory && !childEntries) {
+            schedulePrefetch(entry.path);
+          }
+          const fileCount = childEntries
+            ? childEntries.reduce(
+                (count, child) => (child.is_dir ? count : count + 1),
+                0
+              )
+            : null;
+          const displayCount = childEntries
+            ? fileCount
+            : isDirectory && isLoadingNode
+              ? "…"
+              : null;
           const paddingLeft = 12 + depth * 14;
 
           const rowClass = [
@@ -318,7 +381,6 @@ export default function FileExplorer({
                 title={entry.name}
                 onClick={() => {
                   if (isDirectory) {
-                    onSelectDirectory(entry.path);
                     void handleToggleDirectory(entry);
                   } else {
                     onOpenFile(entry);
@@ -350,6 +412,11 @@ export default function FileExplorer({
                   aria-hidden="true"
                 />
                 <span className="explorer-name">{entry.name}</span>
+                {isDirectory && displayCount !== null && (
+                  <span className="explorer-count" aria-hidden="true">
+                    {displayCount}
+                  </span>
+                )}
               </button>
               {isDirectory &&
                 isExpanded &&
@@ -368,7 +435,6 @@ export default function FileExplorer({
       loadingNodes,
       modifiedFilesMap,
       onOpenFile,
-      onSelectDirectory,
       query,
       tree,
     ]

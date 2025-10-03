@@ -1000,16 +1000,6 @@ function App() {
     [tauriAvailable]
   );
 
-  const handleNavigateDirectory = useCallback(
-    (path: string) => {
-      if (!tauriAvailable) {
-        return;
-      }
-      void loadDirectory(path);
-    },
-    [loadDirectory, tauriAvailable]
-  );
-
   const handleOpenFilePreview = useCallback(
     async (entry: DirectoryEntry) => {
       if (!tauriAvailable || entry.is_dir) {
@@ -1643,7 +1633,6 @@ function App() {
         error={explorerError}
         activePath={explorerPath}
         activeFilePath={previewFile?.path ?? null}
-        onSelectDirectory={handleNavigateDirectory}
         onOpenFile={handleOpenFilePreview}
         onLoadChildren={fetchDirectoryChildren}
         modifiedEntries={gitSummary?.entries ?? null}

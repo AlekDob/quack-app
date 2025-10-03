@@ -1853,6 +1853,18 @@ button.secondary:hover {
   background: rgba(255, 255, 255, 0.85);
 }
 
+.explorer-count {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(240, 243, 255, 0.82);
+  font-size: 0.6rem;
+  font-weight: 500;
+  line-height: 1;
+  min-width: 1.1rem;
+}
+
 .explorer-icon.folder::before {
   left: 3px;
   right: 3px;
