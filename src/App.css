@@ -405,8 +405,8 @@ button.secondary:hover {
 .preview-drawer-panel {
   position: relative;
   height: 100%;
-  width: min(60vw, 880px);
-  min-width: 360px;
+  width: min(70vw, 1080px);
+  min-width: 420px;
   background: rgba(18, 20, 27, 0.97);
   border-left: 1px solid var(--panel-border-strong);
   box-shadow: -18px 0 48px rgba(4, 6, 12, 0.55);
@@ -416,6 +416,32 @@ button.secondary:hover {
   transform: translateX(24px);
   opacity: 0;
   animation: previewDrawerSlide 0.25s ease forwards;
+}
+
+.preview-drawer-resize {
+  position: absolute;
+  left: -6px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.preview-drawer-resize::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.2), rgba(129, 140, 248, 0.05));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.preview-drawer-resize:hover::before,
+.preview-drawer-resize:active::before {
+  opacity: 1;
 }
 
 @keyframes previewDrawerSlide {

@@ -193,6 +193,17 @@ function App() {
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showProcessesDrawer, setShowProcessesDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
+  const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
+    if (typeof window === "undefined") {
+      return 960;
+    }
+    const stored = window.localStorage.getItem("previewDrawer.width");
+    const value = stored ? Number.parseInt(stored, 10) : NaN;
+    if (Number.isFinite(value)) {
+      return Math.min(1200, Math.max(420, value));
+    }
+    return Math.min(window.innerWidth * 0.7, 960);
+  });
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null);
   const [loadingGit, setLoadingGit] = useState(false);
   const [gitError, setGitError] = useState<string | null>(null);
@@ -1747,6 +1758,16 @@ function App() {
       <PreviewDrawer
         open={showPreviewDrawer}
         onClose={() => setShowPreviewDrawer(false)}
+        width={previewDrawerWidth}
+        minWidth={420}
+        maxWidth={1200}
+        onResize={(width) => {
+          setPreviewDrawerWidth(width);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("previewDrawer.width", String(Math.round(width)));
+          }
+        }}
+        explorerPath={explorerPath}
       />
 
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
