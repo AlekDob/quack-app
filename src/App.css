@@ -916,28 +916,36 @@ button.secondary:hover {
 
 .main-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.4rem;
   padding: 0.85rem 1.25rem;
-  min-height: 56px;
   border-bottom: 1px solid var(--panel-border);
   background: var(--panel-bg);
   box-sizing: border-box;
 }
 
-.main-toolbar-left {
+.main-toolbar-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
 }
 
-.main-toolbar-left h1 {
+.main-toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.main-toolbar-title h1 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .dev-badge {
@@ -968,10 +976,20 @@ button.secondary:hover {
   }
 }
 
-.main-toolbar-left .terminal-status {
+.main-toolbar-bottom {
+  display: flex;
+  align-items: center;
+  min-height: 1.25rem;
+}
+
+.terminal-status {
   font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.75rem;
   color: #7f8bb0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
 }
 
 .main-toolbar-right {
@@ -983,14 +1001,15 @@ button.secondary:hover {
 .git-tab-button {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.875rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
   background: transparent;
   color: #9ca3af;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 500;
+  line-height: 1;
   transition: all 0.2s ease;
   cursor: pointer;
 }
@@ -1005,6 +1024,42 @@ button.secondary:hover {
   background: rgba(var(--accent-rgb), 0.15);
   border-color: rgba(var(--accent-rgb), 0.5);
   color: #fff;
+}
+
+.git-branch-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  background: rgba(var(--accent-rgb), 0.08);
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
+  line-height: 1;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.git-branch-indicator:hover {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.git-branch-indicator-dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.85);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.08);
+}
+
+.git-branch-indicator-name {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Legacy terminal-toolbar styles kept for compatibility */

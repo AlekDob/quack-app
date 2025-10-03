@@ -178,8 +178,8 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
 
           const { code, success, message } = event.payload
           const summary = message ?? (success
-            ? `Processo completato (codice ${code})`
-            : `Processo terminato con codice ${code}`)
+            ? `Process completed (code ${code})`
+            : `Process finished with code ${code}`)
           term.writeln(`\r\n${summary}\r\n`)
         })
         if (cancelled) {
@@ -188,7 +188,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
           disposers.push(exitListener)
         }
       } catch (error) {
-        console.error('Impossibile collegarsi agli eventi del terminale', error)
+        console.error('Unable to attach terminal events', error)
       }
     }
 

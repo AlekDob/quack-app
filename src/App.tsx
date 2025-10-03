@@ -1297,6 +1297,13 @@ function App() {
     }
   }, [refreshGitSummary, showGitDrawer]);
 
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+    void refreshGitSummary();
+  }, [refreshGitSummary, tauriAvailable]);
+
   const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
     setSelectedGitPath(entry.path);
     if (entry.unstaged_status || entry.is_untracked) {
@@ -1577,30 +1584,52 @@ function App() {
 
       <section className="terminal-pane">
         <div className="main-toolbar">
-          <div className="main-toolbar-left">
-            <h1>
-              {activeTerminal?.label ?? "Terminale"}
-              {import.meta.env.DEV && <span className="dev-badge">DEV</span>}
-            </h1>
+          <div className="main-toolbar-top">
+            <div className="main-toolbar-title">
+              <h1>
+                {activeTerminal?.label ?? "Terminale"}
+                {import.meta.env.DEV && (
+                  <span className="dev-badge">DEV</span>
+                )}
+              </h1>
+            </div>
+            <div className="main-toolbar-right">
+              <div
+                className="git-branch-indicator"
+                title={
+                  gitSummary?.branch
+                    ? `Current branch: ${gitSummary.branch}`
+                    : "Current branch unavailable"
+                }
+              >
+                <span
+                  className="git-branch-indicator-dot"
+                  aria-hidden="true"
+                />
+                <span className="git-branch-indicator-name">
+                  {gitSummary?.branch ?? "—"}
+                </span>
+              </div>
+              <button
+                type="button"
+                className={`git-tab-button ${showGitDrawer ? "active" : ""}`}
+                onClick={() => setShowGitDrawer(!showGitDrawer)}
+              >
+                Git
+              </button>
+              <button
+                type="button"
+                className={`git-tab-button ${showProcessesDrawer ? "active" : ""}`}
+                onClick={() => setShowProcessesDrawer(!showProcessesDrawer)}
+              >
+                Processes
+              </button>
+            </div>
+          </div>
+          <div className="main-toolbar-bottom">
             <span className="terminal-status">
               {activeTerminal ? activeTerminal.cwd : "Nessun terminale attivo"}
             </span>
-          </div>
-          <div className="main-toolbar-right">
-            <button
-              type="button"
-              className={`git-tab-button ${showGitDrawer ? "active" : ""}`}
-              onClick={() => setShowGitDrawer(!showGitDrawer)}
-            >
-              Git
-            </button>
-            <button
-              type="button"
-              className={`git-tab-button ${showProcessesDrawer ? "active" : ""}`}
-              onClick={() => setShowProcessesDrawer(!showProcessesDrawer)}
-            >
-              Processi
-            </button>
           </div>
         </div>
         <div className="terminal-container">

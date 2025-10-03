@@ -42,7 +42,7 @@ export default function ProcessesDrawer({
         window.open(url, "_blank", "noopener,noreferrer");
       }
     } catch (error) {
-      console.error("Impossibile aprire il browser", error);
+      console.error("Unable to open browser", error);
     }
   };
 
@@ -51,7 +51,7 @@ export default function ProcessesDrawer({
       <div className="processes-drawer-backdrop" onClick={onClose} />
       <div className="processes-drawer-panel">
         <header className="processes-drawer-header">
-          <h2>Processi attivi</h2>
+          <h2>Active processes</h2>
           <button
             type="button"
             className="processes-drawer-close"
@@ -64,7 +64,7 @@ export default function ProcessesDrawer({
         <div className="processes-drawer-body">
           {sortedProcesses.length === 0 && (
             <div className="processes-empty">
-              Nessun terminale attivo in questo momento.
+              No active terminals at the moment.
             </div>
           )}
           {sortedProcesses.map((process) => (
@@ -74,7 +74,7 @@ export default function ProcessesDrawer({
                   className="process-card-status"
                   role="img"
                   aria-label={
-                    process.status === "running" ? "In esecuzione" : "In attesa"
+                    process.status === "running" ? "Running" : "Waiting"
                   }
                 >
                   {process.status === "running" ? "🟢" : "🟡"}
@@ -113,7 +113,7 @@ export default function ProcessesDrawer({
                   className="primary"
                   onClick={() => onFocusTerminal(process.terminalId)}
                 >
-                  Vai al terminale
+                  Focus terminal
                 </button>
               </div>
             </article>
@@ -121,7 +121,7 @@ export default function ProcessesDrawer({
         </div>
         <footer className="processes-drawer-footer">
           <button type="button" onClick={onRefresh}>
-            🔄 Aggiorna
+            🔄 Refresh
           </button>
         </footer>
       </div>
