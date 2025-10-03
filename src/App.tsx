@@ -267,9 +267,18 @@ function App() {
   }, []);
 
   const loadActiveProcesses = useCallback(async () => {
-    // TODO: Implementare get_active_processes nel backend
-    setActiveProcesses([]);
-  }, []);
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      const processes = await invoke<ProcessInfo[]>('get_active_processes');
+      setActiveProcesses(processes);
+    } catch (error) {
+      console.error('Failed to load active processes:', error);
+      setActiveProcesses([]);
+    }
+  }, [tauriAvailable]);
 
   useEffect(() => {
     if (!tauriAvailable) {
@@ -1768,6 +1777,7 @@ function App() {
           }
         }}
         explorerPath={explorerPath}
+        processes={activeProcesses}
       />
 
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>

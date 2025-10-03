@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import PreviewPanel from "./PreviewPanel";
 import { PreviewManagerProvider } from "../composables/usePreviewManager";
+import type { ProcessInfo } from "../types";
 
 interface PreviewDrawerProps {
   open: boolean;
@@ -10,6 +11,7 @@ interface PreviewDrawerProps {
   maxWidth: number;
   onResize: (width: number) => void;
   explorerPath: string;
+  processes: ProcessInfo[];
 }
 
 export default function PreviewDrawer({
@@ -20,6 +22,7 @@ export default function PreviewDrawer({
   maxWidth,
   onResize,
   explorerPath,
+  processes,
 }: PreviewDrawerProps) {
   const draggingRef = useRef(false);
   const lastXRef = useRef(0);
@@ -81,7 +84,7 @@ export default function PreviewDrawer({
           onPointerDown={handleHandlePointerDown}
           role="presentation"
         />
-        <PreviewManagerProvider>
+        <PreviewManagerProvider processes={processes}>
           <div className="flex h-full flex-col">
             <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
               <div className="text-sm font-medium text-slate-200">

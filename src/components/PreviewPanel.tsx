@@ -167,7 +167,7 @@ export default function PreviewPanel() {
             >
               {profiles.map((profile) => (
                 <option key={profile.id} value={profile.id} className="bg-slate-900">
-                  {profile.label}
+                  {profile.isLive ? '🟢 ' : ''}{profile.label}
                 </option>
               ))}
               <option value="" className="bg-slate-900">
@@ -184,6 +184,11 @@ export default function PreviewPanel() {
             <span className="text-xs font-medium uppercase tracking-wide text-slate-300">
               {STATUS_LABEL[status]}
             </span>
+            {selectedProfile?.isLive && (
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                LIVE
+              </span>
+            )}
             {previewUrl ? (
               <span className="truncate text-xs text-slate-500">{previewUrl}</span>
             ) : (

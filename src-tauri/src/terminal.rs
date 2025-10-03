@@ -9,6 +9,7 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use once_cell::sync::Lazy;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
@@ -26,6 +27,8 @@ struct TerminalSession {
   cwd: PathBuf,
   alive: bool,
   process: Option<TerminalProcess>,
+  detected_port: Option<u16>,
+  output_buffer: String,
 }
 
 struct TerminalProcess {
@@ -42,6 +45,7 @@ pub struct TerminalInfo {
   pub color: String,
   pub cwd: String,
   pub alive: bool,
+  pub detected_port: Option<u16>,
 }
 
 #[derive(Serialize, Clone)]
@@ -58,7 +62,63 @@ pub struct TerminalExitPayload {
   pub message: Option<String>,
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessInfo {
+  pub terminal_id: String,
+  pub terminal_label: String,
+  pub command: Option<String>,
+  pub pid: Option<u32>,
+  pub port: Option<u16>,
+  pub uptime_seconds: u64,
+  pub status: String, // "running" | "idle"
+}
+
 static REGISTRY: Lazy<Mutex<TerminalRegistry>> = Lazy::new(|| Mutex::new(TerminalRegistry::default()));
+
+// Detect port from terminal output
+fn detect_port_from_output(text: &str) -> Option<u16> {
+  // Pattern per rilevare porte comuni nei dev server
+  let patterns = [
+    // http://localhost:3000 o https://localhost:3000
+    r"https?://(?:localhost|127\.0\.0\.1):(\d{4,5})",
+    // localhost:3000 o 127.0.0.1:3000
+    r"(?:localhost|127\.0\.0\.1):(\d{4,5})",
+    // port 3000 o Port: 3000
+    r"[Pp]ort[:\s]+(\d{4,5})",
+    // :3000 (da solo)
+    r"(?:^|[^\d]):(\d{4,5})(?:[^\d]|$)",
+  ];
+
+  for pattern_str in &patterns {
+    if let Ok(pattern) = Regex::new(pattern_str) {
+      if let Some(captures) = pattern.captures(text) {
+        if let Some(port_match) = captures.get(1) {
+          if let Ok(port) = port_match.as_str().parse::<u16>() {
+            // Valida range porte comuni dev server
+            if (1024..=65535).contains(&port) {
+              return Some(port);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  None
+}
+
+// Update detected port for terminal
+fn update_terminal_port(id: &str, port: u16) {
+  if let Ok(mut registry) = REGISTRY.lock() {
+    if let Some(session) = registry.sessions.get_mut(id) {
+      if session.detected_port != Some(port) {
+        session.detected_port = Some(port);
+        eprintln!("🦆 Detected port {} for terminal {}", port, session.label);
+      }
+    }
+  }
+}
 
 #[tauri::command]
 pub fn create_terminal(
@@ -88,6 +148,36 @@ fn list_terminals_impl() -> Result<Vec<TerminalInfo>> {
   }
 
   Ok(result)
+}
+
+#[tauri::command]
+pub fn get_active_processes() -> Result<Vec<ProcessInfo>, String> {
+  get_active_processes_impl().map_err(|err| err.to_string())
+}
+
+fn get_active_processes_impl() -> Result<Vec<ProcessInfo>> {
+  let registry = REGISTRY
+    .lock()
+    .map_err(|_| anyhow!("Errore di sincronizzazione"))?;
+
+  let mut processes = Vec::new();
+
+  for (id, session) in &registry.sessions {
+    // Include only alive terminals with detected ports
+    if session.alive && session.detected_port.is_some() {
+      processes.push(ProcessInfo {
+        terminal_id: id.clone(),
+        terminal_label: session.label.clone(),
+        command: None, // Could be enhanced to track actual command
+        pid: None,     // Could be enhanced to track PID
+        port: session.detected_port,
+        uptime_seconds: 0, // Could be enhanced to track uptime
+        status: "running".to_string(),
+      });
+    }
+  }
+
+  Ok(processes)
 }
 
 #[tauri::command]
@@ -147,6 +237,8 @@ fn create_terminal_impl(
     cwd: cwd.clone(),
     alive: true,
     process: Some(process),
+    detected_port: None,
+    output_buffer: String::new(),
   };
 
   registry.order.push(id.clone());
@@ -158,6 +250,7 @@ fn create_terminal_impl(
     color: default_color,
     cwd: cwd_to_string(&cwd),
     alive: true,
+    detected_port: None,
   })
 }
 
@@ -347,6 +440,12 @@ fn start_output_thread(
         Ok(0) => break,
         Ok(size) => {
           let text = String::from_utf8_lossy(&buffer[..size]).to_string();
+
+          // Try to detect port from output
+          if let Some(port) = detect_port_from_output(&text) {
+            update_terminal_port(&id, port);
+          }
+
           let payload = TerminalDataPayload {
             id: id.clone(),
             data: text,
@@ -427,6 +526,7 @@ fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
     color: session.color.clone(),
     cwd: cwd_to_string(&session.cwd),
     alive: session.alive,
+    detected_port: session.detected_port,
   }
 }
 

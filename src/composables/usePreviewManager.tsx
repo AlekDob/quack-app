@@ -1,4 +1,5 @@
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { ProcessInfo } from "../types";
 
 type PreviewStatus = "idle" | "checking" | "online" | "offline";
 
@@ -9,6 +10,8 @@ export interface PreviewProfile {
   url?: string;
   command?: string;
   cwd?: string;
+  isLive?: boolean; // From active process
+  terminalId?: string; // Link to terminal
 }
 
 interface PreviewManagerValue {
@@ -37,8 +40,14 @@ const DEFAULT_PROFILES: PreviewProfile[] = [
   { id: "vite-5173", label: "Localhost 5173", port: 5173 },
 ];
 
-export function PreviewManagerProvider({ children }: { children: ReactNode }) {
-  const [profiles, setProfiles] = useState<PreviewProfile[]>(DEFAULT_PROFILES);
+export function PreviewManagerProvider({
+  children,
+  processes = []
+}: {
+  children: ReactNode;
+  processes?: ProcessInfo[];
+}) {
+  const [staticProfiles] = useState<PreviewProfile[]>(DEFAULT_PROFILES);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     DEFAULT_PROFILES[0]?.id ?? null,
   );
@@ -47,6 +56,32 @@ export function PreviewManagerProvider({ children }: { children: ReactNode }) {
   const [lastError, setLastError] = useState<string | null>(null);
   const [inspectorEnabled, setInspectorEnabled] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+
+  // Generate profiles from active processes
+  const liveProfiles = useMemo<PreviewProfile[]>(() => {
+    return processes
+      .filter(p => p.port !== undefined)
+      .map(p => ({
+        id: `live-${p.terminalId}`,
+        label: `${p.terminalLabel} :${p.port}`,
+        port: p.port,
+        isLive: true,
+        terminalId: p.terminalId,
+        command: p.command
+      }));
+  }, [processes]);
+
+  // Merge static and live profiles
+  const profiles = useMemo<PreviewProfile[]>(() => {
+    return [...liveProfiles, ...staticProfiles];
+  }, [liveProfiles, staticProfiles]);
+
+  // Auto-select first live profile if none selected
+  useEffect(() => {
+    if (!selectedProfileId && liveProfiles.length > 0) {
+      setSelectedProfileId(liveProfiles[0].id);
+    }
+  }, [liveProfiles, selectedProfileId]);
 
   const selectedProfile = useMemo(() => {
     if (!selectedProfileId) {
@@ -78,19 +113,15 @@ export function PreviewManagerProvider({ children }: { children: ReactNode }) {
     setLastError(null);
   }, []);
 
-  const addOrUpdateProfile = useCallback((profile: PreviewProfile) => {
-    setProfiles((previous) => {
-      const exists = previous.some((item) => item.id === profile.id);
-      if (exists) {
-        return previous.map((item) => (item.id === profile.id ? { ...item, ...profile } : item));
-      }
-      return [...previous, profile];
-    });
+  // Note: addOrUpdateProfile and removeProfile only work on static profiles now
+  const addOrUpdateProfile = useCallback((_profile: PreviewProfile) => {
+    // Not implemented for now - could extend to save custom profiles
+    console.warn('addOrUpdateProfile not implemented');
   }, []);
 
-  const removeProfile = useCallback((id: string) => {
-    setProfiles((previous) => previous.filter((item) => item.id !== id));
-    setSelectedProfileId((current) => (current === id ? null : current));
+  const removeProfile = useCallback((_id: string) => {
+    // Not implemented for now - could extend to remove custom profiles
+    console.warn('removeProfile not implemented');
   }, []);
 
   const refresh = useCallback(() => {
