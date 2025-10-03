@@ -30,6 +30,101 @@ interface GitPanelProps {
 const statusBadgeClass = (kind: 'staged' | 'working') =>
   kind === 'staged' ? 'git-status-badge staged' : 'git-status-badge working'
 
+const TIMELINE_LINE_LEFT = 18
+const TIMELINE_CONNECTOR_COLOR = 'rgba(232, 125, 62, 0.32)'
+const DOT_SIZE = 14
+const DOT_TOP_OFFSET = 4 // circa 0.25rem per allinearsi con il layout esistente
+const DOT_CENTER = DOT_TOP_OFFSET + DOT_SIZE / 2
+
+const GitTimelineItem = ({
+  entry,
+  lineLeft,
+  isFirst,
+  isLast,
+}: {
+  entry: GitCommitEntry
+  lineLeft: number
+  isFirst: boolean
+  isLast: boolean
+}) => (
+  <div
+    style={{
+      position: 'relative',
+      paddingLeft: `${lineLeft + 28}px`,
+      paddingBottom: isLast ? 0 : '1.2rem',
+    }}
+  >
+    {!isFirst && (
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: `${lineLeft}px`,
+          top: 0,
+          width: '2px',
+          height: `${DOT_CENTER}px`,
+          background: TIMELINE_CONNECTOR_COLOR,
+          transform: 'translateX(-50%)',
+        }}
+      />
+    )}
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        left: `${lineLeft}px`,
+        top: `${DOT_TOP_OFFSET}px`,
+        width: `${DOT_SIZE}px`,
+        height: `${DOT_SIZE}px`,
+        borderRadius: '999px',
+        background: '#e87d3e',
+        border: '3px solid #e87d3e',
+        boxShadow: '0 0 0 3px rgba(15, 17, 26, 1)',
+        transform: 'translate(-50%, 0)',
+        zIndex: 1,
+      }}
+    />
+    {!isLast && (
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: `${lineLeft}px`,
+          top: `${DOT_CENTER}px`,
+          bottom: 0,
+          width: '2px',
+          background: TIMELINE_CONNECTOR_COLOR,
+          transform: 'translateX(-50%)',
+        }}
+      />
+    )}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.2rem',
+      }}
+    >
+      <span
+        style={{
+          fontSize: '0.78rem',
+          color: '#f1f2f5',
+        }}
+      >
+        {entry.summary}
+      </span>
+      <span
+        style={{
+          fontSize: '0.68rem',
+          color: '#a8aebd',
+        }}
+      >
+        {entry.author} • {entry.relativeTime}
+      </span>
+    </div>
+  </div>
+)
+
 export default function GitPanel({
   summary,
   loading,
@@ -153,22 +248,28 @@ export default function GitPanel({
                   <span className="git-history-error">{historyError}</span>
                 )}
               </header>
-              <div className="git-history-list">
+              <div
+                style={{
+                  position: 'relative',
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '0.5rem 0.8rem 1rem 0',
+                  minHeight: 0,
+                }}
+              >
                 {historyLoading ? (
                   <div className="git-empty">Caricamento commit…</div>
                 ) : history.length === 0 ? (
                   <div className="git-empty">Nessun commit recente</div>
                 ) : (
-                  history.map((entry) => (
-                    <div key={entry.hash} className="git-history-item">
-                      <div className="git-history-dot" />
-                      <div className="git-history-content">
-                        <span className="git-history-summary">{entry.summary}</span>
-                        <span className="git-history-meta">
-                          {entry.author} • {entry.relativeTime}
-                        </span>
-                      </div>
-                    </div>
+                  history.map((entry, index) => (
+                    <GitTimelineItem
+                      key={entry.hash}
+                      entry={entry}
+                      lineLeft={TIMELINE_LINE_LEFT}
+                      isFirst={index === 0}
+                      isLast={index === history.length - 1}
+                    />
                   ))
                 )}
               </div>
