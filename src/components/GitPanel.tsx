@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import CodeEditor from './CodeEditor'
 
 import type { GitCommitEntry, GitStatusEntry, GitStatusSummary } from '../types'
 
@@ -218,7 +217,7 @@ export default function GitPanel({
                       key={`staged-${entry.path}`}
                       type="button"
                       className={`git-status-item ${
-            selected?.path === entry.path ? 'selected' : ''
+                        selected?.path === entry.path ? 'selected' : ''
                       }`}
                       onClick={() => onSelect(entry)}
                       onDoubleClick={() => onOpenFile(entry.path)}
@@ -311,13 +310,71 @@ export default function GitPanel({
                   ) : diffError ? (
                     <div className="git-panel-error">{diffError}</div>
                   ) : (
-                    <div className="git-diff-editor">
-                      <CodeEditor
-                        content={diffContent}
-                        filename={`${selected.path}.diff`}
-                        language="diff"
-                        readOnly={true}
-                      />
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.15rem',
+                        fontFamily:
+                          '"IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace',
+                        fontSize: '0.74rem',
+                        lineHeight: 1.5,
+                        color: '#e5ecff',
+                      }}
+                    >
+                      {diffContent.split('\n').map((line, index) => {
+                        const isAddition = line.startsWith('+') && !line.startsWith('+++')
+                        const isDeletion = line.startsWith('-') && !line.startsWith('---')
+                        const isMeta =
+                          line.startsWith('@@') ||
+                          line.startsWith('diff ') ||
+                          line.startsWith('index ') ||
+                          line.startsWith('---') ||
+                          line.startsWith('+++')
+
+                        const content =
+                          isAddition || isDeletion ? line.slice(1) : line
+
+                        const displayText = content.length > 0 ? content : '\u00a0'
+
+                        let background = 'transparent'
+                        let borderLeft = '3px solid transparent'
+                        let textColor = '#e5ecff'
+                        let fontWeight: number | undefined
+
+                        if (isAddition) {
+                          background = 'rgba(34, 197, 94, 0.18)'
+                          borderLeft = '3px solid rgba(34, 197, 94, 0.55)'
+                          textColor = '#bbf7d0'
+                        } else if (isDeletion) {
+                          background = 'rgba(239, 68, 68, 0.22)'
+                          borderLeft = '3px solid rgba(239, 68, 68, 0.55)'
+                          textColor = '#fecaca'
+                        } else if (isMeta) {
+                          background = 'rgba(59, 130, 246, 0.15)'
+                          borderLeft = '3px solid rgba(59, 130, 246, 0.6)'
+                          textColor = '#cbd5f5'
+                          fontWeight = 600
+                        }
+
+                        return (
+                          <div
+                            key={`${index}-${line}`}
+                            style={{
+                              background,
+                              borderLeft,
+                              borderRadius: '6px',
+                              padding: '0.18rem 0.65rem',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              color: textColor,
+                              fontWeight,
+                            }}
+                          >
+                            {displayText}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
