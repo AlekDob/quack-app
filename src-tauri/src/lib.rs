@@ -7,6 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 mod commands;
 mod fs;
 mod git;
+mod preview;
 mod terminal;
 
 #[derive(Clone)]
@@ -171,7 +172,13 @@ pub fn run() {
             git::git_unstage,
             git::git_commit,
             git::git_commit_history,
-            git::git_repository_root
+            git::git_repository_root,
+            preview::create_preview_webview,
+            preview::update_preview_webview_position,
+            preview::destroy_preview_webview,
+            preview::show_preview_webview,
+            preview::hide_preview_webview,
+            preview::inject_preview_script
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

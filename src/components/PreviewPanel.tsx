@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePreviewManager, type PreviewProfile } from "../composables/usePreviewManager";
+import { usePreviewWebView } from "../composables/usePreviewWebView";
 import { inspectorBridge, type InspectorData } from "../services/inspectorBridge";
 
 const STATUS_LABEL: Record<"idle" | "checking" | "online" | "offline", string> = {
@@ -37,7 +38,8 @@ export default function PreviewPanel() {
 
   const [inspectorData, setInspectorData] = useState<InspectorData | null>(null);
   const [inspectorHistory, setInspectorHistory] = useState<InspectorData[]>([]);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const webviewContainerRef = useRef<HTMLDivElement>(null);
+  const webview = usePreviewWebView();
 
   // Initialize inspector bridge
   useEffect(() => {
@@ -67,25 +69,54 @@ export default function PreviewPanel() {
     };
   }, []);
 
-  // Inject script when iframe loads
+  // Create/destroy webview based on preview URL
   useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe || !previewUrl) return;
+    const container = webviewContainerRef.current;
+    if (!container || !previewUrl) {
+      void webview.destroyWebView();
+      return;
+    }
 
-    const handleLoad = async () => {
+    // Destroy existing before creating new one
+    const createView = async () => {
       try {
-        await inspectorBridge.injectScript(iframe);
-        console.log('🦆 Inspector ready!');
+        // Ensure clean slate
+        await webview.destroyWebView();
+
+        // Wait a tick for cleanup
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const rect = container.getBoundingClientRect();
+
+        await webview.createWebView(previewUrl, {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+        });
+
+        // Inject inspector script after webview loads
+        setTimeout(async () => {
+          try {
+            const response = await fetch('/inspector-script.js');
+            const script = await response.text();
+            await webview.injectScript(script);
+            console.log('🦆 Inspector script injected into webview!');
+          } catch (error) {
+            console.error('Failed to inject inspector script:', error);
+          }
+        }, 1500);
       } catch (error) {
-        console.error('Failed to inject inspector:', error);
+        console.error('Failed to create webview:', error);
       }
     };
 
-    iframe.addEventListener('load', handleLoad);
+    void createView();
 
     return () => {
-      iframe.removeEventListener('load', handleLoad);
+      void webview.destroyWebView();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewUrl, reloadToken]);
 
   // Toggle inspector when enabled changes
@@ -225,16 +256,17 @@ export default function PreviewPanel() {
 
       {previewUrl ? (
         <div className="relative flex flex-1 bg-black/20">
-          <div className={`flex-1 transition-shadow ${inspectorEnabled ? "ring-1 ring-emerald-400/50" : ""}`}>
-            <iframe
-              ref={iframeRef}
-              key={`${previewUrl}-${reloadToken}`}
-              src={previewUrl}
-              title="Preview"
-              className="h-full w-full border-0"
-              sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
-              allow="cross-origin-isolated"
-            />
+          <div
+            ref={webviewContainerRef}
+            className={`flex-1 transition-shadow ${inspectorEnabled ? "ring-1 ring-emerald-400/50" : ""}`}
+          >
+            {/* WebView renders as separate window positioned over this area */}
+            <div className="h-full w-full flex items-center justify-center text-slate-600 text-sm">
+              <div className="text-center">
+                <div className="mb-2">🦆 WebView Preview</div>
+                <div className="text-xs text-slate-500">Window positioned over this area</div>
+              </div>
+            </div>
           </div>
 
           {/* Inspector Toggle Button */}
