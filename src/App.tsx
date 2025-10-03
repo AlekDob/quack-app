@@ -242,7 +242,7 @@ function App() {
     );
   }, [gitSummary, selectedGitPath]);
 
-  const gridTemplateColumns = "340px 1fr 340px";
+  const gridTemplateColumns = "340px minmax(0, 1fr) 340px";
 
   const loadSavedCommands = useCallback(async () => {
     try {
@@ -978,6 +978,41 @@ function App() {
     ]
   );
 
+
+  const handleOpenPreviewWindow = useCallback(async () => {
+    const previewPath = "preview.html";
+    const fullUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/${previewPath}`
+        : previewPath;
+
+    if (tauriAvailable && typeof window !== "undefined" && "__TAURI__" in window) {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/window");
+        const existing = WebviewWindow.getByLabel("preview-viewer");
+        if (existing) {
+          await existing.setFocus();
+          return;
+        }
+        const previewWindow = new WebviewWindow("preview-viewer", {
+          url: previewPath,
+          fullscreen: true,
+          resizable: true,
+          decorations: false,
+        });
+        previewWindow.once("tauri://error", (error) => {
+          console.error("Impossibile aprire la finestra di preview", error);
+        });
+        return;
+      } catch (error) {
+        console.error("Impossibile inizializzare la WebviewWindow", error);
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.open(fullUrl, "_blank", "noopener,noreferrer");
+    }
+  }, [tauriAvailable]);
   const handleColorChange = useCallback(
     async (id: string, color: string) => {
       if (!tauriAvailable) {
@@ -1569,232 +1604,239 @@ function App() {
       className="app-shell"
       style={{ gridTemplateColumns }}
     >
-      <TerminalSidebar
-        terminals={terminals}
-        activeId={activeId}
-        creating={creatingTerminal}
-        collapsedGroups={collapsedGroups}
-        onAdd={handleOpenNewTerminalModal}
-        onSelect={handleSelectTerminal}
-        onClose={handleCloseTerminal}
-        onColorChange={handleColorChange}
-        onEdit={handleEditTerminal}
-        onToggleGroup={handleToggleGroup}
-        onToggleProcesses={() =>
-          setShowProcessesDrawer((value) => !value)
-        }
-        processesOpen={showProcessesDrawer}
-      />
+        <TerminalSidebar
+          terminals={terminals}
+          activeId={activeId}
+          creating={creatingTerminal}
+          collapsedGroups={collapsedGroups}
+          onAdd={handleOpenNewTerminalModal}
+          onSelect={handleSelectTerminal}
+          onClose={handleCloseTerminal}
+          onColorChange={handleColorChange}
+          onEdit={handleEditTerminal}
+          onToggleGroup={handleToggleGroup}
+          onToggleProcesses={() =>
+            setShowProcessesDrawer((value) => !value)
+          }
+          processesOpen={showProcessesDrawer}
+        />
 
-      <section className="terminal-pane">
-        <div className="main-toolbar">
-          <div className="main-toolbar-top">
-            <div className="main-toolbar-title">
-              <h1>
-                {activeTerminal?.label ?? "Terminale"}
-                {import.meta.env.DEV && (
-                  <span className="dev-badge">DEV</span>
-                )}
-              </h1>
-            </div>
-            <div className="main-toolbar-right">
-              <div
-                className="git-branch-indicator"
-                title={
-                  gitSummary?.branch
-                    ? `Current branch: ${gitSummary.branch}`
-                    : "Current branch unavailable"
-                }
-              >
-                <span
-                  className="git-branch-indicator-dot"
-                  aria-hidden="true"
-                />
-                <span className="git-branch-indicator-name">
-                  {gitSummary?.branch ?? "—"}
-                </span>
+        <section className="terminal-pane">
+          <div className="main-toolbar">
+            <div className="main-toolbar-top">
+              <div className="main-toolbar-title">
+                <h1>
+                  {activeTerminal?.label ?? "Terminale"}
+                  {import.meta.env.DEV && (
+                    <span className="dev-badge">DEV</span>
+                  )}
+                </h1>
               </div>
+              <div className="main-toolbar-right">
+                <div
+                  className="git-branch-indicator"
+                  title={
+                    gitSummary?.branch
+                      ? `Current branch: ${gitSummary.branch}`
+                      : "Current branch unavailable"
+                  }
+                >
+                  <span
+                    className="git-branch-indicator-dot"
+                    aria-hidden="true"
+                  />
+                  <span className="git-branch-indicator-name">
+                    {gitSummary?.branch ?? "—"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={`git-tab-button ${showGitDrawer ? "active" : ""}`}
+                  onClick={() => setShowGitDrawer(!showGitDrawer)}
+                >
+                  Git
+                </button>
               <button
                 type="button"
-                className={`git-tab-button ${showGitDrawer ? "active" : ""}`}
-                onClick={() => setShowGitDrawer(!showGitDrawer)}
+                className="git-tab-button"
+                onClick={handleOpenPreviewWindow}
               >
-                Git
+                Preview
               </button>
+              </div>
+            </div>
+            <div className="main-toolbar-bottom">
+              <span className="terminal-status">
+                {activeTerminal ? activeTerminal.cwd : "Nessun terminale attivo"}
+              </span>
             </div>
           </div>
-          <div className="main-toolbar-bottom">
-            <span className="terminal-status">
-              {activeTerminal ? activeTerminal.cwd : "Nessun terminale attivo"}
-            </span>
+          <div className="terminal-container">
+            {activeId ? (
+              <TerminalView
+                activeId={activeId}
+                terminals={terminals}
+                onUserInput={handleTerminalInput}
+                onOutput={handleTerminalOutput}
+              />
+            ) : (
+              <div className="terminal-surface terminal-placeholder">
+                Crea un nuovo terminale per iniziare a lavorare.
+              </div>
+            )}
           </div>
-        </div>
-        <div className="terminal-container">
-          {activeId ? (
-            <TerminalView
-              activeId={activeId}
-              terminals={terminals}
-              onUserInput={handleTerminalInput}
-              onOutput={handleTerminalOutput}
-            />
-          ) : (
-            <div className="terminal-surface terminal-placeholder">
-              Crea un nuovo terminale per iniziare a lavorare.
-            </div>
-          )}
-        </div>
-        <ToolBar
-          onExecuteCommand={handleExecuteAICommand}
-          onToggleSavedCommands={() =>
-            setSavedCommandsDrawerOpen((value) => !value)
-          }
-          savedCommandsOpen={savedCommandsDrawerOpen}
-        />
-      </section>
-
-      <FileExplorer
-        rootPath={(explorerRoot ?? explorerPath) || null}
-        tree={explorerTree}
-        loading={loadingExplorer}
-        error={explorerError}
-        activePath={explorerPath}
-        activeFilePath={previewFile?.path ?? null}
-        onOpenFile={handleOpenFilePreview}
-        onLoadChildren={fetchDirectoryChildren}
-        modifiedEntries={gitSummary?.entries ?? null}
-        gitRootPath={explorerRoot}
-      />
-
-      <NewTerminalModal
-        open={showNewTerminalModal}
-        isEditing={editingTerminal !== null}
-        name={newTerminalName}
-        path={newTerminalPath}
-        color={newTerminalColor}
-        availableColors={COLORS}
-        selectingDirectory={selectingDirectory}
-        creating={creatingTerminal}
-        error={newTerminalError}
-        onNameChange={setNewTerminalName}
-        onColorChange={setNewTerminalColor}
-        onBrowse={handleSelectDirectory}
-        onCancel={handleCancelNewTerminal}
-        onConfirm={handleConfirmNewTerminal}
-      />
-
-      <FilePreviewDrawer
-        open={previewFile !== null}
-        filename={previewFile?.name ?? null}
-        path={previewFile?.path ?? null}
-        content={previewContent}
-        loading={loadingPreview}
-        error={previewError}
-        formatting={formattingPreview}
-        diffInfo={previewDiffInfo}
-        onClose={handleClosePreview}
-        onRefresh={handleRefreshPreview}
-        onFormat={handleFormatPreview}
-        onSave={handleSaveFile}
-      />
-
-      <SavedCommandsDrawer
-        open={savedCommandsDrawerOpen}
-        commands={savedCommands}
-        onLaunch={(command, immediate) =>
-          handleLaunchSavedCommand(
-            command,
-            immediate ? { launchImmediately: true } : undefined
-          )
-        }
-        onEdit={(command) => {
-          setEditingCommand(command);
-          setSavedCommandModalOpen(true);
-        }}
-        onCreate={() => {
-          setEditingCommand(null);
-          setSavedCommandModalOpen(true);
-        }}
-        onDelete={async (command) => {
-          await invoke("delete_command", { id: command.id });
-          setSavedCommands((prev) =>
-            prev.filter((item) => item.id !== command.id)
-          );
-        }}
-        onClose={() => setSavedCommandsDrawerOpen(false)}
-      />
-
-      <ProcessesDrawer
-        open={showProcessesDrawer}
-        processes={activeProcesses}
-        onClose={() => setShowProcessesDrawer(false)}
-        onRefresh={loadActiveProcesses}
-        onFocusTerminal={handleSelectTerminal}
-      />
-
-      <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
-        <div
-          className="git-drawer-backdrop"
-          onClick={() => setShowGitDrawer(false)}
-        />
-        <div className="git-drawer-panel">
-          <header className="git-drawer-header">
-            <h2>Git</h2>
-            <button
-              type="button"
-              className="git-drawer-close"
-              onClick={() => setShowGitDrawer(false)}
-            >
-              ✕
-            </button>
-          </header>
-          <GitPanel
-            summary={gitSummary}
-            loading={loadingGit}
-            error={gitError}
-            history={commitHistory}
-            historyLoading={loadingGit}
-            historyError={historyError}
-            selected={selectedGitEntry}
-            diffContent={diffContent}
-            diffLoading={diffLoading}
-            diffError={diffError}
-            diffView={diffView}
-            onDiffViewChange={handleDiffViewChange}
-            onRefresh={refreshGitSummary}
-            onSelect={handleSelectGitEntry}
-            onStage={handleStageEntry}
-            onUnstage={handleUnstageEntry}
-            onStageAll={handleStageAll}
-            onOpenFile={handleOpenFileFromGit}
-            commitMessage={commitMessage}
-            onCommitMessageChange={setCommitMessage}
-            onCommit={handleCommit}
-            committing={committing}
-          />
-        </div>
-      </div>
-
-      <SavedCommandModal
-        open={savedCommandModalOpen}
-        command={editingCommand}
-        onClose={() => {
-          setSavedCommandModalOpen(false);
-          setEditingCommand(null);
-        }}
-        onSaved={(command) => {
-          setSavedCommands((prev) => {
-            const index = prev.findIndex((c) => c.id === command.id);
-            if (index >= 0) {
-              const updated = [...prev];
-              updated[index] = command;
-              return updated;
+          <ToolBar
+            onExecuteCommand={handleExecuteAICommand}
+            onToggleSavedCommands={() =>
+              setSavedCommandsDrawerOpen((value) => !value)
             }
-            return [...prev, command];
-          });
-          setSavedCommandModalOpen(false);
-          setEditingCommand(null);
-        }}
-      />
+            savedCommandsOpen={savedCommandsDrawerOpen}
+          />
+        </section>
+
+        <FileExplorer
+          rootPath={(explorerRoot ?? explorerPath) || null}
+          tree={explorerTree}
+          loading={loadingExplorer}
+          error={explorerError}
+          activePath={explorerPath}
+          activeFilePath={previewFile?.path ?? null}
+          onOpenFile={handleOpenFilePreview}
+          onLoadChildren={fetchDirectoryChildren}
+          modifiedEntries={gitSummary?.entries ?? null}
+          gitRootPath={explorerRoot}
+        />
+
+        <NewTerminalModal
+          open={showNewTerminalModal}
+          isEditing={editingTerminal !== null}
+          name={newTerminalName}
+          path={newTerminalPath}
+          color={newTerminalColor}
+          availableColors={COLORS}
+          selectingDirectory={selectingDirectory}
+          creating={creatingTerminal}
+          error={newTerminalError}
+          onNameChange={setNewTerminalName}
+          onColorChange={setNewTerminalColor}
+          onBrowse={handleSelectDirectory}
+          onCancel={handleCancelNewTerminal}
+          onConfirm={handleConfirmNewTerminal}
+        />
+
+        <FilePreviewDrawer
+          open={previewFile !== null}
+          filename={previewFile?.name ?? null}
+          path={previewFile?.path ?? null}
+          content={previewContent}
+          loading={loadingPreview}
+          error={previewError}
+          formatting={formattingPreview}
+          diffInfo={previewDiffInfo}
+          onClose={handleClosePreview}
+          onRefresh={handleRefreshPreview}
+          onFormat={handleFormatPreview}
+          onSave={handleSaveFile}
+        />
+
+        <SavedCommandsDrawer
+          open={savedCommandsDrawerOpen}
+          commands={savedCommands}
+          onLaunch={(command, immediate) =>
+            handleLaunchSavedCommand(
+              command,
+              immediate ? { launchImmediately: true } : undefined
+            )
+          }
+          onEdit={(command) => {
+            setEditingCommand(command);
+            setSavedCommandModalOpen(true);
+          }}
+          onCreate={() => {
+            setEditingCommand(null);
+            setSavedCommandModalOpen(true);
+          }}
+          onDelete={async (command) => {
+            await invoke("delete_command", { id: command.id });
+            setSavedCommands((prev) =>
+              prev.filter((item) => item.id !== command.id)
+            );
+          }}
+          onClose={() => setSavedCommandsDrawerOpen(false)}
+        />
+
+        <ProcessesDrawer
+          open={showProcessesDrawer}
+          processes={activeProcesses}
+          onClose={() => setShowProcessesDrawer(false)}
+          onRefresh={loadActiveProcesses}
+          onFocusTerminal={handleSelectTerminal}
+        />
+
+        <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
+          <div
+            className="git-drawer-backdrop"
+            onClick={() => setShowGitDrawer(false)}
+          />
+          <div className="git-drawer-panel">
+            <header className="git-drawer-header">
+              <h2>Git</h2>
+              <button
+                type="button"
+                className="git-drawer-close"
+                onClick={() => setShowGitDrawer(false)}
+              >
+                ✕
+              </button>
+            </header>
+            <GitPanel
+              summary={gitSummary}
+              loading={loadingGit}
+              error={gitError}
+              history={commitHistory}
+              historyLoading={loadingGit}
+              historyError={historyError}
+              selected={selectedGitEntry}
+              diffContent={diffContent}
+              diffLoading={diffLoading}
+              diffError={diffError}
+              diffView={diffView}
+              onDiffViewChange={handleDiffViewChange}
+              onRefresh={refreshGitSummary}
+              onSelect={handleSelectGitEntry}
+              onStage={handleStageEntry}
+              onUnstage={handleUnstageEntry}
+              onStageAll={handleStageAll}
+              onOpenFile={handleOpenFileFromGit}
+              commitMessage={commitMessage}
+              onCommitMessageChange={setCommitMessage}
+              onCommit={handleCommit}
+              committing={committing}
+            />
+          </div>
+        </div>
+
+        <SavedCommandModal
+          open={savedCommandModalOpen}
+          command={editingCommand}
+          onClose={() => {
+            setSavedCommandModalOpen(false);
+            setEditingCommand(null);
+          }}
+          onSaved={(command) => {
+            setSavedCommands((prev) => {
+              const index = prev.findIndex((c) => c.id === command.id);
+              if (index >= 0) {
+                const updated = [...prev];
+                updated[index] = command;
+                return updated;
+              }
+              return [...prev, command];
+            });
+            setSavedCommandModalOpen(false);
+            setEditingCommand(null);
+          }}
+        />
     </div>
   );
 }
