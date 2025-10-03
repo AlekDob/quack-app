@@ -1,18 +1,19 @@
-import { useState, useCallback, useEffect } from 'react'
-import CodeEditor from './CodeEditor'
+import { useState, useCallback, useEffect } from "react";
+import CodeEditor, { type DiffInfo } from "./CodeEditor";
 
 interface FilePreviewDrawerProps {
-  open: boolean
-  filename: string | null
-  path: string | null
-  content: string
-  loading: boolean
-  error: string | null
-  formatting: boolean
-  onClose: () => void
-  onRefresh: () => void
-  onFormat: () => void
-  onSave?: (content: string) => void
+  open: boolean;
+  filename: string | null;
+  path: string | null;
+  content: string;
+  loading: boolean;
+  error: string | null;
+  formatting: boolean;
+  diffInfo?: DiffInfo | null;
+  onClose: () => void;
+  onRefresh: () => void;
+  onFormat: () => void;
+  onSave?: (content: string) => void;
 }
 
 export default function FilePreviewDrawer({
@@ -23,46 +24,55 @@ export default function FilePreviewDrawer({
   loading,
   error,
   formatting,
+  diffInfo,
   onClose,
   onRefresh,
   onFormat,
   onSave,
 }: FilePreviewDrawerProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedContent, setEditedContent] = useState(content)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(content);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const handleToggleEdit = useCallback(() => {
     if (isEditing && hasUnsavedChanges) {
-      const confirmDiscard = window.confirm('Hai modifiche non salvate. Vuoi scartarle?')
-      if (!confirmDiscard) return
+      const confirmDiscard = window.confirm(
+        "Hai modifiche non salvate. Vuoi scartarle?"
+      );
+      if (!confirmDiscard) return;
     }
-    setIsEditing(!isEditing)
-    setEditedContent(content)
-    setHasUnsavedChanges(false)
-  }, [isEditing, hasUnsavedChanges, content])
+    setIsEditing(!isEditing);
+    setEditedContent(content);
+    setHasUnsavedChanges(false);
+  }, [isEditing, hasUnsavedChanges, content]);
 
-  const handleContentChange = useCallback((newContent: string) => {
-    setEditedContent(newContent)
-    setHasUnsavedChanges(newContent !== content)
-  }, [content])
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      setEditedContent(newContent);
+      setHasUnsavedChanges(newContent !== content);
+    },
+    [content]
+  );
 
-  const handleSave = useCallback((contentToSave?: string) => {
-    const finalContent = contentToSave || editedContent
-    if (onSave) {
-      onSave(finalContent)
-      setHasUnsavedChanges(false)
-    }
-  }, [editedContent, onSave])
+  const handleSave = useCallback(
+    (contentToSave?: string) => {
+      const finalContent = contentToSave || editedContent;
+      if (onSave) {
+        onSave(finalContent);
+        setHasUnsavedChanges(false);
+      }
+    },
+    [editedContent, onSave]
+  );
 
   // Reset content when file changes
   useEffect(() => {
-    setEditedContent(content)
-    setHasUnsavedChanges(false)
-    setIsEditing(false)
-  }, [path, content])
+    setEditedContent(content);
+    setHasUnsavedChanges(false);
+    setIsEditing(false);
+  }, [path, content]);
   if (!open) {
-    return null
+    return null;
   }
 
   return (
@@ -75,10 +85,12 @@ export default function FilePreviewDrawer({
       <div className="preview-drawer-panel">
         <header className="preview-toolbar">
           <div className="preview-meta">
-            <span className="preview-filename">{filename ?? 'File'}</span>
+            <span className="preview-filename">{filename ?? "File"}</span>
             {path && <span className="preview-path">{path}</span>}
             {loading && <span className="preview-status">Caricamento…</span>}
-            {error && !loading && <span className="preview-error">{error}</span>}
+            {error && !loading && (
+              <span className="preview-error">{error}</span>
+            )}
           </div>
           <div className="preview-actions">
             <button
@@ -95,15 +107,15 @@ export default function FilePreviewDrawer({
               onClick={onFormat}
               disabled={loading || formatting || isEditing}
             >
-              {formatting ? 'Formatto…' : 'Formatta'}
+              {formatting ? "Formatto…" : "Formatta"}
             </button>
             <button
               type="button"
-              className={`preview-action ${isEditing ? 'active' : ''}`}
+              className={`preview-action ${isEditing ? "active" : ""}`}
               onClick={handleToggleEdit}
               disabled={loading}
             >
-              {isEditing ? 'Anteprima' : 'Modifica'}
+              {isEditing ? "Anteprima" : "Modifica"}
             </button>
             {isEditing && onSave && (
               <button
@@ -112,7 +124,7 @@ export default function FilePreviewDrawer({
                 onClick={() => handleSave()}
                 disabled={!hasUnsavedChanges}
               >
-                {hasUnsavedChanges ? 'Salva *' : 'Salvato'}
+                {hasUnsavedChanges ? "Salva *" : "Salvato"}
               </button>
             )}
             <button type="button" className="preview-close" onClick={onClose}>
@@ -133,6 +145,7 @@ export default function FilePreviewDrawer({
                 readOnly={false}
                 onChange={handleContentChange}
                 onSave={handleSave}
+                diffInfo={diffInfo}
               />
             </div>
           ) : (
@@ -141,11 +154,12 @@ export default function FilePreviewDrawer({
                 content={content}
                 filename={filename}
                 readOnly={true}
+                diffInfo={diffInfo}
               />
             </div>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,56 +1,69 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import FileContextMenu from './FileContextMenu'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react";
+import FileContextMenu from "./FileContextMenu";
 
-const normalize = (value: string) => value.toLowerCase()
-const normalizePathValue = (value: string) => value.replace(/\\/g, '/').replace(/\//g, '/')
-const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '')
+const normalize = (value: string) => value.toLowerCase();
+const normalizePathValue = (value: string) =>
+  value.replace(/\\/g, "/").replace(/\//g, "/");
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const concatPath = (base: string, relative: string) => {
-  const normalizedBase = normalizePathValue(base)
-  const normalizedRelative = normalizePathValue(relative)
-  const trimmedBase = normalizedBase.endsWith('/') ? stripTrailingSlash(normalizedBase) : normalizedBase
-  const trimmedRelative = normalizedRelative.replace(/^\/+/, '')
+  const normalizedBase = normalizePathValue(base);
+  const normalizedRelative = normalizePathValue(relative);
+  const trimmedBase = normalizedBase.endsWith("/")
+    ? stripTrailingSlash(normalizedBase)
+    : normalizedBase;
+  const trimmedRelative = normalizedRelative.replace(/^\/+/, "");
 
   if (!trimmedBase) {
-    return trimmedRelative
+    return trimmedRelative;
   }
 
-  if (trimmedBase === '/') {
-    return `/${trimmedRelative}`
+  if (trimmedBase === "/") {
+    return `/${trimmedRelative}`;
   }
 
-  return `${trimmedBase}/${trimmedRelative}`
-}
+  return `${trimmedBase}/${trimmedRelative}`;
+};
 const fuzzyMatch = (query: string, target: string) => {
   if (!query) {
-    return true
+    return true;
   }
-  const normalizedQuery = normalize(query)
-  const normalizedTarget = normalize(target)
-  let queryIndex = 0
-  let targetIndex = 0
-  while (queryIndex < normalizedQuery.length && targetIndex < normalizedTarget.length) {
+  const normalizedQuery = normalize(query);
+  const normalizedTarget = normalize(target);
+  let queryIndex = 0;
+  let targetIndex = 0;
+  while (
+    queryIndex < normalizedQuery.length &&
+    targetIndex < normalizedTarget.length
+  ) {
     if (normalizedQuery[queryIndex] === normalizedTarget[targetIndex]) {
-      queryIndex += 1
+      queryIndex += 1;
     }
-    targetIndex += 1
+    targetIndex += 1;
   }
-  return queryIndex === normalizedQuery.length
-}
+  return queryIndex === normalizedQuery.length;
+};
 
-import type { DirectoryEntry, GitStatusEntry } from '../types'
+import type { DirectoryEntry, GitStatusEntry } from "../types";
 
 interface FileExplorerProps {
-  rootPath: string | null
-  tree: Record<string, DirectoryEntry[]>
-  loading: boolean
-  error: string | null
-  activePath: string
-  activeFilePath: string | null
-  onSelectDirectory: (path: string) => void
-  onOpenFile: (entry: DirectoryEntry) => void
-  onLoadChildren: (path: string) => Promise<DirectoryEntry[]>
-  modifiedEntries: GitStatusEntry[] | null
-  gitRootPath: string | null
+  rootPath: string | null;
+  tree: Record<string, DirectoryEntry[]>;
+  loading: boolean;
+  error: string | null;
+  activePath: string;
+  activeFilePath: string | null;
+  onSelectDirectory: (path: string) => void;
+  onOpenFile: (entry: DirectoryEntry) => void;
+  onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
+  modifiedEntries: GitStatusEntry[] | null;
+  gitRootPath: string | null;
 }
 
 export default function FileExplorer({
@@ -66,199 +79,346 @@ export default function FileExplorer({
   modifiedEntries,
   gitRootPath,
 }: FileExplorerProps) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
-  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<{
-    position: { x: number; y: number }
-    entry: DirectoryEntry
-  } | null>(null)
+    position: { x: number; y: number };
+    entry: DirectoryEntry;
+  } | null>(null);
 
   const rootEntries = useMemo(() => {
     if (!rootPath) {
-      return []
+      return [];
     }
-    return tree[rootPath] ?? []
-  }, [rootPath, tree])
+    return tree[rootPath] ?? [];
+  }, [rootPath, tree]);
 
   const rootLabel = useMemo(() => {
     if (!rootPath) {
-      return '—'
+      return "—";
     }
-    const normalized = rootPath.replace(/\\/g, '/')
-    const segments = normalized.split('/')
-    const candidate = segments.filter(Boolean).pop()
-    return candidate ?? normalized
-  }, [rootPath])
+    const normalized = rootPath.replace(/\\/g, "/");
+    const segments = normalized.split("/");
+    const candidate = segments.filter(Boolean).pop();
+    return candidate ?? normalized;
+  }, [rootPath]);
+
+  // Mappa dei file modificati per path (usa path relativo come chiave)
+  const modifiedFilesMap = useMemo(() => {
+    if (!modifiedEntries || !gitRootPath)
+      return new Map<string, GitStatusEntry>();
+
+    const map = new Map<string, GitStatusEntry>();
+    for (const entry of modifiedEntries) {
+      const fullPath = concatPath(gitRootPath, entry.path);
+      map.set(fullPath, entry);
+    }
+    return map;
+  }, [modifiedEntries, gitRootPath]);
+
+  // Raccoglie tutti i file modificati dall'intero albero (ricorsivamente)
+  const collectAllModifiedFiles = useCallback(
+    (
+      entries: DirectoryEntry[]
+    ): Array<{
+      entry: DirectoryEntry;
+      gitEntry: GitStatusEntry;
+      displayPath: string;
+    }> => {
+      const result: Array<{
+        entry: DirectoryEntry;
+        gitEntry: GitStatusEntry;
+        displayPath: string;
+      }> = [];
+
+      for (const entry of entries) {
+        const gitEntry = modifiedFilesMap.get(entry.path);
+
+        if (gitEntry && !entry.is_dir) {
+          // Calcola il path relativo per il display
+          let displayPath = entry.path;
+          if (rootPath && entry.path.startsWith(rootPath)) {
+            displayPath = entry.path.substring(rootPath.length);
+            if (displayPath.startsWith("/")) {
+              displayPath = displayPath.substring(1);
+            }
+          }
+
+          result.push({ entry, gitEntry, displayPath });
+        }
+
+        // Ricorsione nelle sottodirectory
+        if (entry.is_dir && tree[entry.path]) {
+          const childModified = collectAllModifiedFiles(tree[entry.path]);
+          result.push(...childModified);
+        }
+      }
+
+      return result;
+    },
+    [modifiedFilesMap, tree, rootPath]
+  );
+
+  // Lista globale di tutti i file modificati
+  const allModifiedFiles = useMemo(() => {
+    if (!rootEntries || modifiedFilesMap.size === 0) {
+      return [];
+    }
+    return collectAllModifiedFiles(rootEntries);
+  }, [rootEntries, modifiedFilesMap, collectAllModifiedFiles]);
 
   useEffect(() => {
     if (!rootPath) {
-      return
+      return;
     }
     setExpanded((previous) => {
       if (previous.has(rootPath)) {
-        return previous
+        return previous;
       }
-      const next = new Set(previous)
-      next.add(rootPath)
-      return next
-    })
-  }, [rootPath])
+      const next = new Set(previous);
+      next.add(rootPath);
+      return next;
+    });
+  }, [rootPath]);
 
   const ensureExpanded = useCallback((path: string) => {
     setExpanded((previous) => {
       if (previous.has(path)) {
-        return previous
+        return previous;
       }
-      const next = new Set(previous)
-      next.add(path)
-      return next
-    })
-  }, [])
+      const next = new Set(previous);
+      next.add(path);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!activePath) {
-      return
+      return;
     }
-    const normalized = activePath.replace(/\\/g, '/')
-    const segments = normalized.split('/').filter((segment) => segment.length > 0)
+    const normalized = activePath.replace(/\\/g, "/");
+    const segments = normalized
+      .split("/")
+      .filter((segment) => segment.length > 0);
 
-    let accumulator = ''
-    if (normalized.startsWith('/')) {
-      accumulator = '/'
+    let accumulator = "";
+    if (normalized.startsWith("/")) {
+      accumulator = "/";
       if (tree[accumulator]) {
-        ensureExpanded(accumulator)
+        ensureExpanded(accumulator);
       }
-    } else if (segments[0]?.includes(':')) {
-      accumulator = segments.shift() ?? ''
+    } else if (segments[0]?.includes(":")) {
+      accumulator = segments.shift() ?? "";
       if (accumulator && tree[accumulator]) {
-        ensureExpanded(accumulator)
+        ensureExpanded(accumulator);
       }
     }
 
     for (const segment of segments) {
-      if (accumulator === '' || accumulator === '/') {
-        accumulator = accumulator === '/' ? `/${segment}` : segment
+      if (accumulator === "" || accumulator === "/") {
+        accumulator = accumulator === "/" ? `/${segment}` : segment;
       } else {
-        accumulator = `${accumulator}/${segment}`
+        accumulator = `${accumulator}/${segment}`;
       }
       if (tree[accumulator]) {
-        ensureExpanded(accumulator)
+        ensureExpanded(accumulator);
       }
     }
-  }, [activePath, ensureExpanded, tree])
+  }, [activePath, ensureExpanded, tree]);
 
-  const handleContextMenu = useCallback((event: MouseEvent, entry: DirectoryEntry) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setContextMenu({
-      position: { x: event.clientX, y: event.clientY },
-      entry,
-    })
-  }, [])
+  const handleContextMenu = useCallback(
+    (event: MouseEvent, entry: DirectoryEntry) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({
+        position: { x: event.clientX, y: event.clientY },
+        entry,
+      });
+    },
+    []
+  );
 
   const closeContextMenu = useCallback(() => {
-    setContextMenu(null)
-  }, [])
+    setContextMenu(null);
+  }, []);
 
-  const handleToggleDirectory = useCallback(async (entry: DirectoryEntry) => {
-    if (!entry.is_dir) {
-      return
-    }
-    const path = entry.path
+  const handleToggleDirectory = useCallback(
+    async (entry: DirectoryEntry) => {
+      if (!entry.is_dir) {
+        return;
+      }
+      const path = entry.path;
 
-    if (expanded.has(path)) {
-      setExpanded((previous) => {
-        if (!previous.has(path)) {
-          return previous
-        }
-        const next = new Set(previous)
-        next.delete(path)
-        return next
-      })
-      return
-    }
+      if (expanded.has(path)) {
+        setExpanded((previous) => {
+          if (!previous.has(path)) {
+            return previous;
+          }
+          const next = new Set(previous);
+          next.delete(path);
+          return next;
+        });
+        return;
+      }
 
-    ensureExpanded(path)
+      ensureExpanded(path);
 
-    if (!tree[path]) {
-      setLoadingNodes((prev) => {
-        const next = new Set(prev)
-        next.add(path)
-        return next
-      })
-      await onLoadChildren(path)
-      setLoadingNodes((prev) => {
-        const next = new Set(prev)
-        next.delete(path)
-        return next
-      })
-    }
-  }, [ensureExpanded, expanded, onLoadChildren, tree])
+      if (!tree[path]) {
+        setLoadingNodes((prev) => {
+          const next = new Set(prev);
+          next.add(path);
+          return next;
+        });
+        await onLoadChildren(path);
+        setLoadingNodes((prev) => {
+          const next = new Set(prev);
+          next.delete(path);
+          return next;
+        });
+      }
+    },
+    [ensureExpanded, expanded, onLoadChildren, tree]
+  );
 
-  const renderEntries = useCallback((entries: DirectoryEntry[], depth = 0) => (
-    entries.filter((entry) => fuzzyMatch(query, entry.name)).map((entry) => {
-      const isDirectory = entry.is_dir
-      const isExpanded = expanded.has(entry.path)
-      const isLoadingNode = loadingNodes.has(entry.path)
-      const isActiveDirectory = activePath === entry.path
-      const isActiveFile = activeFilePath === entry.path
-      const paddingLeft = 12 + depth * 14
+  const renderEntries = useCallback(
+    (entries: DirectoryEntry[], depth = 0, skipModified = false) =>
+      entries
+        .filter((entry) => {
+          // Filtra per query search
+          if (!fuzzyMatch(query, entry.name)) return false;
+          // Se skipModified è true, nascondi i file modificati (già mostrati sopra)
+          if (skipModified && !entry.is_dir && modifiedFilesMap.has(entry.path))
+            return false;
+          return true;
+        })
+        .map((entry) => {
+          const isDirectory = entry.is_dir;
+          const isExpanded = expanded.has(entry.path);
+          const isLoadingNode = loadingNodes.has(entry.path);
+          const isActiveDirectory = activePath === entry.path;
+          const isActiveFile = activeFilePath === entry.path;
+          const paddingLeft = 12 + depth * 14;
+
+          const rowClass = [
+            "explorer-row",
+            isDirectory ? "directory" : "file",
+            isActiveDirectory || isActiveFile ? "active" : "",
+            isActiveFile ? "file-open" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          return (
+            <Fragment key={entry.path}>
+              <button
+                type="button"
+                className={rowClass}
+                style={{ paddingLeft: `${paddingLeft}px` }}
+                title={entry.name}
+                onClick={() => {
+                  if (isDirectory) {
+                    onSelectDirectory(entry.path);
+                    void handleToggleDirectory(entry);
+                  } else {
+                    onOpenFile(entry);
+                  }
+                }}
+                onContextMenu={(event) => handleContextMenu(event, entry)}
+              >
+                <span
+                  className={`explorer-expander ${
+                    isDirectory ? (isExpanded ? "open" : "") : "placeholder"
+                  } ${isLoadingNode ? "loading" : ""}`}
+                  onClick={(event) => {
+                    if (!isDirectory) {
+                      return;
+                    }
+                    event.stopPropagation();
+                    void handleToggleDirectory(entry);
+                  }}
+                  aria-hidden="true"
+                />
+                <span
+                  className={`explorer-icon ${
+                    isDirectory
+                      ? "folder"
+                      : entry.is_symlink
+                        ? "symlink"
+                        : "file"
+                  }`}
+                  aria-hidden="true"
+                />
+                <span className="explorer-name">{entry.name}</span>
+              </button>
+              {isDirectory &&
+                isExpanded &&
+                tree[entry.path] &&
+                tree[entry.path].length > 0 &&
+                renderEntries(tree[entry.path], depth + 1, skipModified)}
+            </Fragment>
+          );
+        }),
+    [
+      activeFilePath,
+      activePath,
+      expanded,
+      handleContextMenu,
+      handleToggleDirectory,
+      loadingNodes,
+      modifiedFilesMap,
+      onOpenFile,
+      onSelectDirectory,
+      query,
+      tree,
+    ]
+  );
+
+  const renderModifiedFile = useCallback(
+    (item: {
+      entry: DirectoryEntry;
+      gitEntry: GitStatusEntry;
+      displayPath: string;
+    }) => {
+      const { entry, gitEntry, displayPath } = item;
+      const isActiveFile = activeFilePath === entry.path;
+      const additions = gitEntry.additions ?? 0;
+      const deletions = gitEntry.deletions ?? 0;
+      const hasStats = additions > 0 || deletions > 0;
 
       const rowClass = [
-        'explorer-row',
-        isDirectory ? 'directory' : 'file',
-        isActiveDirectory || isActiveFile ? 'active' : '',
-        isActiveFile ? 'file-open' : '',
+        "explorer-row",
+        "file",
+        "modified",
+        isActiveFile ? "active file-open" : "",
       ]
         .filter(Boolean)
-        .join(' ')
+        .join(" ");
 
       return (
-        <Fragment key={entry.path}>
-          <button
-            type="button"
-            className={rowClass}
-            style={{ paddingLeft: `${paddingLeft}px` }}
-            title={entry.name}
-            onClick={() => {
-              if (isDirectory) {
-                onSelectDirectory(entry.path)
-                void handleToggleDirectory(entry)
-              } else {
-                onOpenFile(entry)
-              }
-            }}
-            onContextMenu={(event) => handleContextMenu(event, entry)}
-          >
-            <span
-              className={`explorer-expander ${
-                isDirectory ? (isExpanded ? 'open' : '') : 'placeholder'
-              } ${isLoadingNode ? 'loading' : ''}`}
-              onClick={(event) => {
-                if (!isDirectory) {
-                  return
-                }
-                event.stopPropagation()
-                void handleToggleDirectory(entry)
-              }}
-              aria-hidden="true"
-            />
-            <span
-              className={`explorer-icon ${
-                isDirectory ? 'folder' : entry.is_symlink ? 'symlink' : 'file'
-              }`}
-              aria-hidden="true"
-            />
-            <span className="explorer-name">{entry.name}</span>
-          </button>
-          {isDirectory && isExpanded && tree[entry.path] && tree[entry.path].length > 0 && (
-            renderEntries(tree[entry.path], depth + 1)
+        <button
+          key={entry.path}
+          type="button"
+          className={rowClass}
+          style={{ paddingLeft: "12px" }}
+          title={displayPath}
+          onClick={() => onOpenFile(entry)}
+          onContextMenu={(event) => handleContextMenu(event, entry)}
+        >
+          <span className="explorer-expander placeholder" aria-hidden="true" />
+          <span className="explorer-icon file-modified" aria-hidden="true" />
+          <span className="explorer-name">{displayPath}</span>
+          {hasStats && (
+            <span className="explorer-git-stats">
+              {additions > 0 && <span className="additions">+{additions}</span>}
+              {deletions > 0 && <span className="deletions">-{deletions}</span>}
+            </span>
           )}
-        </Fragment>
-      )
-    })
-  ), [activeFilePath, activePath, expanded, handleContextMenu, handleToggleDirectory, loadingNodes, onOpenFile, onSelectDirectory, query, tree])
+        </button>
+      );
+    },
+    [activeFilePath, handleContextMenu, onOpenFile]
+  );
 
   return (
     <aside className="file-explorer">
@@ -275,15 +435,37 @@ export default function FileExplorer({
         />
       </div>
 
-      <div className={`explorer-content ${loading ? 'loading' : ''}`}>
-        {rootPath && (
-          <div className="explorer-root-label">{rootLabel}</div>
-        )}
+      <div className={`explorer-content ${loading ? "loading" : ""}`}>
+        {rootPath && <div className="explorer-root-label">{rootLabel}</div>}
         {(!rootEntries || rootEntries.length === 0) && !loading ? (
           <div className="empty-state">Cartella vuota</div>
         ) : (
           <div className="explorer-tree">
-            {rootEntries && renderEntries(rootEntries)}
+            {/* Modified Files Group */}
+            {allModifiedFiles.length > 0 && (
+              <div className="explorer-section modified-files-section">
+                <div className="explorer-section-header">
+                  <span className="explorer-section-title">
+                    File modificati
+                  </span>
+                  <span className="explorer-section-count">
+                    {allModifiedFiles.length}
+                  </span>
+                </div>
+                <div className="explorer-section-content">
+                  {allModifiedFiles
+                    .filter((item) => fuzzyMatch(query, item.displayPath))
+                    .map((item) => renderModifiedFile(item))}
+                </div>
+              </div>
+            )}
+
+            {/* Normal Files Tree */}
+            {rootEntries && rootEntries.length > 0 && (
+              <div className="explorer-section">
+                {rootEntries && renderEntries(rootEntries, 0, true)}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -297,5 +479,5 @@ export default function FileExplorer({
         />
       )}
     </aside>
-  )
+  );
 }

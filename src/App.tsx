@@ -19,6 +19,8 @@ import ToolBar from "./components/ToolBar";
 import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
+import type { DiffInfo } from "./components/CodeEditor";
+import { parseDiff } from "./lib/diffParser";
 
 import type {
   DirectoryEntry,
@@ -186,6 +188,7 @@ function App() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [formattingPreview, setFormattingPreview] = useState(false);
+  const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showProcessesDrawer, setShowProcessesDrawer] = useState(false);
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null);
@@ -1015,12 +1018,49 @@ function App() {
       setPreviewFile({ name: entry.name, path: entry.path });
       setPreviewContent("");
       setPreviewError(null);
+      setPreviewDiffInfo(null);
       setLoadingPreview(true);
+
       try {
+        // Carica il contenuto del file
         const content = await invoke<string>("read_file_content", {
           path: entry.path,
         });
         setPreviewContent(content);
+
+        // Se il file è modificato, carica anche il diff
+        const isModified = gitSummary?.entries?.some((gitEntry) => {
+          const fullPath = explorerRoot
+            ? `${explorerRoot}/${gitEntry.path}`.replace(/\/+/g, "/")
+            : gitEntry.path;
+          return fullPath === entry.path;
+        });
+
+        if (isModified && gitSummary && explorerRoot) {
+          try {
+            // Calcola il path relativo al git root
+            let relativePath = entry.path;
+            if (entry.path.startsWith(explorerRoot)) {
+              relativePath = entry.path.substring(explorerRoot.length);
+              if (relativePath.startsWith("/")) {
+                relativePath = relativePath.substring(1);
+              }
+            }
+
+            const diff = await invoke<string>("git_diff", {
+              path: relativePath,
+              staged: false,
+              untracked: false,
+              rootPath: explorerRoot,
+            });
+
+            const diffInfo = parseDiff(diff);
+            setPreviewDiffInfo(diffInfo);
+          } catch (diffError) {
+            console.warn("Impossibile caricare il diff:", diffError);
+            // Non blocchiamo l'apertura del file se il diff fallisce
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setPreviewError(message);
@@ -1028,7 +1068,7 @@ function App() {
         setLoadingPreview(false);
       }
     },
-    [tauriAvailable]
+    [tauriAvailable, gitSummary, explorerRoot]
   );
 
   const handleRefreshPreview = useCallback(async () => {
@@ -1142,6 +1182,7 @@ function App() {
     setPreviewFile(null);
     setPreviewContent("");
     setPreviewError(null);
+    setPreviewDiffInfo(null);
     setLoadingPreview(false);
     setFormattingPreview(false);
   }, []);
@@ -1578,6 +1619,7 @@ function App() {
         loading={loadingPreview}
         error={previewError}
         formatting={formattingPreview}
+        diffInfo={previewDiffInfo}
         onClose={handleClosePreview}
         onRefresh={handleRefreshPreview}
         onFormat={handleFormatPreview}

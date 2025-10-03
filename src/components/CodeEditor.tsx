@@ -1,83 +1,90 @@
-import { useRef, useCallback, useMemo } from 'react'
-import Editor from '@monaco-editor/react'
-import type * as monaco from 'monaco-editor'
+import { useRef, useCallback, useMemo, useEffect } from "react";
+import Editor from "@monaco-editor/react";
+import type * as monaco from "monaco-editor";
+
+export interface DiffInfo {
+  additions: number[]; // Array di numeri di linea aggiunte
+  deletions: number[]; // Array di numeri di linea rimosse
+  modifications: number[]; // Array di numeri di linea modificate
+}
 
 interface CodeEditorProps {
-  content: string
-  filename: string | null
-  language?: string
-  readOnly?: boolean
-  onChange?: (value: string) => void
-  onSave?: (value: string) => void
+  content: string;
+  filename: string | null;
+  language?: string;
+  readOnly?: boolean;
+  onChange?: (value: string) => void;
+  onSave?: (value: string) => void;
+  diffInfo?: DiffInfo | null; // Informazioni sulle modifiche per evidenziare le linee
 }
 
 const getLanguageFromFilename = (filename: string | null): string => {
-  if (!filename) return 'plaintext'
+  if (!filename) return "plaintext";
 
-  const extension = filename.split('.').pop()?.toLowerCase() || ''
+  const extension = filename.split(".").pop()?.toLowerCase() || "";
 
   const languageMap: Record<string, string> = {
     // JavaScript/TypeScript
-    'js': 'javascript',
-    'jsx': 'javascript',
-    'ts': 'typescript',
-    'tsx': 'typescript',
-    'mjs': 'javascript',
-    'cjs': 'javascript',
+    js: "javascript",
+    jsx: "javascript",
+    ts: "typescript",
+    tsx: "typescript",
+    mjs: "javascript",
+    cjs: "javascript",
 
     // Web
-    'html': 'html',
-    'htm': 'html',
-    'css': 'css',
-    'scss': 'scss',
-    'sass': 'scss',
-    'less': 'less',
+    html: "html",
+    htm: "html",
+    css: "css",
+    scss: "scss",
+    sass: "scss",
+    less: "less",
 
     // Data
-    'json': 'json',
-    'yaml': 'yaml',
-    'yml': 'yaml',
-    'xml': 'xml',
-    'toml': 'toml',
+    json: "json",
+    yaml: "yaml",
+    yml: "yaml",
+    xml: "xml",
+    toml: "toml",
 
     // Documents
-    'md': 'markdown',
-    'mdx': 'markdown',
-    'markdown': 'markdown',
+    md: "markdown",
+    mdx: "markdown",
+    markdown: "markdown",
 
     // Programming Languages
-    'py': 'python',
-    'rs': 'rust',
-    'go': 'go',
-    'java': 'java',
-    'c': 'c',
-    'cpp': 'cpp',
-    'h': 'c',
-    'hpp': 'cpp',
-    'php': 'php',
-    'rb': 'ruby',
-    'sh': 'shell',
-    'bash': 'shell',
-    'zsh': 'shell',
-    'ps1': 'powershell',
+    py: "python",
+    rs: "rust",
+    go: "go",
+    java: "java",
+    c: "c",
+    cpp: "cpp",
+    h: "c",
+    hpp: "cpp",
+    php: "php",
+    rb: "ruby",
+    sh: "shell",
+    bash: "shell",
+    zsh: "shell",
+    ps1: "powershell",
 
     // Config files
-    'dockerfile': 'dockerfile',
-    'gitignore': 'ignore',
-    'env': 'plaintext',
-    'ini': 'ini',
-    'cfg': 'ini',
-    'conf': 'plaintext',
+    dockerfile: "dockerfile",
+    gitignore: "ignore",
+    env: "plaintext",
+    ini: "ini",
+    cfg: "ini",
+    conf: "plaintext",
 
     // Others
-    'sql': 'sql',
-    'graphql': 'graphql',
-    'vue': 'vue',
-    'svelte': 'svelte',
-  }
+    sql: "sql",
+    graphql: "graphql",
+    vue: "vue",
+    svelte: "svelte",
+  };
 
-  return languageMap[extension] || 'plaintext'
-}
+  return languageMap[extension] || "plaintext";
+};
 
 export default function CodeEditor({
   content,
@@ -86,59 +93,161 @@ export default function CodeEditor({
   readOnly = false,
   onChange,
   onSave,
+  diffInfo,
 }: CodeEditorProps) {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const decorationsRef = useRef<string[]>([]);
 
   const detectedLanguage = useMemo(() => {
-    return language || getLanguageFromFilename(filename)
-  }, [language, filename])
+    return language || getLanguageFromFilename(filename);
+  }, [language, filename]);
 
-  const handleEditorDidMount = useCallback((
-    editor: monaco.editor.IStandaloneCodeEditor,
-    monaco: typeof import('monaco-editor')
-  ) => {
-    editorRef.current = editor
-
-    // Configure editor
-    editor.updateOptions({
-      fontSize: 14,
-      fontFamily: 'JetBrains Mono, SF Mono, Monaco, Inconsolata, Fira Code, Consolas, "Courier New", monospace',
-      lineNumbers: 'on',
-      roundedSelection: false,
-      scrollBeyondLastLine: false,
-      readOnly,
-      minimap: { enabled: true },
-      folding: true,
-      lineDecorationsWidth: 10,
-      lineNumbersMinChars: 3,
-      glyphMargin: false,
-      renderWhitespace: 'selection',
-      renderControlCharacters: false,
-      automaticLayout: true,
-    })
-
-    // Add save shortcut (Cmd/Ctrl + S)
-    if (!readOnly && onSave) {
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-        const value = editor.getValue()
-        onSave(value)
-      })
-    }
-
-    // Add format shortcut (Shift + Alt + F)
-    editor.addCommand(
-      monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
-      () => {
-        editor.getAction('editor.action.formatDocument')?.run()
+  const handleChange = useCallback(
+    (value: string | undefined) => {
+      if (value !== undefined && onChange) {
+        onChange(value);
       }
-    )
-  }, [readOnly, onSave])
+    },
+    [onChange]
+  );
 
-  const handleChange = useCallback((value: string | undefined) => {
-    if (value !== undefined && onChange) {
-      onChange(value)
+  // Applica le decorazioni per evidenziare le modifiche
+  const applyDiffDecorations = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor || !diffInfo) {
+      // Rimuovi decorazioni esistenti se non c'è diff
+      if (decorationsRef.current.length > 0) {
+        decorationsRef.current =
+          editor?.deltaDecorations(decorationsRef.current, []) ?? [];
+      }
+      return;
     }
-  }, [onChange])
+
+    const decorations: monaco.editor.IModelDeltaDecoration[] = [];
+
+    // Aggiunte (verde)
+    for (const lineNumber of diffInfo.additions) {
+      decorations.push({
+        range: new (window as any).monaco.Range(lineNumber, 1, lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          className: "diff-line-added",
+          glyphMarginClassName: "diff-glyph-added",
+          overviewRuler: {
+            color: "#4ade8099",
+            position: (window as any).monaco.editor.OverviewRulerLane.Left,
+          },
+          minimap: {
+            color: "#4ade8099",
+            position: (window as any).monaco.editor.MinimapPosition.Inline,
+          },
+        },
+      });
+    }
+
+    // Rimozioni (rosso)
+    for (const lineNumber of diffInfo.deletions) {
+      decorations.push({
+        range: new (window as any).monaco.Range(lineNumber, 1, lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          className: "diff-line-deleted",
+          glyphMarginClassName: "diff-glyph-deleted",
+          overviewRuler: {
+            color: "#f8717199",
+            position: (window as any).monaco.editor.OverviewRulerLane.Left,
+          },
+          minimap: {
+            color: "#f8717199",
+            position: (window as any).monaco.editor.MinimapPosition.Inline,
+          },
+        },
+      });
+    }
+
+    // Modifiche (giallo/arancione)
+    for (const lineNumber of diffInfo.modifications) {
+      decorations.push({
+        range: new (window as any).monaco.Range(lineNumber, 1, lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          className: "diff-line-modified",
+          glyphMarginClassName: "diff-glyph-modified",
+          overviewRuler: {
+            color: "#fbbf2499",
+            position: (window as any).monaco.editor.OverviewRulerLane.Left,
+          },
+          minimap: {
+            color: "#fbbf2499",
+            position: (window as any).monaco.editor.MinimapPosition.Inline,
+          },
+        },
+      });
+    }
+
+    // Applica le decorazioni
+    decorationsRef.current = editor.deltaDecorations(
+      decorationsRef.current,
+      decorations
+    );
+  }, [diffInfo]);
+
+  const handleEditorDidMount = useCallback(
+    (
+      editor: monaco.editor.IStandaloneCodeEditor,
+      monaco: typeof import("monaco-editor")
+    ) => {
+      editorRef.current = editor;
+
+      // Configure editor
+      editor.updateOptions({
+        fontSize: 14,
+        fontFamily:
+          'JetBrains Mono, SF Mono, Monaco, Inconsolata, Fira Code, Consolas, "Courier New", monospace',
+        lineNumbers: "on",
+        roundedSelection: false,
+        scrollBeyondLastLine: false,
+        readOnly,
+        minimap: { enabled: true },
+        folding: true,
+        lineDecorationsWidth: 10,
+        lineNumbersMinChars: 3,
+        glyphMargin: false,
+        renderWhitespace: "selection",
+        renderControlCharacters: false,
+        automaticLayout: true,
+      });
+
+      // Add save shortcut (Cmd/Ctrl + S)
+      if (!readOnly && onSave) {
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+          const value = editor.getValue();
+          onSave(value);
+        });
+      }
+
+      // Add format shortcut (Shift + Alt + F)
+      editor.addCommand(
+        monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+        () => {
+          editor.getAction("editor.action.formatDocument")?.run();
+        }
+      );
+
+      // Applica decorazioni diff dopo il mount
+      setTimeout(() => {
+        applyDiffDecorations();
+      }, 100);
+    },
+    [readOnly, onSave, applyDiffDecorations]
+  );
+
+  // Aggiorna le decorazioni quando cambia diffInfo o content
+  useEffect(() => {
+    if (editorRef.current) {
+      applyDiffDecorations();
+    }
+  }, [diffInfo, applyDiffDecorations]);
 
   return (
     <Editor
@@ -155,5 +264,5 @@ export default function CodeEditor({
         automaticLayout: true,
       }}
     />
-  )
+  );
 }
