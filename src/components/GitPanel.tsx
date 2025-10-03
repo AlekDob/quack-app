@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import CodeEditor from './CodeEditor'
 
 import type { GitCommitEntry, GitStatusEntry, GitStatusSummary } from '../types'
 
@@ -21,6 +22,8 @@ interface GitPanelProps {
   onSelect: (entry: GitStatusEntry) => void
   onStage: (entry: GitStatusEntry) => void
   onUnstage: (entry: GitStatusEntry) => void
+  onStageAll: () => void
+  onOpenFile: (path: string) => void
   commitMessage: string
   onCommitMessageChange: (message: string) => void
   onCommit: () => void
@@ -30,100 +33,105 @@ interface GitPanelProps {
 const statusBadgeClass = (kind: 'staged' | 'working') =>
   kind === 'staged' ? 'git-status-badge staged' : 'git-status-badge working'
 
-const TIMELINE_LINE_LEFT = 18
-const TIMELINE_CONNECTOR_COLOR = 'rgba(232, 125, 62, 0.32)'
-const DOT_SIZE = 14
-const DOT_TOP_OFFSET = 4 // circa 0.25rem per allinearsi con il layout esistente
-const DOT_CENTER = DOT_TOP_OFFSET + DOT_SIZE / 2
+const TIMELINE_LINE_LEFT = 20
+const TIMELINE_LINE_COLOR = 'rgba(232, 125, 62, 0.32)'
+const TIMELINE_DOT_COLOR = '#e87d3e'
 
 const GitTimelineItem = ({
   entry,
   lineLeft,
-  isFirst,
   isLast,
 }: {
   entry: GitCommitEntry
   lineLeft: number
-  isFirst: boolean
   isLast: boolean
-}) => (
-  <div
-    style={{
-      position: 'relative',
-      paddingLeft: `${lineLeft + 28}px`,
-      paddingBottom: isLast ? 0 : '1.2rem',
-    }}
-  >
-    {!isFirst && (
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          left: `${lineLeft}px`,
-          top: 0,
-          width: '2px',
-          height: `${DOT_CENTER}px`,
-          background: TIMELINE_CONNECTOR_COLOR,
-          transform: 'translateX(-50%)',
-        }}
-      />
-    )}
-    <div
-      aria-hidden
-      style={{
-        position: 'absolute',
-        left: `${lineLeft}px`,
-        top: `${DOT_TOP_OFFSET}px`,
-        width: `${DOT_SIZE}px`,
-        height: `${DOT_SIZE}px`,
-        borderRadius: '999px',
-        background: '#e87d3e',
-        border: '3px solid #e87d3e',
-        boxShadow: '0 0 0 3px rgba(15, 17, 26, 1)',
-        transform: 'translate(-50%, 0)',
-        zIndex: 1,
-      }}
-    />
-    {!isLast && (
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          left: `${lineLeft}px`,
-          top: `${DOT_CENTER}px`,
-          bottom: 0,
-          width: '2px',
-          background: TIMELINE_CONNECTOR_COLOR,
-          transform: 'translateX(-50%)',
-        }}
-      />
-    )}
+}) => {
+  const formattedDate = entry.timestamp
+    ? new Date(entry.timestamp * 1000).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null
+
+  return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.2rem',
+        position: 'relative',
+        paddingLeft: `${lineLeft + 28}px`,
+        paddingBottom: isLast ? 0 : '1.2rem',
       }}
     >
-      <span
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: `${lineLeft}px`,
+            top: 0,
+            bottom: 0,
+            width: '2px',
+            background: TIMELINE_LINE_COLOR,
+            transform: 'translateX(-50%)',
+            zIndex: 0,
+          }}
+        />
+      <div
+        aria-hidden
         style={{
-          fontSize: '0.78rem',
-          color: '#f1f2f5',
+          position: 'absolute',
+          left: `${lineLeft}px`,
+          top: '0.25rem',
+          width: '14px',
+          height: '14px',
+          borderRadius: '999px',
+          background: TIMELINE_DOT_COLOR,
+          border: '3px solid ' + TIMELINE_DOT_COLOR,
+          boxShadow: '0 0 0 3px rgba(15, 17, 26, 1)',
+          transform: 'translate(-50%, 0)',
+          zIndex: 1,
+        }}
+      />
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.2rem',
         }}
       >
-        {entry.summary}
-      </span>
-      <span
-        style={{
-          fontSize: '0.68rem',
-          color: '#a8aebd',
-        }}
-      >
-        {entry.author} • {entry.relativeTime}
-      </span>
+        <span
+          style={{
+            fontSize: '0.78rem',
+            color: '#f1f2f5',
+          }}
+        >
+          {entry.summary}
+        </span>
+        <span
+          style={{
+            fontSize: '0.68rem',
+            color: '#a8aebd',
+          }}
+        >
+          {entry.author} • {entry.relativeTime}
+        </span>
+        {formattedDate && (
+          <span
+            style={{
+              fontSize: '0.62rem',
+              color: 'rgba(255, 255, 255, 0.35)',
+              fontWeight: 400,
+              marginTop: '0.2rem',
+            }}
+          >
+            {formattedDate}
+          </span>
+        )}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 export default function GitPanel({
   summary,
@@ -142,6 +150,8 @@ export default function GitPanel({
   onSelect,
   onStage,
   onUnstage,
+  onStageAll,
+  onOpenFile,
   commitMessage,
   onCommitMessageChange,
   onCommit,
@@ -175,9 +185,19 @@ export default function GitPanel({
             <span className="git-behind">↓ {summary?.behind}</span>
           )}
         </div>
-        <button type="button" className="git-refresh" onClick={onRefresh} disabled={loading}>
-          Aggiorna
-        </button>
+        <div className="git-panel-actions">
+          <button
+            type="button"
+            className="git-stage-all-button"
+            onClick={onStageAll}
+            disabled={loading || groupedEntries.unstaged.length === 0}
+          >
+            Stage All
+          </button>
+          <button type="button" className="git-refresh" onClick={onRefresh} disabled={loading}>
+            Refresh
+          </button>
+        </div>
       </header>
 
       {error ? (
@@ -186,21 +206,22 @@ export default function GitPanel({
         <div className="git-panel-body">
           <aside className="git-status-column">
             <section className="git-status-section">
-              <h3>In staging</h3>
+              <h3>Staging</h3>
               <div className="git-status-list">
                 {loading ? (
-                  <div className="git-empty">Caricamento…</div>
+                  <div className="git-empty">Loading…</div>
                 ) : groupedEntries.staged.length === 0 ? (
-                  <div className="git-empty">Nessun file in staging</div>
+                  <div className="git-empty">No files in staging</div>
                 ) : (
                   groupedEntries.staged.map((entry) => (
                     <button
                       key={`staged-${entry.path}`}
                       type="button"
                       className={`git-status-item ${
-                        selected?.path === entry.path ? 'selected' : ''
+            selected?.path === entry.path ? 'selected' : ''
                       }`}
                       onClick={() => onSelect(entry)}
+                      onDoubleClick={() => onOpenFile(entry.path)}
                     >
                       <span className="git-status-path">{entry.path}</span>
                       <span className={statusBadgeClass('staged')}>
@@ -212,12 +233,12 @@ export default function GitPanel({
               </div>
             </section>
             <section className="git-status-section">
-              <h3>Modifiche locali</h3>
+              <h3>Changes</h3>
               <div className="git-status-list">
                 {loading ? (
-                  <div className="git-empty">Caricamento…</div>
+                  <div className="git-empty">Loading…</div>
                 ) : groupedEntries.unstaged.length === 0 ? (
-                  <div className="git-empty">Working tree pulito</div>
+                  <div className="git-empty">Working tree clean</div>
                 ) : (
                   groupedEntries.unstaged.map((entry) => (
                     <button
@@ -227,10 +248,11 @@ export default function GitPanel({
                         selected?.path === entry.path ? 'selected' : ''
                       }`}
                       onClick={() => onSelect(entry)}
+                      onDoubleClick={() => onOpenFile(entry.path)}
                     >
                       <span className="git-status-path">{entry.path}</span>
                       <span className={statusBadgeClass('working')}>
-                        {entry.unstaged_status ?? 'Modificato'}
+                        {entry.unstaged_status ?? 'Modified'}
                       </span>
                     </button>
                   ))
@@ -240,41 +262,6 @@ export default function GitPanel({
           </aside>
 
           <section className="git-main-column">
-            <div className="git-history-section">
-              <header className="git-history-header">
-                <h3>Timeline</h3>
-                {historyLoading && <span className="git-history-status">Aggiornamento…</span>}
-                {historyError && !historyLoading && (
-                  <span className="git-history-error">{historyError}</span>
-                )}
-              </header>
-              <div
-                style={{
-                  position: 'relative',
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: '0.5rem 0.8rem 1rem 0',
-                  minHeight: 0,
-                }}
-              >
-                {historyLoading ? (
-                  <div className="git-empty">Caricamento commit…</div>
-                ) : history.length === 0 ? (
-                  <div className="git-empty">Nessun commit recente</div>
-                ) : (
-                  history.map((entry, index) => (
-                    <GitTimelineItem
-                      key={entry.hash}
-                      entry={entry}
-                      lineLeft={TIMELINE_LINE_LEFT}
-                      isFirst={index === 0}
-                      isLast={index === history.length - 1}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-
             <div className="git-diff-column">
             {selected ? (
               <div className="git-diff-wrapper">
@@ -282,7 +269,7 @@ export default function GitPanel({
                   <div className="git-diff-meta">
                     <span className="git-diff-filename">{selected.path}</span>
                     {selected.original_path && (
-                      <span className="git-diff-rename">da {selected.original_path}</span>
+                      <span className="git-diff-rename">from {selected.original_path}</span>
                     )}
                   </div>
                   <div className="git-diff-actions">
@@ -307,12 +294,12 @@ export default function GitPanel({
                     <div className="git-diff-buttons">
                       {(selected.unstaged_status || selected.is_untracked) && (
                         <button type="button" onClick={() => onStage(selected)}>
-                          Stagia
+                          Stage
                         </button>
                       )}
                       {selected.staged_status && (
                         <button type="button" onClick={() => onUnstage(selected)}>
-                          Rimuovi dallo staging
+                          Unstage
                         </button>
                       )}
                     </div>
@@ -320,39 +307,90 @@ export default function GitPanel({
                 </div>
                 <div className="git-diff-content">
                   {diffLoading ? (
-                    <div className="git-empty">Calcolo diff…</div>
+                    <div className="git-empty">Computing diff…</div>
                   ) : diffError ? (
                     <div className="git-panel-error">{diffError}</div>
                   ) : (
-                    <pre className="git-diff-code">
-                      <code>{diffContent}</code>
-                    </pre>
+                    <div className="git-diff-editor">
+                      <CodeEditor
+                        content={diffContent}
+                        filename={`${selected.path}.diff`}
+                        language="diff"
+                        readOnly={true}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
             ) : (
               <div className="git-empty git-diff-placeholder">
-                Seleziona un file per vedere il diff
+                Select a file to see the diff
               </div>
             )}
-
-            <div className="git-commit-box">
-              <h3>Commit</h3>
-              <textarea
-                className="git-commit-message"
-                placeholder="Messaggio di commit"
-                value={commitMessage}
-                onChange={(event) => onCommitMessageChange(event.target.value)}
-              />
-              <button
-                type="button"
-                className="git-commit-button"
-                onClick={onCommit}
-                disabled={committing || commitMessage.trim().length === 0}
-              >
-                {committing ? 'Commit…' : 'Esegui commit'}
-              </button>
             </div>
+
+            <div className="git-history-timeline">
+              <header className="git-history-header">
+                <h3>Timeline</h3>
+                {historyLoading && <span className="git-history-status">Updating…</span>}
+                {historyError && !historyLoading && (
+                  <span className="git-history-error">{historyError}</span>
+                )}
+              </header>
+              <div
+                style={{
+                  position: 'relative',
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '0.5rem 0.8rem 1rem 0',
+                  minHeight: 0,
+                }}
+              >
+                <div
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    left: `${TIMELINE_LINE_LEFT}px`,
+                    top: 0,
+                    bottom: 0,
+                    width: '2px',
+                    background: 'rgba(232, 125, 62, 0.3)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                {historyLoading ? (
+                  <div className="git-empty">Loading commits…</div>
+                ) : history.length === 0 ? (
+                  <div className="git-empty">No recent commits</div>
+                ) : (
+                  history.map((entry, index) => (
+                    <GitTimelineItem
+                      key={entry.hash}
+                      entry={entry}
+                      lineLeft={TIMELINE_LINE_LEFT}
+                      isLast={index === history.length - 1}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="git-commit-box">
+                <h3>Commit</h3>
+                <textarea
+                  className="git-commit-message"
+                  placeholder="Commit message"
+                  value={commitMessage}
+                  onChange={(event) => onCommitMessageChange(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="git-commit-button"
+                  onClick={onCommit}
+                  disabled={committing || commitMessage.trim().length === 0}
+                >
+                  {committing ? 'Committing…' : 'Commit'}
+                </button>
+              </div>
             </div>
           </section>
         </div>

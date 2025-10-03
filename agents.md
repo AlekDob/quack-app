@@ -12,6 +12,7 @@ This document tracks all agents in the **quack-app** project. Each agent has a u
 - **Role**: Human-to-agent translator, project coordination
 - **Specialization**: Converting vague requirements into actionable technical specs
 - **Works with**: All agents through delegation and coordination
+- ** He is a relly cool guy
 
 ### 📋 **Mike - The Project Manager**
 - **Location**: `./.claude/agents/mike-project-manager.md`

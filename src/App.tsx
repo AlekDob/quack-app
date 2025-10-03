@@ -1316,6 +1316,32 @@ function App() {
     }
   }, []);
 
+  const handleOpenFileFromGit = useCallback(
+    (relativePath: string) => {
+      if (!explorerRoot) {
+        return;
+      }
+
+      // Converti path relativo in path assoluto
+      const fullPath = `${explorerRoot}/${relativePath}`.replace(/\/+/g, "/");
+
+      // Estrai il nome del file
+      const fileName = relativePath.split("/").pop() || relativePath;
+
+      // Crea un DirectoryEntry finto per aprire il file
+      const fakeEntry: DirectoryEntry = {
+        name: fileName,
+        path: fullPath,
+        is_dir: false,
+        is_symlink: false,
+      };
+
+      // Usa la stessa logica di handleOpenFilePreview
+      void handleOpenFilePreview(fakeEntry);
+    },
+    [explorerRoot, handleOpenFilePreview]
+  );
+
   const handleStageEntry = useCallback(
     async (entry: GitStatusEntry) => {
       if (!tauriAvailable) {
@@ -1351,6 +1377,36 @@ function App() {
     },
     [activeTerminal, explorerPath, refreshGitSummary, tauriAvailable]
   );
+
+  const handleStageAll = useCallback(async () => {
+    if (!tauriAvailable || !gitSummary) {
+      return;
+    }
+    setGitError(null);
+    try {
+      const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
+
+      // Stage all unstaged files
+      const unstagedFiles = gitSummary.entries.filter(
+        (entry) => entry.unstaged_status || entry.is_untracked
+      );
+
+      for (const entry of unstagedFiles) {
+        await invoke("git_stage", { path: entry.path, rootPath });
+      }
+
+      await refreshGitSummary();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setGitError(message);
+    }
+  }, [
+    activeTerminal,
+    explorerPath,
+    gitSummary,
+    refreshGitSummary,
+    tauriAvailable,
+  ]);
 
   const handleCommit = useCallback(async () => {
     if (!tauriAvailable || commitMessage.trim().length === 0) {
@@ -1418,7 +1474,7 @@ function App() {
     }
     const showStaged = diffView === "staged";
     if (showStaged && !selectedGitEntry.staged_status) {
-      setDiffContent("Nessuna differenza in staging.");
+      setDiffContent("No differences in staging.");
       setDiffError(null);
       return;
     }
@@ -1426,7 +1482,7 @@ function App() {
       !showStaged &&
       !(selectedGitEntry.unstaged_status || selectedGitEntry.is_untracked)
     ) {
-      setDiffContent("Nessuna differenza nel working tree.");
+      setDiffContent("No differences in working tree.");
       setDiffError(null);
       return;
     }
@@ -1693,6 +1749,8 @@ function App() {
             onSelect={handleSelectGitEntry}
             onStage={handleStageEntry}
             onUnstage={handleUnstageEntry}
+            onStageAll={handleStageAll}
+            onOpenFile={handleOpenFileFromGit}
             commitMessage={commitMessage}
             onCommitMessageChange={setCommitMessage}
             onCommit={handleCommit}

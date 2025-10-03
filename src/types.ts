@@ -65,6 +65,7 @@ export interface GitCommitEntry {
   summary: string;
   author: string;
   relativeTime: string;
+  timestamp?: number;
 }
 
 export interface TerminalDataEvent {

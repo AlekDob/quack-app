@@ -30,6 +30,7 @@ pub struct GitCommitEntry {
     pub summary: String,
     pub author: String,
     pub relative_time: String,
+    pub timestamp: Option<i64>,
 }
 
 #[tauri::command]
@@ -254,7 +255,7 @@ fn git_commit_history_impl(
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;
     let limit = limit.unwrap_or(50).min(200);
-    let pretty = "--pretty=format:%H%x1f%an%x1f%ad%x1f%s";
+    let pretty = "--pretty=format:%H%x1f%an%x1f%ad%x1f%at%x1f%s";
     let limit_arg = format!("-n{limit}");
     let args = ["log", "--date=relative", pretty, limit_arg.as_str()];
     let output = run_git(&root, &args, false)?;
@@ -268,11 +269,14 @@ fn git_commit_history_impl(
         let hash = parts.next().unwrap_or_default().to_string();
         let author = parts.next().unwrap_or_default().to_string();
         let relative_time = parts.next().unwrap_or_default().to_string();
+        let timestamp_str = parts.next().unwrap_or_default();
+        let timestamp = timestamp_str.parse::<i64>().ok();
         let summary = parts.next().unwrap_or_default().to_string();
         entries.push(GitCommitEntry {
             hash,
             author,
             relative_time,
+            timestamp,
             summary,
         });
     }
