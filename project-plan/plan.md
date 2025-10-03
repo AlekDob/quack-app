@@ -102,6 +102,7 @@ When Jack identifies a new feature or component:
 
 ### 📝 Planned Micro-Projects
 - [ ] *Additional features to be identified based on user needs*
+- [ ] [interactive-preview-inspector](./interactive-preview-inspector/plan.md) – Sistema di preview browser e inspector componenti per AI context
 
 ### 🚧 In Progress
 - 🔄 **[layout-refactoring-bottom-file-explorer](./layout-refactoring-bottom-file-explorer/)**: Major layout refactoring - moving file explorer to bottom horizontal panel
