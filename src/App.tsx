@@ -19,6 +19,7 @@ import ToolBar from "./components/ToolBar";
 import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
+import PreviewDrawer from "./components/PreviewDrawer";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -191,6 +192,7 @@ function App() {
   const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showProcessesDrawer, setShowProcessesDrawer] = useState(false);
+  const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null);
   const [loadingGit, setLoadingGit] = useState(false);
   const [gitError, setGitError] = useState<string | null>(null);
@@ -979,40 +981,9 @@ function App() {
   );
 
 
-  const handleOpenPreviewWindow = useCallback(async () => {
-    const previewPath = "preview.html";
-    const fullUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/${previewPath}`
-        : previewPath;
-
-    if (tauriAvailable && typeof window !== "undefined" && "__TAURI__" in window) {
-      try {
-        const { WebviewWindow } = await import("@tauri-apps/api/window");
-        const existing = WebviewWindow.getByLabel("preview-viewer");
-        if (existing) {
-          await existing.setFocus();
-          return;
-        }
-        const previewWindow = new WebviewWindow("preview-viewer", {
-          url: previewPath,
-          fullscreen: true,
-          resizable: true,
-          decorations: false,
-        });
-        previewWindow.once("tauri://error", (error) => {
-          console.error("Impossibile aprire la finestra di preview", error);
-        });
-        return;
-      } catch (error) {
-        console.error("Impossibile inizializzare la WebviewWindow", error);
-      }
-    }
-
-    if (typeof window !== "undefined") {
-      window.open(fullUrl, "_blank", "noopener,noreferrer");
-    }
-  }, [tauriAvailable]);
+  const handleOpenPreviewDrawer = useCallback(() => {
+    setShowPreviewDrawer(true);
+  }, []);
   const handleColorChange = useCallback(
     async (id: string, color: string) => {
       if (!tauriAvailable) {
@@ -1659,7 +1630,7 @@ function App() {
               <button
                 type="button"
                 className="git-tab-button"
-                onClick={handleOpenPreviewWindow}
+                onClick={handleOpenPreviewDrawer}
               >
                 Preview
               </button>
@@ -1772,6 +1743,11 @@ function App() {
           onRefresh={loadActiveProcesses}
           onFocusTerminal={handleSelectTerminal}
         />
+
+      <PreviewDrawer
+        open={showPreviewDrawer}
+        onClose={() => setShowPreviewDrawer(false)}
+      />
 
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
           <div
