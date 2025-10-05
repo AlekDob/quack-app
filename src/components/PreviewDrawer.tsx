@@ -67,12 +67,8 @@ export default function PreviewDrawer({
     };
   }, [handlePointerMove, handlePointerUp]);
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="preview-drawer">
+    <div className={`preview-drawer ${open ? "open" : ""}`}>
       <div
         className="preview-drawer-backdrop"
         onClick={handleBackdropClick}
