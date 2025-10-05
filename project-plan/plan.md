@@ -103,6 +103,7 @@ When Jack identifies a new feature or component:
 ### 📝 Planned Micro-Projects
 - [ ] *Additional features to be identified based on user needs*
 - [ ] [interactive-preview-inspector](./interactive-preview-inspector/plan.md) – Sistema di preview browser e inspector componenti per AI context
+- [ ] [ai-assistant-integration](./ai-assistant-integration/summary.md) – Integrazione OpenAI per AI Command Assistant e Auto Error Analyzer
 
 ### 🚧 In Progress
 - 🔄 **[layout-refactoring-bottom-file-explorer](./layout-refactoring-bottom-file-explorer/)**: Major layout refactoring - moving file explorer to bottom horizontal panel
@@ -177,6 +178,13 @@ Each significant achievement will be documented here:
   - *Agent*: Mike (Project Manager)
   - *Achievement*: Created comprehensive plan for moving file explorer to bottom panel
   - *Next*: Julie to implement major layout restructuring
+  - *Blockers*: None
+
+- **10/5/2025**: 📋 AI Assistant Integration planning completed
+  - *Agent*: Jack (CEO) + Mike (Project Manager)
+  - *Achievement*: Created comprehensive plan for OpenAI integration with Command Assistant (#-trigger) and Auto Error Analyzer
+  - *Documentation*: summary.md, prompts.md, testing.md created in project-plan/ai-assistant-integration/
+  - *Next*: John (Backend) to implement Rust AI module + Julie (Design) for UI components
   - *Blockers*: None
 
 ## Resource Links

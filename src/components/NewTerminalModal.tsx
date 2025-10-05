@@ -38,34 +38,34 @@ export default function NewTerminalModal({
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel">
-        <h2>{isEditing ? '✏️ Modifica terminale' : 'Crea nuovo terminale'}</h2>
+        <h2>{isEditing ? '✏️ Edit terminal' : 'Create new terminal'}</h2>
 
         <label className="modal-field">
-          <span>Nome terminale</span>
+          <span>Terminal name</span>
           <input
             type="text"
             value={name}
             onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Es. API Server"
+            placeholder="e.g. API Server"
             autoFocus
           />
         </label>
 
         <div className="modal-field">
-          <span>Cartella di lavoro</span>
-          <div className="modal-selected-path">{path || 'Nessuna cartella selezionata'}</div>
+          <span>Working directory</span>
+          <div className="modal-selected-path">{path || 'No directory selected'}</div>
           <button
             type="button"
             className="secondary"
             onClick={onBrowse}
             disabled={selectingDirectory}
           >
-            {selectingDirectory ? 'Apertura Finder…' : 'Scegli cartella'}
+            {selectingDirectory ? 'Opening Finder…' : 'Choose directory'}
           </button>
         </div>
 
         <div className="modal-field">
-          <span>Colore del terminale</span>
+          <span>Terminal color</span>
           <div className="modal-color-grid">
             {availableColors.map((preset) => (
               <button
@@ -81,7 +81,7 @@ export default function NewTerminalModal({
                 type="color"
                 value={color}
                 onChange={(event) => onColorChange(event.target.value)}
-                aria-label="Scegli un colore personalizzato"
+                aria-label="Choose a custom color"
               />
             </label>
           </div>
@@ -91,7 +91,7 @@ export default function NewTerminalModal({
 
         <div className="modal-actions">
           <button type="button" className="secondary" onClick={onCancel}>
-            Annulla
+            Cancel
           </button>
           <button
             type="button"
@@ -99,7 +99,7 @@ export default function NewTerminalModal({
             onClick={onConfirm}
             disabled={!name.trim() || !path.trim() || creating}
           >
-            {creating ? (isEditing ? 'Salvataggio…' : 'Creazione…') : (isEditing ? 'Salva modifiche' : 'Crea terminale')}
+            {creating ? (isEditing ? 'Saving…' : 'Creating…') : (isEditing ? 'Save changes' : 'Create terminal')}
           </button>
         </div>
       </div>

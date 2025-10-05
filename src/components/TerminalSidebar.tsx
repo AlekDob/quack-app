@@ -124,7 +124,7 @@ export default function TerminalSidebar({
             onClick={onAdd}
             disabled={creating}
           >
-            {creating ? "Creazione…" : "Nuovo"}
+            {creating ? "Creating…" : "New"}
           </button>
         </div>
         <input
@@ -132,12 +132,12 @@ export default function TerminalSidebar({
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Cerca terminali"
+          placeholder="Search terminals"
         />
       </div>
 
       <div className="explorer-root-label sidebar-terminals-label">
-        TERMINALI ATTIVI
+        ACTIVE TERMINALS
       </div>
 
       <div className="sidebar-list">

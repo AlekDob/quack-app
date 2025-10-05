@@ -93,7 +93,7 @@ const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
     await store.set(STORAGE_KEY, metadata);
     await store.save();
   } catch (error) {
-    console.warn("Impossibile salvare i terminali", error);
+    console.warn("Unable to save terminals", error);
   }
 };
 
@@ -103,7 +103,7 @@ const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
     const stored = await store.get<TerminalMetadata[]>(STORAGE_KEY);
     return stored ?? [];
   } catch (error) {
-    console.warn("Impossibile caricare i terminali salvati", error);
+    console.warn("Unable to load saved terminals", error);
     return [];
   }
 };
@@ -154,7 +154,7 @@ const playQuackSound = () => {
       }
     };
   } catch (error) {
-    console.warn("Impossibile riprodurre l’audio di notifica", error);
+    console.warn("Unable to play notification sound", error);
   }
 };
 
@@ -262,7 +262,7 @@ function App() {
       const commands = await invoke<SavedCommand[]>("load_saved_commands");
       setSavedCommands(commands);
     } catch (error) {
-      console.warn("Impossibile caricare i comandi salvati", error);
+      console.warn("Unable to load saved commands", error);
     }
   }, []);
 
@@ -300,14 +300,14 @@ function App() {
     if (terminals.length > 0) {
       void saveTerminalsToStorage(terminals);
     } else {
-      // Se non ci sono terminali, pulisci lo storage
+      // If no terminals, clean up storage
       void (async () => {
         try {
           const store = await Store.load("quack-terminals.json");
           await store.delete(STORAGE_KEY);
           await store.save();
         } catch {
-          // Ignora errori
+          // Ignore errors
         }
       })();
     }
@@ -327,7 +327,7 @@ function App() {
         setNotificationGranted(granted);
         return granted;
       } catch (error) {
-        console.warn("Impossibile verificare i permessi di notifica", error);
+        console.warn("Unable to verify notification permissions", error);
         setNotificationGranted(false);
         return false;
       }
@@ -353,11 +353,11 @@ function App() {
       try {
         await sendNotification({
           id: Number(Date.now() % 2147483647),
-          title: "Terminale pronto",
-          body: `${payload.label} è in attesa di input.`,
+          title: "Terminal ready",
+          body: `${payload.label} is waiting for input.`,
         });
       } catch (error) {
-        console.warn("Impossibile mostrare la notifica", error);
+        console.warn("Unable to show notification", error);
       }
     },
     [ensureNotificationPermission, notificationGranted, tauriAvailable]
@@ -370,7 +370,7 @@ function App() {
       if (!tauriAvailable) {
         setLoadingExplorer(false);
         setExplorerError(
-          "Avvia l’app desktop Tauri per usare il file explorer."
+          "Launch the Tauri desktop app to use the file explorer."
         );
         setExplorerTree({});
         setExplorerRoot(null);
@@ -400,7 +400,7 @@ function App() {
     async (path: string) => {
       if (!tauriAvailable) {
         setExplorerError(
-          "Avvia l’app desktop Tauri per usare il file explorer."
+          "Launch the Tauri desktop app to use the file explorer."
         );
         return [];
       }
@@ -604,7 +604,7 @@ function App() {
       });
       if (!resolvedId) {
         console.warn(
-          "Evento hook ignorato: nessun terminale corrisponde a",
+          "Hook event ignored: no matching terminal for",
           payload
         );
         return;
@@ -638,7 +638,7 @@ function App() {
     if (!tauriAvailable) {
       setBooting(false);
       setHasBootstrapped(true);
-      setExplorerError("Esegui l’app tramite Tauri per attivare i terminali.");
+      setExplorerError("Run the app via Tauri to activate terminals.");
       return;
     }
 
@@ -646,11 +646,11 @@ function App() {
 
     const bootstrap = async () => {
       try {
-        // Prova a caricare i terminali salvati
+        // Try to load saved terminals
         const savedMetadata = await loadTerminalsFromStorage();
 
         if (savedMetadata.length > 0) {
-          // Ricrea i terminali dai metadata salvati
+          // Recreate terminals from saved metadata
           const recreated: TerminalInfo[] = [];
           for (const metadata of savedMetadata) {
             try {
@@ -666,7 +666,7 @@ function App() {
               });
             } catch (error) {
               console.warn(
-                `Impossibile ricreare il terminale ${metadata.label}`,
+                `Unable to recreate terminal ${metadata.label}`,
                 error
               );
             }
@@ -677,7 +677,7 @@ function App() {
             setActiveId(recreated[0].id);
             await loadDirectory(recreated[0].cwd);
           } else {
-            // Fallback: crea un terminale di default
+            // Fallback: create a default terminal
             const initial = await invoke<TerminalInfo>("create_terminal", {
               label: "Terminal 1",
               color: COLORS[0],
@@ -693,7 +693,7 @@ function App() {
             await loadDirectory(initialWithState.cwd);
           }
         } else {
-          // Nessun terminale salvato, crea uno di default
+          // No saved terminals, create a default one
           const initial = await invoke<TerminalInfo>("create_terminal", {
             label: "Terminal 1",
             color: COLORS[0],
@@ -709,7 +709,7 @@ function App() {
           await loadDirectory(initialWithState.cwd);
         }
       } catch (error) {
-        console.error("Errore durante l'inizializzazione", error);
+        console.error("Error during initialization", error);
       } finally {
         setBooting(false);
         setHasBootstrapped(true);
@@ -743,7 +743,7 @@ function App() {
           markTerminalIdle(event.payload.id);
         });
       } catch (error) {
-        console.warn("Impossibile ascoltare gli eventi di uscita", error);
+        console.warn("Unable to listen to exit events", error);
       }
     };
 
@@ -783,7 +783,7 @@ function App() {
 
   const handleOpenNewTerminalModal = useCallback(() => {
     if (!tauriAvailable) {
-      setExplorerError("Terminali disponibili solo tramite l'app desktop.");
+      setExplorerError("Terminals available only via desktop app.");
       return;
     }
     setEditingTerminal(null);
@@ -819,7 +819,7 @@ function App() {
         directory: true,
         multiple: false,
         defaultPath: newTerminalPath || explorerPath || undefined,
-        title: "Seleziona la cartella di lavoro",
+        title: "Select working directory",
       })) as string | string[] | null;
 
       if (typeof selected === "string") {
@@ -832,8 +832,8 @@ function App() {
         setNewTerminalPath(selected[0]);
       }
     } catch (error) {
-      console.error("Impossibile selezionare la cartella", error);
-      setNewTerminalError("Impossibile selezionare la cartella. Riprova.");
+      console.error("Unable to select directory", error);
+      setNewTerminalError("Unable to select directory. Please try again.");
     } finally {
       setSelectingDirectory(false);
     }
@@ -848,12 +848,12 @@ function App() {
     const trimmedPath = newTerminalPath.trim();
 
     if (!trimmedName) {
-      setNewTerminalError("Inserisci un nome per il terminale.");
+      setNewTerminalError("Enter a terminal name.");
       return;
     }
 
     if (!trimmedPath) {
-      setNewTerminalError("Seleziona la cartella di lavoro.");
+      setNewTerminalError("Select working directory.");
       return;
     }
 
@@ -912,7 +912,7 @@ function App() {
         await loadDirectory(createdWithState.cwd);
       }
     } catch (error) {
-      console.error("Impossibile salvare il terminale", error);
+      console.error("Unable to save terminal", error);
       const message = error instanceof Error ? error.message : String(error);
       setNewTerminalError(message);
     } finally {
@@ -961,7 +961,7 @@ function App() {
       try {
         await invoke("close_terminal", { id });
       } catch (error) {
-        console.error("Impossibile chiudere il terminale", error);
+        console.error("Unable to close terminal", error);
       }
 
       let nextActive: string | null = activeId;
@@ -1020,7 +1020,7 @@ function App() {
           )
         );
       } catch (error) {
-        console.error("Impossibile aggiornare il colore", error);
+        console.error("Unable to update color", error);
       }
     },
     [tauriAvailable]
@@ -1038,13 +1038,13 @@ function App() {
       setLoadingPreview(true);
 
       try {
-        // Carica il contenuto del file
+        // Load file content
         const content = await invoke<string>("read_file_content", {
           path: entry.path,
         });
         setPreviewContent(content);
 
-        // Se il file è modificato, carica anche il diff
+        // If file is modified, also load the diff
         const isModified = gitSummary?.entries?.some((gitEntry) => {
           const fullPath = explorerRoot
             ? `${explorerRoot}/${gitEntry.path}`.replace(/\/+/g, "/")
@@ -1054,7 +1054,7 @@ function App() {
 
         if (isModified && gitSummary && explorerRoot) {
           try {
-            // Calcola il path relativo al git root
+            // Calculate path relative to git root
             let relativePath = entry.path;
             if (entry.path.startsWith(explorerRoot)) {
               relativePath = entry.path.substring(explorerRoot.length);
@@ -1073,8 +1073,8 @@ function App() {
             const diffInfo = parseDiff(diff);
             setPreviewDiffInfo(diffInfo);
           } catch (diffError) {
-            console.warn("Impossibile caricare il diff:", diffError);
-            // Non blocchiamo l'apertura del file se il diff fallisce
+            console.warn("Unable to load diff:", diffError);
+            // Don't block file opening if diff fails
           }
         }
       } catch (error) {
@@ -1135,7 +1135,7 @@ function App() {
     })();
 
     if (!parser) {
-      setPreviewError("Formattazione non disponibile per questo tipo di file.");
+      setPreviewError("Formatting not available for this file type.");
       return;
     }
 
@@ -1213,9 +1213,9 @@ function App() {
           id: activeId,
           data: command + "\n",
         });
-        console.log(`Comando AI eseguito: ${label} -> ${command}`);
+        console.log(`AI command executed: ${label} -> ${command}`);
       } catch (error) {
-        console.error("Errore durante l'esecuzione del comando AI", error);
+        console.error("Error executing AI command", error);
       }
     },
     [activeId, tauriAvailable]
@@ -1257,7 +1257,7 @@ function App() {
           markTerminalBusy(targetTerminalId);
         }
       } catch (error) {
-        console.error("Impossibile lanciare il comando salvato", error);
+        console.error("Unable to launch saved command", error);
       }
     },
     [activeId, markTerminalBusy, tauriAvailable]
@@ -1345,13 +1345,13 @@ function App() {
         return;
       }
 
-      // Converti path relativo in path assoluto
+      // Convert relative path to absolute path
       const fullPath = `${explorerRoot}/${relativePath}`.replace(/\/+/g, "/");
 
-      // Estrai il nome del file
+      // Extract file name
       const fileName = relativePath.split("/").pop() || relativePath;
 
-      // Crea un DirectoryEntry finto per aprire il file
+      // Create a fake DirectoryEntry to open the file
       const fakeEntry: DirectoryEntry = {
         name: fileName,
         path: fullPath,
@@ -1359,7 +1359,7 @@ function App() {
         is_symlink: false,
       };
 
-      // Usa la stessa logica di handleOpenFilePreview
+      // Use the same logic as handleOpenFilePreview
       void handleOpenFilePreview(fakeEntry);
     },
     [explorerRoot, handleOpenFilePreview]
@@ -1559,16 +1559,16 @@ function App() {
         <div className="fallback-card">
           <h1>Quack</h1>
           <p>
-            Questa interfaccia richiede l’ambiente desktop di Tauri per gestire
-            i terminali e il file explorer.
+            This interface requires Tauri desktop environment to manage
+            terminals and the file explorer.
           </p>
           <p>
-            Avvia l’app con:
+            Launch the app with:
             <code>npm run tauri:dev</code>
           </p>
           <p>
-            Chiudi la scheda del browser e usa la finestra desktop lanciata dal
-            comando.
+            Close the browser tab and use the desktop window launched by the
+            command.
           </p>
         </div>
       </div>
@@ -1617,7 +1617,7 @@ function App() {
             <div className="main-toolbar-top">
               <div className="main-toolbar-title">
                 <h1>
-                  {activeTerminal?.label ?? "Terminale"}
+                  {activeTerminal?.label ?? "Terminal"}
                   {import.meta.env.DEV && (
                     <span className="dev-badge">DEV</span>
                   )}
@@ -1658,7 +1658,7 @@ function App() {
             </div>
             <div className="main-toolbar-bottom">
               <span className="terminal-status">
-                {activeTerminal ? activeTerminal.cwd : "Nessun terminale attivo"}
+                {activeTerminal ? activeTerminal.cwd : "No active terminal"}
               </span>
             </div>
           </div>
@@ -1672,7 +1672,7 @@ function App() {
               />
             ) : (
               <div className="terminal-surface terminal-placeholder">
-                Crea un nuovo terminale per iniziare a lavorare.
+                Create a new terminal to start working.
               </div>
             )}
           </div>

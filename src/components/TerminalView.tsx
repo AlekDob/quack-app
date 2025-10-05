@@ -79,11 +79,14 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       void invoke('write_to_terminal', { id, data: chunk })
     })
 
-    // Smart auto-scroll: scroll solo se già al bottom
+    // Smart proximity-based auto-scroll: scroll solo se l'utente è vicino al bottom
     terminal.onWriteParsed(() => {
       const buffer = terminal.buffer.active
-      const isAtBottom = buffer.viewportY === buffer.baseY
-      if (isAtBottom) {
+      const distanceFromBottom = buffer.baseY - buffer.viewportY
+
+      // Auto-scroll solo se entro 5 righe dal bottom (utente probabilmente vuole vedere output)
+      // Se l'utente ha scrollato più in alto, rispetta la sua scelta
+      if (distanceFromBottom <= 5) {
         terminal.scrollToBottom()
       }
     })
@@ -161,6 +164,16 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       try {
         const dataListener = await listen<TerminalDataEvent>('terminal-data', (event) => {
           const term = ensureTerminal(event.payload.id)
+
+          // Debug: log caratteri speciali per investigare spazi enormi
+          if (event.payload.data.includes('\n\n\n') || event.payload.data.match(/\n{3,}/)) {
+            console.warn('⚠️ Multipli newline rilevati:', {
+              id: event.payload.id,
+              data: event.payload.data,
+              repr: JSON.stringify(event.payload.data)
+            })
+          }
+
           term.write(event.payload.data)
           onOutput(event.payload.id, event.payload.data)
         })
@@ -241,8 +254,6 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     }
 
     let resizeTimeout: ReturnType<typeof setTimeout> | null = null
-    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
-    let isScrolling = false
     let isResizing = false
     let lastRows = 0
     let lastCols = 0
@@ -254,8 +265,8 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         return
       }
 
-      // Non fare resize se stiamo scrollando o se siamo già in resize
-      if (isScrolling || isResizing) {
+      // Non fare resize se siamo già in resize
+      if (isResizing) {
         return
       }
 
@@ -308,33 +319,17 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       }, 200)
     }
 
-    // Gestione scroll - disabilita resize durante scroll
-    const handleScroll = () => {
-      isScrolling = true
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout)
-      }
-      scrollTimeout = setTimeout(() => {
-        isScrolling = false
-      }, 200)
-    }
-
     observer = new ResizeObserver(handleResize)
     observer.observe(container)
-    container.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('resize', handleResize)
 
     return () => {
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout)
-      }
       if (observer) {
         observer.disconnect()
       }
-      container.removeEventListener('scroll', handleScroll)
       window.removeEventListener('resize', handleResize)
     }
   }, [reportResize, tauriAvailable])
@@ -352,6 +347,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     <div
       ref={containerRef}
       className="terminal-surface"
+      style={{ overflow: 'hidden' }}
     />
   )
 }
