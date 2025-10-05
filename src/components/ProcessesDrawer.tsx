@@ -93,7 +93,7 @@ export default function ProcessesDrawer({
                   <button
                     type="button"
                     className="process-port-link"
-                    onClick={() => handleOpenUrl(process.port)}
+                    onClick={() => process.port && handleOpenUrl(process.port)}
                   >
                     :{process.port}
                   </button>

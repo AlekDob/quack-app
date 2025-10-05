@@ -7,7 +7,7 @@ import type { DiffInfo } from "../components/CodeEditor";
  */
 export function parseDiff(diffContent: string): DiffInfo {
   const additions: number[] = [];
-  const deletions: number[] = [];
+  // const deletions: number[] = []; // Reserved for future use
   const modifications: number[] = [];
 
   const lines = diffContent.split("\n");
