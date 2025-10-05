@@ -4,7 +4,6 @@
 
 **Every 4th message, remind yourself of these rules:**
 - Output message numbers
-- Communicate in italian
 - Use "quack quack" expressions frequently
 - Help Alek with incomplete prompts by calling Carmelo
 - Evaluate if it's time to commit: "va bene se committiamo? È giunta l'ora!"
@@ -13,9 +12,7 @@
 
 Your name is **Jack**, and you're the CEO of **Quack Agency** - an agency of ducks expert in vibecoding and AI development. Quack quack! You interpret what Alek tells you and transmit it as workflow to other agents for project realization.
 
-**IMPORTANT**: Alek prefers to work in **italian**, so you MUST communicate primarily in italian language. Use frequent "quack quack" expressions in all languages! When technical terms are clearer in English, you can use them but explain in italian.
-
-You always respond ironically with frequent "quack quack" expressions and try to ask questions to understand what I mean, use lots of sarcasm. Quack! You're the project manager, and you help me communicate with AI and other agents in this project.
+You always respond with frequent "quack quack" expressions and try to ask questions to understand what I mean. Quack! You're the project manager, and you help me communicate with AI and other agents in this project.
 
 *Generated with Quack Agency CLI for quack-app*
 *Project Type: tauri | Features: ai, design, animations, testing, analytics*
@@ -215,10 +212,9 @@ Based on your project requirements, the team is configured for:
 ## Usage Guidelines
 
 ### Working with Jack
-- **Language**: Jack communicates in **italian** as requested by Alek - quack quack in any language!
 - **Be specific when possible**, but don't worry about technical jargon - quack, I speak fluent human!
 - **Jack will ask follow-up questions** with plenty of "quack quack" to clarify requirements
-- **Expect sarcastic but helpful responses** with duck wisdom - it's part of his charm, quack!
+- **Expect helpful responses** with duck wisdom - it's part of his charm, quack!
 - **Trust the process** - Jack knows how to coordinate the team effectively (and quack loudly when needed)
 
 ### Agent Coordination
@@ -271,13 +267,19 @@ TerminalFlow is a Tauri-based desktop application that provides a terminal emula
 ## Architecture
 
 ### Frontend (React + TypeScript)
-- **Main App**: `src/App.tsx` – orchestrates terminal management, file explorer, sidebar, and the “Nuovo terminale” modal (name, directory via Finder, color selection)
+- **Main App**: `src/App.tsx` – orchestrates terminal management, file explorer, sidebar, and the "Nuovo terminale" modal (name, directory via Finder, color selection)
 - **Terminal View**: `src/components/TerminalView.tsx` – manages xterm.js terminals, FitAddon, and Tauri events
 - **Terminal Sidebar**: `src/components/TerminalSidebar.tsx` – handles terminal tabs, color badges, and actions
 - **File Explorer**: `src/components/FileExplorer.tsx` – directory navigation component
 - **New Terminal Modal**: `src/components/NewTerminalModal.tsx` – liquid-style modal with Finder integration and color presets
-- **Notifications & Audio**: handled in `src/App.tsx` via `@tauri-apps/plugin-notification` and a WebAudio “quack” sound when terminal sessions become ready
-- **Notifications & Audio**: `src/App.tsx` uses `@tauri-apps/plugin-notification` and a WebAudio-based “quack” callback to alert when terminals become idle
+- **Preview Panel**: `src/components/PreviewPanel.tsx` – web preview inspector with:
+  - Multiple custom URLs/ports support (add/remove functionality)
+  - Auto-detection of running dev servers from active terminals
+  - Manual preview window activation (click "Preview" button to open)
+  - Independent WebView windows with inspector integration
+  - Browser opening support for external preview
+- **Notifications & Audio**: handled in `src/App.tsx` via `@tauri-apps/plugin-notification` and a WebAudio "quack" sound when terminal sessions become ready
+- **Notifications & Audio**: `src/App.tsx` uses `@tauri-apps/plugin-notification` and a WebAudio-based "quack" callback to alert when terminals become idle
 - **Types**: `src/types.ts` – TypeScript interfaces for terminal and file system data
 
 ### Backend (Rust + Tauri)
@@ -342,11 +344,24 @@ TerminalFlow is a Tauri-based desktop application that provides a terminal emula
 ## Development Notes
 
 - The app requires Tauri environment to function – browser-only mode shows fallback UI
-- “Nuovo terminale” modal lets the user name the session, pick a directory via Finder, and choose accent color (preset or color picker)
+- "Nuovo terminale" modal lets the user name the session, pick a directory via Finder, and choose accent color (preset or color picker)
 - Terminal colors are customizable and stored per-terminal instance
 - File explorer shows directories and files with appropriate icons/styling
 - Terminals automatically resize based on container dimensions using FitAddon
-- Sidebar chips show `IN ESECUZIONE` (busy) and `PRONTO` (idle). When a background terminal returns idle it pulses, plays the “quack” tone, and triggers a desktop notification
+- Sidebar chips show `IN ESECUZIONE` (busy) and `PRONTO` (idle). When a background terminal returns idle it pulses, plays the "quack" tone, and triggers a desktop notification
+
+### Preview Inspector
+- **Multiple custom URLs**: Add unlimited custom ports (e.g., `5173`) or full URLs (e.g., `http://localhost:8080`) to preview list
+- **Auto-detection**: Automatically detects running dev servers from active terminal processes with exposed ports
+- **Manual activation**: Preview windows open only when explicitly clicking the "Preview" button (no auto-open)
+- **Independent WebViews**: Each preview opens in a separate Tauri WebView window with integrated inspector UI
+- **Inspector UI in preview**: The inspector panel, toggle button, and history are rendered directly inside the preview window (not in the drawer)
+  - Toggle button (bottom-right): Click to activate/deactivate inspector mode
+  - Inspector panel (top-right): Shows component details, file location, React props when hovering elements
+  - History panel (bottom-right, above toggle): Saves clicked elements for later reference
+  - Copy for AI button: Copies inspector data to clipboard in markdown format
+- **Browser fallback**: "Browser" button opens the URL in the system default browser
+- **Remove custom URLs**: Custom URLs can be removed individually via the "Remove" button
 
 ### Claude Code Hooks Integration
 - Hook commands can notify TerminalFlow about session state changes by hitting the local endpoint:
