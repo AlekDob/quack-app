@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { usePreviewManager, type PreviewProfile } from "../composables/usePreviewManager";
 import { usePreviewWebView } from "../composables/usePreviewWebView";
 import { inspectorBridge, type InspectorData } from "../services/inspectorBridge";
@@ -38,10 +39,11 @@ export default function PreviewPanel() {
 
   const [inspectorData, setInspectorData] = useState<InspectorData | null>(null);
   const [inspectorHistory, setInspectorHistory] = useState<InspectorData[]>([]);
+  const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
   const webviewContainerRef = useRef<HTMLDivElement>(null);
   const webview = usePreviewWebView();
 
-  // Initialize inspector bridge
+  // Initialize inspector bridge and Tauri event listener
   useEffect(() => {
     inspectorBridge.init();
 
@@ -62,17 +64,33 @@ export default function PreviewPanel() {
     inspectorBridge.on('hover', handleHover);
     inspectorBridge.on('click', handleClick);
 
+    // Listen for Tauri events from the preview WebView and forward to inspector bridge
+    let unlisten: (() => void) | undefined;
+
+    void listen<Record<string, unknown>>('preview-inspector-event', (event) => {
+      const { type, data } = event.payload;
+
+      if (type === 'quack-inspector-hover') {
+        handleHover(data as InspectorData | Record<string, unknown>);
+      } else if (type === 'quack-inspector-click') {
+        handleClick(data as InspectorData | Record<string, unknown>);
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
     return () => {
       inspectorBridge.off('hover', handleHover);
       inspectorBridge.off('click', handleClick);
       inspectorBridge.destroy();
+      unlisten?.();
     };
   }, []);
 
-  // Create/destroy webview based on preview URL
+  // Create/destroy webview based on active preview URL (manual trigger)
   useEffect(() => {
     const container = webviewContainerRef.current;
-    if (!container || !previewUrl) {
+    if (!container || !activePreviewUrl) {
       void webview.destroyWebView();
       return;
     }
@@ -88,7 +106,7 @@ export default function PreviewPanel() {
 
         const rect = container.getBoundingClientRect();
 
-        await webview.createWebView(previewUrl, {
+        await webview.createWebView(activePreviewUrl, {
           x: rect.x,
           y: rect.y,
           width: rect.width,
@@ -117,16 +135,35 @@ export default function PreviewPanel() {
       void webview.destroyWebView();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewUrl, reloadToken]);
+  }, [activePreviewUrl, reloadToken]);
 
-  // Toggle inspector when enabled changes
+  // Toggle inspector when enabled changes - send to webview via script injection
   useEffect(() => {
-    inspectorBridge.toggle(inspectorEnabled);
+    if (!webview.isActive()) return;
+
+    const toggleScript = `
+      window.postMessage({
+        type: 'quack-inspector-toggle',
+        enabled: ${inspectorEnabled}
+      }, '*');
+    `;
+
+    void webview.injectScript(toggleScript);
 
     if (!inspectorEnabled) {
       setInspectorData(null);
     }
-  }, [inspectorEnabled]);
+  }, [inspectorEnabled, webview]);
+
+  // Open preview window manually
+  const openPreviewWindow = useCallback((url: string) => {
+    setActivePreviewUrl(url);
+  }, []);
+
+  // Close preview window
+  const closePreviewWindow = useCallback(() => {
+    setActivePreviewUrl(null);
+  }, []);
 
   // Copy inspector data to clipboard for AI
   const copyForAI = useCallback(() => {
@@ -185,76 +222,171 @@ export default function PreviewPanel() {
     };
   }, [previewUrl, toggleInspector]);
 
+  // Get live profiles (processes with ports)
+  const liveProfiles = useMemo(() => {
+    return profiles.filter(p => p.isLive && p.port);
+  }, [profiles]);
+
+  // Create custom profile from customUrl if present
+  const customProfile = useMemo<PreviewProfile | null>(() => {
+    if (!customUrl || customUrl.trim().length === 0) {
+      return null;
+    }
+
+    // Check if it's a port number
+    const portMatch = customUrl.match(/^(\d+)$/);
+    if (portMatch) {
+      const port = Number.parseInt(portMatch[1], 10);
+      return {
+        id: 'custom-port',
+        label: `Custom Port :${port}`,
+        port,
+        url: `http://localhost:${port}`,
+      };
+    }
+
+    // Otherwise treat as full URL
+    return {
+      id: 'custom-url',
+      label: 'Custom URL',
+      url: customUrl,
+    };
+  }, [customUrl]);
+
+  // Combine all profiles
+  const allProfiles = useMemo(() => {
+    return customProfile ? [customProfile, ...liveProfiles] : liveProfiles;
+  }, [customProfile, liveProfiles]);
+
   return (
     <section className="flex h-full min-h-0 w-full flex-col bg-[#0d1017]">
-      <header className="flex flex-col gap-3 border-b border-slate-800/60 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-            Profilo
-            <select
-              value={selectedProfileId ?? ""}
-              onChange={(event) => selectProfile(event.target.value || null)}
-              className="h-8 rounded-md border border-slate-700 bg-slate-900/80 px-2 text-xs text-slate-100 shadow-inner outline-none transition focus:border-slate-500"
-            >
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id} className="bg-slate-900">
-                  {profile.isLive ? '🟢 ' : ''}{profile.label}
-                </option>
-              ))}
-              <option value="" className="bg-slate-900">
-                Nessuno
-              </option>
-            </select>
-          </label>
-          <PortInput portSource={customUrl} profile={selectedProfile} onChange={setCustomUrl} />
-          <UrlInput value={customUrl ?? ""} onChange={setCustomUrl} />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className={`h-2.5 w-2.5 rounded-full ${STATUS_TONE[status]}`} aria-hidden="true" />
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-300">
-              {STATUS_LABEL[status]}
-            </span>
-            {selectedProfile?.isLive && (
-              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
-                LIVE
-              </span>
-            )}
-            {previewUrl ? (
-              <span className="truncate text-xs text-slate-500">{previewUrl}</span>
-            ) : (
-              <span className="text-xs text-slate-600">Nessuna anteprima configurata</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void checkAvailability()}
-              className="rounded-md border border-slate-700/70 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-700"
-            >
-              Check
-            </button>
-            <button
-              type="button"
-              onClick={refresh}
-              className="rounded-md border border-slate-700/70 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-700"
-              disabled={!previewUrl}
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => openExternal()}
-              className="rounded-md border border-slate-700/70 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-700"
-              disabled={!previewUrl}
-            >
-              Apri
-            </button>
-          </div>
-        </div>
+      <header className="border-b border-slate-800/60 px-4 py-3">
+        <h2 className="text-sm font-medium text-slate-200">Preview Inspector</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Processi attivi con preview disponibile
+        </p>
       </header>
 
-      {previewUrl ? (
+      {/* Form per inserimento manuale porta/URL */}
+      <div className="border-b border-slate-800/60 px-4 py-3">
+        <label className="block text-xs font-medium text-slate-400 mb-2">
+          Inserisci porta o URL
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="5173 oppure http://localhost:5173"
+            className="flex-1 h-8 rounded-md border border-slate-700 bg-slate-900/80 px-3 text-xs text-slate-100 shadow-inner outline-none transition focus:border-slate-500"
+            value={customUrl ?? ""}
+            onChange={(e) => setCustomUrl(e.target.value.trim() || null)}
+          />
+          {customUrl && (
+            <button
+              type="button"
+              onClick={() => setCustomUrl(null)}
+              className="h-8 px-3 rounded-md border border-slate-700/70 bg-slate-800/70 text-xs font-medium text-slate-300 transition hover:border-slate-500 hover:bg-slate-700"
+            >
+              Cancella
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Lista processi con preview disponibile */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {allProfiles.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-center">
+            <div>
+              <div className="text-sm text-slate-500">Nessun processo con porta disponibile</div>
+              <div className="mt-2 text-xs text-slate-600">
+                Inserisci una porta o URL oppure avvia un server di sviluppo
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {allProfiles.map((profile) => {
+              const profileUrl = profile.url || (profile.port ? `http://localhost:${profile.port}` : null);
+              const isActive = activePreviewUrl === profileUrl;
+              const isCustom = profile.id.startsWith('custom-');
+
+              return (
+                <div
+                  key={profile.id}
+                  className={`rounded-lg border p-3 transition ${
+                    isActive
+                      ? "border-emerald-500/50 bg-emerald-500/10"
+                      : "border-slate-700/70 bg-slate-800/40 hover:border-slate-600"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${isCustom ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+                        <h3 className="text-sm font-medium text-slate-200 truncate">
+                          {profile.label}
+                        </h3>
+                        {isActive && (
+                          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                            ATTIVO
+                          </span>
+                        )}
+                        {isCustom && (
+                          <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-300">
+                            CUSTOM
+                          </span>
+                        )}
+                      </div>
+                      {profile.command && (
+                        <div className="mt-1 text-xs text-slate-500 font-mono truncate">
+                          {profile.command}
+                        </div>
+                      )}
+                      <div className="mt-1 text-xs text-slate-400">
+                        {profileUrl}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {isActive ? (
+                        <button
+                          type="button"
+                          onClick={closePreviewWindow}
+                          className="rounded-md border border-rose-500/40 bg-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/30"
+                        >
+                          Chiudi
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => profileUrl && openPreviewWindow(profileUrl)}
+                          className="rounded-md border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/30"
+                        >
+                          Preview
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (profileUrl && typeof window !== "undefined") {
+                            window.open(profileUrl, "_blank", "noopener,noreferrer");
+                          }
+                        }}
+                        disabled={!profileUrl}
+                        className="rounded-md border border-slate-700/70 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Browser
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Preview window area (only when active) */}
+      {activePreviewUrl ? (
         <div className="relative flex flex-1 bg-black/20">
           <div
             ref={webviewContainerRef}
@@ -366,94 +498,16 @@ export default function PreviewPanel() {
             </div>
           )}
         </div>
-      ) : (
-        <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
-          Configura una porta o un URL per vedere la preview della tua app.
-        </div>
-      )}
+      ) : null}
 
-      {inspectorEnabled ? (
+      {inspectorEnabled && activePreviewUrl && (
         <div className="border-t border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">
           <div className="flex items-center justify-between">
             <span>Inspector attivo - Hover elementi per dettagli, click per salvare in history</span>
             <span className="font-mono text-emerald-300/70">⌘I / Ctrl+I</span>
           </div>
         </div>
-      ) : lastError ? (
-        <div className="border-t border-rose-500/40 bg-rose-500/15 px-4 py-2 text-xs text-rose-200">
-          {lastError}
-        </div>
-      ) : null}
+      )}
     </section>
-  );
-}
-
-function PortInput({
-  portSource,
-  profile,
-  onChange,
-}: {
-  portSource: string | null;
-  profile: PreviewProfile | null;
-  onChange: (url: string | null) => void;
-}) {
-  const portValue = useMemo(() => {
-    if (portSource && portSource.startsWith("http://localhost:")) {
-      const part = portSource.replace("http://localhost:", "");
-      return part.split("/")[0];
-    }
-    if (profile?.port) {
-      return String(profile.port);
-    }
-    return "";
-  }, [portSource, profile]);
-
-  return (
-    <label className="flex items-center gap-2 text-xs text-slate-400">
-      Porta
-      <input
-        type="number"
-        inputMode="numeric"
-        min={0}
-        className="h-8 w-20 rounded-md border border-slate-700 bg-slate-900/80 px-2 text-xs text-slate-100 shadow-inner outline-none transition focus:border-slate-500"
-        value={portValue}
-        onChange={(event) => {
-          const value = event.target.value.trim();
-          if (value === "") {
-            onChange(null);
-            return;
-          }
-          const numeric = Number.parseInt(value, 10);
-          if (Number.isNaN(numeric)) {
-            return;
-          }
-          onChange(`http://localhost:${numeric}`);
-        }}
-      />
-    </label>
-  );
-}
-
-function UrlInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (url: string | null) => void;
-}) {
-  return (
-    <label className="flex flex-1 min-w-[180px] items-center gap-2 text-xs text-slate-400">
-      URL personalizzato
-      <input
-        type="text"
-        placeholder="http://localhost:5173"
-        className="h-8 w-full flex-1 rounded-md border border-slate-700 bg-slate-900/80 px-3 text-xs text-slate-100 shadow-inner outline-none transition focus:border-slate-500"
-        value={value}
-        onChange={(event) => {
-          const next = event.target.value.trim();
-          onChange(next.length === 0 ? null : next);
-        }}
-      />
-    </label>
   );
 }

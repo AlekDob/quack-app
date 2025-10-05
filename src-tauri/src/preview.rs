@@ -169,6 +169,24 @@ pub async fn inject_preview_script(
 async fn inject_preview_script_impl(app: &AppHandle, script: String) -> Result<()> {
   if let Some(webview) = app.get_webview_window(PREVIEW_WEBVIEW_LABEL) {
     webview.eval(&script)?;
+
+    // Setup bridge script to forward postMessage events to Tauri events
+    let bridge_script = r#"
+      (function() {
+        // Listen for inspector events from the injected script
+        window.addEventListener('message', function(event) {
+          if (event.data && event.data.type && event.data.type.startsWith('quack-inspector-')) {
+            // Forward to main window via Tauri IPC
+            if (window.__TAURI__) {
+              window.__TAURI__.event.emit('preview-inspector-event', event.data);
+            }
+          }
+        });
+        console.log('🦆 Preview IPC bridge ready');
+      })();
+    "#;
+
+    webview.eval(bridge_script)?;
   }
 
   Ok(())
