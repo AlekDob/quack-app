@@ -966,6 +966,16 @@ button.secondary:hover {
   gap: 2px;
   margin-left: auto;
   margin-right: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.terminal-item-ungrouped:hover .terminal-reorder-controls {
+  opacity: 1;
+}
+
+.terminal-item-grouped:hover .terminal-reorder-controls {
+  opacity: 1;
 }
 
 .terminal-reorder-btn {
@@ -2366,6 +2376,12 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.group-header-wrapper:hover .group-reorder-controls {
+  opacity: 1;
 }
 
 .group-chevron {

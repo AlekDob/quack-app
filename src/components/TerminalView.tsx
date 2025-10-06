@@ -35,6 +35,9 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
   const writeBufferRef = useRef(new Map<string, string[]>())
   const writeTimeoutRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
+  // Performance: buffer per terminali in background (non renderizzati)
+  const backgroundBufferRef = useRef(new Map<string, string[]>())
+
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -66,7 +69,15 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
   }, [])
 
   const scheduleWrite = useCallback((id: string, data: string) => {
-    // Aggiungi al buffer
+    // Performance: Se terminale NON è attivo, bufferizza senza scrivere a xterm
+    if (id !== activeRef.current) {
+      const bgBuffer = backgroundBufferRef.current.get(id) ?? []
+      bgBuffer.push(data)
+      backgroundBufferRef.current.set(id, bgBuffer)
+      return // NON scrivere a xterm per terminali in background!
+    }
+
+    // Solo terminale attivo: aggiungi al buffer di scrittura
     const buffer = writeBufferRef.current.get(id) ?? []
     buffer.push(data)
     writeBufferRef.current.set(id, buffer)
@@ -77,11 +88,16 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       clearTimeout(existingTimeout)
     }
 
-    // Flush dopo 16ms (circa 1 frame @ 60fps) per batch multipli eventi
+    // Performance: Batch ADATTIVO basato sulla dimensione del chunk
+    // - Piccoli chunk (< 100 chars, probabile echo utente): flush immediato (1ms)
+    // - Grandi chunk (output massiccio): batch più lungo (32ms) per meno repaint
+    const isSmallChunk = data.length < 100
+    const batchDelay = isSmallChunk ? 1 : 32
+
     const timeout = setTimeout(() => {
       flushWriteBuffer(id)
       writeTimeoutRef.current.delete(id)
-    }, 16)
+    }, batchDelay)
 
     writeTimeoutRef.current.set(id, timeout)
   }, [flushWriteBuffer])
@@ -118,8 +134,8 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       cursorBlink: true,
       allowTransparency: true,
       scrollOnUserInput: true,
-      // Performance: aumenta scrollback ma usa FastScrollback per rendering ottimizzato
-      scrollback: 10000,
+      // Performance: scrollback ridotto da 10000 a 5000 per rendering più veloce
+      scrollback: 5000,
       fastScrollModifier: 'shift',
       // Performance: rendering ottimizzato
       windowOptions: {
@@ -242,6 +258,14 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         },
       }
 
+      // Performance: Flush buffer background quando terminale diventa attivo
+      const bgBuffer = backgroundBufferRef.current.get(id)
+      if (bgBuffer && bgBuffer.length > 0) {
+        const combined = bgBuffer.join('')
+        terminal.write(combined)
+        backgroundBufferRef.current.delete(id)
+      }
+
       terminal.focus()
 
       // Aspetta che il DOM sia completamente renderizzato prima del fit
@@ -329,6 +353,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         }
         flushWriteBuffer(id) // Flush eventuali dati pendenti prima di chiudere
         writeBufferRef.current.delete(id)
+        backgroundBufferRef.current.delete(id) // Pulisci anche background buffer
 
         terminalMapRef.current.get(id)?.dispose()
         terminalMapRef.current.delete(id)

@@ -303,12 +303,26 @@ function App() {
       return;
     }
     void loadSavedCommands();
+    // Performance: NON fare polling continuo dei processi - carica solo quando necessario
+    // Il drawer ProcessesDrawer chiamerà loadActiveProcesses quando aperto
+  }, [loadSavedCommands, tauriAvailable]);
+
+  // Performance: Carica processi solo quando drawer è aperto (on-demand invece di polling)
+  useEffect(() => {
+    if (!tauriAvailable || !showProcessesDrawer) {
+      return;
+    }
+
+    // Caricamento iniziale
     void loadActiveProcesses();
+
+    // Polling solo quando drawer è aperto (ogni 5 secondi invece di 3)
     const interval = setInterval(() => {
       void loadActiveProcesses();
-    }, 3000);
+    }, 5000);
+
     return () => clearInterval(interval);
-  }, [loadActiveProcesses, loadSavedCommands, tauriAvailable]);
+  }, [loadActiveProcesses, showProcessesDrawer, tauriAvailable]);
 
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
@@ -497,14 +511,22 @@ function App() {
 
   const scheduleIdleTimer = useCallback(
     (id: string) => {
-      clearIdleTimer(id);
+      // Performance: evita clear/set se timer già attivo
+      const existingTimer = idleTimersRef.current.get(id);
+
+      // Se c'è già un timer attivo, non fare nulla (evita clear/set continui)
+      // Il timer esistente verrà comunque triggerato dopo IDLE_TIMEOUT_MS
+      if (existingTimer) {
+        return;
+      }
+
       const handle = setTimeout(() => {
         markTerminalIdle(id);
         idleTimersRef.current.delete(id);
       }, IDLE_TIMEOUT_MS);
       idleTimersRef.current.set(id, handle);
     },
-    [clearIdleTimer, markTerminalIdle]
+    [markTerminalIdle]
   );
 
   const resolveTerminalId = useCallback(
@@ -567,6 +589,10 @@ function App() {
     []
   );
 
+  // Performance: buffer per output chunks per debounce status detection
+  const outputBuffersRef = useRef<Map<string, { chunks: string[], lastCheck: number }>>(new Map());
+  const STATUS_CHECK_INTERVAL = 200; // Check status ogni 200ms invece che ogni chunk
+
   const handleTerminalInput = useCallback(
     (id: string, data: string) => {
       if (!data) {
@@ -579,6 +605,8 @@ function App() {
       ) {
         markTerminalBusy(id);
         clearIdleTimer(id);
+        // Reset output buffer quando user invia input
+        outputBuffersRef.current.delete(id);
       }
     },
     [clearIdleTimer, markTerminalBusy]
@@ -589,10 +617,40 @@ function App() {
       if (!data) {
         return;
       }
-      if (chunkContainsPrompt(data)) {
-        markTerminalIdle(id);
-        clearIdleTimer(id);
-      } else {
+
+      // Performance: accumula chunks invece di processare subito
+      const now = Date.now();
+      let bufferEntry = outputBuffersRef.current.get(id);
+
+      if (!bufferEntry) {
+        bufferEntry = { chunks: [], lastCheck: now };
+        outputBuffersRef.current.set(id, bufferEntry);
+      }
+
+      bufferEntry.chunks.push(data);
+
+      // Check status solo ogni 200ms o se chunk contiene newline (probabile prompt)
+      const shouldCheck = (now - bufferEntry.lastCheck) >= STATUS_CHECK_INTERVAL
+        || data.includes('\n') || data.includes('\r');
+
+      if (shouldCheck && bufferEntry.chunks.length > 0) {
+        // Combina tutti i chunks e controlla una volta sola
+        const combined = bufferEntry.chunks.join('');
+
+        if (chunkContainsPrompt(combined)) {
+          markTerminalIdle(id);
+          clearIdleTimer(id);
+          outputBuffersRef.current.delete(id);
+        } else {
+          // Solo marca busy e schedule timer, non pulire buffer
+          markTerminalBusy(id);
+          scheduleIdleTimer(id);
+          bufferEntry.lastCheck = now;
+          // Mantieni solo ultimi 3 chunks per non far crescere troppo il buffer
+          bufferEntry.chunks = bufferEntry.chunks.slice(-3);
+        }
+      } else if (!shouldCheck) {
+        // Se non checkiamo ancora, marca busy e schedule timer senza check pesante
         markTerminalBusy(id);
         scheduleIdleTimer(id);
       }

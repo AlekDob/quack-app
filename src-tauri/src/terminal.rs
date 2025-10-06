@@ -433,27 +433,73 @@ fn start_output_thread(
   child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
 ) {
   std::thread::spawn(move || {
-    let mut buffer = [0u8; 8192];
+    // Performance: buffer più grande per leggere più dati per volta
+    let mut buffer = [0u8; 65536]; // 64KB invece di 8KB
+
+    // Performance: accumulator per batching temporale ADATTIVO
+    let mut accumulated_bytes = Vec::with_capacity(131072); // 128KB capacity
+    let mut last_flush = std::time::Instant::now();
+
+    // Performance: batch interval ADATTIVO basato sul volume di dati
+    // - Input utente (pochi bytes): flush immediato (5ms)
+    // - Output massiccio (molti bytes): batch più lungo (50ms)
+    let min_flush_interval = std::time::Duration::from_millis(5);
+    let max_flush_interval = std::time::Duration::from_millis(50);
 
     loop {
       match reader.read(&mut buffer) {
         Ok(0) => break,
         Ok(size) => {
-          let text = String::from_utf8_lossy(&buffer[..size]).to_string();
+          // Aggiungi bytes all'accumulator
+          accumulated_bytes.extend_from_slice(&buffer[..size]);
 
-          // Try to detect port from output
-          if let Some(port) = detect_port_from_output(&text) {
-            update_terminal_port(&id, port);
-          }
-
-          let payload = TerminalDataPayload {
-            id: id.clone(),
-            data: text,
+          // Batching ADATTIVO: se pochi dati (probabile input utente), flush rapido
+          let is_small_input = accumulated_bytes.len() < 256; // < 256 bytes = probabilmente input utente
+          let flush_interval = if is_small_input {
+            min_flush_interval // 5ms per input responsivo
+          } else {
+            max_flush_interval // 50ms per output massiccio
           };
-          let _ = app.emit("terminal-data", payload);
+
+          // Flush se: timeout scaduto O accumulator troppo grande (>64KB)
+          let should_flush = last_flush.elapsed() >= flush_interval
+            || accumulated_bytes.len() >= 65536;
+
+          if should_flush && !accumulated_bytes.is_empty() {
+            // Converti tutto in una volta sola
+            let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
+
+            // Port detection solo al flush (non su ogni chunk)
+            if let Some(port) = detect_port_from_output(&text) {
+              update_terminal_port(&id, port);
+            }
+
+            let payload = TerminalDataPayload {
+              id: id.clone(),
+              data: text,
+            };
+            let _ = app.emit("terminal-data", payload);
+
+            // Reset accumulator
+            accumulated_bytes.clear();
+            last_flush = std::time::Instant::now();
+          }
         }
         Err(_) => break,
       }
+    }
+
+    // Flush eventuali dati rimanenti
+    if !accumulated_bytes.is_empty() {
+      let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
+      if let Some(port) = detect_port_from_output(&text) {
+        update_terminal_port(&id, port);
+      }
+      let payload = TerminalDataPayload {
+        id: id.clone(),
+        data: text,
+      };
+      let _ = app.emit("terminal-data", payload);
     }
 
     let (code, success, message) = match child.lock() {
