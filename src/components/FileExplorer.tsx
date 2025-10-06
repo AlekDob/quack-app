@@ -535,10 +535,9 @@ export default memo(FileExplorer, (prevProps, nextProps) => {
   const nextKeys = Object.keys(nextProps.tree)
   if (prevKeys.length !== nextKeys.length) return false
 
-  // Check modifiedEntries length
-  const prevModCount = prevProps.modifiedEntries?.length ?? 0
-  const nextModCount = nextProps.modifiedEntries?.length ?? 0
-  if (prevModCount !== nextModCount) return false
+  // Performance: Check array identity invece di length (molto più efficace)
+  // Con stableModifiedEntries da App.tsx, reference cambia solo quando entries cambiano davvero
+  if (prevProps.modifiedEntries !== nextProps.modifiedEntries) return false
 
   // Callbacks stabili da App.tsx
   return true

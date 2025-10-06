@@ -514,10 +514,12 @@ export default memo(TerminalView, (prevProps, nextProps) => {
   if (prevProps.terminals.length !== nextProps.terminals.length) return false
 
   // Check se i terminali sono cambiati (shallow comparison sufficiente)
+  // PERFORMANCE FIX: Non controllare 'status' perché TerminalView non lo usa!
+  // Status è solo per la sidebar, ma causava re-render completi ad ogni keystroke
   for (let i = 0; i < prevProps.terminals.length; i++) {
     const prev = prevProps.terminals[i]
     const next = nextProps.terminals[i]
-    if (prev.id !== next.id || prev.color !== next.color || prev.status !== next.status) {
+    if (prev.id !== next.id || prev.color !== next.color) {
       return false
     }
   }

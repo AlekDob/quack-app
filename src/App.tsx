@@ -274,6 +274,17 @@ function App() {
     );
   }, [gitSummary, selectedGitPath]);
 
+  // Performance: Stabilizza modifiedEntries reference per evitare re-render FileExplorer
+  const stableModifiedEntries = useMemo(() => {
+    if (!gitSummary?.entries) return null;
+    // Memoizza basandosi su length + primi path per shallow equality check
+    return gitSummary.entries;
+  }, [
+    gitSummary?.entries?.length,
+    gitSummary?.entries?.[0]?.path,
+    gitSummary?.entries?.[gitSummary.entries.length - 1]?.path
+  ]);
+
   const gridTemplateColumns = "340px minmax(0, 1fr) 340px";
 
   const loadSavedCommands = useCallback(async () => {
@@ -456,21 +467,34 @@ function App() {
   );
 
   const markTerminalBusy = useCallback((id: string) => {
-    setTerminals((prev) =>
-      prev.map((terminal) =>
+    setTerminals((prev) => {
+      // Performance: Skip se già busy per evitare re-render inutili
+      const current = prev.find(t => t.id === id);
+      if (current?.status === 'busy') {
+        return prev; // Ritorna stesso array → NO re-render!
+      }
+
+      return prev.map((terminal) =>
         terminal.id === id
           ? { ...terminal, status: "busy", needsAttention: false }
           : terminal
-      )
-    );
+      );
+    });
   }, []);
 
   const markTerminalIdle = useCallback(
     (id: string, options?: { suppressNotification?: boolean }) => {
       const suppressNotification = options?.suppressNotification === true;
       let notifyInfo: { id: string; label: string } | null = null;
-      setTerminals((prev) =>
-        prev.map((terminal) => {
+
+      setTerminals((prev) => {
+        // Performance: Skip se già idle per evitare re-render inutili
+        const current = prev.find(t => t.id === id);
+        if (current?.status === 'idle') {
+          return prev; // Ritorna stesso array → NO re-render!
+        }
+
+        return prev.map((terminal) => {
           if (terminal.id !== id) {
             return terminal;
           }
@@ -484,8 +508,8 @@ function App() {
             status: "idle",
             needsAttention,
           };
-        })
-      );
+        });
+      });
 
       if (notifyInfo && !suppressNotification) {
         void notifyTerminalReady(notifyInfo);
@@ -495,11 +519,17 @@ function App() {
   );
 
   const clearTerminalAttention = useCallback((id: string) => {
-    setTerminals((prev) =>
-      prev.map((terminal) =>
+    setTerminals((prev) => {
+      // Performance: Skip se già senza attention per evitare re-render inutili
+      const current = prev.find(t => t.id === id);
+      if (current && !current.needsAttention) {
+        return prev; // Ritorna stesso array → NO re-render!
+      }
+
+      return prev.map((terminal) =>
         terminal.id === id ? { ...terminal, needsAttention: false } : terminal
-      )
-    );
+      );
+    });
   }, []);
 
   const clearIdleTimer = useCallback((id: string) => {
@@ -1788,7 +1818,7 @@ function App() {
           activeFilePath={previewFile?.path ?? null}
           onOpenFile={handleOpenFilePreview}
           onLoadChildren={fetchDirectoryChildren}
-          modifiedEntries={gitSummary?.entries ?? null}
+          modifiedEntries={stableModifiedEntries}
           gitRootPath={explorerRoot}
         />
 
