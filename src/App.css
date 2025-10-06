@@ -3514,6 +3514,54 @@ button.secondary:hover {
   border-radius: 4px;
 }
 
+/* AI Input Section - New styles for empty modal */
+.ai-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  padding-top: 0.5rem;
+}
+
+.ai-input-label {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 1rem;
+  letter-spacing: 0.01em;
+}
+
+.ai-input-button-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+
+.ai-input-field {
+  width: 100%;
+  padding: 1.1rem 1.35rem;
+  font-size: 0.95rem;
+  font-family: "IBM Plex Mono", "JetBrains Mono", Menlo, monospace;
+  background: rgba(12, 16, 24, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #f0f2f6;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.ai-input-field::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.ai-input-field:focus {
+  border-color: rgba(242, 140, 82, 0.6);
+  background: rgba(12, 16, 24, 0.8);
+  box-shadow: 0 0 0 4px rgba(242, 140, 82, 0.12),
+              0 4px 12px rgba(242, 140, 82, 0.15);
+  transform: translateY(-1px);
+}
+
 .ai-intent-display {
   display: flex;
   align-items: center;
@@ -3762,15 +3810,57 @@ button.secondary:hover {
 }
 
 .ai-btn-primary {
-  background: linear-gradient(135deg, #f28c52 0%, #44b3aa 100%);
+  background: linear-gradient(135deg, #ff8a3d 0%, #f28c52 50%, #ff6b35 100%);
+  background-size: 200% 100%;
   border-color: transparent;
   color: #0f1115;
   font-weight: 600;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s ease;
 }
 
 .ai-btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(242, 140, 82, 0.3);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(242, 140, 82, 0.4),
+              0 4px 12px rgba(255, 107, 53, 0.3);
+  background-position: 100% 0;
+}
+
+.ai-btn-primary:hover::before {
+  left: 100%;
+}
+
+.ai-btn-primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(242, 140, 82, 0.3);
+}
+
+.ai-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ai-btn-primary:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .ai-kbd {

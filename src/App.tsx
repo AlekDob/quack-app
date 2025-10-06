@@ -23,6 +23,7 @@ import SavedCommandModal from "./components/SavedCommandModal";
 import PreviewDrawer from "./components/PreviewDrawer";
 import AISettingsPanel from "./components/AISettingsPanel";
 import PerformanceMonitor from "./components/PerformanceMonitor";
+import AIAssistant from "./components/AIAssistant";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -36,6 +37,7 @@ import type {
   TerminalInfo,
   SavedCommand,
   ProcessInfo,
+  TerminalContext,
 } from "./types";
 
 interface TerminalMetadata {
@@ -260,6 +262,15 @@ function App() {
     null
   );
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiIntent, setAiIntent] = useState('');
+  const [aiContext, setAiContext] = useState<TerminalContext>({
+    os: 'macos',
+    shell: 'zsh',
+    cwd: '',
+    recentCommands: [],
+  });
+  const recentCommandsRef = useRef<string[]>([]);
 
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
@@ -651,11 +662,43 @@ function App() {
   const outputBuffersRef = useRef<Map<string, { chunks: string[], lastCheck: number }>>(new Map());
   const STATUS_CHECK_INTERVAL = 200; // Check status ogni 200ms invece che ogni chunk
 
+  const handleOpenAIAssistant = useCallback((intent = '') => {
+    setAiIntent(intent);
+    setAiContext({
+      os: 'macos',
+      shell: 'zsh',
+      cwd: activeTerminal?.cwd || '',
+      recentCommands: recentCommandsRef.current.slice(-5),
+    });
+    setShowAIAssistant(true);
+  }, [activeTerminal]);
+
+  const handleAICommandSelect = useCallback((command: string) => {
+    if (!activeId) return;
+
+    // Execute the AI command in the active terminal
+    void invoke('write_to_terminal', { id: activeId, data: command + '\r' });
+
+    // Add to recent commands
+    recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), command];
+
+    // Close the modal
+    setShowAIAssistant(false);
+  }, [activeId]);
+
   const handleTerminalInput = useCallback(
     (id: string, data: string) => {
       if (!data) {
         return;
       }
+
+      // Track commands for AI context
+      if (data === '\r' || data === '\n') {
+        const terminal = terminals.find(t => t.id === id);
+        // This is a simplification - in reality we'd need to track the actual command buffer
+        // But for now we can rely on TerminalView's tracking
+      }
+
       if (
         data.includes("\r") ||
         data.includes("\n") ||
@@ -667,7 +710,7 @@ function App() {
         outputBuffersRef.current.delete(id);
       }
     },
-    [clearIdleTimer, markTerminalBusy]
+    [clearIdleTimer, markTerminalBusy, terminals]
   );
 
   const handleTerminalOutput = useCallback(
@@ -1819,6 +1862,10 @@ function App() {
                 terminals={terminals}
                 onUserInput={handleTerminalInput}
                 onOutput={handleTerminalOutput}
+                onOpenAIAssistant={handleOpenAIAssistant}
+                onUpdateRecentCommands={(commands) => {
+                  recentCommandsRef.current = commands;
+                }}
               />
             ) : (
               <div className="terminal-surface terminal-placeholder">
@@ -1832,6 +1879,7 @@ function App() {
               setSavedCommandsDrawerOpen((value) => !value)
             }
             savedCommandsOpen={savedCommandsDrawerOpen}
+            onOpenAIAssistant={handleOpenAIAssistant}
           />
         </section>
 
@@ -2000,6 +2048,15 @@ function App() {
         )}
 
         {showPerformanceMonitor && <PerformanceMonitor />}
+
+        {showAIAssistant && (
+          <AIAssistant
+            intent={aiIntent}
+            context={aiContext}
+            onClose={() => setShowAIAssistant(false)}
+            onSelectCommand={handleAICommandSelect}
+          />
+        )}
     </div>
   );
 }

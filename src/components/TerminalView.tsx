@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { Terminal } from '@xterm/xterm'
@@ -6,12 +6,10 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 
-import AIAssistant from './AIAssistant'
 import type {
   TerminalDataEvent,
   TerminalExitEvent,
   TerminalInfo,
-  TerminalContext,
 } from '../types'
 
 interface TerminalViewProps {
@@ -19,9 +17,11 @@ interface TerminalViewProps {
   terminals: TerminalInfo[]
   onUserInput: (id: string, data: string) => void
   onOutput: (id: string, data: string) => void
+  onOpenAIAssistant: (intent?: string) => void
+  onUpdateRecentCommands: (commands: string[]) => void
 }
 
-function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalViewProps) {
+function TerminalView({ activeId, terminals, onUserInput, onOutput, onOpenAIAssistant, onUpdateRecentCommands }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalMapRef = useRef(new Map<string, Terminal>())
   const fitMapRef = useRef(new Map<string, FitAddon>())
@@ -30,8 +30,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
   const listenersRegisteredRef = useRef(false)
   const inputBufferRef = useRef<string>('')
   const recentCommandsRef = useRef<string[]>([])
-  const aiInputModeRef = useRef(false)
-  const aiInputBufferRef = useRef<string>('')
+  const lastCharRef = useRef<string>('')
 
   // Performance: buffer per batch processing dell'output
   const writeBufferRef = useRef(new Map<string, string[]>())
@@ -42,16 +41,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
 
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-
-  // AI Assistant state
-  const [showAIAssistant, setShowAIAssistant] = useState(false)
-  const [aiIntent, setAiIntent] = useState('')
-  const [aiContext, setAiContext] = useState<TerminalContext>({
-    os: 'macos',
-    shell: 'zsh',
-    cwd: '',
-    recentCommands: [],
-  })
 
   // Performance: batch write con throttling per evitare troppi repaint
   const flushWriteBuffer = useCallback((id: string) => {
@@ -157,80 +146,52 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
     terminal.loadAddon(linksAddon)
 
     terminal.onData((chunk) => {
-      // Check if user pressed # to activate AI input mode
-      if (chunk === '#' && !aiInputModeRef.current && inputBufferRef.current.trim().length === 0) {
-        // Activate AI mode IMMEDIATELY with ref (synchronous)
-        aiInputModeRef.current = true
-        aiInputBufferRef.current = ''
+      // Check if user typed ## to open AI assistant
+      if (chunk === '#' && lastCharRef.current === '#' && inputBufferRef.current.trim().length === 0) {
+        // Double ## detected - open AI assistant modal
+        onOpenAIAssistant('');
 
-        // Visual feedback: write AI mode indicator
-        terminal.write('\r\n🤖 AI Mode (Enter to confirm, Esc to cancel): ')
-        return
+        // Clear the ## from terminal (erase both #)
+        terminal.write('\b \b\b \b');
+
+        // Reset refs
+        lastCharRef.current = '';
+        inputBufferRef.current = '';
+        return;
       }
 
-      // AI Input Mode - capture input without sending to PTY
-      if (aiInputModeRef.current) {
-        if (chunk === '\r' || chunk === '\n') {
-          // Enter pressed - open AI assistant with captured intent
-          const intent = aiInputBufferRef.current.trim()
-
-          if (intent.length > 0) {
-            const activeTerminal = terminals.find((t) => t.id === id)
-
-            setAiIntent(intent)
-            setAiContext({
-              os: 'macos',
-              shell: 'zsh',
-              cwd: activeTerminal?.cwd || '',
-              recentCommands: recentCommandsRef.current.slice(-5),
-            })
-            setShowAIAssistant(true)
-          }
-
-          // Exit AI mode
-          aiInputModeRef.current = false
-          aiInputBufferRef.current = ''
-          terminal.write('\r\n')
-          return
-        } else if (chunk === '\x1b') {
-          // Escape pressed - cancel AI mode
-          aiInputModeRef.current = false
-          aiInputBufferRef.current = ''
-          terminal.write('\r\n')
-          return
-        } else if (chunk === '\x7f' || chunk === '\b') {
-          // Backspace in AI mode
-          if (aiInputBufferRef.current.length > 0) {
-            aiInputBufferRef.current = aiInputBufferRef.current.slice(0, -1)
-            terminal.write('\b \b') // Erase character visually
-          }
-          return
-        } else if (chunk.length === 1 && chunk.charCodeAt(0) >= 32) {
-          // Printable character in AI mode
-          aiInputBufferRef.current += chunk
-          terminal.write(chunk) // Show character visually
-          return
-        }
-        // Other control characters in AI mode - ignore
-        return
+      // Track last character for ## detection
+      if (chunk === '#') {
+        lastCharRef.current = '#';
+      } else if (chunk !== '\b' && chunk !== '\x7f') {
+        // Reset lastChar on any non-backspace character
+        lastCharRef.current = '';
       }
 
-      // Normal mode - track input buffer for AI context
+      // Track input buffer and commands for AI context
       if (chunk === '\r' || chunk === '\n') {
-        const cmd = inputBufferRef.current.trim()
+        const cmd = inputBufferRef.current.trim();
         if (cmd.length > 0) {
-          recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), cmd]
+          recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), cmd];
+          onUpdateRecentCommands(recentCommandsRef.current);
         }
-        inputBufferRef.current = ''
+        inputBufferRef.current = '';
+        lastCharRef.current = '';
       } else if (chunk === '\x7f' || chunk === '\b') {
-        inputBufferRef.current = inputBufferRef.current.slice(0, -1)
+        if (inputBufferRef.current.length > 0) {
+          inputBufferRef.current = inputBufferRef.current.slice(0, -1);
+        }
+        // If we backspace the first #, reset lastChar
+        if (lastCharRef.current === '#' && inputBufferRef.current.trim().length === 0) {
+          lastCharRef.current = '';
+        }
       } else if (chunk.length === 1 && chunk.charCodeAt(0) >= 32) {
-        inputBufferRef.current += chunk
+        inputBufferRef.current += chunk;
       }
 
-      // Normal mode - send to terminal
-      onUserInput(id, chunk)
-      void invoke('write_to_terminal', { id, data: chunk })
+      // Send to terminal
+      onUserInput(id, chunk);
+      void invoke('write_to_terminal', { id, data: chunk });
     })
 
     // Performance: throttled auto-scroll invece di ogni write
@@ -503,25 +464,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
     }
   }, [reportResize, tauriAvailable])
 
-
-  const handleAICommandSelect = useCallback((command: string) => {
-    if (!activeId) return
-
-    const terminal = terminalMapRef.current.get(activeId)
-    if (!terminal) return
-
-    // Simply execute the AI command
-    // The intent text was already "executed" (and failed) when user pressed #
-    // So we're now on a clean line
-    const executeCommand = command + '\r'
-
-    terminal.write(executeCommand)
-    void invoke('write_to_terminal', { id: activeId, data: executeCommand })
-
-    // Add to recent commands
-    recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), command]
-  }, [activeId])
-
   if (!tauriAvailable) {
     return (
       <div className="terminal-surface terminal-placeholder">
@@ -531,22 +473,11 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
   }
 
   return (
-    <>
-      <div
-        ref={containerRef}
-        className="terminal-surface"
-        style={{ overflow: 'hidden' }}
-      />
-
-      {showAIAssistant && (
-        <AIAssistant
-          intent={aiIntent}
-          context={aiContext}
-          onClose={() => setShowAIAssistant(false)}
-          onSelectCommand={handleAICommandSelect}
-        />
-      )}
-    </>
+    <div
+      ref={containerRef}
+      className="terminal-surface"
+      style={{ overflow: 'hidden' }}
+    />
   )
 }
 

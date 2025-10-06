@@ -1,24 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { AISuggestion, AIRequest, TerminalContext } from '../types'
 
 interface AIAssistantProps {
-  intent: string
+  intent?: string
   context: TerminalContext
   onClose: () => void
   onSelectCommand: (command: string) => void
 }
 
 export default function AIAssistant({
-  intent,
+  intent = '',
   context,
   onClose,
   onSelectCommand,
 }: AIAssistantProps) {
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
+  const [inputValue, setInputValue] = useState(intent)
+  const [hasSubmitted, setHasSubmitted] = useState(intent.trim().length > 0)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const handleClose = () => {
     setClosing(true)
@@ -27,11 +30,32 @@ export default function AIAssistant({
     }, 250) // Match animation duration
   }
 
+  const handleSubmit = () => {
+    const trimmedInput = inputValue.trim()
+    if (trimmedInput.length === 0) {
+      return
+    }
+    setHasSubmitted(true)
+    setLoading(true)
+    setError(null)
+  }
+
   useEffect(() => {
+    // Focus input on mount if intent is empty
+    if (!hasSubmitted && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [hasSubmitted])
+
+  useEffect(() => {
+    if (!hasSubmitted) {
+      return
+    }
+
     const fetchSuggestion = async () => {
       try {
         const request: AIRequest = {
-          intent,
+          intent: inputValue.trim(),
           context,
           requestType: 'command',
         }
@@ -46,7 +70,7 @@ export default function AIAssistant({
     }
 
     void fetchSuggestion()
-  }, [intent, context])
+  }, [hasSubmitted, inputValue, context])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,15 +78,23 @@ export default function AIAssistant({
 
       if (e.key === 'Escape') {
         handleClose()
-      } else if (e.key === 'Enter' && suggestion && !loading && !error) {
-        onSelectCommand(suggestion.command)
-        handleClose()
+      } else if (e.key === 'Enter') {
+        // If input mode (not submitted yet), submit the input
+        if (!hasSubmitted) {
+          e.preventDefault()
+          handleSubmit()
+        }
+        // If has suggestion and not in input, execute command
+        else if (suggestion && !loading && !error) {
+          onSelectCommand(suggestion.command)
+          handleClose()
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [suggestion, loading, error, closing, onSelectCommand])
+  }, [suggestion, loading, error, closing, hasSubmitted, onSelectCommand])
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.9) return 'var(--color-success)'
@@ -90,12 +122,44 @@ export default function AIAssistant({
         </div>
 
         <div className="ai-assistant-content">
-          <div className="ai-intent-display">
-            <span className="ai-intent-label">Intent:</span>
-            <span className="ai-intent-text">{intent}</span>
-          </div>
+          {!hasSubmitted ? (
+            <div className="ai-input-section">
+              <div>
+                <div className="ai-input-label">What do you want to do?</div>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className="ai-input-field"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSubmit()
+                    }
+                  }}
+                  placeholder="e.g., list all files, find large files, git status..."
+                  autoFocus
+                />
+              </div>
+              <div className="ai-input-button-wrapper">
+                <button
+                  className="ai-btn ai-btn-primary"
+                  onClick={handleSubmit}
+                  disabled={inputValue.trim().length === 0}
+                >
+                  Ask AI
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="ai-intent-display">
+              <span className="ai-intent-label">Intent:</span>
+              <span className="ai-intent-text">{inputValue}</span>
+            </div>
+          )}
 
-          {loading && (
+          {loading && hasSubmitted && (
             <div className="ai-loading">
               <div className="ai-spinner"></div>
               <p>Thinking...</p>
@@ -169,7 +233,7 @@ export default function AIAssistant({
           )}
         </div>
 
-        {suggestion && !loading && !error && (
+        {suggestion && !loading && !error && hasSubmitted && (
           <div className="ai-assistant-footer">
             <button className="ai-btn ai-btn-secondary" onClick={handleClose}>
               Cancel <span className="ai-kbd">Esc</span>
@@ -182,6 +246,14 @@ export default function AIAssistant({
               }}
             >
               Execute <span className="ai-kbd">⏎</span>
+            </button>
+          </div>
+        )}
+
+        {!hasSubmitted && (
+          <div className="ai-assistant-footer">
+            <button className="ai-btn ai-btn-secondary" onClick={handleClose}>
+              Cancel <span className="ai-kbd">Esc</span>
             </button>
           </div>
         )}
