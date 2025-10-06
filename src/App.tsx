@@ -259,6 +259,7 @@ function App() {
   const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(
     null
   );
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
 
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
@@ -315,6 +316,26 @@ function App() {
       return;
     }
     void loadSavedCommands();
+
+    // Load performance monitor preference
+    const loadPreferences = async () => {
+      try {
+        const prefs = await invoke<{ show_performance_monitor: boolean }>("get_preferences");
+        setShowPerformanceMonitor(prefs.show_performance_monitor);
+      } catch (error) {
+        console.warn("Unable to load preferences", error);
+      }
+    };
+    void loadPreferences();
+
+    // Listen for preference changes
+    const unlistenPromise = listen<{ show_performance_monitor: boolean }>("preferences-changed", (event) => {
+      setShowPerformanceMonitor(event.payload.show_performance_monitor);
+    });
+
+    return () => {
+      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
+    };
     // Performance: NON fare polling continuo dei processi - carica solo quando necessario
     // Il drawer ProcessesDrawer chiamerà loadActiveProcesses quando aperto
   }, [loadSavedCommands, tauriAvailable]);
@@ -1973,7 +1994,7 @@ function App() {
           <AISettingsPanel onClose={() => setShowAISettings(false)} />
         )}
 
-        {import.meta.env.DEV && <PerformanceMonitor />}
+        {showPerformanceMonitor && <PerformanceMonitor />}
     </div>
   );
 }

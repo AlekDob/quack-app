@@ -2,12 +2,13 @@ use std::net::SocketAddr;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{menu::MenuBuilder, AppHandle, Emitter, Manager};
 
 mod ai;
 mod commands;
 mod fs;
 mod git;
+mod preferences;
 mod preview;
 mod terminal;
 
@@ -92,6 +93,51 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
+            // Setup native menu for macOS
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{CheckMenuItemBuilder, SubmenuBuilder};
+
+                let app_handle = app.handle().clone();
+                let toggle_perf_id = "toggle_performance_monitor";
+
+                // Get initial state
+                let initial_state = tauri::async_runtime::block_on(async {
+                    preferences::get_preferences(app_handle.clone())
+                        .await
+                        .map(|prefs| prefs.show_performance_monitor)
+                        .unwrap_or(false)
+                });
+
+                // Create View menu with Performance Monitor toggle
+                let toggle_perf = CheckMenuItemBuilder::with_id(toggle_perf_id, "Show Performance Monitor")
+                    .checked(initial_state)
+                    .accelerator("Cmd+Shift+P")
+                    .build(app)?;
+
+                let view_menu = SubmenuBuilder::new(app, "View")
+                    .item(&toggle_perf)
+                    .build()?;
+
+                // Build and set the menu
+                let menu = MenuBuilder::new(app)
+                    .item(&view_menu)
+                    .build()?;
+
+                app.set_menu(menu)?;
+
+                // Handle menu events
+                app.on_menu_event(move |app, event| {
+                    if event.id() == toggle_perf_id {
+                        let app_handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Ok(new_state) = preferences::toggle_performance_monitor(app_handle).await {
+                                log::info!("Performance monitor toggled: {}", new_state);
+                            }
+                        });
+                    }
+                });
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -184,7 +230,10 @@ pub fn run() {
             ai::analyze_error,
             ai::save_api_key,
             ai::test_api_connection,
-            ai::get_token_usage_stats
+            ai::get_token_usage_stats,
+            preferences::get_preferences,
+            preferences::set_preference,
+            preferences::toggle_performance_monitor
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
