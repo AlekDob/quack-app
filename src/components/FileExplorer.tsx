@@ -423,18 +423,34 @@ function FileExplorer({
       const additions = gitEntry.additions ?? 0;
       const deletions = gitEntry.deletions ?? 0;
       const hasStats = additions > 0 || deletions > 0;
+
+      // Determina il tipo di modifica
+      const isDeletedFile = gitEntry.staged_status === "Deleted" || gitEntry.unstaged_status === "Deleted";
       const isNewFile = gitEntry.is_untracked;
+
+      // Determina classe e icona in base al tipo
+      let fileType: string;
+      let iconClass: string;
+
+      if (isDeletedFile) {
+        fileType = "deleted-file";
+        iconClass = "explorer-icon file-deleted";
+      } else if (isNewFile) {
+        fileType = "new-file";
+        iconClass = "explorer-icon file-new";
+      } else {
+        fileType = "modified";
+        iconClass = "explorer-icon file-modified";
+      }
 
       const rowClass = [
         "explorer-row",
         "file",
-        isNewFile ? "new-file" : "modified",
+        fileType,
         isActiveFile ? "active file-open" : "",
       ]
         .filter(Boolean)
         .join(" ");
-
-      const iconClass = isNewFile ? "explorer-icon file-new" : "explorer-icon file-modified";
 
       return (
         <button
@@ -464,7 +480,7 @@ function FileExplorer({
   return (
     <aside className="file-explorer">
       <div className="explorer-header">
-        <h2 className="explorer-title">Esplora file</h2>
+        <h2 className="explorer-title">File Explorer</h2>
         <span className="explorer-path">{activePath}</span>
         {error && <span className="explorer-error">{error}</span>}
         <input
@@ -472,14 +488,14 @@ function FileExplorer({
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Cerca file o cartelle"
+          placeholder="Search files or folders"
         />
       </div>
 
       <div className={`explorer-content ${loading ? "loading" : ""}`}>
         {rootPath && <div className="explorer-root-label">{rootLabel}</div>}
         {(!rootEntries || rootEntries.length === 0) && !loading ? (
-          <div className="empty-state">Cartella vuota</div>
+          <div className="empty-state">Empty folder</div>
         ) : (
           <div className="explorer-tree">
             {/* Modified Files Group */}
@@ -487,7 +503,7 @@ function FileExplorer({
               <div className="explorer-section modified-files-section">
                 <div className="explorer-section-header">
                   <span className="explorer-section-title">
-                    File modificati
+                    Modified Files
                   </span>
                   <span className="explorer-section-count">
                     {allModifiedFiles.length}

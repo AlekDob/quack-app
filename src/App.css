@@ -2292,6 +2292,51 @@ button.secondary:hover {
   line-height: 1;
 }
 
+/* Row per file eliminati (deleted) */
+.explorer-row.deleted-file {
+  border-color: rgba(255, 143, 143, 0.2);
+  background: rgba(255, 143, 143, 0.08);
+}
+
+.explorer-row.deleted-file:hover {
+  border-color: rgba(255, 143, 143, 0.35);
+  background: rgba(255, 143, 143, 0.14);
+}
+
+.explorer-row.deleted-file.active,
+.explorer-row.deleted-file.file-open {
+  border-color: rgba(255, 143, 143, 0.5);
+  background: rgba(255, 143, 143, 0.2);
+}
+
+/* Icona per file eliminato */
+.explorer-icon.file-deleted::before {
+  left: 4px;
+  right: 4px;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+  background: rgba(255, 143, 143, 0.85);
+}
+
+.explorer-icon.file-deleted::after {
+  content: '×';
+  position: absolute;
+  right: 2px;
+  top: 0px;
+  width: 8px;
+  height: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  color: rgba(18, 20, 27, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 143, 143, 0.95);
+  border-radius: 50%;
+  line-height: 1;
+}
+
 .explorer-error {
   color: #ff8f8f;
   font-size: 0.8rem;
