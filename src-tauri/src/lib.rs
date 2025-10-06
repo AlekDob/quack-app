@@ -4,6 +4,7 @@ use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
+mod ai;
 mod commands;
 mod fs;
 mod git;
@@ -178,7 +179,12 @@ pub fn run() {
             preview::destroy_preview_webview,
             preview::show_preview_webview,
             preview::hide_preview_webview,
-            preview::inject_preview_script
+            preview::inject_preview_script,
+            ai::get_ai_suggestion,
+            ai::analyze_error,
+            ai::save_api_key,
+            ai::test_api_connection,
+            ai::get_token_usage_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

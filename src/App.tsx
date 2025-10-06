@@ -20,6 +20,7 @@ import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import PreviewDrawer from "./components/PreviewDrawer";
+import AISettingsPanel from "./components/AISettingsPanel";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -193,6 +194,7 @@ function App() {
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showProcessesDrawer, setShowProcessesDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
   const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
     if (typeof window === "undefined") {
       return 960;
@@ -1682,6 +1684,7 @@ function App() {
               setSavedCommandsDrawerOpen((value) => !value)
             }
             savedCommandsOpen={savedCommandsDrawerOpen}
+            onToggleAISettings={() => setShowAISettings((value) => !value)}
           />
         </section>
 
@@ -1844,6 +1847,10 @@ function App() {
             setEditingCommand(null);
           }}
         />
+
+        {showAISettings && (
+          <AISettingsPanel onClose={() => setShowAISettings(false)} />
+        )}
     </div>
   );
 }

@@ -2,14 +2,24 @@ interface ToolBarProps {
   onExecuteCommand: (command: string, label: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
+  onToggleAISettings?: () => void;
 }
 
 export default function ToolBar({
   onExecuteCommand,
   onToggleSavedCommands,
   savedCommandsOpen,
+  onToggleAISettings,
 }: ToolBarProps) {
   const aiTools = [
+    {
+      id: "ai-settings",
+      label: "AI Settings",
+      icon: "⚙️",
+      command: "",
+      disabled: false,
+      type: "ai-settings",
+    },
     {
       id: "saved-commands",
       label: savedCommandsOpen ? "Chiudi comandi" : "Comandi salvati",
@@ -58,7 +68,9 @@ export default function ToolBar({
             type="button"
             className={`ai-tool-button ${tool.disabled ? "disabled" : ""} ${tool.type === "saved" && savedCommandsOpen ? "active" : ""}`}
             onClick={() => {
-              if (tool.type === "saved") {
+              if (tool.type === "ai-settings") {
+                onToggleAISettings?.();
+              } else if (tool.type === "saved") {
                 onToggleSavedCommands();
               } else if (!tool.disabled) {
                 onExecuteCommand(tool.command, tool.label);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { Terminal } from '@xterm/xterm'
@@ -6,10 +6,12 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 
+import AIAssistant from './AIAssistant'
 import type {
   TerminalDataEvent,
   TerminalExitEvent,
   TerminalInfo,
+  TerminalContext,
 } from '../types'
 
 interface TerminalViewProps {
@@ -26,8 +28,20 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
   const viewMapRef = useRef(new Map<string, { element: HTMLDivElement; mounted: boolean }>())
   const activeRef = useRef<string | null>(null)
   const listenersRegisteredRef = useRef(false)
+  const inputBufferRef = useRef<string>('')
+  const recentCommandsRef = useRef<string[]>([])
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+  // AI Assistant state
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
+  const [aiIntent, setAiIntent] = useState('')
+  const [aiContext, setAiContext] = useState<TerminalContext>({
+    os: 'macos',
+    shell: 'zsh',
+    cwd: '',
+    recentCommands: [],
+  })
 
   const reportResize = useCallback(async (id: string, terminal: Terminal) => {
     if (!tauriAvailable) {
@@ -75,6 +89,41 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     terminal.loadAddon(linksAddon)
 
     terminal.onData((chunk) => {
+      // Check if user pressed # to trigger AI assistant
+      if (chunk === '#' && inputBufferRef.current.trim().length > 0) {
+        const intent = inputBufferRef.current.trim()
+        const activeTerminal = terminals.find((t) => t.id === id)
+
+        setAiIntent(intent)
+        setAiContext({
+          os: 'macos', // TODO: detect OS dynamically
+          shell: 'zsh', // TODO: detect shell from terminal
+          cwd: activeTerminal?.cwd || '',
+          recentCommands: recentCommandsRef.current.slice(-5),
+        })
+        setShowAIAssistant(true)
+
+        // Clear input buffer
+        inputBufferRef.current = ''
+        return // Don't send # to terminal
+      }
+
+      // Track input buffer for AI context
+      if (chunk === '\r' || chunk === '\n') {
+        // Command submitted - save to recent commands
+        const cmd = inputBufferRef.current.trim()
+        if (cmd.length > 0) {
+          recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), cmd]
+        }
+        inputBufferRef.current = ''
+      } else if (chunk === '\x7f' || chunk === '\b') {
+        // Backspace - remove last char from buffer
+        inputBufferRef.current = inputBufferRef.current.slice(0, -1)
+      } else if (chunk.length === 1 && chunk.charCodeAt(0) >= 32) {
+        // Printable character - add to buffer
+        inputBufferRef.current += chunk
+      }
+
       onUserInput(id, chunk)
       void invoke('write_to_terminal', { id, data: chunk })
     })
@@ -335,6 +384,20 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
   }, [reportResize, tauriAvailable])
 
 
+  const handleAICommandSelect = useCallback((command: string) => {
+    if (!activeId) return
+
+    const terminal = terminalMapRef.current.get(activeId)
+    if (!terminal) return
+
+    // Write command to terminal and execute it
+    terminal.write(command + '\r')
+    void invoke('write_to_terminal', { id: activeId, data: command + '\r' })
+
+    // Add to recent commands
+    recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), command]
+  }, [activeId])
+
   if (!tauriAvailable) {
     return (
       <div className="terminal-surface terminal-placeholder">
@@ -344,10 +407,21 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="terminal-surface"
-      style={{ overflow: 'hidden' }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="terminal-surface"
+        style={{ overflow: 'hidden' }}
+      />
+
+      {showAIAssistant && (
+        <AIAssistant
+          intent={aiIntent}
+          context={aiContext}
+          onClose={() => setShowAIAssistant(false)}
+          onSelectCommand={handleAICommandSelect}
+        />
+      )}
+    </>
   )
 }

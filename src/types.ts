@@ -79,3 +79,38 @@ export interface TerminalExitEvent {
   success: boolean;
   message: string | null;
 }
+
+// AI Assistant types
+export interface AISuggestion {
+  command: string;
+  explanation: string;
+  confidence: number;
+  alternative?: string;
+}
+
+export interface AISettings {
+  apiKey: string;
+  model: 'gpt-4o-mini' | 'gpt-4o' | 'gpt-3.5-turbo';
+  enableCommandAssistant: boolean;
+  enableErrorAnalyzer: boolean;
+}
+
+export interface TokenStats {
+  totalTokensUsed: number;
+  estimatedCost: number;
+  requestCount: number;
+}
+
+export interface TerminalContext {
+  os: string;
+  shell: string;
+  cwd: string;
+  recentCommands: string[];
+  errorOutput?: string;
+}
+
+export interface AIRequest {
+  intent: string;
+  context: TerminalContext;
+  requestType: 'command' | 'error';
+}

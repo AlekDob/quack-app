@@ -2136,15 +2136,15 @@ button.secondary:hover {
   justify-content: space-between;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.35rem;
-  background: rgba(78, 205, 196, 0.08);
+  background: rgba(242, 140, 82, 0.08);
   border-radius: 6px;
-  border: 1px solid rgba(78, 205, 196, 0.15);
+  border: 1px solid rgba(242, 140, 82, 0.15);
 }
 
 .explorer-section-title {
   font-size: 0.7rem;
   font-weight: 600;
-  color: rgba(78, 205, 196, 1);
+  color: rgba(242, 140, 82, 1);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -2152,8 +2152,8 @@ button.secondary:hover {
 .explorer-section-count {
   font-size: 0.65rem;
   font-weight: 700;
-  color: rgba(78, 205, 196, 0.9);
-  background: rgba(78, 205, 196, 0.15);
+  color: rgba(242, 140, 82, 0.9);
+  background: rgba(242, 140, 82, 0.15);
   padding: 0.15rem 0.45rem;
   border-radius: 12px;
   min-width: 20px;
@@ -2173,7 +2173,7 @@ button.secondary:hover {
   top: 3px;
   bottom: 3px;
   border-radius: 2px;
-  background: rgba(78, 205, 196, 0.85);
+  background: rgba(242, 140, 82, 0.85);
 }
 
 .explorer-icon.file-modified::after {
@@ -2182,7 +2182,7 @@ button.secondary:hover {
   width: 6px;
   height: 6px;
   background: transparent;
-  border: 2px solid rgba(78, 205, 196, 0.85);
+  border: 2px solid rgba(242, 140, 82, 0.85);
   border-left: none;
   border-bottom: none;
   transform: translateX(3px) translateY(-3px);
@@ -2190,19 +2190,19 @@ button.secondary:hover {
 
 /* Row per file modificati */
 .explorer-row.modified {
-  border-color: rgba(78, 205, 196, 0.2);
-  background: rgba(78, 205, 196, 0.08);
+  border-color: rgba(242, 140, 82, 0.2);
+  background: rgba(242, 140, 82, 0.08);
 }
 
 .explorer-row.modified:hover {
-  border-color: rgba(78, 205, 196, 0.35);
-  background: rgba(78, 205, 196, 0.14);
+  border-color: rgba(242, 140, 82, 0.35);
+  background: rgba(242, 140, 82, 0.14);
 }
 
 .explorer-row.modified.active,
 .explorer-row.modified.file-open {
-  border-color: rgba(78, 205, 196, 0.5);
-  background: rgba(78, 205, 196, 0.2);
+  border-color: rgba(242, 140, 82, 0.5);
+  background: rgba(242, 140, 82, 0.2);
 }
 
 .explorer-error {
@@ -2572,7 +2572,7 @@ button.secondary:hover {
 }
 
 .saved-command-item:hover {
-  border-color: rgba(78, 205, 196, 0.4);
+  border-color: rgba(242, 140, 82, 0.4);
   background: rgba(17, 24, 36, 0.85);
 }
 
@@ -2801,9 +2801,9 @@ button.secondary:hover {
 .process-port-link {
   padding: 0.2rem 0.55rem;
   border-radius: 6px;
-  border: 1px solid rgba(78, 205, 196, 0.35);
-  background: rgba(78, 205, 196, 0.12);
-  color: #4ecdc4;
+  border: 1px solid rgba(242, 140, 82, 0.35);
+  background: rgba(242, 140, 82, 0.12);
+  color: #f28c52;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -2811,7 +2811,7 @@ button.secondary:hover {
 }
 
 .process-port-link:hover {
-  background: rgba(78, 205, 196, 0.2);
+  background: rgba(242, 140, 82, 0.2);
   transform: translateY(-1px);
 }
 
@@ -2853,14 +2853,14 @@ button.secondary:hover {
 }
 
 .processes-toggle:hover {
-  border-color: rgba(78, 205, 196, 0.4);
-  color: #4ecdc4;
+  border-color: rgba(242, 140, 82, 0.4);
+  color: #f28c52;
 }
 
 .processes-toggle.active {
-  background: rgba(78, 205, 196, 0.18);
-  border-color: rgba(78, 205, 196, 0.55);
-  color: #4ecdc4;
+  background: rgba(242, 140, 82, 0.18);
+  border-color: rgba(242, 140, 82, 0.55);
+  color: #f28c52;
 }
 
 .processes-icon-button {
@@ -2882,16 +2882,16 @@ button.secondary:hover {
 }
 
 .processes-icon-button:hover {
-  border-color: rgba(78, 205, 196, 0.55);
-  color: #4ecdc4;
+  border-color: rgba(242, 140, 82, 0.55);
+  color: #f28c52;
   transform: translateY(-1px);
 }
 
 .processes-icon-button.active {
-  background: rgba(78, 205, 196, 0.18);
-  border-color: rgba(78, 205, 196, 0.6);
-  color: #4ecdc4;
-  box-shadow: 0 6px 16px rgba(78, 205, 196, 0.25);
+  background: rgba(242, 140, 82, 0.18);
+  border-color: rgba(242, 140, 82, 0.6);
+  color: #f28c52;
+  box-shadow: 0 6px 16px rgba(242, 140, 82, 0.25);
 }
 
 .bottom-dock {
@@ -3024,13 +3024,13 @@ button.secondary:hover {
 }
 
 .saved-command-card.compact:hover {
-  border-color: rgba(78, 205, 196, 0.4);
+  border-color: rgba(242, 140, 82, 0.4);
   background: rgba(22, 26, 34, 0.78);
   box-shadow: 0 12px 28px rgba(12, 16, 24, 0.45);
 }
 
 .saved-command-card.compact:hover .saved-command-code {
-  border-color: rgba(78, 205, 196, 0.35);
+  border-color: rgba(242, 140, 82, 0.35);
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -3063,8 +3063,8 @@ button.secondary:hover {
 
 .saved-command-icon-actions .icon:hover {
   transform: translateY(-1px);
-  border-color: rgba(78, 205, 196, 0.55);
-  color: #4ecdc4;
+  border-color: rgba(242, 140, 82, 0.55);
+  color: #f28c52;
 }
 
 .saved-command-icon-actions .icon.danger:hover {
@@ -3141,7 +3141,7 @@ button.secondary:hover {
 }
 
 .saved-command-card.compact:hover {
-  border-color: rgba(78, 205, 196, 0.5);
+  border-color: rgba(242, 140, 82, 0.5);
   background: rgba(24, 28, 38, 0.82);
   box-shadow: 0 14px 30px rgba(12, 16, 24, 0.55);
 }
@@ -3248,4 +3248,750 @@ button.secondary:hover {
   border-color: rgba(255, 255, 255, 0.5);
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
+}
+
+/* ===== AI ASSISTANT ===== */
+.ai-assistant-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 16, 0.75);
+  backdrop-filter: blur(12px);
+  z-index: 2000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ai-assistant-modal {
+  width: min(600px, 90vw);
+  max-height: 80vh;
+  background: linear-gradient(145deg, #1a1d26 0%, #14161d 100%);
+  border: 1px solid rgba(242, 140, 82, 0.25);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 1px rgba(242, 140, 82, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ai-assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 16, 24, 0.5);
+}
+
+.ai-assistant-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.ai-icon {
+  font-size: 1.5rem;
+}
+
+.ai-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-close-btn:hover {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.ai-assistant-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ai-assistant-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-assistant-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.ai-intent-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: rgba(12, 16, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.ai-intent-label {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-intent-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ai-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(242, 140, 82, 0.2);
+  border-top-color: #f28c52;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 12px;
+}
+
+.ai-error-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.ai-error-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ai-error-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f87171;
+}
+
+.ai-error-message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.ai-error-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.ai-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ai-suggestion-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ai-confidence {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ai-confidence-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 90px;
+}
+
+.ai-confidence-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ai-confidence-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 999px;
+}
+
+.ai-confidence-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+.ai-command-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ai-command-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-command {
+  padding: 1rem;
+  background: rgba(12, 16, 24, 0.8);
+  border: 1px solid rgba(242, 140, 82, 0.25);
+  border-radius: 10px;
+  color: #f28c52;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.95rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.ai-explanation {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(12, 16, 24, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.ai-explanation-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.ai-alternative {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(255, 182, 111, 0.05);
+  border: 1px solid rgba(255, 182, 111, 0.25);
+  border-radius: 10px;
+}
+
+.ai-alternative-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 182, 111, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-alternative-command {
+  padding: 0.75rem;
+  background: rgba(12, 16, 24, 0.6);
+  border: 1px solid rgba(255, 182, 111, 0.25);
+  border-radius: 8px;
+  color: #ffb26f;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.ai-assistant-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 16, 24, 0.5);
+}
+
+.ai-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 10px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-btn-secondary {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ai-btn-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.ai-btn-primary {
+  background: linear-gradient(135deg, #f28c52 0%, #44b3aa 100%);
+  border-color: transparent;
+  color: #0f1115;
+  font-weight: 600;
+}
+
+.ai-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(242, 140, 82, 0.3);
+}
+
+.ai-kbd {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  font-family: "IBM Plex Mono", monospace;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+:root {
+  --color-success: #f28c52;
+  --color-warning: #ffb26f;
+  --color-error: #f87171;
+}
+
+/* ===== AI SETTINGS PANEL ===== */
+.ai-settings-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 16, 0.75);
+  backdrop-filter: blur(12px);
+  z-index: 2000;
+  animation: fadeIn 0.2s ease;
+}
+
+.ai-settings-panel {
+  width: min(700px, 90vw);
+  max-height: 85vh;
+  background: linear-gradient(145deg, #1a1d26 0%, #14161d 100%);
+  border: 1px solid rgba(242, 140, 82, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 16, 24, 0.5);
+}
+
+.ai-settings-header h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.ai-settings-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+}
+
+.ai-settings-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.ai-settings-close:hover {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.ai-settings-body {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.ai-settings-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-settings-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.ai-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ai-settings-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.ai-settings-description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.5;
+}
+
+.ai-settings-link {
+  color: #f28c52;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.ai-settings-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.ai-settings-input-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.ai-settings-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: rgba(12, 16, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-family: "IBM Plex Mono", monospace;
+  transition: border-color 0.2s ease;
+}
+
+.ai-settings-input:focus {
+  outline: none;
+  border-color: rgba(242, 140, 82, 0.5);
+}
+
+.ai-settings-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ai-settings-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+.ai-settings-status-success {
+  background: rgba(242, 140, 82, 0.12);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.ai-settings-status-error {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+}
+
+.ai-settings-status-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.ai-model-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ai-model-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(12, 16, 24, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-model-option:hover {
+  border-color: rgba(242, 140, 82, 0.3);
+  background: rgba(12, 16, 24, 0.6);
+}
+
+.ai-model-option input[type="radio"] {
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.ai-model-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ai-model-name {
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.ai-model-desc {
+  font-size: 0.825rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-model-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.ai-model-badge-recommended {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+  border: 1px solid rgba(242, 140, 82, 0.3);
+}
+
+.ai-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.ai-stat-card {
+  padding: 1.25rem;
+  background: rgba(12, 16, 24, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.ai-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #f28c52;
+  margin-bottom: 0.5rem;
+}
+
+.ai-stat-label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-stats-loading,
+.ai-stats-empty {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+}
+
+.ai-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ai-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(12, 16, 24, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.ai-feature-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.ai-feature-item strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.ai-feature-item code {
+  padding: 0.15rem 0.4rem;
+  background: rgba(12, 16, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  color: #f28c52;
+}
+
+.ai-feature-example {
+  margin-top: 0.5rem;
+  font-size: 0.825rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ai-settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.25rem 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 16, 24, 0.5);
+}
+
+/* AI Assistant closing animation */
+.ai-assistant-overlay.closing {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+.ai-assistant-overlay.closing .ai-assistant-modal {
+  animation: slideDown 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(30px) scale(0.92);
+  }
+}
+
+/* AI Settings Panel closing animation */
+.ai-settings-overlay.closing {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+.ai-settings-overlay.closing .ai-settings-panel {
+  animation: slideDown 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
 }

@@ -1,0 +1,446 @@
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
+use once_cell::sync::Lazy;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use tauri::AppHandle;
+use tauri_plugin_store::StoreExt;
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AIRequest {
+    pub intent: String,
+    pub context: TerminalContext,
+    pub request_type: String, // "command" | "error"
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalContext {
+    pub os: String,              // "macos", "linux", "windows"
+    pub shell: String,           // "zsh", "bash", "fish"
+    pub cwd: String,             // current working directory
+    pub recent_commands: Vec<String>, // last 5 commands
+    pub error_output: Option<String>, // if type = "error"
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AISuggestion {
+    pub command: String,
+    pub explanation: String,
+    pub confidence: f32,
+    pub alternative: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct OpenAIMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Serialize)]
+struct OpenAIRequest {
+    model: String,
+    messages: Vec<OpenAIMessage>,
+    temperature: f32,
+    max_tokens: u32,
+}
+
+#[derive(Deserialize)]
+struct OpenAIResponse {
+    choices: Vec<OpenAIChoice>,
+    usage: OpenAIUsage,
+}
+
+#[derive(Deserialize)]
+struct OpenAIChoice {
+    message: OpenAIMessage,
+}
+
+#[derive(Deserialize)]
+struct OpenAIUsage {
+    total_tokens: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenStats {
+    pub total_tokens_used: u32,
+    pub estimated_cost: f32,
+    pub request_count: u32,
+}
+
+// ============================================================================
+// Global State
+// ============================================================================
+
+static RATE_LIMITER: Lazy<Mutex<RateLimiter>> = Lazy::new(|| {
+    Mutex::new(RateLimiter {
+        requests: Vec::new(),
+        max_per_minute: 10,
+    })
+});
+
+static SUGGESTION_CACHE: Lazy<Mutex<HashMap<String, (AISuggestion, Instant)>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+static TOKEN_STATS: Lazy<Mutex<TokenStats>> = Lazy::new(|| {
+    Mutex::new(TokenStats {
+        total_tokens_used: 0,
+        estimated_cost: 0.0,
+        request_count: 0,
+    })
+});
+
+// ============================================================================
+// Rate Limiting
+// ============================================================================
+
+struct RateLimiter {
+    requests: Vec<Instant>,
+    max_per_minute: usize,
+}
+
+impl RateLimiter {
+    fn can_proceed(&mut self) -> bool {
+        let now = Instant::now();
+        let one_minute_ago = now - Duration::from_secs(60);
+
+        // Remove old requests
+        self.requests.retain(|&time| time > one_minute_ago);
+
+        if self.requests.len() < self.max_per_minute {
+            self.requests.push(now);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// ============================================================================
+// Caching
+// ============================================================================
+
+fn get_cached_suggestion(intent: &str) -> Option<AISuggestion> {
+    let cache = SUGGESTION_CACHE.lock().unwrap();
+    if let Some((suggestion, timestamp)) = cache.get(intent) {
+        // Cache valid for 1 hour
+        if timestamp.elapsed() < Duration::from_secs(3600) {
+            return Some(suggestion.clone());
+        }
+    }
+    None
+}
+
+fn store_in_cache(intent: String, suggestion: AISuggestion) {
+    let mut cache = SUGGESTION_CACHE.lock().unwrap();
+    cache.insert(intent, (suggestion, Instant::now()));
+}
+
+// ============================================================================
+// Token Tracking
+// ============================================================================
+
+fn track_token_usage(tokens: u32, model: &str) {
+    let mut stats = TOKEN_STATS.lock().unwrap();
+    stats.total_tokens_used += tokens;
+    stats.request_count += 1;
+
+    // Cost calculation (approximate, based on OpenAI pricing)
+    let cost_per_1m_tokens = match model {
+        "gpt-4o-mini" => 0.15,
+        "gpt-4o" => 2.50,
+        "gpt-3.5-turbo" => 0.50,
+        _ => 0.15,
+    };
+
+    let cost = (tokens as f32 / 1_000_000.0) * cost_per_1m_tokens;
+    stats.estimated_cost += cost;
+}
+
+// ============================================================================
+// API Key Storage
+// ============================================================================
+
+#[tauri::command]
+pub fn save_api_key(app: AppHandle, key: String) -> Result<(), String> {
+    let store = app
+        .store("ai-config.json")
+        .map_err(|e| format!("Failed to access store: {}", e))?;
+
+    // Base64 encode for basic obfuscation
+    let encoded = STANDARD.encode(key.as_bytes());
+
+    store.set("openai_api_key", json!(encoded));
+
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+
+    Ok(())
+}
+
+fn get_stored_api_key(app: &AppHandle) -> Result<String> {
+    let store = app
+        .store("ai-config.json")
+        .map_err(|e| anyhow!("Failed to access store: {}", e))?;
+
+    let encoded = store
+        .get("openai_api_key")
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .ok_or_else(|| anyhow!("API key not configured"))?;
+
+    let decoded_bytes = STANDARD
+        .decode(encoded)
+        .map_err(|e| anyhow!("Failed to decode API key: {}", e))?;
+
+    let decoded = String::from_utf8(decoded_bytes)
+        .map_err(|e| anyhow!("Invalid UTF-8 in API key: {}", e))?;
+
+    Ok(decoded)
+}
+
+#[tauri::command]
+pub async fn test_api_connection(app: AppHandle) -> Result<bool, String> {
+    let api_key = get_stored_api_key(&app).map_err(|e| e.to_string())?;
+
+    let client = Client::new();
+    let response = client
+        .get("https://api.openai.com/v1/models")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .send()
+        .await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+
+    Ok(response.status().is_success())
+}
+
+#[tauri::command]
+pub fn get_token_usage_stats() -> Result<TokenStats, String> {
+    let stats = TOKEN_STATS.lock().unwrap();
+    Ok(stats.clone())
+}
+
+// ============================================================================
+// Prompt Templates
+// ============================================================================
+
+fn build_system_prompt(context: &TerminalContext) -> String {
+    format!(
+        r#"You are an expert terminal command assistant for {os}.
+Shell: {shell}
+Directory: {cwd}
+
+Your task is to suggest precise terminal commands based on the user's intent.
+
+Respond ONLY in JSON format:
+{{
+  "command": "exact command to execute",
+  "explanation": "brief explanation (max 100 characters)",
+  "confidence": 0.95,
+  "alternative": "alternative command (optional)"
+}}
+
+RULES:
+1. The command must be executable in {shell} on {os}
+2. If intent is unclear, use confidence < 0.7
+3. Suggest alternatives when possible
+4. Consider current directory context: {cwd}
+5. Keep recent commands in mind for consistency
+
+EXAMPLES:
+- Intent: "install prettier" → {{"command": "npm install -D prettier", "explanation": "Install Prettier as dev dependency", "confidence": 0.98}}
+- Intent: "list files" → {{"command": "ls -la", "explanation": "Show all files including hidden", "confidence": 1.0, "alternative": "ls -lh"}}
+- Intent: "run dev server" → {{"command": "npm run dev", "explanation": "Start development server", "confidence": 0.90}}
+
+RECENT COMMANDS CONTEXT:
+{recent_commands}
+
+Analyze recent commands to understand the user's workflow and suggest coherent commands."#,
+        os = context.os,
+        shell = context.shell,
+        cwd = context.cwd,
+        recent_commands = context.recent_commands.join("\n")
+    )
+}
+
+fn build_error_analysis_prompt(error: &str, context: &TerminalContext) -> String {
+    format!(
+        r#"You are an expert in terminal debugging and system administration for {os}.
+
+Your task is to analyze terminal errors and suggest practical solutions.
+
+Respond ONLY in JSON format:
+{{
+  "command": "command to fix (if applicable, otherwise null)",
+  "explanation": "clear explanation of problem and solution (max 200 characters)",
+  "confidence": 0.85
+}}
+
+SYSTEM CONTEXT:
+OS: {os}
+Shell: {shell}
+Directory: {cwd}
+Recent commands: {recent_commands}
+
+ERROR TO ANALYZE:
+```
+{error_output}
+```
+
+RULES:
+1. Identify error type (permission, missing module, syntax, network, etc.)
+2. Suggest the simplest command to fix
+3. If no command can fix it, provide manual steps and set "command": null
+4. Use confidence < 0.6 if error is ambiguous
+5. Consider recent command context to understand what user was trying to do
+
+EXAMPLES:
+- Error: "bash: npm: command not found" → {{"command": "brew install node", "explanation": "npm not installed. Install Node.js which includes npm", "confidence": 0.95}}
+- Error: "Error: Cannot find module 'vite'" → {{"command": "npm install vite", "explanation": "vite module missing. Install it with npm", "confidence": 0.98}}
+- Error: "Permission denied: ./script.sh" → {{"command": "chmod +x script.sh", "explanation": "File not executable. Add execution permissions", "confidence": 0.99}}"#,
+        os = context.os,
+        shell = context.shell,
+        cwd = context.cwd,
+        recent_commands = context.recent_commands.join(" → "),
+        error_output = error
+    )
+}
+
+// ============================================================================
+// OpenAI Client
+// ============================================================================
+
+async fn call_openai(
+    app: &AppHandle,
+    prompt: String,
+    context: &TerminalContext,
+    model: &str,
+    is_error_analysis: bool,
+) -> Result<String> {
+    let api_key = get_stored_api_key(app)?;
+
+    let client = Client::new();
+    let system_prompt = if is_error_analysis {
+        build_error_analysis_prompt(&prompt, context)
+    } else {
+        build_system_prompt(context)
+    };
+
+    let body = OpenAIRequest {
+        model: model.to_string(),
+        messages: vec![
+            OpenAIMessage {
+                role: "system".to_string(),
+                content: system_prompt,
+            },
+            OpenAIMessage {
+                role: "user".to_string(),
+                content: prompt,
+            },
+        ],
+        temperature: if is_error_analysis { 0.4 } else { 0.3 },
+        max_tokens: if is_error_analysis { 700 } else { 500 },
+    };
+
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow!("OpenAI API request failed: {}", e))?
+        .json::<OpenAIResponse>()
+        .await
+        .map_err(|e| anyhow!("Failed to parse OpenAI response: {}", e))?;
+
+    // Track token usage
+    track_token_usage(response.usage.total_tokens, model);
+
+    Ok(response.choices[0].message.content.clone())
+}
+
+// ============================================================================
+// Tauri Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn get_ai_suggestion(
+    app: AppHandle,
+    request: AIRequest,
+) -> Result<AISuggestion, String> {
+    // Check rate limit
+    {
+        let mut limiter = RATE_LIMITER.lock().unwrap();
+        if !limiter.can_proceed() {
+            return Err("Rate limit exceeded. Please wait a moment.".to_string());
+        }
+    }
+
+    // Check cache
+    if let Some(cached) = get_cached_suggestion(&request.intent) {
+        return Ok(cached);
+    }
+
+    // Determine model based on request type
+    let model = if request.request_type == "error" {
+        "gpt-4o-mini" // Use mini even for errors for cost efficiency
+    } else {
+        "gpt-4o-mini"
+    };
+
+    // Call OpenAI
+    let ai_response = call_openai(
+        &app,
+        request.intent.clone(),
+        &request.context,
+        model,
+        request.request_type == "error",
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Parse JSON response
+    let suggestion: AISuggestion = serde_json::from_str(&ai_response).map_err(|e| {
+        format!(
+            "Failed to parse AI response as JSON: {}. Response: {}",
+            e, ai_response
+        )
+    })?;
+
+    // Validate confidence
+    if suggestion.confidence < 0.5 {
+        return Err("AI confidence too low for this suggestion".to_string());
+    }
+
+    // Store in cache
+    store_in_cache(request.intent, suggestion.clone());
+
+    Ok(suggestion)
+}
+
+#[tauri::command]
+pub async fn analyze_error(
+    app: AppHandle,
+    error_text: String,
+    context: TerminalContext,
+) -> Result<AISuggestion, String> {
+    let request = AIRequest {
+        intent: error_text,
+        context,
+        request_type: "error".to_string(),
+    };
+
+    get_ai_suggestion(app, request).await
+}
