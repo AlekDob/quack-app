@@ -76,7 +76,7 @@ export default function FilePreviewDrawer({
   }
 
   return (
-    <div className="preview-drawer" role="dialog" aria-modal="true">
+    <div className={`preview-drawer ${open ? "open" : ""}`} role="dialog" aria-modal="true">
       <div
         className="preview-drawer-backdrop"
         onClick={onClose}
