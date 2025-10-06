@@ -423,15 +423,18 @@ function FileExplorer({
       const additions = gitEntry.additions ?? 0;
       const deletions = gitEntry.deletions ?? 0;
       const hasStats = additions > 0 || deletions > 0;
+      const isNewFile = gitEntry.is_untracked;
 
       const rowClass = [
         "explorer-row",
         "file",
-        "modified",
+        isNewFile ? "new-file" : "modified",
         isActiveFile ? "active file-open" : "",
       ]
         .filter(Boolean)
         .join(" ");
+
+      const iconClass = isNewFile ? "explorer-icon file-new" : "explorer-icon file-modified";
 
       return (
         <button
@@ -444,7 +447,7 @@ function FileExplorer({
           onContextMenu={(event) => handleContextMenu(event, entry)}
         >
           <span className="explorer-expander placeholder" aria-hidden="true" />
-          <span className="explorer-icon file-modified" aria-hidden="true" />
+          <span className={iconClass} aria-hidden="true" />
           <span className="explorer-name">{displayPath}</span>
           {hasStats && (
             <span className="explorer-git-stats">

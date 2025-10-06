@@ -2247,6 +2247,51 @@ button.secondary:hover {
   background: rgba(242, 140, 82, 0.2);
 }
 
+/* Row per file nuovi (untracked) */
+.explorer-row.new-file {
+  border-color: rgba(77, 212, 179, 0.2);
+  background: rgba(77, 212, 179, 0.08);
+}
+
+.explorer-row.new-file:hover {
+  border-color: rgba(77, 212, 179, 0.35);
+  background: rgba(77, 212, 179, 0.14);
+}
+
+.explorer-row.new-file.active,
+.explorer-row.new-file.file-open {
+  border-color: rgba(77, 212, 179, 0.5);
+  background: rgba(77, 212, 179, 0.2);
+}
+
+/* Icona per file nuovo */
+.explorer-icon.file-new::before {
+  left: 4px;
+  right: 4px;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+  background: rgba(77, 212, 179, 0.85);
+}
+
+.explorer-icon.file-new::after {
+  content: '+';
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  width: 8px;
+  height: 8px;
+  font-size: 10px;
+  font-weight: bold;
+  color: rgba(18, 20, 27, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(77, 212, 179, 0.95);
+  border-radius: 50%;
+  line-height: 1;
+}
+
 .explorer-error {
   color: #ff8f8f;
   font-size: 0.8rem;
