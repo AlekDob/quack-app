@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { Terminal } from '@xterm/xterm'
@@ -21,7 +21,7 @@ interface TerminalViewProps {
   onOutput: (id: string, data: string) => void
 }
 
-export default function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalViewProps) {
+function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalMapRef = useRef(new Map<string, Terminal>())
   const fitMapRef = useRef(new Map<string, FitAddon>())
@@ -506,3 +506,22 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     </>
   )
 }
+
+// Performance: Memo con comparatore custom per evitare re-render quando cambia solo git/explorer
+export default memo(TerminalView, (prevProps, nextProps) => {
+  // Re-render solo se activeId o terminals array cambiano effettivamente
+  if (prevProps.activeId !== nextProps.activeId) return false
+  if (prevProps.terminals.length !== nextProps.terminals.length) return false
+
+  // Check se i terminali sono cambiati (shallow comparison sufficiente)
+  for (let i = 0; i < prevProps.terminals.length; i++) {
+    const prev = prevProps.terminals[i]
+    const next = nextProps.terminals[i]
+    if (prev.id !== next.id || prev.color !== next.color || prev.status !== next.status) {
+      return false
+    }
+  }
+
+  // Callbacks sono già stabili grazie a useCallback in App.tsx
+  return true // Props uguali, skippa re-render
+})

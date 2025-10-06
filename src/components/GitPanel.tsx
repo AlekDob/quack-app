@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 
 import type { GitCommitEntry, GitStatusEntry, GitStatusSummary } from '../types'
 
@@ -132,7 +132,7 @@ const GitTimelineItem = ({
   )
 }
 
-export default function GitPanel({
+function GitPanel({
   summary,
   loading,
   error,
@@ -455,3 +455,17 @@ export default function GitPanel({
     </div>
   )
 }
+
+// Performance: Memo per evitare re-render quando cambiano solo terminali
+export default memo(GitPanel, (prevProps, nextProps) => {
+  // Re-render solo se dati git cambiano
+  return (
+    prevProps.summary === nextProps.summary &&
+    prevProps.loading === nextProps.loading &&
+    prevProps.error === nextProps.error &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.diffContent === nextProps.diffContent &&
+    prevProps.diffView === nextProps.diffView &&
+    prevProps.committing === nextProps.committing
+  )
+})

@@ -22,6 +22,7 @@ import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import PreviewDrawer from "./components/PreviewDrawer";
 import AISettingsPanel from "./components/AISettingsPanel";
+import PerformanceMonitor from "./components/PerformanceMonitor";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -1941,6 +1942,8 @@ function App() {
         {showAISettings && (
           <AISettingsPanel onClose={() => setShowAISettings(false)} />
         )}
+
+        {import.meta.env.DEV && <PerformanceMonitor />}
     </div>
   );
 }

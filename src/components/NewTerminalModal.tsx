@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 interface NewTerminalModalProps {
   open: boolean
   isEditing?: boolean
@@ -15,7 +17,7 @@ interface NewTerminalModalProps {
   onConfirm: () => void
 }
 
-export default function NewTerminalModal({
+function NewTerminalModal({
   open,
   isEditing = false,
   name,
@@ -106,3 +108,6 @@ export default function NewTerminalModal({
     </div>
   )
 }
+
+// Performance: Memo basato solo su open prop
+export default memo(NewTerminalModal, (prev, next) => prev.open === next.open && !next.open)

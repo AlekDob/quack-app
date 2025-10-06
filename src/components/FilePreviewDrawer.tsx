@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { memo, useState, useCallback, useEffect } from "react";
 import CodeEditor, { type DiffInfo } from "./CodeEditor";
 
 interface FilePreviewDrawerProps {
@@ -16,7 +16,7 @@ interface FilePreviewDrawerProps {
   onSave?: (content: string) => void;
 }
 
-export default function FilePreviewDrawer({
+function FilePreviewDrawer({
   open,
   filename,
   path,
@@ -163,3 +163,6 @@ export default function FilePreviewDrawer({
     </div>
   );
 }
+
+// Performance: Memo drawer - skippa re-render quando chiuso
+export default memo(FilePreviewDrawer, (prev, next) => prev.open === next.open && !next.open)

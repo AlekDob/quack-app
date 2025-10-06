@@ -1,5 +1,6 @@
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -66,7 +67,7 @@ interface FileExplorerProps {
   gitRootPath: string | null;
 }
 
-export default function FileExplorer({
+function FileExplorer({
   rootPath,
   tree,
   loading,
@@ -518,3 +519,27 @@ export default function FileExplorer({
     </aside>
   );
 }
+
+// Performance: Memo per evitare re-render quando cambiano solo terminali/git status
+export default memo(FileExplorer, (prevProps, nextProps) => {
+  // Re-render solo se tree, modifiedEntries, activePath o activeFilePath cambiano
+  if (prevProps.rootPath !== nextProps.rootPath) return false
+  if (prevProps.loading !== nextProps.loading) return false
+  if (prevProps.error !== nextProps.error) return false
+  if (prevProps.activePath !== nextProps.activePath) return false
+  if (prevProps.activeFilePath !== nextProps.activeFilePath) return false
+  if (prevProps.gitRootPath !== nextProps.gitRootPath) return false
+
+  // Check tree shallow (keys changed?)
+  const prevKeys = Object.keys(prevProps.tree)
+  const nextKeys = Object.keys(nextProps.tree)
+  if (prevKeys.length !== nextKeys.length) return false
+
+  // Check modifiedEntries length
+  const prevModCount = prevProps.modifiedEntries?.length ?? 0
+  const nextModCount = nextProps.modifiedEntries?.length ?? 0
+  if (prevModCount !== nextModCount) return false
+
+  // Callbacks stabili da App.tsx
+  return true
+})
