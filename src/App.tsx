@@ -1832,7 +1832,6 @@ function App() {
               setSavedCommandsDrawerOpen((value) => !value)
             }
             savedCommandsOpen={savedCommandsDrawerOpen}
-            onToggleAISettings={() => setShowAISettings((value) => !value)}
           />
         </section>
 

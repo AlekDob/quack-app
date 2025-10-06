@@ -441,9 +441,9 @@ fn start_output_thread(
     let mut last_flush = std::time::Instant::now();
 
     // Performance: batch interval ADATTIVO basato sul volume di dati
-    // - Input utente (pochi bytes): flush immediato (5ms)
+    // - Input utente (pochi bytes): flush quasi immediato (1ms)
     // - Output massiccio (molti bytes): batch più lungo (50ms)
-    let min_flush_interval = std::time::Duration::from_millis(5);
+    let min_flush_interval = std::time::Duration::from_millis(1);
     let max_flush_interval = std::time::Duration::from_millis(50);
 
     loop {
@@ -453,16 +453,21 @@ fn start_output_thread(
           // Aggiungi bytes all'accumulator
           accumulated_bytes.extend_from_slice(&buffer[..size]);
 
+          // Check se ci sono caratteri critici che richiedono flush immediato
+          // \r (13) = Enter, \n (10) = Newline, \x03 (3) = Ctrl+C
+          let has_critical_char = buffer[..size].iter().any(|&b| b == 13 || b == 10 || b == 3);
+
           // Batching ADATTIVO: se pochi dati (probabile input utente), flush rapido
-          let is_small_input = accumulated_bytes.len() < 256; // < 256 bytes = probabilmente input utente
+          let is_small_input = accumulated_bytes.len() < 64; // < 64 bytes = probabilmente input utente
           let flush_interval = if is_small_input {
-            min_flush_interval // 5ms per input responsivo
+            min_flush_interval // 1ms per input responsivo
           } else {
             max_flush_interval // 50ms per output massiccio
           };
 
-          // Flush se: timeout scaduto O accumulator troppo grande (>64KB)
-          let should_flush = last_flush.elapsed() >= flush_interval
+          // Flush se: caratteri critici O timeout scaduto O accumulator troppo grande (>64KB)
+          let should_flush = has_critical_char
+            || last_flush.elapsed() >= flush_interval
             || accumulated_bytes.len() >= 65536;
 
           if should_flush && !accumulated_bytes.is_empty() {

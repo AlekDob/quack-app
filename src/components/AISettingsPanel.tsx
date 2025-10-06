@@ -145,11 +145,13 @@ export default function AISettingsPanel({ onClose }: AISettingsPanelProps) {
 
             <div className="ai-settings-input-group">
               <input
-                type="password"
+                type="text"
                 className="ai-settings-input"
                 placeholder="sk-..."
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
               />
               <button
                 className="ai-btn ai-btn-primary"

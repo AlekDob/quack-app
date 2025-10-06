@@ -471,9 +471,12 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
     const terminal = terminalMapRef.current.get(activeId)
     if (!terminal) return
 
-    // Write command to terminal and execute it
-    terminal.write(command + '\r')
-    void invoke('write_to_terminal', { id: activeId, data: command + '\r' })
+    // Simply execute the AI command on a new line
+    // Don't try to clear the previous intent text - let it remain visible above
+    const executeCommand = command + '\r'
+
+    terminal.write(executeCommand)
+    void invoke('write_to_terminal', { id: activeId, data: executeCommand })
 
     // Add to recent commands
     recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), command]
