@@ -30,6 +30,8 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
   const listenersRegisteredRef = useRef(false)
   const inputBufferRef = useRef<string>('')
   const recentCommandsRef = useRef<string[]>([])
+  const aiInputModeRef = useRef(false)
+  const aiInputBufferRef = useRef<string>('')
 
   // Performance: buffer per batch processing dell'output
   const writeBufferRef = useRef(new Map<string, string[]>())
@@ -155,41 +157,78 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
     terminal.loadAddon(linksAddon)
 
     terminal.onData((chunk) => {
-      // Check if user pressed # to trigger AI assistant
-      if (chunk === '#' && inputBufferRef.current.trim().length > 0) {
-        const intent = inputBufferRef.current.trim()
-        const activeTerminal = terminals.find((t) => t.id === id)
+      // Check if user pressed # to activate AI input mode
+      if (chunk === '#' && !aiInputModeRef.current && inputBufferRef.current.trim().length === 0) {
+        // Activate AI mode IMMEDIATELY with ref (synchronous)
+        aiInputModeRef.current = true
+        aiInputBufferRef.current = ''
 
-        setAiIntent(intent)
-        setAiContext({
-          os: 'macos', // TODO: detect OS dynamically
-          shell: 'zsh', // TODO: detect shell from terminal
-          cwd: activeTerminal?.cwd || '',
-          recentCommands: recentCommandsRef.current.slice(-5),
-        })
-        setShowAIAssistant(true)
-
-        // Clear input buffer
-        inputBufferRef.current = ''
-        return // Don't send # to terminal
+        // Visual feedback: write AI mode indicator
+        terminal.write('\r\n🤖 AI Mode (Enter to confirm, Esc to cancel): ')
+        return
       }
 
-      // Track input buffer for AI context
+      // AI Input Mode - capture input without sending to PTY
+      if (aiInputModeRef.current) {
+        if (chunk === '\r' || chunk === '\n') {
+          // Enter pressed - open AI assistant with captured intent
+          const intent = aiInputBufferRef.current.trim()
+
+          if (intent.length > 0) {
+            const activeTerminal = terminals.find((t) => t.id === id)
+
+            setAiIntent(intent)
+            setAiContext({
+              os: 'macos',
+              shell: 'zsh',
+              cwd: activeTerminal?.cwd || '',
+              recentCommands: recentCommandsRef.current.slice(-5),
+            })
+            setShowAIAssistant(true)
+          }
+
+          // Exit AI mode
+          aiInputModeRef.current = false
+          aiInputBufferRef.current = ''
+          terminal.write('\r\n')
+          return
+        } else if (chunk === '\x1b') {
+          // Escape pressed - cancel AI mode
+          aiInputModeRef.current = false
+          aiInputBufferRef.current = ''
+          terminal.write('\r\n')
+          return
+        } else if (chunk === '\x7f' || chunk === '\b') {
+          // Backspace in AI mode
+          if (aiInputBufferRef.current.length > 0) {
+            aiInputBufferRef.current = aiInputBufferRef.current.slice(0, -1)
+            terminal.write('\b \b') // Erase character visually
+          }
+          return
+        } else if (chunk.length === 1 && chunk.charCodeAt(0) >= 32) {
+          // Printable character in AI mode
+          aiInputBufferRef.current += chunk
+          terminal.write(chunk) // Show character visually
+          return
+        }
+        // Other control characters in AI mode - ignore
+        return
+      }
+
+      // Normal mode - track input buffer for AI context
       if (chunk === '\r' || chunk === '\n') {
-        // Command submitted - save to recent commands
         const cmd = inputBufferRef.current.trim()
         if (cmd.length > 0) {
           recentCommandsRef.current = [...recentCommandsRef.current.slice(-9), cmd]
         }
         inputBufferRef.current = ''
       } else if (chunk === '\x7f' || chunk === '\b') {
-        // Backspace - remove last char from buffer
         inputBufferRef.current = inputBufferRef.current.slice(0, -1)
       } else if (chunk.length === 1 && chunk.charCodeAt(0) >= 32) {
-        // Printable character - add to buffer
         inputBufferRef.current += chunk
       }
 
+      // Normal mode - send to terminal
       onUserInput(id, chunk)
       void invoke('write_to_terminal', { id, data: chunk })
     })
@@ -471,8 +510,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput }: TerminalVi
     const terminal = terminalMapRef.current.get(activeId)
     if (!terminal) return
 
-    // Simply execute the AI command on a new line
-    // Don't try to clear the previous intent text - let it remain visible above
+    // Simply execute the AI command
+    // The intent text was already "executed" (and failed) when user pressed #
+    // So we're now on a clean line
     const executeCommand = command + '\r'
 
     terminal.write(executeCommand)
