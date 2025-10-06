@@ -96,7 +96,7 @@ pub fn run() {
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {
-                use tauri::menu::{CheckMenuItemBuilder, SubmenuBuilder};
+                use tauri::menu::{CheckMenuItemBuilder, MenuItemBuilder, SubmenuBuilder};
 
                 let app_handle = app.handle().clone();
                 let toggle_perf_id = "toggle_performance_monitor";
@@ -109,14 +109,21 @@ pub fn run() {
                         .unwrap_or(false)
                 });
 
-                // Create View menu with Performance Monitor toggle
+                // Create View menu with Performance Monitor toggle and AI Settings
                 let toggle_perf = CheckMenuItemBuilder::with_id(toggle_perf_id, "Show Performance Monitor")
                     .checked(initial_state)
                     .accelerator("Cmd+Shift+P")
                     .build(app)?;
 
+                let ai_settings_id = "open_ai_settings";
+                let ai_settings = tauri::menu::MenuItemBuilder::with_id(ai_settings_id, "AI Settings...")
+                    .accelerator("Cmd+Shift+A")
+                    .build(app)?;
+
                 let view_menu = SubmenuBuilder::new(app, "View")
                     .item(&toggle_perf)
+                    .separator()
+                    .item(&ai_settings)
                     .build()?;
 
                 // Build and set the menu
@@ -133,6 +140,13 @@ pub fn run() {
                         tauri::async_runtime::spawn(async move {
                             if let Ok(new_state) = preferences::toggle_performance_monitor(app_handle).await {
                                 log::info!("Performance monitor toggled: {}", new_state);
+                            }
+                        });
+                    } else if event.id() == ai_settings_id {
+                        let app_handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(e) = app_handle.emit("open-ai-settings", ()) {
+                                log::error!("Failed to emit open-ai-settings event: {}", e);
                             }
                         });
                     }
@@ -233,7 +247,11 @@ pub fn run() {
             ai::get_token_usage_stats,
             preferences::get_preferences,
             preferences::set_preference,
-            preferences::toggle_performance_monitor
+            preferences::toggle_performance_monitor,
+            preferences::set_ai_api_key,
+            preferences::get_ai_api_key,
+            preferences::set_ai_model,
+            preferences::get_ai_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

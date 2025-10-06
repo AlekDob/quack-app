@@ -25,7 +25,26 @@ export default function AISettingsPanel({ onClose }: AISettingsPanelProps) {
 
   useEffect(() => {
     loadStats()
+    loadSavedSettings()
   }, [])
+
+  const loadSavedSettings = async () => {
+    try {
+      // Load API key from preferences (it will be encoded)
+      const savedKey = await invoke<string | null>('get_ai_api_key')
+      if (savedKey) {
+        // Decode for display (Base64)
+        const decoded = atob(savedKey)
+        setApiKey(decoded)
+      }
+
+      // Load model from preferences
+      const savedModel = await invoke<string>('get_ai_model')
+      setModel(savedModel as typeof model)
+    } catch (err) {
+      console.error('Failed to load saved AI settings:', err)
+    }
+  }
 
   const loadStats = async () => {
     setLoadingStats(true)
@@ -57,8 +76,11 @@ export default function AISettingsPanel({ onClose }: AISettingsPanelProps) {
     setErrorMessage('')
 
     try {
-      // Save API key
+      // Save API key (will be encoded in Rust backend)
       await invoke('save_api_key', { key: apiKey })
+
+      // Save model selection
+      await invoke('set_ai_model', { model })
 
       // Test connection
       const connected = await invoke<boolean>('test_api_connection')

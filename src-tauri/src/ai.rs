@@ -170,35 +170,22 @@ fn track_token_usage(tokens: u32, model: &str) {
 }
 
 // ============================================================================
-// API Key Storage
+// API Key Storage (using preferences module)
 // ============================================================================
 
 #[tauri::command]
-pub fn save_api_key(app: AppHandle, key: String) -> Result<(), String> {
-    let store = app
-        .store("ai-config.json")
-        .map_err(|e| format!("Failed to access store: {}", e))?;
-
+pub async fn save_api_key(app: AppHandle, key: String) -> Result<(), String> {
     // Base64 encode for basic obfuscation
     let encoded = STANDARD.encode(key.as_bytes());
 
-    store.set("openai_api_key", json!(encoded));
-
-    store
-        .save()
-        .map_err(|e| format!("Failed to save store: {}", e))?;
-
-    Ok(())
+    // Use preferences module to store
+    crate::preferences::set_ai_api_key(app, encoded).await
 }
 
-fn get_stored_api_key(app: &AppHandle) -> Result<String> {
-    let store = app
-        .store("ai-config.json")
-        .map_err(|e| anyhow!("Failed to access store: {}", e))?;
-
-    let encoded = store
-        .get("openai_api_key")
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
+async fn get_stored_api_key(app: &AppHandle) -> Result<String> {
+    let encoded = crate::preferences::get_ai_api_key(app.clone())
+        .await
+        .map_err(|e| anyhow!("Failed to get API key from preferences: {}", e))?
         .ok_or_else(|| anyhow!("API key not configured"))?;
 
     let decoded_bytes = STANDARD
@@ -213,7 +200,7 @@ fn get_stored_api_key(app: &AppHandle) -> Result<String> {
 
 #[tauri::command]
 pub async fn test_api_connection(app: AppHandle) -> Result<bool, String> {
-    let api_key = get_stored_api_key(&app).map_err(|e| e.to_string())?;
+    let api_key = get_stored_api_key(&app).await.map_err(|e| e.to_string())?;
 
     let client = Client::new();
     let response = client
@@ -329,7 +316,7 @@ async fn call_openai(
     model: &str,
     is_error_analysis: bool,
 ) -> Result<String> {
-    let api_key = get_stored_api_key(app)?;
+    let api_key = get_stored_api_key(app).await?;
 
     let client = Client::new();
     let system_prompt = if is_error_analysis {

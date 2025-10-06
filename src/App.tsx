@@ -333,8 +333,14 @@ function App() {
       setShowPerformanceMonitor(event.payload.show_performance_monitor);
     });
 
+    // Listen for menu event to open AI Settings
+    const unlistenAISettingsPromise = listen("open-ai-settings", () => {
+      setShowAISettings(true);
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
     // Performance: NON fare polling continuo dei processi - carica solo quando necessario
     // Il drawer ProcessesDrawer chiamerà loadActiveProcesses quando aperto
