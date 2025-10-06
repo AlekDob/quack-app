@@ -7,10 +7,16 @@ interface TerminalGroupProps {
   terminals: TerminalInfo[]
   isCollapsed: boolean
   activeId: string | null
+  canGroupMoveUp: boolean
+  canGroupMoveDown: boolean
   onToggle: () => void
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void
+  onMoveUp: (id: string) => void
+  onMoveDown: (id: string) => void
+  onMoveGroupUp: (cwd: string) => void
+  onMoveGroupDown: (cwd: string) => void
 }
 
 export default function TerminalGroup({
@@ -18,10 +24,16 @@ export default function TerminalGroup({
   terminals,
   isCollapsed,
   activeId,
+  canGroupMoveUp,
+  canGroupMoveDown,
   onToggle,
   onSelect,
   onClose,
   onContextMenu,
+  onMoveUp,
+  onMoveDown,
+  onMoveGroupUp,
+  onMoveGroupDown,
 }: TerminalGroupProps) {
   return (
     <div className="terminal-group">
@@ -29,7 +41,11 @@ export default function TerminalGroup({
         cwd={cwd}
         count={terminals.length}
         isCollapsed={isCollapsed}
+        canMoveUp={canGroupMoveUp}
+        canMoveDown={canGroupMoveDown}
         onToggle={onToggle}
+        onMoveUp={() => onMoveGroupUp(cwd)}
+        onMoveDown={() => onMoveGroupDown(cwd)}
       />
 
       {!isCollapsed && (
@@ -42,6 +58,11 @@ export default function TerminalGroup({
               active ? 'active' : '',
               terminal.alive ? '' : 'inactive',
             ].filter(Boolean).join(' ')
+
+            // Verifica se può muoversi su/giù nell'array globale dei terminali
+            // (Nota: questo richiede accesso all'array completo, per ora usa index locale nel gruppo)
+            const canMoveUp = index > 0
+            const canMoveDown = index < terminals.length - 1
 
             return (
               <div
@@ -65,6 +86,32 @@ export default function TerminalGroup({
                 />
                 <div className="terminal-details">
                   <span className="terminal-name">{terminal.label}</span>
+                </div>
+                <div className="terminal-reorder-controls">
+                  <button
+                    type="button"
+                    className="terminal-reorder-btn"
+                    disabled={!canMoveUp}
+                    aria-label="Sposta su"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onMoveUp(terminal.id)
+                    }}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    className="terminal-reorder-btn"
+                    disabled={!canMoveDown}
+                    aria-label="Sposta giù"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onMoveDown(terminal.id)
+                    }}
+                  >
+                    ▼
+                  </button>
                 </div>
                 <button
                   type="button"

@@ -961,6 +961,37 @@ button.secondary:hover {
   color: #7f8bb0;
 }
 
+.terminal-reorder-controls {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.terminal-reorder-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: #7f8bb0;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+  min-width: 16px;
+}
+
+.terminal-reorder-btn:hover:not(:disabled) {
+  color: var(--accent-text);
+  background: rgba(var(--accent-rgb), 0.18);
+  transform: scale(1.1);
+}
+
+.terminal-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .terminal-close {
   border: none;
   background: transparent;
@@ -969,6 +1000,7 @@ button.secondary:hover {
   cursor: pointer;
   padding: 0.1rem;
   border-radius: 6px;
+  margin-left: 4px;
 }
 
 .terminal-close:hover {
@@ -2299,11 +2331,18 @@ button.secondary:hover {
   margin-bottom: 12px;
 }
 
+.group-header-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
 .group-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
   height: 40px;
   padding: 0 12px;
   background: rgba(255, 255, 255, 0.03);
@@ -2323,6 +2362,12 @@ button.secondary:hover {
   transform: scale(1.01);
 }
 
+.group-reorder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .group-chevron {
   font-size: 10px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2334,7 +2379,10 @@ button.secondary:hover {
 }
 
 .group-folder-icon {
-  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .group-path {

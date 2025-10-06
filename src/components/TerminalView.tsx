@@ -30,6 +30,11 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
   const listenersRegisteredRef = useRef(false)
   const inputBufferRef = useRef<string>('')
   const recentCommandsRef = useRef<string[]>([])
+
+  // Performance: buffer per batch processing dell'output
+  const writeBufferRef = useRef(new Map<string, string[]>())
+  const writeTimeoutRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -42,6 +47,44 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     cwd: '',
     recentCommands: [],
   })
+
+  // Performance: batch write con throttling per evitare troppi repaint
+  const flushWriteBuffer = useCallback((id: string) => {
+    const term = terminalMapRef.current.get(id)
+    const buffer = writeBufferRef.current.get(id)
+
+    if (!term || !buffer || buffer.length === 0) {
+      return
+    }
+
+    // Scrivi tutto in una volta sola invece di N volte
+    const chunk = buffer.join('')
+    term.write(chunk)
+
+    // Pulisci buffer
+    writeBufferRef.current.set(id, [])
+  }, [])
+
+  const scheduleWrite = useCallback((id: string, data: string) => {
+    // Aggiungi al buffer
+    const buffer = writeBufferRef.current.get(id) ?? []
+    buffer.push(data)
+    writeBufferRef.current.set(id, buffer)
+
+    // Cancella timer precedente se esiste
+    const existingTimeout = writeTimeoutRef.current.get(id)
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+    }
+
+    // Flush dopo 16ms (circa 1 frame @ 60fps) per batch multipli eventi
+    const timeout = setTimeout(() => {
+      flushWriteBuffer(id)
+      writeTimeoutRef.current.delete(id)
+    }, 16)
+
+    writeTimeoutRef.current.set(id, timeout)
+  }, [flushWriteBuffer])
 
   const reportResize = useCallback(async (id: string, terminal: Terminal) => {
     if (!tauriAvailable) {
@@ -75,6 +118,13 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       cursorBlink: true,
       allowTransparency: true,
       scrollOnUserInput: true,
+      // Performance: aumenta scrollback ma usa FastScrollback per rendering ottimizzato
+      scrollback: 10000,
+      fastScrollModifier: 'shift',
+      // Performance: rendering ottimizzato
+      windowOptions: {
+        setWinSizeChars: true,
+      },
       theme: {
         background: '#0f1115',
         foreground: '#f0f2f6',
@@ -128,16 +178,21 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       void invoke('write_to_terminal', { id, data: chunk })
     })
 
-    // Smart proximity-based auto-scroll: scroll solo se l'utente è vicino al bottom
+    // Performance: throttled auto-scroll invece di ogni write
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
     terminal.onWriteParsed(() => {
-      const buffer = terminal.buffer.active
-      const distanceFromBottom = buffer.baseY - buffer.viewportY
+      if (scrollTimeout) return
 
-      // Auto-scroll solo se entro 5 righe dal bottom (utente probabilmente vuole vedere output)
-      // Se l'utente ha scrollato più in alto, rispetta la sua scelta
-      if (distanceFromBottom <= 5) {
-        terminal.scrollToBottom()
-      }
+      scrollTimeout = setTimeout(() => {
+        const buffer = terminal.buffer.active
+        const distanceFromBottom = buffer.baseY - buffer.viewportY
+
+        // Auto-scroll solo se entro 5 righe dal bottom
+        if (distanceFromBottom <= 5) {
+          terminal.scrollToBottom()
+        }
+        scrollTimeout = null
+      }, 50) // Scroll max ogni 50ms invece che ad ogni carattere
     })
 
     terminalMapRef.current.set(id, terminal)
@@ -212,18 +267,10 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
     const register = async () => {
       try {
         const dataListener = await listen<TerminalDataEvent>('terminal-data', (event) => {
-          const term = ensureTerminal(event.payload.id)
+          ensureTerminal(event.payload.id)
 
-          // Debug: log caratteri speciali per investigare spazi enormi
-          if (event.payload.data.includes('\n\n\n') || event.payload.data.match(/\n{3,}/)) {
-            console.warn('⚠️ Multipli newline rilevati:', {
-              id: event.payload.id,
-              data: event.payload.data,
-              repr: JSON.stringify(event.payload.data)
-            })
-          }
-
-          term.write(event.payload.data)
+          // Performance: usa batch write invece di write immediato
+          scheduleWrite(event.payload.id, event.payload.data)
           onOutput(event.payload.id, event.payload.data)
         })
         if (cancelled) {
@@ -261,7 +308,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
       listenersRegisteredRef.current = false
       disposers.forEach((dispose) => dispose())
     }
-  }, [ensureTerminal, onOutput, tauriAvailable])
+  }, [ensureTerminal, onOutput, scheduleWrite, tauriAvailable])
 
   useEffect(() => {
     if (!tauriAvailable) {
@@ -274,6 +321,15 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
 
     Array.from(terminalMapRef.current.keys()).forEach((id) => {
       if (!validIds.has(id)) {
+        // Performance: cleanup dei buffer quando terminale viene chiuso
+        const timeout = writeTimeoutRef.current.get(id)
+        if (timeout) {
+          clearTimeout(timeout)
+          writeTimeoutRef.current.delete(id)
+        }
+        flushWriteBuffer(id) // Flush eventuali dati pendenti prima di chiudere
+        writeBufferRef.current.delete(id)
+
         terminalMapRef.current.get(id)?.dispose()
         terminalMapRef.current.delete(id)
         fitMapRef.current.delete(id)
@@ -284,7 +340,7 @@ export default function TerminalView({ activeId, terminals, onUserInput, onOutpu
         }
       }
     })
-  }, [ensureTerminal, tauriAvailable, terminals])
+  }, [ensureTerminal, flushWriteBuffer, tauriAvailable, terminals])
 
   useEffect(() => {
     if (!tauriAvailable) {

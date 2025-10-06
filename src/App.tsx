@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   isPermissionGranted,
@@ -163,6 +164,21 @@ function App() {
   const [tauriAvailable] = useState(
     () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
   );
+
+  // Check if we're running inside the preview-webview window
+  // If so, don't initialize the app to avoid permission errors
+  const [isPreviewWebview] = useState(() => {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+      return false;
+    }
+    try {
+      const current = getCurrentWindow();
+      return current.label === "preview-webview";
+    } catch {
+      return false;
+    }
+  });
+
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [explorerPath, setExplorerPath] = useState("");
@@ -781,6 +797,15 @@ function App() {
     setNewTerminalPath(terminal.cwd);
     setNewTerminalError(null);
     setShowNewTerminalModal(true);
+  }, []);
+
+  const handleReorderTerminals = useCallback((reorderedIds: string[]) => {
+    setTerminals((prev) => {
+      // Crea una mappa per accesso rapido
+      const terminalMap = new Map(prev.map((t) => [t.id, t]));
+      // Riordina secondo l'array di IDs
+      return reorderedIds.map((id) => terminalMap.get(id)).filter(Boolean) as TerminalInfo[];
+    });
   }, []);
 
   const handleOpenNewTerminalModal = useCallback(() => {
@@ -1577,6 +1602,12 @@ function App() {
     );
   }
 
+  // If we're in the preview-webview, don't render anything
+  // The preview window should only show the external URL content
+  if (isPreviewWebview) {
+    return null;
+  }
+
   if (booting) {
     return (
       <div className="app-loader">
@@ -1608,6 +1639,7 @@ function App() {
           onColorChange={handleColorChange}
           onEdit={handleEditTerminal}
           onToggleGroup={handleToggleGroup}
+          onReorder={handleReorderTerminals}
           onToggleProcesses={() =>
             setShowProcessesDrawer((value) => !value)
           }

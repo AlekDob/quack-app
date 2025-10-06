@@ -35,9 +35,17 @@ interface TerminalSidebarProps {
   onColorChange: (id: string, color: string) => void;
   onEdit: (terminal: TerminalInfo) => void;
   onToggleGroup: (cwd: string) => void;
+  onReorder: (reorderedIds: string[]) => void;
   onToggleProcesses: () => void;
   processesOpen: boolean;
 }
+
+// Helper type for drag handlers
+type DragStartHandler = (event: React.DragEvent, id: string) => void;
+type DragOverHandler = (event: React.DragEvent, id: string) => void;
+type DragLeaveHandler = (event: React.DragEvent) => void;
+type DragDropHandler = (event: React.DragEvent, id: string) => void;
+type DragEndHandler = () => void;
 
 export default function TerminalSidebar({
   terminals,
@@ -50,6 +58,7 @@ export default function TerminalSidebar({
   onColorChange: _onColorChange,
   onEdit,
   onToggleGroup,
+  onReorder,
   onToggleProcesses,
   processesOpen,
 }: TerminalSidebarProps) {
@@ -87,14 +96,8 @@ export default function TerminalSidebar({
       }
     });
 
-    // Sort groups: active group first, then by recent activity
-    groupedEntries.sort(([, termsA], [, termsB]) => {
-      const hasActiveA = termsA.some((t) => t.id === activeId);
-      const hasActiveB = termsB.some((t) => t.id === activeId);
-      if (hasActiveA && !hasActiveB) return -1;
-      if (!hasActiveA && hasActiveB) return 1;
-      return 0; // Keep order for rest
-    });
+    // Mantieni ordine originale, non riordinare automaticamente
+    // groupedEntries.sort(...) rimosso per preservare ordine fisso
 
     return {
       groups: groupedEntries,
@@ -112,6 +115,73 @@ export default function TerminalSidebar({
 
   const closeContextMenu = () => {
     setContextMenu(null);
+  };
+
+  const handleMoveUp = (id: string) => {
+    const currentIds = terminals.map((t) => t.id);
+    const index = currentIds.indexOf(id);
+    if (index <= 0) return; // Già in cima
+
+    const reordered = [...currentIds];
+    reordered.splice(index, 1);
+    reordered.splice(index - 1, 0, id);
+    onReorder(reordered);
+  };
+
+  const handleMoveDown = (id: string) => {
+    const currentIds = terminals.map((t) => t.id);
+    const index = currentIds.indexOf(id);
+    if (index === -1 || index >= currentIds.length - 1) return; // Già in fondo
+
+    const reordered = [...currentIds];
+    reordered.splice(index, 1);
+    reordered.splice(index + 1, 0, id);
+    onReorder(reordered);
+  };
+
+  // Handlers per muovere gruppi interi
+  const handleMoveGroupUp = (cwd: string) => {
+    // Trova tutti i terminali del gruppo
+    const groupTerminals = groups.find(([c]) => c === cwd)?.[1] || [];
+    if (groupTerminals.length === 0) return;
+
+    // Trova l'indice del primo terminale del gruppo nell'array globale
+    const firstTerminalId = groupTerminals[0].id;
+    const currentIds = terminals.map((t) => t.id);
+    const firstIndex = currentIds.indexOf(firstTerminalId);
+
+    if (firstIndex <= 0) return; // Già in cima
+
+    // Rimuovi tutti i terminali del gruppo
+    const groupIds = groupTerminals.map(t => t.id);
+    const withoutGroup = currentIds.filter(id => !groupIds.includes(id));
+
+    // Reinserisci il gruppo una posizione prima
+    const reordered = [...withoutGroup];
+    reordered.splice(firstIndex - 1, 0, ...groupIds);
+    onReorder(reordered);
+  };
+
+  const handleMoveGroupDown = (cwd: string) => {
+    // Trova tutti i terminali del gruppo
+    const groupTerminals = groups.find(([c]) => c === cwd)?.[1] || [];
+    if (groupTerminals.length === 0) return;
+
+    // Trova l'indice dell'ultimo terminale del gruppo nell'array globale
+    const lastTerminalId = groupTerminals[groupTerminals.length - 1].id;
+    const currentIds = terminals.map((t) => t.id);
+    const lastIndex = currentIds.indexOf(lastTerminalId);
+
+    if (lastIndex === -1 || lastIndex >= currentIds.length - 1) return; // Già in fondo
+
+    // Rimuovi tutti i terminali del gruppo
+    const groupIds = groupTerminals.map(t => t.id);
+    const withoutGroup = currentIds.filter(id => !groupIds.includes(id));
+
+    // Reinserisci il gruppo una posizione dopo
+    const reordered = [...withoutGroup];
+    reordered.splice(lastIndex, 0, ...groupIds);
+    onReorder(reordered);
   };
   return (
     <aside className="sidebar">
@@ -142,22 +212,39 @@ export default function TerminalSidebar({
 
       <div className="sidebar-list">
         {/* Render grouped terminals */}
-        {groups.map(([cwd, groupTerminals]) => (
-          <TerminalGroup
-            key={cwd}
-            cwd={cwd}
-            terminals={groupTerminals}
-            isCollapsed={collapsedGroups.has(cwd)}
-            activeId={activeId}
-            onToggle={() => onToggleGroup(cwd)}
-            onSelect={onSelect}
-            onClose={onClose}
-            onContextMenu={handleContextMenu}
-          />
-        ))}
+        {groups.map(([cwd, groupTerminals], groupIndex) => {
+          // Calcola se il gruppo può muoversi su/giù
+          const firstTerminalId = groupTerminals[0]?.id;
+          const lastTerminalId = groupTerminals[groupTerminals.length - 1]?.id;
+          const firstIndex = terminals.findIndex(t => t.id === firstTerminalId);
+          const lastIndex = terminals.findIndex(t => t.id === lastTerminalId);
+
+          const canGroupMoveUp = firstIndex > 0;
+          const canGroupMoveDown = lastIndex < terminals.length - 1;
+
+          return (
+            <TerminalGroup
+              key={cwd}
+              cwd={cwd}
+              terminals={groupTerminals}
+              isCollapsed={collapsedGroups.has(cwd)}
+              activeId={activeId}
+              canGroupMoveUp={canGroupMoveUp}
+              canGroupMoveDown={canGroupMoveDown}
+              onToggle={() => onToggleGroup(cwd)}
+              onSelect={onSelect}
+              onClose={onClose}
+              onContextMenu={handleContextMenu}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onMoveGroupUp={handleMoveGroupUp}
+              onMoveGroupDown={handleMoveGroupDown}
+            />
+          );
+        })}
 
         {/* Render ungrouped terminals */}
-        {ungrouped.map((terminal) => {
+        {ungrouped.map((terminal, index) => {
           const active = terminal.id === activeId;
           const itemClasses = [
             "terminal-item",
@@ -167,6 +254,11 @@ export default function TerminalSidebar({
           ]
             .filter(Boolean)
             .join(" ");
+
+          const terminalIndex = terminals.findIndex(t => t.id === terminal.id);
+          const canMoveUp = terminalIndex > 0;
+          const canMoveDown = terminalIndex < terminals.length - 1;
+
           return (
             <div
               key={terminal.id}
@@ -188,6 +280,32 @@ export default function TerminalSidebar({
               />
               <div className="terminal-details">
                 <span className="terminal-name">{terminal.label}</span>
+              </div>
+              <div className="terminal-reorder-controls">
+                <button
+                  type="button"
+                  className="terminal-reorder-btn"
+                  disabled={!canMoveUp}
+                  aria-label="Sposta su"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleMoveUp(terminal.id);
+                  }}
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  className="terminal-reorder-btn"
+                  disabled={!canMoveDown}
+                  aria-label="Sposta giù"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleMoveDown(terminal.id);
+                  }}
+                >
+                  ▼
+                </button>
               </div>
               <button
                 type="button"
