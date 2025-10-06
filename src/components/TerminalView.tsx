@@ -17,11 +17,10 @@ interface TerminalViewProps {
   terminals: TerminalInfo[]
   onUserInput: (id: string, data: string) => void
   onOutput: (id: string, data: string) => void
-  onOpenAIAssistant: (intent?: string) => void
   onUpdateRecentCommands: (commands: string[]) => void
 }
 
-function TerminalView({ activeId, terminals, onUserInput, onOutput, onOpenAIAssistant, onUpdateRecentCommands }: TerminalViewProps) {
+function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRecentCommands }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalMapRef = useRef(new Map<string, Terminal>())
   const fitMapRef = useRef(new Map<string, FitAddon>())
@@ -30,7 +29,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onOpenAIAssi
   const listenersRegisteredRef = useRef(false)
   const inputBufferRef = useRef<string>('')
   const recentCommandsRef = useRef<string[]>([])
-  const lastCharRef = useRef<string>('')
 
   // Performance: buffer per batch processing dell'output
   const writeBufferRef = useRef(new Map<string, string[]>())
@@ -146,28 +144,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onOpenAIAssi
     terminal.loadAddon(linksAddon)
 
     terminal.onData((chunk) => {
-      // Check if user typed ## to open AI assistant
-      if (chunk === '#' && lastCharRef.current === '#' && inputBufferRef.current.trim().length === 0) {
-        // Double ## detected - open AI assistant modal
-        onOpenAIAssistant('');
-
-        // Clear the ## from terminal (erase both #)
-        terminal.write('\b \b\b \b');
-
-        // Reset refs
-        lastCharRef.current = '';
-        inputBufferRef.current = '';
-        return;
-      }
-
-      // Track last character for ## detection
-      if (chunk === '#') {
-        lastCharRef.current = '#';
-      } else if (chunk !== '\b' && chunk !== '\x7f') {
-        // Reset lastChar on any non-backspace character
-        lastCharRef.current = '';
-      }
-
       // Track input buffer and commands for AI context
       if (chunk === '\r' || chunk === '\n') {
         const cmd = inputBufferRef.current.trim();
@@ -176,14 +152,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onOpenAIAssi
           onUpdateRecentCommands(recentCommandsRef.current);
         }
         inputBufferRef.current = '';
-        lastCharRef.current = '';
       } else if (chunk === '\x7f' || chunk === '\b') {
         if (inputBufferRef.current.length > 0) {
           inputBufferRef.current = inputBufferRef.current.slice(0, -1);
-        }
-        // If we backspace the first #, reset lastChar
-        if (lastCharRef.current === '#' && inputBufferRef.current.trim().length === 0) {
-          lastCharRef.current = '';
         }
       } else if (chunk.length === 1 && chunk.charCodeAt(0) >= 32) {
         inputBufferRef.current += chunk;

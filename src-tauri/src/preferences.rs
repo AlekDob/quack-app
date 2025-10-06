@@ -64,11 +64,10 @@ pub async fn set_preference(
         _ => return Err(format!("Unknown preference key: {}", key)),
     }
 
-    store
-        .set(
-            PREFERENCES_KEY.to_string(),
-            serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
-        );
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
 
     store.save().map_err(|e| e.to_string())?;
 
@@ -92,11 +91,10 @@ pub async fn toggle_performance_monitor(app: AppHandle) -> Result<bool, String> 
 
     prefs.show_performance_monitor = !prefs.show_performance_monitor;
 
-    store
-        .set(
-            PREFERENCES_KEY.to_string(),
-            serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
-        );
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
 
     store.save().map_err(|e| e.to_string())?;
 

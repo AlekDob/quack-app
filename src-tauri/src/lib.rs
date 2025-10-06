@@ -245,6 +245,8 @@ pub fn run() {
             ai::save_api_key,
             ai::test_api_connection,
             ai::get_token_usage_stats,
+            ai::get_prompt_engineering_questions,
+            ai::improve_prompt_with_answers,
             preferences::get_preferences,
             preferences::set_preference,
             preferences::toggle_performance_monitor,

@@ -112,5 +112,30 @@ export interface TerminalContext {
 export interface AIRequest {
   intent: string;
   context: TerminalContext;
-  requestType: 'command' | 'error';
+  requestType: 'command' | 'error' | 'prompt-engineer';
+}
+
+// Prompt Engineering types
+export interface AIQuestion {
+  question: string;
+  questionNumber: number;
+  totalQuestions: number;
+}
+
+export interface AIAnswer {
+  questionNumber: number;
+  answer: string;
+}
+
+export interface AIPromptImprovement {
+  originalPrompt: string;
+  improvedPrompt: string;
+  improvements: string[];
+  confidence: number;
+}
+
+export interface AIPromptEngineerResponse {
+  type: 'questions' | 'improvement';
+  questions?: AIQuestion[];
+  improvement?: AIPromptImprovement;
 }

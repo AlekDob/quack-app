@@ -901,6 +901,20 @@ function App() {
     }
   }, [tauriAvailable]);
 
+  // Global keyboard shortcut: Cmd+J to open AI Assistant
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+J on Mac or Ctrl+J on other platforms
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+        e.preventDefault();
+        handleOpenAIAssistant();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleOpenAIAssistant]);
+
   useEffect(() => {
     let unlisten: (() => void) | undefined;
 
@@ -1862,7 +1876,6 @@ function App() {
                 terminals={terminals}
                 onUserInput={handleTerminalInput}
                 onOutput={handleTerminalOutput}
-                onOpenAIAssistant={handleOpenAIAssistant}
                 onUpdateRecentCommands={(commands) => {
                   recentCommandsRef.current = commands;
                 }}

@@ -42,6 +42,40 @@ pub struct AISuggestion {
     pub alternative: Option<String>,
 }
 
+// Prompt Engineering structures
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AIQuestion {
+    pub question: String,
+    pub question_number: u32,
+    pub total_questions: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AIAnswer {
+    pub question_number: u32,
+    pub answer: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AIPromptImprovement {
+    pub original_prompt: String,
+    pub improved_prompt: String,
+    pub improvements: Vec<String>,
+    pub confidence: f32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum AIPromptEngineerResponse {
+    #[serde(rename = "questions")]
+    Questions { questions: Vec<AIQuestion> },
+    #[serde(rename = "improvement")]
+    Improvement { improvement: AIPromptImprovement },
+}
+
 #[derive(Serialize, Deserialize)]
 struct OpenAIMessage {
     role: String,
@@ -305,6 +339,250 @@ EXAMPLES:
     )
 }
 
+// Helper function to clean JSON response from markdown code fences
+fn clean_json_response(response: &str) -> String {
+    let trimmed = response.trim();
+
+    // Remove markdown code fences if present
+    if trimmed.starts_with("```json") {
+        trimmed
+            .strip_prefix("```json")
+            .unwrap_or(trimmed)
+            .strip_suffix("```")
+            .unwrap_or(trimmed)
+            .trim()
+            .to_string()
+    } else if trimmed.starts_with("```") {
+        trimmed
+            .strip_prefix("```")
+            .unwrap_or(trimmed)
+            .strip_suffix("```")
+            .unwrap_or(trimmed)
+            .trim()
+            .to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn build_prompt_engineering_questions_prompt(original_prompt: &str) -> String {
+    format!(
+        r#"You are an expert prompt engineer specializing in improving AI prompts.
+
+Your task is to ask 2-3 clarifying questions to help improve the user's prompt.
+
+USER'S ORIGINAL PROMPT:
+```
+{original_prompt}
+```
+
+IMPORTANT: Ask questions in the SAME LANGUAGE as the user's original prompt.
+- If the prompt is in Italian, ask questions in Italian
+- If the prompt is in English, ask questions in English
+- Match the language of the original prompt exactly
+
+Respond ONLY with pure JSON (NO markdown code fences, NO ```json wrapper):
+{{
+  "questions": [
+    {{
+      "question": "First clarifying question",
+      "questionNumber": 1,
+      "totalQuestions": 3
+    }},
+    {{
+      "question": "Second clarifying question",
+      "questionNumber": 2,
+      "totalQuestions": 3
+    }},
+    {{
+      "question": "Third clarifying question",
+      "questionNumber": 3,
+      "totalQuestions": 3
+    }}
+  ]
+}}
+
+RULES FOR QUESTIONS:
+1. Ask specific, actionable questions that will help clarify the user's intent
+2. Focus on missing details, context, constraints, or desired outcomes
+3. Keep questions short and focused (max 100 characters each)
+4. Ask 2-3 questions maximum
+5. Make questions conversational and friendly
+6. USE THE SAME LANGUAGE AS THE ORIGINAL PROMPT
+
+EXAMPLE INPUT (English):
+"Build a web app"
+
+EXAMPLE OUTPUT (English):
+{{
+  "questions": [
+    {{
+      "question": "What specific features should this web app have?",
+      "questionNumber": 1,
+      "totalQuestions": 3
+    }},
+    {{
+      "question": "What tech stack do you prefer (React, Vue, vanilla JS)?",
+      "questionNumber": 2,
+      "totalQuestions": 3
+    }},
+    {{
+      "question": "Do you need user authentication or a database?",
+      "questionNumber": 3,
+      "totalQuestions": 3
+    }}
+  ]
+}}
+
+EXAMPLE INPUT (Italian):
+"Costruisci una web app"
+
+EXAMPLE OUTPUT (Italian):
+{{
+  "questions": [
+    {{
+      "question": "Quali funzionalità specifiche dovrebbe avere questa web app?",
+      "questionNumber": 1,
+      "totalQuestions": 3
+    }},
+    {{
+      "question": "Che stack tecnologico preferisci (React, Vue, vanilla JS)?",
+      "questionNumber": 2,
+      "totalQuestions": 3
+    }},
+    {{
+      "question": "Hai bisogno di autenticazione utente o di un database?",
+      "questionNumber": 3,
+      "totalQuestions": 3
+    }}
+  ]
+}}
+
+Now analyze the user's prompt and generate thoughtful clarifying questions IN THE SAME LANGUAGE.
+Return ONLY pure JSON without markdown code fences."#,
+        original_prompt = original_prompt
+    )
+}
+
+fn build_prompt_improvement_prompt(original_prompt: &str, answers: &[AIAnswer]) -> String {
+    let answers_text = answers
+        .iter()
+        .map(|a| format!("Q{}: {}", a.question_number, a.answer))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        r#"You are an expert prompt engineer specializing in improving AI prompts.
+
+Your task is to improve the user's original prompt based on their answers to clarifying questions.
+
+ORIGINAL PROMPT:
+```
+{original_prompt}
+```
+
+USER'S ANSWERS TO CLARIFYING QUESTIONS:
+{answers}
+
+IMPORTANT: Write the improved prompt in the SAME LANGUAGE as the original prompt.
+- If the original is in Italian, write the improved prompt in Italian
+- If the original is in English, write the improved prompt in English
+- Match the language exactly
+
+Respond ONLY with pure JSON (NO markdown code fences, NO ```json wrapper):
+{{
+  "originalPrompt": "copy of original prompt",
+  "improvedPrompt": "significantly improved version of the prompt",
+  "improvements": [
+    "Added specific detail about X",
+    "Clarified context regarding Y",
+    "Defined constraints for Z"
+  ],
+  "confidence": 0.95
+}}
+
+RULES FOR IMPROVEMENT:
+1. Make the prompt significantly more detailed and specific
+2. Incorporate ALL information from user answers
+3. Structure the improved prompt clearly with sections if needed
+4. Include context, constraints, expected outcomes, and technical details
+5. Make it actionable for any AI system
+6. Keep it concise but comprehensive (aim for 3-5x more detail than original)
+7. List 3-5 specific improvements made
+8. Set confidence based on how much clarity was gained (0.7-1.0)
+9. USE THE SAME LANGUAGE AS THE ORIGINAL PROMPT
+
+EXAMPLE (English):
+
+ORIGINAL: "Build a web app"
+ANSWERS:
+Q1: E-commerce store with product listings and checkout
+Q2: React with TypeScript, Tailwind CSS
+Q3: Yes, need Firebase auth and product database
+
+IMPROVED PROMPT:
+"Build a modern e-commerce web application with the following specifications:
+
+TECH STACK:
+- Frontend: React 18 + TypeScript
+- Styling: Tailwind CSS
+- Authentication: Firebase Auth
+- Database: Firebase Firestore for products and orders
+
+CORE FEATURES:
+1. Product catalog with search and filtering
+2. Shopping cart with quantity management
+3. User authentication (sign up, login, logout)
+4. Secure checkout flow
+5. Order history for authenticated users
+
+REQUIREMENTS:
+- Mobile-responsive design
+- Fast page load times
+- Secure payment processing
+- Clean, modern UI following e-commerce best practices
+
+Please structure the project with clear component hierarchy and follow React best practices."
+
+EXAMPLE (Italian):
+
+ORIGINAL: "Costruisci una web app"
+ANSWERS:
+Q1: Negozio e-commerce con catalogo prodotti e checkout
+Q2: React con TypeScript, Tailwind CSS
+Q3: Sì, serve autenticazione Firebase e database prodotti
+
+IMPROVED PROMPT:
+"Costruisci un'applicazione web e-commerce moderna con le seguenti specifiche:
+
+STACK TECNOLOGICO:
+- Frontend: React 18 + TypeScript
+- Styling: Tailwind CSS
+- Autenticazione: Firebase Auth
+- Database: Firebase Firestore per prodotti e ordini
+
+FUNZIONALITÀ PRINCIPALI:
+1. Catalogo prodotti con ricerca e filtri
+2. Carrello con gestione quantità
+3. Autenticazione utente (registrazione, login, logout)
+4. Flusso di checkout sicuro
+5. Storico ordini per utenti autenticati
+
+REQUISITI:
+- Design responsive per mobile
+- Tempi di caricamento rapidi
+- Gestione sicura dei pagamenti
+- UI pulita e moderna seguendo best practices e-commerce
+
+Strutturare il progetto con gerarchia componenti chiara e seguire best practices React."
+
+Now improve the user's prompt using their answers IN THE SAME LANGUAGE AS THE ORIGINAL.
+Return ONLY pure JSON without markdown code fences."#,
+        original_prompt = original_prompt,
+        answers = answers_text
+    )
+}
+
 // ============================================================================
 // OpenAI Client
 // ============================================================================
@@ -430,4 +708,128 @@ pub async fn analyze_error(
     };
 
     get_ai_suggestion(app, request).await
+}
+
+// ============================================================================
+// Prompt Engineering Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn get_prompt_engineering_questions(
+    app: AppHandle,
+    original_prompt: String,
+) -> Result<Vec<AIQuestion>, String> {
+    // Check rate limit
+    {
+        let mut limiter = RATE_LIMITER.lock().unwrap();
+        if !limiter.can_proceed() {
+            return Err("Rate limit exceeded. Please wait a moment.".to_string());
+        }
+    }
+
+    let api_key = get_stored_api_key(&app).await.map_err(|e| e.to_string())?;
+
+    let client = Client::new();
+    let prompt = build_prompt_engineering_questions_prompt(&original_prompt);
+
+    let body = OpenAIRequest {
+        model: "gpt-4o-mini".to_string(),
+        messages: vec![OpenAIMessage {
+            role: "user".to_string(),
+            content: prompt,
+        }],
+        temperature: 0.7,
+        max_tokens: 400,
+    };
+
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("OpenAI API request failed: {}", e))?
+        .json::<OpenAIResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse OpenAI response: {}", e))?;
+
+    // Track token usage
+    track_token_usage(response.usage.total_tokens, "gpt-4o-mini");
+
+    let ai_response = &response.choices[0].message.content;
+
+    // Clean markdown code fences from response
+    let cleaned_response = clean_json_response(ai_response);
+
+    // Parse the JSON response to extract questions array
+    let parsed: serde_json::Value = serde_json::from_str(&cleaned_response).map_err(|e| {
+        format!(
+            "Failed to parse AI response as JSON: {}. Response: {}",
+            e, cleaned_response
+        )
+    })?;
+
+    let questions: Vec<AIQuestion> = serde_json::from_value(parsed["questions"].clone())
+        .map_err(|e| format!("Failed to extract questions from response: {}", e))?;
+
+    Ok(questions)
+}
+
+#[tauri::command]
+pub async fn improve_prompt_with_answers(
+    app: AppHandle,
+    original_prompt: String,
+    answers: Vec<AIAnswer>,
+) -> Result<AIPromptImprovement, String> {
+    // Check rate limit
+    {
+        let mut limiter = RATE_LIMITER.lock().unwrap();
+        if !limiter.can_proceed() {
+            return Err("Rate limit exceeded. Please wait a moment.".to_string());
+        }
+    }
+
+    let api_key = get_stored_api_key(&app).await.map_err(|e| e.to_string())?;
+
+    let client = Client::new();
+    let prompt = build_prompt_improvement_prompt(&original_prompt, &answers);
+
+    let body = OpenAIRequest {
+        model: "gpt-4o-mini".to_string(),
+        messages: vec![OpenAIMessage {
+            role: "user".to_string(),
+            content: prompt,
+        }],
+        temperature: 0.5,
+        max_tokens: 800,
+    };
+
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("OpenAI API request failed: {}", e))?
+        .json::<OpenAIResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse OpenAI response: {}", e))?;
+
+    // Track token usage
+    track_token_usage(response.usage.total_tokens, "gpt-4o-mini");
+
+    let ai_response = &response.choices[0].message.content;
+
+    // Clean JSON response (remove markdown code fences if present)
+    let cleaned_response = clean_json_response(ai_response);
+
+    // Parse JSON response
+    let improvement: AIPromptImprovement = serde_json::from_str(&cleaned_response).map_err(|e| {
+        format!(
+            "Failed to parse AI response as JSON: {}. Response: {}",
+            e, cleaned_response
+        )
+    })?;
+
+    Ok(improvement)
 }
