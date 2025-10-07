@@ -326,6 +326,13 @@ TerminalFlow is a Tauri-based desktop application that provides a terminal emula
 - Frontend creates Terminal instances from xterm.js with custom themes
 - Terminal data flows through Tauri events (`terminal-data`, `terminal-exit`)
 - Terminals are persisted in memory with unique UUIDs
+- **Smart Auto-Scroll System**: Intelligent scroll management prevents frustrating auto-scroll behavior during heavy output
+  - Auto-scroll automatically disables when user scrolls UP more than 10 lines (intentional navigation)
+  - Auto-scroll re-enables when user scrolls back within 3 lines of bottom (returned to live output)
+  - Floating "Scroll to bottom" badge appears when auto-scroll is disabled (only for active terminal)
+  - Click badge to instantly jump to bottom and re-enable auto-scroll
+  - Prevents sfarfallamento (flickering) during Claude Code, Factory.ai, or other verbose command output
+  - Each terminal maintains independent scroll state (preserved across terminal switches)
 
 ### File System Integration
 - File explorer synchronizes with active terminal's current working directory

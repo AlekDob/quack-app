@@ -40,13 +40,6 @@ interface TerminalSidebarProps {
   processesOpen: boolean;
 }
 
-// Helper type for drag handlers
-type DragStartHandler = (event: React.DragEvent, id: string) => void;
-type DragOverHandler = (event: React.DragEvent, id: string) => void;
-type DragLeaveHandler = (event: React.DragEvent) => void;
-type DragDropHandler = (event: React.DragEvent, id: string) => void;
-type DragEndHandler = () => void;
-
 export default function TerminalSidebar({
   terminals,
   activeId,
@@ -212,7 +205,7 @@ export default function TerminalSidebar({
 
       <div className="sidebar-list">
         {/* Render grouped terminals */}
-        {groups.map(([cwd, groupTerminals], groupIndex) => {
+        {groups.map(([cwd, groupTerminals]) => {
           // Calcola se il gruppo può muoversi su/giù
           const firstTerminalId = groupTerminals[0]?.id;
           const lastTerminalId = groupTerminals[groupTerminals.length - 1]?.id;
@@ -244,7 +237,7 @@ export default function TerminalSidebar({
         })}
 
         {/* Render ungrouped terminals */}
-        {ungrouped.map((terminal, index) => {
+        {ungrouped.map((terminal) => {
           const active = terminal.id === activeId;
           const itemClasses = [
             "terminal-item",

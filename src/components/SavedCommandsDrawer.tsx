@@ -158,7 +158,10 @@ export default function SavedCommandsDrawer({
                               type="button"
                               className="icon"
                               title="Send to active terminal"
-                              onClick={() => onLaunch(command, false)}
+                              onClick={() => {
+                                onLaunch(command, false);
+                                onClose();
+                              }}
                             >
                               {icons.send}
                             </button>

@@ -693,11 +693,7 @@ function App() {
       }
 
       // Track commands for AI context
-      if (data === '\r' || data === '\n') {
-        const terminal = terminals.find(t => t.id === id);
-        // This is a simplification - in reality we'd need to track the actual command buffer
-        // But for now we can rely on TerminalView's tracking
-      }
+      // Command tracking is handled by TerminalView component
 
       if (
         data.includes("\r") ||

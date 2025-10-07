@@ -4569,3 +4569,30 @@ button.secondary:hover {
 .ai-settings-overlay.closing .ai-settings-panel {
   animation: slideDown 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
+
+/* Smart Scroll Badge */
+.scroll-to-bottom-badge {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10;
+
+  padding: 8px 16px;
+  background: rgba(242, 140, 82, 0.9);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 8px;
+
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  cursor: pointer;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.scroll-to-bottom-badge:hover {
+  background: rgba(242, 140, 82, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
