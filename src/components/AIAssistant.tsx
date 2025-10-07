@@ -44,6 +44,7 @@ export default function AIAssistant({
   const [closing, setClosing] = useState(false)
   const [inputValue, setInputValue] = useState(intent)
   const [hasSubmitted, setHasSubmitted] = useState(intent.trim().length > 0)
+  const [showCopyNotification, setShowCopyNotification] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const answerInputRef = useRef<HTMLInputElement>(null)
@@ -219,12 +220,19 @@ export default function AIAssistant({
   }
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).catch(console.error)
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setShowCopyNotification(true)
+        setTimeout(() => setShowCopyNotification(false), 3000)
+      })
+      .catch(console.error)
   }
+
+  const isImprovementView = mode === 'prompt-engineer' && promptEngineerStep === 'improvement'
 
   return (
     <div className={`ai-assistant-overlay ${closing ? 'closing' : ''}`} onClick={handleClose}>
-      <div className="ai-assistant-modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`ai-assistant-modal ${isImprovementView ? 'ai-modal-large' : 'ai-modal-compact'}`} onClick={(e) => e.stopPropagation()}>
         <div className="ai-assistant-header">
           <div className="ai-assistant-title">
             <span className="ai-icon">🤖</span>
@@ -581,6 +589,12 @@ export default function AIAssistant({
           </div>
         )}
       </div>
+
+      {showCopyNotification && (
+        <div className="ai-copy-notification">
+          Text copied
+        </div>
+      )}
     </div>
   )
 }

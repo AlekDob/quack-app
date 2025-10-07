@@ -369,17 +369,14 @@ fn build_prompt_engineering_questions_prompt(original_prompt: &str) -> String {
     format!(
         r#"You are an expert prompt engineer specializing in improving AI prompts.
 
-Your task is to ask 2-3 clarifying questions to help improve the user's prompt.
-
 USER'S ORIGINAL PROMPT:
 ```
 {original_prompt}
 ```
 
-IMPORTANT: Ask questions in the SAME LANGUAGE as the user's original prompt.
-- If the prompt is in Italian, ask questions in Italian
-- If the prompt is in English, ask questions in English
-- Match the language of the original prompt exactly
+LANGUAGE RULE: Respond in English by default. If you can clearly detect the user's prompt is in another language (Italian, Spanish, French, etc.), you may respond in that language. When in doubt, use English.
+
+Your task is to ask 2-3 clarifying questions to help improve the user's prompt.
 
 Respond ONLY with pure JSON (NO markdown code fences, NO ```json wrapper):
 {{
@@ -403,17 +400,17 @@ Respond ONLY with pure JSON (NO markdown code fences, NO ```json wrapper):
 }}
 
 RULES FOR QUESTIONS:
-1. Ask specific, actionable questions that will help clarify the user's intent
-2. Focus on missing details, context, constraints, or desired outcomes
-3. Keep questions short and focused (max 100 characters each)
-4. Ask 2-3 questions maximum
-5. Make questions conversational and friendly
-6. USE THE SAME LANGUAGE AS THE ORIGINAL PROMPT
+1. Write questions in English by default; match user's language if clearly detectable
+2. Ask specific, actionable questions that will help clarify the user's intent
+3. Focus on missing details, context, constraints, or desired outcomes
+4. Keep questions short and focused (max 100 characters each)
+5. Ask 2-3 questions maximum
+6. Make questions conversational and friendly
 
-EXAMPLE INPUT (English):
+EXAMPLE INPUT:
 "Build a web app"
 
-EXAMPLE OUTPUT (English):
+EXAMPLE OUTPUT:
 {{
   "questions": [
     {{
@@ -434,31 +431,7 @@ EXAMPLE OUTPUT (English):
   ]
 }}
 
-EXAMPLE INPUT (Italian):
-"Costruisci una web app"
-
-EXAMPLE OUTPUT (Italian):
-{{
-  "questions": [
-    {{
-      "question": "Quali funzionalità specifiche dovrebbe avere questa web app?",
-      "questionNumber": 1,
-      "totalQuestions": 3
-    }},
-    {{
-      "question": "Che stack tecnologico preferisci (React, Vue, vanilla JS)?",
-      "questionNumber": 2,
-      "totalQuestions": 3
-    }},
-    {{
-      "question": "Hai bisogno di autenticazione utente o di un database?",
-      "questionNumber": 3,
-      "totalQuestions": 3
-    }}
-  ]
-}}
-
-Now analyze the user's prompt and generate thoughtful clarifying questions IN THE SAME LANGUAGE.
+Now analyze the user's prompt and generate thoughtful clarifying questions. Use English by default, or match the user's language if clearly detectable.
 Return ONLY pure JSON without markdown code fences."#,
         original_prompt = original_prompt
     )
@@ -474,8 +447,6 @@ fn build_prompt_improvement_prompt(original_prompt: &str, answers: &[AIAnswer]) 
     format!(
         r#"You are an expert prompt engineer specializing in improving AI prompts.
 
-Your task is to improve the user's original prompt based on their answers to clarifying questions.
-
 ORIGINAL PROMPT:
 ```
 {original_prompt}
@@ -484,10 +455,9 @@ ORIGINAL PROMPT:
 USER'S ANSWERS TO CLARIFYING QUESTIONS:
 {answers}
 
-IMPORTANT: Write the improved prompt in the SAME LANGUAGE as the original prompt.
-- If the original is in Italian, write the improved prompt in Italian
-- If the original is in English, write the improved prompt in English
-- Match the language exactly
+LANGUAGE RULE: Write the improved prompt in English by default. If you can clearly detect the original prompt is in another language (Italian, Spanish, French, etc.), you may write the improved prompt in that language. When in doubt, use English.
+
+Your task is to improve the user's original prompt based on their answers to clarifying questions.
 
 Respond ONLY with pure JSON (NO markdown code fences, NO ```json wrapper):
 {{
@@ -502,17 +472,17 @@ Respond ONLY with pure JSON (NO markdown code fences, NO ```json wrapper):
 }}
 
 RULES FOR IMPROVEMENT:
-1. Make the prompt significantly more detailed and specific
-2. Incorporate ALL information from user answers
-3. Structure the improved prompt clearly with sections if needed
-4. Include context, constraints, expected outcomes, and technical details
-5. Make it actionable for any AI system
-6. Keep it concise but comprehensive (aim for 3-5x more detail than original)
-7. List 3-5 specific improvements made
-8. Set confidence based on how much clarity was gained (0.7-1.0)
-9. USE THE SAME LANGUAGE AS THE ORIGINAL PROMPT
+1. Write improved prompt in English by default; match original language if clearly detectable
+2. Make the prompt significantly more detailed and specific
+3. Incorporate ALL information from user answers
+4. Structure the improved prompt clearly with sections if needed
+5. Include context, constraints, expected outcomes, and technical details
+6. Make it actionable for any AI system
+7. Keep it concise but comprehensive (aim for 3-5x more detail than original)
+8. List 3-5 specific improvements made
+9. Set confidence based on how much clarity was gained (0.7-1.0)
 
-EXAMPLE (English):
+EXAMPLE:
 
 ORIGINAL: "Build a web app"
 ANSWERS:
@@ -544,39 +514,7 @@ REQUIREMENTS:
 
 Please structure the project with clear component hierarchy and follow React best practices."
 
-EXAMPLE (Italian):
-
-ORIGINAL: "Costruisci una web app"
-ANSWERS:
-Q1: Negozio e-commerce con catalogo prodotti e checkout
-Q2: React con TypeScript, Tailwind CSS
-Q3: Sì, serve autenticazione Firebase e database prodotti
-
-IMPROVED PROMPT:
-"Costruisci un'applicazione web e-commerce moderna con le seguenti specifiche:
-
-STACK TECNOLOGICO:
-- Frontend: React 18 + TypeScript
-- Styling: Tailwind CSS
-- Autenticazione: Firebase Auth
-- Database: Firebase Firestore per prodotti e ordini
-
-FUNZIONALITÀ PRINCIPALI:
-1. Catalogo prodotti con ricerca e filtri
-2. Carrello con gestione quantità
-3. Autenticazione utente (registrazione, login, logout)
-4. Flusso di checkout sicuro
-5. Storico ordini per utenti autenticati
-
-REQUISITI:
-- Design responsive per mobile
-- Tempi di caricamento rapidi
-- Gestione sicura dei pagamenti
-- UI pulita e moderna seguendo best practices e-commerce
-
-Strutturare il progetto con gerarchia componenti chiara e seguire best practices React."
-
-Now improve the user's prompt using their answers IN THE SAME LANGUAGE AS THE ORIGINAL.
+Now improve the user's prompt using their answers. Use English by default, or match the original language if clearly detectable.
 Return ONLY pure JSON without markdown code fences."#,
         original_prompt = original_prompt,
         answers = answers_text
