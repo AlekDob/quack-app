@@ -139,3 +139,16 @@ export interface AIPromptEngineerResponse {
   questions?: AIQuestion[];
   improvement?: AIPromptImprovement;
 }
+
+// Quack Agency types
+export interface AgentInfo {
+  name: string;
+  description: string;
+  model: string;
+  color: string;
+  file_path: string;
+}
+
+export interface AgentDetails extends AgentInfo {
+  content: string;
+}

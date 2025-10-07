@@ -4,6 +4,7 @@ use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
 use tauri::{menu::MenuBuilder, AppHandle, Emitter, Manager};
 
+mod agency;
 mod ai;
 mod commands;
 mod fs;
@@ -211,6 +212,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            agency::list_agents,
+            agency::get_agent_details,
+            agency::save_agent,
             terminal::create_terminal,
             terminal::list_terminals,
             terminal::get_active_processes,

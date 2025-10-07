@@ -24,6 +24,7 @@ import PreviewDrawer from "./components/PreviewDrawer";
 import AISettingsPanel from "./components/AISettingsPanel";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
+import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -38,6 +39,8 @@ import type {
   SavedCommand,
   ProcessInfo,
   TerminalContext,
+  AgentInfo,
+  AgentDetails,
 } from "./types";
 
 interface TerminalMetadata {
@@ -271,6 +274,13 @@ function App() {
     recentCommands: [],
   });
   const recentCommandsRef = useRef<string[]>([]);
+
+  // Quack Agency state
+  const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
 
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
@@ -685,6 +695,55 @@ function App() {
     // Close the modal
     setShowAIAssistant(false);
   }, [activeId]);
+
+  // Quack Agency handlers
+  const loadAgents = useCallback(async () => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    setLoadingAgents(true);
+    setAgentsError(null);
+
+    try {
+      const agentsList = await invoke<AgentInfo[]>("list_agents");
+      setAgents(agentsList);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAgentsError(message);
+      setAgents([]);
+    } finally {
+      setLoadingAgents(false);
+    }
+  }, [tauriAvailable]);
+
+  const handleToggleQuackAgency = useCallback(() => {
+    setShowQuackAgencyDrawer(prev => !prev);
+  }, []);
+
+  const handleSelectAgent = useCallback(async (agentInfo: AgentInfo) => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      const details = await invoke<AgentDetails>("get_agent_details", {
+        name: agentInfo.name,
+      });
+      setSelectedAgent(details);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAgentsError(message);
+    }
+  }, [tauriAvailable]);
+
+  // Load Quack Agency agents on startup
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+    void loadAgents();
+  }, [loadAgents, tauriAvailable]);
 
   const handleTerminalInput = useCallback(
     (id: string, data: string) => {
@@ -1889,6 +1948,8 @@ function App() {
             }
             savedCommandsOpen={savedCommandsDrawerOpen}
             onOpenAIAssistant={handleOpenAIAssistant}
+            onToggleQuackAgency={handleToggleQuackAgency}
+            quackAgencyOpen={showQuackAgencyDrawer}
           />
         </section>
 
@@ -2066,6 +2127,17 @@ function App() {
             onSelectCommand={handleAICommandSelect}
           />
         )}
+
+        <QuackAgencyDrawer
+          open={showQuackAgencyDrawer}
+          agents={agents}
+          selectedAgent={selectedAgent}
+          loading={loadingAgents}
+          error={agentsError}
+          onClose={() => setShowQuackAgencyDrawer(false)}
+          onSelectAgent={handleSelectAgent}
+          onRefresh={loadAgents}
+        />
     </div>
   );
 }

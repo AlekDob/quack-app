@@ -3,6 +3,8 @@ interface ToolBarProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onOpenAIAssistant: () => void;
+  onToggleQuackAgency: () => void;
+  quackAgencyOpen: boolean;
 }
 
 export default function ToolBar({
@@ -10,6 +12,8 @@ export default function ToolBar({
   onToggleSavedCommands,
   savedCommandsOpen,
   onOpenAIAssistant,
+  onToggleQuackAgency,
+  quackAgencyOpen,
 }: ToolBarProps) {
   const aiTools = [
     {
@@ -19,6 +23,14 @@ export default function ToolBar({
       command: "",
       disabled: false,
       type: "saved",
+    },
+    {
+      id: "quack-agency",
+      label: quackAgencyOpen ? "Chiudi Quack Agency" : "Quack Agency",
+      icon: "🦆",
+      command: "",
+      disabled: false,
+      type: "quack-agency",
     },
     {
       id: "ai-assistant",
@@ -66,10 +78,12 @@ export default function ToolBar({
           <button
             key={tool.id}
             type="button"
-            className={`ai-tool-button ${tool.disabled ? "disabled" : ""} ${tool.type === "saved" && savedCommandsOpen ? "active" : ""}`}
+            className={`ai-tool-button ${tool.disabled ? "disabled" : ""} ${(tool.type === "saved" && savedCommandsOpen) || (tool.type === "quack-agency" && quackAgencyOpen) ? "active" : ""}`}
             onClick={() => {
               if (tool.type === "saved") {
                 onToggleSavedCommands();
+              } else if (tool.type === "quack-agency") {
+                onToggleQuackAgency();
               } else if (tool.type === "ai-modal") {
                 onOpenAIAssistant();
               } else if (!tool.disabled) {
