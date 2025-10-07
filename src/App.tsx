@@ -281,6 +281,7 @@ function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
+  const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
 
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
@@ -706,7 +707,23 @@ function App() {
     setAgentsError(null);
 
     try {
-      const agentsList = await invoke<AgentInfo[]>("list_agents");
+      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+
+      // Check if agents directory exists
+      const dirExists = await invoke<boolean>("check_agents_directory", {
+        workingDir,
+      });
+      setAgentsDirectoryExists(dirExists);
+
+      if (!dirExists) {
+        setAgents([]);
+        setAgentsError(null); // Clear error if directory just doesn't exist
+        return;
+      }
+
+      const agentsList = await invoke<AgentInfo[]>("list_agents", {
+        workingDir,
+      });
       setAgents(agentsList);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -715,7 +732,7 @@ function App() {
     } finally {
       setLoadingAgents(false);
     }
-  }, [tauriAvailable]);
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
   const handleToggleQuackAgency = useCallback(() => {
     setShowQuackAgencyDrawer(prev => !prev);
@@ -727,15 +744,41 @@ function App() {
     }
 
     try {
+      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
       const details = await invoke<AgentDetails>("get_agent_details", {
         name: agentInfo.name,
+        workingDir,
       });
       setSelectedAgent(details);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setAgentsError(message);
     }
-  }, [tauriAvailable]);
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+
+  const handleSetupQuackAgency = useCallback(async () => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    setLoadingAgents(true);
+    setAgentsError(null);
+
+    try {
+      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      await invoke<string>("create_agents_directory", {
+        workingDir,
+      });
+
+      // Reload agents after creating directory
+      await loadAgents();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAgentsError(message);
+    } finally {
+      setLoadingAgents(false);
+    }
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath, loadAgents]);
 
   // Load Quack Agency agents on startup
   useEffect(() => {
@@ -2134,9 +2177,12 @@ function App() {
           selectedAgent={selectedAgent}
           loading={loadingAgents}
           error={agentsError}
+          workingDir={activeTerminal?.cwd ?? explorerPath}
+          directoryExists={agentsDirectoryExists}
           onClose={() => setShowQuackAgencyDrawer(false)}
           onSelectAgent={handleSelectAgent}
           onRefresh={loadAgents}
+          onSetupAgency={handleSetupQuackAgency}
         />
     </div>
   );

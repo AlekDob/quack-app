@@ -8,9 +8,12 @@ interface QuackAgencyDrawerProps {
   selectedAgent: AgentDetails | null;
   loading: boolean;
   error: string | null;
+  workingDir?: string;
+  directoryExists: boolean;
   onClose: () => void;
   onSelectAgent: (agent: AgentInfo) => void;
   onRefresh: () => void;
+  onSetupAgency: () => void;
 }
 
 // Agent color mapping for consistent styling
@@ -70,9 +73,12 @@ export default function QuackAgencyDrawer({
   selectedAgent,
   loading,
   error,
+  workingDir,
+  directoryExists,
   onClose,
   onSelectAgent,
   onRefresh,
+  onSetupAgency,
 }: QuackAgencyDrawerProps) {
   const [viewMode, setViewMode] = useState<"list" | "detail">("list");
   const [isEditing, setIsEditing] = useState(false);
@@ -138,6 +144,7 @@ export default function QuackAgencyDrawer({
         model: editModel,
         color: editColor,
         content: editContent,
+        workingDir,
       });
 
       // Refresh agents list
@@ -217,11 +224,31 @@ export default function QuackAgencyDrawer({
 
           {!loading && !error && viewMode === "list" && (
             <div className={`quack-agency-list-view ${isAnimating ? "animating" : ""}`}>
-              {agents.length === 0 && (
+              {agents.length === 0 && !directoryExists && (
+                <div className="quack-agency-empty quack-agency-setup">
+                  <div className="quack-agency-setup-icon">🦆</div>
+                  <h3>Setup Quack Agency</h3>
+                  <p>
+                    Quack Agency helps you manage AI agents for this project.
+                  </p>
+                  <p>
+                    Click the button below to create the <code>.claude/agents/</code> directory structure.
+                  </p>
+                  <button
+                    type="button"
+                    className="quack-agency-setup-button"
+                    onClick={onSetupAgency}
+                  >
+                    🚀 Setup Quack Agency
+                  </button>
+                </div>
+              )}
+
+              {agents.length === 0 && directoryExists && (
                 <div className="quack-agency-empty">
                   <p>No agents found.</p>
                   <p>
-                    Make sure the <code>.claude/agents/</code> directory exists.
+                    Add agent files to the <code>.claude/agents/</code> directory.
                   </p>
                 </div>
               )}

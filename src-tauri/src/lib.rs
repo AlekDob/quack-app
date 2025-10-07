@@ -215,6 +215,8 @@ pub fn run() {
             agency::list_agents,
             agency::get_agent_details,
             agency::save_agent,
+            agency::check_agents_directory,
+            agency::create_agents_directory,
             terminal::create_terminal,
             terminal::list_terminals,
             terminal::get_active_processes,

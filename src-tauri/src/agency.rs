@@ -24,14 +24,26 @@ pub struct AgentDetails {
 
 /// List all agents from .claude/agents/ directory
 #[tauri::command]
-pub fn list_agents() -> Result<Vec<AgentInfo>, String> {
-    list_agents_impl().map_err(|err| err.to_string())
+pub fn list_agents(working_dir: Option<String>) -> Result<Vec<AgentInfo>, String> {
+    list_agents_impl(working_dir).map_err(|err| err.to_string())
 }
 
 /// Get detailed information about a specific agent
 #[tauri::command]
-pub fn get_agent_details(name: String) -> Result<AgentDetails, String> {
-    get_agent_details_impl(name).map_err(|err| err.to_string())
+pub fn get_agent_details(name: String, working_dir: Option<String>) -> Result<AgentDetails, String> {
+    get_agent_details_impl(name, working_dir).map_err(|err| err.to_string())
+}
+
+/// Check if .claude/agents directory exists in the given path
+#[tauri::command]
+pub fn check_agents_directory(working_dir: Option<String>) -> Result<bool, String> {
+    check_agents_directory_impl(working_dir).map_err(|err| err.to_string())
+}
+
+/// Create .claude/agents directory structure
+#[tauri::command]
+pub fn create_agents_directory(working_dir: Option<String>) -> Result<String, String> {
+    create_agents_directory_impl(working_dir).map_err(|err| err.to_string())
 }
 
 /// Save/update an agent file
@@ -43,32 +55,26 @@ pub fn save_agent(
     model: String,
     color: String,
     content: String,
+    working_dir: Option<String>,
 ) -> Result<String, String> {
-    save_agent_impl(original_name, name, description, model, color, content)
+    save_agent_impl(original_name, name, description, model, color, content, working_dir)
         .map_err(|err| err.to_string())
 }
 
-fn list_agents_impl() -> Result<Vec<AgentInfo>> {
-    // Get current working directory
-    let mut current = std::env::current_dir()
-        .context("Unable to get current working directory")?;
-
-    // Search for .claude/agents by going up the directory tree
-    let agents_dir = loop {
-        let candidate = current.join(".claude").join("agents");
-        if candidate.exists() {
-            break candidate;
-        }
-
-        // Go up one directory
-        match current.parent() {
-            Some(parent) => current = parent.to_path_buf(),
-            None => return Err(anyhow!("Could not find .claude/agents directory")),
-        }
+fn list_agents_impl(working_dir: Option<String>) -> Result<Vec<AgentInfo>> {
+    // Use provided working directory or current directory
+    let current = if let Some(dir) = working_dir {
+        PathBuf::from(dir)
+    } else {
+        std::env::current_dir()
+            .context("Unable to get current working directory")?
     };
 
+    // Look for .claude/agents ONLY in the specified directory (don't traverse up)
+    let agents_dir = current.join(".claude").join("agents");
+
     if !agents_dir.exists() {
-        return Err(anyhow!("Agents directory not found: {:?}", agents_dir));
+        return Err(anyhow!("Agents directory not found in: {:?}. Please setup Quack Agency for this project.", current));
     }
 
     log::info!("Found agents directory at: {:?}", agents_dir);
@@ -108,23 +114,21 @@ fn list_agents_impl() -> Result<Vec<AgentInfo>> {
     Ok(agents)
 }
 
-fn get_agent_details_impl(name: String) -> Result<AgentDetails> {
-    let mut current = std::env::current_dir()
-        .context("Unable to get current working directory")?;
-
-    // Search for .claude/agents by going up the directory tree
-    let agents_dir = loop {
-        let candidate = current.join(".claude").join("agents");
-        if candidate.exists() {
-            break candidate;
-        }
-
-        // Go up one directory
-        match current.parent() {
-            Some(parent) => current = parent.to_path_buf(),
-            None => return Err(anyhow!("Could not find .claude/agents directory")),
-        }
+fn get_agent_details_impl(name: String, working_dir: Option<String>) -> Result<AgentDetails> {
+    // Use provided working directory or current directory
+    let current = if let Some(dir) = working_dir {
+        PathBuf::from(dir)
+    } else {
+        std::env::current_dir()
+            .context("Unable to get current working directory")?
     };
+
+    // Look for .claude/agents ONLY in the specified directory (don't traverse up)
+    let agents_dir = current.join(".claude").join("agents");
+
+    if !agents_dir.exists() {
+        return Err(anyhow!("Agents directory not found in: {:?}. Please setup Quack Agency for this project.", current));
+    }
 
     // Try to find the agent file
     let agent_path = agents_dir.join(format!("{}.md", name));
@@ -236,6 +240,20 @@ fn extract_frontmatter(content: &str) -> Result<(AgentFrontmatter, String)> {
     Ok((frontmatter, markdown_content))
 }
 
+fn check_agents_directory_impl(working_dir: Option<String>) -> Result<bool> {
+    // Use provided working directory or current directory
+    let current = if let Some(dir) = working_dir {
+        PathBuf::from(dir)
+    } else {
+        std::env::current_dir()
+            .context("Unable to get current working directory")?
+    };
+
+    // Check for .claude/agents ONLY in the specified directory (don't traverse up)
+    let agents_dir = current.join(".claude").join("agents");
+    Ok(agents_dir.exists())
+}
+
 fn save_agent_impl(
     original_name: String,
     name: String,
@@ -243,22 +261,22 @@ fn save_agent_impl(
     model: String,
     color: String,
     content: String,
+    working_dir: Option<String>,
 ) -> Result<String> {
-    let mut current = std::env::current_dir()
-        .context("Unable to get current working directory")?;
-
-    // Search for .claude/agents by going up the directory tree
-    let agents_dir = loop {
-        let candidate = current.join(".claude").join("agents");
-        if candidate.exists() {
-            break candidate;
-        }
-
-        match current.parent() {
-            Some(parent) => current = parent.to_path_buf(),
-            None => return Err(anyhow!("Could not find .claude/agents directory")),
-        }
+    // Use provided working directory or current directory
+    let current = if let Some(dir) = working_dir {
+        PathBuf::from(dir)
+    } else {
+        std::env::current_dir()
+            .context("Unable to get current working directory")?
     };
+
+    // Look for .claude/agents ONLY in the specified directory (don't traverse up)
+    let agents_dir = current.join(".claude").join("agents");
+
+    if !agents_dir.exists() {
+        return Err(anyhow!("Agents directory not found in: {:?}. Please setup Quack Agency for this project.", current));
+    }
 
     let old_path = agents_dir.join(format!("{}.md", original_name));
     let new_path = agents_dir.join(format!("{}.md", name));
@@ -288,4 +306,24 @@ fn save_agent_impl(
 
     log::info!("Agent saved successfully: {}", name);
     Ok(new_path.to_string_lossy().to_string())
+}
+
+fn create_agents_directory_impl(working_dir: Option<String>) -> Result<String> {
+    // Use provided working directory or current directory
+    let current = if let Some(dir) = working_dir {
+        PathBuf::from(dir)
+    } else {
+        std::env::current_dir()
+            .context("Unable to get current working directory")?
+    };
+
+    let claude_dir = current.join(".claude");
+    let agents_dir = claude_dir.join("agents");
+
+    // Create directories
+    fs::create_dir_all(&agents_dir)
+        .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
+
+    log::info!("Created agents directory at: {:?}", agents_dir);
+    Ok(agents_dir.to_string_lossy().to_string())
 }

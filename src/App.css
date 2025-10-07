@@ -4815,6 +4815,64 @@ button.secondary:hover {
   color: #f28c52;
 }
 
+/* Setup Quack Agency UI */
+.quack-agency-setup {
+  gap: 1.5rem;
+  max-width: 500px;
+}
+
+.quack-agency-setup-icon {
+  font-size: 4rem;
+  line-height: 1;
+  animation: duckBounce 2s ease-in-out infinite;
+}
+
+@keyframes duckBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.quack-agency-setup h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f28c52;
+}
+
+.quack-agency-setup p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.quack-agency-setup-button {
+  padding: 0.75rem 1.5rem;
+  margin-top: 1rem;
+  background: linear-gradient(135deg, #f28c52 0%, #e67339 100%);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.3);
+}
+
+.quack-agency-setup-button:hover {
+  background: linear-gradient(135deg, #e67339 0%, #d96629 100%);
+  box-shadow: 0 6px 20px rgba(242, 140, 82, 0.4);
+  transform: translateY(-2px);
+}
+
+.quack-agency-setup-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(242, 140, 82, 0.3);
+}
+
 .quack-agency-error {
   display: flex;
   flex-direction: column;
