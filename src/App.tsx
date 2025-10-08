@@ -12,7 +12,7 @@ import { Store } from "@tauri-apps/plugin-store";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import TerminalView from "./components/TerminalView";
-import FileExplorer from "./components/FileExplorer";
+import SidePanel from "./components/SidePanel";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer from "./components/FilePreviewDrawer";
 import GitPanel from "./components/GitPanel";
@@ -308,7 +308,7 @@ function App() {
     gitSummary?.entries?.[gitSummary.entries.length - 1]?.path
   ]);
 
-  const gridTemplateColumns = "340px minmax(0, 1fr) 340px";
+  const gridTemplateColumns = "280px minmax(0, 1fr) 420px";
 
   const loadSavedCommands = useCallback(async () => {
     try {
@@ -750,6 +750,7 @@ function App() {
         workingDir,
       });
       setSelectedAgent(details);
+      setShowQuackAgencyDrawer(true); // Apre il drawer quando si seleziona un agent
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setAgentsError(message);
@@ -1967,12 +1968,11 @@ function App() {
             }
             savedCommandsOpen={savedCommandsDrawerOpen}
             onOpenAIAssistant={handleOpenAIAssistant}
-            onToggleQuackAgency={handleToggleQuackAgency}
-            quackAgencyOpen={showQuackAgencyDrawer}
           />
         </section>
 
-        <FileExplorer
+        <SidePanel
+          // FileExplorer props
           rootPath={(explorerRoot ?? explorerPath) || null}
           tree={explorerTree}
           loading={loadingExplorer}
@@ -1983,6 +1983,15 @@ function App() {
           onLoadChildren={fetchDirectoryChildren}
           modifiedEntries={stableModifiedEntries}
           gitRootPath={explorerRoot}
+          // Agents props
+          agents={agents}
+          selectedAgent={selectedAgent}
+          loadingAgents={loadingAgents}
+          agentsError={agentsError}
+          agentsDirectoryExists={agentsDirectoryExists}
+          workingDir={activeTerminal?.cwd ?? explorerPath}
+          onSelectAgent={handleSelectAgent}
+          onRefreshAgents={loadAgents}
         />
 
         <NewTerminalModal

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { AgentInfo, AgentDetails } from "../types";
 import QuackAgencySetupWizard from "./QuackAgencySetupWizard";
@@ -84,6 +84,9 @@ export default function QuackAgencyDrawer({
   const [isSaving, setIsSaving] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+
+  // Track previous open state to detect drawer opening
+  const prevOpenRef = useRef(open);
 
   // Edit form state
   const [editName, setEditName] = useState("");
@@ -180,6 +183,26 @@ export default function QuackAgencyDrawer({
   const getAgentColor = (colorName: string): string => {
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
   };
+
+  // Auto-switch to detail view when drawer opens with a selected agent
+  // (e.g., when clicking agent from AgentsPanel)
+  useEffect(() => {
+    const wasOpening = !prevOpenRef.current && open;
+
+    if (wasOpening && selectedAgent) {
+      setViewMode("detail");
+    }
+
+    prevOpenRef.current = open;
+  }, [open, selectedAgent]);
+
+  // Reset to list view when drawer closes
+  useEffect(() => {
+    if (!open) {
+      setViewMode("list");
+      setIsEditing(false);
+    }
+  }, [open]);
 
   return (
     <div className={`quack-agency-drawer ${open ? "open" : ""}`}>
