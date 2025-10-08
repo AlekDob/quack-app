@@ -42,8 +42,8 @@ body,
 body {
   background-color: #0f1115;
   background-image: url('/images/duck.png');
-  background-size: 50%;
-  background-position: 70% center;
+  background-size: 60%;
+  background-position: 75% bottom;
   background-repeat: no-repeat;
   background-attachment: fixed;
   overflow: hidden;

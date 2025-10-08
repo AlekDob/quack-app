@@ -309,7 +309,7 @@ function App() {
     gitSummary?.entries?.[gitSummary.entries.length - 1]?.path
   ]);
 
-  const gridTemplateColumns = "280px minmax(0, 1fr) 420px";
+  const gridTemplateColumns = "360px minmax(0, 1fr) 420px";
 
   const loadSavedCommands = useCallback(async () => {
     try {
@@ -734,10 +734,6 @@ function App() {
       setLoadingAgents(false);
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
-
-  const handleToggleQuackAgency = useCallback(() => {
-    setShowQuackAgencyDrawer(prev => !prev);
-  }, []);
 
   const handleSelectAgent = useCallback(async (agentInfo: AgentInfo) => {
     if (!tauriAvailable) {

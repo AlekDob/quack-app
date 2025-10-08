@@ -569,7 +569,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       className="terminal-surface"
       style={{ overflow: 'hidden', position: 'relative' }}
     >
-      {scrollBadgeVisible === activeId && (
+      {scrollBadgeVisible === activeId && activeId && (
         <button
           type="button"
           className="scroll-to-bottom-badge"
