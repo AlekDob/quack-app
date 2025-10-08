@@ -122,10 +122,16 @@ pub fn run() {
                     .accelerator("Cmd+Shift+A")
                     .build(app)?;
 
+                let watch_intro_id = "watch_intro";
+                let watch_intro = tauri::menu::MenuItemBuilder::with_id(watch_intro_id, "Watch Intro")
+                    .accelerator("Cmd+Shift+I")
+                    .build(app)?;
+
                 let view_menu = SubmenuBuilder::new(app, "View")
                     .item(&toggle_perf)
                     .separator()
                     .item(&ai_settings)
+                    .item(&watch_intro)
                     .build()?;
 
                 // Build and set the menu
@@ -149,6 +155,13 @@ pub fn run() {
                         tauri::async_runtime::spawn(async move {
                             if let Err(e) = app_handle.emit("open-ai-settings", ()) {
                                 log::error!("Failed to emit open-ai-settings event: {}", e);
+                            }
+                        });
+                    } else if event.id() == watch_intro_id {
+                        let app_handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(e) = app_handle.emit("watch-intro", ()) {
+                                log::error!("Failed to emit watch-intro event: {}", e);
                             }
                         });
                     }

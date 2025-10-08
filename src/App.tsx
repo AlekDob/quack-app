@@ -53,6 +53,7 @@ import "./App.css";
 
 const splashImage = new URL("../images/quack-agency.jpeg", import.meta.url).href;
 const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
+const INTRO_REPLAY_DURATION_MS = 5000;
 
 const COLORS = [
   "#f28c52",
@@ -275,6 +276,9 @@ function App() {
     recentCommands: [],
   });
   const recentCommandsRef = useRef<string[]>([]);
+  const [introReplayActive, setIntroReplayActive] = useState(false);
+  const introReplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const introAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -334,6 +338,38 @@ function App() {
     }
   }, [tauriAvailable]);
 
+  const showIntroReplay = useCallback(() => {
+    if (introReplayTimeoutRef.current) {
+      clearTimeout(introReplayTimeoutRef.current);
+      introReplayTimeoutRef.current = null;
+    }
+
+    if (introAudioRef.current) {
+      introAudioRef.current.pause();
+      introAudioRef.current.currentTime = 0;
+      introAudioRef.current = null;
+    }
+
+    setIntroReplayActive(true);
+
+    const audio = new Audio(introAudio);
+    audio.volume = 0.5;
+    audio.play().catch((error) => {
+      console.warn("Unable to play intro audio:", error);
+    });
+    introAudioRef.current = audio;
+
+    introReplayTimeoutRef.current = setTimeout(() => {
+      setIntroReplayActive(false);
+      if (introAudioRef.current) {
+        introAudioRef.current.pause();
+        introAudioRef.current.currentTime = 0;
+        introAudioRef.current = null;
+      }
+      introReplayTimeoutRef.current = null;
+    }, INTRO_REPLAY_DURATION_MS);
+  }, []);
+
   useEffect(() => {
     if (!tauriAvailable) {
       return;
@@ -361,13 +397,18 @@ function App() {
       setShowAISettings(true);
     });
 
+    const unlistenWatchIntroPromise = listen("watch-intro", () => {
+      showIntroReplay();
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
     // Performance: NON fare polling continuo dei processi - carica solo quando necessario
     // Il drawer ProcessesDrawer chiamerà loadActiveProcesses quando aperto
-  }, [loadSavedCommands, tauriAvailable]);
+  }, [loadSavedCommands, showIntroReplay, tauriAvailable]);
 
   // Performance: Carica processi solo quando drawer è aperto (on-demand invece di polling)
   useEffect(() => {
@@ -972,6 +1013,20 @@ function App() {
       setBooting(false);
     }
   }, [tauriAvailable]);
+
+  useEffect(() => {
+    return () => {
+      if (introReplayTimeoutRef.current) {
+        clearTimeout(introReplayTimeoutRef.current);
+        introReplayTimeoutRef.current = null;
+      }
+      if (introAudioRef.current) {
+        introAudioRef.current.pause();
+        introAudioRef.current.currentTime = 0;
+        introAudioRef.current = null;
+      }
+    };
+  }, []);
 
   // Play intro audio on splash screen
   useEffect(() => {
@@ -1884,11 +1939,12 @@ function App() {
   }
 
   return (
-    <div
-      ref={appShellRef}
-      className="app-shell"
-      style={{ gridTemplateColumns }}
-    >
+    <>
+      <div
+        ref={appShellRef}
+        className="app-shell"
+        style={{ gridTemplateColumns }}
+      >
         <TerminalSidebar
           terminals={terminals}
           activeId={activeId}
@@ -2072,22 +2128,21 @@ function App() {
           onRefresh={loadActiveProcesses}
           onFocusTerminal={handleSelectTerminal}
         />
-
-      <PreviewDrawer
-        open={showPreviewDrawer}
-        onClose={() => setShowPreviewDrawer(false)}
-        width={previewDrawerWidth}
-        minWidth={420}
-        maxWidth={1200}
-        onResize={(width) => {
-          setPreviewDrawerWidth(width);
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("previewDrawer.width", String(Math.round(width)));
-          }
-        }}
-        explorerPath={explorerPath}
-        processes={activeProcesses}
-      />
+        <PreviewDrawer
+          open={showPreviewDrawer}
+          onClose={() => setShowPreviewDrawer(false)}
+          width={previewDrawerWidth}
+          minWidth={420}
+          maxWidth={1200}
+          onResize={(width) => {
+            setPreviewDrawerWidth(width);
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem("previewDrawer.width", String(Math.round(width)));
+            }
+          }}
+          explorerPath={explorerPath}
+          processes={activeProcesses}
+        />
 
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
           <div
@@ -2181,7 +2236,14 @@ function App() {
           onSelectAgent={handleSelectAgent}
           onRefresh={loadAgents}
         />
-    </div>
+      </div>
+      {introReplayActive && (
+        <div
+          className="intro-replay-overlay"
+          style={{ backgroundImage: `url(${splashImage})` }}
+        />
+      )}
+    </>
   );
 }
 
