@@ -54,6 +54,45 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       .replace(/(\r?\n){3,}/g, '\n\n')  // 3+ newline → 2 newline (max 1 riga vuota)
   }, [])
 
+  // Formattazione righe output Claude Code con colori diversi
+  const formatQuoteLines = useCallback((data: string): string => {
+    // ANSI codes:
+    // Arancione 208 (256 colors) simile a #f28c52 per bullet points
+    const orangeBg = '\x1b[48;5;208m\x1b[38;5;16m\x1b[1m'
+    // Blu pastello RGB (143, 166, 255) = #8fa6ff per righe con ">"
+    const pastelBlueBg = '\x1b[48;2;143;166;255m\x1b[38;2;0;0;0m\x1b[1m'
+    const reset = '\x1b[0m'
+
+    // Splitta per righe preservando i delimitatori
+    const lines = data.split(/(\r?\n)/)
+
+    const formatted = lines.map((line) => {
+      // Salta i delimitatori (newline)
+      if (line === '\r\n' || line === '\n' || line === '\r') {
+        return line
+      }
+
+      // Rimuovi codici ANSI esistenti per il check
+      // eslint-disable-next-line no-control-regex
+      const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '')
+      const trimmed = cleanLine.trim()
+
+      // Se la riga contiene "●" o "•" (bullet points di Claude Code) → arancione
+      if (line.includes('●') || line.includes('•') || line.includes('⏺')) {
+        return `${orangeBg}${cleanLine}${reset}`
+      }
+
+      // Se la riga inizia con ">" → blu pastello
+      if (trimmed.startsWith('>')) {
+        return `${pastelBlueBg}${cleanLine}${reset}`
+      }
+
+      return line
+    })
+
+    return formatted.join('')
+  }, [])
+
   // Performance: batch write con throttling per evitare troppi repaint
   const flushWriteBuffer = useCallback((id: string) => {
     const term = terminalMapRef.current.get(id)
@@ -332,12 +371,13 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         const dataListener = await listen<TerminalDataEvent>('terminal-data', (event) => {
           ensureTerminal(event.payload.id)
 
-          // Filtra righe vuote eccessive prima di scrivere
-          const cleanedData = cleanEmptyLines(event.payload.data)
+          // Filtra righe vuote eccessive e formatta righe con ">"
+          let processedData = cleanEmptyLines(event.payload.data)
+          processedData = formatQuoteLines(processedData)
 
           // Performance: usa batch write invece di write immediato
-          scheduleWrite(event.payload.id, cleanedData)
-          onOutput(event.payload.id, cleanedData)
+          scheduleWrite(event.payload.id, processedData)
+          onOutput(event.payload.id, processedData)
         })
         if (cancelled) {
           dataListener()
@@ -374,7 +414,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       listenersRegisteredRef.current = false
       disposers.forEach((dispose) => dispose())
     }
-  }, [ensureTerminal, onOutput, scheduleWrite, tauriAvailable])
+  }, [ensureTerminal, onOutput, scheduleWrite, tauriAvailable, cleanEmptyLines, formatQuoteLines])
 
   useEffect(() => {
     if (!tauriAvailable) {
