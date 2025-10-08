@@ -184,7 +184,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         setWinSizeChars: true,
       },
       theme: {
-        background: '#0f1115',
+        background: 'rgba(15, 17, 21, 0.2)',
         foreground: '#f0f2f6',
         cursor: '#f28c52',
         selectionBackground: 'rgba(242, 140, 82, 0.38)',
@@ -328,7 +328,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       const accent = terminals.find((item) => item.id === id)?.color ?? '#f28c52'
       terminal.options = {
         theme: {
-          background: '#0f1115',
+          background: 'rgba(15, 17, 21, 0.2)',
           foreground: '#f2f4f8',
           cursor: accent,
           cursorAccent: '#080a0d',

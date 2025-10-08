@@ -41,6 +41,11 @@ body,
 
 body {
   background-color: #0f1115;
+  background-image: url('/images/duck.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   overflow: hidden;
 }
 

@@ -4,7 +4,7 @@
   grid-template-rows: auto 1fr;
   height: 100vh;
   overflow: hidden;
-  background: linear-gradient(135deg, #0d1014 0%, #12161c 45%, #161b22 100%);
+  background: transparent;
   color: #eef0f5;
   position: relative;
   /* macOS rounded corners support */
@@ -599,21 +599,15 @@ button.directory-chooser:hover {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  border-right: 1px solid rgba(65, 75, 95, 0.4);
-  /* Fork-inspired sophisticated gradient */
-  background: linear-gradient(
-    170deg,
-    rgba(15, 17, 22, 0.95) 0%,
-    rgba(20, 24, 31, 0.92) 25%,
-    rgba(25, 28, 36, 0.88) 65%,
-    rgba(30, 34, 42, 0.85) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  /* Glassmorphism effect */
+  background: rgba(15, 17, 22, 0.4);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   box-shadow:
-    inset 1px 0 0 rgba(80, 90, 110, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    2px 0 12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(40, 45, 55, 0.6);
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    2px 0 12px rgba(0, 0, 0, 0.3);
   position: relative;
   grid-column: 1;
   grid-row: 1 / 3;
@@ -1068,8 +1062,9 @@ button.directory-chooser:hover {
 .terminal-pane {
   display: flex;
   flex-direction: column;
-  background: rgba(17, 18, 22, 0.72);
-  backdrop-filter: blur(14px);
+  background: rgba(17, 18, 22, 0.3);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   min-width: 600px;
   min-height: 0;
   height: 100%;
@@ -1284,10 +1279,17 @@ button.directory-chooser:hover {
 .terminal-surface {
   width: 100%;
   height: 100%;
-  background: rgba(20, 22, 28, 0.9);
+  background: linear-gradient(
+    135deg,
+    rgba(20, 22, 28, 0.3) 0%,
+    rgba(20, 22, 28, 0.4) 40%,
+    rgba(20, 22, 28, 0.5) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 16px;
-  border: 1px solid rgba(124, 128, 142, 0.32);
-  padding: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1301,6 +1303,9 @@ button.directory-chooser:hover {
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  padding: 1.2rem;
+  background: rgba(15, 17, 21, 0.3);
+  border-radius: 12px;
 }
 
 .terminal-instance .xterm {
@@ -1412,9 +1417,10 @@ button.directory-chooser:hover {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  background: #181a21;
-  backdrop-filter: blur(14px);
-  border-left: 1px solid var(--panel-border);
+  background: rgba(24, 26, 33, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
   grid-column: 3;
   grid-row: 1 / 3;
 }
