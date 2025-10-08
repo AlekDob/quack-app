@@ -152,3 +152,21 @@ export interface AgentInfo {
 export interface AgentDetails extends AgentInfo {
   content: string;
 }
+
+// Quack Agency Setup Wizard types
+export interface SetupWizardData {
+  userName: string;
+  userLanguage: string;
+  description: string;
+  techStack: string;
+  features: string[];
+  initGit: boolean;
+  createAgents: boolean;
+}
+
+export interface SetupResult {
+  success: boolean;
+  message: string;
+  agentsCreated: number;
+  filesCreated: string[];
+}

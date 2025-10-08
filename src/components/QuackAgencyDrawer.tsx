@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { AgentInfo, AgentDetails } from "../types";
+import QuackAgencySetupWizard from "./QuackAgencySetupWizard";
 
 interface QuackAgencyDrawerProps {
   open: boolean;
@@ -13,7 +14,6 @@ interface QuackAgencyDrawerProps {
   onClose: () => void;
   onSelectAgent: (agent: AgentInfo) => void;
   onRefresh: () => void;
-  onSetupAgency: () => void;
 }
 
 // Agent color mapping for consistent styling
@@ -78,12 +78,12 @@ export default function QuackAgencyDrawer({
   onClose,
   onSelectAgent,
   onRefresh,
-  onSetupAgency,
 }: QuackAgencyDrawerProps) {
   const [viewMode, setViewMode] = useState<"list" | "detail">("list");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   // Edit form state
   const [editName, setEditName] = useState("");
@@ -225,19 +225,53 @@ export default function QuackAgencyDrawer({
           {!loading && !error && viewMode === "list" && (
             <div className={`quack-agency-list-view ${isAnimating ? "animating" : ""}`}>
               {agents.length === 0 && !directoryExists && (
-                <div className="quack-agency-empty quack-agency-setup">
-                  <div className="quack-agency-setup-icon">🦆</div>
-                  <h3>Setup Quack Agency</h3>
-                  <p>
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                  <div className="text-6xl mb-6">🦆</div>
+                  <h3
+                    className="text-2xl font-bold mb-4"
+                    style={{ color: "#f28c52" }}
+                  >
+                    Setup Quack Agency
+                  </h3>
+                  <p
+                    className="text-base mb-3 max-w-md"
+                    style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                  >
                     Quack Agency helps you manage AI agents for this project.
                   </p>
-                  <p>
-                    Click the button below to create the <code>.claude/agents/</code> directory structure.
+                  <p
+                    className="text-sm mb-8 max-w-md"
+                    style={{ color: "rgba(255, 255, 255, 0.6)" }}
+                  >
+                    Click the button below to create the{" "}
+                    <code
+                      className="px-2 py-1 rounded text-xs font-mono"
+                      style={{
+                        background: "rgba(242, 140, 82, 0.1)",
+                        color: "#f28c52",
+                      }}
+                    >
+                      .claude/agents/
+                    </code>{" "}
+                    directory structure.
                   </p>
                   <button
                     type="button"
-                    className="quack-agency-setup-button"
-                    onClick={onSetupAgency}
+                    className="px-6 py-3 rounded-lg font-semibold text-base transition-all duration-200"
+                    style={{
+                      background: "linear-gradient(135deg, #f28c52 0%, #e67339 100%)",
+                      color: "#ffffff",
+                      boxShadow: "0 4px 12px rgba(242, 140, 82, 0.3)",
+                    }}
+                    onClick={() => setShowWizard(true)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(242, 140, 82, 0.4)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(242, 140, 82, 0.3)";
+                    }}
                   >
                     🚀 Setup Quack Agency
                   </button>
@@ -434,6 +468,18 @@ export default function QuackAgencyDrawer({
           </button>
         </footer>
       </div>
+
+      {/* Setup Wizard */}
+      <QuackAgencySetupWizard
+        open={showWizard}
+        workingDir={workingDir}
+        onClose={() => setShowWizard(false)}
+        onComplete={() => {
+          setShowWizard(false);
+          // Refresh agents after setup completes
+          onRefresh();
+        }}
+      />
     </div>
   );
 }

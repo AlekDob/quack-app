@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{menu::MenuBuilder, AppHandle, Emitter, Manager};
 
 mod agency;
+mod agency_setup;
 mod ai;
 mod commands;
 mod fs;
@@ -217,6 +218,7 @@ pub fn run() {
             agency::save_agent,
             agency::check_agents_directory,
             agency::create_agents_directory,
+            agency_setup::setup_quack_agency_full,
             terminal::create_terminal,
             terminal::list_terminals,
             terminal::get_active_processes,
