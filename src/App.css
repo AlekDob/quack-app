@@ -1463,13 +1463,151 @@ button.directory-chooser:hover {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   background: rgba(24, 26, 33, 0.4);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   grid-column: 3;
   grid-row: 1 / 3;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: rgba(24, 26, 33, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  grid-column: 3;
+  grid-row: 1 / 3;
+}
+
+.side-panel-tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 16, 24, 0.8);
+}
+
+.side-panel-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.side-panel-tab .tab-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.side-panel-tab:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.side-panel-tab.active {
+  color: #f28c52;
+  border-bottom-color: #f28c52;
+  background: rgba(242, 140, 82, 0.05);
+}
+
+.side-panel-tab-badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.side-panel-tab-badge.has-content {
+  background: linear-gradient(135deg, #f28c52 0%, #e67339 100%);
+  color: #fff;
+}
+
+.side-panel-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.side-panel-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.side-panel-pane > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.agents-panel,
+.context-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 1.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(12, 16, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  margin: 1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+}
+
+.agents-panel {
+  padding: 0;
+}
+
+.agents-panel > .agents-panel-header,
+.agents-panel > .agents-panel-footer {
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.agents-panel > .agents-panel-footer {
+  border-bottom: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.agents-panel-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+}
+
+.context-panel {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .removed-right-panel-tabs {

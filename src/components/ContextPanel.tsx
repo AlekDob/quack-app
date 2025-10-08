@@ -4,12 +4,7 @@
 
 export default function ContextPanel() {
   return (
-    <div
-      className="flex flex-col items-center justify-center h-full px-6 text-center"
-      style={{
-        background: "#0c1018",
-      }}
-    >
+    <div className="context-panel">
       <div className="text-6xl mb-6">📝</div>
       <h3
         className="text-xl font-bold mb-3"

@@ -124,15 +124,8 @@ export default function SidePanel({
   ];
 
   return (
-    <aside className="flex flex-col h-full" style={{ background: "#0c1018" }}>
-      {/* Tab Navigation */}
-      <div
-        className="flex items-center border-b"
-        style={{
-          borderColor: "rgba(255, 255, 255, 0.1)",
-          background: "rgba(12, 16, 24, 0.8)",
-        }}
-      >
+    <aside className="side-panel">
+      <div className="side-panel-tabs">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const hasAgents = tab.id === "agents" && tab.hasContent;
@@ -142,40 +135,15 @@ export default function SidePanel({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 flex-1"
-              style={{
-                color: isActive
-                  ? "#f28c52"
-                  : "rgba(255, 255, 255, 0.6)",
-                borderBottomColor: isActive ? "#f28c52" : "transparent",
-                background: isActive
-                  ? "rgba(242, 140, 82, 0.05)"
-                  : "transparent",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.9)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.6)";
-                }
-              }}
+              className={`side-panel-tab ${isActive ? "active" : ""}`}
             >
-              <span className="flex items-center">{tab.icon}</span>
+              <span className="tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.id === "agents" && typeof tab.badge === "number" && (
                 <span
-                  className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                  style={{
-                    background: hasAgents
-                      ? "linear-gradient(135deg, #f28c52 0%, #e67339 100%)"
-                      : "rgba(255, 255, 255, 0.2)",
-                    color: hasAgents ? "#ffffff" : "rgba(255, 255, 255, 0.6)",
-                  }}
+                  className={`side-panel-tab-badge ${
+                    hasAgents ? "has-content" : ""
+                  }`}
                 >
                   {tab.badge}
                 </span>
@@ -185,9 +153,9 @@ export default function SidePanel({
         })}
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="side-panel-content">
         {activeTab === "explorer" && (
+          <div className="side-panel-pane">
           <FileExplorer
             rootPath={rootPath}
             tree={tree}
@@ -200,22 +168,29 @@ export default function SidePanel({
             modifiedEntries={modifiedEntries}
             gitRootPath={gitRootPath}
           />
+          </div>
         )}
 
         {activeTab === "agents" && (
-          <AgentsPanel
-            agents={agents}
-            selectedAgent={selectedAgent}
-            loading={loadingAgents}
-            error={agentsError}
-            directoryExists={agentsDirectoryExists}
-            workingDir={workingDir}
-            onSelectAgent={onSelectAgent}
-            onRefresh={onRefreshAgents}
-          />
+          <div className="side-panel-pane">
+            <AgentsPanel
+              agents={agents}
+              selectedAgent={selectedAgent}
+              loading={loadingAgents}
+              error={agentsError}
+              directoryExists={agentsDirectoryExists}
+              workingDir={workingDir}
+              onSelectAgent={onSelectAgent}
+              onRefresh={onRefreshAgents}
+            />
+          </div>
         )}
 
-        {activeTab === "context" && <ContextPanel />}
+        {activeTab === "context" && (
+          <div className="side-panel-pane">
+            <ContextPanel />
+          </div>
+        )}
       </div>
     </aside>
   );

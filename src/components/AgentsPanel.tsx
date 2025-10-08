@@ -40,13 +40,7 @@ export default function AgentsPanel({
   };
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{
-        background: "#0c1018",
-        color: "rgba(255, 255, 255, 0.9)",
-      }}
-    >
+    <div className="agents-panel">
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 border-b"
