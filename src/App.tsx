@@ -51,7 +51,8 @@ interface TerminalMetadata {
 
 import "./App.css";
 
-const splashImage = new URL("../images/quackapp.jpeg", import.meta.url).href;
+const splashImage = new URL("../images/quack-agency.jpeg", import.meta.url).href;
+const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
 
 const COLORS = [
   "#f28c52",
@@ -975,6 +976,22 @@ function App() {
       setBooting(false);
     }
   }, [tauriAvailable]);
+
+  // Play intro audio on splash screen
+  useEffect(() => {
+    if (booting && tauriAvailable) {
+      const audio = new Audio(introAudio);
+      audio.volume = 0.5;
+      audio.play().catch((error) => {
+        console.warn("Unable to play intro audio:", error);
+      });
+
+      return () => {
+        audio.pause();
+        audio.currentTime = 0;
+      };
+    }
+  }, [booting, tauriAvailable]);
 
   // Global keyboard shortcut: Cmd+J to open AI Assistant
   useEffect(() => {
