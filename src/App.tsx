@@ -9,6 +9,9 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { Store } from "@tauri-apps/plugin-store";
+import { Toaster, toast } from "sonner";
+import "sonner/dist/styles.css";
+import "./sonner-custom.css";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import TerminalView from "./components/TerminalView";
@@ -52,9 +55,6 @@ interface TerminalMetadata {
 
 import "./App.css";
 
-const splashImage = new URL("../images/quack-agency.jpeg", import.meta.url).href;
-const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
-const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
 const INTRO_REPLAY_DURATION_MS = 5000;
 
 const COLORS = [
@@ -66,6 +66,9 @@ const COLORS = [
   "#8fa6ff",
   "#f2a57b",
 ];
+
+// Notification settings
+const NOTIFY_ACTIVE_TERMINAL = true; // Send notifications even for active terminal
 
 // eslint-disable-next-line no-control-regex
 const ANSI_REGEX = new RegExp("\\x1B\\[[0-9;?]*[ -/]*[@-~]", "g");
@@ -120,22 +123,14 @@ const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
   }
 };
 
-const playQuackSound = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    const audio = new Audio(notificationAudio);
-    audio.volume = 0.6; // Volume moderato per le notifiche
-    audio.play().catch((error) => {
-      console.warn("Unable to play notification sound", error);
-    });
-  } catch (error) {
-    console.warn("Unable to play notification sound", error);
-  }
-};
-
 function App() {
+  // Load assets INSIDE the component, not at module level
+  const splashImage = new URL("../images/quack-agency.jpeg", import.meta.url).href;
+  const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
+  const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
+  const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
+  const ducksPatternBackgroundImage = new URL("../images/backgrounds/ducks-pattern.png", import.meta.url).href;
+
   const [tauriAvailable] = useState(
     () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
   );
@@ -224,12 +219,17 @@ function App() {
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
   );
+  // Separate timers for notifications (longer delay)
+  const notificationTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
   // Anti-flickering: debounce visual transitions from busy→idle
   const visualIdleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
   );
   const terminalsRef = useRef<TerminalInfo[]>([]);
-  const IDLE_TIMEOUT_MS = 2000;
+  const IDLE_TIMEOUT_MS = 5000; // 5s - for activity bar (fast response)
+  const NOTIFICATION_TIMEOUT_MS = 60000; // 1 minute - for notifications only
   const VISUAL_IDLE_DELAY_MS = 400; // Delay before showing idle status (prevents flickering)
   const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
   const [activeProcesses, setActiveProcesses] = useState<ProcessInfo[]>([]);
@@ -291,6 +291,21 @@ function App() {
 
   const gridTemplateColumns = "360px minmax(0, 1fr) 420px";
 
+  const playQuackSound = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const audio = new Audio(notificationAudio);
+      audio.volume = 0.6; // Volume moderato per le notifiche
+      audio.play().catch((error) => {
+        console.warn("Unable to play notification sound", error);
+      });
+    } catch (error) {
+      console.warn("Unable to play notification sound", error);
+    }
+  }, [notificationAudio]);
+
   const loadSavedCommands = useCallback(async () => {
     try {
       const commands = await invoke<SavedCommand[]>("load_saved_commands");
@@ -344,7 +359,7 @@ function App() {
       }
       introReplayTimeoutRef.current = null;
     }, INTRO_REPLAY_DURATION_MS);
-  }, []);
+  }, [introAudio]);
 
   useEffect(() => {
     if (!tauriAvailable) {
@@ -454,6 +469,12 @@ function App() {
     async (payload: { id: string; label: string }) => {
       playQuackSound();
 
+      // Show in-app toast notification
+      toast.success(`${payload.label}`, {
+        description: "Hey, you can do something here!",
+        duration: 4000,
+      });
+
       if (!tauriAvailable) {
         return;
       }
@@ -470,14 +491,14 @@ function App() {
       try {
         await sendNotification({
           id: Number(Date.now() % 2147483647),
-          title: "Terminal ready",
-          body: `${payload.label} is waiting for input.`,
+          title: payload.label,
+          body: "Hey, you can do something here!",
         });
       } catch (error) {
         console.warn("Unable to show notification", error);
       }
     },
-    [ensureNotificationPermission, notificationGranted, tauriAvailable]
+    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable]
   );
 
   const loadDirectory = useCallback(
@@ -539,80 +560,7 @@ function App() {
     [tauriAvailable]
   );
 
-  const markTerminalBusy = useCallback((id: string) => {
-    // Anti-flickering: cancella timer visuale pending se esiste
-    const visualTimer = visualIdleTimersRef.current.get(id);
-    if (visualTimer) {
-      clearTimeout(visualTimer);
-      visualIdleTimersRef.current.delete(id);
-    }
-
-    setTerminals((prev) => {
-      // Performance: Skip se già busy per evitare re-render inutili
-      const current = prev.find(t => t.id === id);
-      if (current?.status === 'busy') {
-        return prev; // Ritorna stesso array → NO re-render!
-      }
-
-      return prev.map((terminal) =>
-        terminal.id === id
-          ? { ...terminal, status: "busy", needsAttention: false }
-          : terminal
-      );
-    });
-  }, []);
-
-  const markTerminalIdle = useCallback(
-    (id: string, options?: { suppressNotification?: boolean }) => {
-      const suppressNotification = options?.suppressNotification === true;
-
-      // Anti-flickering: delay di 400ms prima di mostrare idle
-      // Cancella timer esistente se presente
-      const existingTimer = visualIdleTimersRef.current.get(id);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-      }
-
-      // Schedule il cambio di stato con delay
-      const timer = setTimeout(() => {
-        let notifyInfo: { id: string; label: string } | null = null;
-
-        setTerminals((prev) => {
-          // Performance: Skip se già idle per evitare re-render inutili
-          const current = prev.find(t => t.id === id);
-          if (current?.status === 'idle') {
-            return prev; // Ritorna stesso array → NO re-render!
-          }
-
-          return prev.map((terminal) => {
-            if (terminal.id !== id) {
-              return terminal;
-            }
-            const wasBusy = terminal.status === "busy";
-            const needsAttention = wasBusy && id !== activeId;
-            if (needsAttention) {
-              notifyInfo = { id: terminal.id, label: terminal.label };
-            }
-            return {
-              ...terminal,
-              status: "idle",
-              needsAttention,
-            };
-          });
-        });
-
-        if (notifyInfo && !suppressNotification) {
-          void notifyTerminalReady(notifyInfo);
-        }
-
-        visualIdleTimersRef.current.delete(id);
-      }, VISUAL_IDLE_DELAY_MS);
-
-      visualIdleTimersRef.current.set(id, timer);
-    },
-    [activeId, notifyTerminalReady]
-  );
-
+  // Helper callbacks without dependencies - defined FIRST to avoid temporal dead zone
   const clearTerminalAttention = useCallback((id: string) => {
     setTerminals((prev) => {
       // Performance: Skip se già senza attention per evitare re-render inutili
@@ -635,17 +583,93 @@ function App() {
     }
   }, []);
 
-  const scheduleIdleTimer = useCallback(
-    (id: string) => {
-      // Performance: evita clear/set se timer già attivo
-      const existingTimer = idleTimersRef.current.get(id);
+  const clearNotificationTimer = useCallback((id: string) => {
+    const timer = notificationTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      notificationTimersRef.current.delete(id);
+    }
+  }, []);
 
-      // Se c'è già un timer attivo, non fare nulla (evita clear/set continui)
-      // Il timer esistente verrà comunque triggerato dopo IDLE_TIMEOUT_MS
-      if (existingTimer) {
-        return;
+  // Status management callbacks - can now safely use helper callbacks above
+  const markTerminalBusy = useCallback((id: string) => {
+    // Anti-flickering: cancella timer visuale pending se esiste
+    const visualTimer = visualIdleTimersRef.current.get(id);
+    if (visualTimer) {
+      clearTimeout(visualTimer);
+      visualIdleTimersRef.current.delete(id);
+    }
+
+    // Cancella timer di notifica quando il terminale diventa busy
+    clearNotificationTimer(id);
+
+    setTerminals((prev) => {
+      // Performance: Skip se già busy per evitare re-render inutili
+      const current = prev.find(t => t.id === id);
+      if (current?.status === 'busy') {
+        return prev; // Ritorna stesso array → NO re-render!
       }
 
+      return prev.map((terminal) =>
+        terminal.id === id
+          ? { ...terminal, status: "busy", needsAttention: false }
+          : terminal
+      );
+    });
+  }, [clearNotificationTimer]);
+
+  const markTerminalIdle = useCallback(
+    (id: string, options?: { suppressNotification?: boolean }) => {
+      const suppressNotification = options?.suppressNotification === true;
+
+      // Anti-flickering: delay di 400ms prima di mostrare idle
+      // Cancella timer esistente se presente
+      const existingTimer = visualIdleTimersRef.current.get(id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      // Schedule il cambio di stato con delay
+      const timer = setTimeout(() => {
+        setTerminals((prev) => {
+          // Performance: Skip se già idle per evitare re-render inutili
+          const current = prev.find(t => t.id === id);
+          if (current?.status === 'idle') {
+            return prev; // Ritorna stesso array → NO re-render!
+          }
+
+          return prev.map((terminal) => {
+            if (terminal.id !== id) {
+              return terminal;
+            }
+            const wasBusy = terminal.status === "busy";
+            const needsAttention = wasBusy && id !== activeId;
+            return {
+              ...terminal,
+              status: "idle",
+              needsAttention,
+            };
+          });
+        });
+
+        visualIdleTimersRef.current.delete(id);
+      }, VISUAL_IDLE_DELAY_MS);
+
+      visualIdleTimersRef.current.set(id, timer);
+    },
+    [activeId]
+  );
+
+  const scheduleIdleTimer = useCallback(
+    (id: string) => {
+      // Cancella il timer esistente se c'è (reset on activity)
+      const existingTimer = idleTimersRef.current.get(id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        idleTimersRef.current.delete(id);
+      }
+
+      // Crea un nuovo timer che triggera dopo 5s (activity bar response)
       const handle = setTimeout(() => {
         markTerminalIdle(id);
         idleTimersRef.current.delete(id);
@@ -653,6 +677,32 @@ function App() {
       idleTimersRef.current.set(id, handle);
     },
     [markTerminalIdle]
+  );
+
+  const scheduleNotificationTimer = useCallback(
+    (id: string) => {
+      // Cancella il timer esistente se c'è (reset on activity)
+      const existingTimer = notificationTimersRef.current.get(id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        notificationTimersRef.current.delete(id);
+      }
+
+      // Crea un nuovo timer che triggera dopo 1 minuto di inattività
+      const handle = setTimeout(() => {
+        // Retrieve terminal info for notification
+        const terminal = terminalsRef.current.find(t => t.id === id);
+        if (terminal && terminal.status === 'idle') {
+          const shouldNotify = NOTIFY_ACTIVE_TERMINAL || id !== activeId;
+          if (shouldNotify) {
+            void notifyTerminalReady({ id: terminal.id, label: terminal.label });
+          }
+        }
+        notificationTimersRef.current.delete(id);
+      }, NOTIFICATION_TIMEOUT_MS);
+      notificationTimersRef.current.set(id, handle);
+    },
+    [activeId, notifyTerminalReady]
   );
 
   const resolveTerminalId = useCallback(
@@ -807,6 +857,33 @@ function App() {
     void loadAgents();
   }, [loadAgents, tauriAvailable]);
 
+  // Helper to apply background (image or gradient)
+  const applyBackground = useCallback((backgroundName: string) => {
+    // Check if it's a gradient
+    if (backgroundName.startsWith('gradient-')) {
+      // Map gradient names to actual CSS gradients - MUCH more colorful!
+      const gradientMap: Record<string, string> = {
+        'gradient-orange-dark': 'linear-gradient(135deg, #1a0f0a 0%, #3d2415 25%, #5a3a25 50%, #3d2415 75%, #1a0f0a 100%)',
+        'gradient-blue-dark': 'linear-gradient(135deg, #0a0f1a 0%, #15243d 25%, #20355a 50%, #15243d 75%, #0a0f1a 100%)',
+      };
+
+      const gradient = gradientMap[backgroundName];
+      if (gradient) {
+        document.body.style.backgroundImage = gradient;
+        document.body.style.backgroundSize = '';
+      }
+    } else {
+      // It's an image file - use pre-loaded URLs from component scope
+      const imageMap: Record<string, string> = {
+        'duck.png': duckBackgroundImage,
+        'ducks-pattern.png': ducksPatternBackgroundImage,
+      };
+
+      const imagePath = imageMap[backgroundName] || `/images/backgrounds/${backgroundName}`;
+      document.body.style.backgroundImage = `url('${imagePath}')`;
+    }
+  }, [duckBackgroundImage, ducksPatternBackgroundImage]);
+
   // Load saved background on mount
   useEffect(() => {
     if (!tauriAvailable) {
@@ -817,17 +894,14 @@ function App() {
       try {
         const savedBackground = await invoke<string>("get_background_image");
         setCurrentBackground(savedBackground);
-
-        // Apply background immediately
-        const backgroundPath = `/images/backgrounds/${savedBackground}`;
-        document.body.style.backgroundImage = `url('${backgroundPath}')`;
+        applyBackground(savedBackground);
       } catch (error) {
         console.warn("Unable to load saved background", error);
       }
     };
 
     void loadBackground();
-  }, [tauriAvailable]);
+  }, [tauriAvailable, applyBackground]);
 
   // Apply background when it changes
   useEffect(() => {
@@ -835,9 +909,8 @@ function App() {
       return;
     }
 
-    const backgroundPath = `/images/backgrounds/${currentBackground}`;
-    document.body.style.backgroundImage = `url('${backgroundPath}')`;
-  }, [currentBackground]);
+    applyBackground(currentBackground);
+  }, [currentBackground, applyBackground]);
 
   const handleSelectBackground = useCallback(async (background: string) => {
     if (!tauriAvailable) {
@@ -868,11 +941,12 @@ function App() {
       ) {
         markTerminalBusy(id);
         clearIdleTimer(id);
+        clearNotificationTimer(id); // Reset notification timer on input
         // Reset output buffer quando user invia input
         outputBuffersRef.current.delete(id);
       }
     },
-    [clearIdleTimer, markTerminalBusy, terminals]
+    [clearIdleTimer, clearNotificationTimer, markTerminalBusy, terminals]
   );
 
   const handleTerminalOutput = useCallback(
@@ -903,11 +977,15 @@ function App() {
         if (chunkContainsPrompt(combined)) {
           markTerminalIdle(id);
           clearIdleTimer(id);
+          // Schedule notification timer dopo che l'idle viene rilevato
+          scheduleNotificationTimer(id);
           outputBuffersRef.current.delete(id);
         } else {
           // Solo marca busy e schedule timer, non pulire buffer
           markTerminalBusy(id);
           scheduleIdleTimer(id);
+          // Resetta notification timer perché c'è attività
+          scheduleNotificationTimer(id);
           bufferEntry.lastCheck = now;
           // Mantieni solo ultimi 3 chunks per non far crescere troppo il buffer
           bufferEntry.chunks = bufferEntry.chunks.slice(-3);
@@ -916,9 +994,11 @@ function App() {
         // Se non checkiamo ancora, marca busy e schedule timer senza check pesante
         markTerminalBusy(id);
         scheduleIdleTimer(id);
+        // Resetta notification timer perché c'è attività
+        scheduleNotificationTimer(id);
       }
     },
-    [clearIdleTimer, markTerminalBusy, markTerminalIdle, scheduleIdleTimer]
+    [clearIdleTimer, markTerminalBusy, markTerminalIdle, scheduleIdleTimer, scheduleNotificationTimer]
   );
 
   useEffect(() => {
@@ -1091,7 +1171,7 @@ function App() {
         audio.currentTime = 0;
       };
     }
-  }, [booting, tauriAvailable]);
+  }, [booting, tauriAvailable, introAudio]);
 
   // Global keyboard shortcut: Cmd+J to open AI Assistant
   useEffect(() => {
@@ -1350,6 +1430,7 @@ function App() {
         return;
       }
       clearIdleTimer(id);
+      clearNotificationTimer(id);
 
       // Anti-flickering: cleanup visual idle timer
       const visualTimer = visualIdleTimersRef.current.get(id);
@@ -1394,6 +1475,7 @@ function App() {
     [
       activeId,
       clearIdleTimer,
+      clearNotificationTimer,
       clearTerminalAttention,
       loadDirectory,
       tauriAvailable,
@@ -1863,12 +1945,16 @@ function App() {
   useEffect(() => {
     const timers = idleTimersRef.current;
     const visualTimers = visualIdleTimersRef.current;
+    const notificationTimers = notificationTimersRef.current;
     return () => {
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
       // Anti-flickering: cleanup visual idle timers
       visualTimers.forEach((timer) => clearTimeout(timer));
       visualTimers.clear();
+      // Cleanup notification timers
+      notificationTimers.forEach((timer) => clearTimeout(timer));
+      notificationTimers.clear();
     };
   }, []);
 
@@ -2311,6 +2397,7 @@ function App() {
           style={{ backgroundImage: `url(${splashImage})` }}
         />
       )}
+      <Toaster position="bottom-right" richColors closeButton />
     </>
   );
 }

@@ -1,0 +1,134 @@
+/* Sonner Custom Styles - Minimal Black Glass with Orange Accent */
+
+/* Override default Sonner styles with high specificity */
+[data-sonner-toaster][data-theme] {
+  --normal-bg: rgba(0, 0, 0, 0.85) !important;
+  --normal-border: rgba(244, 175, 142, 0.2) !important;
+  --normal-text: rgba(255, 255, 255, 0.95) !important;
+  --success-bg: rgba(0, 0, 0, 0.85) !important;
+  --success-border: rgba(244, 175, 142, 0.4) !important;
+  --success-text: rgba(255, 255, 255, 0.95) !important;
+  --accent-color: #F4AF8E !important;
+  --toast-bg: rgba(0, 0, 0, 0.85) !important;
+  --toast-border-color: rgba(244, 175, 142, 0.2) !important;
+}
+
+/* Force theme for all toaster instances */
+[data-sonner-toaster] {
+  --normal-bg: rgba(0, 0, 0, 0.85) !important;
+  --normal-border: rgba(244, 175, 142, 0.2) !important;
+  --normal-text: rgba(255, 255, 255, 0.95) !important;
+  --success-bg: rgba(0, 0, 0, 0.85) !important;
+  --success-border: rgba(244, 175, 142, 0.4) !important;
+  --success-text: rgba(255, 255, 255, 0.95) !important;
+  --accent-color: #F4AF8E !important;
+  --toast-bg: rgba(0, 0, 0, 0.85) !important;
+}
+
+[data-sonner-toast] {
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(244, 175, 142, 0.2) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
+              0 0 30px rgba(244, 175, 142, 0.5),
+              0 0 60px rgba(244, 175, 142, 0.2),
+              0 0 0 1px rgba(244, 175, 142, 0.1) inset !important;
+  padding: 16px !important;
+  min-width: 320px !important;
+  max-width: 400px !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Target all toast types with direct values - no CSS vars */
+[data-sonner-toast][data-type="success"],
+[data-sonner-toast][data-type="info"],
+[data-sonner-toast][data-type="warning"],
+[data-sonner-toast][data-type="error"],
+[data-sonner-toast][data-type="default"] {
+  background: rgba(0, 0, 0, 0.85) !important;
+  border-color: rgba(244, 175, 142, 0.4) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Title styling */
+[data-sonner-toast] [data-title] {
+  color: var(--accent-color) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 4px !important;
+}
+
+/* Description styling */
+[data-sonner-toast] [data-description] {
+  color: var(--normal-text) !important;
+  font-size: 13px !important;
+  opacity: 0.9 !important;
+  line-height: 1.4 !important;
+}
+
+/* Success icon - orange accent */
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--accent-color) !important;
+}
+
+/* Remove default colored backgrounds */
+[data-sonner-toast][data-type="success"] {
+  --normal-bg: rgba(0, 0, 0, 0.85);
+}
+
+/* Close button styling */
+[data-sonner-toast] [data-close-button] {
+  background: rgba(244, 175, 142, 0.1) !important;
+  border: 1px solid rgba(244, 175, 142, 0.2) !important;
+  color: var(--accent-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background: rgba(244, 175, 142, 0.2) !important;
+  border-color: rgba(244, 175, 142, 0.4) !important;
+}
+
+/* Progress bar - orange accent */
+[data-sonner-toast] [data-content] > [data-description] + div {
+  background: rgba(244, 175, 142, 0.2) !important;
+}
+
+[data-sonner-toast] [data-content] > [data-description] + div > div {
+  background: var(--accent-color) !important;
+}
+
+/* Animations - smooth and elegant */
+[data-sonner-toast] {
+  animation: sonner-slide-in 0.3s cubic-bezier(0.21, 1.02, 0.73, 1) forwards !important;
+}
+
+[data-sonner-toast][data-removed="true"] {
+  animation: sonner-slide-out 0.2s cubic-bezier(0.06, 0.71, 0.55, 1) forwards !important;
+}
+
+@keyframes sonner-slide-in {
+  from {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sonner-slide-out {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+}

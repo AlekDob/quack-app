@@ -42,8 +42,8 @@ body,
 body {
   background-color: #0f1115;
   /* Background image set dynamically by App.tsx */
-  background-size: 60%;
-  background-position: 75% bottom;
+  background-size: 50%;
+  background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
   overflow: hidden;
