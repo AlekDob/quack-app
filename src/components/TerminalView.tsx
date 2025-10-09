@@ -43,6 +43,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
   // Performance: buffer per terminali in background (non renderizzati)
   const backgroundBufferRef = useRef(new Map<string, string[]>())
 
+  // Tracking paragrafi arancioni: se siamo dentro un paragrafo che inizia con bullet point
+  const inOrangeParagraphRef = useRef(false)
+
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -57,10 +60,8 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
   // Formattazione righe output Claude Code con colori diversi
   const formatQuoteLines = useCallback((data: string): string => {
     // ANSI codes:
-    // Arancione 208 (256 colors) simile a #f28c52 per bullet points
-    const orangeBg = '\x1b[48;5;208m\x1b[38;5;16m\x1b[1m'
-    // Blu pastello RGB (143, 166, 255) = #8fa6ff per righe con ">"
-    const pastelBlueBg = '\x1b[48;2;143;166;255m\x1b[38;2;0;0;0m\x1b[1m'
+    // Arancione 208 (256 colors) simile a #f28c52 per testo (non sfondo!)
+    const orangeText = '\x1b[38;5;208m\x1b[1m' // 38 = foreground color
     const reset = '\x1b[0m'
 
     // Splitta per righe preservando i delimitatori
@@ -77,14 +78,26 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '')
       const trimmed = cleanLine.trim()
 
-      // Se la riga contiene "●" o "•" (bullet points di Claude Code) → arancione
-      if (line.includes('●') || line.includes('•') || line.includes('⏺')) {
-        return `${orangeBg}${cleanLine}${reset}`
+      // Se la riga contiene "#" → termina paragrafo arancione
+      if (trimmed.includes('#')) {
+        inOrangeParagraphRef.current = false
+        return line // Lascia la riga con # normale (senza arancione)
       }
 
-      // Se la riga inizia con ">" → blu pastello
-      if (trimmed.startsWith('>')) {
-        return `${pastelBlueBg}${cleanLine}${reset}`
+      // Se la riga contiene "●" o "•" (bullet points di Claude Code) → inizia paragrafo arancione
+      if (cleanLine.includes('●') || cleanLine.includes('•') || cleanLine.includes('⏺')) {
+        inOrangeParagraphRef.current = true
+        // Inserisci papera DOPO il bullet point CON SPAZIO + testo arancione su TUTTA la riga
+        const withDuck = cleanLine
+          .replace('●', '● 🦆 ')
+          .replace('•', '• 🦆 ')
+          .replace('⏺', '⏺ 🦆 ')
+        return `${orangeText}${withDuck}${reset}`
+      }
+
+      // Se siamo dentro un paragrafo arancione → continua con arancione (anche righe vuote!)
+      if (inOrangeParagraphRef.current) {
+        return `${orangeText}${cleanLine}${reset}`
       }
 
       return line
