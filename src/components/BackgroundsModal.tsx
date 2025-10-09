@@ -23,6 +23,7 @@ interface BackgroundGroup {
 // Import backgrounds using Vite's URL constructor for proper bundling
 const duckImage = new URL('../../images/backgrounds/duck.png', import.meta.url).href;
 const ducksPatternImage = new URL('../../images/backgrounds/ducks-pattern.png', import.meta.url).href;
+const duckPattern3Image = new URL('../../images/backgrounds/duck-pattern3.png', import.meta.url).href;
 
 // Available backgrounds grouped by type
 const BACKGROUND_GROUPS: BackgroundGroup[] = [
@@ -31,6 +32,7 @@ const BACKGROUND_GROUPS: BackgroundGroup[] = [
     items: [
       { name: 'duck.png', label: 'Duck', preview: duckImage, type: 'image' },
       { name: 'ducks-pattern.png', label: 'Ducks Pattern', preview: ducksPatternImage, type: 'image' },
+      { name: 'duck-pattern3.png', label: 'Duck Pattern 3', preview: duckPattern3Image, type: 'image' },
     ],
   },
   {
@@ -46,6 +48,36 @@ const BACKGROUND_GROUPS: BackgroundGroup[] = [
         name: 'gradient-blue-dark',
         label: 'Blue Dark',
         gradient: 'linear-gradient(135deg, #0a0f1a 0%, #15243d 25%, #20355a 50%, #15243d 75%, #0a0f1a 100%)',
+        type: 'gradient',
+      },
+      {
+        name: 'gradient-green-dark',
+        label: 'Green Dark',
+        gradient: 'linear-gradient(135deg, #0a1a0f 0%, #15392d 25%, #20564a 50%, #15392d 75%, #0a1a0f 100%)',
+        type: 'gradient',
+      },
+      {
+        name: 'gradient-purple-dark',
+        label: 'Purple Dark',
+        gradient: 'linear-gradient(135deg, #160a1a 0%, #2d1539 25%, #4a2056 50%, #2d1539 75%, #160a1a 100%)',
+        type: 'gradient',
+      },
+      {
+        name: 'gradient-red-dark',
+        label: 'Red Dark',
+        gradient: 'linear-gradient(135deg, #1a0a0a 0%, #3d1515 25%, #5a2020 50%, #3d1515 75%, #1a0a0a 100%)',
+        type: 'gradient',
+      },
+      {
+        name: 'gradient-teal-dark',
+        label: 'Teal Dark',
+        gradient: 'linear-gradient(135deg, #0a1a1a 0%, #153d3d 25%, #205a5a 50%, #153d3d 75%, #0a1a1a 100%)',
+        type: 'gradient',
+      },
+      {
+        name: 'gradient-amber-dark',
+        label: 'Amber Dark',
+        gradient: 'linear-gradient(135deg, #1a150a 0%, #3d3015 25%, #5a4a20 50%, #3d3015 75%, #1a150a 100%)',
         type: 'gradient',
       },
     ],

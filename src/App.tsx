@@ -130,6 +130,7 @@ function App() {
   const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
   const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
   const ducksPatternBackgroundImage = new URL("../images/backgrounds/ducks-pattern.png", import.meta.url).href;
+  const duckPattern3BackgroundImage = new URL("../images/backgrounds/duck-pattern3.png", import.meta.url).href;
 
   const [tauriAvailable] = useState(
     () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -865,6 +866,11 @@ function App() {
       const gradientMap: Record<string, string> = {
         'gradient-orange-dark': 'linear-gradient(135deg, #1a0f0a 0%, #3d2415 25%, #5a3a25 50%, #3d2415 75%, #1a0f0a 100%)',
         'gradient-blue-dark': 'linear-gradient(135deg, #0a0f1a 0%, #15243d 25%, #20355a 50%, #15243d 75%, #0a0f1a 100%)',
+        'gradient-green-dark': 'linear-gradient(135deg, #0a1a0f 0%, #15392d 25%, #20564a 50%, #15392d 75%, #0a1a0f 100%)',
+        'gradient-purple-dark': 'linear-gradient(135deg, #160a1a 0%, #2d1539 25%, #4a2056 50%, #2d1539 75%, #160a1a 100%)',
+        'gradient-red-dark': 'linear-gradient(135deg, #1a0a0a 0%, #3d1515 25%, #5a2020 50%, #3d1515 75%, #1a0a0a 100%)',
+        'gradient-teal-dark': 'linear-gradient(135deg, #0a1a1a 0%, #153d3d 25%, #205a5a 50%, #153d3d 75%, #0a1a1a 100%)',
+        'gradient-amber-dark': 'linear-gradient(135deg, #1a150a 0%, #3d3015 25%, #5a4a20 50%, #3d3015 75%, #1a150a 100%)',
       };
 
       const gradient = gradientMap[backgroundName];
@@ -877,12 +883,24 @@ function App() {
       const imageMap: Record<string, string> = {
         'duck.png': duckBackgroundImage,
         'ducks-pattern.png': ducksPatternBackgroundImage,
+        'duck-pattern3.png': duckPattern3BackgroundImage,
       };
 
       const imagePath = imageMap[backgroundName] || `/images/backgrounds/${backgroundName}`;
       document.body.style.backgroundImage = `url('${imagePath}')`;
+
+      // Apply repeat-y and center position only for duck-pattern3.png
+      if (backgroundName === 'duck-pattern3.png') {
+        document.body.style.backgroundRepeat = 'repeat-y';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundSize = 'auto';
+      } else {
+        document.body.style.backgroundRepeat = '';
+        document.body.style.backgroundPosition = '';
+        document.body.style.backgroundSize = '';
+      }
     }
-  }, [duckBackgroundImage, ducksPatternBackgroundImage]);
+  }, [duckBackgroundImage, ducksPatternBackgroundImage, duckPattern3BackgroundImage]);
 
   // Load saved background on mount
   useEffect(() => {
