@@ -51,10 +51,11 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
 
   // Filtro righe vuote eccessive (per Claude Code e output verboso)
   const cleanEmptyLines = useCallback((data: string): string => {
-    // Sostituisci sequenze di 3+ newline consecutive con max 2 newline
+    // Sostituisci sequenze di 2+ newline consecutive con max 1 newline
+    // Questo elimina completamente le righe vuote, mantenendo solo il newline necessario
     // Supporta sia \n che \r\n
     return data
-      .replace(/(\r?\n){3,}/g, '\n\n')  // 3+ newline → 2 newline (max 1 riga vuota)
+      .replace(/(\r?\n){2,}/g, '\n')  // 2+ newline → 1 newline (0 righe vuote visibili)
   }, [])
 
   // Formattazione righe output Claude Code con colori diversi
@@ -86,9 +87,15 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       }
 
       // Se la riga inizia con ">" (user input) → badge "You" azzurro
+      // Ma solo se c'è del testo vero dopo il >, altrimenti skippa (evita di rompere placeholder/cursore)
       if (trimmed.startsWith('>')) {
-        // Emoji 👨🏻‍💻 + spazio + badge "You" con sfondo azzurro
         const withoutArrow = trimmed.substring(1).trim() // rimuovi ">" e spazi
+        // Se non c'è testo dopo >, skippa la formattazione (è solo un prompt/placeholder)
+        if (withoutArrow.length === 0) {
+          return line
+        }
+
+        // Emoji 👨🏻‍💻 + spazio + badge "You" con sfondo azzurro
         return `👨🏻‍💻  ${blueBadge} You ${reset} ${withoutArrow}`
       }
 

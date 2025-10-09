@@ -111,6 +111,16 @@ pub fn run() {
                         .unwrap_or(false)
                 });
 
+                let edit_menu = SubmenuBuilder::new(app, "Edit")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+
                 // Create View menu with Performance Monitor toggle and AI Settings
                 let toggle_perf = CheckMenuItemBuilder::with_id(toggle_perf_id, "Show Performance Monitor")
                     .checked(initial_state)
@@ -136,6 +146,7 @@ pub fn run() {
 
                 // Build and set the menu
                 let menu = MenuBuilder::new(app)
+                    .item(&edit_menu)
                     .item(&view_menu)
                     .build()?;
 

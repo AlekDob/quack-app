@@ -1391,15 +1391,41 @@ button.directory-chooser:hover {
 .terminal-instance .xterm {
   width: 100% !important;
   max-height: 100% !important;
+  padding: 0 !important;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .terminal-instance .xterm-viewport {
   width: 100% !important;
   overflow-x: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb), 0.3) transparent;
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.3);
+  border-radius: 4px;
+}
+
+.terminal-instance .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.45);
 }
 
 .terminal-instance .xterm-screen {
   width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .terminal-placeholder {
