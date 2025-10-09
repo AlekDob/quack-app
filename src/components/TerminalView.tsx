@@ -243,18 +243,17 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       if (scrollTimeout) return
 
       scrollTimeout = setTimeout(() => {
-        // Smart scroll: Check se auto-scroll è abilitato per questo terminale
-        const autoScrollEnabled = autoScrollEnabledRef.current.get(id) ?? true
-        if (!autoScrollEnabled) {
+        // Smart scroll: scroll automaticamente finché l'utente non ha disabilitato l'autoscroll
+        const autoScrollEnabled = autoScrollEnabledRef.current.get(id)
+        if (autoScrollEnabled === false) {
           scrollTimeout = null
-          return // Skip auto-scroll se utente ha scrollato UP
+          return // Skip auto-scroll se l'utente ha scrollato UP intenzionalmente
         }
 
         const buffer = terminal.buffer.active
         const distanceFromBottom = buffer.baseY - buffer.viewportY
 
-        // Auto-scroll solo se entro 5 righe dal bottom
-        if (distanceFromBottom <= 5) {
+        if (distanceFromBottom !== 0) {
           terminal.scrollToBottom()
         }
         scrollTimeout = null

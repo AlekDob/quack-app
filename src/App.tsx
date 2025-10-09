@@ -53,6 +53,7 @@ import "./App.css";
 
 const splashImage = new URL("../images/quack-agency.jpeg", import.meta.url).href;
 const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
+const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
 const INTRO_REPLAY_DURATION_MS = 5000;
 
 const COLORS = [
@@ -123,46 +124,11 @@ const playQuackSound = () => {
     return;
   }
   try {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioCtx) {
-      return;
-    }
-    const ctx = new AudioCtx();
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    oscillator.type = "square";
-    const now = ctx.currentTime;
-    oscillator.frequency.setValueAtTime(520, now);
-    oscillator.frequency.exponentialRampToValueAtTime(250, now + 0.25);
-
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.45, now + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-
-    oscillator.start(now);
-    oscillator.stop(now + 0.5);
-    oscillator.onended = () => {
-      const close = (ctx as AudioContext & { close?: () => Promise<void> })
-        .close;
-      if (typeof close === "function") {
-        try {
-          const result = close.call(ctx);
-          const promiseLike = result as Promise<void>;
-          if (promiseLike && typeof promiseLike.then === "function") {
-            promiseLike.catch(() => undefined);
-          }
-        } catch {
-          // ignore close errors
-        }
-      }
-    };
+    const audio = new Audio(notificationAudio);
+    audio.volume = 0.6; // Volume moderato per le notifiche
+    audio.play().catch((error) => {
+      console.warn("Unable to play notification sound", error);
+    });
   } catch (error) {
     console.warn("Unable to play notification sound", error);
   }
@@ -257,8 +223,13 @@ function App() {
   const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
   );
+  // Anti-flickering: debounce visual transitions from busy→idle
+  const visualIdleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
   const terminalsRef = useRef<TerminalInfo[]>([]);
   const IDLE_TIMEOUT_MS = 2000;
+  const VISUAL_IDLE_DELAY_MS = 400; // Delay before showing idle status (prevents flickering)
   const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
   const [activeProcesses, setActiveProcesses] = useState<ProcessInfo[]>([]);
   const [savedCommandsDrawerOpen, setSavedCommandsDrawerOpen] = useState(false);
@@ -558,6 +529,13 @@ function App() {
   );
 
   const markTerminalBusy = useCallback((id: string) => {
+    // Anti-flickering: cancella timer visuale pending se esiste
+    const visualTimer = visualIdleTimersRef.current.get(id);
+    if (visualTimer) {
+      clearTimeout(visualTimer);
+      visualIdleTimersRef.current.delete(id);
+    }
+
     setTerminals((prev) => {
       // Performance: Skip se già busy per evitare re-render inutili
       const current = prev.find(t => t.id === id);
@@ -576,35 +554,50 @@ function App() {
   const markTerminalIdle = useCallback(
     (id: string, options?: { suppressNotification?: boolean }) => {
       const suppressNotification = options?.suppressNotification === true;
-      let notifyInfo: { id: string; label: string } | null = null;
 
-      setTerminals((prev) => {
-        // Performance: Skip se già idle per evitare re-render inutili
-        const current = prev.find(t => t.id === id);
-        if (current?.status === 'idle') {
-          return prev; // Ritorna stesso array → NO re-render!
+      // Anti-flickering: delay di 400ms prima di mostrare idle
+      // Cancella timer esistente se presente
+      const existingTimer = visualIdleTimersRef.current.get(id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      // Schedule il cambio di stato con delay
+      const timer = setTimeout(() => {
+        let notifyInfo: { id: string; label: string } | null = null;
+
+        setTerminals((prev) => {
+          // Performance: Skip se già idle per evitare re-render inutili
+          const current = prev.find(t => t.id === id);
+          if (current?.status === 'idle') {
+            return prev; // Ritorna stesso array → NO re-render!
+          }
+
+          return prev.map((terminal) => {
+            if (terminal.id !== id) {
+              return terminal;
+            }
+            const wasBusy = terminal.status === "busy";
+            const needsAttention = wasBusy && id !== activeId;
+            if (needsAttention) {
+              notifyInfo = { id: terminal.id, label: terminal.label };
+            }
+            return {
+              ...terminal,
+              status: "idle",
+              needsAttention,
+            };
+          });
+        });
+
+        if (notifyInfo && !suppressNotification) {
+          void notifyTerminalReady(notifyInfo);
         }
 
-        return prev.map((terminal) => {
-          if (terminal.id !== id) {
-            return terminal;
-          }
-          const wasBusy = terminal.status === "busy";
-          const needsAttention = wasBusy && id !== activeId;
-          if (needsAttention) {
-            notifyInfo = { id: terminal.id, label: terminal.label };
-          }
-          return {
-            ...terminal,
-            status: "idle",
-            needsAttention,
-          };
-        });
-      });
+        visualIdleTimersRef.current.delete(id);
+      }, VISUAL_IDLE_DELAY_MS);
 
-      if (notifyInfo && !suppressNotification) {
-        void notifyTerminalReady(notifyInfo);
-      }
+      visualIdleTimersRef.current.set(id, timer);
     },
     [activeId, notifyTerminalReady]
   );
@@ -1301,6 +1294,14 @@ function App() {
         return;
       }
       clearIdleTimer(id);
+
+      // Anti-flickering: cleanup visual idle timer
+      const visualTimer = visualIdleTimersRef.current.get(id);
+      if (visualTimer) {
+        clearTimeout(visualTimer);
+        visualIdleTimersRef.current.delete(id);
+      }
+
       try {
         await invoke("close_terminal", { id });
       } catch (error) {
@@ -1805,9 +1806,13 @@ function App() {
 
   useEffect(() => {
     const timers = idleTimersRef.current;
+    const visualTimers = visualIdleTimersRef.current;
     return () => {
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
+      // Anti-flickering: cleanup visual idle timers
+      visualTimers.forEach((timer) => clearTimeout(timer));
+      visualTimers.clear();
     };
   }, []);
 

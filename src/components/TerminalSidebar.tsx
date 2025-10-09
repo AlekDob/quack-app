@@ -1,6 +1,7 @@
 import { useState, useMemo, type MouseEvent } from "react";
 import TerminalGroup from "./TerminalGroup";
 import ContextMenu from "./ContextMenu";
+import TerminalActivityBar from "./TerminalActivityBar";
 import type { TerminalInfo } from "../types";
 
 const normalize = (value: string) => value.toLowerCase();
@@ -96,7 +97,7 @@ export default function TerminalSidebar({
       groups: groupedEntries,
       ungrouped: ungroupedList,
     };
-  }, [filteredTerminals, activeId]);
+  }, [filteredTerminals]);
 
   const handleContextMenu = (event: MouseEvent, terminal: TerminalInfo) => {
     event.preventDefault();
@@ -267,23 +268,7 @@ export default function TerminalSidebar({
                 }
               }}
             >
-              <div
-                className={`terminal-dot ${(terminal.status ?? 'idle') === 'busy' ? 'pulsing' : ''}`}
-                style={{ backgroundColor: terminal.color }}
-              />
-              <div className="terminal-details">
-                <span className="terminal-name">
-                  {terminal.label}
-                  <span className="terminal-status-badge">
-                    {(terminal.status ?? 'idle') === 'busy' ? '⚡' : '✓'}
-                  </span>
-                </span>
-                {(terminal.status ?? 'idle') === 'busy' && (
-                  <div className="terminal-progress-bar">
-                    <div className="terminal-progress-indicator" />
-                  </div>
-                )}
-              </div>
+              <TerminalActivityBar terminal={terminal} />
               <div className="terminal-reorder-controls">
                 <button
                   type="button"

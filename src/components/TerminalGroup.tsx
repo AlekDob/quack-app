@@ -1,5 +1,6 @@
 import { type MouseEvent } from 'react'
 import GroupHeader from './GroupHeader'
+import TerminalActivityBar from './TerminalActivityBar'
 import type { TerminalInfo } from '../types'
 
 interface TerminalGroupProps {
@@ -80,23 +81,7 @@ export default function TerminalGroup({
                   }
                 }}
               >
-                <div
-                  className={`terminal-dot ${(terminal.status ?? 'idle') === 'busy' ? 'pulsing' : ''}`}
-                  style={{ backgroundColor: terminal.color }}
-                />
-                <div className="terminal-details">
-                  <span className="terminal-name">
-                    {terminal.label}
-                    <span className="terminal-status-badge">
-                      {(terminal.status ?? 'idle') === 'busy' ? '⚡' : '✓'}
-                    </span>
-                  </span>
-                  {(terminal.status ?? 'idle') === 'busy' && (
-                    <div className="terminal-progress-bar">
-                      <div className="terminal-progress-indicator" />
-                    </div>
-                  )}
-                </div>
+                <TerminalActivityBar terminal={terminal} />
                 <div className="terminal-reorder-controls">
                   <button
                     type="button"
