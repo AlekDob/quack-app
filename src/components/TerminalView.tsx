@@ -62,8 +62,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
   const formatQuoteLines = useCallback((data: string): string => {
     // ANSI codes per badge "Jack" con sfondo arancione
     const orangeBadge = '\x1b[48;5;208m\x1b[38;5;16m\x1b[1m' // bg arancione, testo nero, bold
-    // ANSI codes per badge "You" con sfondo azzurro #8FA6FF (RGB: 143, 166, 255)
-    const blueBadge = '\x1b[48;2;143;166;255m\x1b[38;2;0;0;0m\x1b[1m' // bg azzurro, testo nero, bold
     const reset = '\x1b[0m'
 
     // Splitta per righe preservando i delimitatori
@@ -86,17 +84,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         return line // Lascia la riga con # normale
       }
 
-      // Se la riga inizia con ">" (user input) → badge "You" azzurro
-      // Ma solo se c'è del testo vero dopo il >, altrimenti skippa (evita di rompere placeholder/cursore)
+      // Se la riga inizia con ">" (user input) → lascia invariato (niente badge dedicato)
       if (trimmed.startsWith('>')) {
-        const withoutArrow = trimmed.substring(1).trim() // rimuovi ">" e spazi
-        // Se non c'è testo dopo >, skippa la formattazione (è solo un prompt/placeholder)
-        if (withoutArrow.length === 0) {
-          return line
-        }
-
-        // Emoji 👨🏻‍💻 + spazio + badge "You" con sfondo azzurro
-        return `👨🏻‍💻  ${blueBadge} You ${reset} ${withoutArrow}`
+        return line
       }
 
       // Se la riga contiene "●" o "•" (bullet points di Claude Code) → inizia paragrafo Jack

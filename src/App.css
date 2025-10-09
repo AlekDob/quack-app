@@ -1008,7 +1008,9 @@ button.directory-chooser:hover {
 .terminal-details {
   flex: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
   min-width: 0;
 }
 
