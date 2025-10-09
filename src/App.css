@@ -863,7 +863,7 @@ button.directory-chooser:hover {
 
 .terminal-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.55rem;
   border-radius: 8px;
@@ -967,7 +967,6 @@ button.directory-chooser:hover {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
   position: relative;
-  margin-top: 3px;
   /* Subtle inner shadow for depth */
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.1),
@@ -1378,7 +1377,8 @@ button.directory-chooser:hover {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  padding: 1.2rem;
+  box-sizing: border-box;
+  padding: 0.75rem;
   background: rgba(15, 17, 21, 0.2);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1395,6 +1395,7 @@ button.directory-chooser:hover {
 
 .terminal-instance .xterm-viewport {
   width: 100% !important;
+  overflow-x: hidden !important;
 }
 
 .terminal-instance .xterm-screen {
@@ -2799,6 +2800,7 @@ button.directory-chooser:hover {
 
 .terminal-group-items {
   margin-top: 4px;
+  margin-left: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2818,7 +2820,6 @@ button.directory-chooser:hover {
 
 .terminal-item-grouped {
   position: relative;
-  padding-left: 16px !important;
   animation: slideInItem calc(0.2s + var(--item-index, 0) * 0.04s)
     cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -2837,16 +2838,21 @@ button.directory-chooser:hover {
 .terminal-item-grouped::before {
   content: "";
   position: absolute;
-  left: 6px;
+  left: -8px;
   top: 0;
-  height: 100%;
+  bottom: 50%;
   width: 2px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 1px;
 }
 
-.terminal-item-grouped:last-child::before {
-  height: 50%;
+.terminal-item-grouped:first-child::before {
+  top: 50%;
+  bottom: 0;
+}
+
+.terminal-item-grouped:only-child::before {
+  display: none;
 }
 
 .terminal-item-ungrouped {

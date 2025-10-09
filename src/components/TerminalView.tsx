@@ -59,9 +59,10 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
 
   // Formattazione righe output Claude Code con colori diversi
   const formatQuoteLines = useCallback((data: string): string => {
-    // ANSI codes:
-    // Arancione 208 (256 colors) simile a #f28c52 per testo (non sfondo!)
-    const orangeText = '\x1b[38;5;208m\x1b[1m' // 38 = foreground color
+    // ANSI codes per badge "Jack" con sfondo arancione
+    const orangeBadge = '\x1b[48;5;208m\x1b[38;5;16m\x1b[1m' // bg arancione, testo nero, bold
+    // ANSI codes per badge "You" con sfondo azzurro #8FA6FF (RGB: 143, 166, 255)
+    const blueBadge = '\x1b[48;2;143;166;255m\x1b[38;2;0;0;0m\x1b[1m' // bg azzurro, testo nero, bold
     const reset = '\x1b[0m'
 
     // Splitta per righe preservando i delimitatori
@@ -78,28 +79,31 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '')
       const trimmed = cleanLine.trim()
 
-      // Se la riga contiene "#" → termina paragrafo arancione
+      // Se la riga contiene "#" → termina paragrafo Jack
       if (trimmed.includes('#')) {
         inOrangeParagraphRef.current = false
-        return line // Lascia la riga con # normale (senza arancione)
+        return line // Lascia la riga con # normale
       }
 
-      // Se la riga contiene "●" o "•" (bullet points di Claude Code) → inizia paragrafo arancione
+      // Se la riga inizia con ">" (user input) → badge "You" azzurro
+      if (trimmed.startsWith('>')) {
+        // Emoji 👨🏻‍💻 + spazio + badge "You" con sfondo azzurro
+        const withoutArrow = trimmed.substring(1).trim() // rimuovi ">" e spazi
+        return `👨🏻‍💻  ${blueBadge} You ${reset} ${withoutArrow}`
+      }
+
+      // Se la riga contiene "●" o "•" (bullet points di Claude Code) → inizia paragrafo Jack
       if (cleanLine.includes('●') || cleanLine.includes('•') || cleanLine.includes('⏺')) {
         inOrangeParagraphRef.current = true
-        // Inserisci papera DOPO il bullet point CON SPAZIO + testo arancione su TUTTA la riga
-        const withDuck = cleanLine
-          .replace('●', '● 🦆 ')
-          .replace('•', '• 🦆 ')
-          .replace('⏺', '⏺ 🦆 ')
-        return `${orangeText}${withDuck}${reset}`
+        // Rimuovi pallino + papera fuori + spazio + badge "Jack" con sfondo arancione
+        const withJackBadge = cleanLine
+          .replace('●', `🦆  ${orangeBadge} Jack ${reset}`)
+          .replace('•', `🦆  ${orangeBadge} Jack ${reset}`)
+          .replace('⏺', `🦆  ${orangeBadge} Jack ${reset}`)
+        return withJackBadge
       }
 
-      // Se siamo dentro un paragrafo arancione → continua con arancione (anche righe vuote!)
-      if (inOrangeParagraphRef.current) {
-        return `${orangeText}${cleanLine}${reset}`
-      }
-
+      // Righe successive nel paragrafo → continua normale (senza badge)
       return line
     })
 
