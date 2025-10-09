@@ -81,11 +81,21 @@ export default function TerminalGroup({
                 }}
               >
                 <div
-                  className="terminal-dot"
+                  className={`terminal-dot ${(terminal.status ?? 'idle') === 'busy' ? 'pulsing' : ''}`}
                   style={{ backgroundColor: terminal.color }}
                 />
                 <div className="terminal-details">
-                  <span className="terminal-name">{terminal.label}</span>
+                  <span className="terminal-name">
+                    {terminal.label}
+                    <span className="terminal-status-badge">
+                      {(terminal.status ?? 'idle') === 'busy' ? '⚡' : '✓'}
+                    </span>
+                  </span>
+                  {(terminal.status ?? 'idle') === 'busy' && (
+                    <div className="terminal-progress-bar">
+                      <div className="terminal-progress-indicator" />
+                    </div>
+                  )}
                 </div>
                 <div className="terminal-reorder-controls">
                   <button

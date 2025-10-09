@@ -111,17 +111,7 @@ pub fn run() {
                         .unwrap_or(false)
                 });
 
-                let edit_menu = SubmenuBuilder::new(app, "Edit")
-                    .undo()
-                    .redo()
-                    .separator()
-                    .cut()
-                    .copy()
-                    .paste()
-                    .select_all()
-                    .build()?;
-
-                // Create View menu with Performance Monitor toggle and AI Settings
+                // Create Quack menu with Performance Monitor toggle and AI Settings
                 let toggle_perf = CheckMenuItemBuilder::with_id(toggle_perf_id, "Show Performance Monitor")
                     .checked(initial_state)
                     .accelerator("Cmd+Shift+P")
@@ -137,17 +127,27 @@ pub fn run() {
                     .accelerator("Cmd+Shift+I")
                     .build(app)?;
 
-                let view_menu = SubmenuBuilder::new(app, "View")
+                let quack_menu = SubmenuBuilder::new(app, "Quack")
                     .item(&toggle_perf)
                     .separator()
                     .item(&ai_settings)
                     .item(&watch_intro)
                     .build()?;
 
+                let edit_menu = SubmenuBuilder::new(app, "Edit")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+
                 // Build and set the menu
                 let menu = MenuBuilder::new(app)
+                    .item(&quack_menu)
                     .item(&edit_menu)
-                    .item(&view_menu)
                     .build()?;
 
                 app.set_menu(menu)?;
