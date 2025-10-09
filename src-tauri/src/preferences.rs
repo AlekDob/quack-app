@@ -9,10 +9,16 @@ pub struct AppPreferences {
     pub openai_api_key: Option<String>,
     #[serde(default = "default_ai_model")]
     pub ai_model: String,
+    #[serde(default = "default_background")]
+    pub background_image: String,
 }
 
 fn default_ai_model() -> String {
     "gpt-4o-mini".to_string()
+}
+
+fn default_background() -> String {
+    "duck.png".to_string()
 }
 
 impl Default for AppPreferences {
@@ -21,6 +27,7 @@ impl Default for AppPreferences {
             show_performance_monitor: false,
             openai_api_key: None,
             ai_model: default_ai_model(),
+            background_image: default_background(),
         }
     }
 }
@@ -169,4 +176,79 @@ pub async fn set_ai_model(app: AppHandle, model: String) -> Result<(), String> {
 pub async fn get_ai_model(app: AppHandle) -> Result<String, String> {
     let prefs = get_preferences(app).await?;
     Ok(prefs.ai_model)
+}
+
+#[tauri::command]
+pub async fn get_background_image(app: AppHandle) -> Result<String, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.background_image)
+}
+
+#[tauri::command]
+pub async fn set_background_image(app: AppHandle, image: String) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.background_image = image;
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    // Emit event to notify frontend
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_available_backgrounds(app: AppHandle) -> Result<Vec<String>, String> {
+    use std::fs;
+    use tauri::Manager;
+
+    // Get the resource path relative to the app
+    let resource_path = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource directory: {}", e))?;
+
+    let backgrounds_path = resource_path.join("images").join("backgrounds");
+
+    if !backgrounds_path.exists() {
+        return Ok(vec![]);
+    }
+
+    let entries = fs::read_dir(&backgrounds_path)
+        .map_err(|e| format!("Failed to read backgrounds directory: {}", e))?;
+
+    let mut backgrounds = Vec::new();
+
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    let ext_str = ext.to_string_lossy().to_lowercase();
+                    if ext_str == "png" || ext_str == "jpg" || ext_str == "jpeg" {
+                        if let Some(filename) = path.file_name() {
+                            backgrounds.push(filename.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    backgrounds.sort();
+    Ok(backgrounds)
 }

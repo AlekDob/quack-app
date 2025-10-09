@@ -25,6 +25,7 @@ import AISettingsPanel from "./components/AISettingsPanel";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
 import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
+import BackgroundsModal from "./components/BackgroundsModal";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -251,6 +252,10 @@ function App() {
   const introReplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Background state
+  const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
+  const [currentBackground, setCurrentBackground] = useState("duck.png");
+
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -372,10 +377,16 @@ function App() {
       showIntroReplay();
     });
 
+    // Listen for menu event to open Backgrounds modal
+    const unlistenBackgroundsPromise = listen("open-backgrounds", () => {
+      setShowBackgroundsModal(true);
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
     // Performance: NON fare polling continuo dei processi - carica solo quando necessario
     // Il drawer ProcessesDrawer chiamerà loadActiveProcesses quando aperto
@@ -795,6 +806,51 @@ function App() {
     }
     void loadAgents();
   }, [loadAgents, tauriAvailable]);
+
+  // Load saved background on mount
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    const loadBackground = async () => {
+      try {
+        const savedBackground = await invoke<string>("get_background_image");
+        setCurrentBackground(savedBackground);
+
+        // Apply background immediately
+        const backgroundPath = `/images/backgrounds/${savedBackground}`;
+        document.body.style.backgroundImage = `url('${backgroundPath}')`;
+      } catch (error) {
+        console.warn("Unable to load saved background", error);
+      }
+    };
+
+    void loadBackground();
+  }, [tauriAvailable]);
+
+  // Apply background when it changes
+  useEffect(() => {
+    if (!currentBackground) {
+      return;
+    }
+
+    const backgroundPath = `/images/backgrounds/${currentBackground}`;
+    document.body.style.backgroundImage = `url('${backgroundPath}')`;
+  }, [currentBackground]);
+
+  const handleSelectBackground = useCallback(async (background: string) => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      await invoke("set_background_image", { image: background });
+      setCurrentBackground(background);
+    } catch (error) {
+      console.error("Unable to save background", error);
+    }
+  }, [tauriAvailable]);
 
   const handleTerminalInput = useCallback(
     (id: string, data: string) => {
@@ -2240,6 +2296,13 @@ function App() {
           onClose={() => setShowQuackAgencyDrawer(false)}
           onSelectAgent={handleSelectAgent}
           onRefresh={loadAgents}
+        />
+
+        <BackgroundsModal
+          open={showBackgroundsModal}
+          currentBackground={currentBackground}
+          onSelect={handleSelectBackground}
+          onClose={() => setShowBackgroundsModal(false)}
         />
       </div>
       {introReplayActive && (

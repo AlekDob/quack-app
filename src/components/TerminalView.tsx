@@ -30,12 +30,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
   const inputBufferRef = useRef<string>('')
   const recentCommandsRef = useRef<string[]>([])
 
-  // Smart scroll: tracking per auto-scroll state
-  const autoScrollEnabledRef = useRef(new Map<string, boolean>())
-  const userScrollPositionRef = useRef(new Map<string, number>())
-  const scrollCheckTimeoutRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
-  const [scrollBadgeVisible, setScrollBadgeVisible] = useState<string | null>(null)
-
   // Performance: buffer per batch processing dell'output
   const writeBufferRef = useRef(new Map<string, string[]>())
   const writeTimeoutRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
@@ -232,32 +226,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       void invoke('write_to_terminal', { id, data: chunk });
     })
 
-    // Smart scroll: registra listener per detectare scroll utente
-    terminal.onScroll(() => {
-      handleUserScroll(id, terminal)
-    })
-
-    // Performance: throttled auto-scroll invece di ogni write
-    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+    // Auto-scroll sempre attivo: scorre sempre in basso automaticamente
     terminal.onWriteParsed(() => {
-      if (scrollTimeout) return
-
-      scrollTimeout = setTimeout(() => {
-        // Smart scroll: scroll automaticamente finché l'utente non ha disabilitato l'autoscroll
-        const autoScrollEnabled = autoScrollEnabledRef.current.get(id)
-        if (autoScrollEnabled === false) {
-          scrollTimeout = null
-          return // Skip auto-scroll se l'utente ha scrollato UP intenzionalmente
-        }
-
-        const buffer = terminal.buffer.active
-        const distanceFromBottom = buffer.baseY - buffer.viewportY
-
-        if (distanceFromBottom !== 0) {
-          terminal.scrollToBottom()
-        }
-        scrollTimeout = null
-      }, 50) // Scroll max ogni 50ms invece che ad ogni carattere
+      terminal.scrollToBottom()
     })
 
     terminalMapRef.current.set(id, terminal)
@@ -267,48 +238,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     viewMapRef.current.set(id, { element, mounted: false })
     return terminal
   }, [onUserInput])
-
-  // Smart scroll: detectare user scroll gesture e gestire auto-scroll state (con throttling)
-  const handleUserScroll = useCallback((id: string, terminal: Terminal) => {
-    // Throttle: check solo ogni 150ms per evitare troppi re-render durante output massiccio
-    const existingTimeout = scrollCheckTimeoutRef.current.get(id)
-    if (existingTimeout) {
-      return // Skip se già c'è un check in corso
-    }
-
-    const timeout = setTimeout(() => {
-      const buffer = terminal.buffer.active
-      const distanceFromBottom = buffer.baseY - buffer.viewportY
-
-      // Se utente scrolla UP di più di 10 righe → disabilita auto-scroll
-      if (distanceFromBottom > 10) {
-        const wasEnabled = autoScrollEnabledRef.current.get(id) ?? true
-        if (wasEnabled) {
-          autoScrollEnabledRef.current.set(id, false)
-          // Mostra badge solo se questo è il terminale attivo
-          if (id === activeRef.current) {
-            setScrollBadgeVisible(id)
-          }
-        }
-      }
-
-      // Se utente torna entro 3 righe dal bottom → ri-abilita auto-scroll
-      if (distanceFromBottom <= 3) {
-        const wasDisabled = !(autoScrollEnabledRef.current.get(id) ?? true)
-        if (wasDisabled) {
-          autoScrollEnabledRef.current.set(id, true)
-          // Nascondi badge
-          setScrollBadgeVisible(null)
-        }
-      }
-
-      // Memorizza posizione corrente
-      userScrollPositionRef.current.set(id, buffer.viewportY)
-      scrollCheckTimeoutRef.current.delete(id)
-    }, 150)
-
-    scrollCheckTimeoutRef.current.set(id, timeout)
-  }, [])
 
   const attachTerminal = useCallback(
     (id: string | null) => {
@@ -450,15 +379,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         writeBufferRef.current.delete(id)
         backgroundBufferRef.current.delete(id) // Pulisci anche background buffer
 
-        // Smart scroll: cleanup scroll state refs
-        const scrollTimeout = scrollCheckTimeoutRef.current.get(id)
-        if (scrollTimeout) {
-          clearTimeout(scrollTimeout)
-          scrollCheckTimeoutRef.current.delete(id)
-        }
-        autoScrollEnabledRef.current.delete(id)
-        userScrollPositionRef.current.delete(id)
-
         terminalMapRef.current.get(id)?.dispose()
         terminalMapRef.current.delete(id)
         fitMapRef.current.delete(id)
@@ -597,24 +517,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       ref={containerRef}
       className="terminal-surface"
       style={{ overflow: 'hidden', position: 'relative' }}
-    >
-      {scrollBadgeVisible === activeId && activeId && (
-        <button
-          type="button"
-          className="scroll-to-bottom-badge"
-          onClick={() => {
-            const terminal = terminalMapRef.current.get(activeId)
-            if (terminal) {
-              terminal.scrollToBottom()
-              autoScrollEnabledRef.current.set(activeId, true)
-              setScrollBadgeVisible(null)
-            }
-          }}
-        >
-          ⬇ Scroll to bottom
-        </button>
-      )}
-    </div>
+    />
   )
 }
 

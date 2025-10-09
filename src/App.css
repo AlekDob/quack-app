@@ -359,6 +359,117 @@ button.directory-chooser:hover {
   color: var(--accent-text);
 }
 
+/* Backgrounds Modal */
+.backgrounds-modal {
+  max-width: 800px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #a8b6dd;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-text);
+}
+
+.backgrounds-loading,
+.backgrounds-error,
+.backgrounds-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #8895b8;
+}
+
+.backgrounds-error {
+  color: #ff6b6b;
+}
+
+.backgrounds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.background-item {
+  position: relative;
+  background: rgba(20, 25, 40, 0.6);
+  border: 2px solid rgba(var(--accent-rgb), 0.25);
+  border-radius: 12px;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.background-item:hover {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  background: rgba(20, 25, 40, 0.8);
+  transform: translateY(-2px);
+}
+
+.background-item.selected {
+  border-color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.15);
+}
+
+.background-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0a0d15;
+}
+
+.background-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.background-name {
+  font-size: 0.85rem;
+  color: #a8b6dd;
+  text-align: center;
+  word-break: break-word;
+}
+
+.background-selected-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: var(--accent-color);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 .removed-panel-resizer {
   grid-column: 3;
   cursor: col-resize;
