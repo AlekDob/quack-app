@@ -492,7 +492,6 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     }
 
     let resizeTimeout: ReturnType<typeof setTimeout> | null = null
-    let isResizing = false
     let lastRows = 0
     let lastCols = 0
     let observer: ResizeObserver | null = null
@@ -503,15 +502,17 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         return
       }
 
-      // Non fare resize se siamo già in resize
-      if (isResizing) {
-        return
-      }
-
       const fitAddon = fitMapRef.current.get(active)
       const terminal = terminalMapRef.current.get(active)
       const containerEl = containerRef.current
+
+      // Defensive null checks to prevent NotFoundError
       if (!fitAddon || !terminal || !containerEl) {
+        return
+      }
+
+      // Check if container is still in DOM
+      if (!document.body.contains(containerEl)) {
         return
       }
 
@@ -520,53 +521,68 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         return
       }
 
-      // Debounce
+      // Debounce resize operations
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
 
       resizeTimeout = setTimeout(() => {
-        // Previeni re-entry
-        isResizing = true
-
-        // DISCONNETTI l'observer prima del fit per evitare loop
-        if (observer) {
-          observer.disconnect()
+        // Re-check validity before executing (container might have been removed)
+        if (!containerRef.current || !document.body.contains(containerRef.current)) {
+          return
         }
 
         requestAnimationFrame(() => {
-          fitAddon.fit()
-
-          // Report resize solo se rows/cols sono cambiati
-          const currentRows = terminal.rows
-          const currentCols = terminal.cols
-          if (currentRows !== lastRows || currentCols !== lastCols) {
-            lastRows = currentRows
-            lastCols = currentCols
-            void reportResize(active, terminal)
+          // Final validity check
+          if (!fitAddon || !terminal || !containerRef.current) {
+            return
           }
 
-          // RICONNETTI l'observer dopo il fit
-          setTimeout(() => {
-            if (observer && containerEl) {
-              observer.observe(containerEl)
+          try {
+            fitAddon.fit()
+
+            // Report resize only if rows/cols changed
+            const currentRows = terminal.rows
+            const currentCols = terminal.cols
+            if (currentRows !== lastRows || currentCols !== lastCols) {
+              lastRows = currentRows
+              lastCols = currentCols
+              void reportResize(active, terminal)
             }
-            isResizing = false
-          }, 150)
+          } catch (error) {
+            // Catch any errors during fit to prevent crash
+            console.warn('Error during terminal resize:', error)
+          }
         })
       }, 200)
     }
 
-    observer = new ResizeObserver(handleResize)
+    observer = new ResizeObserver((entries) => {
+      // Check if entries are valid before processing
+      if (!entries || entries.length === 0) {
+        return
+      }
+
+      // Check if observed element is still in DOM
+      const entry = entries[0]
+      if (!entry || !entry.target || !document.body.contains(entry.target as Node)) {
+        return
+      }
+
+      handleResize()
+    })
+
     observer.observe(container)
     window.addEventListener('resize', handleResize)
 
     return () => {
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
+        resizeTimeout = null
       }
       if (observer) {
         observer.disconnect()
+        observer = null
       }
       window.removeEventListener('resize', handleResize)
     }

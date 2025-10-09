@@ -17,14 +17,37 @@ export default function FileContextMenu({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose()
+      try {
+        // Defensive checks to prevent NotFoundError
+        if (!menuRef.current) {
+          return
+        }
+
+        // Check if menu is still in DOM
+        if (!document.body.contains(menuRef.current)) {
+          return
+        }
+
+        // Check if event target is valid
+        if (!event.target || !(event.target instanceof Node)) {
+          return
+        }
+
+        if (!menuRef.current.contains(event.target)) {
+          onClose()
+        }
+      } catch (error) {
+        console.warn('Error handling click outside:', error)
       }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
+      try {
+        if (event.key === 'Escape') {
+          onClose()
+        }
+      } catch (error) {
+        console.warn('Error handling escape:', error)
       }
     }
 
