@@ -117,6 +117,12 @@ When Jack identifies a new feature or component:
   - *Agent*: Mike (Planning) → Julie (Implementation)
   - *Dependencies*: None
 
+- 🚀 **[claude-sdk-integration](./claude-sdk-integration/)**: Integrate Claude conversational AI with chat interface alongside terminal functionality
+  - *Status*: Planning Phase (Specification Mode)
+  - *Agent*: Mike (Planning) → John (Backend) + Julie (UI/UX)
+  - *Timeline*: 6-8 days (4 phases)
+  - *Dependencies*: API key management, UI/UX decision
+
 ### ✅ Completed
 - ✅ **Project Setup**: Quack Agency team initialization complete
 - ✅ **[move-git-tab-to-top-bar](./move-git-tab-to-top-bar/)**: Git tab successfully moved to top toolbar (completed by Julie)

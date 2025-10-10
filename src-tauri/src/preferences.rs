@@ -7,6 +7,8 @@ pub struct AppPreferences {
     pub show_performance_monitor: bool,
     #[serde(default)]
     pub openai_api_key: Option<String>,
+    #[serde(default)]
+    pub claude_api_key: Option<String>,
     #[serde(default = "default_ai_model")]
     pub ai_model: String,
     #[serde(default = "default_background")]
@@ -26,6 +28,7 @@ impl Default for AppPreferences {
         Self {
             show_performance_monitor: false,
             openai_api_key: None,
+            claude_api_key: None,
             ai_model: default_ai_model(),
             background_image: default_background(),
         }
@@ -209,6 +212,39 @@ pub async fn set_background_image(app: AppHandle, image: String) -> Result<(), S
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn set_claude_api_key(app: AppHandle, key: String) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.claude_api_key = Some(key);
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    // Emit event to notify frontend
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_claude_api_key(app: AppHandle) -> Result<Option<String>, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.claude_api_key)
 }
 
 #[tauri::command]

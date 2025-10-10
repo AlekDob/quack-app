@@ -1,0 +1,82 @@
+.chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: rgba(15, 17, 21, 0.4);
+}
+
+.chat-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 17, 21, 0.6);
+  backdrop-filter: blur(20px);
+}
+
+.chat-view-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-view-icon {
+  font-size: 24px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.chat-view-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-view-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(77, 212, 179, 0.6);
+  transition: all 0.3s ease;
+}
+
+.status-indicator.active {
+  background: #f28c52;
+  box-shadow: 0 0 8px rgba(242, 140, 82, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+}
+
+.status-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

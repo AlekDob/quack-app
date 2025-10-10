@@ -170,3 +170,55 @@ export interface SetupResult {
   agentsCreated: number;
   filesCreated: string[];
 }
+
+// Claude Chat types
+export type ChatRole = "user" | "assistant" | "system";
+export type ChatMessageStatus = "sending" | "streaming" | "complete" | "error";
+
+export interface ChatToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface ChatToolResult {
+  toolCallId: string;
+  output: string;
+  error?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  timestamp: number;
+  status?: ChatMessageStatus;
+  toolCalls?: ChatToolCall[];
+  toolResults?: ChatToolResult[];
+  error?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+  systemPrompt?: string;
+  workingDirectory?: string;
+}
+
+export interface ClaudeSettings {
+  apiKey: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  enableTools: boolean;
+  enableStreaming: boolean;
+}
+
+export interface StreamChunk {
+  type: "text" | "tool_use" | "tool_result";
+  content: string;
+  toolCall?: ChatToolCall;
+}

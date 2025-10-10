@@ -29,6 +29,7 @@ import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
 import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
+import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 
@@ -256,6 +257,9 @@ function App() {
   // Background state
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
+
+  // Tab state (Terminal | Chat)
+  const [activeTab, setActiveTab] = useState<'terminal' | 'chat'>('terminal');
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -2132,12 +2136,25 @@ function App() {
           <div className="main-toolbar">
             <div className="main-toolbar-top">
               <div className="main-toolbar-title">
-                <h1>
-                  {activeTerminal?.label ?? "Terminal"}
-                  {import.meta.env.DEV && (
-                    <span className="dev-badge">DEV</span>
-                  )}
-                </h1>
+                <div className="main-toolbar-tabs">
+                  <button
+                    type="button"
+                    className={`toolbar-tab ${activeTab === 'terminal' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('terminal')}
+                  >
+                    Terminal
+                  </button>
+                  <button
+                    type="button"
+                    className={`toolbar-tab ${activeTab === 'chat' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('chat')}
+                  >
+                    🦆 Chat
+                  </button>
+                </div>
+                {import.meta.env.DEV && (
+                  <span className="dev-badge">DEV</span>
+                )}
               </div>
               <div className="main-toolbar-right">
                 <div
@@ -2173,27 +2190,37 @@ function App() {
               </div>
             </div>
             <div className="main-toolbar-bottom">
-              <span className="terminal-status">
-                {activeTerminal ? activeTerminal.cwd : "No active terminal"}
-              </span>
+              {activeTab === 'terminal' && (
+                <span className="terminal-status">
+                  {activeTerminal ? activeTerminal.cwd : "No active terminal"}
+                </span>
+              )}
+              {activeTab === 'chat' && (
+                <span className="terminal-status">
+                  Claude Agent Chat
+                </span>
+              )}
             </div>
           </div>
           <div className="terminal-container">
-            {activeId ? (
-              <TerminalView
-                activeId={activeId}
-                terminals={terminals}
-                onUserInput={handleTerminalInput}
-                onOutput={handleTerminalOutput}
-                onUpdateRecentCommands={(commands) => {
-                  recentCommandsRef.current = commands;
-                }}
-              />
-            ) : (
-              <div className="terminal-surface terminal-placeholder">
-                Create a new terminal to start working.
-              </div>
+            {activeTab === 'terminal' && (
+              activeId ? (
+                <TerminalView
+                  activeId={activeId}
+                  terminals={terminals}
+                  onUserInput={handleTerminalInput}
+                  onOutput={handleTerminalOutput}
+                  onUpdateRecentCommands={(commands) => {
+                    recentCommandsRef.current = commands;
+                  }}
+                />
+              ) : (
+                <div className="terminal-surface terminal-placeholder">
+                  Create a new terminal to start working.
+                </div>
+              )
             )}
+            {activeTab === 'chat' && <ChatView />}
           </div>
           <ToolBar
             onExecuteCommand={handleExecuteAICommand}

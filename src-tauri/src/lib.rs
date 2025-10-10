@@ -7,6 +7,7 @@ use tauri::{menu::MenuBuilder, AppHandle, Emitter, Manager};
 mod agency;
 mod agency_setup;
 mod ai;
+mod claude_auth;
 mod commands;
 mod fs;
 mod git;
@@ -297,11 +298,16 @@ pub fn run() {
             preferences::toggle_performance_monitor,
             preferences::set_ai_api_key,
             preferences::get_ai_api_key,
+            preferences::set_claude_api_key,
+            preferences::get_claude_api_key,
             preferences::set_ai_model,
             preferences::get_ai_model,
             preferences::get_background_image,
             preferences::set_background_image,
-            preferences::list_available_backgrounds
+            preferences::list_available_backgrounds,
+            claude_auth::get_claude_cli_credentials,
+            claude_auth::check_claude_cli_auth,
+            claude_auth::get_credentials_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

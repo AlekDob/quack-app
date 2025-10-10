@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { TokenStats } from '../types'
+import ClaudeAuthSettings from './ClaudeAuthSettings'
 
 interface AISettingsPanelProps {
   onClose: () => void
@@ -290,6 +291,11 @@ export default function AISettingsPanel({ onClose }: AISettingsPanelProps) {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Claude Authentication Section */}
+          <div className="ai-settings-section ai-settings-divider">
+            <ClaudeAuthSettings />
           </div>
         </div>
 

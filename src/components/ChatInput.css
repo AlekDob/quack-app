@@ -1,0 +1,96 @@
+.chat-input-container {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 17, 21, 0.6);
+  backdrop-filter: blur(20px);
+}
+
+.chat-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.chat-input-field {
+  flex: 1;
+  min-height: 44px;
+  max-height: 200px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.chat-input-field::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chat-input-field:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(242, 140, 82, 0.5);
+  box-shadow: 0 0 0 3px rgba(242, 140, 82, 0.1);
+}
+
+.chat-input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-input-send {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f28c52;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.chat-input-send:hover:not(:disabled) {
+  background: #ff9d63;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.3);
+}
+
+.chat-input-send:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(242, 140, 82, 0.2);
+}
+
+.chat-input-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.chat-input-hint {
+  padding: 0 20px 12px 20px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+}
+
+.chat-input-hint kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
