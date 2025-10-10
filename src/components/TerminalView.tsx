@@ -78,11 +78,29 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     const terminal = terminalMapRef.current.get(activeRef.current)
     if (!terminal) return
 
-    const scrollState = getScrollState(activeRef.current)
-    scrollState.autoScrollEnabled = true
-    scrollStateRef.current.set(activeRef.current, scrollState)
-    terminal.scrollToBottom()
-    setShowScrollBadge(false)
+    // Defensive check: verify container still exists in DOM
+    const container = containerRef.current
+    if (!container || !document.body.contains(container)) {
+      return
+    }
+
+    // Defensive check: verify terminal element still exists
+    const viewEntry = viewMapRef.current.get(activeRef.current)
+    if (!viewEntry || !viewEntry.element || !document.body.contains(viewEntry.element)) {
+      return
+    }
+
+    try {
+      const scrollState = getScrollState(activeRef.current)
+      scrollState.autoScrollEnabled = true
+      scrollStateRef.current.set(activeRef.current, scrollState)
+      terminal.scrollToBottom()
+      setShowScrollBadge(false)
+    } catch (error) {
+      // Catch any DOM errors to prevent crash
+      console.warn('Error scrolling to bottom:', error)
+      setShowScrollBadge(false)
+    }
   }, [getScrollState])
 
   // Filtro righe vuote eccessive SOLO per output massiccio (es. Claude Code)
@@ -161,12 +179,25 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       return
     }
 
-    // Scrivi tutto in una volta sola invece di N volte
-    const chunk = buffer.join('')
-    term.write(chunk)
+    // Defensive check: verify terminal element still exists
+    const viewEntry = viewMapRef.current.get(id)
+    if (!viewEntry || !viewEntry.element || !document.body.contains(viewEntry.element)) {
+      // Clean up buffer even if element is gone
+      writeBufferRef.current.set(id, [])
+      return
+    }
 
-    // Pulisci buffer
-    writeBufferRef.current.set(id, [])
+    try {
+      // Scrivi tutto in una volta sola invece di N volte
+      const chunk = buffer.join('')
+      term.write(chunk)
+    } catch (error) {
+      // Catch any DOM errors to prevent crash
+      console.warn('Error writing to terminal:', error)
+    } finally {
+      // Pulisci buffer
+      writeBufferRef.current.set(id, [])
+    }
   }, [])
 
   const scheduleWrite = useCallback((id: string, data: string) => {
@@ -369,13 +400,23 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         backgroundBufferRef.current.delete(id)
       }
 
-      terminal.focus()
+      // Defensive focus: only if element exists in DOM
+      try {
+        if (viewEntry.element && document.body.contains(viewEntry.element)) {
+          terminal.focus()
+        }
+      } catch (error) {
+        console.warn('Error focusing terminal:', error)
+      }
 
       // Eager resize: fit IMMEDIATAMENTE per evitare wrapping sbagliato
       // Poi ri-fit dopo stabilizzazione DOM per precisione
       try {
-        fitAddon?.fit()
-        void reportResize(id, terminal)
+        // Verify container still exists before fit
+        if (containerRef.current && document.body.contains(containerRef.current)) {
+          fitAddon?.fit()
+          void reportResize(id, terminal)
+        }
       } catch (error) {
         console.warn('Error during eager terminal fit:', error)
       }
@@ -385,7 +426,12 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
+            // Verify all refs and DOM elements still exist
             if (!fitAddon || !terminal || !containerRef.current) return
+            if (!document.body.contains(containerRef.current)) return
+
+            const viewEntry = viewMapRef.current.get(id)
+            if (!viewEntry || !viewEntry.element || !document.body.contains(viewEntry.element)) return
 
             try {
               fitAddon.fit()
