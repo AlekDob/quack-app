@@ -384,10 +384,12 @@ fn update_terminal_impl(
 
 fn spawn_process(app: &AppHandle, id: &str, cwd: &Path) -> Result<TerminalProcess> {
   let pty_system = native_pty_system();
+  // Dimensioni iniziali più generose per evitare wrapping prematuro
+  // Il frontend farà resize appena il terminale viene montato
   let pair = pty_system
     .openpty(PtySize {
-      rows: 24,
-      cols: 80,
+      rows: 40,  // Più righe invece di 24
+      cols: 120, // Più colonne invece di 80
       pixel_width: 0,
       pixel_height: 0,
     })
@@ -442,9 +444,9 @@ fn start_output_thread(
 
     // Performance: batch interval ADATTIVO basato sul volume di dati
     // - Input utente (pochi bytes): flush quasi immediato (1ms)
-    // - Output massiccio (molti bytes): batch più lungo (50ms)
+    // - Output massiccio (molti bytes): batch ottimizzato (8ms) per output fluido
     let min_flush_interval = std::time::Duration::from_millis(1);
-    let max_flush_interval = std::time::Duration::from_millis(50);
+    let max_flush_interval = std::time::Duration::from_millis(8);
 
     loop {
       match reader.read(&mut buffer) {

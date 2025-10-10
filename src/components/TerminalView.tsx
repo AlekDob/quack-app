@@ -20,6 +20,11 @@ interface TerminalViewProps {
   onUpdateRecentCommands: (commands: string[]) => void
 }
 
+interface TerminalScrollState {
+  autoScrollEnabled: boolean
+  lastScrollTop: number
+}
+
 function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRecentCommands }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalMapRef = useRef(new Map<string, Terminal>())
@@ -40,28 +45,72 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
   // Tracking paragrafi arancioni: se siamo dentro un paragrafo che inizia con bullet point
   const inOrangeParagraphRef = useRef(false)
 
+  // Smart Scroll: stato per ogni terminale (autoscroll abilitato/disabilitato)
+  const scrollStateRef = useRef(new Map<string, TerminalScrollState>())
+  const [showScrollBadge, setShowScrollBadge] = useState(false)
+
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
-  // Filtro righe vuote eccessive (per Claude Code e output verboso)
-  const cleanEmptyLines = useCallback((data: string): string => {
-    // Sostituisci sequenze di 2+ newline consecutive con max 1 newline
-    // Questo elimina completamente le righe vuote, mantenendo solo il newline necessario
-    // Supporta sia \n che \r\n
-    return data
-      .replace(/(\r?\n){2,}/g, '\n')  // 2+ newline → 1 newline (0 righe vuote visibili)
+  // Helper: ottieni o inizializza scroll state per un terminale
+  const getScrollState = useCallback((id: string): TerminalScrollState => {
+    let state = scrollStateRef.current.get(id)
+    if (!state) {
+      state = { autoScrollEnabled: true, lastScrollTop: 0 }
+      scrollStateRef.current.set(id, state)
+    }
+    return state
   }, [])
 
-  // Formattazione righe output Claude Code con colori diversi
+  // Helper: check se il viewport è vicino al bottom (entro N righe)
+  const isNearBottom = useCallback((terminal: Terminal, threshold: number = 3): boolean => {
+    if (!terminal.buffer || !terminal.buffer.active) return true
+    const viewport = terminal.buffer.active.viewportY
+    const baseY = terminal.buffer.active.baseY
+    const totalLines = baseY + terminal.rows
+    const distanceFromBottom = totalLines - (viewport + terminal.rows)
+    return distanceFromBottom <= threshold
+  }, [])
+
+  // Handler: scroll al bottom e riabilita autoscroll
+  const handleScrollToBottom = useCallback(() => {
+    if (!activeRef.current) return
+    const terminal = terminalMapRef.current.get(activeRef.current)
+    if (!terminal) return
+
+    const scrollState = getScrollState(activeRef.current)
+    scrollState.autoScrollEnabled = true
+    scrollStateRef.current.set(activeRef.current, scrollState)
+    terminal.scrollToBottom()
+    setShowScrollBadge(false)
+  }, [getScrollState])
+
+  // Filtro righe vuote eccessive SOLO per output massiccio (es. Claude Code)
+  // Ma preserva formatting normale dell'utente
+  const cleanEmptyLines = useCallback((data: string): string => {
+    // NON filtrare se è input breve dell'utente (< 200 chars)
+    if (data.length < 200) {
+      return data
+    }
+
+    // Solo per output lungo: riduci sequenze di 3+ newline → 2 newline (1 riga vuota max)
+    // Questo preserva paragrafi ma evita "muri" di spazio vuoto
+    return data
+      .replace(/(\r?\n){3,}/g, '\n\n')  // 3+ newline → 2 newline (1 riga vuota visibile)
+  }, [])
+
+  // Formattazione righe output Claude Code con colori diversi e block markers
   const formatQuoteLines = useCallback((data: string): string => {
     // ANSI codes per badge "Jack" con sfondo arancione
     const orangeBadge = '\x1b[48;5;208m\x1b[38;5;16m\x1b[1m' // bg arancione, testo nero, bold
     const reset = '\x1b[0m'
+    // ANSI code per separatore block (linea orizzontale sottile grigio scuro)
+    const blockSeparator = '\x1b[2m\x1b[90m' + '─'.repeat(80) + reset
 
     // Splitta per righe preservando i delimitatori
     const lines = data.split(/(\r?\n)/)
 
-    const formatted = lines.map((line) => {
+    const formatted = lines.map((line, index) => {
       // Salta i delimitatori (newline)
       if (line === '\r\n' || line === '\n' || line === '\r') {
         return line
@@ -78,9 +127,11 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         return line // Lascia la riga con # normale
       }
 
-      // Se la riga inizia con ">" (user input) → lascia invariato (niente badge dedicato)
+      // Se la riga inizia con ">" (user input) → aggiungi block separator prima
       if (trimmed.startsWith('>')) {
-        return line
+        // Aggiungi separatore solo se non è la prima riga
+        const separator = index > 0 ? `\r\n${blockSeparator}\r\n` : ''
+        return separator + line
       }
 
       // Se la riga contiene "●" o "•" (bullet points di Claude Code) → inizia paragrafo Jack
@@ -140,9 +191,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
 
     // Performance: Batch ADATTIVO basato sulla dimensione del chunk
     // - Piccoli chunk (< 100 chars, probabile echo utente): flush immediato (1ms)
-    // - Grandi chunk (output massiccio): batch ridotto (16ms invece di 32ms) per evitare spazi vuoti con Claude Code
+    // - Grandi chunk (output massiccio): batch ottimizzato (8ms) per output fluido senza "tagli"
     const isSmallChunk = data.length < 100
-    const batchDelay = isSmallChunk ? 1 : 16
+    const batchDelay = isSmallChunk ? 1 : 8
 
     const timeout = setTimeout(() => {
       flushWriteBuffer(id)
@@ -187,6 +238,8 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       // Performance: scrollback ridotto da 10000 a 5000 per rendering più veloce
       scrollback: 5000,
       fastScrollModifier: 'shift',
+      // Unicode: supporto completo per emoji e caratteri speciali
+      allowProposedApi: true,
       // Performance: rendering ottimizzato
       windowOptions: {
         setWinSizeChars: true,
@@ -226,9 +279,39 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       void invoke('write_to_terminal', { id, data: chunk });
     })
 
-    // Auto-scroll sempre attivo: scorre sempre in basso automaticamente
+    // Smart Auto-scroll: scorre solo se autoscroll è abilitato
     terminal.onWriteParsed(() => {
-      terminal.scrollToBottom()
+      const scrollState = getScrollState(id)
+      if (scrollState.autoScrollEnabled) {
+        terminal.scrollToBottom()
+      }
+    })
+
+    // Listener per scroll manuale: disabilita/riabilita autoscroll
+    terminal.onScroll(() => {
+      const scrollState = getScrollState(id)
+      const nearBottom = isNearBottom(terminal, 3)
+      const farFromBottom = !isNearBottom(terminal, 10)
+
+      // Se utente scrolla SU (>10 righe dal bottom) → disabilita autoscroll
+      if (farFromBottom && scrollState.autoScrollEnabled) {
+        scrollState.autoScrollEnabled = false
+        scrollStateRef.current.set(id, scrollState)
+        // Mostra badge solo per terminale attivo
+        if (id === activeRef.current) {
+          setShowScrollBadge(true)
+        }
+      }
+
+      // Se utente scrolla GIÙ (vicino al bottom <3 righe) → riabilita autoscroll
+      if (nearBottom && !scrollState.autoScrollEnabled) {
+        scrollState.autoScrollEnabled = true
+        scrollStateRef.current.set(id, scrollState)
+        // Nascondi badge
+        if (id === activeRef.current) {
+          setShowScrollBadge(false)
+        }
+      }
     })
 
     terminalMapRef.current.set(id, terminal)
@@ -237,7 +320,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     element.className = 'terminal-instance'
     viewMapRef.current.set(id, { element, mounted: false })
     return terminal
-  }, [onUserInput])
+  }, [onUserInput, getScrollState, isNearBottom])
 
   const attachTerminal = useCallback(
     (id: string | null) => {
@@ -288,11 +371,29 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
 
       terminal.focus()
 
-      // Aspetta che il DOM sia completamente renderizzato prima del fit
+      // Eager resize: fit IMMEDIATAMENTE per evitare wrapping sbagliato
+      // Poi ri-fit dopo stabilizzazione DOM per precisione
+      try {
+        fitAddon?.fit()
+        void reportResize(id, terminal)
+      } catch (error) {
+        console.warn('Error during eager terminal fit:', error)
+      }
+
+      // Aspetta che il DOM sia completamente renderizzato per fit finale
+      // Usa triple requestAnimationFrame per garantire che il layout sia stabile
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          fitAddon?.fit()
-          void reportResize(id, terminal)
+          requestAnimationFrame(() => {
+            if (!fitAddon || !terminal || !containerRef.current) return
+
+            try {
+              fitAddon.fit()
+              void reportResize(id, terminal)
+            } catch (error) {
+              console.warn('Error during final terminal fit:', error)
+            }
+          })
         })
       })
     },
@@ -379,6 +480,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         writeBufferRef.current.delete(id)
         backgroundBufferRef.current.delete(id) // Pulisci anche background buffer
 
+        // Smart Scroll: pulisci scroll state
+        scrollStateRef.current.delete(id)
+
         terminalMapRef.current.get(id)?.dispose()
         terminalMapRef.current.delete(id)
         fitMapRef.current.delete(id)
@@ -396,7 +500,15 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       return
     }
     attachTerminal(activeId)
-  }, [activeId, attachTerminal, tauriAvailable])
+
+    // Smart Scroll: aggiorna visibilità badge quando cambia terminale attivo
+    if (activeId) {
+      const scrollState = getScrollState(activeId)
+      setShowScrollBadge(!scrollState.autoScrollEnabled)
+    } else {
+      setShowScrollBadge(false)
+    }
+  }, [activeId, attachTerminal, tauriAvailable, getScrollState])
 
   useEffect(() => {
     if (!tauriAvailable) {
@@ -517,7 +629,17 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       ref={containerRef}
       className="terminal-surface"
       style={{ overflow: 'hidden', position: 'relative' }}
-    />
+    >
+      {showScrollBadge && (
+        <button
+          className="terminal-scroll-badge"
+          onClick={handleScrollToBottom}
+          title="Scroll to bottom"
+        >
+          ↓ Scroll to bottom
+        </button>
+      )}
+    </div>
   )
 }
 

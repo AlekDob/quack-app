@@ -1644,6 +1644,59 @@ button.directory-chooser:hover {
   line-height: 1.4;
 }
 
+/* Terminal Scroll Badge */
+.terminal-scroll-badge {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  padding: 10px 16px;
+  background: rgba(242, 140, 82, 0.95);
+  color: #0f1115;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow:
+    0 4px 16px rgba(242, 140, 82, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+.terminal-scroll-badge:hover {
+  background: rgba(242, 140, 82, 1);
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 20px rgba(242, 140, 82, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.terminal-scroll-badge:active {
+  transform: translateY(0);
+  box-shadow:
+    0 2px 8px rgba(242, 140, 82, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 16px rgba(242, 140, 82, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 4px 20px rgba(242, 140, 82, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
 /* AI ToolBar Styles */
 .ai-toolbar {
   display: flex;
