@@ -6358,3 +6358,66 @@ button.directory-chooser:hover {
   color: #f28c52;
   font-family: 'Monaco', 'Courier New', monospace;
 }
+
+/* OAuth Login Section */
+.oauth-login-section {
+  background: linear-gradient(135deg, rgba(103, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border: 1px solid rgba(103, 126, 234, 0.3);
+}
+
+.auth-info-text {
+  margin: 0.75rem 0 1.5rem 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.oauth-button {
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.oauth-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(103, 126, 234, 0.4);
+}
+
+.oauth-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.oauth-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.oauth-icon {
+  font-size: 1.2rem;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

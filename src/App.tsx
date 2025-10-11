@@ -32,6 +32,7 @@ import BackgroundsModal from "./components/BackgroundsModal";
 import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
+import { useClaudeChat } from "./hooks/useClaudeChat";
 
 import type {
   DirectoryEntry,
@@ -260,6 +261,16 @@ function App() {
 
   // Tab state (Terminal | Chat)
   const [activeTab, setActiveTab] = useState<'terminal' | 'chat'>('terminal');
+
+  // Claude Chat state
+  const { messages: chatMessages, isLoading: chatLoading, sendMessage: sendChatMessage, initialize: initializeChat } = useClaudeChat();
+
+  // Initialize chat when switching to chat tab
+  useEffect(() => {
+    if (activeTab === 'chat' && tauriAvailable) {
+      void initializeChat();
+    }
+  }, [activeTab, tauriAvailable, initializeChat]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -625,7 +636,9 @@ function App() {
 
   const markTerminalIdle = useCallback(
     (id: string, options?: { suppressNotification?: boolean }) => {
-      const suppressNotification = options?.suppressNotification === true;
+      // Note: suppressNotification option is passed from external-terminal-status event
+      // but not currently used in this function. Kept for future implementation.
+      void options;
 
       // Anti-flickering: delay di 400ms prima di mostrare idle
       // Cancella timer esistente se presente
@@ -2220,7 +2233,13 @@ function App() {
                 </div>
               )
             )}
-            {activeTab === 'chat' && <ChatView />}
+            {activeTab === 'chat' && (
+              <ChatView
+                messages={chatMessages}
+                isLoading={chatLoading}
+                onSendMessage={sendChatMessage}
+              />
+            )}
           </div>
           <ToolBar
             onExecuteCommand={handleExecuteAICommand}

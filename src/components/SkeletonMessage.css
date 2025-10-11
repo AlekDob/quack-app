@@ -1,0 +1,93 @@
+.skeleton-message {
+  opacity: 0.8;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.8;
+    transform: translateY(0);
+  }
+}
+
+.skeleton-avatar {
+  opacity: 0.5;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  display: inline-block;
+  height: 12px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: shimmer 2s infinite linear;
+}
+
+.skeleton-role {
+  width: 60px;
+  margin-right: 12px;
+}
+
+.skeleton-timestamp {
+  width: 50px;
+}
+
+.skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.skeleton-line {
+  height: 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 2s infinite linear;
+}
+
+.skeleton-line-long {
+  width: 90%;
+}
+
+.skeleton-line-medium {
+  width: 75%;
+}
+
+.skeleton-line-short {
+  width: 60%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}

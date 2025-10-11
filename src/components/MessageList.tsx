@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
+import SkeletonMessage from './SkeletonMessage';
 import type { ChatMessage as ChatMessageType } from '../types';
 import './MessageList.css';
 
@@ -41,15 +42,7 @@ export default function MessageList({ messages, loading }: MessageListProps) {
         {messages.map((message) => (
           <ChatMessage key={message.id} message={message} />
         ))}
-        {loading && (
-          <div className="message-list-loading">
-            <div className="loading-indicator">
-              <span className="loading-dot"></span>
-              <span className="loading-dot"></span>
-              <span className="loading-dot"></span>
-            </div>
-          </div>
-        )}
+        {loading && <SkeletonMessage />}
       </div>
     </div>
   );

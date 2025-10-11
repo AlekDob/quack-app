@@ -79,4 +79,42 @@
   color: rgba(255, 255, 255, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.status-indicator.active + .status-text {
+  color: #f28c52;
+  animation: colorPulse 2s ease-in-out infinite;
+}
+
+.status-indicator.active + .status-text::after {
+  content: '...';
+  display: inline-block;
+  width: 20px;
+  text-align: left;
+  animation: typingDots 1.4s infinite;
+}
+
+@keyframes colorPulse {
+  0%, 100% {
+    color: #f28c52;
+  }
+  50% {
+    color: rgba(242, 140, 82, 0.7);
+  }
+}
+
+@keyframes typingDots {
+  0%, 20% {
+    content: '';
+  }
+  40% {
+    content: '.';
+  }
+  60% {
+    content: '..';
+  }
+  80%, 100% {
+    content: '...';
+  }
 }

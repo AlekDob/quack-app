@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 interface ClaudeCredentials {
   auth_type: 'oauth' | 'apikey';
@@ -17,14 +18,48 @@ export default function ClaudeAuthSettings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [credentialsPath, setCredentialsPath] = useState<string | null>(null);
+  const [oauthLoading, setOAuthLoading] = useState(false);
+  const [cliAvailable, setCliAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     checkAuthentication();
+
+    // Listen for OAuth success
+    const unlistenSuccess = listen<{ access_token: string }>('claude-oauth-success', async (event) => {
+      console.log('OAuth success:', event.payload);
+      setOAuthLoading(false);
+
+      // Save the token
+      try {
+        await invoke('set_claude_api_key', { key: event.payload.access_token });
+        setMessage({ type: 'success', text: 'OAuth authentication successful!' });
+        await checkAuthentication();
+      } catch (error) {
+        console.error('Failed to save OAuth token:', error);
+        setMessage({ type: 'error', text: 'Failed to save OAuth token' });
+      }
+    });
+
+    // Listen for OAuth errors
+    const unlistenError = listen<string>('claude-oauth-error', (event) => {
+      console.error('OAuth error:', event.payload);
+      setOAuthLoading(false);
+      setMessage({ type: 'error', text: `OAuth failed: ${event.payload}` });
+    });
+
+    return () => {
+      unlistenSuccess.then(fn => fn());
+      unlistenError.then(fn => fn());
+    };
   }, []);
 
   const checkAuthentication = async () => {
     setLoading(true);
     try {
+      // Check if Claude CLI is available
+      const cliAvail = await invoke<boolean>('check_claude_cli_available');
+      setCliAvailable(cliAvail);
+
       // Check for Claude CLI credentials (OAuth)
       const cliCreds = await invoke<ClaudeCredentials | null>('get_claude_cli_credentials');
 
@@ -99,6 +134,20 @@ export default function ClaudeAuthSettings() {
     }
   };
 
+  const handleOAuthLogin = async () => {
+    setOAuthLoading(true);
+    setMessage(null);
+
+    try {
+      await invoke('start_claude_oauth');
+      setMessage({ type: 'success', text: 'Opening browser for authentication...' });
+    } catch (error) {
+      console.error('Failed to start OAuth flow:', error);
+      setMessage({ type: 'error', text: 'Failed to start OAuth flow' });
+      setOAuthLoading(false);
+    }
+  };
+
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return '••••••••';
     return `${key.slice(0, 4)}${'•'.repeat(key.length - 8)}${key.slice(-4)}`;
@@ -120,6 +169,38 @@ export default function ClaudeAuthSettings() {
       <div className="auth-header">
         <h2>🦆 Claude Authentication</h2>
         <p className="auth-subtitle">Configure how to authenticate with Claude API</p>
+      </div>
+
+      {/* Claude CLI Status */}
+      <div className="auth-section cli-status-section">
+        <div className="section-header">
+          <h3>Claude Code CLI Status</h3>
+          {cliAvailable !== null && (
+            <div className={`status-badge ${cliAvailable ? 'status-success' : 'status-error'}`}>
+              <span className="status-dot" />
+              {cliAvailable ? 'Available' : 'Not Available'}
+            </div>
+          )}
+        </div>
+        {cliAvailable ? (
+          <div className="auth-info">
+            <p className="info-text">
+              ✓ Claude Code CLI is installed and authenticated. The chat will use your CLI credentials automatically.
+            </p>
+          </div>
+        ) : (
+          <div className="auth-info warning-info">
+            <p className="info-text">
+              ⚠️ Claude Code CLI is not available or not authenticated.
+              <br />
+              To enable chat features, please:
+              <ol>
+                <li>Install Claude Code CLI: <code>npm install -g claude-code</code></li>
+                <li>Login with your account: <code>claude auth login</code></li>
+              </ol>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* OAuth Status */}
@@ -155,10 +236,36 @@ export default function ClaudeAuthSettings() {
         </div>
       )}
 
+      {/* OAuth Login Section */}
+      <div className="auth-section oauth-login-section">
+        <div className="section-header">
+          <h3>🔐 OAuth Authentication (Recommended)</h3>
+        </div>
+        <p className="auth-info-text">
+          Log in with your Claude account for seamless authentication.
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary oauth-button"
+          onClick={handleOAuthLogin}
+          disabled={oauthLoading}
+        >
+          {oauthLoading ? (
+            <>
+              <span className="spinner" /> Waiting for authentication...
+            </>
+          ) : (
+            <>
+              <span className="oauth-icon">🔑</span> Login with Claude
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Manual API Key Section */}
       <div className="auth-section manual-section">
         <div className="section-header">
-          <h3>Manual API Key</h3>
+          <h3>Manual API Key (Alternative)</h3>
           {!cliCredentials && authMode === 'manual' && (
             <div className="status-badge status-active">
               <span className="status-dot" />

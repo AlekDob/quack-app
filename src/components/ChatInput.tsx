@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import './ChatInput.css';
 
 interface ChatInputProps {
