@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { ChatMessage } from '../types';
+import type { ChatAttachment, ChatMessage } from '../types';
 
 interface ClaudeCliResponse {
   result: string;
@@ -12,6 +12,15 @@ interface ClaudeCliResponse {
     cache_read_input_tokens: number;
     cache_creation_input_tokens: number;
   };
+}
+
+export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
+
+export interface ChatSendOptions {
+  attachments?: ChatAttachment[];
+  model?: string;
+  thinkingMode?: ThinkingMode;
+  thinkingDuration?: string | null;
 }
 
 export function useClaudeChat() {
@@ -44,7 +53,7 @@ export function useClaudeChat() {
   }, []);
 
   // Send message to Claude
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
 
     // Ensure we're initialized
@@ -66,12 +75,20 @@ export function useClaudeChat() {
     }
 
     // Create user message
+    const attachments = options?.attachments ?? [];
+    const attachmentLines = attachments.map((item, index) => `Attachment ${index + 1}: ${item.path}`);
+    const contentWithAttachments =
+      attachmentLines.length > 0
+        ? `${content}\n\nAttachments:\n${attachmentLines.join('\n')}`
+        : content;
+
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}-user`,
       role: 'user',
       content,
       timestamp: Date.now(),
       status: 'sending',
+      attachments,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -91,21 +108,38 @@ export function useClaudeChat() {
 
     try {
       // Build context from conversation history
-      let prompt = content;
+      let prompt = contentWithAttachments;
       if (conversationHistory.current.length > 0) {
         const history = conversationHistory.current
           .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
           .join('\n\n');
-        prompt = `${history}\n\nUser: ${content}`;
+        prompt = `${history}\n\nUser: ${contentWithAttachments}`;
       }
 
       // Call Claude CLI
-      const response = await invoke<ClaudeCliResponse>('send_message_via_cli', { prompt });
+      const sanitizedAttachments = attachments
+        .map((item) => item.path)
+        .filter((path) => !!path);
+
+      const requestPayload = {
+        prompt,
+        model: options?.model,
+        thinkingMode: options?.thinkingMode,
+        thinkingDuration:
+          options?.thinkingDuration && options.thinkingDuration !== 'auto'
+            ? options.thinkingDuration
+            : undefined,
+        attachments: sanitizedAttachments.length > 0 ? sanitizedAttachments : undefined,
+      };
+
+      const response = await invoke<ClaudeCliResponse>('send_message_via_cli', {
+        request: requestPayload,
+      });
 
       // Add to conversation history
       conversationHistory.current.push({
         role: 'user',
-        content,
+        content: contentWithAttachments,
       });
 
       conversationHistory.current.push({
@@ -128,7 +162,12 @@ export function useClaudeChat() {
     } catch (err) {
       console.error('Error calling Claude CLI:', err);
 
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Unknown error';
 
       // Update message with error
       setMessages((prev) =>

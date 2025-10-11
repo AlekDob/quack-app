@@ -1,6 +1,8 @@
 use std::{cmp::Ordering, fs, path::PathBuf};
 
 use anyhow::{anyhow, Context, Result};
+use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
+use base64::Engine;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -16,6 +18,15 @@ pub struct DirectoryListing {
     pub path: String,
     pub entries: Vec<DirectoryEntry>,
 }
+
+#[derive(Serialize)]
+pub struct FileMetadata {
+    pub size: u64,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+}
+
+const MAX_PREVIEW_SIZE: u64 = 3 * 1024 * 1024;
 
 #[tauri::command]
 pub fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
@@ -35,6 +46,16 @@ pub fn read_file_content(path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn write_file_content(path: String, content: String) -> Result<(), String> {
     write_file_impl(path, content).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn stat_file(path: String) -> Result<FileMetadata, String> {
+    stat_file_impl(path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn read_file_preview(path: String) -> Result<String, String> {
+    read_file_preview_impl(path).map_err(|err| err.to_string())
 }
 
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
@@ -111,6 +132,39 @@ fn write_file_impl(path: String, content: String) -> Result<()> {
         .with_context(|| format!("Impossibile scrivere il file {:?}", resolved))?;
 
     Ok(())
+}
+
+fn stat_file_impl(path: String) -> Result<FileMetadata> {
+    let resolved = PathBuf::from(path);
+    let metadata = fs::symlink_metadata(&resolved).with_context(|| {
+        format!("Impossibile ottenere le informazioni del file {:?}", resolved)
+    })?;
+
+    Ok(FileMetadata {
+        size: metadata.len(),
+        is_dir: metadata.is_dir(),
+        is_symlink: metadata.is_symlink(),
+    })
+}
+
+fn read_file_preview_impl(path: String) -> Result<String> {
+    let resolved = PathBuf::from(&path);
+    if resolved.is_dir() {
+        return Err(anyhow!("Impossibile generare l'anteprima di una cartella"));
+    }
+
+    let metadata = fs::metadata(&resolved).with_context(|| {
+        format!("Impossibile ottenere le informazioni del file {:?}", resolved)
+    })?;
+
+    if metadata.len() > MAX_PREVIEW_SIZE {
+        return Err(anyhow!("Il file è troppo grande per l'anteprima (limite 3MB)"));
+    }
+
+    let bytes = fs::read(&resolved)
+        .with_context(|| format!("Impossibile leggere il file {:?}", resolved))?;
+
+    Ok(BASE64_ENGINE.encode(bytes))
 }
 
 fn get_home() -> Result<String> {

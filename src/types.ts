@@ -187,6 +187,15 @@ export interface ChatToolResult {
   error?: string;
 }
 
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  path: string;
+  size: number;
+  mimeType?: string;
+  previewUrl?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -196,6 +205,7 @@ export interface ChatMessage {
   toolCalls?: ChatToolCall[];
   toolResults?: ChatToolResult[];
   error?: string;
+  attachments?: ChatAttachment[];
 }
 
 export interface ChatSession {

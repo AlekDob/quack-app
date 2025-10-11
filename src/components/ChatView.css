@@ -42,10 +42,53 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.chat-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .chat-view-status {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.chat-view-selectors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.chat-control select {
+  min-width: 140px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.chat-control select:focus {
+  border-color: rgba(242, 140, 82, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-control-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
 }
 
 .status-indicator {

@@ -1,8 +1,7 @@
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use tokio::process::{Command};
+use std::{fs, path::Path, process::Stdio};
 use tokio::io::AsyncWriteExt;
-use std::process::Stdio;
+use tokio::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeCliResponse {
@@ -21,6 +20,19 @@ pub struct Usage {
     #[serde(default)]
     pub cache_creation_input_tokens: u32,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClaudeCliRequest {
+    pub prompt: String,
+    pub model: Option<String>,
+    pub thinking_mode: Option<String>,
+    pub thinking_duration: Option<String>,
+    pub attachments: Option<Vec<String>>,
+}
+
+const DEFAULT_MODEL: &str = "sonnet";
+const MAX_ATTACHMENTS: usize = 6;
+const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
 
 /// Check if Claude CLI is available and authenticated
 #[tauri::command]
@@ -43,23 +55,106 @@ pub fn check_claude_cli_available() -> Result<bool, String> {
 
 /// Send a message to Claude via CLI
 #[tauri::command]
-pub async fn send_message_via_cli(prompt: String) -> Result<ClaudeCliResponse, String> {
+pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCliResponse, String> {
     // Check if CLI is available
     if !check_claude_cli_available().map_err(|e| e.to_string())? {
         return Err("Claude CLI is not available. Make sure Claude Code CLI is installed and you are logged in.".to_string());
     }
 
+    let ClaudeCliRequest {
+        prompt,
+        model,
+        thinking_mode,
+        thinking_duration,
+        attachments,
+    } = request;
+
+    let mut prompt_with_attachments = prompt.clone();
+
+    if let Some(list) = attachments {
+        if list.len() > MAX_ATTACHMENTS {
+            return Err(format!("Too many attachments. Maximum allowed is {}.", MAX_ATTACHMENTS));
+        }
+
+        let mut has_header = prompt_with_attachments.contains("Attachments:");
+
+        for path in list {
+            let trimmed = path.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let metadata = fs::metadata(trimmed)
+                .map_err(|e| format!("Unable to read attachment '{}': {}", trimmed, e))?;
+
+            if !metadata.is_file() {
+                return Err(format!("Attachment is not a file: {}", trimmed));
+            }
+
+            if metadata.len() > MAX_ATTACHMENT_SIZE {
+                let name = Path::new(trimmed)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(trimmed);
+                return Err(format!("Attachment '{}' exceeds 15MB limit.", name));
+            }
+
+            if prompt_with_attachments.contains(trimmed) {
+                continue;
+            }
+
+            if !has_header {
+                if !prompt_with_attachments.ends_with('\n') {
+                    prompt_with_attachments.push('\n');
+                }
+                prompt_with_attachments.push_str("\nAttachments:\n");
+                has_header = true;
+            }
+
+            prompt_with_attachments.push_str(trimmed);
+            prompt_with_attachments.push('\n');
+        }
+    }
+
     // Prepare the command
-    let mut child = Command::new("claude")
+    let mut command = Command::new("claude");
+    command
         .arg("--print")
         .arg("--dangerously-skip-permissions")
         .arg("--output-format")
-        .arg("json")
-        .arg("--model")
-        .arg("sonnet")
+        .arg("json");
+
+    let selected_model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
+    command.arg("--model").arg(&selected_model);
+
+    if let Some(mode) = thinking_mode.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+            None
+        } else {
+            Some(trimmed.to_owned())
+        }
+    }) {
+        command.arg("--think").arg(mode);
+    }
+
+    if let Some(duration) = thinking_duration.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+            None
+        } else {
+            Some(trimmed.to_owned())
+        }
+    }) {
+        command.arg("--think-duration").arg(duration);
+    }
+
+    command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to spawn claude command: {}", e))?;
 
@@ -67,7 +162,7 @@ pub async fn send_message_via_cli(prompt: String) -> Result<ClaudeCliResponse, S
     {
         let stdin = child.stdin.as_mut()
             .ok_or("Failed to open stdin".to_string())?;
-        stdin.write_all(prompt.as_bytes()).await
+        stdin.write_all(prompt_with_attachments.as_bytes()).await
             .map_err(|e| format!("Failed to write to stdin: {}", e))?;
     }
 
@@ -87,6 +182,7 @@ pub async fn send_message_via_cli(prompt: String) -> Result<ClaudeCliResponse, S
 
     Ok(response)
 }
+
 
 #[cfg(test)]
 mod tests {

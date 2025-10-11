@@ -10,6 +10,15 @@ function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
+  const attachments = message.attachments ?? [];
+
+  const formatSize = (size: number | undefined) => {
+    if (!size) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const value = size / Math.pow(1024, exponent);
+    return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[exponent]}`;
+  };
 
   return (
     <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''}`}>
@@ -36,6 +45,28 @@ function ChatMessage({ message }: ChatMessageProps) {
           {message.content}
           {isStreaming && <span className="streaming-cursor">▊</span>}
         </div>
+        {attachments.length > 0 && (
+          <div className="chat-message-attachments">
+            {attachments.map((attachment) => {
+              const isImage = attachment.previewUrl !== undefined;
+              return (
+                <div key={attachment.id} className="chat-message-attachment">
+                  <div className="chat-message-attachment-preview">
+                    {isImage ? (
+                      <img src={attachment.previewUrl} alt={attachment.name} />
+                    ) : (
+                      <span className="chat-message-attachment-icon">📎</span>
+                    )}
+                  </div>
+                  <div className="chat-message-attachment-meta">
+                    <span className="chat-message-attachment-name">{attachment.name}</span>
+                    <span className="chat-message-attachment-size">{formatSize(attachment.size)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {hasError && message.error && (
           <div className="chat-message-error">
             ⚠️ {message.error}

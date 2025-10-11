@@ -275,6 +275,8 @@ pub fn run() {
             fs::get_home_directory,
             fs::read_file_content,
             fs::write_file_content,
+            fs::stat_file,
+            fs::read_file_preview,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,
