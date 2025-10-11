@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
 use serde::Serialize;
+use uuid::Uuid;
 
 #[derive(Serialize)]
 pub struct DirectoryEntry {
@@ -27,6 +28,7 @@ pub struct FileMetadata {
 }
 
 const MAX_PREVIEW_SIZE: u64 = 3 * 1024 * 1024;
+const MAX_CLIPBOARD_FILE_SIZE: u64 = 15 * 1024 * 1024;
 
 #[tauri::command]
 pub fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
@@ -56,6 +58,15 @@ pub fn stat_file(path: String) -> Result<FileMetadata, String> {
 #[tauri::command]
 pub fn read_file_preview(path: String) -> Result<String, String> {
     read_file_preview_impl(path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn save_clipboard_file(
+    data_base64: String,
+    extension: Option<String>,
+    suggested_name: Option<String>,
+) -> Result<String, String> {
+    save_clipboard_file_impl(data_base64, extension, suggested_name).map_err(|err| err.to_string())
 }
 
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
@@ -171,4 +182,92 @@ fn get_home() -> Result<String> {
     dirs::home_dir()
         .map(|path| path.to_string_lossy().to_string())
         .ok_or_else(|| anyhow!("Impossibile determinare la home directory"))
+}
+
+fn save_clipboard_file_impl(
+    data_base64: String,
+    extension: Option<String>,
+    suggested_name: Option<String>,
+) -> Result<String> {
+    let bytes = BASE64_ENGINE
+        .decode(data_base64)
+        .map_err(|err| anyhow!("Impossibile decodificare l'immagine incollata: {err}"))?;
+
+    if bytes.len() as u64 > MAX_CLIPBOARD_FILE_SIZE {
+        return Err(anyhow!(
+            "L'immagine incollata supera il limite di 15MB consentito"
+        ));
+    }
+
+    let extension = extension
+        .map(|value| sanitize_extension(&value))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "png".to_string());
+
+    let mut temp_dir = std::env::temp_dir();
+    temp_dir.push("quack-app");
+    fs::create_dir_all(&temp_dir)
+        .with_context(|| format!("Impossibile creare la cartella temporanea {:?}", temp_dir.clone()))?;
+
+    let file_name = suggested_name
+        .and_then(|name| sanitize_filename(&name))
+        .unwrap_or_else(|| format!("clipboard-{}", Uuid::new_v4()));
+
+    let mut final_name = file_name;
+    if !final_name.to_lowercase().ends_with(&format!(".{}", extension)) {
+        final_name = format!("{}.{}", final_name.trim_end_matches('.'), extension);
+    }
+
+    let mut file_path = temp_dir;
+    file_path.push(&final_name);
+
+    if file_path.exists() {
+        let mut counter = 1;
+        let stem = file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("clipboard")
+            .to_string();
+        let ext_clone = extension.clone();
+        loop {
+            let candidate = format!("{}-{}.{}", stem, counter, ext_clone);
+            file_path.set_file_name(&candidate);
+            if !file_path.exists() {
+                break;
+            }
+            counter += 1;
+        }
+    }
+
+    fs::write(&file_path, &bytes)
+        .with_context(|| format!("Impossibile salvare il file incollato in {:?}", file_path))?;
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+fn sanitize_extension(extension: &str) -> String {
+    extension
+        .trim()
+        .trim_start_matches('.')
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_lowercase()
+}
+
+fn sanitize_filename(name: &str) -> Option<String> {
+    let sanitized: String = name
+        .trim()
+        .chars()
+        .map(|ch| match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | ' ' | '.' => ch,
+            _ => '_',
+        })
+        .collect();
+
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized.replace(' ', "_"))
+    }
 }

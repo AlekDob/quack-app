@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type KeyboardEvent,
+  type ClipboardEvent as ReactClipboardEvent,
+} from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import type { ChatAttachment } from '../types';
@@ -88,6 +95,42 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     }
   }, []);
 
+  const createAttachmentFromPath = useCallback(
+    async (path: string): Promise<ChatAttachment | null> => {
+      try {
+        const metadata = await invoke<FileStatResult>('stat_file', { path });
+
+        if (metadata.is_dir) {
+          setError('Cannot attach directories.');
+          return null;
+        }
+
+        if (metadata.size && metadata.size > MAX_FILE_SIZE) {
+          setError(`File ${path.split(/[\\/]/).pop() ?? path} is larger than 15MB.`);
+          return null;
+        }
+
+        const name = path.split(/[\\/]/).pop() ?? path;
+        const mimeType = guessMimeType(name);
+        const previewUrl = await buildPreviewUrl(path, mimeType, metadata.size ?? undefined);
+
+        return {
+          id: generateId(),
+          name,
+          path,
+          size: metadata.size ?? 0,
+          mimeType,
+          previewUrl,
+        };
+      } catch (err) {
+        console.warn('Unable to read attachment metadata', err);
+        setError('Failed to add one or more files.');
+        return null;
+      }
+    },
+    [buildPreviewUrl, generateId, guessMimeType]
+  );
+
   const handleAttach = useCallback(async () => {
     if (disabled) {
       return;
@@ -111,33 +154,9 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
 
       const entries: ChatAttachment[] = [];
       for (const path of paths) {
-        try {
-          const metadata = await invoke<FileStatResult>('stat_file', { path });
-
-          if (metadata.is_dir) {
-            setError('Cannot attach directories.');
-            continue;
-          }
-
-          if (metadata.size && metadata.size > MAX_FILE_SIZE) {
-            setError(`File ${path.split(/[\\/]/).pop() ?? path} is larger than 15MB.`);
-            continue;
-          }
-
-          const name = path.split(/[\\/]/).pop() ?? path;
-          const mimeType = guessMimeType(name);
-          const previewUrl = await buildPreviewUrl(path, mimeType, metadata.size ?? undefined);
-          entries.push({
-            id: generateId(),
-            name,
-            path,
-            size: metadata.size ?? 0,
-            mimeType,
-            previewUrl,
-          });
-        } catch (err) {
-          console.warn('Unable to read attachment metadata', err);
-          setError('Failed to add one or more files.');
+        const entry = await createAttachmentFromPath(path);
+        if (entry) {
+          entries.push(entry);
         }
       }
 
@@ -149,11 +168,126 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
       console.error('Attachment selection failed', err);
       setError('Unable to select attachments.');
     }
-  }, [attachments.length, buildPreviewUrl, disabled, generateId, guessMimeType]);
+  }, [attachments.length, createAttachmentFromPath, disabled]);
 
   const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((item) => item.id !== id));
   }, []);
+
+  const readFileAsBase64 = useCallback((file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          const commaIndex = result.indexOf(',');
+          resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+        } else {
+          reject(new Error('Unsupported clipboard data'));
+        }
+      };
+      reader.onerror = () => {
+        reject(reader.error ?? new Error('Unable to read clipboard data'));
+      };
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const mimeToExtension = useCallback((mime?: string): string | undefined => {
+    if (!mime) return undefined;
+    const lower = mime.toLowerCase();
+    switch (lower) {
+      case 'image/png':
+        return 'png';
+      case 'image/jpeg':
+        return 'jpg';
+      case 'image/jpg':
+        return 'jpg';
+      case 'image/gif':
+        return 'gif';
+      case 'image/webp':
+        return 'webp';
+      case 'image/bmp':
+        return 'bmp';
+      case 'image/svg+xml':
+        return 'svg';
+      default:
+        return undefined;
+    }
+  }, []);
+
+  const handlePaste = useCallback(
+    async (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+      if (disabled) {
+        return;
+      }
+
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) {
+        return;
+      }
+
+      const files = Array.from(clipboardData.items)
+        .filter((item) => item.kind === 'file')
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+
+      if (files.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const entries: ChatAttachment[] = [];
+
+      for (const file of files) {
+        if (attachments.length + entries.length >= MAX_ATTACHMENTS) {
+          setError(`Quack! Max ${MAX_ATTACHMENTS} attachments per message.`);
+          break;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+          setError(`Clipboard file ${file.name || '(unnamed)'} is larger than 15MB.`);
+          continue;
+        }
+
+        try {
+          const extensionFromMime = mimeToExtension(file.type);
+          const nameExtension = (() => {
+            const parts = file.name?.split('.') ?? [];
+            if (parts.length > 1) {
+              return parts.pop();
+            }
+            return undefined;
+          })();
+          const extension = extensionFromMime ?? nameExtension ?? 'png';
+          const base64 = await readFileAsBase64(file);
+
+          const tempPath = await invoke<string>('save_clipboard_file', {
+            dataBase64: base64,
+            extension,
+            suggestedName: file.name ?? null,
+          });
+
+          const entry = await createAttachmentFromPath(tempPath);
+          if (entry) {
+            entries.push(entry);
+          }
+        } catch (err) {
+          console.error('Failed to process pasted file', err);
+          const message =
+            err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+          setError(`Unable to attach pasted image: ${message}`);
+        }
+      }
+
+      if (entries.length > 0) {
+        setAttachments((prev) => [...prev, ...entries]);
+        setError(null);
+      }
+    },
+    [attachments.length, createAttachmentFromPath, disabled, mimeToExtension, readFileAsBase64]
+  );
 
   const formatSize = useCallback((size: number) => {
     if (!size) return '0 B';
@@ -195,6 +329,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
@@ -269,7 +404,10 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
       )}
       {error && <div className="chat-input-error">{error}</div>}
       <div className="chat-input-hint">
-        <span>Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line</span>
+        <span>
+          Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line, <kbd>Cmd+V</kbd> to paste
+          images
+        </span>
       </div>
     </div>
   );

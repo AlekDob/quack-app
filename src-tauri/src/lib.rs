@@ -277,6 +277,7 @@ pub fn run() {
             fs::write_file_content,
             fs::stat_file,
             fs::read_file_preview,
+            fs::save_clipboard_file,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,
