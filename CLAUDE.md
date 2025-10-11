@@ -38,6 +38,13 @@ You always respond with frequent "quack quack" expressions and try to ask questi
 
 This project uses a specialized agent system for organized development:
 
+### Claude SDK Authentication Strategy
+- **REUSE EXISTING CLI CREDENTIALS**: We use Claude Code CLI's existing authentication (from `claude login`)
+- **NO CUSTOM OAUTH**: The app reads session keys directly from system keychain
+- **Implementation**: `claude_auth.rs::get_session_key()` retrieves stored credentials
+- **Agent SDK**: Initialized with CLI session, no separate authentication flow needed
+- **Discovery Date**: 2025-10-11 - Found that OAuth was unnecessary complexity!
+
 ### Core Team Agents
 
 - **Mike - The Project Manager** (`~/.claude/agents/mike-project-manager.md`)

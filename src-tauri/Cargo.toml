@@ -36,6 +36,7 @@ dirs = "5.0"
 regex = "1"
 reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.22"
+sha2 = "0.10"
 serde_yaml = "0.9"
 chrono = "0.4"
 keyring = "3.6"

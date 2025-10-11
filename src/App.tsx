@@ -263,7 +263,19 @@ function App() {
   const [activeTab, setActiveTab] = useState<'terminal' | 'chat'>('terminal');
 
   // Claude Chat state
-  const { messages: chatMessages, isLoading: chatLoading, sendMessage: sendChatMessage, initialize: initializeChat } = useClaudeChat();
+  const {
+    messages: chatMessages,
+    isLoading: chatLoading,
+    mode: chatMode,
+    agentOptions: chatAgentOptions,
+    attachedImages: chatAttachedImages,
+    sendMessage: sendChatMessage,
+    initialize: initializeChat,
+    onModeChange: handleChatModeChange,
+    onAgentOptionsChange: handleChatAgentOptionsChange,
+    onImagesAttach: handleChatImagesAttach,
+    onImageRemove: handleChatImageRemove,
+  } = useClaudeChat();
 
   // Initialize chat when switching to chat tab
   useEffect(() => {
@@ -2237,7 +2249,14 @@ function App() {
               <ChatView
                 messages={chatMessages}
                 isLoading={chatLoading}
+                mode={chatMode}
+                agentOptions={chatAgentOptions}
+                attachedImages={chatAttachedImages}
                 onSendMessage={sendChatMessage}
+                onModeChange={handleChatModeChange}
+                onAgentOptionsChange={handleChatAgentOptionsChange}
+                onImagesAttach={handleChatImagesAttach}
+                onImageRemove={handleChatImageRemove}
               />
             )}
           </div>

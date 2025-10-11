@@ -176,3 +176,28 @@ pub fn check_claude_cli_auth() -> bool {
 pub fn get_credentials_path() -> Option<String> {
     get_credentials_file_path().map(|p| p.to_string_lossy().to_string())
 }
+
+/// Save Claude API key to credentials file (~/.claude/.credentials.json)
+#[tauri::command]
+pub fn save_claude_credentials(api_key: String) -> Result<(), String> {
+    let home = dirs::home_dir().ok_or("Unable to find home directory")?;
+    let claude_dir = home.join(".claude");
+    let creds_path = claude_dir.join(".credentials.json");
+
+    // Create .claude directory if it doesn't exist
+    if !claude_dir.exists() {
+        std::fs::create_dir_all(&claude_dir)
+            .map_err(|e| format!("Failed to create .claude directory: {}", e))?;
+    }
+
+    // Create credentials JSON
+    let creds_json = serde_json::json!({
+        "api_key": api_key,
+    });
+
+    // Write to file
+    std::fs::write(&creds_path, serde_json::to_string_pretty(&creds_json).unwrap())
+        .map_err(|e| format!("Failed to write credentials file: {}", e))?;
+
+    Ok(())
+}

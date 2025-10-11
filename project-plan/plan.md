@@ -117,11 +117,32 @@ When Jack identifies a new feature or component:
   - *Agent*: Mike (Planning) → Julie (Implementation)
   - *Dependencies*: None
 
-- 🚀 **[claude-sdk-integration](./claude-sdk-integration/)**: Integrate Claude conversational AI with chat interface alongside terminal functionality
-  - *Status*: Planning Phase (Specification Mode)
-  - *Agent*: Mike (Planning) → John (Backend) + Julie (UI/UX)
-  - *Timeline*: 6-8 days (4 phases)
-  - *Dependencies*: API key management, UI/UX decision
+- 🚀 **[sdk-integration](./sdk-integration/)**: Full Claude SDK Integration - Advanced AI features with streaming, tool use, and agent capabilities
+  - *Status*: Planning Complete ✅ - Awaiting approval to start Phase 1
+  - *Agent*: Mike (Planning Complete) → John (Backend) + Julie (UI/UX) ready to start
+  - *Timeline*: 6-8 days (6 detailed phases using Specification Mode)
+  - *Plan*: `plan.md` with 500+ lines, comprehensive architecture, testing, rollback strategies
+  - *Key Strategy*: "Best of Both Worlds" - Keep CLI integration, Add SDK features (no conflicts)
+  - **NEW DISCOVERY (2025-10-11)**: Claude SDK works with Claude Max subscriptions - no separate API billing needed!
+    - Users with Max 5x confirmed working
+    - Fix for auth conflicts: `unset ANTHROPIC_API_KEY`
+    - Major cost saving for individual developers
+  - *Dependencies*: None (SDKs already installed, chat UI foundation exists)
+  - *Next*: Jack approval → Phase 1 kickoff
+
+- 🎨 **[claude-advanced-features](./claude-advanced-features/)**: Conare-inspired Advanced Claude Features - 5 powerful enhancements
+  - *Status*: Planning Complete ✅ - Ready for implementation after SDK Phase 3
+  - *Agent*: Mike (Planning Complete) → John (Backend) + Julie (UI/UX) ready to implement
+  - *Timeline*: 5-7 days (4 phases using Specification Mode)
+  - *Features*:
+    - Model Selection UI (Sonnet/Opus/Haiku)
+    - Thinking Mode Selector (5 levels with visual indicators)
+    - Image Attachment Support (clipboard + file picker)
+    - @ File References System (fuzzy search project files)
+    - Subagents Management UI (create/configure custom agents)
+  - *Dependencies*: Requires SDK Integration Phase 3 completion (tool use foundation)
+  - *Key Innovation*: Transforms chat into professional AI development environment
+  - *Next*: Wait for SDK Phase 3 → Start Phase 1 (Model & Thinking UI)
 
 ### ✅ Completed
 - ✅ **Project Setup**: Quack Agency team initialization complete
@@ -193,6 +214,55 @@ Each significant achievement will be documented here:
   - *Documentation*: summary.md, prompts.md, testing.md created in project-plan/ai-assistant-integration/
   - *Next*: John (Backend) to implement Rust AI module + Julie (Design) for UI components
   - *Blockers*: None
+
+- **10/11/2025**: 🚀 Claude SDK Integration comprehensive planning completed
+  - *Agent*: Mike (Project Manager) on request from Jack (CEO)
+  - *Achievement*: Created detailed 6-phase implementation plan for full Claude SDK integration
+  - *Documentation*:
+    - `project-plan/sdk-integration/plan.md` (500+ lines, comprehensive)
+    - `diary/2025-10-11.md` (planning session details)
+  - *Key Decisions*:
+    - "Best of Both Worlds" strategy: Keep CLI integration (perfect for dev workflow), Add SDK features (AI capabilities)
+    - 6 phases with Specification Mode approach (objectives, testing, risks, rollback for each)
+    - Total timeline: 6-8 days
+    - No conflicts: CLI and SDK serve complementary purposes
+  - *Technical Highlights*:
+    - Phase 1: SDK Foundation & API Key Management (1-2 days)
+    - Phase 2: Streaming & Real-time Chat (1-2 days)
+    - Phase 3: Advanced Agent SDK Features (2 days)
+    - Phase 4: Terminal Integration & Context Awareness (1-2 days)
+    - Phase 5: Enhanced Chat UI & UX Polish (1-2 days)
+    - Phase 6: Testing, Documentation & Refinement (1 day)
+  - *Architecture*:
+    - New Rust module: `src-tauri/src/claude_sdk/`
+    - Enhanced existing: `useClaudeChat.ts`, `ChatView.tsx`
+    - New components: `ToolApprovalModal.tsx`, `ThinkingPanel.tsx`
+  - *Status*: ✅ Planning complete, ready for implementation
+  - *Next*: Awaiting Jack's approval to start Phase 1
+  - *Blockers*: None (SDKs installed, chat foundation exists, team ready)
+
+- **10/11/2025**: 🎨 Claude Advanced Features (Conare-inspired) planning completed
+  - *Agent*: Mike (Project Manager) on request from Jack (CEO)
+  - *Achievement*: Created comprehensive 4-phase plan for 5 advanced Claude features
+  - *Documentation*:
+    - `project-plan/claude-advanced-features/plan.md` (detailed Specification Mode plan)
+    - `project-plan/claude-advanced-features/summary.md` (executive summary)
+  - *Features Planned*:
+    - Model Selection UI (Sonnet/Opus/Haiku dropdown)
+    - Thinking Mode Selector (5 levels: Auto → Ultra Think)
+    - Image Attachment Support (clipboard paste + file picker)
+    - @ File References System (fuzzy search project files)
+    - Subagents Management UI (create/configure custom agents)
+  - *Key Technical Decisions*:
+    - Reuse CLI credentials (no custom OAuth needed!)
+    - Fuse.js for frontend fuzzy search
+    - Server-side image resize for performance
+    - JSON config for Claude Code --agents compatibility
+  - *Timeline*: 5-7 days across 4 phases
+  - *Dependencies*: Requires SDK Integration Phase 3 completion
+  - *Status*: ✅ Planning complete, ready for implementation
+  - *Next*: Wait for SDK Phase 3 → Start Phase 1
+  - *Blockers*: None (clear path forward)
 
 ## Resource Links
 

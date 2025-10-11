@@ -1,0 +1,363 @@
+.claude-auth-settings {
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.auth-header {
+  margin-bottom: 24px;
+}
+
+.auth-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.auth-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.auth-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.oauth-section {
+  border-color: rgba(77, 212, 179, 0.3);
+  background: rgba(77, 212, 179, 0.05);
+}
+
+.warning-section {
+  border-color: rgba(242, 140, 82, 0.3);
+  background: rgba(242, 140, 82, 0.05);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-success {
+  background: rgba(77, 212, 179, 0.15);
+  color: #4dd4b3;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.auth-details {
+  margin-bottom: 16px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  flex: 0 0 120px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.detail-value {
+  flex: 1;
+  font-size: 13px;
+  color: #e2e8f0;
+  font-family: 'Monaco', monospace;
+}
+
+.token-masked {
+  letter-spacing: 2px;
+}
+
+.credential-path {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.auth-info {
+  margin-top: 12px;
+}
+
+.info-text {
+  margin: 0;
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+/* Warning Banner */
+.warning-banner {
+  display: flex;
+  gap: 16px;
+}
+
+.warning-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-content h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.warning-content p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.warning-content h5 {
+  margin: 16px 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.auth-command {
+  display: block;
+  margin: 12px 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-family: 'Monaco', monospace;
+  font-size: 14px;
+  color: #4dd4b3;
+}
+
+.auth-note {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.auth-note a {
+  color: #4dd4b3;
+  text-decoration: none;
+}
+
+.auth-note a:hover {
+  text-decoration: underline;
+}
+
+/* Authentication Methods */
+.auth-method {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-method:first-child {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.refresh-auth-button,
+.show-api-input-button,
+.save-api-key-button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: rgba(77, 212, 179, 0.15);
+  border: 1px solid rgba(77, 212, 179, 0.3);
+  border-radius: 6px;
+  color: #4dd4b3;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-auth-button:hover,
+.show-api-input-button:hover,
+.save-api-key-button:hover {
+  background: rgba(77, 212, 179, 0.25);
+  border-color: rgba(77, 212, 179, 0.5);
+}
+
+.refresh-auth-button:disabled,
+.save-api-key-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* API Key Input */
+.api-key-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.api-key-input-wrapper {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.api-key-input {
+  flex: 1;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-family: 'Monaco', monospace;
+  transition: all 0.2s ease;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: rgba(77, 212, 179, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.api-key-input::placeholder {
+  color: #64748b;
+}
+
+.save-api-key-button {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+/* Messages */
+.auth-message {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.auth-message.success {
+  background: rgba(77, 212, 179, 0.15);
+  border: 1px solid rgba(77, 212, 179, 0.3);
+  color: #4dd4b3;
+}
+
+.auth-message.error {
+  background: rgba(242, 82, 82, 0.15);
+  border: 1px solid rgba(242, 82, 82, 0.3);
+  color: #f25252;
+}
+
+/* Help Section */
+.help-section {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.help-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.help-item h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.help-item p {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.help-item code {
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #4dd4b3;
+}
+
+/* Loading */
+.auth-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4dd4b3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-loading p {
+  margin-top: 16px;
+  font-size: 14px;
+  color: #94a3b8;
+}

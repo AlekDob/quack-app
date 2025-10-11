@@ -7,9 +7,9 @@ use tauri::{menu::MenuBuilder, AppHandle, Emitter, Manager};
 mod agency;
 mod agency_setup;
 mod ai;
+mod claude_agent;
 mod claude_auth;
 mod claude_cli;
-mod claude_oauth;
 mod commands;
 mod fs;
 mod git;
@@ -310,9 +310,11 @@ pub fn run() {
             claude_auth::get_claude_cli_credentials,
             claude_auth::check_claude_cli_auth,
             claude_auth::get_credentials_path,
+            claude_auth::save_claude_credentials,
             claude_cli::check_claude_cli_available,
             claude_cli::send_message_via_cli,
-            claude_oauth::start_claude_oauth
+            claude_agent::send_message_with_agent,
+            claude_agent::list_available_models
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
