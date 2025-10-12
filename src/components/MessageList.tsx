@@ -28,8 +28,7 @@ export default function MessageList({ messages, loading }: MessageListProps) {
     return (
       <div className="message-list-empty">
         <div className="empty-state">
-          <div className="empty-icon">🦆</div>
-          <h3>Quack quack! Start a conversation</h3>
+          <h3>Start a conversation</h3>
           <p>Ask Claude anything about your project, code, or commands.</p>
         </div>
       </div>

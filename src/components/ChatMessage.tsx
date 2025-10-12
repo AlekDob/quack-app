@@ -2,6 +2,9 @@ import { memo } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import './ChatMessage.css';
 
+// Import duck avatar
+import duckAvatar from '../../images/duck.png';
+
 interface ChatMessageProps {
   message: ChatMessageType;
 }
@@ -24,9 +27,16 @@ function ChatMessage({ message }: ChatMessageProps) {
     <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''}`}>
       <div className="chat-message-avatar">
         {isUser ? (
-          <div className="avatar-icon user-avatar">👤</div>
+          <div className="avatar-icon user-avatar">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <circle cx="8" cy="5" r="3"/>
+              <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+            </svg>
+          </div>
         ) : (
-          <div className="avatar-icon assistant-avatar">🦆</div>
+          <div className="avatar-icon assistant-avatar">
+            <img src={duckAvatar} alt="Jack" />
+          </div>
         )}
       </div>
       <div className="chat-message-content">
@@ -55,7 +65,9 @@ function ChatMessage({ message }: ChatMessageProps) {
                     {isImage ? (
                       <img src={attachment.previewUrl} alt={attachment.name} />
                     ) : (
-                      <span className="chat-message-attachment-icon">📎</span>
+                      <svg className="chat-message-attachment-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
+                      </svg>
                     )}
                   </div>
                   <div className="chat-message-attachment-meta">
@@ -69,14 +81,13 @@ function ChatMessage({ message }: ChatMessageProps) {
         )}
         {hasError && message.error && (
           <div className="chat-message-error">
-            ⚠️ {message.error}
+            Error: {message.error}
           </div>
         )}
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="chat-message-tools">
             {message.toolCalls.map((tool) => (
               <div key={tool.id} className="tool-call">
-                <span className="tool-icon">🛠️</span>
                 <span className="tool-name">{tool.name}</span>
               </div>
             ))}

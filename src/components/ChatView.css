@@ -9,73 +9,61 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 17, 21, 0.6);
-  backdrop-filter: blur(20px);
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 17, 21, 0.4);
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
 }
 
 .chat-view-title {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.chat-view-icon {
-  font-size: 24px;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
+  gap: 8px;
 }
 
 .chat-view-title h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 0.3px;
 }
 
 .chat-view-controls {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .chat-view-status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .chat-view-selectors {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .chat-control {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  gap: 2px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .chat-control select {
-  min-width: 140px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
+  min-width: 120px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
@@ -88,12 +76,12 @@
 .chat-control-label {
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
 }
 
 .status-indicator {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: rgba(77, 212, 179, 0.6);
   transition: all 0.3s ease;
@@ -101,7 +89,7 @@
 
 .status-indicator.active {
   background: #f28c52;
-  box-shadow: 0 0 8px rgba(242, 140, 82, 0.6);
+  box-shadow: 0 0 6px rgba(242, 140, 82, 0.5);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -112,16 +100,16 @@
   }
   50% {
     opacity: 0.7;
-    transform: scale(1.2);
+    transform: scale(1.15);
   }
 }
 
 .status-text {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   transition: color 0.3s ease;
 }
 

@@ -67,7 +67,6 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
     <div className="chat-view">
       <div className="chat-view-header">
         <div className="chat-view-title">
-          <span className="chat-view-icon">🦆</span>
           <h2>Claude Chat</h2>
         </div>
         <div className="chat-view-controls">
