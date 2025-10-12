@@ -3,6 +3,7 @@ import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
 import ContextPanel from "./ContextPanel";
 import TerminalView from "./TerminalView";
+import TerminalToolBar from "./TerminalToolBar";
 import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo } from "../types";
 
 /**
@@ -102,6 +103,11 @@ interface SidePanelProps {
   onTerminalInput: (id: string, data: string) => void;
   onTerminalOutput: (id: string, data: string) => void;
   onUpdateRecentCommands: (commands: string[]) => void;
+
+  // TerminalToolBar props
+  onExecuteCommand: (command: string, label: string) => void;
+  onToggleSavedCommands: () => void;
+  savedCommandsOpen: boolean;
 }
 
 export default function SidePanel({
@@ -133,6 +139,11 @@ export default function SidePanel({
   onTerminalInput,
   onTerminalOutput,
   onUpdateRecentCommands,
+
+  // TerminalToolBar
+  onExecuteCommand,
+  onToggleSavedCommands,
+  savedCommandsOpen,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("explorer");
 
@@ -235,13 +246,20 @@ export default function SidePanel({
         {activeTab === "terminal" && (
           <div className="side-panel-pane terminal-panel-pane">
             {activeTerminalId ? (
-              <TerminalView
-                activeId={activeTerminalId}
-                terminals={terminals}
-                onUserInput={onTerminalInput}
-                onOutput={onTerminalOutput}
-                onUpdateRecentCommands={onUpdateRecentCommands}
-              />
+              <>
+                <TerminalView
+                  activeId={activeTerminalId}
+                  terminals={terminals}
+                  onUserInput={onTerminalInput}
+                  onOutput={onTerminalOutput}
+                  onUpdateRecentCommands={onUpdateRecentCommands}
+                />
+                <TerminalToolBar
+                  onExecuteCommand={onExecuteCommand}
+                  onToggleSavedCommands={onToggleSavedCommands}
+                  savedCommandsOpen={savedCommandsOpen}
+                />
+              </>
             ) : (
               <div className="terminal-placeholder">
                 <p>No active terminal</p>

@@ -337,12 +337,36 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
         <div className="chat-input-actions">
           <button
             type="button"
-            className="chat-input-attach"
+            className="chat-input-action-btn"
             onClick={handleAttach}
             disabled={disabled}
             title="Attach files"
           >
-            📎
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="chat-input-action-btn"
+            disabled={disabled}
+            title="AI Assistant"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5L8 1Z" opacity="0.8"/>
+              <path d="M12 2l0.5 1.5L14 4l-1.5 0.5L12 6l-0.5-1.5L10 4l1.5-0.5L12 2Z" opacity="0.6"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="chat-input-action-btn"
+            disabled={disabled}
+            title="Voice input"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z"/>
+              <path d="M4 7v1a4 4 0 0 0 8 0V7h1v1a5 5 0 0 1-4.5 4.975V15h3v1h-7v-1h3v-2.025A5 5 0 0 1 3 8V7h1Z"/>
+            </svg>
           </button>
           <button
             type="button"
@@ -354,17 +378,17 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
             title="Send message (⌘+Enter)"
           >
             <svg
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
               <path
-                d="M3 10L17 3L10 17L8.5 11.5L3 10Z"
+                d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
                 fill="currentColor"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="1.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -382,7 +406,10 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
                   {isImage ? (
                     <img src={attachment.previewUrl} alt={attachment.name} />
                   ) : (
-                    <span className="chat-attachment-icon">📄</span>
+                    <svg className="chat-attachment-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z" opacity="0.5"/>
+                      <path d="M13 2v7h7"/>
+                    </svg>
                   )}
                 </div>
                 <div className="chat-attachment-meta">
@@ -395,7 +422,9 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
                   onClick={() => handleRemoveAttachment(attachment.id)}
                   aria-label="Remove attachment"
                 >
-                  ✕
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
                 </button>
               </div>
             );
@@ -403,12 +432,6 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
         </div>
       )}
       {error && <div className="chat-input-error">{error}</div>}
-      <div className="chat-input-hint">
-        <span>
-          Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line, <kbd>Cmd+V</kbd> to paste
-          images
-        </span>
-      </div>
     </div>
   );
 }

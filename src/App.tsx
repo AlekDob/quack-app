@@ -18,7 +18,6 @@ import SidePanel from "./components/SidePanel";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer from "./components/FilePreviewDrawer";
 import GitPanel from "./components/GitPanel";
-import ToolBar from "./components/ToolBar";
 import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
@@ -2404,14 +2403,6 @@ function App() {
               onSendMessage={sendMessageForAgent}
             />
           </div>
-          <ToolBar
-            onExecuteCommand={handleExecuteAICommand}
-            onToggleSavedCommands={() =>
-              setSavedCommandsDrawerOpen((value) => !value)
-            }
-            savedCommandsOpen={savedCommandsDrawerOpen}
-            onOpenAIAssistant={handleOpenAIAssistant}
-          />
         </section>
 
         <SidePanel
@@ -2443,6 +2434,12 @@ function App() {
           onUpdateRecentCommands={(commands) => {
             recentCommandsRef.current = commands;
           }}
+          // TerminalToolBar props
+          onExecuteCommand={handleExecuteAICommand}
+          onToggleSavedCommands={() =>
+            setSavedCommandsDrawerOpen((value) => !value)
+          }
+          savedCommandsOpen={savedCommandsDrawerOpen}
         />
 
         <NewTerminalModal
