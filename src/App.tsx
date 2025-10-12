@@ -2398,6 +2398,7 @@ function App() {
           </div>
           <div className="terminal-container">
             <ChatView
+              key={activeId ?? 'no-agent'}
               messages={currentAgentMessages}
               isLoading={currentAgentLoading}
               onSendMessage={sendMessageForAgent}
