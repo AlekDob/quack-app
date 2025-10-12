@@ -26,7 +26,7 @@ pub struct ClaudeCliRequest {
     pub prompt: String,
     pub model: Option<String>,
     pub thinking_mode: Option<String>,
-    pub thinking_duration: Option<String>,
+    pub permission_mode: Option<String>,
     pub attachments: Option<Vec<String>>,
 }
 
@@ -65,7 +65,7 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         prompt,
         model,
         thinking_mode,
-        thinking_duration,
+        permission_mode,
         attachments,
     } = request;
 
@@ -120,7 +120,6 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
     let mut command = Command::new("claude");
     command
         .arg("--print")
-        .arg("--dangerously-skip-permissions")
         .arg("--output-format")
         .arg("json");
 
@@ -138,15 +137,20 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         command.arg("--think").arg(mode);
     }
 
-    if let Some(duration) = thinking_duration.and_then(|value| {
+    if let Some(mode) = permission_mode.and_then(|value| {
         let trimmed = value.trim();
-        if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+        if trimmed.is_empty() {
             None
         } else {
-            Some(trimmed.to_owned())
+            Some(trimmed.to_lowercase())
         }
     }) {
-        command.arg("--think-duration").arg(duration);
+        if mode.eq_ignore_ascii_case("bypass") {
+            command.arg("--permission-mode").arg(&mode);
+            command.arg("--dangerously-skip-permissions");
+        } else {
+            command.arg("--permission-mode").arg(&mode);
+        }
     }
 
     command

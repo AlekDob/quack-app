@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import type { ChatMessage } from '../types';
-import type { ChatSendOptions, ThinkingMode } from '../hooks/useClaudeChat';
+import type {
+  ChatSendOptions,
+  ThinkingMode,
+  PermissionMode,
+} from '../hooks/useClaudeChat';
 import './ChatView.css';
 
 interface ChatViewProps {
@@ -14,7 +18,7 @@ interface ChatViewProps {
 export default function ChatView({ messages, isLoading, onSendMessage }: ChatViewProps) {
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
-  const [thinkingDuration, setThinkingDuration] = useState('auto');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('act');
 
   const modelOptions = useMemo(
     () => [
@@ -27,21 +31,24 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
 
   const thinkingModeOptions = useMemo(
     () => [
-      { value: 'auto' as ThinkingMode, label: 'Auto' },
-      { value: 'think' as ThinkingMode, label: 'Think' },
-      { value: 'hard' as ThinkingMode, label: 'Think Hard' },
-      { value: 'harder' as ThinkingMode, label: 'Think Harder' },
-      { value: 'ultra' as ThinkingMode, label: 'Ultra Think' },
+      { value: 'auto' as ThinkingMode, label: '▮ Auto · Let model decide' },
+      { value: 'think' as ThinkingMode, label: '▮▮ Think · Step-by-step' },
+      { value: 'hard' as ThinkingMode, label: '▮▮▮ Think Hard · Deeper reasoning' },
+      { value: 'harder' as ThinkingMode, label: '▮▮▮▮ Think Harder · Thorough reasoning' },
+      { value: 'ultra' as ThinkingMode, label: '▮▮▮▮▮ Ultra Think · Maximum deliberation' },
     ],
     []
   );
 
-  const thinkingDurationOptions = useMemo(
+  const permissionModeOptions = useMemo(
     () => [
-      { value: 'auto', label: 'Auto' },
-      { value: '15s', label: '15s' },
-      { value: '30s', label: '30s' },
-      { value: '60s', label: '60s' },
+      { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
+      { value: 'act' as PermissionMode, label: '◆ Act · Direct execution' },
+      { value: 'bypass' as PermissionMode, label: '⬢ Bypass · Full access' },
+      { value: 'read' as PermissionMode, label: '▤ Read · View-only capabilities' },
+      { value: 'review' as PermissionMode, label: '▦ Review · Feedback focus' },
+      { value: 'write' as PermissionMode, label: '▧ Write · Create new only' },
+      { value: 'safe' as PermissionMode, label: '▩ Safe · Manual confirmation' },
     ],
     []
   );
@@ -52,7 +59,7 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
       ...options,
       model,
       thinkingMode,
-      thinkingDuration,
+      permissionMode,
     });
   };
 
@@ -96,12 +103,12 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
               </select>
             </label>
             <label className="chat-control">
-              <span className="chat-control-label">Duration</span>
+              <span className="chat-control-label">Mode</span>
               <select
-                value={thinkingDuration}
-                onChange={(event) => setThinkingDuration(event.target.value)}
+                value={permissionMode}
+                onChange={(event) => setPermissionMode(event.target.value as PermissionMode)}
               >
-                {thinkingDurationOptions.map((option) => (
+                {permissionModeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

@@ -15,12 +15,13 @@ interface ClaudeCliResponse {
 }
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
+export type PermissionMode = 'plan' | 'act' | 'bypass' | 'read' | 'review' | 'write' | 'safe';
 
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
   model?: string;
   thinkingMode?: ThinkingMode;
-  thinkingDuration?: string | null;
+  permissionMode?: PermissionMode;
 }
 
 export function useClaudeChat() {
@@ -125,10 +126,7 @@ export function useClaudeChat() {
         prompt,
         model: options?.model,
         thinkingMode: options?.thinkingMode,
-        thinkingDuration:
-          options?.thinkingDuration && options.thinkingDuration !== 'auto'
-            ? options.thinkingDuration
-            : undefined,
+        permissionMode: options?.permissionMode,
         attachments: sanitizedAttachments.length > 0 ? sanitizedAttachments : undefined,
       };
 
