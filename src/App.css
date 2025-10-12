@@ -1843,6 +1843,7 @@ button.directory-chooser:hover {
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(12, 16, 24, 0.8);
+  overflow: visible; /* Allow tooltips to escape */
 }
 
 .side-panel-tab {
@@ -1874,6 +1875,50 @@ button.directory-chooser:hover {
 .side-panel-tab:hover:not(.active) {
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* Instant tooltip for tabs - appearing BELOW the tabs */
+.side-panel-tab[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 8px); /* Changed from bottom to top */
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px); /* Changed direction */
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.95);
+  color: rgba(255, 255, 255, 1);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  z-index: 10000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.side-panel-tab[data-tooltip]::after {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px); /* Changed from bottom to top */
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: rgba(0, 0, 0, 0.95); /* Changed from border-top to border-bottom */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 10000;
+}
+
+.side-panel-tab[data-tooltip]:hover::before {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0);
+}
+
+.side-panel-tab[data-tooltip]:hover::after {
+  opacity: 1 !important;
 }
 
 .side-panel-tab.active {
@@ -1925,10 +1970,9 @@ button.directory-chooser:hover {
   min-height: 0;
 }
 
-/* Terminal in sidebar - full space, with bottom padding for toolbar */
+/* Terminal in sidebar - full space */
 .side-panel-pane.terminal-panel-pane {
   padding: 0;
-  padding-bottom: 44px; /* Space for fixed toolbar */
 }
 
 .terminal-panel-pane .terminal-placeholder {

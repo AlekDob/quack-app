@@ -186,7 +186,7 @@ export default function SidePanel({
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`side-panel-tab ${isActive ? "active" : ""}`}
-              title={tab.label}
+              data-tooltip={tab.label}
               aria-label={tab.label}
             >
               <span className="tab-icon">{tab.icon}</span>

@@ -2,6 +2,7 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(15, 17, 21, 0.4);
   backdrop-filter: blur(10px);
+  overflow: visible; /* Allow tooltips to escape */
 }
 
 .chat-input-wrapper {
@@ -9,6 +10,7 @@
   align-items: flex-end;
   gap: 6px;
   padding: 8px 12px;
+  overflow: visible; /* Allow tooltips to escape */
 }
 
 .chat-input-field {
@@ -47,6 +49,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  overflow: visible; /* Allow tooltips to escape */
 }
 
 .chat-input-action-btn,
@@ -66,6 +69,7 @@
 }
 
 .chat-input-action-btn {
+  position: relative;
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.6);
 }
@@ -78,6 +82,54 @@
 .chat-input-action-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Instant tooltip for chat buttons - appearing ABOVE the buttons */
+.chat-input-action-btn[data-tooltip]::before,
+.chat-input-send[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px); /* Changed from top to bottom */
+  left: 50%;
+  transform: translateX(-50%) translateY(4px); /* Changed direction */
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.95);
+  color: rgba(255, 255, 255, 1);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  z-index: 10000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.chat-input-action-btn[data-tooltip]::after,
+.chat-input-send[data-tooltip]::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px); /* Changed from top to bottom */
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.95); /* Changed from border-bottom to border-top */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 10000;
+}
+
+.chat-input-action-btn[data-tooltip]:hover::before,
+.chat-input-send[data-tooltip]:hover:not(:disabled)::before {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0);
+}
+
+.chat-input-action-btn[data-tooltip]:hover::after,
+.chat-input-send[data-tooltip]:hover:not(:disabled)::after {
+  opacity: 1 !important;
 }
 
 .chat-input-send {

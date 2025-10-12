@@ -340,7 +340,8 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
             className="chat-input-action-btn"
             onClick={handleAttach}
             disabled={disabled}
-            title="Attach files"
+            data-tooltip="Attach files"
+            aria-label="Attach files"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
@@ -350,7 +351,8 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
             type="button"
             className="chat-input-action-btn"
             disabled={disabled}
-            title="AI Assistant"
+            data-tooltip="AI Assistant"
+            aria-label="AI Assistant"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5L8 1Z" opacity="0.8"/>
@@ -361,7 +363,8 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
             type="button"
             className="chat-input-action-btn"
             disabled={disabled}
-            title="Voice input"
+            data-tooltip="Voice input"
+            aria-label="Voice input"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z"/>
@@ -375,7 +378,8 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
               void handleSend();
             }}
             disabled={disabled || (!input.trim() && attachments.length === 0)}
-            title="Send message (⌘+Enter)"
+            data-tooltip="Send (⌘+Enter)"
+            aria-label="Send message"
           >
             <svg
               width="16"
