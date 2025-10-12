@@ -1590,11 +1590,11 @@ button.directory-chooser:hover {
 }
 
 .terminal-container {
-  padding: 1rem 1.25rem 1.4rem;
+  padding: 0;
   display: flex;
   min-width: 0;
   min-height: 0;
-  height: calc(100vh - 160px);
+  flex: 1;
   overflow: hidden;
 }
 
@@ -1860,9 +1860,9 @@ button.directory-chooser:hover {
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition:
-    color 0.2s ease,
-    background 0.2s ease,
-    border-color 0.2s ease;
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .side-panel-tab .tab-icon {
@@ -1873,7 +1873,7 @@ button.directory-chooser:hover {
 
 .side-panel-tab:hover:not(.active) {
   color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .side-panel-tab.active {
@@ -1925,9 +1925,10 @@ button.directory-chooser:hover {
   min-height: 0;
 }
 
-/* Terminal in sidebar - full space, no padding */
+/* Terminal in sidebar - full space, with bottom padding for toolbar */
 .side-panel-pane.terminal-panel-pane {
   padding: 0;
+  padding-bottom: 44px; /* Space for fixed toolbar */
 }
 
 .terminal-panel-pane .terminal-placeholder {

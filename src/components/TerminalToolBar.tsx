@@ -76,7 +76,8 @@ export default function TerminalToolBar({
               onExecuteCommand(tool.command, tool.label);
             }
           }}
-          title={tool.label}
+          data-tooltip={tool.label}
+          aria-label={tool.label}
         >
           {tool.icon}
         </button>

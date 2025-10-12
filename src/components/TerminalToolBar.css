@@ -1,14 +1,21 @@
 .terminal-toolbar {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 340px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: rgba(15, 17, 21, 0.6);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(10px);
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border-top: none;
+  z-index: 100;
+  box-sizing: border-box;
 }
 
 .terminal-tool-button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -19,7 +26,8 @@
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .terminal-tool-button:hover {
@@ -35,4 +43,48 @@
 .terminal-tool-button svg {
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
+}
+
+/* Custom instant tooltip */
+.terminal-tool-button::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.9);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  z-index: 1000;
+}
+
+.terminal-tool-button::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 1000;
+}
+
+.terminal-tool-button:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.terminal-tool-button:hover::after {
+  opacity: 1;
 }
