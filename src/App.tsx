@@ -46,6 +46,7 @@ import type {
   AgentInfo,
   AgentDetails,
   ChatMessage,
+  ChatToolCall,
 } from "./types";
 
 interface TerminalMetadata {
@@ -280,6 +281,101 @@ function App() {
     }
   }, [tauriAvailable]);
 
+  // Listen to Claude tool events
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    const setupToolListeners = async () => {
+      // Listen for tool start events
+      const unlistenToolStart = await listen<{
+        tool_id: string;
+        tool_name: string;
+        message_id: string;
+      }>('claude-tool-start', (event) => {
+        const { tool_id, tool_name, message_id } = event.payload;
+
+        setChatSessions((prev) => {
+          const newSessions = new Map(prev);
+
+          // Find the agent with this message
+          for (const [agentId, messages] of newSessions.entries()) {
+            const messageIndex = messages.findIndex(m => m.id === message_id);
+            if (messageIndex !== -1) {
+              const updatedMessages = [...messages];
+              const message = { ...updatedMessages[messageIndex] };
+
+              // Add new tool call with running status
+              const newToolCall: ChatToolCall = {
+                id: tool_id,
+                name: tool_name,
+                input: {},
+                status: 'running',
+                timestamp: Date.now(),
+              };
+
+              message.toolCalls = [...(message.toolCalls ?? []), newToolCall];
+              updatedMessages[messageIndex] = message;
+              newSessions.set(agentId, updatedMessages);
+              break;
+            }
+          }
+
+          return newSessions;
+        });
+      });
+
+      // Listen for tool result events
+      const unlistenToolResult = await listen<{
+        tool_id: string;
+        tool_name: string;
+        message_id: string;
+        result: string;
+        status: string;
+      }>('claude-tool-result', (event) => {
+        const { tool_id, message_id, result, status } = event.payload;
+
+        setChatSessions((prev) => {
+          const newSessions = new Map(prev);
+
+          for (const [agentId, messages] of newSessions.entries()) {
+            const messageIndex = messages.findIndex(m => m.id === message_id);
+            if (messageIndex !== -1) {
+              const updatedMessages = [...messages];
+              const message = { ...updatedMessages[messageIndex] };
+
+              // Update tool call with result
+              if (message.toolCalls) {
+                message.toolCalls = message.toolCalls.map(tool =>
+                  tool.id === tool_id
+                    ? { ...tool, status: status as 'completed' | 'error', result }
+                    : tool
+                );
+              }
+
+              updatedMessages[messageIndex] = message;
+              newSessions.set(agentId, updatedMessages);
+              break;
+            }
+          }
+
+          return newSessions;
+        });
+      });
+
+      return () => {
+        unlistenToolStart.then(fn => fn()).catch(() => undefined);
+        unlistenToolResult.then(fn => fn()).catch(() => undefined);
+      };
+    };
+
+    const cleanup = setupToolListeners();
+    return () => {
+      cleanup.then(fn => fn?.()).catch(() => undefined);
+    };
+  }, [tauriAvailable]);
+
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !activeId) return;
@@ -365,7 +461,7 @@ function App() {
         prompt = `${history}\n\nUser: ${contentWithAttachments}`;
       }
 
-      // Call Claude CLI
+      // Call Claude CLI (using streaming version for tool tracking)
       const sanitizedAttachments = attachments
         .map((item) => item.path)
         .filter((path) => !!path);
@@ -390,7 +486,9 @@ function App() {
         };
       }
 
-      const response = await invoke<ClaudeCliResponse>('send_message_via_cli', {
+      // Use streaming command to get real-time tool tracking
+      const response = await invoke<ClaudeCliResponse>('send_message_via_cli_streaming', {
+        messageId: assistantMessageId,
         request: requestPayload,
       });
 

@@ -1,0 +1,133 @@
+.diff-viewer {
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(100, 150, 255, 0.2);
+}
+
+.diff-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(100, 150, 255, 0.15);
+}
+
+.diff-viewer-icon {
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.diff-viewer-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.diff-viewer-content {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.diff-line {
+  display: flex;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  line-height: 1.6;
+  position: relative;
+}
+
+.diff-line::before {
+  content: attr(data-line-number);
+  position: absolute;
+  left: 0;
+  width: 40px;
+  padding: 0 8px;
+  text-align: right;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  user-select: none;
+  pointer-events: none;
+}
+
+.diff-line-marker {
+  width: 16px;
+  margin-left: 40px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 700;
+  user-select: none;
+}
+
+.diff-line-content {
+  flex: 1;
+  padding: 2px 12px 2px 4px;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Added lines - green background */
+.diff-line-added {
+  background: rgba(40, 167, 69, 0.15);
+  border-left: 3px solid rgba(40, 167, 69, 0.6);
+}
+
+.diff-line-added .diff-line-marker {
+  color: rgba(72, 240, 120, 0.95);
+}
+
+.diff-line-added .diff-line-content {
+  color: rgba(200, 255, 200, 0.95);
+}
+
+/* Removed lines - red background */
+.diff-line-removed {
+  background: rgba(220, 53, 69, 0.15);
+  border-left: 3px solid rgba(220, 53, 69, 0.6);
+}
+
+.diff-line-removed .diff-line-marker {
+  color: rgba(255, 100, 100, 0.95);
+}
+
+.diff-line-removed .diff-line-content {
+  color: rgba(255, 180, 180, 0.95);
+}
+
+/* Unchanged lines - neutral */
+.diff-line-unchanged {
+  background: transparent;
+  border-left: 3px solid transparent;
+}
+
+.diff-line-unchanged .diff-line-marker {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.diff-line-unchanged .diff-line-content {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Scrollbar styling */
+.diff-viewer-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.diff-viewer-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.diff-viewer-content::-webkit-scrollbar-thumb {
+  background: rgba(100, 150, 255, 0.3);
+  border-radius: 4px;
+}
+
+.diff-viewer-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 150, 255, 0.5);
+}

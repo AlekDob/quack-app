@@ -190,24 +190,8 @@
 }
 
 .chat-message-tools {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
-}
-
-.tool-call {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: rgba(143, 166, 255, 0.1);
-  border: 1px solid rgba(143, 166, 255, 0.2);
-  border-radius: 4px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.tool-name {
-  font-weight: 500;
 }

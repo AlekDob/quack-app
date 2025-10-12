@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
+import ToolCallCard from './ToolCallCard';
 import './ChatMessage.css';
 
 // Import duck avatar
@@ -87,9 +88,7 @@ function ChatMessage({ message }: ChatMessageProps) {
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="chat-message-tools">
             {message.toolCalls.map((tool) => (
-              <div key={tool.id} className="tool-call">
-                <span className="tool-name">{tool.name}</span>
-              </div>
+              <ToolCallCard key={tool.id} tool={tool} />
             ))}
           </div>
         )}

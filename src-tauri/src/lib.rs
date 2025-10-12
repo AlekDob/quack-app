@@ -315,6 +315,7 @@ pub fn run() {
             claude_auth::get_credentials_path,
             claude_cli::check_claude_cli_available,
             claude_cli::send_message_via_cli,
+            claude_cli::send_message_via_cli_streaming,
             claude_oauth::start_claude_oauth
         ])
         .run(tauri::generate_context!())

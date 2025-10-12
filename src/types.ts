@@ -175,10 +175,25 @@ export interface SetupResult {
 export type ChatRole = "user" | "assistant" | "system";
 export type ChatMessageStatus = "sending" | "streaming" | "complete" | "error";
 
+export interface DiffLine {
+  type: 'added' | 'removed' | 'unchanged';
+  content: string;
+  lineNumber?: number;
+}
+
+export interface ToolDiff {
+  fileName?: string;
+  lines: DiffLine[];
+}
+
 export interface ChatToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  status?: 'running' | 'completed' | 'error';
+  result?: string;
+  diff?: ToolDiff;
+  timestamp?: number;
 }
 
 export interface ChatToolResult {
