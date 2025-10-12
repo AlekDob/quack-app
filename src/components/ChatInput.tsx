@@ -47,7 +47,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     if (!textarea) return;
 
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 50)}px`;
   }, [input]);
 
   const guessMimeType = useCallback((filename: string) => {

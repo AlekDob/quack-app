@@ -9,14 +9,14 @@
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 0;
   overflow: visible; /* Allow tooltips to escape */
 }
 
 .chat-input-field {
   flex: 1;
   min-height: 32px;
-  max-height: 200px;
+  max-height: 50px;
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
