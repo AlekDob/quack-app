@@ -1846,11 +1846,12 @@ button.directory-chooser:hover {
 }
 
 .side-panel-tab {
-  flex: 1;
+  position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 1.25rem;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.6);
@@ -1867,6 +1868,7 @@ button.directory-chooser:hover {
 .side-panel-tab .tab-icon {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
 }
 
 .side-panel-tab:hover:not(.active) {
@@ -1881,10 +1883,18 @@ button.directory-chooser:hover {
 }
 
 .side-panel-tab-badge {
-  padding: 0.1rem 0.5rem;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.65rem;
+  font-weight: 700;
   background: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.6);
 }
@@ -1913,6 +1923,26 @@ button.directory-chooser:hover {
 .side-panel-pane > * {
   flex: 1;
   min-height: 0;
+}
+
+/* Terminal in sidebar - full space, no padding */
+.side-panel-pane.terminal-panel-pane {
+  padding: 0;
+}
+
+.terminal-panel-pane .terminal-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.5rem;
+  color: #a3aab6;
+  font-size: 0.95rem;
+}
+
+.terminal-panel-pane .terminal-placeholder p {
+  margin: 0;
 }
 
 .agents-panel,

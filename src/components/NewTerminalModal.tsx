@@ -40,10 +40,10 @@ function NewTerminalModal({
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel">
-        <h2>{isEditing ? '✏️ Edit terminal' : 'Create new terminal'}</h2>
+        <h2>{isEditing ? '✏️ Edit agent' : 'Create new agent'}</h2>
 
         <label className="modal-field">
-          <span>Terminal name</span>
+          <span>Agent name</span>
           <input
             type="text"
             value={name}
@@ -70,7 +70,7 @@ function NewTerminalModal({
         </div>
 
         <div className="modal-field">
-          <span>Terminal color</span>
+          <span>Agent color</span>
           <div className="modal-color-grid">
             {availableColors.map((preset) => (
               <button
@@ -104,7 +104,7 @@ function NewTerminalModal({
             onClick={onConfirm}
             disabled={!name.trim() || !path.trim() || creating}
           >
-            {creating ? (isEditing ? 'Saving…' : 'Creating…') : (isEditing ? 'Save changes' : 'Create terminal')}
+            {creating ? (isEditing ? 'Saving…' : 'Creating…') : (isEditing ? 'Save changes' : 'Create agent')}
           </button>
         </div>
       </div>

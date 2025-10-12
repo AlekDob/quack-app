@@ -2,14 +2,15 @@ import { useState, type ReactNode } from "react";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
 import ContextPanel from "./ContextPanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails } from "../types";
+import TerminalView from "./TerminalView";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo } from "../types";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, Context
+ * Tabs: File Explorer, Agents, Context, Terminal
  */
 
-type TabId = "explorer" | "agents" | "context";
+type TabId = "explorer" | "agents" | "context" | "terminal";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -51,6 +52,25 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  terminal: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 8l2 2-2 2M10 12h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -75,6 +95,13 @@ interface SidePanelProps {
   workingDir?: string;
   onSelectAgent: (agent: AgentInfo) => void;
   onRefreshAgents: () => void;
+
+  // Terminal props
+  activeTerminalId: string | null;
+  terminals: TerminalInfo[];
+  onTerminalInput: (id: string, data: string) => void;
+  onTerminalOutput: (id: string, data: string) => void;
+  onUpdateRecentCommands: (commands: string[]) => void;
 }
 
 export default function SidePanel({
@@ -99,6 +126,13 @@ export default function SidePanel({
   workingDir,
   onSelectAgent,
   onRefreshAgents,
+
+  // Terminal
+  activeTerminalId,
+  terminals,
+  onTerminalInput,
+  onTerminalOutput,
+  onUpdateRecentCommands,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("explorer");
 
@@ -121,6 +155,11 @@ export default function SidePanel({
       label: "Context",
       icon: icons.context,
     },
+    {
+      id: "terminal" as TabId,
+      label: "Terminal",
+      icon: icons.terminal,
+    },
   ];
 
   return (
@@ -136,9 +175,10 @@ export default function SidePanel({
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`side-panel-tab ${isActive ? "active" : ""}`}
+              title={tab.label}
+              aria-label={tab.label}
             >
               <span className="tab-icon">{tab.icon}</span>
-              <span>{tab.label}</span>
               {tab.id === "agents" && typeof tab.badge === "number" && (
                 <span
                   className={`side-panel-tab-badge ${
@@ -189,6 +229,25 @@ export default function SidePanel({
         {activeTab === "context" && (
           <div className="side-panel-pane">
             <ContextPanel />
+          </div>
+        )}
+
+        {activeTab === "terminal" && (
+          <div className="side-panel-pane terminal-panel-pane">
+            {activeTerminalId ? (
+              <TerminalView
+                activeId={activeTerminalId}
+                terminals={terminals}
+                onUserInput={onTerminalInput}
+                onOutput={onTerminalOutput}
+                onUpdateRecentCommands={onUpdateRecentCommands}
+              />
+            ) : (
+              <div className="terminal-placeholder">
+                <p>No active terminal</p>
+                <p>Create a new terminal to start working</p>
+              </div>
+            )}
           </div>
         )}
       </div>

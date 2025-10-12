@@ -181,7 +181,7 @@ export default function TerminalSidebar({
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="sidebar-header-top">
-          <span className="sidebar-title">Quack Terminal</span>
+          <span className="sidebar-title">Quack Agents</span>
           <button
             type="button"
             className="sidebar-button"
@@ -196,12 +196,12 @@ export default function TerminalSidebar({
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search terminals"
+          placeholder="Search agents"
         />
       </div>
 
       <div className="explorer-root-label sidebar-terminals-label">
-        ACTIVE TERMINALS
+        ACTIVE AGENTS
       </div>
 
       <div className="sidebar-list">
@@ -313,12 +313,12 @@ export default function TerminalSidebar({
         {terminals.length === 0 && (
           <div className="empty-state">
             <div>🦆 Quack quack!</div>
-            <div>Nessun terminale attivo</div>
+            <div>No active agents</div>
           </div>
         )}
 
         {terminals.length > 0 && filteredTerminals.length === 0 && (
-          <div className="empty-state">Nessun terminale trovato</div>
+          <div className="empty-state">No agents found</div>
         )}
       </div>
 

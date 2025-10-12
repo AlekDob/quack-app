@@ -14,7 +14,6 @@ import "sonner/dist/styles.css";
 import "./sonner-custom.css";
 
 import TerminalSidebar from "./components/TerminalSidebar";
-import TerminalView from "./components/TerminalView";
 import SidePanel from "./components/SidePanel";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer from "./components/FilePreviewDrawer";
@@ -259,18 +258,15 @@ function App() {
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
 
-  // Tab state (Terminal | Chat)
-  const [activeTab, setActiveTab] = useState<'terminal' | 'chat'>('terminal');
-
   // Claude Chat state
   const { messages: chatMessages, isLoading: chatLoading, sendMessage: sendChatMessage, initialize: initializeChat } = useClaudeChat();
 
-  // Initialize chat when switching to chat tab
+  // Initialize chat on mount
   useEffect(() => {
-    if (activeTab === 'chat' && tauriAvailable) {
+    if (tauriAvailable) {
       void initializeChat();
     }
-  }, [activeTab, tauriAvailable, initializeChat]);
+  }, [tauriAvailable, initializeChat]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -2149,22 +2145,7 @@ function App() {
           <div className="main-toolbar">
             <div className="main-toolbar-top">
               <div className="main-toolbar-title">
-                <div className="main-toolbar-tabs">
-                  <button
-                    type="button"
-                    className={`toolbar-tab ${activeTab === 'terminal' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('terminal')}
-                  >
-                    Terminal
-                  </button>
-                  <button
-                    type="button"
-                    className={`toolbar-tab ${activeTab === 'chat' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('chat')}
-                  >
-                    🦆 Chat
-                  </button>
-                </div>
+                <h2 className="main-toolbar-heading">🦆 Claude Agent Chat</h2>
                 {import.meta.env.DEV && (
                   <span className="dev-badge">DEV</span>
                 )}
@@ -2203,43 +2184,17 @@ function App() {
               </div>
             </div>
             <div className="main-toolbar-bottom">
-              {activeTab === 'terminal' && (
-                <span className="terminal-status">
-                  {activeTerminal ? activeTerminal.cwd : "No active terminal"}
-                </span>
-              )}
-              {activeTab === 'chat' && (
-                <span className="terminal-status">
-                  Claude Agent Chat
-                </span>
-              )}
+              <span className="terminal-status">
+                AI Agent Chat Interface
+              </span>
             </div>
           </div>
           <div className="terminal-container">
-            {activeTab === 'terminal' && (
-              activeId ? (
-                <TerminalView
-                  activeId={activeId}
-                  terminals={terminals}
-                  onUserInput={handleTerminalInput}
-                  onOutput={handleTerminalOutput}
-                  onUpdateRecentCommands={(commands) => {
-                    recentCommandsRef.current = commands;
-                  }}
-                />
-              ) : (
-                <div className="terminal-surface terminal-placeholder">
-                  Create a new terminal to start working.
-                </div>
-              )
-            )}
-            {activeTab === 'chat' && (
-              <ChatView
-                messages={chatMessages}
-                isLoading={chatLoading}
-                onSendMessage={sendChatMessage}
-              />
-            )}
+            <ChatView
+              messages={chatMessages}
+              isLoading={chatLoading}
+              onSendMessage={sendChatMessage}
+            />
           </div>
           <ToolBar
             onExecuteCommand={handleExecuteAICommand}
@@ -2272,6 +2227,14 @@ function App() {
           workingDir={activeTerminal?.cwd ?? explorerPath}
           onSelectAgent={handleSelectAgent}
           onRefreshAgents={loadAgents}
+          // Terminal props
+          activeTerminalId={activeId}
+          terminals={terminals}
+          onTerminalInput={handleTerminalInput}
+          onTerminalOutput={handleTerminalOutput}
+          onUpdateRecentCommands={(commands) => {
+            recentCommandsRef.current = commands;
+          }}
         />
 
         <NewTerminalModal
