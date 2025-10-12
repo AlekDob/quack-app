@@ -39,6 +39,18 @@ const BACKGROUND_GROUPS: BackgroundGroup[] = [
     title: 'Gradients',
     items: [
       {
+        name: 'gradient-black-plain',
+        label: 'Black Plain',
+        gradient: '#000000',
+        type: 'gradient',
+      },
+      {
+        name: 'gradient-dark-gray-plain',
+        label: 'Dark Gray Plain',
+        gradient: '#0D1118',
+        type: 'gradient',
+      },
+      {
         name: 'gradient-orange-dark',
         label: 'Orange Dark',
         gradient: 'linear-gradient(135deg, #1a0f0a 0%, #3d2415 25%, #5a3a25 50%, #3d2415 75%, #1a0f0a 100%)',

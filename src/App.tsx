@@ -1083,6 +1083,8 @@ function App() {
     if (backgroundName.startsWith('gradient-')) {
       // Map gradient names to actual CSS gradients - MUCH more colorful!
       const gradientMap: Record<string, string> = {
+        'gradient-black-plain': 'linear-gradient(#000000, #000000)',
+        'gradient-dark-gray-plain': 'linear-gradient(#0D1118, #0D1118)',
         'gradient-orange-dark': 'linear-gradient(135deg, #1a0f0a 0%, #3d2415 25%, #5a3a25 50%, #3d2415 75%, #1a0f0a 100%)',
         'gradient-blue-dark': 'linear-gradient(135deg, #0a0f1a 0%, #15243d 25%, #20355a 50%, #15243d 75%, #0a0f1a 100%)',
         'gradient-green-dark': 'linear-gradient(135deg, #0a1a0f 0%, #15392d 25%, #20564a 50%, #15392d 75%, #0a1a0f 100%)',
