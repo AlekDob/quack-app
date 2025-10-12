@@ -91,3 +91,28 @@
     opacity: 0.8;
   }
 }
+
+.skeleton-loading-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 12px 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(242, 140, 82, 0.08) 0%,
+    rgba(242, 140, 82, 0.15) 50%,
+    rgba(242, 140, 82, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(242, 140, 82, 0.2);
+  animation: shimmer 2s infinite linear;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skeleton-loading-text::before {
+  content: '🦆';
+  animation: pulse 1.5s ease-in-out infinite;
+}

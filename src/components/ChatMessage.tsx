@@ -42,7 +42,7 @@ function ChatMessage({ message }: ChatMessageProps) {
       <div className="chat-message-content">
         <div className="chat-message-header">
           <span className="chat-message-role">
-            {isUser ? 'You' : 'Claude'}
+            {isUser ? 'You' : 'Jack'}
           </span>
           <span className="chat-message-timestamp">
             {new Date(message.timestamp).toLocaleTimeString('it-IT', {

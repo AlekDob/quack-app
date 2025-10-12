@@ -12,9 +12,9 @@ export default function SkeletonMessage() {
           <span className="skeleton-text skeleton-timestamp"></span>
         </div>
         <div className="chat-message-body skeleton-body">
-          <div className="skeleton-line skeleton-line-long"></div>
-          <div className="skeleton-line skeleton-line-medium"></div>
-          <div className="skeleton-line skeleton-line-short"></div>
+          <div className="skeleton-loading-text">
+            Quack Agency is working with Claude Code, hold on...
+          </div>
         </div>
       </div>
     </div>
