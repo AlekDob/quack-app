@@ -31,7 +31,7 @@ import BackgroundsModal from "./components/BackgroundsModal";
 import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
-import { useClaudeChat } from "./hooks/useClaudeChat";
+import type { ChatSendOptions } from "./hooks/useClaudeChat";
 
 import type {
   DirectoryEntry,
@@ -46,6 +46,7 @@ import type {
   TerminalContext,
   AgentInfo,
   AgentDetails,
+  ChatMessage,
 } from "./types";
 
 interface TerminalMetadata {
@@ -258,15 +259,212 @@ function App() {
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
 
-  // Claude Chat state
-  const { messages: chatMessages, isLoading: chatLoading, sendMessage: sendChatMessage, initialize: initializeChat } = useClaudeChat();
+  // Multi-Chat state - one chat session per agent
+  const [chatSessions, setChatSessions] = useState<Map<string, ChatMessage[]>>(new Map());
+  const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
+  const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
+  const [isChatConfigured, setIsChatConfigured] = useState(false);
 
   // Initialize chat on mount
   useEffect(() => {
     if (tauriAvailable) {
-      void initializeChat();
+      const initialize = async () => {
+        try {
+          const available = await invoke<boolean>('check_claude_cli_available');
+          setIsChatConfigured(available);
+        } catch (err) {
+          console.error('Failed to check Claude CLI:', err);
+          setIsChatConfigured(false);
+        }
+      };
+      void initialize();
     }
-  }, [tauriAvailable, initializeChat]);
+  }, [tauriAvailable]);
+
+  // Send message for specific agent
+  const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
+    if (!content.trim() || !activeId) return;
+
+    // Check if chat is configured
+    if (!isChatConfigured) {
+      const errorMessage: ChatMessage = {
+        id: `msg-${Date.now()}-error`,
+        role: 'assistant',
+        content: 'Quack quack! 🦆 Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
+        timestamp: Date.now(),
+        status: 'error',
+        error: 'Not configured',
+      };
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(activeId) ?? [];
+        newSessions.set(activeId, [...agentMessages, errorMessage]);
+        return newSessions;
+      });
+      return;
+    }
+
+    // Get current agent's chat session
+    const currentMessages = chatSessions.get(activeId) ?? [];
+
+    // Create user message
+    const attachments = options?.attachments ?? [];
+    const attachmentLines = attachments.map((item, index) => `Attachment ${index + 1}: ${item.path}`);
+    const contentWithAttachments =
+      attachmentLines.length > 0
+        ? `${content}\n\nAttachments:\n${attachmentLines.join('\n')}`
+        : content;
+
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}-user`,
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+      status: 'sending',
+      attachments,
+    };
+
+    // Add user message to agent's chat session
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      newSessions.set(activeId, [...currentMessages, userMessage]);
+      return newSessions;
+    });
+
+    // Set loading for this agent
+    setChatLoadingMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(activeId, true);
+      return newMap;
+    });
+
+    // Create assistant message placeholder
+    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessage: ChatMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      status: 'streaming',
+    };
+
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      const agentMessages = newSessions.get(activeId) ?? [];
+      newSessions.set(activeId, [...agentMessages, assistantMessage]);
+      return newSessions;
+    });
+
+    try {
+      // Build context from agent's conversation history
+      const agentHistory = chatConversationHistoryRef.current.get(activeId) ?? [];
+      let prompt = contentWithAttachments;
+      if (agentHistory.length > 0) {
+        const history = agentHistory
+          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+          .join('\n\n');
+        prompt = `${history}\n\nUser: ${contentWithAttachments}`;
+      }
+
+      // Call Claude CLI
+      const sanitizedAttachments = attachments
+        .map((item) => item.path)
+        .filter((path) => !!path);
+
+      const requestPayload = {
+        prompt,
+        model: options?.model,
+        thinkingMode: options?.thinkingMode,
+        permissionMode: options?.permissionMode,
+        attachments: sanitizedAttachments.length > 0 ? sanitizedAttachments : undefined,
+      };
+
+      interface ClaudeCliResponse {
+        result: string;
+        session_id: string;
+        total_cost_usd: number;
+        usage: {
+          input_tokens: number;
+          output_tokens: number;
+          cache_read_input_tokens: number;
+          cache_creation_input_tokens: number;
+        };
+      }
+
+      const response = await invoke<ClaudeCliResponse>('send_message_via_cli', {
+        request: requestPayload,
+      });
+
+      // Add to agent's conversation history
+      const updatedHistory = [
+        ...agentHistory,
+        {
+          role: 'user' as const,
+          content: contentWithAttachments,
+        },
+        {
+          role: 'assistant' as const,
+          content: response.result,
+        },
+      ];
+      chatConversationHistoryRef.current.set(activeId, updatedHistory);
+
+      // Update message with response
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(activeId) ?? [];
+        newSessions.set(
+          activeId,
+          agentMessages.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: response.result,
+                  status: 'complete' as const,
+                }
+              : msg
+          )
+        );
+        return newSessions;
+      });
+    } catch (err) {
+      console.error('Error calling Claude CLI:', err);
+
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Unknown error';
+
+      // Update message with error
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(activeId) ?? [];
+        newSessions.set(
+          activeId,
+          agentMessages.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
+                  status: 'error' as const,
+                  error: errorMessage,
+                }
+              : msg
+          )
+        );
+        return newSessions;
+      });
+    } finally {
+      // Clear loading for this agent
+      setChatLoadingMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(activeId, false);
+        return newMap;
+      });
+    }
+  }, [activeId, isChatConfigured, chatSessions]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -280,6 +478,15 @@ function App() {
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
     [activeId, terminals]
   );
+
+  // Compute current agent's chat messages and loading state
+  const currentAgentMessages = useMemo(() => {
+    return activeId ? (chatSessions.get(activeId) ?? []) : [];
+  }, [activeId, chatSessions]);
+
+  const currentAgentLoading = useMemo(() => {
+    return activeId ? (chatLoadingMap.get(activeId) ?? false) : false;
+  }, [activeId, chatLoadingMap]);
 
   const selectedGitEntry = useMemo(() => {
     if (!gitSummary || !selectedGitPath) {
@@ -2191,9 +2398,9 @@ function App() {
           </div>
           <div className="terminal-container">
             <ChatView
-              messages={chatMessages}
-              isLoading={chatLoading}
-              onSendMessage={sendChatMessage}
+              messages={currentAgentMessages}
+              isLoading={currentAgentLoading}
+              onSendMessage={sendMessageForAgent}
             />
           </div>
           <ToolBar
