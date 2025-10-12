@@ -15,16 +15,16 @@
 
 .chat-input-field {
   flex: 1;
-  min-height: 36px;
+  min-height: 32px;
   max-height: 200px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.9);
   font-family: inherit;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
   resize: none;
   transition: all 0.15s ease;
   outline: none;

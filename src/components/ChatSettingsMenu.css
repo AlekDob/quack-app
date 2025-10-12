@@ -1,0 +1,127 @@
+.chat-settings-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chat-settings-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.chat-settings-trigger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.chat-settings-trigger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-settings-trigger svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.chat-settings-summary {
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.chat-settings-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  min-width: 240px;
+  background: rgba(20, 22, 28, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  padding: 8px;
+  animation: slideUp 0.15s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-settings-section {
+  padding: 4px 0;
+}
+
+.chat-settings-section + .chat-settings-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.chat-settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-settings-label-text {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 0 4px;
+}
+
+.chat-settings-select {
+  width: 100%;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-settings-select:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.chat-settings-select:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(242, 140, 82, 0.5);
+}
+
+.chat-settings-select option {
+  background: #14161c;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 6px 8px;
+}

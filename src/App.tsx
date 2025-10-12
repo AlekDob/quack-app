@@ -2353,7 +2353,9 @@ function App() {
           <div className="main-toolbar">
             <div className="main-toolbar-top">
               <div className="main-toolbar-title">
-                <h2 className="main-toolbar-heading">🦆 Claude Agent Chat</h2>
+                <h2 className="main-toolbar-heading">
+                  🦆 {activeTerminal?.label ?? 'Claude Agent Chat'}
+                </h2>
                 {import.meta.env.DEV && (
                   <span className="dev-badge">DEV</span>
                 )}
@@ -2390,11 +2392,6 @@ function App() {
                 Preview
               </button>
               </div>
-            </div>
-            <div className="main-toolbar-bottom">
-              <span className="terminal-status">
-                AI Agent Chat Interface
-              </span>
             </div>
           </div>
           <div className="terminal-container">

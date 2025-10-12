@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
+import ChatSettingsMenu from './ChatSettingsMenu';
 import type { ChatMessage } from '../types';
 import type {
   ChatSendOptions,
@@ -65,64 +66,23 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
 
   return (
     <div className="chat-view">
-      <div className="chat-view-header">
-        <div className="chat-view-title">
-          <h2>Claude Chat</h2>
-        </div>
-        <div className="chat-view-controls">
-          <div className="chat-view-status">
-            <span className={`status-indicator ${isLoading ? 'active' : ''}`} />
-            <span className="status-text">{isLoading ? 'Thinking...' : 'Ready'}</span>
-          </div>
-          <div className="chat-view-selectors">
-            <label className="chat-control">
-              <span className="chat-control-label">Model</span>
-              <select
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-              >
-                {modelOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="chat-control">
-              <span className="chat-control-label">Thinking</span>
-              <select
-                value={thinkingMode}
-                onChange={(event) => setThinkingMode(event.target.value as ThinkingMode)}
-              >
-                {thinkingModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="chat-control">
-              <span className="chat-control-label">Mode</span>
-              <select
-                value={permissionMode}
-                onChange={(event) => setPermissionMode(event.target.value as PermissionMode)}
-              >
-                {permissionModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-      </div>
       <MessageList messages={messages} loading={isLoading} />
-      <ChatInput
-        onSend={handleSend}
-        disabled={isLoading}
-        placeholder="Ask Claude about your code, commands, or project..."
-      />
+      <div className="chat-view-footer">
+        <ChatSettingsMenu
+          model={model}
+          thinkingMode={thinkingMode}
+          permissionMode={permissionMode}
+          onModelChange={setModel}
+          onThinkingModeChange={setThinkingMode}
+          onPermissionModeChange={setPermissionMode}
+          disabled={isLoading}
+        />
+        <ChatInput
+          onSend={handleSend}
+          disabled={isLoading}
+          placeholder="Ask Claude about your code, commands, or project..."
+        />
+      </div>
     </div>
   );
 }
