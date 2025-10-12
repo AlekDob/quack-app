@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
+import DuckAnimation from './DuckAnimation';
 import type { ChatMessage as ChatMessageType } from '../types';
 import './MessageList.css';
 
@@ -28,8 +29,7 @@ export default function MessageList({ messages, loading }: MessageListProps) {
     return (
       <div className="message-list-empty">
         <div className="empty-state">
-          <h3>Start a conversation</h3>
-          <p>Ask Claude anything about your project, code, or commands.</p>
+          <DuckAnimation />
         </div>
       </div>
     );
