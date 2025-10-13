@@ -3,7 +3,7 @@
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 8px;
-  padding: 16px;
+  padding: 10px 16px; /* Reduced padding for collapsed state */
   margin-bottom: 12px;
 }
 
@@ -11,10 +11,19 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 0; /* No margin by default (collapsed) */
   cursor: pointer;
   user-select: none;
   transition: opacity 0.2s ease;
+}
+
+/* When expanded (has content visible), add margin and padding */
+.system-init-header:has(+ .system-init-content) {
+  margin-bottom: 12px;
+}
+
+.system-init-widget:has(.system-init-content) {
+  padding-bottom: 16px;
 }
 
 .system-init-header:hover {
