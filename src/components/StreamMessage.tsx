@@ -61,7 +61,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
         model={message.model}
         cwd={message.cwd}
         tools={message.tools}
-        defaultExpanded={isFirstSystemInit}
+        defaultExpanded={false}
       />
     );
   }

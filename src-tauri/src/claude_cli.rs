@@ -240,9 +240,10 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         }
     }) {
         // Map frontend permission modes to valid Claude CLI modes
-        // Valid CLI modes: bypassPermissions, default, plan
+        // Valid CLI modes: bypassPermissions, acceptEdits, default, plan
         let cli_mode = match mode.as_str() {
             "bypass" => "bypassPermissions",
+            "acceptedits" => "acceptEdits",
             "act" => "default",
             "plan" => "plan",
             _ => "default",  // fallback to default
@@ -419,9 +420,10 @@ pub async fn send_message_via_cli_streaming(
         }
     }) {
         // Map frontend permission modes to valid Claude CLI modes
-        // Valid CLI modes: bypassPermissions, default, plan
+        // Valid CLI modes: bypassPermissions, acceptEdits, default, plan
         let cli_mode = match mode.as_str() {
             "bypass" => "bypassPermissions",
+            "acceptedits" => "acceptEdits",
             "act" => "default",
             "plan" => "plan",
             _ => "default",  // fallback to default
@@ -524,6 +526,7 @@ pub async fn send_message_via_sdk_streaming(
         "thinkingMode": thinking_mode,
         "permissionMode": permission_mode.map(|mode| match mode.as_str() {
             "bypass" => "bypassPermissions",
+            "acceptedits" => "acceptEdits",
             "act" => "default",
             "plan" => "plan",
             _ => "default"
