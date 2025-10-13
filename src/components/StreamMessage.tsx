@@ -9,6 +9,7 @@ import {
   GrepWidget,
 } from './ToolWidgets';
 import type { ClaudeEvent } from '../types';
+import type { PermissionMode } from '../hooks/useClaudeChat';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
@@ -16,9 +17,10 @@ import duckAvatar from '../../images/duck.png';
 interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
+  onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
-const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }) => {
+const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onPermissionModeChange }) => {
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
     const results = new Map<string, any>();
@@ -110,6 +112,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
                   old_string={input.old_string}
                   new_string={input.new_string}
                   result={toolResult}
+                  onPermissionModeChange={onPermissionModeChange}
                 />
               );
             }
@@ -122,6 +125,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
                   filePath={input.file_path}
                   content={input.content}
                   result={toolResult}
+                  onPermissionModeChange={onPermissionModeChange}
                 />
               );
             }

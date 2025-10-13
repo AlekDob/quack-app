@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
@@ -60,9 +60,34 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
     });
   };
 
+  // Keyboard shortcut: Shift+Tab to cycle permission modes
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab' && e.shiftKey && !isLoading) {
+        e.preventDefault();
+
+        // Cycle through permission modes
+        const modes: PermissionMode[] = ['plan', 'act', 'acceptEdits', 'bypass'];
+        const currentIndex = modes.indexOf(permissionMode);
+        const nextIndex = (currentIndex + 1) % modes.length;
+        setPermissionMode(modes[nextIndex]);
+
+        // Show toast notification (we'll add this later)
+        console.log(`Switched to ${modes[nextIndex]} mode`);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [permissionMode, isLoading]);
+
   return (
     <div className="chat-view">
-      <MessageList messages={messages} loading={isLoading} />
+      <MessageList
+        messages={messages}
+        loading={isLoading}
+        onPermissionModeChange={setPermissionMode}
+      />
       <div className="chat-view-footer">
         <ChatSettingsMenu
           model={model}

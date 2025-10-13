@@ -3,14 +3,16 @@ import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
 import type { ChatMessage as ChatMessageType } from '../types';
+import type { PermissionMode } from '../hooks/useClaudeChat';
 import './MessageList.css';
 
 interface MessageListProps {
   messages: ChatMessageType[];
   loading?: boolean;
+  onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
-export default function MessageList({ messages, loading }: MessageListProps) {
+export default function MessageList({ messages, loading, onPermissionModeChange }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
 
@@ -39,7 +41,11 @@ export default function MessageList({ messages, loading }: MessageListProps) {
     <div className="message-list" ref={scrollRef}>
       <div className="message-list-content">
         {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+          <ChatMessage
+            key={message.id}
+            message={message}
+            onPermissionModeChange={onPermissionModeChange}
+          />
         ))}
         {loading && <SkeletonMessage />}
       </div>
