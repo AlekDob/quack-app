@@ -3,18 +3,30 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   type KeyboardEvent,
   type ClipboardEvent as ReactClipboardEvent,
 } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import type { ChatAttachment } from '../types';
+import type { ChatAttachment, AgentInfo } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const MAX_PREVIEW_SIZE = 3 * 1024 * 1024;
+
+// Agent color mapping
+const AGENT_COLORS: Record<string, string> = {
+  blue: "#4A9EFF",
+  purple: "#A855F7",
+  green: "#10B981",
+  orange: "#F59E0B",
+  yellow: "#EAB308",
+  red: "#EF4444",
+  pink: "#EC4899",
+};
 
 interface FileStatResult {
   size: number;
@@ -26,13 +38,21 @@ interface ChatInputProps {
   onSend: (message: string, options?: ChatSendOptions) => Promise<void> | void;
   disabled?: boolean;
   placeholder?: string;
+  agents?: AgentInfo[];
+  onSelectAgent?: (agent: AgentInfo) => void;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...' }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, onSelectAgent }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Agent autocomplete state
+  const [showAgentAutocomplete, setShowAgentAutocomplete] = useState(false);
+  const [agentFilter, setAgentFilter] = useState('');
+  const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
+  const [atMentionStart, setAtMentionStart] = useState(-1);
 
   const generateId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -40,6 +60,92 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     }
     return `attachment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }, []);
+
+  const getAgentColor = useCallback((colorName: string): string => {
+    return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
+  }, []);
+
+  // Filter agents based on current @ mention
+  const filteredAgents = useMemo(() => {
+    if (!agents || !showAgentAutocomplete) return [];
+
+    const filter = agentFilter.toLowerCase();
+    return agents.filter(agent => {
+      const name = agent.name.toLowerCase().replace(/-/g, ' ');
+      const description = agent.description.toLowerCase();
+      return name.includes(filter) || description.includes(filter);
+    });
+  }, [agents, showAgentAutocomplete, agentFilter]);
+
+  // Handle input change and detect @ mentions
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    const cursorPos = e.target.selectionStart;
+
+    setInput(newValue);
+
+    // Check for @ mention
+    if (!agents || agents.length === 0) {
+      setShowAgentAutocomplete(false);
+      return;
+    }
+
+    // Find the last @ before cursor
+    const textBeforeCursor = newValue.substring(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      // Check if there's a space or we're at the start before @
+      const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+      const isAtWordBoundary = charBeforeAt === ' ' || charBeforeAt === '\n';
+
+      if (isAtWordBoundary) {
+        // Extract text after @ until cursor (no spaces allowed in mention)
+        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+
+        if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+          // Valid @ mention
+          setShowAgentAutocomplete(true);
+          setAgentFilter(textAfterAt);
+          setAtMentionStart(lastAtIndex);
+          setSelectedAgentIndex(0);
+          return;
+        }
+      }
+    }
+
+    // No valid @ mention found
+    setShowAgentAutocomplete(false);
+  }, [agents]);
+
+  // Select an agent from autocomplete
+  const selectAgent = useCallback((agent: AgentInfo) => {
+    if (!textareaRef.current) return;
+
+    // Remove the @ mention from input
+    const beforeMention = input.substring(0, atMentionStart);
+    const afterMention = input.substring(textareaRef.current.selectionStart);
+    const newInput = beforeMention + afterMention;
+
+    setInput(newInput);
+    setShowAgentAutocomplete(false);
+    setAgentFilter('');
+    setAtMentionStart(-1);
+
+    // Call the parent callback to activate agent
+    if (onSelectAgent) {
+      onSelectAgent(agent);
+    }
+
+    // Focus back to textarea
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeMention.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [input, atMentionStart, onSelectAgent]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -308,6 +414,34 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle agent autocomplete navigation
+    if (showAgentAutocomplete && filteredAgents.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedAgentIndex((prev) => (prev + 1) % filteredAgents.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedAgentIndex((prev) => (prev - 1 + filteredAgents.length) % filteredAgents.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const selectedAgent = filteredAgents[selectedAgentIndex];
+        if (selectedAgent) {
+          selectAgent(selectedAgent);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowAgentAutocomplete(false);
+        return;
+      }
+    }
+
+    // Normal behavior when autocomplete is not active
     // Send on Cmd+Enter or Ctrl+Enter
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -322,12 +456,42 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
 
   return (
     <div className="chat-input-container">
+      {/* Agent autocomplete dropdown */}
+      {showAgentAutocomplete && filteredAgents.length > 0 && (
+        <div className="agent-autocomplete">
+          {filteredAgents.map((agent, index) => (
+            <button
+              key={agent.name}
+              type="button"
+              className={`agent-autocomplete-item ${selectedAgentIndex === index ? 'selected' : ''}`}
+              onClick={() => selectAgent(agent)}
+              onMouseEnter={() => setSelectedAgentIndex(index)}
+            >
+              <div
+                className="agent-autocomplete-badge"
+                style={{ backgroundColor: getAgentColor(agent.color) }}
+              />
+              <div className="agent-autocomplete-info">
+                <div className="agent-autocomplete-name">
+                  {agent.name.replace(/-/g, ' ')}
+                </div>
+                <div className="agent-autocomplete-description">
+                  {agent.description.length > 50
+                    ? `${agent.description.substring(0, 50)}...`
+                    : agent.description}
+                </div>
+              </div>
+              <div className="agent-autocomplete-model">{agent.model}</div>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="chat-input-wrapper">
         <textarea
           ref={textareaRef}
           className="chat-input-field"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}

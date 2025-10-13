@@ -16,9 +16,11 @@ interface ChatViewProps {
   onSendMessage: (content: string, options?: ChatSendOptions) => Promise<void>;
   activeAgent?: AgentInfo | null;
   onClearAgent?: () => void;
+  agents?: AgentInfo[];
+  onSelectAgent?: (agent: AgentInfo) => void;
 }
 
-export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent }: ChatViewProps) {
+export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent }: ChatViewProps) {
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('act');
@@ -120,6 +122,8 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           onSend={handleSend}
           disabled={isLoading}
           placeholder="Ask Claude about your code, commands, or project..."
+          agents={agents}
+          onSelectAgent={onSelectAgent}
         />
       </div>
     </div>

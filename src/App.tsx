@@ -2487,6 +2487,8 @@ function App() {
               onSendMessage={sendMessageForAgent}
               activeAgent={activeAgent}
               onClearAgent={handleClearAgent}
+              agents={agents}
+              onSelectAgent={handleUseAgent}
             />
           </div>
         </section>
