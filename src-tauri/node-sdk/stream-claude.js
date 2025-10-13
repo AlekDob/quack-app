@@ -20,6 +20,7 @@ const {
   thinkingMode,
   cwd,
   sessionId,
+  agents,
 } = config;
 
 // Emit event via stdout
@@ -54,6 +55,16 @@ async function main() {
 
     if (sessionId) {
       options.resume = sessionId;
+    }
+
+    if (agents && Array.isArray(agents) && agents.length > 0) {
+      // Transform agents to SDK format
+      options.agents = agents.map(agent => ({
+        name: agent.name,
+        description: agent.description,
+        model: agent.model,
+        path: agent.filePath,
+      }));
     }
 
     // Query Claude with streaming

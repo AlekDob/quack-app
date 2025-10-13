@@ -16,3 +16,53 @@
   backdrop-filter: blur(10px);
   flex-shrink: 0;
 }
+
+.active-agent-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(242, 140, 82, 0.1);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.9);
+  width: fit-content;
+}
+
+.active-agent-label {
+  color: rgba(242, 140, 82, 0.8);
+  font-weight: 600;
+}
+
+.active-agent-name {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+.active-agent-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.active-agent-clear:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.active-agent-clear:active {
+  transform: scale(0.95);
+}

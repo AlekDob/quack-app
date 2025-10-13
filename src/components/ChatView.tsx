@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, AgentInfo } from '../types';
 import type {
   ChatSendOptions,
   ThinkingMode,
@@ -14,9 +14,11 @@ interface ChatViewProps {
   messages: ChatMessage[];
   isLoading: boolean;
   onSendMessage: (content: string, options?: ChatSendOptions) => Promise<void>;
+  activeAgent?: AgentInfo | null;
+  onClearAgent?: () => void;
 }
 
-export default function ChatView({ messages, isLoading, onSendMessage }: ChatViewProps) {
+export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent }: ChatViewProps) {
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('act');
@@ -98,6 +100,22 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
           onPermissionModeChange={setPermissionMode}
           disabled={isLoading}
         />
+        {activeAgent && (
+          <div className="active-agent-indicator">
+            <span className="active-agent-label">Agent:</span>
+            <span className="active-agent-name">{activeAgent.name.replace(/-/g, ' ')}</span>
+            {onClearAgent && (
+              <button
+                type="button"
+                onClick={onClearAgent}
+                className="active-agent-clear"
+                title="Clear active agent"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
         <ChatInput
           onSend={handleSend}
           disabled={isLoading}

@@ -79,6 +79,15 @@ pub struct Usage {
     pub cache_creation_input_tokens: u32,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentConfig {
+    pub name: String,
+    pub description: String,
+    pub model: String,
+    pub file_path: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCliRequest {
@@ -87,6 +96,7 @@ pub struct ClaudeCliRequest {
     pub thinking_mode: Option<String>,
     pub permission_mode: Option<String>,
     pub attachments: Option<Vec<String>>,
+    pub agents: Option<Vec<AgentConfig>>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -161,6 +171,7 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         thinking_mode,
         permission_mode,
         attachments,
+        ..
     } = request;
 
     let mut prompt_with_attachments = prompt.clone();
@@ -341,6 +352,7 @@ pub async fn send_message_via_cli_streaming(
         thinking_mode,
         permission_mode,
         attachments,
+        ..
     } = request;
 
     let mut prompt_with_attachments = prompt.clone();
@@ -516,11 +528,12 @@ pub async fn send_message_via_sdk_streaming(
         model,
         thinking_mode,
         permission_mode,
+        agents,
         ..
     } = request;
 
     // Build config JSON for Node.js script
-    let config = serde_json::json!({
+    let mut config = serde_json::json!({
         "prompt": prompt,
         "model": model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
         "thinkingMode": thinking_mode,
@@ -532,6 +545,11 @@ pub async fn send_message_via_sdk_streaming(
             _ => "default"
         }).unwrap_or("default"),
     });
+
+    // Add agents if provided
+    if let Some(agent_list) = agents {
+        config["agents"] = serde_json::json!(agent_list);
+    }
 
     let config_str = config.to_string();
 

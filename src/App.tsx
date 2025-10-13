@@ -409,6 +409,12 @@ function App() {
           thinkingMode: options?.thinkingMode,
           permissionMode: options?.permissionMode,
           attachments: attachments.map(a => a.path),
+          agents: activeAgent ? [{
+            name: activeAgent.name,
+            description: activeAgent.description,
+            model: activeAgent.model,
+            filePath: activeAgent.file_path,
+          }] : undefined,
         },
       });
 
@@ -487,6 +493,7 @@ function App() {
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
+  const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
@@ -1120,6 +1127,22 @@ function App() {
       setAgentsError(message);
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+
+  const handleUseAgent = useCallback((agentInfo: AgentInfo) => {
+    setActiveAgent(agentInfo);
+    toast.success(`Agent activated: ${agentInfo.name}`, {
+      description: 'This agent will be used for future chat messages',
+      duration: 3000,
+    });
+  }, []);
+
+  const handleClearAgent = useCallback(() => {
+    setActiveAgent(null);
+    toast.info('Agent deactivated', {
+      description: 'Chat will use default model settings',
+      duration: 2000,
+    });
+  }, []);
 
   // Load Quack Agency agents on startup
   useEffect(() => {
@@ -2462,6 +2485,8 @@ function App() {
               messages={currentAgentMessages}
               isLoading={currentAgentLoading}
               onSendMessage={sendMessageForAgent}
+              activeAgent={activeAgent}
+              onClearAgent={handleClearAgent}
             />
           </div>
         </section>
@@ -2486,6 +2511,7 @@ function App() {
           agentsDirectoryExists={agentsDirectoryExists}
           workingDir={activeTerminal?.cwd ?? explorerPath}
           onSelectAgent={handleSelectAgent}
+          onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
           // Terminal props
           activeTerminalId={activeId}

@@ -95,6 +95,7 @@ interface SidePanelProps {
   agentsDirectoryExists: boolean;
   workingDir?: string;
   onSelectAgent: (agent: AgentInfo) => void;
+  onUseAgent: (agent: AgentInfo) => void;
   onRefreshAgents: () => void;
 
   // Terminal props
@@ -131,6 +132,7 @@ export default function SidePanel({
   agentsDirectoryExists,
   workingDir,
   onSelectAgent,
+  onUseAgent,
   onRefreshAgents,
 
   // Terminal
@@ -232,6 +234,7 @@ export default function SidePanel({
               directoryExists={agentsDirectoryExists}
               workingDir={workingDir}
               onSelectAgent={onSelectAgent}
+              onUseAgent={onUseAgent}
               onRefresh={onRefreshAgents}
             />
           </div>
