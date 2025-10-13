@@ -12,6 +12,13 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.system-init-header:hover {
+  opacity: 0.8;
 }
 
 .system-icon {
@@ -283,4 +290,61 @@
 .grep-widget .tool-widget-output {
   max-height: 400px;
   overflow-y: auto;
+}
+
+/* Result Stats Compact */
+.result-stats-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.result-stat-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+}
+
+.result-error-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  font-size: 12px;
+  color: rgba(239, 68, 68, 1);
+}
+
+.result-error-inline svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.result-message-consolidated {
+  margin-bottom: 12px;
+}
+
+/* Result Stats Only - no avatar, attached to previous message */
+.result-stats-only {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-left: 44px; /* Align with assistant message content (20px avatar + 12px gap + 12px padding) */
+  margin-top: -4px; /* Pull up slightly to attach to previous message */
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
 }

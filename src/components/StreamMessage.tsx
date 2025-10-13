@@ -10,6 +10,9 @@ import {
 } from './ToolWidgets';
 import type { ClaudeEvent } from '../types';
 
+// Import duck avatar
+import duckAvatar from '../../images/duck.png';
+
 interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
@@ -33,6 +36,23 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
     return results;
   }, [streamMessages]);
 
+  // Check if this is the first System Initialized event in the stream
+  const isFirstSystemInit = useMemo(() => {
+    if (message.type !== 'system' || message.subtype !== 'init') return false;
+
+    const currentIndex = streamMessages.indexOf(message);
+
+    // Check if there's any System Initialized before this one
+    for (let i = 0; i < currentIndex; i++) {
+      const msg = streamMessages[i];
+      if (msg.type === 'system' && msg.subtype === 'init') {
+        return false; // Found one before, so this is not the first
+      }
+    }
+
+    return true; // This is the first one
+  }, [message, streamMessages]);
+
   // System initialization message
   if (message.type === 'system' && message.subtype === 'init') {
     return (
@@ -41,6 +61,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
         model={message.model}
         cwd={message.cwd}
         tools={message.tools}
+        defaultExpanded={isFirstSystemInit}
       />
     );
   }
@@ -62,7 +83,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
               <div key={idx} className="assistant-text">
                 <div className="assistant-avatar">
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M16 8A8 8 0 110 8a8 8 0 0116 0zM5.354 4.646a.5.5 0 10-.708.708L7.293 8l-2.647 2.646a.5.5 0 00.708.708L8 8.707l2.646 2.647a.5.5 0 00.708-.708L8.707 8l2.647-2.646a.5.5 0 00-.708-.708L8 7.293 5.354 4.646z"/>
+                    <path d="M2.678 11.894a1 1 0 01.287.801 10.97 10.97 0 01-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 01.71-.074A8.06 8.06 0 008 14c3.996 0 7-2.807 7-6 0-3.192-3.004-6-7-6S1 4.808 1 8c0 1.468.617 2.83 1.678 3.894zm-.493 3.905a21.682 21.682 0 01-.713.129c-.2.032-.352-.176-.273-.362a9.68 9.68 0 00.244-.637l.003-.01c.248-.72.45-1.548.524-2.319C.743 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7-3.582 7-8 7a9.06 9.06 0 01-2.347-.306c-.52.263-1.639.742-3.468 1.105z"/>
                   </svg>
                 </div>
                 <div className="assistant-content">
@@ -170,58 +191,94 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages }
     return null;
   }
 
-  // Result message - final summary
+  // Result message - final summary with consolidated layout
   if (message.type === 'result') {
-    return (
-      <div className="stream-message result-message">
-        <div className="result-header">
-          <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-            {message.is_error ? (
-              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
-            ) : (
-              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-            )}
-          </svg>
-          <span className="result-title">
-            {message.is_error ? 'Execution Failed' : 'Execution Complete'}
-          </span>
-        </div>
-        {message.result && (
-          <div className="result-content">
-            <p>{message.result}</p>
-          </div>
-        )}
-        {message.error && (
-          <div className="result-error">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M4.47.22A.75.75 0 015 0h6a.75.75 0 01.53.22l4.25 4.25c.141.14.22.331.22.53v6a.75.75 0 01-.22.53l-4.25 4.25A.75.75 0 0111 16H5a.75.75 0 01-.53-.22L.22 11.53A.75.75 0 010 11V5a.75.75 0 01.22-.53L4.47.22z"/>
-            </svg>
-            {message.error}
-          </div>
-        )}
-        <div className="result-stats">
-          {message.cost_usd !== undefined && (
-            <div className="result-stat">
-              <span className="result-stat-label">Cost:</span>
-              <span className="result-stat-value">${message.cost_usd.toFixed(4)}</span>
-            </div>
-          )}
+    // Check if the result text is already shown in the last assistant message
+    // to avoid duplication
+    const lastAssistantMessage = useMemo(() => {
+      for (let i = streamMessages.length - 1; i >= 0; i--) {
+        const msg = streamMessages[i];
+        if (msg === message) continue; // Skip current message
+        if (msg.type === 'assistant' && msg.message?.content) {
+          return msg;
+        }
+      }
+      return null;
+    }, [streamMessages, message]);
+
+    // Get the text from last assistant message
+    const lastAssistantText = useMemo(() => {
+      if (!lastAssistantMessage?.message?.content) return null;
+      const content = lastAssistantMessage.message.content;
+      if (Array.isArray(content)) {
+        const textBlock = content.find((c: any) => c.type === 'text');
+        return textBlock?.text || null;
+      }
+      return null;
+    }, [lastAssistantMessage]);
+
+    // Only show result text if it's different from assistant text or if there's an error
+    const shouldShowResultText = message.error || (message.result && message.result !== lastAssistantText);
+
+    // If we don't need to show the text, render only stats without avatar/name
+    if (!shouldShowResultText) {
+      return (
+        <div className="result-stats-only">
           {message.duration_ms !== undefined && (
-            <div className="result-stat">
-              <span className="result-stat-label">Duration:</span>
-              <span className="result-stat-value">{(message.duration_ms / 1000).toFixed(2)}s</span>
-            </div>
+            <span className="result-stat-inline">
+              Duration: {(message.duration_ms / 1000).toFixed(2)}s
+            </span>
           )}
           {message.usage && (
-            <div className="result-stat">
-              <span className="result-stat-label">Tokens:</span>
-              <span className="result-stat-value">
-                {message.usage.input_tokens + message.usage.output_tokens}
-                {' '}
-                ({message.usage.input_tokens} in, {message.usage.output_tokens} out)
-              </span>
+            <span className="result-stat-inline">
+              Tokens: {message.usage.input_tokens + message.usage.output_tokens} ({message.usage.input_tokens} in, {message.usage.output_tokens} out)
+            </span>
+          )}
+          {message.session_id && (
+            <span className="result-stat-inline">
+              Session: {message.session_id.substring(0, 8)}...
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    // If we need to show text (error or different result), show full message with avatar
+    return (
+      <div className="assistant-text result-message-consolidated">
+        <div className="assistant-avatar">
+          <img src={duckAvatar} alt="Jack" style={{ width: '20px', height: '20px', borderRadius: '50%' }} />
+        </div>
+        <div className="assistant-content">
+          <div className="assistant-name">Jack</div>
+          {message.result && (
+            <div className="assistant-message-text">{message.result}</div>
+          )}
+          {message.error && (
+            <div className="result-error-inline">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4.47.22A.75.75 0 015 0h6a.75.75 0 01.53.22l4.25 4.25c.141.14.22.331.22.53v6a.75.75 0 01-.22.53l-4.25 4.25A.75.75 0 0111 16H5a.75.75 0 01-.53-.22L.22 11.53A.75.75 0 010 11V5a.75.75 0 01.22-.53L4.47.22z"/>
+              </svg>
+              {message.error}
             </div>
           )}
+          <div className="result-stats-compact">
+            {message.duration_ms !== undefined && (
+              <span className="result-stat-inline">
+                Duration: {(message.duration_ms / 1000).toFixed(2)}s
+              </span>
+            )}
+            {message.usage && (
+              <span className="result-stat-inline">
+                Tokens: {message.usage.input_tokens + message.usage.output_tokens} ({message.usage.input_tokens} in, {message.usage.output_tokens} out)
+              </span>
+            )}
+            {message.session_id && (
+              <span className="result-stat-inline">
+                Session: {message.session_id.substring(0, 8)}...
+              </span>
+            )}
+          </div>
         </div>
       </div>
     );
