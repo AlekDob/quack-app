@@ -1,0 +1,13 @@
+{
+  "name": "quack-app-node-sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Node.js SDK wrapper for Claude Agent SDK used by Rust backend",
+  "main": "stream-claude.js",
+  "scripts": {
+    "test": "node stream-claude.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.14"
+  }
+}

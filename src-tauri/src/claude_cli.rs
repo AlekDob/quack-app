@@ -502,6 +502,118 @@ pub async fn send_message_via_cli_streaming(
     Ok(result_event)
 }
 
+/// Send a message to Claude via Node.js SDK with real-time streaming
+#[tauri::command]
+pub async fn send_message_via_sdk_streaming(
+    app: AppHandle,
+    agent_id: String,
+    request: ClaudeCliRequest,
+) -> Result<ClaudeCliResponse, String> {
+    let ClaudeCliRequest {
+        prompt,
+        model,
+        thinking_mode,
+        permission_mode,
+        ..
+    } = request;
+
+    // Build config JSON for Node.js script
+    let config = serde_json::json!({
+        "prompt": prompt,
+        "model": model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
+        "thinkingMode": thinking_mode,
+        "permissionMode": permission_mode.map(|mode| match mode.as_str() {
+            "bypass" => "bypassPermissions",
+            "act" => "default",
+            "plan" => "plan",
+            _ => "default"
+        }).unwrap_or("default"),
+    });
+
+    let config_str = config.to_string();
+
+    // Get path to Node.js script
+    let mut base_path = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+
+    // If current dir already ends with "src-tauri", we're in dev mode
+    // Otherwise, we need to add "src-tauri" to the path
+    if !base_path.ends_with("src-tauri") {
+        base_path = base_path.join("src-tauri");
+    }
+
+    let script_path = base_path
+        .join("node-sdk")
+        .join("stream-claude.js");
+
+    if !script_path.exists() {
+        return Err(format!("Node.js SDK script not found at: {:?}", script_path));
+    }
+
+    // Spawn Node.js process
+    let mut command = Command::new("node");
+    command
+        .arg(&script_path)
+        .arg(&config_str)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("Failed to spawn Node.js SDK script: {}", e))?;
+
+    // Read stdout for events (in foreground to stream in real-time)
+    let stdout = child.stdout.take()
+        .ok_or("Failed to capture stdout".to_string())?;
+    let mut stdout_reader = BufReader::new(stdout).lines();
+
+    // Move stderr logging to background
+    if let Some(stderr) = child.stderr.take() {
+        tokio::spawn(async move {
+            let mut stderr_reader = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = stderr_reader.next_line().await {
+                log::error!("[Node.js SDK stderr] {}", line);
+            }
+        });
+    }
+
+    // Track final response
+    let mut final_result: Option<ClaudeCliResponse> = None;
+
+    // Stream stdout events in real-time (foreground task)
+    while let Ok(Some(line)) = stdout_reader.next_line().await {
+        // Parse JSON event
+        if let Ok(event) = serde_json::from_str::<ClaudeEvent>(&line) {
+            // Emit event to frontend immediately
+            let event_name = format!("claude-event:{}", agent_id);
+            let _ = app.emit(&event_name, &event);
+
+            // Check if this is the final result
+            if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = &event {
+                final_result = Some(ClaudeCliResponse {
+                    result: result.clone(),
+                    session_id: session_id.clone(),
+                    total_cost_usd: *total_cost_usd,
+                    usage: usage.clone(),
+                });
+            }
+        }
+    }
+
+    // Wait for process to complete
+    let status = child.wait().await
+        .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("Node.js SDK script failed with status: {}", status));
+    }
+
+    // Return final response
+    final_result.ok_or_else(|| {
+        "No result event found in Node.js SDK output".to_string()
+    })
+}
+
 
 #[cfg(test)]
 mod tests {

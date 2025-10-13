@@ -47,6 +47,7 @@ import type {
   AgentDetails,
   ChatMessage,
   ChatToolCall,
+  ClaudeEvent,
 } from "./types";
 
 interface TerminalMetadata {
@@ -281,45 +282,32 @@ function App() {
     }
   }, [tauriAvailable]);
 
-  // Listen for Claude CLI streaming events
+  // Listen for Claude SDK streaming events from backend
   useEffect(() => {
     if (!tauriAvailable || !activeId) return;
 
-    const setupListener = async () => {
-      const unlisten = await listen(`claude-event:${activeId}`, (event: any) => {
-        const claudeEvent = event.payload;
+    const eventName = `claude-event:${activeId}`;
+    const unlistenPromise = listen<ClaudeEvent>(eventName, (event) => {
+      const claudeEvent = event.payload;
 
-        // Update the assistant message with the new event
-        setChatSessions((prev) => {
-          const newSessions = new Map(prev);
-          const agentMessages = newSessions.get(activeId) ?? [];
+      // Update chat session with incoming events
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(activeId) ?? [];
+        const lastMsg = agentMessages[agentMessages.length - 1];
 
-          // Find the last assistant message (the one being streamed)
-          const lastAssistantIndex = agentMessages.findIndex(
-            (msg, idx) => idx === agentMessages.length - 1 && msg.role === 'assistant'
-          );
+        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+          const updatedMessages = [...agentMessages];
+          updatedMessages[updatedMessages.length - 1] = {
+            ...lastMsg,
+            events: [...(lastMsg.events || []), claudeEvent],
+          };
+          newSessions.set(activeId, updatedMessages);
+        }
 
-          if (lastAssistantIndex !== -1) {
-            const updatedMessages = [...agentMessages];
-            const assistantMsg = updatedMessages[lastAssistantIndex];
-
-            // Add event to the events array
-            updatedMessages[lastAssistantIndex] = {
-              ...assistantMsg,
-              events: [...(assistantMsg.events || []), claudeEvent],
-            };
-
-            newSessions.set(activeId, updatedMessages);
-          }
-
-          return newSessions;
-        });
+        return newSessions;
       });
-
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
+    });
 
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -411,52 +399,20 @@ function App() {
         prompt = `${history}\n\nUser: ${contentWithAttachments}`;
       }
 
-      // Call Claude CLI (using streaming version for tool tracking)
-      const sanitizedAttachments = attachments
-        .map((item) => item.path)
-        .filter((path) => !!path);
-
-      const requestPayload = {
-        prompt,
-        model: options?.model,
-        thinkingMode: options?.thinkingMode,
-        permissionMode: options?.permissionMode,
-        attachments: sanitizedAttachments.length > 0 ? sanitizedAttachments : undefined,
-      };
-
-      interface ClaudeCliResponse {
-        result: string;
-        session_id: string;
-        total_cost_usd: number;
-        usage: {
-          input_tokens: number;
-          output_tokens: number;
-          cache_read_input_tokens: number;
-          cache_creation_input_tokens: number;
-        };
-      }
-
-      // Use streaming command to get real-time tool tracking
-      const response = await invoke<ClaudeCliResponse>('send_message_via_cli_streaming', {
+      // Call Rust backend for SDK streaming
+      // Events are received via the claude-event listener above
+      const response = await invoke<{ result: string; session_id: string; total_cost_usd: number }>('send_message_via_sdk_streaming', {
         agentId: activeId,
-        request: requestPayload,
+        request: {
+          prompt,
+          model: options?.model || 'sonnet',
+          thinkingMode: options?.thinkingMode,
+          permissionMode: options?.permissionMode,
+          attachments: attachments.map(a => a.path),
+        },
       });
 
-      // Add to agent's conversation history
-      const updatedHistory = [
-        ...agentHistory,
-        {
-          role: 'user' as const,
-          content: contentWithAttachments,
-        },
-        {
-          role: 'assistant' as const,
-          content: response.result,
-        },
-      ];
-      chatConversationHistoryRef.current.set(activeId, updatedHistory);
-
-      // Update message with response
+      // Update message with final result
       setChatSessions((prev) => {
         const newSessions = new Map(prev);
         const agentMessages = newSessions.get(activeId) ?? [];
@@ -474,8 +430,22 @@ function App() {
         );
         return newSessions;
       });
+
+      // Add to agent's conversation history
+      const updatedHistory = [
+        ...agentHistory,
+        {
+          role: 'user' as const,
+          content: contentWithAttachments,
+        },
+        {
+          role: 'assistant' as const,
+          content: response.result,
+        },
+      ];
+      chatConversationHistoryRef.current.set(activeId, updatedHistory);
     } catch (err) {
-      console.error('Error calling Claude CLI:', err);
+      console.error('Error calling Claude SDK:', err);
 
       const errorMessage =
         err instanceof Error
