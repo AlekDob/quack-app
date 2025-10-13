@@ -1,0 +1,116 @@
+.custom-permission-select {
+  position: relative;
+  width: 100%;
+}
+
+.permission-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.permission-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.permission-select-trigger:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(242, 140, 82, 0.5);
+}
+
+.permission-icon {
+  font-size: 14px;
+  font-weight: bold;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.permission-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.permission-chevron {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: transform 0.2s ease;
+}
+
+.permission-chevron.open {
+  transform: rotate(180deg);
+}
+
+.permission-options-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(20, 22, 28, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.permission-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.permission-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.permission-option.selected {
+  background: rgba(242, 140, 82, 0.1);
+}
+
+.permission-option .permission-label {
+  flex: 1;
+}
+
+.check-icon {
+  flex-shrink: 0;
+  color: rgba(242, 140, 82, 0.8);
+}

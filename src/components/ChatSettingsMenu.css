@@ -126,23 +126,23 @@
   padding: 6px 8px;
 }
 
-/* Permission mode colors */
+/* Permission mode colors - using background for better visibility */
 .chat-settings-select option[value="plan"] {
-  color: #60a5fa;
-  background: rgba(96, 165, 250, 0.1);
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.2) 0%, transparent 100%);
+  border-left: 3px solid #60a5fa;
 }
 
 .chat-settings-select option[value="act"] {
-  color: #34d399;
-  background: rgba(52, 211, 153, 0.1);
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.2) 0%, transparent 100%);
+  border-left: 3px solid #34d399;
 }
 
 .chat-settings-select option[value="acceptEdits"] {
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.1);
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.2) 0%, transparent 100%);
+  border-left: 3px solid #fbbf24;
 }
 
 .chat-settings-select option[value="bypass"] {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.2) 0%, transparent 100%);
+  border-left: 3px solid #f87171;
 }
