@@ -1,0 +1,286 @@
+/* System Initialized Widget */
+.system-init-widget {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.system-init-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.system-icon {
+  color: rgba(59, 130, 246, 0.8);
+}
+
+.system-init-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: rgba(59, 130, 246, 1);
+}
+
+.system-init-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.system-init-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.system-init-row svg {
+  color: rgba(59, 130, 246, 0.6);
+  flex-shrink: 0;
+}
+
+.system-init-label {
+  color: rgba(255, 255, 255, 0.5);
+  min-width: fit-content;
+}
+
+.system-init-value {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.system-init-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 22px;
+}
+
+.system-init-tool-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  color: rgba(59, 130, 246, 0.9);
+}
+
+.system-init-tool-badge svg {
+  width: 12px;
+  height: 12px;
+  color: rgba(59, 130, 246, 0.7);
+}
+
+/* Tool Widget Base */
+.tool-widget {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.tool-widget:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tool-widget-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tool-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tool-widget-title svg:first-child {
+  color: rgba(147, 197, 253, 0.8);
+}
+
+.tool-widget-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+.tool-widget-command {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tool-widget-pattern {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-size: 12px;
+  background: rgba(147, 197, 253, 0.15);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: rgba(147, 197, 253, 0.9);
+}
+
+.tool-widget-path {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+}
+
+.tool-widget-file-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(147, 197, 253, 0.1);
+  border: 1px solid rgba(147, 197, 253, 0.2);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  color: rgba(147, 197, 253, 0.9);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.tool-widget-file-link:hover {
+  background: rgba(147, 197, 253, 0.2);
+  border-color: rgba(147, 197, 253, 0.4);
+}
+
+.tool-widget-file-link svg {
+  color: rgba(147, 197, 253, 0.7);
+}
+
+.tool-widget-chevron {
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.tool-widget-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.tool-widget-status-success {
+  color: rgba(34, 197, 94, 1);
+}
+
+.tool-widget-status-error {
+  color: rgba(239, 68, 68, 1);
+}
+
+.tool-widget-loading {
+  display: flex;
+  align-items: center;
+}
+
+.tool-widget-loading .spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(147, 197, 253, 0.2);
+  border-top-color: rgba(147, 197, 253, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tool Widget Content */
+.tool-widget-content {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tool-widget-code,
+.tool-widget-output {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.tool-widget-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(239, 68, 68, 1);
+  line-height: 1.5;
+}
+
+.tool-widget-error svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Edit Widget - use DiffViewer */
+.edit-widget .tool-widget-content {
+  padding: 0;
+}
+
+/* Write Widget */
+.write-widget .tool-widget-code {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Bash Widget */
+.bash-widget .tool-widget-command {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Read Widget */
+.read-widget .tool-widget-output {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Grep Widget */
+.grep-widget .tool-widget-output {
+  max-height: 400px;
+  overflow-y: auto;
+}

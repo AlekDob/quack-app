@@ -13,7 +13,7 @@ pub struct ClaudeCliResponse {
 }
 
 // New event-based structures for --output-format json
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ClaudeEvent {
     System {
@@ -45,7 +45,7 @@ pub enum ClaudeEvent {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantMessage {
     pub id: String,
     pub content: Vec<ContentBlock>,
@@ -53,7 +53,7 @@ pub struct AssistantMessage {
     pub extra: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ContentBlock {
     Text {
@@ -240,18 +240,11 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         }
     }) {
         // Map frontend permission modes to valid Claude CLI modes
-        // Valid CLI modes: acceptEdits, bypassPermissions, default, plan
+        // Valid CLI modes: bypassPermissions, default, plan
         let cli_mode = match mode.as_str() {
             "bypass" => "bypassPermissions",
             "act" => "default",
-            "read" => "default",
-            "review" => "default",
-            "write" => "acceptEdits",
-            "safe" => "default",
             "plan" => "plan",
-            "acceptedits" => "acceptEdits",
-            "bypasspermissions" => "bypassPermissions",
-            "default" => "default",
             _ => "default",  // fallback to default
         };
 
@@ -333,7 +326,7 @@ fn parse_tool_from_line(line: &str) -> Option<(String, String)> {
 #[tauri::command]
 pub async fn send_message_via_cli_streaming(
     app: AppHandle,
-    message_id: String,
+    agent_id: String,
     request: ClaudeCliRequest,
 ) -> Result<ClaudeCliResponse, String> {
     // Check if CLI is available
@@ -426,18 +419,11 @@ pub async fn send_message_via_cli_streaming(
         }
     }) {
         // Map frontend permission modes to valid Claude CLI modes
-        // Valid CLI modes: acceptEdits, bypassPermissions, default, plan
+        // Valid CLI modes: bypassPermissions, default, plan
         let cli_mode = match mode.as_str() {
             "bypass" => "bypassPermissions",
             "act" => "default",
-            "read" => "default",
-            "review" => "default",
-            "write" => "acceptEdits",
-            "safe" => "default",
             "plan" => "plan",
-            "acceptedits" => "acceptEdits",
-            "bypasspermissions" => "bypassPermissions",
-            "default" => "default",
             _ => "default",  // fallback to default
         };
 
@@ -461,48 +447,17 @@ pub async fn send_message_via_cli_streaming(
             .map_err(|e| format!("Failed to write to stdin: {}", e))?;
     }
 
-    // Read stderr for tool tracking
-    let stderr = child.stderr.take()
-        .ok_or("Failed to capture stderr".to_string())?;
-    let mut stderr_reader = BufReader::new(stderr).lines();
-
-    let app_clone = app.clone();
-    let message_id_clone = message_id.clone();
-
-    // Spawn task to read stderr and emit tool events
-    tokio::spawn(async move {
-        let mut tool_counter = 0u32;
-        while let Ok(Some(line)) = stderr_reader.next_line().await {
-            // Log all stderr lines for debugging
-            log::info!("[Claude stderr] {}", line);
-
-            // Try to parse tool from line
-            if let Some((tool_name, _full_line)) = parse_tool_from_line(&line) {
-                tool_counter += 1;
-                let tool_id = format!("tool-{}-{}", message_id_clone, tool_counter);
-
-                // Emit tool start event
-                let start_event = ToolStartEvent {
-                    tool_id: tool_id.clone(),
-                    tool_name: tool_name.clone(),
-                    message_id: message_id_clone.clone(),
-                };
-
-                let _ = app_clone.emit("claude-tool-start", start_event);
-
-                // For now, immediately mark as completed
-                let result_event = ToolResultEvent {
-                    tool_id,
-                    tool_name,
-                    message_id: message_id_clone.clone(),
-                    result: line.clone(),
-                    status: "completed".to_string(),
-                };
-
-                let _ = app_clone.emit("claude-tool-result", result_event);
+    // Read stderr only for logging (tool tracking now done via JSON parsing)
+    if let Some(stderr) = child.stderr.take() {
+        let mut stderr_reader = BufReader::new(stderr).lines();
+        // Spawn task to log stderr (but don't emit tool events - handled by JSON)
+        tokio::spawn(async move {
+            while let Ok(Some(line)) = stderr_reader.next_line().await {
+                // Log stderr for debugging
+                log::info!("[Claude stderr] {}", line);
             }
-        }
-    });
+        });
+    }
 
     // Wait for command to complete and get output
     let output = child.wait_with_output().await
@@ -523,32 +478,10 @@ pub async fn send_message_via_cli_streaming(
     let events: Vec<ClaudeEvent> = serde_json::from_str(&stdout)
         .map_err(|e| format!("Failed to parse Claude CLI events: {}. Output: {}", e, stdout))?;
 
-    // Emit tool events from Assistant message
+    // Emit each event to the frontend for real-time visualization
     for event in &events {
-        if let ClaudeEvent::Assistant { message, .. } = event {
-            for block in &message.content {
-                if let ContentBlock::ToolUse { id, name, input } = block {
-                    // Emit tool start event
-                    let tool_id = id.clone();
-                    let start_event = ToolStartEvent {
-                        tool_id: tool_id.clone(),
-                        tool_name: name.clone(),
-                        message_id: message_id.clone(),
-                    };
-                    let _ = app.emit("claude-tool-start", start_event);
-
-                    // Emit tool result event (mark as completed)
-                    let result_event = ToolResultEvent {
-                        tool_id,
-                        tool_name: name.clone(),
-                        message_id: message_id.clone(),
-                        result: serde_json::to_string_pretty(input).unwrap_or_else(|_| format!("{:?}", input)),
-                        status: "completed".to_string(),
-                    };
-                    let _ = app.emit("claude-tool-result", result_event);
-                }
-            }
-        }
+        let event_name = format!("claude-event:{}", agent_id);
+        let _ = app.emit(&event_name, event);
     }
 
     // Extract final response from Result event

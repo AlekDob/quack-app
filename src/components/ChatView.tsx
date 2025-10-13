@@ -46,10 +46,6 @@ export default function ChatView({ messages, isLoading, onSendMessage }: ChatVie
       { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
       { value: 'act' as PermissionMode, label: '◆ Act · Direct execution' },
       { value: 'bypass' as PermissionMode, label: '⬢ Bypass · Full access' },
-      { value: 'read' as PermissionMode, label: '▤ Read · View-only capabilities' },
-      { value: 'review' as PermissionMode, label: '▦ Review · Feedback focus' },
-      { value: 'write' as PermissionMode, label: '▧ Write · Create new only' },
-      { value: 'safe' as PermissionMode, label: '▩ Safe · Manual confirmation' },
     ],
     []
   );

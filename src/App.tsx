@@ -281,100 +281,50 @@ function App() {
     }
   }, [tauriAvailable]);
 
-  // Listen to Claude tool events
+  // Listen for Claude CLI streaming events
   useEffect(() => {
-    if (!tauriAvailable) {
-      return;
-    }
+    if (!tauriAvailable || !activeId) return;
 
-    const setupToolListeners = async () => {
-      // Listen for tool start events
-      const unlistenToolStart = await listen<{
-        tool_id: string;
-        tool_name: string;
-        message_id: string;
-      }>('claude-tool-start', (event) => {
-        const { tool_id, tool_name, message_id } = event.payload;
+    const setupListener = async () => {
+      const unlisten = await listen(`claude-event:${activeId}`, (event: any) => {
+        const claudeEvent = event.payload;
 
+        // Update the assistant message with the new event
         setChatSessions((prev) => {
           const newSessions = new Map(prev);
+          const agentMessages = newSessions.get(activeId) ?? [];
 
-          // Find the agent with this message
-          for (const [agentId, messages] of newSessions.entries()) {
-            const messageIndex = messages.findIndex(m => m.id === message_id);
-            if (messageIndex !== -1) {
-              const updatedMessages = [...messages];
-              const message = { ...updatedMessages[messageIndex] };
+          // Find the last assistant message (the one being streamed)
+          const lastAssistantIndex = agentMessages.findIndex(
+            (msg, idx) => idx === agentMessages.length - 1 && msg.role === 'assistant'
+          );
 
-              // Add new tool call with running status
-              const newToolCall: ChatToolCall = {
-                id: tool_id,
-                name: tool_name,
-                input: {},
-                status: 'running',
-                timestamp: Date.now(),
-              };
+          if (lastAssistantIndex !== -1) {
+            const updatedMessages = [...agentMessages];
+            const assistantMsg = updatedMessages[lastAssistantIndex];
 
-              message.toolCalls = [...(message.toolCalls ?? []), newToolCall];
-              updatedMessages[messageIndex] = message;
-              newSessions.set(agentId, updatedMessages);
-              break;
-            }
+            // Add event to the events array
+            updatedMessages[lastAssistantIndex] = {
+              ...assistantMsg,
+              events: [...(assistantMsg.events || []), claudeEvent],
+            };
+
+            newSessions.set(activeId, updatedMessages);
           }
 
           return newSessions;
         });
       });
 
-      // Listen for tool result events
-      const unlistenToolResult = await listen<{
-        tool_id: string;
-        tool_name: string;
-        message_id: string;
-        result: string;
-        status: string;
-      }>('claude-tool-result', (event) => {
-        const { tool_id, message_id, result, status } = event.payload;
-
-        setChatSessions((prev) => {
-          const newSessions = new Map(prev);
-
-          for (const [agentId, messages] of newSessions.entries()) {
-            const messageIndex = messages.findIndex(m => m.id === message_id);
-            if (messageIndex !== -1) {
-              const updatedMessages = [...messages];
-              const message = { ...updatedMessages[messageIndex] };
-
-              // Update tool call with result
-              if (message.toolCalls) {
-                message.toolCalls = message.toolCalls.map(tool =>
-                  tool.id === tool_id
-                    ? { ...tool, status: status as 'completed' | 'error', result }
-                    : tool
-                );
-              }
-
-              updatedMessages[messageIndex] = message;
-              newSessions.set(agentId, updatedMessages);
-              break;
-            }
-          }
-
-          return newSessions;
-        });
-      });
-
-      return () => {
-        unlistenToolStart.then(fn => fn()).catch(() => undefined);
-        unlistenToolResult.then(fn => fn()).catch(() => undefined);
-      };
+      return unlisten;
     };
 
-    const cleanup = setupToolListeners();
+    const unlistenPromise = setupListener();
+
     return () => {
-      cleanup.then(fn => fn?.()).catch(() => undefined);
+      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
-  }, [tauriAvailable]);
+  }, [tauriAvailable, activeId]);
 
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
@@ -488,7 +438,7 @@ function App() {
 
       // Use streaming command to get real-time tool tracking
       const response = await invoke<ClaudeCliResponse>('send_message_via_cli_streaming', {
-        messageId: assistantMessageId,
+        agentId: activeId,
         request: requestPayload,
       });
 
@@ -928,7 +878,13 @@ function App() {
 
       return prev.map((terminal) =>
         terminal.id === id
-          ? { ...terminal, status: "busy", needsAttention: false }
+          ? {
+              ...terminal,
+              status: "busy",
+              needsAttention: false,
+              hasResponded: false,          // Reset: nuovo prompt inviato
+              responseStartTime: Date.now() // Timestamp inizio lavoro
+            }
           : terminal
       );
     });
@@ -1010,12 +966,40 @@ function App() {
       const handle = setTimeout(() => {
         // Retrieve terminal info for notification
         const terminal = terminalsRef.current.find(t => t.id === id);
-        if (terminal && terminal.status === 'idle') {
-          const shouldNotify = NOTIFY_ACTIVE_TERMINAL || id !== activeId;
-          if (shouldNotify) {
-            void notifyTerminalReady({ id: terminal.id, label: terminal.label });
-          }
+
+        if (!terminal || terminal.status !== 'idle') {
+          notificationTimersRef.current.delete(id);
+          return;
         }
+
+        // 🦆 SMART LOGIC: Notifica SOLO se:
+        // 1. Terminal è idle
+        // 2. hasResponded === false (prima risposta per questo prompt)
+        // 3. Tempo dall'ultimo busy > 5 secondi (filtro anti-spam)
+        // 4. Terminal NON è attivo (utente sta guardando altro)
+
+        const hasResponded = terminal.hasResponded ?? false;
+        const responseStartTime = terminal.responseStartTime ?? 0;
+        const timeSinceBusy = Date.now() - responseStartTime;
+        const isMinimumTimeElapsed = timeSinceBusy > 5000; // 5 secondi
+        const isTerminalInactive = id !== activeId;
+
+        const shouldNotify =
+          !hasResponded &&
+          isMinimumTimeElapsed &&
+          (NOTIFY_ACTIVE_TERMINAL || isTerminalInactive);
+
+        if (shouldNotify) {
+          void notifyTerminalReady({ id: terminal.id, label: terminal.label });
+
+          // Marca come "già risposto" per evitare notifiche multiple
+          setTerminals((prev) =>
+            prev.map((t) =>
+              t.id === id ? { ...t, hasResponded: true } : t
+            )
+          );
+        }
+
         notificationTimersRef.current.delete(id);
       }, NOTIFICATION_TIMEOUT_MS);
       notificationTimersRef.current.set(id, handle);
@@ -1419,6 +1403,8 @@ function App() {
                 ...terminal,
                 status: "idle" as const,
                 needsAttention: false,
+                hasResponded: false,
+                responseStartTime: null,
               });
             } catch (error) {
               console.warn(
@@ -1443,6 +1429,8 @@ function App() {
               ...initial,
               status: "idle" as const,
               needsAttention: false,
+              hasResponded: false,
+              responseStartTime: null,
             };
             setTerminals([initialWithState]);
             setActiveId(initialWithState.id);
@@ -1459,6 +1447,8 @@ function App() {
             ...initial,
             status: "idle" as const,
             needsAttention: false,
+            hasResponded: false,
+            responseStartTime: null,
           };
           setTerminals([initialWithState]);
           setActiveId(initialWithState.id);
@@ -1713,6 +1703,8 @@ function App() {
           ...created,
           status: "idle",
           needsAttention: false,
+          hasResponded: false,
+          responseStartTime: null,
         };
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
@@ -2062,6 +2054,8 @@ function App() {
             ...result,
             status: "busy",
             needsAttention: false,
+            hasResponded: false,
+            responseStartTime: Date.now(),
           };
           setTerminals((prev) => [...prev, terminalWithState]);
           targetTerminalId = terminalWithState.id;

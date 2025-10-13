@@ -1,16 +1,19 @@
 import { memo } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
+import StreamMessage from './StreamMessage';
 import './ChatMessage.css';
+import './StreamMessage.css';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onOpenFile?: (path: string) => void;
 }
 
-function ChatMessage({ message }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
@@ -52,10 +55,23 @@ function ChatMessage({ message }: ChatMessageProps) {
             })}
           </span>
         </div>
-        <div className="chat-message-body">
-          {message.content}
-          {isStreaming && <span className="streaming-cursor">▊</span>}
-        </div>
+        {/* If we have Claude events, show them using StreamMessage */}
+        {message.events && message.events.length > 0 ? (
+          <div className="chat-message-events">
+            {message.events.map((event, idx) => (
+              <StreamMessage
+                key={idx}
+                message={event}
+                streamMessages={message.events || []}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="chat-message-body">
+            {message.content}
+            {isStreaming && <span className="streaming-cursor">▊</span>}
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="chat-message-attachments">
             {attachments.map((attachment) => {
@@ -88,7 +104,7 @@ function ChatMessage({ message }: ChatMessageProps) {
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="chat-message-tools">
             {message.toolCalls.map((tool) => (
-              <ToolCallCard key={tool.id} tool={tool} />
+              <ToolCallCard key={tool.id} tool={tool} onOpenFile={onOpenFile} />
             ))}
           </div>
         )}

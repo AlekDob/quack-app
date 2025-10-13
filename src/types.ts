@@ -6,6 +6,8 @@ export interface TerminalInfo {
   alive: boolean;
   status?: "idle" | "busy";
   needsAttention?: boolean;
+  hasResponded?: boolean;           // Ha già risposto alla richiesta corrente?
+  responseStartTime?: number | null; // Timestamp inizio risposta
 }
 
 export type SavedCommandCategory = "dev" | "build" | "test" | "custom";
@@ -221,6 +223,7 @@ export interface ChatMessage {
   toolResults?: ChatToolResult[];
   error?: string;
   attachments?: ChatAttachment[];
+  events?: ClaudeEvent[]; // Claude CLI events for streaming visualization
 }
 
 export interface ChatSession {
@@ -247,3 +250,67 @@ export interface StreamChunk {
   content: string;
   toolCall?: ChatToolCall;
 }
+
+// Claude CLI Event types (matching Rust backend)
+export interface ClaudeEventBase {
+  type: 'system' | 'assistant' | 'user' | 'result';
+}
+
+export interface ClaudeSystemEvent extends ClaudeEventBase {
+  type: 'system';
+  subtype?: string;
+  session_id?: string;
+  model?: string;
+  cwd?: string;
+  tools?: string[];
+}
+
+export interface ClaudeContentBlock {
+  type: 'text' | 'tool_use';
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+}
+
+export interface ClaudeAssistantMessage {
+  id: string;
+  content: ClaudeContentBlock[];
+}
+
+export interface ClaudeAssistantEvent extends ClaudeEventBase {
+  type: 'assistant';
+  message: ClaudeAssistantMessage;
+  session_id?: string;
+}
+
+export interface ClaudeUserEvent extends ClaudeEventBase {
+  type: 'user';
+  message: {
+    content: Array<{
+      type: 'text' | 'tool_result';
+      text?: string;
+      tool_use_id?: string;
+      content?: string;
+      is_error?: boolean;
+    }>;
+  };
+  session_id?: string;
+}
+
+export interface ClaudeResultEvent extends ClaudeEventBase {
+  type: 'result';
+  result?: string;
+  error?: string;
+  is_error?: boolean;
+  session_id?: string;
+  total_cost_usd?: number;
+  cost_usd?: number;
+  duration_ms?: number;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+export type ClaudeEvent = ClaudeSystemEvent | ClaudeAssistantEvent | ClaudeUserEvent | ClaudeResultEvent;

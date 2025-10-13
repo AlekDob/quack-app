@@ -1,0 +1,148 @@
+/* Stream Message Base */
+.stream-message {
+  margin-bottom: 16px;
+}
+
+/* Assistant Message */
+.assistant-message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assistant-text {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.assistant-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(147, 197, 253, 0.2), rgba(59, 130, 246, 0.2));
+  border: 1px solid rgba(147, 197, 253, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.assistant-avatar svg {
+  color: rgba(147, 197, 253, 0.9);
+}
+
+.assistant-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.assistant-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(147, 197, 253, 0.9);
+  margin-bottom: 6px;
+}
+
+.assistant-message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Result Message */
+.result-message {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.result-message.error {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.result-header svg {
+  color: rgba(34, 197, 94, 1);
+}
+
+.result-message.error .result-header svg {
+  color: rgba(239, 68, 68, 1);
+}
+
+.result-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.result-content {
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.result-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  font-size: 13px;
+  color: rgba(239, 68, 68, 1);
+  line-height: 1.5;
+}
+
+.result-error svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.result-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.result-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.result-stat-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.result-stat-value {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+/* Unknown Tool Widget */
+.unknown-tool-widget .tool-widget-header {
+  cursor: default;
+}
+
+.unknown-tool-widget .tool-widget-content {
+  display: block;
+}

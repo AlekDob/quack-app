@@ -15,7 +15,7 @@ interface ClaudeCliResponse {
 }
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
-export type PermissionMode = 'plan' | 'act' | 'bypass' | 'read' | 'review' | 'write' | 'safe';
+export type PermissionMode = 'plan' | 'act' | 'bypass';
 
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
