@@ -157,7 +157,8 @@ export const EditWidget: React.FC<{
   old_string: string;
   new_string: string;
   result?: any;
-}> = ({ file_path, old_string, new_string, result }) => {
+  onFilePathClick?: (path: string) => void;
+}> = ({ file_path, old_string, new_string, result, onFilePathClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -182,7 +183,15 @@ export const EditWidget: React.FC<{
             </div>
           )}
         </div>
-        <button className="tool-widget-file-link">
+        <button
+          className="tool-widget-file-link"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onFilePathClick) {
+              onFilePathClick(file_path);
+            }
+          }}
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z"/>
           </svg>
@@ -220,7 +229,8 @@ export const WriteWidget: React.FC<{
   filePath: string;
   content: string;
   result?: any;
-}> = ({ filePath, content, result }) => {
+  onFilePathClick?: (path: string) => void;
+}> = ({ filePath, content, result, onFilePathClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Count lines
@@ -249,7 +259,15 @@ export const WriteWidget: React.FC<{
             </div>
           )}
         </div>
-        <button className="tool-widget-file-link">
+        <button
+          className="tool-widget-file-link"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onFilePathClick) {
+              onFilePathClick(filePath);
+            }
+          }}
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z"/>
           </svg>
@@ -347,7 +365,8 @@ export const BashWidget: React.FC<{
 export const ReadWidget: React.FC<{
   filePath: string;
   result?: any;
-}> = ({ filePath, result }) => {
+  onFilePathClick?: (path: string) => void;
+}> = ({ filePath, result, onFilePathClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -372,7 +391,15 @@ export const ReadWidget: React.FC<{
             </div>
           )}
         </div>
-        <button className="tool-widget-file-link">
+        <button
+          className="tool-widget-file-link"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onFilePathClick) {
+              onFilePathClick(filePath);
+            }
+          }}
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z"/>
           </svg>

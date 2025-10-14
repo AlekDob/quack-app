@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
-import type { PermissionMode } from '../hooks/useClaudeChat';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
 import './ChatMessage.css';
@@ -12,10 +11,10 @@ import duckAvatar from '../../images/duck.png';
 interface ChatMessageProps {
   message: ChatMessageType;
   onOpenFile?: (path: string) => void;
-  onPermissionModeChange?: (mode: PermissionMode) => void;
+  onFilePathClick?: (path: string) => void;
 }
 
-function ChatMessage({ message, onOpenFile, onPermissionModeChange }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
@@ -65,7 +64,7 @@ function ChatMessage({ message, onOpenFile, onPermissionModeChange }: ChatMessag
                 key={idx}
                 message={event}
                 streamMessages={message.events || []}
-                onPermissionModeChange={onPermissionModeChange}
+                onFilePathClick={onFilePathClick}
               />
             ))}
           </div>

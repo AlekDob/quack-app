@@ -10,7 +10,6 @@ import {
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import type { ClaudeEvent } from '../types';
-import type { PermissionMode } from '../hooks/useClaudeChat';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
@@ -18,10 +17,10 @@ import duckAvatar from '../../images/duck.png';
 interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
-  onPermissionModeChange?: (mode: PermissionMode) => void;
+  onFilePathClick?: (path: string) => void;
 }
 
-const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onPermissionModeChange }) => {
+const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick }) => {
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
     const results = new Map<string, any>();
@@ -39,22 +38,6 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
     return results;
   }, [streamMessages]);
 
-  // Check if this is the first System Initialized event in the stream
-  const isFirstSystemInit = useMemo(() => {
-    if (message.type !== 'system' || message.subtype !== 'init') return false;
-
-    const currentIndex = streamMessages.indexOf(message);
-
-    // Check if there's any System Initialized before this one
-    for (let i = 0; i < currentIndex; i++) {
-      const msg = streamMessages[i];
-      if (msg.type === 'system' && msg.subtype === 'init') {
-        return false; // Found one before, so this is not the first
-      }
-    }
-
-    return true; // This is the first one
-  }, [message, streamMessages]);
 
   // System initialization message
   if (message.type === 'system' && message.subtype === 'init') {
@@ -115,7 +98,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   old_string={input.old_string}
                   new_string={input.new_string}
                   result={toolResult}
-                  onPermissionModeChange={onPermissionModeChange}
+                  onFilePathClick={onFilePathClick}
                 />
               );
             }
@@ -128,7 +111,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   filePath={input.file_path}
                   content={input.content}
                   result={toolResult}
-                  onPermissionModeChange={onPermissionModeChange}
+                  onFilePathClick={onFilePathClick}
                 />
               );
             }
@@ -152,6 +135,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   key={idx}
                   filePath={input.file_path}
                   result={toolResult}
+                  onFilePathClick={onFilePathClick}
                 />
               );
             }

@@ -18,9 +18,10 @@ interface ChatViewProps {
   onClearAgent?: () => void;
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
+  onFilePathClick?: (path: string) => void;
 }
 
-export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent }: ChatViewProps) {
+export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick }: ChatViewProps) {
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
@@ -100,7 +101,7 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
       <MessageList
         messages={messages}
         loading={isLoading}
-        onPermissionModeChange={setPermissionMode}
+        onFilePathClick={onFilePathClick}
       />
       <div className="chat-view-footer">
         <ChatSettingsMenu

@@ -46,7 +46,6 @@ import type {
   AgentInfo,
   AgentDetails,
   ChatMessage,
-  ChatToolCall,
   ClaudeEvent,
 } from "./types";
 
@@ -307,6 +306,56 @@ function App() {
 
         return newSessions;
       });
+
+      // Auto-refresh FileExplorer when files are created/modified
+      if (claudeEvent.type === 'result') {
+        // Get all events from the last message to check for Write/Edit tools
+        setChatSessions((prev) => {
+          const agentMessages = prev.get(activeId) ?? [];
+          const lastMsg = agentMessages[agentMessages.length - 1];
+
+          if (lastMsg && lastMsg.events) {
+            const modifiedPaths = new Set<string>();
+
+            // Check assistant events for Write/Edit tool uses
+            lastMsg.events.forEach((evt) => {
+              if (evt.type === 'assistant' && evt.message?.content) {
+                evt.message.content.forEach((content) => {
+                  if (content.type === 'tool_use') {
+                    const toolName = content.name?.toLowerCase();
+                    const input = content.input as any;
+
+                    // Extract file paths from Write and Edit tools
+                    if (toolName === 'write' && input?.file_path) {
+                      modifiedPaths.add(input.file_path);
+                    } else if (toolName === 'edit' && input?.file_path) {
+                      modifiedPaths.add(input.file_path);
+                    }
+                  }
+                });
+              }
+            });
+
+            // Refresh parent directories of modified files
+            if (modifiedPaths.size > 0) {
+              const dirsToRefresh = new Set<string>();
+              modifiedPaths.forEach((filePath) => {
+                const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+                if (parentDir) {
+                  dirsToRefresh.add(parentDir);
+                }
+              });
+
+              // Trigger refresh for each parent directory
+              dirsToRefresh.forEach((dir) => {
+                fetchDirectoryChildren(dir);
+              });
+            }
+          }
+
+          return prev;
+        });
+      }
     });
 
     return () => {
@@ -1142,6 +1191,11 @@ function App() {
       description: 'Chat will use default model settings',
       duration: 2000,
     });
+  }, []);
+
+  const handleFilePathClick = useCallback((path: string) => {
+    const name = path.split('/').pop() || path;
+    setPreviewFile({ name, path });
   }, []);
 
   // Load Quack Agency agents on startup
@@ -2489,6 +2543,7 @@ function App() {
               onClearAgent={handleClearAgent}
               agents={agents}
               onSelectAgent={handleUseAgent}
+              onFilePathClick={handleFilePathClick}
             />
           </div>
         </section>
