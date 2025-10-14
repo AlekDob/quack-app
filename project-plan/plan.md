@@ -123,6 +123,12 @@ When Jack identifies a new feature or component:
   - *Timeline*: 6-8 days (4 phases)
   - *Dependencies*: API key management, UI/UX decision
 
+- 🎯 **[git-integration-improvement](./git-integration-improvement/)**: Comprehensive Git management system with visual branch graph and advanced features
+  - *Status*: Planning Phase Complete (Specification Mode)
+  - *Agent*: Mike (Planning) → John (Backend Phase 1) → Julie (UI Phases 2-6)
+  - *Timeline*: 6-8 days (6 phases)
+  - *Dependencies*: None - can start immediately
+
 ### ✅ Completed
 - ✅ **Project Setup**: Quack Agency team initialization complete
 - ✅ **[move-git-tab-to-top-bar](./move-git-tab-to-top-bar/)**: Git tab successfully moved to top toolbar (completed by Julie)

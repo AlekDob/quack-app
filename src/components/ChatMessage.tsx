@@ -5,9 +5,6 @@ import StreamMessage from './StreamMessage';
 import './ChatMessage.css';
 import './StreamMessage.css';
 
-// Import duck avatar
-import duckAvatar from '../../images/duck.png';
-
 interface ChatMessageProps {
   message: ChatMessageType;
   onOpenFile?: (path: string) => void;
@@ -39,15 +36,13 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
             </svg>
           </div>
         ) : (
-          <div className="avatar-icon assistant-avatar">
-            <img src={duckAvatar} alt="Jack" />
-          </div>
+          <div className="avatar-icon assistant-avatar">🦆</div>
         )}
       </div>
       <div className="chat-message-content">
         <div className="chat-message-header">
           <span className="chat-message-role">
-            {isUser ? 'You' : 'Jack'}
+            {isUser ? 'You' : 'Quack Agency'}
           </span>
           <span className="chat-message-timestamp">
             {new Date(message.timestamp).toLocaleTimeString('it-IT', {
