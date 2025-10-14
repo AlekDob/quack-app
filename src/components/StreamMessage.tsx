@@ -9,6 +9,7 @@ import {
   GrepWidget,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
+import { getAgentAvatar } from '../utils/agentAvatars';
 import type { ClaudeEvent } from '../types';
 
 // Import duck avatar
@@ -151,6 +152,41 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             }
 
             // Default fallback for unknown tools
+            // Special handling for Task tool (subagent invocation)
+            if (toolName === 'task' && input?.subagent_type) {
+              const subagentType = input.subagent_type;
+              const avatarPath = getAgentAvatar(subagentType) || duckAvatar;
+              const description = input.description || 'Running task';
+
+              return (
+                <div key={idx} className="tool-widget task-widget">
+                  <div className="tool-widget-header">
+                    <div className="tool-widget-title">
+                      <img
+                        src={avatarPath}
+                        alt={subagentType}
+                        className="tool-widget-agent-avatar"
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          objectFit: 'contain',
+                          marginRight: '6px'
+                        }}
+                      />
+                      <span>Agent: <strong>{subagentType.replace(/-/g, ' ')}</strong></span>
+                    </div>
+                    <span className="tool-widget-meta">{description}</span>
+                    {!toolResult && (
+                      <div className="tool-widget-loading">
+                        <div className="spinner"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div key={idx} className="tool-widget unknown-tool-widget">
                 <div className="tool-widget-header">

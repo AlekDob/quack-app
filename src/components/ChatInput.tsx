@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { getAgentAvatar } from '../utils/agentAvatars';
 import type { ChatAttachment, AgentInfo } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import './ChatInput.css';
@@ -40,9 +41,11 @@ interface ChatInputProps {
   placeholder?: string;
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
+  activeAgent?: AgentInfo | null;
+  onClearAgent?: () => void;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, onSelectAgent }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, onSelectAgent, activeAgent, onClearAgent }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -487,18 +490,48 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
         </div>
       )}
       <div className="chat-input-wrapper">
-        <textarea
-          ref={textareaRef}
-          className="chat-input-field"
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={1}
-        />
-        <div className="chat-input-actions">
+        {/* Agent tag inside input area */}
+        {activeAgent && (
+          <div className="chat-input-agent-tag">
+            {(() => {
+              const avatarPath = getAgentAvatar(activeAgent.name);
+              if (avatarPath) {
+                return (
+                  <img
+                    src={avatarPath}
+                    alt={activeAgent.name}
+                    className="chat-input-agent-avatar"
+                  />
+                );
+              }
+              return null;
+            })()}
+            <span className="chat-input-agent-name">@{activeAgent.name.replace(/-/g, ' ')}</span>
+            {onClearAgent && (
+              <button
+                type="button"
+                onClick={onClearAgent}
+                className="chat-input-agent-remove"
+                title="Remove agent"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
+        <div className="chat-input-field-row">
+          <textarea
+            ref={textareaRef}
+            className="chat-input-field"
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={1}
+          />
+          <div className="chat-input-actions">
           <button
             type="button"
             className="chat-input-action-btn"
@@ -562,6 +595,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
               />
             </svg>
           </button>
+          </div>
         </div>
       </div>
       {attachments.length > 0 && (

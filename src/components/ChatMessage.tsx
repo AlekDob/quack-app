@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
+import { getAgentAvatar } from '../utils/agentAvatars';
 import './ChatMessage.css';
 import './StreamMessage.css';
 
@@ -13,6 +14,7 @@ interface ChatMessageProps {
 
 function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps) {
   const isUser = message.role === 'user';
+  const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
   const attachments = message.attachments ?? [];
@@ -24,6 +26,33 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
     const value = size / Math.pow(1024, exponent);
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[exponent]}`;
   };
+
+  // System messages (agent invocation) - render as centered notification
+  if (isSystem) {
+    // Extract agent name from content (format: "🦆 Invocando agente: **agent name**")
+    const agentNameMatch = message.content.match(/\*\*(.*?)\*\*/);
+    const agentName = agentNameMatch ? agentNameMatch[1] : null;
+    const avatarPath = agentName ? getAgentAvatar(agentName) : null;
+
+    return (
+      <div className="chat-message system">
+        <div className="chat-message-system-content">
+          {avatarPath ? (
+            <>
+              <img
+                src={avatarPath}
+                alt={agentName || 'agent'}
+                className="agent-system-avatar"
+              />
+              <span>Invocando agente: <strong>{agentName}</strong></span>
+            </>
+          ) : (
+            message.content
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''}`}>

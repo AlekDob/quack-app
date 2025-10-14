@@ -396,9 +396,23 @@ function App() {
     };
 
     // Add user message to agent's chat session
+    const messagesToAdd: ChatMessage[] = [userMessage];
+
+    // If agent is selected, add system message showing agent invocation
+    if (activeAgent) {
+      const agentSystemMessage: ChatMessage = {
+        id: `msg-${Date.now()}-agent-system`,
+        role: 'system',
+        content: `🦆 Invocando agente: **${activeAgent.name}**`,
+        timestamp: Date.now() + 1, // Slightly after user message
+        status: 'complete',
+      };
+      messagesToAdd.push(agentSystemMessage);
+    }
+
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
-      newSessions.set(activeId, [...currentMessages, userMessage]);
+      newSessions.set(activeId, [...currentMessages, ...messagesToAdd]);
       return newSessions;
     });
 
@@ -490,6 +504,10 @@ function App() {
         },
       ];
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
+
+      // Reset active agent after sending message
+      // This ensures agent is only used for this message, not persistent
+      setActiveAgent(null);
     } catch (err) {
       console.error('Error calling Claude SDK:', err);
 

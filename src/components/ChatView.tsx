@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
+import { getAgentAvatar } from '../utils/agentAvatars';
 import type { ChatMessage, AgentInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -113,28 +114,14 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           onPermissionModeChange={setPermissionMode}
           disabled={isLoading}
         />
-        {activeAgent && (
-          <div className="active-agent-indicator">
-            <span className="active-agent-label">Agent:</span>
-            <span className="active-agent-name">{activeAgent.name.replace(/-/g, ' ')}</span>
-            {onClearAgent && (
-              <button
-                type="button"
-                onClick={onClearAgent}
-                className="active-agent-clear"
-                title="Clear active agent"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        )}
         <ChatInput
           onSend={handleSend}
           disabled={isLoading}
           placeholder="Ask Claude about your code, commands, or project..."
           agents={agents}
           onSelectAgent={onSelectAgent}
+          activeAgent={activeAgent}
+          onClearAgent={onClearAgent}
         />
       </div>
     </div>
