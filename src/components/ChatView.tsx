@@ -23,7 +23,7 @@ interface ChatViewProps {
 export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent }: ChatViewProps) {
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('act');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
 
   const modelOptions = useMemo(
     () => [
@@ -48,8 +48,8 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
   const permissionModeOptions = useMemo(
     () => [
       { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
-      { value: 'act' as PermissionMode, label: '◆ Act · Direct execution' },
-      { value: 'bypass' as PermissionMode, label: '⬢ Bypass · Full access' },
+      { value: 'acceptEdits' as PermissionMode, label: '◆ Full access · Auto-approve edits' },
+      { value: 'bypass' as PermissionMode, label: '⬢ Bypass · No confirmations' },
     ],
     []
   );
@@ -64,19 +64,29 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
     });
   };
 
-  // Keyboard shortcut: Shift+Tab to cycle permission modes
+  // Keyboard shortcuts: Shift+Tab to cycle modes, ESC to abort
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC to abort operation
+      if (e.key === 'Escape' && isLoading) {
+        e.preventDefault();
+        console.warn('ESC pressed - abort requested (not yet implemented in backend)');
+        // TODO: Implement actual abort by killing Node.js process
+        // For now, just log a warning
+        alert('⚠️ ESC pressed. Abort functionality coming soon!\n\nNote: The backend process will continue, but you can close this tab or reload the page.');
+        return;
+      }
+
+      // Shift+Tab to cycle permission modes
       if (e.key === 'Tab' && e.shiftKey && !isLoading) {
         e.preventDefault();
 
         // Cycle through permission modes
-        const modes: PermissionMode[] = ['plan', 'act', 'acceptEdits', 'bypass'];
+        const modes: PermissionMode[] = ['plan', 'acceptEdits', 'bypass'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
         setPermissionMode(modes[nextIndex]);
 
-        // Show toast notification (we'll add this later)
         console.log(`Switched to ${modes[nextIndex]} mode`);
       }
     };

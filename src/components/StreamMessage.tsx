@@ -8,6 +8,7 @@ import {
   ReadWidget,
   GrepWidget,
 } from './ToolWidgets';
+import MarkdownText from './MarkdownText';
 import type { ClaudeEvent } from '../types';
 import type { PermissionMode } from '../hooks/useClaudeChat';
 
@@ -90,7 +91,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                 </div>
                 <div className="assistant-content">
                   <div className="assistant-name">Jack</div>
-                  <div className="assistant-message-text">{content.text}</div>
+                  <div className="assistant-message-text">
+                    <MarkdownText>{content.text}</MarkdownText>
+                  </div>
                 </div>
               </div>
             );
@@ -256,7 +259,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
         <div className="assistant-content">
           <div className="assistant-name">Jack</div>
           {message.result && (
-            <div className="assistant-message-text">{message.result}</div>
+            <div className="assistant-message-text">
+              <MarkdownText>{message.result}</MarkdownText>
+            </div>
           )}
           {message.error && (
             <div className="result-error-inline">

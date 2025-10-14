@@ -8,6 +8,8 @@
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -51,6 +53,23 @@ async function main() {
 
     if (cwd) {
       options.cwd = cwd;
+
+      // Try to read CLAUDE.md as context
+      const claudeMdPath = join(cwd, 'CLAUDE.md');
+      if (existsSync(claudeMdPath)) {
+        try {
+          const claudeMdContent = readFileSync(claudeMdPath, 'utf-8');
+          // Pass CLAUDE.md as context to the SDK
+          options.context = [
+            {
+              type: 'text',
+              text: `# Project Context (CLAUDE.md)\n\n${claudeMdContent}`,
+            },
+          ];
+        } catch (err) {
+          console.error('Failed to read CLAUDE.md:', err);
+        }
+      }
     }
 
     if (sessionId) {

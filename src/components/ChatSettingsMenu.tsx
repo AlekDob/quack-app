@@ -29,9 +29,8 @@ const thinkingModeOptions = [
 
 const permissionModeOptions = [
   { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
-  { value: 'act' as PermissionMode, label: '◆ Act · Direct execution' },
-  { value: 'acceptEdits' as PermissionMode, label: '◈ Accept Edits · Auto-approve file changes' },
-  { value: 'bypass' as PermissionMode, label: '⬢ Bypass · Full access (⚠️ use with caution)' },
+  { value: 'acceptEdits' as PermissionMode, label: '◆ Full access · Auto-approve file changes' },
+  { value: 'bypass' as PermissionMode, label: '⬢ Bypass · No confirmations' },
 ];
 
 export default function ChatSettingsMenu({
@@ -97,7 +96,6 @@ export default function ChatSettingsMenu({
   const getPermissionColor = () => {
     const colors: Record<PermissionMode, string> = {
       plan: '#60a5fa',
-      act: '#34d399',
       acceptEdits: '#fbbf24',
       bypass: '#f87171',
     };

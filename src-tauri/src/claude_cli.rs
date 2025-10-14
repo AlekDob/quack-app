@@ -532,6 +532,11 @@ pub async fn send_message_via_sdk_streaming(
         ..
     } = request;
 
+    // Get current working directory
+    let cwd = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_string()));
+
     // Build config JSON for Node.js script
     let mut config = serde_json::json!({
         "prompt": prompt,
@@ -543,7 +548,8 @@ pub async fn send_message_via_sdk_streaming(
             "act" => "default",
             "plan" => "plan",
             _ => "default"
-        }).unwrap_or("default"),
+        }).unwrap_or("bypassPermissions"), // Default to bypass for Read access
+        "cwd": cwd,
     });
 
     // Add agents if provided
