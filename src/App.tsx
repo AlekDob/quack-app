@@ -161,6 +161,7 @@ function App() {
   const [explorerRoot, setExplorerRoot] = useState<string | null>(null);
   const [loadingExplorer, setLoadingExplorer] = useState(false);
   const [explorerError, setExplorerError] = useState<string | null>(null);
+  const [refreshExplorerTrigger, setRefreshExplorerTrigger] = useState(0);
   const [creatingTerminal, setCreatingTerminal] = useState(false);
   const [showNewTerminalModal, setShowNewTerminalModal] = useState(false);
   const [newTerminalName, setNewTerminalName] = useState("");
@@ -315,7 +316,7 @@ function App() {
           const lastMsg = agentMessages[agentMessages.length - 1];
 
           if (lastMsg && lastMsg.events) {
-            const modifiedPaths = new Set<string>();
+            let hasFileModifications = false;
 
             // Check assistant events for Write/Edit tool uses
             lastMsg.events.forEach((evt) => {
@@ -325,31 +326,19 @@ function App() {
                     const toolName = content.name?.toLowerCase();
                     const input = content.input as any;
 
-                    // Extract file paths from Write and Edit tools
-                    if (toolName === 'write' && input?.file_path) {
-                      modifiedPaths.add(input.file_path);
-                    } else if (toolName === 'edit' && input?.file_path) {
-                      modifiedPaths.add(input.file_path);
+                    // Check if Write or Edit tools were used
+                    if ((toolName === 'write' && input?.file_path) ||
+                        (toolName === 'edit' && input?.file_path)) {
+                      hasFileModifications = true;
                     }
                   }
                 });
               }
             });
 
-            // Refresh parent directories of modified files
-            if (modifiedPaths.size > 0) {
-              const dirsToRefresh = new Set<string>();
-              modifiedPaths.forEach((filePath) => {
-                const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
-                if (parentDir) {
-                  dirsToRefresh.add(parentDir);
-                }
-              });
-
-              // Trigger refresh for each parent directory
-              dirsToRefresh.forEach((dir) => {
-                fetchDirectoryChildren(dir);
-              });
+            // Trigger FileExplorer refresh if files were modified
+            if (hasFileModifications) {
+              setRefreshExplorerTrigger(prev => prev + 1);
             }
           }
 
@@ -450,6 +439,7 @@ function App() {
 
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
+      const workingDir = activeTerminal?.cwd ?? explorerPath;
       const response = await invoke<{ result: string; session_id: string; total_cost_usd: number }>('send_message_via_sdk_streaming', {
         agentId: activeId,
         request: {
@@ -464,6 +454,7 @@ function App() {
             model: activeAgent.model,
             filePath: activeAgent.file_path,
           }] : undefined,
+          cwd: workingDir,
         },
       });
 
@@ -852,6 +843,14 @@ function App() {
     [tauriAvailable]
   );
 
+  // Auto-refresh FileExplorer when files are modified by Claude
+  useEffect(() => {
+    if (refreshExplorerTrigger > 0 && explorerRoot) {
+      // Refresh the root directory to show new/modified files
+      loadDirectory(explorerRoot);
+    }
+  }, [refreshExplorerTrigger, explorerRoot, loadDirectory]);
+
   // Helper callbacks without dependencies - defined FIRST to avoid temporal dead zone
   const clearTerminalAttention = useCallback((id: string) => {
     setTerminals((prev) => {
@@ -1193,10 +1192,6 @@ function App() {
     });
   }, []);
 
-  const handleFilePathClick = useCallback((path: string) => {
-    const name = path.split('/').pop() || path;
-    setPreviewFile({ name, path });
-  }, []);
 
   // Load Quack Agency agents on startup
   useEffect(() => {
@@ -1944,6 +1939,19 @@ function App() {
     },
     [tauriAvailable, gitSummary, explorerRoot]
   );
+
+  const handleFilePathClick = useCallback((path: string) => {
+    const name = path.split('/').pop() || path;
+    // Create a fake DirectoryEntry to open the file
+    const fakeEntry: DirectoryEntry = {
+      name,
+      path,
+      is_dir: false,
+      is_symlink: false,
+    };
+    // Use handleOpenFilePreview to actually load file content
+    handleOpenFilePreview(fakeEntry);
+  }, [handleOpenFilePreview]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!tauriAvailable || !previewFile) {

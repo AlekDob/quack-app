@@ -97,6 +97,7 @@ pub struct ClaudeCliRequest {
     pub permission_mode: Option<String>,
     pub attachments: Option<Vec<String>>,
     pub agents: Option<Vec<AgentConfig>>,
+    pub cwd: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -529,13 +530,16 @@ pub async fn send_message_via_sdk_streaming(
         thinking_mode,
         permission_mode,
         agents,
+        cwd,
         ..
     } = request;
 
-    // Get current working directory
-    let cwd = std::env::current_dir()
-        .ok()
-        .and_then(|p| p.to_str().map(|s| s.to_string()));
+    // Use provided cwd or fallback to current directory
+    let working_dir = cwd.or_else(|| {
+        std::env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(|s| s.to_string()))
+    });
 
     // Build config JSON for Node.js script
     let mut config = serde_json::json!({
@@ -549,7 +553,7 @@ pub async fn send_message_via_sdk_streaming(
             "plan" => "plan",
             _ => "default"
         }).unwrap_or("bypassPermissions"), // Default to bypass for Read access
-        "cwd": cwd,
+        "cwd": working_dir,
     });
 
     // Add agents if provided
