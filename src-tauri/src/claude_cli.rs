@@ -523,6 +523,7 @@ pub async fn send_message_via_sdk_streaming(
     app: AppHandle,
     agent_id: String,
     request: ClaudeCliRequest,
+    session_state: tauri::State<'_, crate::SessionState>,
 ) -> Result<ClaudeCliResponse, String> {
     let ClaudeCliRequest {
         prompt,
@@ -541,6 +542,15 @@ pub async fn send_message_via_sdk_streaming(
             .and_then(|p| p.to_str().map(|s| s.to_string()))
     });
 
+    // Get existing session ID for this agent (for resume)
+    let current_session_id = session_state.get_session(&agent_id);
+
+    if let Some(ref session_id) = current_session_id {
+        log::info!("[SDK] Resuming session for agent {}: {}", agent_id, session_id);
+    } else {
+        log::info!("[SDK] Starting new session for agent {}", agent_id);
+    }
+
     // Build config JSON for Node.js script
     let mut config = serde_json::json!({
         "prompt": prompt,
@@ -554,6 +564,7 @@ pub async fn send_message_via_sdk_streaming(
             _ => "default"
         }).unwrap_or("bypassPermissions"), // Default to bypass for Read access
         "cwd": working_dir,
+        "sessionId": current_session_id, // Pass session ID for resume
     });
 
     // Add agents if provided
@@ -607,6 +618,12 @@ pub async fn send_message_via_sdk_streaming(
     while let Ok(Some(line)) = stdout_reader.next_line().await {
         // Parse JSON event
         if let Ok(event) = serde_json::from_str::<ClaudeEvent>(&line) {
+            // Capture and save session ID from system init event
+            if let ClaudeEvent::System { session_id, .. } = &event {
+                log::info!("[SDK] Captured session ID for agent {}: {}", agent_id, session_id);
+                session_state.set_session(agent_id.clone(), session_id.clone());
+            }
+
             // Emit event to frontend immediately
             let event_name = format!("claude-event:{}", agent_id);
             let _ = app.emit(&event_name, &event);

@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Mutex;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,29 @@ mod preferences;
 mod preview;
 mod slash_commands;
 mod terminal;
+
+// Global state for tracking Claude SDK session IDs per agent
+pub struct SessionState {
+    sessions: Mutex<HashMap<String, String>>, // agentId -> sessionId
+}
+
+impl SessionState {
+    pub fn new() -> Self {
+        Self {
+            sessions: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn get_session(&self, agent_id: &str) -> Option<String> {
+        self.sessions.lock().ok()?.get(agent_id).cloned()
+    }
+
+    pub fn set_session(&self, agent_id: String, session_id: String) {
+        if let Ok(mut sessions) = self.sessions.lock() {
+            sessions.insert(agent_id, session_id);
+        }
+    }
+}
 
 #[derive(Clone)]
 struct HookState {
@@ -95,6 +120,7 @@ async fn handle_status_update(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(SessionState::new()) // Register global session state
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
