@@ -290,6 +290,26 @@ function App() {
     }
   }, [tauriAvailable]);
 
+  // Sync terminal status with chatLoadingMap
+  useEffect(() => {
+    setTerminals((prev) => {
+      return prev.map((terminal) => {
+        const isLoading = chatLoadingMap.get(terminal.id) ?? false;
+        const newStatus = isLoading ? 'busy' : 'idle';
+
+        // Only update if status actually changed to avoid unnecessary re-renders
+        if (terminal.status === newStatus) {
+          return terminal;
+        }
+
+        return {
+          ...terminal,
+          status: newStatus as 'busy' | 'idle',
+        };
+      });
+    });
+  }, [chatLoadingMap]);
+
   // Listen for Claude SDK streaming events from backend
   useEffect(() => {
     if (!tauriAvailable || !activeId) return;
