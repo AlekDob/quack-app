@@ -1228,6 +1228,30 @@ button.directory-chooser:hover {
   transition: opacity 0.2s ease;
 }
 
+/* Animated badge when waiting for response */
+.terminal-status-badge.waiting {
+  animation: badgeBounce 2s ease-in-out infinite;
+  opacity: 1;
+}
+
+@keyframes badgeBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  10% {
+    transform: translateY(-3px) scale(1.1);
+  }
+  20% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(-2px) scale(1.05);
+  }
+  40% {
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Pulsing animation for busy terminal dot */
 .terminal-dot.pulsing {
   animation: dotPulse 1.5s ease-in-out infinite;
@@ -1250,6 +1274,33 @@ button.directory-chooser:hover {
       inset 0 -1px 1px rgba(0, 0, 0, 0.2),
       0 2px 6px rgba(0, 0, 0, 0.2),
       0 0 8px currentColor;
+  }
+}
+
+/* Gentle pulse animation for waiting terminal dot - more noticeable */
+.terminal-dot.waiting {
+  animation: dotWaiting 2s ease-in-out infinite;
+}
+
+@keyframes dotWaiting {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.1),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.15),
+      0 1px 2px rgba(0, 0, 0, 0.1),
+      0 0 0 0 currentColor;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.15),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.2),
+      0 2px 6px rgba(0, 0, 0, 0.2),
+      0 0 12px currentColor,
+      0 0 0 3px rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -1596,6 +1647,74 @@ button.directory-chooser:hover {
   min-height: 0;
   flex: 1;
   overflow: hidden;
+}
+
+/* Terminal container with vertical icon bar */
+.terminal-container-with-iconbar {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* Vertical icon bar on the right */
+.terminal-icon-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  background: rgba(15, 17, 21, 0.6);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  width: 48px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.terminal-icon-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Terminal icon button */
+.terminal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.terminal-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.terminal-icon.active {
+  color: #0f1115;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.terminal-icon.add-terminal {
+  margin-top: 4px;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 18px;
+}
+
+.terminal-icon.add-terminal:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .terminal-surface {

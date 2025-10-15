@@ -10,8 +10,9 @@ interface TerminalActivityBarProps {
  *
  * Features:
  * - Colored dot indicator with pulsing animation when busy
- * - Status badge (⚡ for busy, ✓ for idle)
+ * - Status badge (⚡ for busy, 💬 for waiting response, ✓ for idle)
  * - Animated progress bar when terminal is active
+ * - Gentle pulse animation when waiting for user response
  * - 1-second delay before confirming idle state (prevents flickering)
  *
  * Usage:
@@ -38,18 +39,36 @@ export default function TerminalActivityBar({ terminal }: TerminalActivityBarPro
   }, [status])
 
   const isBusy = confirmedStatus === 'busy'
+  const isWaitingForResponse = terminal.waitingForResponse ?? false
+
+  // Determine badge and styling based on state
+  const getBadge = () => {
+    if (isBusy) return '⚡'
+    if (isWaitingForResponse) return '💬'
+    return '✓'
+  }
+
+  const dotClassName = isBusy
+    ? 'terminal-dot pulsing'
+    : isWaitingForResponse
+      ? 'terminal-dot waiting'
+      : 'terminal-dot'
+
+  const badgeClassName = isWaitingForResponse
+    ? 'terminal-status-badge waiting'
+    : 'terminal-status-badge'
 
   return (
     <>
       <div
-        className={`terminal-dot ${isBusy ? 'pulsing' : ''}`}
+        className={dotClassName}
         style={{ backgroundColor: terminal.color }}
       />
       <div className="terminal-details">
         <span className="terminal-name">
           {terminal.label}
-          <span className="terminal-status-badge">
-            {isBusy ? '⚡' : '✓'}
+          <span className={badgeClassName}>
+            {getBadge()}
           </span>
         </span>
         {isBusy && (

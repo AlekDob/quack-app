@@ -8,6 +8,7 @@ export interface TerminalInfo {
   needsAttention?: boolean;
   hasResponded?: boolean;           // Ha già risposto alla richiesta corrente?
   responseStartTime?: number | null; // Timestamp inizio risposta
+  waitingForResponse?: boolean;      // Chat is idle and waiting for user input
 }
 
 export type SavedCommandCategory = "dev" | "build" | "test" | "custom";

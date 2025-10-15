@@ -290,25 +290,38 @@ function App() {
     }
   }, [tauriAvailable]);
 
-  // Sync terminal status with chatLoadingMap
+  // Sync terminal status with chatLoadingMap and check if waiting for response
   useEffect(() => {
     setTerminals((prev) => {
       return prev.map((terminal) => {
         const isLoading = chatLoadingMap.get(terminal.id) ?? false;
         const newStatus = isLoading ? 'busy' : 'idle';
 
-        // Only update if status actually changed to avoid unnecessary re-renders
-        if (terminal.status === newStatus) {
+        // Check if chat is waiting for user response
+        const chatMessages = chatSessions.get(terminal.id) ?? [];
+        const lastMessage = chatMessages[chatMessages.length - 1];
+        const isWaitingForResponse =
+          !isLoading && // Not currently loading
+          chatMessages.length > 0 && // Has messages
+          lastMessage?.role === 'assistant' && // Last message is from assistant
+          lastMessage?.status === 'complete'; // Message is complete
+
+        // Only update if something actually changed to avoid unnecessary re-renders
+        if (
+          terminal.status === newStatus &&
+          terminal.waitingForResponse === isWaitingForResponse
+        ) {
           return terminal;
         }
 
         return {
           ...terminal,
           status: newStatus as 'busy' | 'idle',
+          waitingForResponse: isWaitingForResponse,
         };
       });
     });
-  }, [chatLoadingMap]);
+  }, [chatLoadingMap, chatSessions]);
 
   // Listen for Claude SDK streaming events from backend
   useEffect(() => {
@@ -1898,8 +1911,9 @@ function App() {
       // Pick random color from COLORS array
       const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
 
-      // Use current terminal's cwd, or explorer path, or null (home)
-      const cwd = activeTerminal?.cwd || explorerPath || null;
+      // IMPORTANT: Always use active terminal's CWD to group under same agent
+      // Only fallback to explorerPath if there are NO terminals at all
+      const cwd = activeTerminal?.cwd ?? (terminals.length === 0 ? (explorerPath || null) : null);
 
       // Create terminal immediately
       const created = await invoke<TerminalInfo>("create_terminal", {
@@ -2760,6 +2774,7 @@ function App() {
           onUpdateRecentCommands={(commands) => {
             recentCommandsRef.current = commands;
           }}
+          onSelectTerminal={handleSelectTerminal}
           // TerminalToolBar props
           onExecuteCommand={handleExecuteAICommand}
           onToggleSavedCommands={() =>

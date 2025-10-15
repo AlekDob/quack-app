@@ -134,6 +134,7 @@ interface SidePanelProps {
   onTerminalInput: (id: string, data: string) => void;
   onTerminalOutput: (id: string, data: string) => void;
   onUpdateRecentCommands: (commands: string[]) => void;
+  onSelectTerminal: (id: string) => void;
 
   // TerminalToolBar props
   onExecuteCommand: (command: string, label: string) => void;
@@ -175,6 +176,7 @@ export default function SidePanel({
   onTerminalInput,
   onTerminalOutput,
   onUpdateRecentCommands,
+  onSelectTerminal,
 
   // TerminalToolBar
   onExecuteCommand,
@@ -297,8 +299,9 @@ export default function SidePanel({
 
         {activeTab === "terminal" && (
           <div className="side-panel-pane terminal-panel-pane">
-            {activeTerminalId ? (
-              <>
+            {terminals.length > 0 ? (
+              <div className="terminal-container-with-iconbar">
+                {/* Active terminal view */}
                 <TerminalView
                   activeId={activeTerminalId}
                   terminals={terminals}
@@ -306,17 +309,44 @@ export default function SidePanel({
                   onOutput={onTerminalOutput}
                   onUpdateRecentCommands={onUpdateRecentCommands}
                 />
+                {/* Vertical icon bar on the right */}
+                <div className="terminal-icon-bar">
+                  {terminals.map((terminal, index) => (
+                    <button
+                      key={terminal.id}
+                      type="button"
+                      className={`terminal-icon ${terminal.id === activeTerminalId ? 'active' : ''}`}
+                      onClick={() => onSelectTerminal(terminal.id)}
+                      style={{
+                        backgroundColor: terminal.id === activeTerminalId ? terminal.color : 'transparent',
+                        borderColor: terminal.color,
+                      }}
+                      title={terminal.label}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                  {/* Add terminal button */}
+                  <button
+                    type="button"
+                    className="terminal-icon add-terminal"
+                    onClick={onCreateTerminal}
+                    title="New Terminal"
+                  >
+                    +
+                  </button>
+                </div>
                 <TerminalToolBar
                   onExecuteCommand={onExecuteCommand}
                   onToggleSavedCommands={onToggleSavedCommands}
                   savedCommandsOpen={savedCommandsOpen}
                   onCreateTerminal={onCreateTerminal}
                 />
-              </>
+              </div>
             ) : (
               <div className="terminal-placeholder">
-                <p>No active terminal</p>
-                <p>Create a new terminal to start working</p>
+                <p>No terminals open</p>
+                <p>Click + to create a new terminal</p>
               </div>
             )}
           </div>
