@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ThinkingMode, PermissionMode } from '../hooks/useClaudeChat';
-import CustomPermissionSelect from './CustomPermissionSelect';
 import './ChatSettingsMenu.css';
 
 interface ChatSettingsMenuProps {
@@ -29,7 +28,6 @@ const thinkingModeOptions = [
 
 const permissionModeOptions = [
   { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
-  { value: 'act' as PermissionMode, label: '◆ Act · Auto-approve file changes' },
   { value: 'bypass' as PermissionMode, label: '⬢ Bypass · No confirmations' },
 ];
 
@@ -96,7 +94,6 @@ export default function ChatSettingsMenu({
   const getPermissionColor = () => {
     const colors: Record<PermissionMode, string> = {
       plan: '#60a5fa',
-      act: '#fbbf24',
       bypass: '#f87171',
     };
     return colors[permissionMode] || '#ffffff';
@@ -162,10 +159,17 @@ export default function ChatSettingsMenu({
           <div className="chat-settings-section">
             <label className="chat-settings-label">
               <span className="chat-settings-label-text">Mode</span>
-              <CustomPermissionSelect
+              <select
                 value={permissionMode}
-                onChange={onPermissionModeChange}
-              />
+                onChange={(e) => onPermissionModeChange(e.target.value as PermissionMode)}
+                className="chat-settings-select"
+              >
+                {permissionModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
         </div>

@@ -40,12 +40,13 @@ export async function* streamClaudeMessage(
     } = options;
 
     // Map permission mode to SDK permission mode
+    // SDK accepts: undefined (auto-approve), 'plan' (planning only), 'bypassPermissions' (no confirmations)
     const sdkPermissionMode =
       permissionMode === 'bypass'
         ? 'bypassPermissions'
         : permissionMode === 'plan'
           ? 'plan'
-          : 'default';
+          : undefined; // 'act' mode = undefined = auto-approve in SDK
 
     // Build options object - SDK expects { prompt, options }
     const sdkOptions: any = {

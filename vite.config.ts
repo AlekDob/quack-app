@@ -22,6 +22,7 @@ export default defineConfig(() => ({
       input: {
         main: resolve(rootDir, 'index.html'),
         preview: resolve(rootDir, 'preview.html'),
+        terminal: resolve(rootDir, 'terminal.html'),
       },
     },
   },

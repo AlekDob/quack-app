@@ -243,6 +243,8 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         command.arg("--think").arg(mode);
     }
 
+    // Map frontend permission modes to CLI permission modes
+    // Note: "act" mode (auto-approve) is the CLI default, so we omit --permission-mode flag
     if let Some(mode) = permission_mode.and_then(|value| {
         let trimmed = value.trim();
         if trimmed.is_empty() {
@@ -251,17 +253,20 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
             Some(trimmed.to_lowercase())
         }
     }) {
-        // Map frontend permission modes to valid Claude CLI modes
-        // Valid CLI modes: bypassPermissions, acceptEdits, default, plan
-        let cli_mode = match mode.as_str() {
-            "bypass" => "bypassPermissions",
-            "acceptedits" => "acceptEdits",
-            "act" => "default",
-            "plan" => "plan",
-            _ => "default",  // fallback to default
-        };
-
-        command.arg("--permission-mode").arg(cli_mode);
+        match mode.as_str() {
+            "bypass" => {
+                command.arg("--permission-mode").arg("bypassPermissions");
+            }
+            "plan" => {
+                command.arg("--permission-mode").arg("plan");
+            }
+            "act" => {
+                // Do nothing - CLI default is auto-approve
+            }
+            _ => {
+                // Unknown mode - fallback to auto-approve (do nothing)
+            }
+        }
     }
 
     command
@@ -424,6 +429,8 @@ pub async fn send_message_via_cli_streaming(
         command.arg("--think").arg(mode);
     }
 
+    // Map frontend permission modes to CLI permission modes
+    // Note: "act" mode (auto-approve) is the CLI default, so we omit --permission-mode flag
     if let Some(mode) = permission_mode.and_then(|value| {
         let trimmed = value.trim();
         if trimmed.is_empty() {
@@ -432,17 +439,20 @@ pub async fn send_message_via_cli_streaming(
             Some(trimmed.to_lowercase())
         }
     }) {
-        // Map frontend permission modes to valid Claude CLI modes
-        // Valid CLI modes: bypassPermissions, acceptEdits, default, plan
-        let cli_mode = match mode.as_str() {
-            "bypass" => "bypassPermissions",
-            "acceptedits" => "acceptEdits",
-            "act" => "default",
-            "plan" => "plan",
-            _ => "default",  // fallback to default
-        };
-
-        command.arg("--permission-mode").arg(cli_mode);
+        match mode.as_str() {
+            "bypass" => {
+                command.arg("--permission-mode").arg("bypassPermissions");
+            }
+            "plan" => {
+                command.arg("--permission-mode").arg("plan");
+            }
+            "act" => {
+                // Do nothing - CLI default is auto-approve
+            }
+            _ => {
+                // Unknown mode - fallback to auto-approve (do nothing)
+            }
+        }
     }
 
     command
@@ -532,7 +542,7 @@ pub async fn send_message_via_sdk_streaming(
         permission_mode,
         agents,
         cwd,
-        ..
+        attachments,
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -552,24 +562,61 @@ pub async fn send_message_via_sdk_streaming(
     }
 
     // Build config JSON for Node.js script
+    // Note: permissionMode mapping for Agent SDK:
+    // - undefined (not set) = auto-approve (our "act" mode)
+    // - "plan" = planning only
+    // - "bypassPermissions" = no confirmations (our "bypass" mode)
+
+    // DEBUG: Log the received permission_mode
+    log::info!("[SDK DEBUG] Received permission_mode from frontend: {:?}", permission_mode);
+
+    let permission_value = permission_mode.as_ref().and_then(|mode| match mode.as_str() {
+        "bypass" => {
+            log::info!("[SDK DEBUG] Mapping 'bypass' -> 'bypassPermissions'");
+            Some(serde_json::Value::String("bypassPermissions".to_string()))
+        }
+        "plan" => {
+            log::info!("[SDK DEBUG] Mapping 'plan' -> 'plan'");
+            Some(serde_json::Value::String("plan".to_string()))
+        }
+        "act" => {
+            log::info!("[SDK DEBUG] Mapping 'act' -> undefined (omitting permissionMode)");
+            None // undefined = auto-approve in SDK
+        }
+        _ => {
+            log::warn!("[SDK DEBUG] Unknown permission mode '{}', defaulting to auto-approve (omitting permissionMode)", mode);
+            None // fallback to auto-approve
+        }
+    });
+
     let mut config = serde_json::json!({
         "prompt": prompt,
         "model": model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
         "thinkingMode": thinking_mode,
-        "permissionMode": permission_mode.map(|mode| match mode.as_str() {
-            "bypass" => "bypassPermissions",
-            "acceptedits" => "acceptEdits",
-            "act" => "default",
-            "plan" => "plan",
-            _ => "default"
-        }).unwrap_or("bypassPermissions"), // Default to bypass for Read access
         "cwd": working_dir,
         "sessionId": current_session_id, // Pass session ID for resume
     });
 
+    // Add permissionMode only if explicitly set (not "act")
+    if let Some(perm) = permission_value {
+        log::info!("[SDK DEBUG] Adding permissionMode to config: {:?}", perm);
+        config["permissionMode"] = perm;
+    } else {
+        log::info!("[SDK DEBUG] Omitting permissionMode from config (will use SDK default: auto-approve)");
+    }
+
+    // DEBUG: Log final config
+    log::info!("[SDK DEBUG] Final config JSON: {}", config.to_string());
+
     // Add agents if provided
     if let Some(agent_list) = agents {
         config["agents"] = serde_json::json!(agent_list);
+    }
+
+    // Add attachments if provided (for image support)
+    if let Some(attachment_list) = attachments {
+        config["attachments"] = serde_json::json!(attachment_list);
+        log::info!("[SDK DEBUG] Adding {} attachments to config", attachment_list.len());
     }
 
     let config_str = config.to_string();

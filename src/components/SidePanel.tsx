@@ -139,6 +139,7 @@ interface SidePanelProps {
   onExecuteCommand: (command: string, label: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
+  onCreateTerminal: () => void;
 }
 
 export default function SidePanel({
@@ -179,6 +180,7 @@ export default function SidePanel({
   onExecuteCommand,
   onToggleSavedCommands,
   savedCommandsOpen,
+  onCreateTerminal,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("explorer");
 
@@ -308,6 +310,7 @@ export default function SidePanel({
                   onExecuteCommand={onExecuteCommand}
                   onToggleSavedCommands={onToggleSavedCommands}
                   savedCommandsOpen={savedCommandsOpen}
+                  onCreateTerminal={onCreateTerminal}
                 />
               </>
             ) : (

@@ -154,6 +154,14 @@ function App() {
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Derived state - moved here to fix TypeScript hoisting errors
+  const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat
+  const activeTerminal = useMemo(
+    () => terminals.find((terminal) => terminal.id === activeId) ?? null,
+    [activeId, terminals]
+  );
+
   const [explorerPath, setExplorerPath] = useState("");
   const [explorerTree, setExplorerTree] = useState<
     Record<string, DirectoryEntry[]>
@@ -505,6 +513,10 @@ function App() {
       ];
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
 
+      // Notify that agent response is complete
+      const agentLabel = activeAgent?.name || `Agent ${activeId}`;
+      notifyAgentReadyRef.current({ id: activeId, label: agentLabel });
+
       // Reset active agent after sending message
       // This ensures agent is only used for this message, not persistent
       setActiveAgent(null);
@@ -545,23 +557,20 @@ function App() {
         return newMap;
       });
     }
-  }, [activeId, isChatConfigured, chatSessions]);
+  }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
-  const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat
+  // activeAgent moved to top of component for TypeScript hoisting
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
 
-  const activeTerminal = useMemo(
-    () => terminals.find((terminal) => terminal.id === activeId) ?? null,
-    [activeId, terminals]
-  );
+  // activeTerminal moved to top of component for TypeScript hoisting
 
   // Compute current agent's chat messages and loading state
   const currentAgentMessages = useMemo(() => {
@@ -803,6 +812,49 @@ function App() {
     },
     [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable]
   );
+
+  // Notify when agent/chat completes response
+  const notifyAgentReady = useCallback(
+    async (payload: { id: string; label: string }) => {
+      playQuackSound();
+
+      // Show in-app toast notification
+      toast.success(`${payload.label}`, {
+        description: "Response completed! 🦆",
+        duration: 4000,
+      });
+
+      if (!tauriAvailable) {
+        return;
+      }
+
+      let granted = notificationGranted;
+      if (!granted) {
+        granted = await ensureNotificationPermission();
+      }
+
+      if (!granted) {
+        return;
+      }
+
+      try {
+        await sendNotification({
+          id: Number(Date.now() % 2147483647),
+          title: payload.label,
+          body: "Response completed! 🦆",
+        });
+      } catch (error) {
+        console.warn("Unable to show notification", error);
+      }
+    },
+    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable]
+  );
+
+  // Keep ref to latest notifyAgentReady to avoid dependency issues
+  const notifyAgentReadyRef = useRef(notifyAgentReady);
+  useEffect(() => {
+    notifyAgentReadyRef.current = notifyAgentReady;
+  }, [notifyAgentReady]);
 
   const loadDirectory = useCallback(
     async (path?: string) => {
@@ -1804,6 +1856,70 @@ function App() {
     tauriAvailable,
   ]);
 
+  // Quick create terminal - no modal, instant like VSCode
+  const handleQuickCreateTerminal = useCallback(async () => {
+    if (!tauriAvailable || creatingTerminal) {
+      return;
+    }
+
+    setCreatingTerminal(true);
+
+    try {
+      // Generate automatic name "Terminal N"
+      const terminalNumbers = terminals
+        .map((t) => {
+          const match = t.label.match(/^Terminal (\d+)$/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter((n) => n > 0);
+      const nextNumber = terminalNumbers.length > 0 ? Math.max(...terminalNumbers) + 1 : terminals.length + 1;
+      const autoName = `Terminal ${nextNumber}`;
+
+      // Pick random color from COLORS array
+      const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+
+      // Use current terminal's cwd, or explorer path, or null (home)
+      const cwd = activeTerminal?.cwd || explorerPath || null;
+
+      // Create terminal immediately
+      const created = await invoke<TerminalInfo>("create_terminal", {
+        label: autoName,
+        color: randomColor,
+        cwd,
+      });
+
+      const createdWithState: TerminalInfo = {
+        ...created,
+        status: "idle",
+        needsAttention: false,
+        hasResponded: false,
+        responseStartTime: null,
+      };
+
+      setTerminals((prev) => [...prev, createdWithState]);
+      setActiveId(createdWithState.id);
+      clearTerminalAttention(createdWithState.id);
+
+      // Load directory if we have a cwd
+      if (createdWithState.cwd) {
+        await loadDirectory(createdWithState.cwd);
+      }
+    } catch (error) {
+      console.error("Unable to quick create terminal", error);
+      toast.error("Failed to create terminal");
+    } finally {
+      setCreatingTerminal(false);
+    }
+  }, [
+    tauriAvailable,
+    creatingTerminal,
+    terminals,
+    activeTerminal,
+    explorerPath,
+    clearTerminalAttention,
+    loadDirectory,
+  ]);
+
   const handleSelectTerminal = useCallback(
     (id: string) => {
       if (!tauriAvailable) {
@@ -2630,6 +2746,7 @@ function App() {
             setSavedCommandsDrawerOpen((value) => !value)
           }
           savedCommandsOpen={savedCommandsDrawerOpen}
+          onCreateTerminal={handleQuickCreateTerminal}
         />
 
         <NewTerminalModal

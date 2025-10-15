@@ -17,8 +17,9 @@
   font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
   outline: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.12s ease, border-color 0.12s ease;
   text-align: left;
+  will-change: background, border-color;
 }
 
 .permission-select-trigger:hover {
@@ -68,7 +69,8 @@
               0 0 0 1px rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px);
   overflow: hidden;
-  animation: slideDown 0.15s ease-out;
+  animation: slideDown 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 @keyframes slideDown {
@@ -94,8 +96,10 @@
   font-size: 11px;
   font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.1s ease;
   text-align: left;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .permission-option:hover {

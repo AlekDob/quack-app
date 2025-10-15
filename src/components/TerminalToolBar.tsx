@@ -1,15 +1,18 @@
 import './TerminalToolBar.css';
+import TerminalWindowButton from './TerminalWindowButton';
 
 interface TerminalToolBarProps {
   onExecuteCommand: (command: string, label: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
+  onCreateTerminal: () => void;
 }
 
 export default function TerminalToolBar({
   onExecuteCommand,
   onToggleSavedCommands,
   savedCommandsOpen,
+  onCreateTerminal,
 }: TerminalToolBarProps) {
   const tools = [
     {
@@ -64,6 +67,13 @@ export default function TerminalToolBar({
 
   return (
     <div className="terminal-toolbar">
+      {/* New Terminal Tab Button - primo pulsante a sinistra */}
+      <TerminalWindowButton onCreateTerminal={onCreateTerminal} />
+
+      {/* Separator */}
+      <div className="terminal-toolbar-separator" />
+
+      {/* Existing tools */}
       {tools.map((tool) => (
         <button
           key={tool.id}

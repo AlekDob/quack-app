@@ -3,7 +3,7 @@ import type { ChatAttachment, ChatMessage, ClaudeEvent } from '../types';
 import { streamClaudeMessage } from '../services/claudeSDK';
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
-export type PermissionMode = 'plan' | 'act' | 'bypass';
+export type PermissionMode = 'plan' | 'bypass';
 
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
@@ -11,6 +11,7 @@ export interface ChatSendOptions {
   thinkingMode?: ThinkingMode;
   permissionMode?: PermissionMode;
   workingDirectory?: string;
+  onComplete?: () => void; // Callback when chat completes successfully
 }
 
 export function useClaudeChat() {
@@ -65,7 +66,7 @@ export function useClaudeChat() {
       const stream = streamClaudeMessage(content, {
         model: options?.model || 'sonnet',
         thinkingMode: options?.thinkingMode,
-        permissionMode: options?.permissionMode || 'act',
+        permissionMode: options?.permissionMode || 'bypass',
         sessionId: claudeSessionId.current, // Resume previous session if exists
         workingDirectory: options?.workingDirectory,
       });
@@ -121,6 +122,11 @@ export function useClaudeChat() {
                 : msg
             )
           );
+
+          // Trigger onComplete callback if provided
+          if (options?.onComplete) {
+            options.onComplete();
+          }
         } else if (chunk.type === 'error') {
           // Stream error
           throw new Error(chunk.error || 'Unknown streaming error');

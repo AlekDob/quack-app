@@ -11,7 +11,6 @@ interface PermissionOption {
 
 const permissionOptions: PermissionOption[] = [
   { value: 'plan', label: 'Plan · Planning only', icon: '◇', color: '#60a5fa' },
-  { value: 'act', label: 'Act · Auto-approve file changes', icon: '◆', color: '#fbbf24' },
   { value: 'bypass', label: 'Bypass · No confirmations', icon: '⬢', color: '#f87171' },
 ];
 
@@ -24,7 +23,7 @@ export default function CustomPermissionSelect({ value, onChange }: CustomPermis
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = permissionOptions.find(opt => opt.value === value) || permissionOptions[1];
+  const selectedOption = permissionOptions.find(opt => opt.value === value) || permissionOptions[1]; // Default to bypass
 
   // Close on outside click
   useEffect(() => {
@@ -55,8 +54,10 @@ export default function CustomPermissionSelect({ value, onChange }: CustomPermis
   }, [isOpen]);
 
   const handleSelect = (option: PermissionOption) => {
-    onChange(option.value);
+    // Close immediately to prevent visual glitches
     setIsOpen(false);
+    // Call onChange after state update to avoid race conditions
+    setTimeout(() => onChange(option.value), 0);
   };
 
   return (

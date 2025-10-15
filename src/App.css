@@ -1617,7 +1617,7 @@ button.directory-chooser:hover {
   height: 100%;
   overflow: hidden;
   box-sizing: border-box;
-  padding: 0.75rem;
+  padding: 0.75rem 0.75rem 3.5rem 0.75rem; /* Aumentato padding bottom per non sovrapporsi alla toolbar */
   background: rgba(15, 17, 21, 0.2);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);

@@ -87,3 +87,12 @@
 .terminal-tool-button[data-tooltip]:hover::after {
   opacity: 1 !important;
 }
+
+/* Toolbar separator */
+.terminal-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+  flex-shrink: 0;
+}

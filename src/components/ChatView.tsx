@@ -29,7 +29,7 @@ interface ChatViewProps {
 export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick, pendingAgentMention, onMentionInserted, pendingSlashCommand, onCommandInserted, basePath }: ChatViewProps) {
   const [model, setModel] = useState<'opus' | 'sonnet'>('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('act');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
 
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -59,7 +59,7 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
         e.preventDefault();
 
         // Cycle through permission modes
-        const modes: PermissionMode[] = ['plan', 'act', 'bypass'];
+        const modes: PermissionMode[] = ['plan', 'bypass'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
         setPermissionMode(modes[nextIndex]);
