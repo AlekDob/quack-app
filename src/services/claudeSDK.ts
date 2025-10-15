@@ -51,6 +51,8 @@ export async function* streamClaudeMessage(
     const sdkOptions: any = {
       model,
       permissionMode: sdkPermissionMode,
+      // Enable automatic reading of CLAUDE.md, slash commands, and project settings
+      settingSources: ['project', 'user', 'local'],
     };
 
     if (thinkingMode) {

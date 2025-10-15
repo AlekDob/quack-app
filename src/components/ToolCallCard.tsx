@@ -1,6 +1,7 @@
 import { useState, memo } from 'react';
-import type { ChatToolCall } from '../types';
+import type { ChatToolCall, TodoItem } from '../types';
 import DiffViewer from './DiffViewer';
+import TodoWidget from './TodoWidget';
 import './ToolCallCard.css';
 
 interface ToolCallCardProps {
@@ -10,6 +11,28 @@ interface ToolCallCardProps {
 
 function ToolCallCard({ tool, onOpenFile }: ToolCallCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Check if this is a TodoWrite tool
+  const isTodoWrite = tool.name.toLowerCase() === 'todowrite';
+
+  // Parse todos from TodoWrite input
+  const parseTodos = (): TodoItem[] | null => {
+    if (!isTodoWrite || !tool.input) return null;
+
+    try {
+      const todos = (tool.input as { todos?: TodoItem[] }).todos;
+      return todos || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const todos = parseTodos();
+
+  // If this is a TodoWrite tool with valid todos, render TodoWidget instead
+  if (isTodoWrite && todos && todos.length > 0) {
+    return <TodoWidget todos={todos} defaultExpanded={true} />;
+  }
 
   const getToolIcon = (name: string) => {
     const toolName = name.toLowerCase();

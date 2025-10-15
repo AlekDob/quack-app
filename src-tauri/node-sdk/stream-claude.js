@@ -53,11 +53,20 @@ async function main() {
 
     if (cwd) {
       options.cwd = cwd;
+      console.error(`[DEBUG] Working directory: ${cwd}`);
+    } else {
+      console.error(`[DEBUG] No working directory specified, using default`);
     }
 
     if (sessionId) {
       options.resume = sessionId;
+      console.error(`[DEBUG] Resuming session: ${sessionId}`);
+    } else {
+      console.error(`[DEBUG] Starting new session`);
     }
+
+    console.error(`[DEBUG] Prompt: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
+    console.error(`[DEBUG] Options:`, JSON.stringify(options, null, 2));
 
     if (agents && Array.isArray(agents) && agents.length > 0) {
       // Transform agents to SDK format
@@ -67,6 +76,7 @@ async function main() {
         model: agent.model,
         path: agent.filePath,
       }));
+      console.error(`[DEBUG] Using ${agents.length} agent(s)`);
     }
 
     // Query Claude with streaming
@@ -77,6 +87,13 @@ async function main() {
 
     // Stream events
     for await (const event of stream) {
+      // Log slash command info from system events
+      if (event.type === 'system' && event.subtype === 'init') {
+        console.error(`[DEBUG] System initialized - Session: ${event.session_id}`);
+        if (event.slash_commands) {
+          console.error(`[DEBUG] Available slash commands:`, event.slash_commands);
+        }
+      }
       emitEvent(event);
     }
 

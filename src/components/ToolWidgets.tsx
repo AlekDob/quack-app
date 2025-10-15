@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DiffViewer from './DiffViewer';
-import type { ToolDiff, DiffLine } from '../types';
+import TodoWidget from './TodoWidget';
+import type { ToolDiff, DiffLine, TodoItem } from '../types';
 
 // Helper function to convert old/new strings to ToolDiff
 function createDiffFromStrings(oldString: string, newString: string, fileName?: string): ToolDiff {
@@ -479,4 +480,12 @@ export const GrepWidget: React.FC<{
       )}
     </div>
   );
+};
+
+// TodoWrite widget
+export const TodoWriteWidget: React.FC<{
+  todos: TodoItem[];
+  defaultExpanded?: boolean;
+}> = ({ todos, defaultExpanded = true }) => {
+  return <TodoWidget todos={todos} defaultExpanded={defaultExpanded} />;
 };
