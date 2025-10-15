@@ -84,6 +84,35 @@
   flex-shrink: 0;
 }
 
+/* Command autocomplete specific styles */
+.command-autocomplete {
+  border-color: rgba(77, 212, 179, 0.3);
+}
+
+.command-badge {
+  background: rgba(77, 212, 179, 0.15);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: #4dd4b3;
+}
+
+.command-type-badge {
+  padding: 4px 8px;
+  background: rgba(77, 212, 179, 0.15);
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  color: #4dd4b3;
+}
+
+.command-autocomplete .agent-autocomplete-item:hover,
+.command-autocomplete .agent-autocomplete-item.selected {
+  background: rgba(77, 212, 179, 0.12);
+}
+
 .chat-input-wrapper {
   display: flex;
   flex-direction: column;

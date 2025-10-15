@@ -15,6 +15,7 @@ mod fs;
 mod git;
 mod preferences;
 mod preview;
+mod slash_commands;
 mod terminal;
 
 #[derive(Clone)]
@@ -317,7 +318,11 @@ pub fn run() {
             claude_cli::send_message_via_cli,
             claude_cli::send_message_via_cli_streaming,
             claude_cli::send_message_via_sdk_streaming,
-            claude_oauth::start_claude_oauth
+            claude_oauth::start_claude_oauth,
+            slash_commands::list_slash_commands,
+            slash_commands::create_slash_command,
+            slash_commands::update_slash_command,
+            slash_commands::delete_slash_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

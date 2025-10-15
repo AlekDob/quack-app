@@ -14,6 +14,7 @@ import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMention
 import duckAvatar from '../../images/duck.png';
 import type { ChatAttachment, AgentInfo } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
+import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
@@ -47,19 +48,36 @@ interface ChatInputProps {
   onClearAgent?: () => void;
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
+  pendingSlashCommand?: { name: string; description: string } | null;
+  onCommandInserted?: () => void;
+  basePath?: string;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, pendingAgentMention, onMentionInserted }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, pendingAgentMention, onMentionInserted, pendingSlashCommand, onCommandInserted, basePath }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load slash commands
+  const { commands: commandsResponse } = useSlashCommands(basePath || '');
+
+  // Flatten commands for autocomplete (builtin + custom)
+  const commands = useMemo(() => {
+    return [...commandsResponse.builtin, ...commandsResponse.custom];
+  }, [commandsResponse]);
 
   // Agent autocomplete state
   const [showAgentAutocomplete, setShowAgentAutocomplete] = useState(false);
   const [agentFilter, setAgentFilter] = useState('');
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [atMentionStart, setAtMentionStart] = useState(-1);
+
+  // Slash command autocomplete state
+  const [showCommandAutocomplete, setShowCommandAutocomplete] = useState(false);
+  const [commandFilter, setCommandFilter] = useState('');
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [slashCommandStart, setSlashCommandStart] = useState(-1);
 
   const generateId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -84,21 +102,57 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     });
   }, [agents, showAgentAutocomplete, agentFilter]);
 
-  // Handle input change and detect @ mentions
+  // Filter commands based on current / command
+  const filteredCommands = useMemo(() => {
+    if (!commands || !showCommandAutocomplete) return [];
+
+    const filter = commandFilter.toLowerCase();
+    return commands.filter(command => {
+      const name = command.name.toLowerCase();
+      const description = command.description.toLowerCase();
+      return name.includes(filter) || description.includes(filter);
+    });
+  }, [commands, showCommandAutocomplete, commandFilter]);
+
+  // Handle input change and detect @ mentions and / commands
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart;
 
     setInput(newValue);
 
+    const textBeforeCursor = newValue.substring(0, cursorPos);
+
+    // Check for / command first (at start of line or after newline)
+    const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+    if (lastSlashIndex !== -1 && commands && commands.length > 0) {
+      // Check if / is at start or after newline
+      const charBeforeSlash = lastSlashIndex > 0 ? textBeforeCursor[lastSlashIndex - 1] : '\n';
+      const isAtLineStart = charBeforeSlash === '\n' || lastSlashIndex === 0;
+
+      if (isAtLineStart) {
+        const textAfterSlash = textBeforeCursor.substring(lastSlashIndex + 1);
+
+        if (!textAfterSlash.includes(' ') && !textAfterSlash.includes('\n')) {
+          // Valid / command
+          setShowCommandAutocomplete(true);
+          setCommandFilter(textAfterSlash);
+          setSlashCommandStart(lastSlashIndex);
+          setSelectedCommandIndex(0);
+          setShowAgentAutocomplete(false); // Hide agent autocomplete
+          return;
+        }
+      }
+    }
+
     // Check for @ mention
     if (!agents || agents.length === 0) {
       setShowAgentAutocomplete(false);
+      setShowCommandAutocomplete(false);
       return;
     }
 
     // Find the last @ before cursor
-    const textBeforeCursor = newValue.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
     if (lastAtIndex !== -1) {
@@ -116,14 +170,16 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
           setAgentFilter(textAfterAt);
           setAtMentionStart(lastAtIndex);
           setSelectedAgentIndex(0);
+          setShowCommandAutocomplete(false); // Hide command autocomplete
           return;
         }
       }
     }
 
-    // No valid @ mention found
+    // No valid @ mention or / command found
     setShowAgentAutocomplete(false);
-  }, [agents]);
+    setShowCommandAutocomplete(false);
+  }, [agents, commands]);
 
   // Select an agent from autocomplete
   const selectAgent = useCallback((agent: AgentInfo) => {
@@ -149,6 +205,31 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
       }
     }, 0);
   }, [input, atMentionStart]);
+
+  // Select a command from autocomplete
+  const selectCommand = useCallback((command: SlashCommand) => {
+    if (!textareaRef.current) return;
+
+    // Replace the partial /command with full command name
+    const beforeCommand = input.substring(0, slashCommandStart);
+    const afterCommand = input.substring(textareaRef.current.selectionStart);
+    const fullCommand = `/${command.name} `;
+    const newInput = beforeCommand + fullCommand + afterCommand;
+
+    setInput(newInput);
+    setShowCommandAutocomplete(false);
+    setCommandFilter('');
+    setSlashCommandStart(-1);
+
+    // Focus back to textarea and position cursor after command
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeCommand.length + fullCommand.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [input, slashCommandStart]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -190,6 +271,40 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
       onMentionInserted();
     }
   }, [pendingAgentMention, onMentionInserted, input]);
+
+  // Insert slash command when requested from panel
+  useEffect(() => {
+    if (!pendingSlashCommand || !textareaRef.current) return;
+
+    // Insert /command at current cursor position (or at start of line if empty)
+    const cursorPos = textareaRef.current.selectionStart;
+    const beforeCursor = input.substring(0, cursorPos);
+    const afterCursor = input.substring(cursorPos);
+
+    // Check if we're at the start of a line
+    const isAtLineStart = beforeCursor.length === 0 || beforeCursor.endsWith('\n');
+
+    // Add newline before / if needed (not at start and not after newline)
+    const prefix = !isAtLineStart && beforeCursor.length > 0 ? '\n' : '';
+    const command = `${prefix}/${pendingSlashCommand.name} `;
+    const newInput = beforeCursor + command + afterCursor;
+
+    setInput(newInput);
+
+    // Position cursor after command
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeCursor.length + command.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+
+    // Notify parent that command was inserted
+    if (onCommandInserted) {
+      onCommandInserted();
+    }
+  }, [pendingSlashCommand, onCommandInserted, input]);
 
   const guessMimeType = useCallback((filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
@@ -449,6 +564,33 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle command autocomplete navigation
+    if (showCommandAutocomplete && filteredCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedCommandIndex((prev) => (prev + 1) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedCommandIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const selectedCommand = filteredCommands[selectedCommandIndex];
+        if (selectedCommand) {
+          selectCommand(selectedCommand);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowCommandAutocomplete(false);
+        return;
+      }
+    }
+
     // Handle agent autocomplete navigation
     if (showAgentAutocomplete && filteredAgents.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -491,6 +633,42 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
 
   return (
     <div className="chat-input-container">
+      {/* Command autocomplete dropdown */}
+      {showCommandAutocomplete && filteredCommands.length > 0 && (
+        <div className="agent-autocomplete command-autocomplete">
+          {filteredCommands.map((command, index) => (
+            <button
+              key={command.name}
+              type="button"
+              className={`agent-autocomplete-item ${selectedCommandIndex === index ? 'selected' : ''}`}
+              onClick={() => selectCommand(command)}
+              onMouseEnter={() => setSelectedCommandIndex(index)}
+            >
+              <div className="agent-autocomplete-badge command-badge">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+                  <path d="M2 4l3 3-3 3M7 10h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </div>
+              <div className="agent-autocomplete-info">
+                <div className="agent-autocomplete-name">
+                  /{command.name}
+                </div>
+                <div className="agent-autocomplete-description">
+                  {command.description.length > 60
+                    ? `${command.description.substring(0, 60)}...`
+                    : command.description}
+                </div>
+              </div>
+              {!command.isBuiltin && (
+                <div className="agent-autocomplete-model">
+                  <span className="command-type-badge">Custom</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Agent autocomplete dropdown */}
       {showAgentAutocomplete && filteredAgents.length > 0 && (
         <div className="agent-autocomplete">

@@ -1,17 +1,19 @@
 import { useState, type ReactNode } from "react";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
+import { CommandsPanel } from "./CommandsPanel";
 import ContextPanel from "./ContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
 import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo } from "../types";
+import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, Context, Terminal
+ * Tabs: File Explorer, Agents, Commands, Context, Terminal
  */
 
-type TabId = "explorer" | "agents" | "context" | "terminal";
+type TabId = "explorer" | "agents" | "commands" | "context" | "terminal";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -31,6 +33,31 @@ const icons: Record<string, ReactNode> = {
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
       <path
         d="M10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm-5 9a3 3 0 0 0-3 3v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1a3 3 0 0 0-3-3H5Z"
+        fill="currentColor"
+      />
+    </svg>
+  ),
+  commands: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 7l2 2-2 2M10 11h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="14"
+        cy="7"
+        r="1.5"
         fill="currentColor"
       />
     </svg>
@@ -98,6 +125,9 @@ interface SidePanelProps {
   onUseAgent: (agent: AgentInfo) => void;
   onRefreshAgents: () => void;
 
+  // Commands props
+  onUseCommand: (command: SlashCommand) => void;
+
   // Terminal props
   activeTerminalId: string | null;
   terminals: TerminalInfo[];
@@ -135,6 +165,9 @@ export default function SidePanel({
   onUseAgent,
   onRefreshAgents,
 
+  // Commands
+  onUseCommand,
+
   // Terminal
   activeTerminalId,
   terminals,
@@ -162,6 +195,11 @@ export default function SidePanel({
       icon: icons.agents,
       badge: agents.length,
       hasContent: agents.length > 0,
+    },
+    {
+      id: "commands" as TabId,
+      label: "Commands",
+      icon: icons.commands,
     },
     {
       id: "context" as TabId,
@@ -236,6 +274,15 @@ export default function SidePanel({
               onSelectAgent={onSelectAgent}
               onUseAgent={onUseAgent}
               onRefresh={onRefreshAgents}
+            />
+          </div>
+        )}
+
+        {activeTab === "commands" && (
+          <div className="side-panel-pane">
+            <CommandsPanel
+              basePath={rootPath || ''}
+              onUseCommand={onUseCommand}
             />
           </div>
         )}

@@ -553,6 +553,7 @@ function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
   const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
+  const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
@@ -1201,6 +1202,15 @@ function App() {
     setPendingAgentMention(agentInfo);
     toast.success(`Agent mention added: @${agentInfo.name}`, {
       description: 'Type your message to send with this agent',
+      duration: 2000,
+    });
+  }, []);
+
+  const handleUseCommand = useCallback((command: { name: string; description: string }) => {
+    // Set pending slash command to trigger insertion in ChatInput
+    setPendingSlashCommand(command);
+    toast.success(`Command added: /${command.name}`, {
+      description: 'Press Enter to execute the command',
       duration: 2000,
     });
   }, []);
@@ -2575,6 +2585,9 @@ function App() {
               onFilePathClick={handleFilePathClick}
               pendingAgentMention={pendingAgentMention}
               onMentionInserted={() => setPendingAgentMention(null)}
+              pendingSlashCommand={pendingSlashCommand}
+              onCommandInserted={() => setPendingSlashCommand(null)}
+              basePath={explorerRoot ?? explorerPath}
             />
           </div>
         </section>
@@ -2601,6 +2614,8 @@ function App() {
           onSelectAgent={handleSelectAgent}
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
+          // Commands props
+          onUseCommand={handleUseCommand}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}

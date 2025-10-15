@@ -11,7 +11,7 @@ interface PermissionOption {
 
 const permissionOptions: PermissionOption[] = [
   { value: 'plan', label: 'Plan · Planning only', icon: '◇', color: '#60a5fa' },
-  { value: 'acceptEdits', label: 'Full access · Auto-approve file changes', icon: '◆', color: '#fbbf24' },
+  { value: 'act', label: 'Act · Auto-approve file changes', icon: '◆', color: '#fbbf24' },
   { value: 'bypass', label: 'Bypass · No confirmations', icon: '⬢', color: '#f87171' },
 ];
 

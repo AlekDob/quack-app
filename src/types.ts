@@ -234,6 +234,7 @@ export interface ChatSession {
   updatedAt: number;
   systemPrompt?: string;
   workingDirectory?: string;
+  claudeSessionId?: string; // Claude Agent SDK session ID for resume
 }
 
 export interface ClaudeSettings {
@@ -314,3 +315,39 @@ export interface ClaudeResultEvent extends ClaudeEventBase {
 }
 
 export type ClaudeEvent = ClaudeSystemEvent | ClaudeAssistantEvent | ClaudeUserEvent | ClaudeResultEvent;
+
+// Slash Commands types
+export type SlashCommandScope = 'built-in' | 'project' | 'user' | 'plugin' | 'mcp';
+
+export interface SlashCommandFrontmatter {
+  'allowed-tools'?: string;
+  'argument-hint'?: string;
+  description?: string;
+  model?: string;
+  'disable-model-invocation'?: boolean;
+}
+
+export interface SlashCommand {
+  name: string; // Command name without the leading "/"
+  description: string;
+  scope: SlashCommandScope;
+  filePath?: string; // Path to .md file (for custom commands)
+  frontmatter?: SlashCommandFrontmatter;
+  content?: string; // Markdown content (for custom commands)
+  argumentHint?: string; // Hint for command arguments
+  namespace?: string; // Subdirectory namespace (e.g., "frontend", "backend")
+  serverName?: string; // MCP server name (for MCP commands)
+}
+
+export interface SlashCommandsResponse {
+  builtIn: SlashCommand[];
+  custom: SlashCommand[];
+}
+
+export interface CreateSlashCommandParams {
+  name: string;
+  description: string;
+  content: string;
+  argumentHint?: string;
+  frontmatter?: SlashCommandFrontmatter;
+}

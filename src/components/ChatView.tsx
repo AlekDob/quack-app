@@ -21,12 +21,15 @@ interface ChatViewProps {
   onFilePathClick?: (path: string) => void;
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
+  pendingSlashCommand?: { name: string; description: string } | null;
+  onCommandInserted?: () => void;
+  basePath?: string;
 }
 
-export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick, pendingAgentMention, onMentionInserted }: ChatViewProps) {
-  const [model, setModel] = useState('sonnet');
+export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick, pendingAgentMention, onMentionInserted, pendingSlashCommand, onCommandInserted, basePath }: ChatViewProps) {
+  const [model, setModel] = useState<'opus' | 'sonnet'>('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('act');
 
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -56,7 +59,7 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
         e.preventDefault();
 
         // Cycle through permission modes
-        const modes: PermissionMode[] = ['plan', 'acceptEdits', 'bypass'];
+        const modes: PermissionMode[] = ['plan', 'act', 'bypass'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
         setPermissionMode(modes[nextIndex]);
@@ -81,7 +84,7 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           model={model}
           thinkingMode={thinkingMode}
           permissionMode={permissionMode}
-          onModelChange={setModel}
+          onModelChange={(m) => setModel(m as 'opus' | 'sonnet')}
           onThinkingModeChange={setThinkingMode}
           onPermissionModeChange={setPermissionMode}
           disabled={isLoading}
@@ -96,6 +99,9 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           onClearAgent={onClearAgent}
           pendingAgentMention={pendingAgentMention}
           onMentionInserted={onMentionInserted}
+          pendingSlashCommand={pendingSlashCommand}
+          onCommandInserted={onCommandInserted}
+          basePath={basePath}
         />
       </div>
     </div>

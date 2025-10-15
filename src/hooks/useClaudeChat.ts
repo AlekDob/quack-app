@@ -1,88 +1,40 @@
 import { useState, useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import type { ChatAttachment, ChatMessage } from '../types';
-
-interface ClaudeCliResponse {
-  result: string;
-  session_id: string;
-  total_cost_usd: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-  };
-}
+import type { ChatAttachment, ChatMessage, ClaudeEvent } from '../types';
+import { streamClaudeMessage } from '../services/claudeSDK';
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
-export type PermissionMode = 'plan' | 'bypass' | 'acceptEdits';
+export type PermissionMode = 'plan' | 'act' | 'bypass';
 
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
-  model?: string;
+  model?: 'opus' | 'sonnet';
   thinkingMode?: ThinkingMode;
   permissionMode?: PermissionMode;
+  workingDirectory?: string;
 }
 
 export function useClaudeChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(true); // SDK always available
   const [error, setError] = useState<string | null>(null);
-  const conversationHistory = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
-  // Check if Claude CLI is available
+  // Store the Claude SDK session ID for resume
+  const claudeSessionId = useRef<string | undefined>(undefined);
+
+  // Initialize (SDK doesn't need initialization)
   const initialize = useCallback(async () => {
-    try {
-      const available = await invoke<boolean>('check_claude_cli_available');
-
-      if (available) {
-        setIsConfigured(true);
-        setError(null);
-        return true;
-      } else {
-        setIsConfigured(false);
-        setError('Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.');
-        return false;
-      }
-    } catch (err) {
-      console.error('Failed to check Claude CLI:', err);
-      setIsConfigured(false);
-      setError(err instanceof Error ? err.message : 'Failed to check Claude CLI');
-      return false;
-    }
+    setIsConfigured(true);
+    setError(null);
+    return true;
   }, []);
 
-  // Send message to Claude
+  // Send message to Claude using the SDK with streaming
   const sendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
 
-    // Ensure we're initialized
-    if (!isConfigured) {
-      const initialized = await initialize();
-      if (!initialized) {
-        // Show error message in chat
-        const errorMessage: ChatMessage = {
-          id: `msg-${Date.now()}-error`,
-          role: 'assistant',
-          content: 'Quack quack! 🦆 Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
-          timestamp: Date.now(),
-          status: 'error',
-          error: error || 'Not configured',
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-        return;
-      }
-    }
-
     // Create user message
     const attachments = options?.attachments ?? [];
-    const attachmentLines = attachments.map((item, index) => `Attachment ${index + 1}: ${item.path}`);
-    const contentWithAttachments =
-      attachmentLines.length > 0
-        ? `${content}\n\nAttachments:\n${attachmentLines.join('\n')}`
-        : content;
-
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}-user`,
       role: 'user',
@@ -103,62 +55,79 @@ export function useClaudeChat() {
       content: '',
       timestamp: Date.now(),
       status: 'streaming',
+      events: [], // Store all Claude events for visualization
     };
 
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      // Build context from conversation history
-      let prompt = contentWithAttachments;
-      if (conversationHistory.current.length > 0) {
-        const history = conversationHistory.current
-          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n');
-        prompt = `${history}\n\nUser: ${contentWithAttachments}`;
-      }
-
-      // Call Claude CLI
-      const sanitizedAttachments = attachments
-        .map((item) => item.path)
-        .filter((path) => !!path);
-
-      const requestPayload = {
-        prompt,
-        model: options?.model,
+      // Stream message using Claude Agent SDK
+      const stream = streamClaudeMessage(content, {
+        model: options?.model || 'sonnet',
         thinkingMode: options?.thinkingMode,
-        permissionMode: options?.permissionMode,
-        attachments: sanitizedAttachments.length > 0 ? sanitizedAttachments : undefined,
-      };
-
-      const response = await invoke<ClaudeCliResponse>('send_message_via_cli', {
-        request: requestPayload,
+        permissionMode: options?.permissionMode || 'act',
+        sessionId: claudeSessionId.current, // Resume previous session if exists
+        workingDirectory: options?.workingDirectory,
       });
 
-      // Add to conversation history
-      conversationHistory.current.push({
-        role: 'user',
-        content: contentWithAttachments,
-      });
+      const events: ClaudeEvent[] = [];
+      let assistantContent = '';
 
-      conversationHistory.current.push({
-        role: 'assistant',
-        content: response.result,
-      });
+      // Process streaming events
+      for await (const chunk of stream) {
+        if (chunk.type === 'event' && chunk.event) {
+          const event = chunk.event;
+          events.push(event);
 
-      // Update message with response
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                content: response.result,
-                status: 'complete' as const,
+          // Capture session ID from system init event
+          if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
+            console.log('[useClaudeChat] Captured session ID:', event.session_id);
+            claudeSessionId.current = event.session_id;
+          }
+
+          // Accumulate assistant text from assistant events
+          if (event.type === 'assistant' && event.message?.content) {
+            for (const block of event.message.content) {
+              if (block.type === 'text' && block.text) {
+                assistantContent += block.text;
               }
-            : msg
-        )
-      );
+            }
+          }
+
+          // Update message with streaming content
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content: assistantContent,
+                    status: 'streaming' as const,
+                    events: [...events],
+                  }
+                : msg
+            )
+          );
+        } else if (chunk.type === 'complete') {
+          // Stream completed successfully
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content: assistantContent || chunk.result?.text || '',
+                    status: 'complete' as const,
+                    events: [...events],
+                  }
+                : msg
+            )
+          );
+        } else if (chunk.type === 'error') {
+          // Stream error
+          throw new Error(chunk.error || 'Unknown streaming error');
+        }
+      }
     } catch (err) {
-      console.error('Error calling Claude CLI:', err);
+      console.error('[useClaudeChat] Error streaming message:', err);
 
       const errorMessage =
         err instanceof Error
@@ -183,12 +152,17 @@ export function useClaudeChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, error, initialize, isConfigured]);
+  }, [isLoading]);
 
-  // Clear conversation
+  // Clear conversation and reset session
   const clearConversation = useCallback(() => {
     setMessages([]);
-    conversationHistory.current = [];
+    claudeSessionId.current = undefined; // Clear session ID to start fresh
+  }, []);
+
+  // Get current session ID (useful for debugging)
+  const getCurrentSessionId = useCallback(() => {
+    return claudeSessionId.current;
   }, []);
 
   return {
@@ -199,5 +173,6 @@ export function useClaudeChat() {
     sendMessage,
     clearConversation,
     initialize,
+    getCurrentSessionId,
   };
 }
