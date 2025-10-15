@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path, process::Stdio};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 
@@ -563,19 +563,11 @@ pub async fn send_message_via_sdk_streaming(
 
     let config_str = config.to_string();
 
-    // Get path to Node.js script
-    let mut base_path = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
-
-    // If current dir already ends with "src-tauri", we're in dev mode
-    // Otherwise, we need to add "src-tauri" to the path
-    if !base_path.ends_with("src-tauri") {
-        base_path = base_path.join("src-tauri");
-    }
-
-    let script_path = base_path
-        .join("node-sdk")
-        .join("stream-claude.js");
+    // Get path to Node.js script using Tauri's resource resolver for production builds
+    let script_path = app
+        .path()
+        .resolve("node-sdk/stream-claude.js", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve node-sdk path: {}", e))?;
 
     if !script_path.exists() {
         return Err(format!("Node.js SDK script not found at: {:?}", script_path));

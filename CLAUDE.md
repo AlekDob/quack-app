@@ -20,8 +20,28 @@ You always respond with frequent "quack quack" expressions and try to ask questi
 - **Code comments**: Can be in English
 - **Documentation**: CLAUDE.md and technical docs in English; keep Italian only when specifically talking to Alek
 
+## What is Quack?
+
+Quack is a multi-agentic desktop application built on the **Claude Agent SDK** (https://docs.claude.com/en/api/agent-sdk/overview). It's not just a simple multi-terminal session manager anymore - it's a complete environment that leverages the power of Claude Code SDK to create autonomous agents.
+
+### Architecture
+- **Base**: Claude Agent SDK (formerly Claude Code SDK)
+- **Interface**: Integrated file explorer, multiple terminal panels, code editor, AI assistant
+- **Functionality**: Multi-agentic management with support for subagents, custom tools, MCP servers
+- **SDK Documentation**: https://www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk
+
+### Core Principles
+The Agent SDK is based on the principle of "giving Claude a computer" - providing the same tools programmers use:
+- File system access (Read, Write, Edit)
+- Bash command execution
+- Intelligent search (Grep, Glob)
+- Automatic context management (compaction)
+- Subagents for parallel tasks
+- MCP for external integrations
+
 *Generated with Quack Agency CLI for quack-app*
-*Project Type: tauri | Features: ai, design, animations, testing, analytics*
+*Project Type: Tauri + React + TypeScript*
+*Features: Claude Agent SDK, Multi-terminal, File Explorer, Git Integration, AI Assistant*
 *Jack's Personality: Full sarcasm mode activated with maximum wit and creative commentary*
 
 ## Your Responsibilities
@@ -268,25 +288,97 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TerminalFlow is a Tauri-based desktop application that provides a terminal emulator with integrated file explorer. The app features multiple terminal tabs with customizable colors and a file navigation sidebar.
+Quack is a multi-agentic Tauri-based desktop application that provides:
+- **Multi-terminal emulator** with PTY management and intelligent state detection (busy/idle)
+- **Integrated file explorer** with navigation and file preview
+- **Git integration** with status, diff viewer, stage/unstage, commit and timeline
+- **AI Assistant** powered by Claude Agent SDK with real-time streaming
+- **Agents Panel** for managing subagents and custom tools
+- **HTTP hooks** for external tool integration (e.g., Claude Code status updates)
+- **Setup Wizard** (Quack Agency) for bootstrapping new projects with agent-based workflows
+
+The app is designed for vibecoding - managing multiple projects simultaneously with AI-assisted development workflows.
 
 ## Architecture
 
 ### Frontend (React + TypeScript)
-- **Main App**: `src/App.tsx` – orchestrates terminal management, file explorer, sidebar, and the "Nuovo terminale" modal (name, directory via Finder, color selection)
-- **Terminal View**: `src/components/TerminalView.tsx` – manages xterm.js terminals, FitAddon, and Tauri events
-- **Terminal Sidebar**: `src/components/TerminalSidebar.tsx` – handles terminal tabs, color badges, and actions
-- **File Explorer**: `src/components/FileExplorer.tsx` – directory navigation component
+
+#### Core Application
+- **Main App**: `src/App.tsx` – orchestrates the entire application (terminals, file explorer, Git, AI assistant, drawers)
+- **Types**: `src/types.ts` – TypeScript interfaces for terminal, file system, Git, and Claude SDK data
+
+#### Terminal System
+- **Terminal View**: `src/components/TerminalView.tsx` – manages xterm.js terminals, FitAddon, and Tauri PTY events
+- **Terminal Sidebar**: `src/components/TerminalSidebar.tsx` – handles terminal tabs, color badges, status indicators, and actions
+- **Terminal Activity Bar**: `src/components/TerminalActivityBar.tsx` – activity bar with terminal groups
+- **Terminal Group**: `src/components/TerminalGroup.tsx` – groups of related terminals
 - **New Terminal Modal**: `src/components/NewTerminalModal.tsx` – liquid-style modal with Finder integration and color presets
-- **Preview Panel**: `src/components/PreviewPanel.tsx` – web preview inspector with:
-  - Multiple custom URLs/ports support (add/remove functionality)
-  - Auto-detection of running dev servers from active terminals
-  - Manual preview window activation (click "Preview" button to open)
-  - Independent WebView windows with inspector integration
-  - Browser opening support for external preview
-- **Notifications & Audio**: handled in `src/App.tsx` via `@tauri-apps/plugin-notification` and a WebAudio "quack" sound when terminal sessions become ready
-- **Notifications & Audio**: `src/App.tsx` uses `@tauri-apps/plugin-notification` and a WebAudio-based "quack" callback to alert when terminals become idle
-- **Types**: `src/types.ts` – TypeScript interfaces for terminal and file system data
+- **Terminal Toolbar**: `src/components/TerminalToolBar.tsx` – toolbar with actions for active terminal
+
+#### File System
+- **File Explorer**: `src/components/FileExplorer.tsx` – directory navigation and file browsing
+- **File Preview Drawer**: `src/components/FilePreviewDrawer.tsx` – drawer for previewing file contents (up to 5MB)
+- **File Context Menu**: `src/components/FileContextMenu.tsx` – right-click context menu for file operations
+
+#### Git Integration
+- **Git Panel**: `src/components/GitPanel.tsx` – Git status, diff viewer, stage/unstage, commit UI, and timeline
+- **Diff Viewer**: `src/components/DiffViewer.tsx` – side-by-side diff display for worktree and staged changes
+
+#### AI Assistant (Claude Agent SDK)
+- **AI Assistant**: `src/components/AIAssistant.tsx` – main AI assistant interface
+- **Chat View**: `src/components/ChatView.tsx` – chat interface with streaming messages
+- **Chat Input**: `src/components/ChatInput.tsx` – input area with multiline support and keyboard shortcuts
+- **Chat Message**: `src/components/ChatMessage.tsx` – individual message display (user/assistant)
+- **Stream Message**: `src/components/StreamMessage.tsx` – real-time streaming message renderer
+- **Message List**: `src/components/MessageList.tsx` – scrollable list of all messages
+- **Agents Panel**: `src/components/AgentsPanel.tsx` – management panel for subagents and custom tools
+- **AI Settings Panel**: `src/components/AISettingsPanel.tsx` – configuration for Claude SDK (model, permissions, etc.)
+- **Claude Auth Settings**: `src/components/ClaudeAuthSettings.tsx` – API key configuration
+- **Chat Settings Menu**: `src/components/ChatSettingsMenu.tsx` – session settings and options
+- **Custom Permission Select**: `src/components/CustomPermissionSelect.tsx` – permission mode selector (plan/act/bypass)
+- **Tool Widgets**: `src/components/ToolWidgets.tsx` – visual widgets for tool usage display
+- **Tool Call Card**: `src/components/ToolCallCard.tsx` – card displaying individual tool calls
+- **Markdown Text**: `src/components/MarkdownText.tsx` – markdown renderer for assistant messages
+- **Skeleton Message**: `src/components/SkeletonMessage.tsx` – loading skeleton for streaming messages
+
+#### Quack Agency Setup
+- **Quack Agency Drawer**: `src/components/QuackAgencyDrawer.tsx` – main drawer for agency setup
+- **Setup Wizard**: `src/components/QuackAgencySetupWizard.tsx` – multi-step wizard for project setup
+- **Setup Steps**:
+  - `SetupStepWelcome.tsx` – welcome screen
+  - `SetupStepProject.tsx` – project configuration
+  - `SetupStepFeatures.tsx` – feature selection
+  - `SetupStepOptions.tsx` – additional options
+  - `SetupStepReview.tsx` – review and confirm
+- **Wizard Step**: `src/components/WizardStep.tsx` – reusable wizard step component
+
+#### Preview & Development
+- **Preview Panel**: `src/components/PreviewPanel.tsx` – web preview list with auto-detection
+- **Preview Drawer**: `src/components/PreviewDrawer.tsx` – drawer containing preview panel
+- **Processes Drawer**: `src/components/ProcessesDrawer.tsx` – running processes monitor
+
+#### UI Components
+- **Toolbar**: `src/components/ToolBar.tsx` – main toolbar with actions and settings
+- **Title Bar**: `src/components/TitleBar.tsx` – custom title bar with window controls
+- **Side Panel**: `src/components/SidePanel.tsx` – collapsible side panel container
+- **Context Panel**: `src/components/ContextPanel.tsx` – contextual information panel
+- **Context Menu**: `src/components/ContextMenu.tsx` – generic context menu component
+- **Group Header**: `src/components/GroupHeader.tsx` – collapsible group header
+- **Code Editor**: `src/components/CodeEditor.tsx` – Monaco editor integration
+- **Duck Animation**: `src/components/DuckAnimation.tsx` – delightful duck animations 🦆
+- **Error Boundary**: `src/components/ErrorBoundary.tsx` – React error boundary
+- **Performance Monitor**: `src/components/PerformanceMonitor.tsx` – performance monitoring UI
+- **Backgrounds Modal**: `src/components/BackgroundsModal.tsx` – terminal background customization
+- **Saved Commands**: `src/components/SavedCommands.tsx` – saved command snippets
+- **Saved Commands Drawer**: `src/components/SavedCommandsDrawer.tsx` – drawer for saved commands
+- **Saved Command Modal**: `src/components/SavedCommandModal.tsx` – modal for editing commands
+
+#### Services & SDK Integration
+- **Claude SDK Service**: `src/services/claudeSDK.ts` – wrapper around `@anthropic-ai/claude-agent-sdk` with streaming support
+
+#### Notifications & Audio
+- **Notifications**: handled in `src/App.tsx` via `@tauri-apps/plugin-notification`
+- **Audio feedback**: WebAudio-based "quack" sound when terminals become idle or jobs complete
 
 ### Backend (Rust + Tauri)
 - **Core Library**: `src-tauri/src/lib.rs` – Tauri setup, dialog + notification plugin registration, command wiring, local hook HTTP endpoint

@@ -1,8 +1,7 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
-import { getAgentAvatar } from '../utils/agentAvatars';
 import type { ChatMessage, AgentInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -28,35 +27,6 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
-
-  const modelOptions = useMemo(
-    () => [
-      { value: 'haiku', label: 'Haiku 3.5' },
-      { value: 'sonnet', label: 'Sonnet 4.5' },
-      { value: 'opus', label: 'Opus 4.5' },
-    ],
-    []
-  );
-
-  const thinkingModeOptions = useMemo(
-    () => [
-      { value: 'auto' as ThinkingMode, label: '▮ Auto · Let model decide' },
-      { value: 'think' as ThinkingMode, label: '▮▮ Think · Step-by-step' },
-      { value: 'hard' as ThinkingMode, label: '▮▮▮ Think Hard · Deeper reasoning' },
-      { value: 'harder' as ThinkingMode, label: '▮▮▮▮ Think Harder · Thorough reasoning' },
-      { value: 'ultra' as ThinkingMode, label: '▮▮▮▮▮ Ultra Think · Maximum deliberation' },
-    ],
-    []
-  );
-
-  const permissionModeOptions = useMemo(
-    () => [
-      { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
-      { value: 'acceptEdits' as PermissionMode, label: '◆ Full access · Auto-approve edits' },
-      { value: 'bypass' as PermissionMode, label: '⬢ Bypass · No confirmations' },
-    ],
-    []
-  );
 
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;

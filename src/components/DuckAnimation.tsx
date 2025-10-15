@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import './DuckAnimation.css';
 
 const DUCK_VARIANTS = ['>°)>', '>^)>', '>·)>', '>~)>', '>´)>'];

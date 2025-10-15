@@ -42,7 +42,8 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "../images"
+      "../images",
+      "node-sdk"
     ]
   }
 }

@@ -10,12 +10,33 @@
  * - Example: "mike project manager" matches "mike.png"
  */
 
+import { convertFileSrc } from '@tauri-apps/api/core';
+
+// Type augmentation for Tauri
+declare global {
+  interface Window {
+    __TAURI__?: unknown;
+  }
+}
+
+// Helper to resolve asset path (works in both dev and production)
+function resolveAssetPath(path: string): string {
+  // In Tauri production, resources are in the bundle
+  // In dev mode, we use the direct path
+  if (window.__TAURI__) {
+    // Tauri expects paths relative to the resource directory
+    return convertFileSrc(path);
+  }
+  // Dev mode - serve from public
+  return `/${path}`;
+}
+
 // Available duck avatars in /images/ducks/
 const DUCK_AVATARS: Record<string, string> = {
-  mike: '/images/ducks/mike.png',
-  julie: '/images/ducks/julie.png',
-  john: '/images/ducks/john.png',
-  giuseppe: '/images/ducks/giuseppe.png',
+  mike: resolveAssetPath('images/ducks/mike.png'),
+  julie: resolveAssetPath('images/ducks/julie.png'),
+  john: resolveAssetPath('images/ducks/john.png'),
+  giuseppe: resolveAssetPath('images/ducks/giuseppe.png'),
 };
 
 /**

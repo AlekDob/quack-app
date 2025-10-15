@@ -7,9 +7,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tauri::AppHandle;
-use tauri_plugin_store::StoreExt;
 
 // ============================================================================
 // Data Structures

@@ -49,7 +49,7 @@ interface ChatInputProps {
   onMentionInserted?: () => void;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, onSelectAgent, activeAgent, onClearAgent, pendingAgentMention, onMentionInserted }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, pendingAgentMention, onMentionInserted }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
