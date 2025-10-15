@@ -3,6 +3,8 @@ import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
 import { getAgentAvatar } from '../utils/agentAvatars';
+import { parseAgentMentions } from '../utils/agentMentions';
+import duckAvatar from '../../images/duck.png';
 import './ChatMessage.css';
 import './StreamMessage.css';
 
@@ -25,6 +27,47 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
     const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
     const value = size / Math.pow(1024, exponent);
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[exponent]}`;
+  };
+
+  // Render text with @mentions as inline chips
+  const renderTextWithMentions = (text: string) => {
+    const mentions = parseAgentMentions(text);
+
+    if (mentions.length === 0) {
+      return text;
+    }
+
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    mentions.forEach((mention, idx) => {
+      // Add text before mention
+      if (mention.startIndex > lastIndex) {
+        parts.push(text.substring(lastIndex, mention.startIndex));
+      }
+
+      // Add mention chip
+      const avatarPath = getAgentAvatar(mention.agentName) || duckAvatar;
+      parts.push(
+        <span key={`mention-${idx}`} className="agent-mention-chip">
+          <img
+            src={avatarPath}
+            alt={mention.agentName}
+            className="agent-mention-avatar"
+          />
+          <span className="agent-mention-name">@{mention.agentName}</span>
+        </span>
+      );
+
+      lastIndex = mention.endIndex;
+    });
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts;
   };
 
   // System messages (agent invocation) - render as centered notification
@@ -94,7 +137,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
           </div>
         ) : (
           <div className="chat-message-body">
-            {message.content}
+            {renderTextWithMentions(message.content)}
             {isStreaming && <span className="streaming-cursor">▊</span>}
           </div>
         )}

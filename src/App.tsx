@@ -552,6 +552,7 @@ function App() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
   const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat
+  const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
@@ -1195,10 +1196,12 @@ function App() {
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
   const handleUseAgent = useCallback((agentInfo: AgentInfo) => {
-    setActiveAgent(agentInfo);
-    toast.success(`Agent activated: ${agentInfo.name}`, {
-      description: 'This agent will be used for future chat messages',
-      duration: 3000,
+    // Instead of setting activeAgent, we'll trigger mention insertion in ChatInput
+    // This is done by setting a pending mention that ChatInput will pick up
+    setPendingAgentMention(agentInfo);
+    toast.success(`Agent mention added: @${agentInfo.name}`, {
+      description: 'Type your message to send with this agent',
+      duration: 2000,
     });
   }, []);
 
@@ -2570,6 +2573,8 @@ function App() {
               agents={agents}
               onSelectAgent={handleUseAgent}
               onFilePathClick={handleFilePathClick}
+              pendingAgentMention={pendingAgentMention}
+              onMentionInserted={() => setPendingAgentMention(null)}
             />
           </div>
         </section>

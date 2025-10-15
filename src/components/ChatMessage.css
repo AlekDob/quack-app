@@ -229,3 +229,34 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* Agent mention chips in messages */
+.agent-mention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  margin: 0 2px;
+  background: rgba(242, 140, 82, 0.15);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.agent-mention-avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(242, 140, 82, 0.2);
+}
+
+.agent-mention-name {
+  color: rgba(255, 255, 255, 0.95);
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  line-height: 1;
+}

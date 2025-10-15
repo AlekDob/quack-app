@@ -20,9 +20,11 @@ interface ChatViewProps {
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
   onFilePathClick?: (path: string) => void;
+  pendingAgentMention?: AgentInfo | null;
+  onMentionInserted?: () => void;
 }
 
-export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick }: ChatViewProps) {
+export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick, pendingAgentMention, onMentionInserted }: ChatViewProps) {
   const [model, setModel] = useState('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
@@ -122,6 +124,8 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           onSelectAgent={onSelectAgent}
           activeAgent={activeAgent}
           onClearAgent={onClearAgent}
+          pendingAgentMention={pendingAgentMention}
+          onMentionInserted={onMentionInserted}
         />
       </div>
     </div>

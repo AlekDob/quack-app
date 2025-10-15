@@ -10,6 +10,8 @@ import {
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { getAgentAvatar } from '../utils/agentAvatars';
+import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
+import duckAvatar from '../../images/duck.png';
 import type { ChatAttachment, AgentInfo } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import './ChatInput.css';
@@ -43,9 +45,11 @@ interface ChatInputProps {
   onSelectAgent?: (agent: AgentInfo) => void;
   activeAgent?: AgentInfo | null;
   onClearAgent?: () => void;
+  pendingAgentMention?: AgentInfo | null;
+  onMentionInserted?: () => void;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, onSelectAgent, activeAgent, onClearAgent }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, onSelectAgent, activeAgent, onClearAgent, pendingAgentMention, onMentionInserted }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -125,30 +129,26 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
   const selectAgent = useCallback((agent: AgentInfo) => {
     if (!textareaRef.current) return;
 
-    // Remove the @ mention from input
+    // Replace the partial @mention with full agent name
     const beforeMention = input.substring(0, atMentionStart);
     const afterMention = input.substring(textareaRef.current.selectionStart);
-    const newInput = beforeMention + afterMention;
+    const fullMention = `@${agent.name} `;
+    const newInput = beforeMention + fullMention + afterMention;
 
     setInput(newInput);
     setShowAgentAutocomplete(false);
     setAgentFilter('');
     setAtMentionStart(-1);
 
-    // Call the parent callback to activate agent
-    if (onSelectAgent) {
-      onSelectAgent(agent);
-    }
-
-    // Focus back to textarea
+    // Focus back to textarea and position cursor after mention
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
-        const newCursorPos = beforeMention.length;
+        const newCursorPos = beforeMention.length + fullMention.length;
         textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
       }
     }, 0);
-  }, [input, atMentionStart, onSelectAgent]);
+  }, [input, atMentionStart]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -158,6 +158,38 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, 50)}px`;
   }, [input]);
+
+  // Insert agent mention when requested from panel
+  useEffect(() => {
+    if (!pendingAgentMention || !textareaRef.current) return;
+
+    // Insert @mention at current cursor position
+    const cursorPos = textareaRef.current.selectionStart;
+    const beforeCursor = input.substring(0, cursorPos);
+    const afterCursor = input.substring(cursorPos);
+
+    // Add space before @ if needed
+    const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+    const prefix = needsSpaceBefore ? ' ' : '';
+    const mention = `${prefix}@${pendingAgentMention.name} `;
+    const newInput = beforeCursor + mention + afterCursor;
+
+    setInput(newInput);
+
+    // Position cursor after mention
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeCursor.length + mention.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+
+    // Notify parent that mention was inserted
+    if (onMentionInserted) {
+      onMentionInserted();
+    }
+  }, [pendingAgentMention, onMentionInserted, input]);
 
   const guessMimeType = useCallback((filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
@@ -490,35 +522,32 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
         </div>
       )}
       <div className="chat-input-wrapper">
-        {/* Agent tag inside input area */}
-        {activeAgent && (
-          <div className="chat-input-agent-tag">
-            {(() => {
-              const avatarPath = getAgentAvatar(activeAgent.name);
-              if (avatarPath) {
+        {/* Show agent mention chips */}
+        {(() => {
+          const mentions = parseAgentMentions(input);
+          if (mentions.length === 0 || !agents) return null;
+
+          const matchedAgents = matchMentionsToAgents(input, agents);
+          if (matchedAgents.length === 0) return null;
+
+          return (
+            <div className="chat-input-mentions">
+              {matchedAgents.map((agent, idx) => {
+                const avatarPath = getAgentAvatar(agent.name) || duckAvatar;
                 return (
-                  <img
-                    src={avatarPath}
-                    alt={activeAgent.name}
-                    className="chat-input-agent-avatar"
-                  />
+                  <div key={idx} className="chat-input-mention-chip">
+                    <img
+                      src={avatarPath}
+                      alt={agent.name}
+                      className="chat-input-mention-avatar"
+                    />
+                    <span className="chat-input-mention-name">@{agent.name}</span>
+                  </div>
                 );
-              }
-              return null;
-            })()}
-            <span className="chat-input-agent-name">@{activeAgent.name.replace(/-/g, ' ')}</span>
-            {onClearAgent && (
-              <button
-                type="button"
-                onClick={onClearAgent}
-                className="chat-input-agent-remove"
-                title="Remove agent"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        )}
+              })}
+            </div>
+          );
+        })()}
         <div className="chat-input-field-row">
           <textarea
             ref={textareaRef}
