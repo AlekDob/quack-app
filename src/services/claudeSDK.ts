@@ -2,11 +2,25 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeEvent } from '../types';
 
 export interface ClaudeSDKOptions {
-  model?: 'opus' | 'sonnet';
+  model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5';
   thinkingMode?: string;
   permissionMode?: 'plan' | 'act' | 'bypass';
   sessionId?: string;
   workingDirectory?: string;
+}
+
+/**
+ * Map friendly model names to official API model IDs
+ */
+function getModelId(model: string): string {
+  const modelMap: Record<string, string> = {
+    'haiku': 'claude-haiku-4-5-20251001',        // Haiku 4.5 (latest)
+    'haiku-3.5': 'claude-3-5-haiku-20241022',    // Haiku 3.5
+    'sonnet': 'claude-sonnet-4-5-20250929',      // Sonnet 4.5 (latest)
+    'opus': 'claude-opus-4-1-20250805',          // Opus 4.1 (latest)
+  };
+
+  return modelMap[model] || model; // Return as-is if not in map (allows full model IDs)
 }
 
 export interface ClaudeSDKStreamEvent {
@@ -50,7 +64,7 @@ export async function* streamClaudeMessage(
 
     // Build options object - SDK expects { prompt, options }
     const sdkOptions: any = {
-      model,
+      model: getModelId(model), // Map friendly name to API model ID
       permissionMode: sdkPermissionMode,
       // Enable automatic reading of CLAUDE.md, slash commands, and project settings
       settingSources: ['project', 'user', 'local'],

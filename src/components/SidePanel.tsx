@@ -300,49 +300,63 @@ export default function SidePanel({
         {activeTab === "terminal" && (
           <div className="side-panel-pane terminal-panel-pane">
             {terminals.length > 0 ? (
-              <div className="terminal-container-with-iconbar">
-                {/* Active terminal view */}
-                <TerminalView
-                  activeId={activeTerminalId}
-                  terminals={terminals}
-                  onUserInput={onTerminalInput}
-                  onOutput={onTerminalOutput}
-                  onUpdateRecentCommands={onUpdateRecentCommands}
-                />
-                {/* Vertical icon bar on the right */}
-                <div className="terminal-icon-bar">
-                  {terminals.map((terminal, index) => (
-                    <button
-                      key={terminal.id}
-                      type="button"
-                      className={`terminal-icon ${terminal.id === activeTerminalId ? 'active' : ''}`}
-                      onClick={() => onSelectTerminal(terminal.id)}
-                      style={{
-                        backgroundColor: terminal.id === activeTerminalId ? terminal.color : 'transparent',
-                        borderColor: terminal.color,
-                      }}
-                      title={terminal.label}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                  {/* Add terminal button */}
-                  <button
-                    type="button"
-                    className="terminal-icon add-terminal"
-                    onClick={onCreateTerminal}
-                    title="New Terminal"
-                  >
-                    +
-                  </button>
-                </div>
-                <TerminalToolBar
-                  onExecuteCommand={onExecuteCommand}
-                  onToggleSavedCommands={onToggleSavedCommands}
-                  savedCommandsOpen={savedCommandsOpen}
-                  onCreateTerminal={onCreateTerminal}
-                />
-              </div>
+              (() => {
+                // Find active terminal's CWD
+                const activeTerminal = terminals.find((t) => t.id === activeTerminalId);
+                const activeCwd = activeTerminal?.cwd;
+
+                // Filter terminals with same CWD as active terminal
+                const groupTerminals = activeCwd
+                  ? terminals.filter((t) => t.cwd === activeCwd)
+                  : (activeTerminal ? [activeTerminal] : []);
+
+                return (
+                  <div className="terminal-container-with-iconbar">
+                    {/* Active terminal view */}
+                    <TerminalView
+                      activeId={activeTerminalId}
+                      terminals={terminals}
+                      onUserInput={onTerminalInput}
+                      onOutput={onTerminalOutput}
+                      onUpdateRecentCommands={onUpdateRecentCommands}
+                    />
+                    {/* Vertical icon bar on the right - shows only terminals from same group */}
+                    <div className="terminal-icon-bar">
+                      {/* Add terminal button - at the top */}
+                      <button
+                        type="button"
+                        className="terminal-icon add-terminal"
+                        onClick={onCreateTerminal}
+                        title="New Terminal"
+                      >
+                        +
+                      </button>
+                      {/* Terminal icons - numbered 1, 2, 3... within this group */}
+                      {groupTerminals.map((terminal, index) => (
+                        <button
+                          key={terminal.id}
+                          type="button"
+                          className={`terminal-icon ${terminal.id === activeTerminalId ? 'active' : ''}`}
+                          onClick={() => onSelectTerminal(terminal.id)}
+                          style={{
+                            backgroundColor: terminal.id === activeTerminalId ? terminal.color : 'transparent',
+                            borderColor: terminal.color,
+                          }}
+                          title={terminal.label}
+                        >
+                          {index + 1}
+                        </button>
+                      ))}
+                    </div>
+                    <TerminalToolBar
+                      onExecuteCommand={onExecuteCommand}
+                      onToggleSavedCommands={onToggleSavedCommands}
+                      savedCommandsOpen={savedCommandsOpen}
+                      onCreateTerminal={onCreateTerminal}
+                    />
+                  </div>
+                );
+              })()
             ) : (
               <div className="terminal-placeholder">
                 <p>No terminals open</p>

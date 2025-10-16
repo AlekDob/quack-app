@@ -27,7 +27,7 @@ interface ChatViewProps {
 }
 
 export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick, pendingAgentMention, onMentionInserted, pendingSlashCommand, onCommandInserted, basePath }: ChatViewProps) {
-  const [model, setModel] = useState<'opus' | 'sonnet'>('sonnet');
+  const [model, setModel] = useState<'opus' | 'sonnet' | 'haiku' | 'haiku-3.5'>('sonnet');
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
 
@@ -84,7 +84,7 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           model={model}
           thinkingMode={thinkingMode}
           permissionMode={permissionMode}
-          onModelChange={(m) => setModel(m as 'opus' | 'sonnet')}
+          onModelChange={(m) => setModel(m as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5')}
           onThinkingModeChange={setThinkingMode}
           onPermissionModeChange={setPermissionMode}
           disabled={isLoading}

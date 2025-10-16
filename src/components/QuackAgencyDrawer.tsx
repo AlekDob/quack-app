@@ -425,7 +425,7 @@ export default function QuackAgencyDrawer({
                       type="text"
                       value={editModel}
                       onChange={(e) => setEditModel(e.target.value)}
-                      placeholder="e.g., claude-sonnet-4"
+                      placeholder="e.g., claude-sonnet-4-5-20250929"
                     />
                   </div>
 
