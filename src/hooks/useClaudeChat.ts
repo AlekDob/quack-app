@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { ChatAttachment, ChatMessage, ClaudeEvent } from '../types';
 import { streamClaudeMessage } from '../services/claudeSDK';
+import { invoke } from '@tauri-apps/api/core';
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
@@ -122,6 +123,15 @@ export function useClaudeChat() {
                 : msg
             )
           );
+
+          // 🆕 Trigger mobile notification
+          try {
+            await invoke('send_ai_completion_notification', {
+              content: assistantContent.substring(0, 100) || 'Chat completed!'
+            });
+          } catch (err) {
+            console.warn('[Mobile Notification] Failed:', err);
+          }
 
           // Trigger onComplete callback if provided
           if (options?.onComplete) {
