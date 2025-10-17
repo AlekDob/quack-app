@@ -139,26 +139,42 @@ export function NativeTerminalPanel({
                   ${terminal.isOpen ? "bg-white/[0.02]" : ""}
                 `}
               >
-                {/* Status Indicator */}
+                {/* Status Indicator (now uses terminal color) */}
                 <div className="flex items-start gap-3">
                   <div
-                    className={`
-                      mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0
-                      ${terminal.isOpen ? "bg-green-500" : "bg-gray-500"}
-                    `}
+                    className="mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: terminal.color }}
                   />
 
                   {/* Terminal Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-start justify-between gap-2 mb-1">
                       <h3 className="font-medium text-white/90 text-sm truncate">
                         {terminal.name}
                       </h3>
-                      {/* Color Badge */}
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: terminal.color }}
-                      />
+                      {/* Remove Button - now here instead of color badge */}
+                      <button
+                        onClick={(e) => handleRemoveTerminal(e, terminal)}
+                        className="
+                          opacity-0 group-hover:opacity-100 flex-shrink-0
+                          p-1 hover:bg-red-500/20 rounded transition-all
+                        "
+                        title="Remove terminal"
+                      >
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
                     </div>
 
                     {/* Directory */}
@@ -177,30 +193,6 @@ export function NativeTerminalPanel({
                     </p>
                   </div>
                 </div>
-
-                {/* Remove Button */}
-                <button
-                  onClick={(e) => handleRemoveTerminal(e, terminal)}
-                  className="
-                    absolute top-2 right-2 opacity-0 group-hover:opacity-100
-                    p-1 hover:bg-red-500/20 rounded transition-all
-                  "
-                  title="Remove terminal"
-                >
-                  <svg
-                    className="w-4 h-4 text-red-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
               </div>
             ))}
           </div>

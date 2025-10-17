@@ -279,6 +279,20 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
                     }
                 });
         },
+        "Terminal" => format!(
+            r#"
+            tell application "Terminal"
+                activate
+                -- Do everything in a single do script to avoid opening multiple windows
+                set newTab to do script "cd '{}' && clear; export PS1='\\[\\033]0;Terminal: {}\\007\\]$PS1'; exec $SHELL"
+                -- Also set custom title property for reliable searching later
+                set custom title of newTab to "Terminal: {}"
+            end tell
+            "#,
+            escaped_dir,
+            escaped_name,
+            escaped_name,
+        ),
         _ => format!(
             r#"
             tell application "{}"
@@ -323,7 +337,7 @@ fn focus_native_terminal_impl(name: String, app: Option<String>) -> Result<Nativ
     }
 
     let applescript = match app.as_str() {
-        "iTerm" => format!(
+        "iTerm" | "iTerm2" => format!(
             r#"
             tell application "iTerm"
                 activate
@@ -342,6 +356,58 @@ fn focus_native_terminal_impl(name: String, app: Option<String>) -> Result<Nativ
             "#,
             name.replace('"', "\\\""),
         ),
+        "Terminal" => format!(
+            r#"
+            tell application "Terminal"
+                activate
+                set targetName to "{}"
+                set foundWindow to false
+
+                -- Try to find by custom title (what we set with echo)
+                repeat with w in windows
+                    repeat with t in (every tab of w)
+                        try
+                            set tabTitle to custom title of t
+                            if tabTitle contains targetName then
+                                set frontmost of w to true
+                                set selected tab of w to t
+                                set foundWindow to true
+                                exit repeat
+                            end if
+                        end try
+                    end repeat
+                    if foundWindow then exit repeat
+                end repeat
+
+                -- If not found by custom title, try window name
+                if not foundWindow then
+                    repeat with w in windows
+                        if name of w contains targetName then
+                            set frontmost of w to true
+                            set foundWindow to true
+                            exit repeat
+                        end if
+                    end repeat
+                end if
+
+                return foundWindow
+            end tell
+            "#,
+            name.replace('"', "\\\""),
+        ),
+        "Warp" | "Alacritty" | "Kitty" | "WezTerm" => {
+            // These apps don't support AppleScript window selection well
+            // Just activate the app - it will bring all windows to front
+            format!(
+                r#"
+                tell application "{}"
+                    activate
+                end tell
+                return true
+                "#,
+                sanitize_app_name(&app),
+            )
+        },
         _ => format!(
             r#"
             tell application "{}"
