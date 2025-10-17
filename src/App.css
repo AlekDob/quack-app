@@ -6310,10 +6310,12 @@ button.directory-chooser:hover {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.8);
   font-family: 'Monaco', 'Courier New', monospace;
+  word-break: break-all;
 }
 
 .token-masked {
   color: rgba(242, 140, 82, 0.9);
+  word-break: break-all;
 }
 
 .credential-path {

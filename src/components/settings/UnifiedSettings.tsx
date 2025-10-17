@@ -13,9 +13,16 @@ import './UnifiedSettings.css';
 interface UnifiedSettingsProps {
   onClose: () => void;
   initialCategory?: SettingsCategory;
+  currentBackground?: string;
+  onSelectBackground?: (background: string) => void;
 }
 
-export default function UnifiedSettings({ onClose, initialCategory = 'general' }: UnifiedSettingsProps) {
+export default function UnifiedSettings({
+  onClose,
+  initialCategory = 'general',
+  currentBackground,
+  onSelectBackground
+}: UnifiedSettingsProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory);
   const [closing, setClosing] = useState(false);
 
@@ -35,7 +42,12 @@ export default function UnifiedSettings({ onClose, initialCategory = 'general' }
       case 'notifications':
         return <NotificationSettings />;
       case 'appearance':
-        return <AppearanceSettings />;
+        return (
+          <AppearanceSettings
+            currentBackground={currentBackground}
+            onSelectBackground={onSelectBackground}
+          />
+        );
       case 'terminal':
         return <TerminalSettings />;
       case 'about':

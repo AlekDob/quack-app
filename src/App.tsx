@@ -3340,7 +3340,11 @@ function App() {
         />
 
         {showSettings && (
-          <UnifiedSettings onClose={() => setShowSettings(false)} />
+          <UnifiedSettings
+            onClose={() => setShowSettings(false)}
+            currentBackground={currentBackground}
+            onSelectBackground={handleSelectBackground}
+          />
         )}
 
         {showPerformanceMonitor && <PerformanceMonitor />}

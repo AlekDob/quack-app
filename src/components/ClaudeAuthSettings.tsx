@@ -167,7 +167,7 @@ export default function ClaudeAuthSettings() {
   return (
     <div className="claude-auth-settings">
       <div className="auth-header">
-        <h2>🦆 Claude Authentication</h2>
+        <h2>Claude Authentication</h2>
         <p className="auth-subtitle">Configure how to authenticate with Claude API</p>
       </div>
 
@@ -185,13 +185,13 @@ export default function ClaudeAuthSettings() {
         {cliAvailable ? (
           <div className="auth-info">
             <p className="info-text">
-              ✓ Claude Code CLI is installed and authenticated. The chat will use your CLI credentials automatically.
+              Claude Code CLI is installed and authenticated. The chat will use your CLI credentials automatically.
             </p>
           </div>
         ) : (
           <div className="auth-info warning-info">
             <p className="info-text">
-              ⚠️ Claude Code CLI is not available or not authenticated.
+              Claude Code CLI is not available or not authenticated.
               <br />
               To enable chat features, please:
               <ol>
@@ -230,7 +230,7 @@ export default function ClaudeAuthSettings() {
           </div>
           <div className="auth-info">
             <p className="info-text">
-              ✓ Using Claude CLI credentials. The app will automatically use your CLI authentication.
+              Using Claude CLI credentials. The app will automatically use your CLI authentication.
             </p>
           </div>
         </div>
@@ -239,7 +239,7 @@ export default function ClaudeAuthSettings() {
       {/* OAuth Login Section */}
       <div className="auth-section oauth-login-section">
         <div className="section-header">
-          <h3>🔐 OAuth Authentication (Recommended)</h3>
+          <h3>OAuth Authentication (Recommended)</h3>
         </div>
         <p className="auth-info-text">
           Log in with your Claude account for seamless authentication.
@@ -256,7 +256,7 @@ export default function ClaudeAuthSettings() {
             </>
           ) : (
             <>
-              <span className="oauth-icon">🔑</span> Login with Claude
+              Login with Claude
             </>
           )}
         </button>
@@ -340,7 +340,6 @@ export default function ClaudeAuthSettings() {
       {authMode === 'none' && (
         <div className="auth-section warning-section">
           <div className="warning-banner">
-            <span className="warning-icon">⚠️</span>
             <div className="warning-content">
               <h4>No Authentication Configured</h4>
               <p>
@@ -355,7 +354,7 @@ export default function ClaudeAuthSettings() {
       {/* Messages */}
       {message && (
         <div className={`auth-message ${message.type}`}>
-          {message.type === 'success' ? '✓' : '✗'} {message.text}
+          {message.text}
         </div>
       )}
 
@@ -364,14 +363,14 @@ export default function ClaudeAuthSettings() {
         <h3>Authentication Methods</h3>
         <div className="help-grid">
           <div className="help-item">
-            <h4>🔐 Claude CLI (Recommended)</h4>
+            <h4>Claude CLI (Recommended)</h4>
             <p>
               Use <code>claude-code auth login</code> to authenticate via OAuth.
               Your credentials will be automatically detected from the keychain.
             </p>
           </div>
           <div className="help-item">
-            <h4>🔑 Manual API Key</h4>
+            <h4>Manual API Key</h4>
             <p>
               Enter your API key manually. This is useful if you prefer direct API access
               or don't use Claude CLI.
