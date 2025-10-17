@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { ClaudeEvent } from '../types';
+import { invoke } from '@tauri-apps/api/core';
+import type { ClaudeEvent, MCPServer } from '../types';
 
 export interface ClaudeSDKOptions {
   model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5';
@@ -7,6 +8,11 @@ export interface ClaudeSDKOptions {
   permissionMode?: 'plan' | 'act' | 'bypass';
   sessionId?: string;
   workingDirectory?: string;
+  mcpServers?: Record<string, {
+    command: string;
+    args: string[];
+    env?: Record<string, string>;
+  }>;
 }
 
 /**
@@ -21,6 +27,47 @@ function getModelId(model: string): string {
   };
 
   return modelMap[model] || model; // Return as-is if not in map (allows full model IDs)
+}
+
+/**
+ * Load enabled MCP servers from the project's .mcp.json file
+ */
+async function loadMCPServers(workingDir?: string): Promise<Record<string, {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}> | undefined> {
+  try {
+    const servers = await invoke<MCPServer[]>('list_mcp_servers', {
+      workingDir: workingDir || null,
+    });
+
+    // Filter only enabled servers and convert to SDK format
+    const enabledServers = servers.filter(server => server.enabled);
+
+    if (enabledServers.length === 0) {
+      return undefined;
+    }
+
+    const mcpServers: Record<string, {
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+    }> = {};
+
+    enabledServers.forEach(server => {
+      mcpServers[server.id] = {
+        command: server.command,
+        args: server.args,
+        env: server.env,
+      };
+    });
+
+    return mcpServers;
+  } catch (error) {
+    console.warn('Failed to load MCP servers:', error);
+    return undefined;
+  }
 }
 
 export interface ClaudeSDKStreamEvent {
@@ -62,6 +109,12 @@ export async function* streamClaudeMessage(
           ? 'plan'
           : undefined; // 'act' mode = undefined = auto-approve in SDK
 
+    // Load MCP servers from .mcp.json (if not explicitly provided)
+    let mcpServers = options.mcpServers;
+    if (!mcpServers) {
+      mcpServers = await loadMCPServers(workingDirectory);
+    }
+
     // Build options object - SDK expects { prompt, options }
     const sdkOptions: any = {
       model: getModelId(model), // Map friendly name to API model ID
@@ -80,6 +133,12 @@ export async function* streamClaudeMessage(
 
     if (workingDirectory) {
       sdkOptions.cwd = workingDirectory;
+    }
+
+    // Add MCP servers if available
+    if (mcpServers && Object.keys(mcpServers).length > 0) {
+      sdkOptions.mcpServers = mcpServers;
+      console.log('MCP servers loaded:', Object.keys(mcpServers));
     }
 
     // Call Claude SDK with streaming - correct API: query({ prompt, options })

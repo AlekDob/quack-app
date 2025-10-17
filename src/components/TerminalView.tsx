@@ -49,8 +49,22 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
   const scrollStateRef = useRef(new Map<string, TerminalScrollState>())
   const [showScrollBadge, setShowScrollBadge] = useState(false)
 
+  // Safety: track component mount state to prevent async operations after unmount
+  const mountedRef = useRef(true)
+
   const tauriAvailable =
     typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+  // Safety: set mounted flag on mount and cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      // Clear all pending write timeouts
+      writeTimeoutRef.current.forEach((timeout) => clearTimeout(timeout))
+      writeTimeoutRef.current.clear()
+    }
+  }, [])
 
   // Helper: ottieni o inizializza scroll state per un terminale
   const getScrollState = useCallback((id: string): TerminalScrollState => {
@@ -74,6 +88,8 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
 
   // Handler: scroll al bottom e riabilita autoscroll
   const handleScrollToBottom = useCallback(() => {
+    // Safety: check component is still mounted
+    if (!mountedRef.current) return
     if (!activeRef.current) return
     const terminal = terminalMapRef.current.get(activeRef.current)
     if (!terminal) return
@@ -172,6 +188,13 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
 
   // Performance: batch write con throttling per evitare troppi repaint
   const flushWriteBuffer = useCallback((id: string) => {
+    // Safety: check component is still mounted
+    if (!mountedRef.current) {
+      // Clean up buffer if unmounted
+      writeBufferRef.current.set(id, [])
+      return
+    }
+
     const term = terminalMapRef.current.get(id)
     const buffer = writeBufferRef.current.get(id)
 
@@ -424,8 +447,17 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       // Aspetta che il DOM sia completamente renderizzato per fit finale
       // Usa triple requestAnimationFrame per garantire che il layout sia stabile
       requestAnimationFrame(() => {
+        // Safety: check if unmounted
+        if (!mountedRef.current) return
+
         requestAnimationFrame(() => {
+          // Safety: check if unmounted
+          if (!mountedRef.current) return
+
           requestAnimationFrame(() => {
+            // Safety: check if unmounted
+            if (!mountedRef.current) return
+
             // Verify all refs and DOM elements still exist
             if (!fitAddon || !terminal || !containerRef.current) return
             if (!document.body.contains(containerRef.current)) return
@@ -601,12 +633,18 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       }
 
       resizeTimeout = setTimeout(() => {
+        // Safety: check if unmounted
+        if (!mountedRef.current) return
+
         // Re-check validity before executing (container might have been removed)
         if (!containerRef.current || !document.body.contains(containerRef.current)) {
           return
         }
 
         requestAnimationFrame(() => {
+          // Safety: check if unmounted
+          if (!mountedRef.current) return
+
           // Final validity check
           if (!fitAddon || !terminal || !containerRef.current) {
             return

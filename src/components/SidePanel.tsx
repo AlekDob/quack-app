@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
+import MCPPanel from "./MCPPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import ContextPanel from "./ContextPanel";
 import TerminalView from "./TerminalView";
@@ -11,10 +12,10 @@ import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, Commands, Context, Terminal, Native Terminals
+ * Tabs: File Explorer, Agents, MCP, Commands, Context, Terminal, Native Terminals
  */
 
-type TabId = "explorer" | "agents" | "commands" | "context" | "terminal" | "native-terminals";
+type TabId = "explorer" | "agents" | "mcp" | "commands" | "context" | "terminal" | "native-terminals";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -35,6 +36,26 @@ const icons: Record<string, ReactNode> = {
       <path
         d="M10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm-5 9a3 3 0 0 0-3 3v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1a3 3 0 0 0-3-3H5Z"
         fill="currentColor"
+      />
+    </svg>
+  ),
+  mcp: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M3 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="7" cy="8" r="1.5" fill="currentColor" />
+      <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+      <path
+        d="M7 12h6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
     </svg>
   ),
@@ -235,6 +256,11 @@ export default function SidePanel({
       hasContent: agents.length > 0,
     },
     {
+      id: "mcp" as TabId,
+      label: "MCP Servers",
+      icon: icons.mcp,
+    },
+    {
       id: "commands" as TabId,
       label: "Commands",
       icon: icons.commands,
@@ -320,6 +346,12 @@ export default function SidePanel({
               onUseAgent={onUseAgent}
               onRefresh={onRefreshAgents}
             />
+          </div>
+        )}
+
+        {activeTab === "mcp" && (
+          <div className="side-panel-pane">
+            <MCPPanel workingDir={workingDir} />
           </div>
         )}
 

@@ -15,6 +15,7 @@ mod claude_oauth;
 mod commands;
 mod fs;
 mod git;
+mod mcp;
 mod notifications;
 mod native_terminal;
 mod preferences;
@@ -363,7 +364,13 @@ pub fn run() {
             slash_commands::list_slash_commands,
             slash_commands::create_slash_command,
             slash_commands::update_slash_command,
-            slash_commands::delete_slash_command
+            slash_commands::delete_slash_command,
+            mcp::list_mcp_servers,
+            mcp::get_mcp_server,
+            mcp::save_mcp_server,
+            mcp::delete_mcp_server,
+            mcp::get_mcp_templates,
+            mcp::test_mcp_connection
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

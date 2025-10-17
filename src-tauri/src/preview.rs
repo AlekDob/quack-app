@@ -52,7 +52,7 @@ async fn create_preview_webview_impl(
   let webview_url = WebviewUrl::External(url.parse()?);
 
   // Create webview window
-  let webview = WebviewWindowBuilder::new(app, PREVIEW_WEBVIEW_LABEL, webview_url)
+  let _webview = WebviewWindowBuilder::new(app, PREVIEW_WEBVIEW_LABEL, webview_url)
     .title("🦆 Preview Inspector")
     .inner_size(width, height)
     .position(x, y)

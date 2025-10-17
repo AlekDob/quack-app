@@ -400,3 +400,51 @@ export interface AgentChatSettings {
   thinkingMode: string; // Thinking mode setting
   permissionMode: string; // Permission mode ('plan', 'act', 'bypass')
 }
+
+// MCP (Model Context Protocol) Server types
+export type MCPServerType =
+  | 'filesystem'
+  | 'github'
+  | 'slack'
+  | 'database'
+  | 'puppeteer'
+  | 'playwright'
+  | 'custom';
+
+export type MCPServerStatus =
+  | 'stopped'
+  | 'starting'
+  | 'running'
+  | 'error';
+
+export interface MCPServer {
+  id: string;
+  name: string;
+  type: MCPServerType;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  enabled: boolean;
+  status: MCPServerStatus;
+  error?: string;
+  scope: 'global' | 'project'; // Indicates where the MCP is configured
+}
+
+export interface MCPServerConfig {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+export interface MCPConfigFile {
+  mcpServers: Record<string, MCPServerConfig>;
+}
+
+export interface MCPTemplate {
+  id: string;
+  name: string;
+  description: string;
+  type: MCPServerType;
+  icon: string;
+  config: MCPServerConfig;
+}
