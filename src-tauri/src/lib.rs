@@ -298,6 +298,7 @@ pub fn run() {
             native_terminal::open_native_terminal,
             native_terminal::focus_native_terminal,
             native_terminal::close_native_terminal,
+            native_terminal::get_installed_terminal_apps,
             commands::load_saved_commands,
             commands::save_command,
             commands::update_command,

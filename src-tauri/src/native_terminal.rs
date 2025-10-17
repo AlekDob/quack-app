@@ -13,6 +13,14 @@ pub struct NativeTerminalResult {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct TerminalApp {
+    pub name: String,
+    pub display_name: String,
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 struct NativeTerminalRequest {
     name: String,
     directory: Option<String>,
@@ -23,23 +31,124 @@ fn resolve_app(app: Option<String>) -> String {
     app.unwrap_or_else(|| "Terminal".to_string())
 }
 
-fn get_app_bundle_path(app: &str) -> &str {
-    match app {
-        "Terminal" => "/System/Applications/Utilities/Terminal.app",
-        "iTerm" => "/Applications/iTerm.app",
-        "Warp" => "/Applications/Warp.app",
-        "WezTerm" => "/Applications/WezTerm.app",
-        "Hyper" => "/Applications/Hyper.app",
-        "Alacritty" => "/Applications/Alacritty.app",
-        _ => "/System/Applications/Utilities/Terminal.app",
+fn get_app_bundle_path(app: &str) -> String {
+    // Prima prova nei percorsi standard
+    let standard_paths = match app {
+        "Terminal" => vec!["/System/Applications/Utilities/Terminal.app"],
+        "iTerm" | "iTerm2" => vec!["/Applications/iTerm.app", "/Applications/iTerm2.app"],
+        "Warp" => vec!["/Applications/Warp.app"],
+        "WezTerm" => vec!["/Applications/WezTerm.app"],
+        "Hyper" => vec!["/Applications/Hyper.app"],
+        "Alacritty" => vec!["/Applications/Alacritty.app"],
+        "Kitty" => vec!["/Applications/kitty.app"],
+        "Tabby" => vec!["/Applications/Tabby.app"],
+        "Termius" => vec!["/Applications/Termius.app"],
+        _ => vec!["/System/Applications/Utilities/Terminal.app"],
+    };
+
+    // Controlla i percorsi standard
+    for path in &standard_paths {
+        if Path::new(path).exists() {
+            return path.to_string();
+        }
     }
+
+    // Controlla anche in ~/Applications
+    if let Some(home_dir) = dirs::home_dir() {
+        let home_apps = home_dir.join("Applications");
+        for path in standard_paths {
+            if let Some(app_name) = Path::new(path).file_name() {
+                let home_path = home_apps.join(app_name);
+                if home_path.exists() {
+                    return home_path.to_string_lossy().to_string();
+                }
+            }
+        }
+    }
+
+    // Fallback a Terminal.app
+    "/System/Applications/Utilities/Terminal.app".to_string()
 }
 
 fn sanitize_app_name(app: &str) -> &str {
     match app {
-        "iTerm" => "iTerm",
+        "iTerm" | "iTerm2" => "iTerm",
         other => other,
     }
+}
+
+/// Get list of installed terminal applications on the system
+#[tauri::command]
+pub fn get_installed_terminal_apps() -> Result<Vec<TerminalApp>, String> {
+    get_installed_terminal_apps_impl().map_err(|err| err.to_string())
+}
+
+fn get_installed_terminal_apps_impl() -> Result<Vec<TerminalApp>> {
+    let mut apps = Vec::new();
+
+    // Lista di applicazioni terminali comuni da cercare
+    let terminal_candidates = vec![
+        ("Terminal", "Terminal.app", "/System/Applications/Utilities/Terminal.app"),
+        ("iTerm", "iTerm.app", "/Applications/iTerm.app"),
+        ("iTerm2", "iTerm2.app", "/Applications/iTerm2.app"),
+        ("Warp", "Warp.app", "/Applications/Warp.app"),
+        ("WezTerm", "WezTerm.app", "/Applications/WezTerm.app"),
+        ("Hyper", "Hyper.app", "/Applications/Hyper.app"),
+        ("Alacritty", "Alacritty.app", "/Applications/Alacritty.app"),
+        ("Kitty", "kitty.app", "/Applications/kitty.app"),
+        ("Tabby", "Tabby.app", "/Applications/Tabby.app"),
+        ("Termius", "Termius.app", "/Applications/Termius.app"),
+    ];
+
+    // Controlla ogni applicazione e aggiungi quelle installate
+    for (name, display_name, path) in terminal_candidates {
+        if Path::new(path).exists() {
+            apps.push(TerminalApp {
+                name: name.to_string(),
+                display_name: display_name.to_string(),
+                path: path.to_string(),
+            });
+        }
+    }
+
+    // Cerca anche in ~/Applications
+    let home_apps_dir = dirs::home_dir()
+        .map(|h| h.join("Applications"))
+        .filter(|p| p.exists());
+
+    if let Some(home_apps) = home_apps_dir {
+        for (name, display_name, default_path) in vec![
+            ("iTerm", "iTerm.app", ""),
+            ("iTerm2", "iTerm2.app", ""),
+            ("Warp", "Warp.app", ""),
+            ("WezTerm", "WezTerm.app", ""),
+            ("Hyper", "Hyper.app", ""),
+            ("Alacritty", "Alacritty.app", ""),
+            ("Kitty", "kitty.app", ""),
+            ("Tabby", "Tabby.app", ""),
+            ("Termius", "Termius.app", ""),
+        ] {
+            let home_path = home_apps.join(display_name);
+            if home_path.exists() && !apps.iter().any(|a| a.name == name) {
+                apps.push(TerminalApp {
+                    name: name.to_string(),
+                    display_name: display_name.to_string(),
+                    path: home_path.to_string_lossy().to_string(),
+                });
+            }
+        }
+    }
+
+    // Se non troviamo nessuna app, almeno restituiamo Terminal.app che è sempre presente su macOS
+    if apps.is_empty() {
+        apps.push(TerminalApp {
+            name: "Terminal".to_string(),
+            display_name: "Terminal.app".to_string(),
+            path: "/System/Applications/Utilities/Terminal.app".to_string(),
+        });
+    }
+
+    Ok(apps)
 }
 
 #[tauri::command]
@@ -54,8 +163,9 @@ pub fn open_native_terminal(
 
 fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTerminalResult> {
     let app = resolve_app(request.app.clone());
-    if !Path::new(get_app_bundle_path(&app)).exists() {
-        return Err(anyhow!("Requested app '{}' not found", app));
+    let app_path = get_app_bundle_path(&app);
+    if !Path::new(&app_path).exists() {
+        return Err(anyhow!("Requested app '{}' not found at path: {}", app, app_path));
     }
 
     let dir = if let Some(d) = request.directory {
@@ -78,7 +188,7 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
     let escaped_name = request.name.replace("'", "\\'");
 
     let applescript = match app.as_str() {
-        "iTerm" => format!(
+        "iTerm" | "iTerm2" => format!(
             r#"
             tell application "iTerm"
                 activate
@@ -98,6 +208,77 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
             escaped_dir,
             escaped_name,
         ),
+        "Warp" => {
+            // Warp doesn't support AppleScript well, so we use 'open' command with URL scheme
+            // First, just open Warp and let it handle the directory
+            let warp_command = format!(
+                r#"
+                tell application "Warp"
+                    activate
+                end tell
+                "#
+            );
+
+            // After opening Warp, we'll use 'open' command to open a new window in the directory
+            // Note: This is a workaround since Warp's AppleScript support is limited
+            return Command::new("open")
+                .arg("-a")
+                .arg("Warp")
+                .arg(&dir)
+                .output()
+                .map_err(|e| anyhow!("Failed to open Warp: {}", e))
+                .and_then(|output| {
+                    if output.status.success() {
+                        Ok(NativeTerminalResult {
+                            success: true,
+                            message: format!("Opened Warp in directory: {}", dir),
+                            pid: None,
+                        })
+                    } else {
+                        let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+                        Err(anyhow!("Failed to open Warp: {}", error_msg))
+                    }
+                });
+        },
+        "Alacritty" | "Kitty" | "WezTerm" => {
+            // These terminals don't support AppleScript, use 'open' command instead
+            return Command::new("open")
+                .arg("-a")
+                .arg(sanitize_app_name(&app))
+                .arg("--args")
+                .arg("--working-directory")
+                .arg(&dir)
+                .output()
+                .map_err(|e| anyhow!("Failed to open {}: {}", app, e))
+                .and_then(|output| {
+                    if output.status.success() {
+                        Ok(NativeTerminalResult {
+                            success: true,
+                            message: format!("Opened {} in directory: {}", app, dir),
+                            pid: None,
+                        })
+                    } else {
+                        // Fallback: just open the app without directory argument
+                        Command::new("open")
+                            .arg("-a")
+                            .arg(sanitize_app_name(&app))
+                            .output()
+                            .map_err(|e| anyhow!("Failed to open {}: {}", app, e))
+                            .and_then(|output2| {
+                                if output2.status.success() {
+                                    Ok(NativeTerminalResult {
+                                        success: true,
+                                        message: format!("Opened {} (couldn't set directory)", app),
+                                        pid: None,
+                                    })
+                                } else {
+                                    let error_msg = String::from_utf8_lossy(&output2.stderr).to_string();
+                                    Err(anyhow!("Failed to open {}: {}", app, error_msg))
+                                }
+                            })
+                    }
+                });
+        },
         _ => format!(
             r#"
             tell application "{}"
@@ -136,8 +317,9 @@ pub fn focus_native_terminal(name: String, app: Option<String>) -> Result<Native
 
 fn focus_native_terminal_impl(name: String, app: Option<String>) -> Result<NativeTerminalResult> {
     let app = resolve_app(app);
-    if !Path::new(get_app_bundle_path(&app)).exists() {
-        return Err(anyhow!("Requested app '{}' not found", app));
+    let app_path = get_app_bundle_path(&app);
+    if !Path::new(&app_path).exists() {
+        return Err(anyhow!("Requested app '{}' not found at path: {}", app, app_path));
     }
 
     let applescript = match app.as_str() {
@@ -215,8 +397,9 @@ pub fn close_native_terminal(name: String, app: Option<String>) -> Result<Native
 
 fn close_native_terminal_impl(name: String, app: Option<String>) -> Result<NativeTerminalResult> {
     let app = resolve_app(app);
-    if !Path::new(get_app_bundle_path(&app)).exists() {
-        return Err(anyhow!("Requested app '{}' not found", app));
+    let app_path = get_app_bundle_path(&app);
+    if !Path::new(&app_path).exists() {
+        return Err(anyhow!("Requested app '{}' not found at path: {}", app, app_path));
     }
 
     let applescript = match app.as_str() {

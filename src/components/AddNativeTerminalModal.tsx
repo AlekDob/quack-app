@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { NativeTerminalApp } from "../types";
+import type { NativeTerminalApp, TerminalAppInfo } from "../types";
 
 interface AddNativeTerminalModalProps {
   isOpen: boolean;
@@ -9,15 +9,6 @@ interface AddNativeTerminalModalProps {
   onConfirm: (name: string, directory: string, color: string, app: NativeTerminalApp) => void;
   defaultDirectory?: string;
 }
-
-const AVAILABLE_APPS: Array<{ id: NativeTerminalApp; label: string }> = [
-  { id: "Terminal", label: "Terminal.app" },
-  { id: "iTerm", label: "iTerm2" },
-  { id: "Warp", label: "Warp" },
-  { id: "WezTerm", label: "WezTerm" },
-  { id: "Hyper", label: "Hyper" },
-  { id: "Alacritty", label: "Alacritty" },
-];
 
 const PRESET_COLORS = [
   "#4ecdc4",
@@ -46,6 +37,34 @@ export function AddNativeTerminalModal({
   const [customColor, setCustomColor] = useState("");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedApp, setSelectedApp] = useState<NativeTerminalApp>("Terminal");
+  const [availableApps, setAvailableApps] = useState<TerminalAppInfo[]>([]);
+  const [loadingApps, setLoadingApps] = useState(false);
+
+  // Load available terminal apps when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingApps(true);
+      invoke<TerminalAppInfo[]>("get_installed_terminal_apps")
+        .then((apps) => {
+          setAvailableApps(apps);
+          // Set first available app as default
+          if (apps.length > 0) {
+            setSelectedApp(apps[0].name as NativeTerminalApp);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to load terminal apps:", error);
+          // Fallback to Terminal.app
+          setAvailableApps([
+            { name: "Terminal", displayName: "Terminal.app", path: "/System/Applications/Utilities/Terminal.app" }
+          ]);
+          setSelectedApp("Terminal");
+        })
+        .finally(() => {
+          setLoadingApps(false);
+        });
+    }
+  }, [isOpen]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -55,7 +74,6 @@ export function AddNativeTerminalModal({
       setColor(PRESET_COLORS[0]);
       setCustomColor("");
       setShowColorPicker(false);
-      setSelectedApp("Terminal");
     }
   }, [isOpen, defaultDirectory]);
 
@@ -224,17 +242,27 @@ export function AddNativeTerminalModal({
         {/* App Selection */}
         <div className="mb-6">
           <label className="block text-sm text-white/70 mb-2">Open With</label>
-          <select
-            value={selectedApp}
-            onChange={(e) => setSelectedApp(e.target.value as NativeTerminalApp)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#0e639c]"
-          >
-            {AVAILABLE_APPS.map((app) => (
-              <option key={app.id} value={app.id} className="bg-[#1e1e1e] text-white">
-                {app.label}
-              </option>
-            ))}
-          </select>
+          {loadingApps ? (
+            <div className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white/50 text-sm">
+              Loading available apps...
+            </div>
+          ) : availableApps.length === 0 ? (
+            <div className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white/50 text-sm">
+              No terminal apps found
+            </div>
+          ) : (
+            <select
+              value={selectedApp}
+              onChange={(e) => setSelectedApp(e.target.value as NativeTerminalApp)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#0e639c]"
+            >
+              {availableApps.map((app) => (
+                <option key={app.name} value={app.name} className="bg-[#1e1e1e] text-white">
+                  {app.displayName}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Actions */}

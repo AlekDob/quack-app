@@ -11,7 +11,14 @@ export interface NativeTerminal {
   createdAt: number;
 }
 
-export type NativeTerminalApp = "Terminal" | "iTerm" | "Warp" | "WezTerm" | "Hyper" | "Alacritty";
+export type NativeTerminalApp = "Terminal" | "iTerm" | "iTerm2" | "Warp" | "WezTerm" | "Hyper" | "Alacritty" | "Kitty" | "Tabby" | "Termius";
+
+// Info about an installed terminal application
+export interface TerminalAppInfo {
+  name: string;           // Internal name (e.g., "iTerm", "Warp")
+  displayName: string;    // Display name (e.g., "iTerm.app", "Warp.app")
+  path: string;           // Full path to the application bundle
+}
 
 // AgentChat: Container for multiple terminal tabs
 // Represents a workspace/project with its own directory and terminals
