@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
@@ -24,13 +24,41 @@ interface ChatViewProps {
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
   basePath?: string;
+  // Agent Chat Settings - controlled from parent
+  inputDraft?: string;
+  onInputDraftChange?: (draft: string) => void;
+  model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5';
+  onModelChange?: (model: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5') => void;
+  thinkingMode?: ThinkingMode;
+  onThinkingModeChange?: (mode: ThinkingMode) => void;
+  permissionMode?: PermissionMode;
+  onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
-export default function ChatView({ messages, isLoading, onSendMessage, activeAgent, onClearAgent, agents, onSelectAgent, onFilePathClick, pendingAgentMention, onMentionInserted, pendingSlashCommand, onCommandInserted, basePath }: ChatViewProps) {
-  const [model, setModel] = useState<'opus' | 'sonnet' | 'haiku' | 'haiku-3.5'>('sonnet');
-  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
-
+export default function ChatView({
+  messages,
+  isLoading,
+  onSendMessage,
+  activeAgent,
+  onClearAgent,
+  agents,
+  onSelectAgent,
+  onFilePathClick,
+  pendingAgentMention,
+  onMentionInserted,
+  pendingSlashCommand,
+  onCommandInserted,
+  basePath,
+  // Agent Chat Settings - controlled from parent
+  inputDraft = '',
+  onInputDraftChange,
+  model = 'sonnet',
+  onModelChange,
+  thinkingMode = 'auto',
+  onThinkingModeChange,
+  permissionMode = 'bypass',
+  onPermissionModeChange,
+}: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
     await onSendMessage(content, {
@@ -55,14 +83,14 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
       }
 
       // Shift+Tab to cycle permission modes
-      if (e.key === 'Tab' && e.shiftKey && !isLoading) {
+      if (e.key === 'Tab' && e.shiftKey && !isLoading && onPermissionModeChange) {
         e.preventDefault();
 
         // Cycle through permission modes
         const modes: PermissionMode[] = ['plan', 'bypass'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
-        setPermissionMode(modes[nextIndex]);
+        onPermissionModeChange(modes[nextIndex]);
 
         console.log(`Switched to ${modes[nextIndex]} mode`);
       }
@@ -70,7 +98,7 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [permissionMode, isLoading]);
+  }, [permissionMode, isLoading, onPermissionModeChange]);
 
   return (
     <div className="chat-view">
@@ -84,9 +112,9 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           model={model}
           thinkingMode={thinkingMode}
           permissionMode={permissionMode}
-          onModelChange={(m) => setModel(m as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5')}
-          onThinkingModeChange={setThinkingMode}
-          onPermissionModeChange={setPermissionMode}
+          onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5')}
+          onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
+          onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
           disabled={isLoading}
         />
         <ChatInput
@@ -102,6 +130,9 @@ export default function ChatView({ messages, isLoading, onSendMessage, activeAge
           pendingSlashCommand={pendingSlashCommand}
           onCommandInserted={onCommandInserted}
           basePath={basePath}
+          // Controlled input draft
+          inputValue={inputDraft}
+          onInputChange={onInputDraftChange}
         />
       </div>
     </div>

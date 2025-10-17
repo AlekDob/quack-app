@@ -23,7 +23,7 @@ import SavedCommandModal from "./components/SavedCommandModal";
 import { NativeTerminalPanel } from "./components/NativeTerminalPanel";
 import { AddNativeTerminalModal } from "./components/AddNativeTerminalModal";
 import PreviewDrawer from "./components/PreviewDrawer";
-import AISettingsPanel from "./components/AISettingsPanel";
+import UnifiedSettings from "./components/settings/UnifiedSettings";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
 import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
@@ -50,6 +50,7 @@ import type {
   AgentDetails,
   ChatMessage,
   ClaudeEvent,
+  AgentChatSettings,
 } from "./types";
 
 interface TerminalMetadata {
@@ -298,7 +299,7 @@ function App() {
   const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
-  const [showAISettings, setShowAISettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
     if (typeof window === "undefined") {
       return 960;
@@ -378,6 +379,9 @@ function App() {
   const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
   const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
   const [isChatConfigured, setIsChatConfigured] = useState(false);
+
+  // Agent Chat Settings - persistent configuration per agent
+  const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
   // Initialize chat on mount
   useEffect(() => {
@@ -740,6 +744,58 @@ function App() {
   ]);
 
   const gridTemplateColumns = "360px minmax(0, 1fr) 420px";
+
+  // Agent Chat Settings helpers - get or create settings for current agent
+  const getCurrentAgentSettings = useCallback((): AgentChatSettings => {
+    if (!activeId) {
+      // Default settings when no agent is active
+      return {
+        inputDraft: '',
+        model: 'sonnet',
+        thinkingMode: 'auto',
+        permissionMode: 'bypass',
+      };
+    }
+
+    const existing = agentChatSettings.get(activeId);
+    if (existing) {
+      return existing;
+    }
+
+    // Initialize default settings for new agent
+    const defaultSettings: AgentChatSettings = {
+      inputDraft: '',
+      model: 'sonnet',
+      thinkingMode: 'auto',
+      permissionMode: 'bypass',
+    };
+
+    setAgentChatSettings((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(activeId, defaultSettings);
+      return newMap;
+    });
+
+    return defaultSettings;
+  }, [activeId, agentChatSettings]);
+
+  const updateAgentSettings = useCallback((updates: Partial<AgentChatSettings>) => {
+    if (!activeId) return;
+
+    setAgentChatSettings((prev) => {
+      const newMap = new Map(prev);
+      const current = newMap.get(activeId) ?? {
+        inputDraft: '',
+        model: 'sonnet',
+        thinkingMode: 'auto',
+        permissionMode: 'bypass',
+      };
+      newMap.set(activeId, { ...current, ...updates });
+      return newMap;
+    });
+  }, [activeId]);
+
+  const currentSettings = getCurrentAgentSettings();
 
   const playQuackSound = useCallback(() => {
     if (typeof window === "undefined") {
@@ -2955,6 +3011,7 @@ function App() {
           onEdit={handleEditTerminal}
           onToggleGroup={handleToggleGroup}
           onReorder={handleReorderTerminals}
+          onOpenSettings={() => setShowSettings(true)}
         />
 
         <section className="terminal-pane">
@@ -3018,6 +3075,15 @@ function App() {
               pendingSlashCommand={pendingSlashCommand}
               onCommandInserted={() => setPendingSlashCommand(null)}
               basePath={explorerRoot ?? explorerPath}
+              // Agent Chat Settings - persistent per-agent state
+              inputDraft={currentSettings.inputDraft}
+              onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
+              model={currentSettings.model as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5'}
+              onModelChange={(model) => updateAgentSettings({ model })}
+              thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+              onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
+              permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+              onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
             />
           </div>
         </section>
@@ -3259,8 +3325,8 @@ function App() {
           defaultDirectory={explorerPath || activeTerminal?.cwd || ""}
         />
 
-        {showAISettings && (
-          <AISettingsPanel onClose={() => setShowAISettings(false)} />
+        {showSettings && (
+          <UnifiedSettings onClose={() => setShowSettings(false)} />
         )}
 
         {showPerformanceMonitor && <PerformanceMonitor />}
@@ -3300,6 +3366,7 @@ function App() {
           style={{ backgroundImage: `url(${splashImage})` }}
         />
       )}
+
       <Toaster position="bottom-right" richColors closeButton />
     </>
   );

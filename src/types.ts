@@ -392,3 +392,11 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed';
   activeForm: string;
 }
+
+// Agent Chat Settings - persistent per-agent configuration
+export interface AgentChatSettings {
+  inputDraft: string; // Draft text being typed
+  model: string; // Selected model (e.g., 'sonnet', 'opus')
+  thinkingMode: string; // Thinking mode setting
+  permissionMode: string; // Permission mode ('plan', 'act', 'bypass')
+}

@@ -51,13 +51,34 @@ interface ChatInputProps {
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
   basePath?: string;
+  // Controlled input value
+  inputValue?: string;
+  onInputChange?: (value: string) => void;
 }
 
-export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude anything...', agents, pendingAgentMention, onMentionInserted, pendingSlashCommand, onCommandInserted, basePath }: ChatInputProps) {
-  const [input, setInput] = useState('');
+export default function ChatInput({
+  onSend,
+  disabled,
+  placeholder = 'Ask Claude anything...',
+  agents,
+  pendingAgentMention,
+  onMentionInserted,
+  pendingSlashCommand,
+  onCommandInserted,
+  basePath,
+  inputValue: controlledInputValue,
+  onInputChange: controlledOnInputChange,
+}: ChatInputProps) {
+  // Use local state as fallback if not controlled
+  const [localInput, setLocalInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Determine if controlled or uncontrolled
+  const isControlled = controlledInputValue !== undefined && controlledOnInputChange !== undefined;
+  const input = isControlled ? controlledInputValue : localInput;
+  const setInput = isControlled ? controlledOnInputChange : setLocalInput;
 
   // Load slash commands
   const { commands: commandsResponse } = useSlashCommands(basePath || '');
@@ -179,7 +200,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     // No valid @ mention or / command found
     setShowAgentAutocomplete(false);
     setShowCommandAutocomplete(false);
-  }, [agents, commands]);
+  }, [agents, commands, setInput]);
 
   // Select an agent from autocomplete
   const selectAgent = useCallback((agent: AgentInfo) => {
@@ -204,7 +225,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
         textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
       }
     }, 0);
-  }, [input, atMentionStart]);
+  }, [input, atMentionStart, setInput]);
 
   // Select a command from autocomplete
   const selectCommand = useCallback((command: SlashCommand) => {
@@ -229,7 +250,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
         textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
       }
     }, 0);
-  }, [input, slashCommandStart]);
+  }, [input, slashCommandStart, setInput]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -270,7 +291,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     if (onMentionInserted) {
       onMentionInserted();
     }
-  }, [pendingAgentMention, onMentionInserted, input]);
+  }, [pendingAgentMention, onMentionInserted, input, setInput]);
 
   // Insert slash command when requested from panel
   useEffect(() => {
@@ -304,7 +325,7 @@ export default function ChatInput({ onSend, disabled, placeholder = 'Ask Claude 
     if (onCommandInserted) {
       onCommandInserted();
     }
-  }, [pendingSlashCommand, onCommandInserted, input]);
+  }, [pendingSlashCommand, onCommandInserted, input, setInput]);
 
   const guessMimeType = useCallback((filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
