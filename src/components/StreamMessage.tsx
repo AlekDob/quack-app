@@ -7,6 +7,7 @@ import {
   BashWidget,
   ReadWidget,
   GrepWidget,
+  TodoWriteWidget,
   ExitPlanModeWidget,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
@@ -148,6 +149,17 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   pattern={input.pattern}
                   path={input.path}
                   result={toolResult}
+                />
+              );
+            }
+
+            // TodoWrite tool
+            if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
+              return (
+                <TodoWriteWidget
+                  key={idx}
+                  todos={input.todos}
+                  defaultExpanded={true}
                 />
               );
             }

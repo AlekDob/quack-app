@@ -168,7 +168,6 @@ interface SidePanelProps {
   onRemoveNativeTerminal: (id: string) => void;
   onOpenNativeTerminal: (terminal: NativeTerminal) => void;
   onFocusNativeTerminal: (terminal: NativeTerminal) => void;
-  onCloseNativeTerminal: (terminal: NativeTerminal) => void;
 }
 
 export default function SidePanel({
@@ -218,7 +217,6 @@ export default function SidePanel({
   onRemoveNativeTerminal,
   onOpenNativeTerminal,
   onFocusNativeTerminal,
-  onCloseNativeTerminal,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("explorer");
 
@@ -417,7 +415,6 @@ export default function SidePanel({
               onRemove={onRemoveNativeTerminal}
               onOpen={onOpenNativeTerminal}
               onFocus={onFocusNativeTerminal}
-              onClose={onCloseNativeTerminal}
             />
           </div>
         )}

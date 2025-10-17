@@ -1,13 +1,7 @@
 /**
  * Agent Avatar Utilities
  *
- * Maps agent names to their corresponding duck avatar images.
- * Images should be placed in /images/ducks/ with filenames matching agent names.
- *
- * Matching logic:
- * - If agent name contains the image filename (without extension), use that image
- * - Case-insensitive matching
- * - Example: "mike project manager" matches "mike.png"
+ * Simplified: All agents use the same cyberduck avatar.
  */
 
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -31,44 +25,31 @@ function resolveAssetPath(path: string): string {
   return `/${path}`;
 }
 
-// Available duck avatars in /images/ducks/
-const DUCK_AVATARS: Record<string, string> = {
-  mike: resolveAssetPath('images/ducks/mike.png'),
-  julie: resolveAssetPath('images/ducks/julie.png'),
-  john: resolveAssetPath('images/ducks/john.png'),
-  giuseppe: resolveAssetPath('images/ducks/giuseppe.png'),
-};
+// Universal cyberduck avatar for all agents
+const CYBERDUCK_AVATAR = resolveAssetPath('images/cyberduck.png');
 
 /**
- * Get the avatar image path for an agent based on their name
- * @param agentName - The full agent name (e.g., "mike project manager")
- * @returns Avatar image path or null if no match found
+ * Get the avatar image path for an agent
+ * @param _agentName - The full agent name (unused, kept for API compatibility)
+ * @returns Avatar image path (always cyberduck.png)
  */
-export function getAgentAvatar(agentName: string): string | null {
-  if (!agentName) return null;
-
-  const nameLower = agentName.toLowerCase();
-
-  // Try to find a matching duck avatar
-  for (const [key, imagePath] of Object.entries(DUCK_AVATARS)) {
-    if (nameLower.includes(key)) {
-      return imagePath;
-    }
-  }
-
-  return null;
+export function getAgentAvatar(_agentName: string): string | null {
+  // Always return cyberduck avatar for all agents
+  return CYBERDUCK_AVATAR;
 }
 
 /**
  * Check if an agent has a custom avatar
+ * @returns Always true since all agents have the cyberduck avatar
  */
-export function hasAgentAvatar(agentName: string): boolean {
-  return getAgentAvatar(agentName) !== null;
+export function hasAgentAvatar(_agentName: string): boolean {
+  return true;
 }
 
 /**
  * Get all available duck avatars
+ * @returns Single cyberduck avatar
  */
 export function getAvailableAvatars(): Record<string, string> {
-  return { ...DUCK_AVATARS };
+  return { cyberduck: CYBERDUCK_AVATAR };
 }

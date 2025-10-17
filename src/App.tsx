@@ -20,7 +20,7 @@ import FilePreviewDrawer from "./components/FilePreviewDrawer";
 import GitPanel from "./components/GitPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
-import { NativeTerminalPanel } from "./components/NativeTerminalPanel";
+// import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
 import { AddNativeTerminalModal } from "./components/AddNativeTerminalModal";
 import PreviewDrawer from "./components/PreviewDrawer";
 import UnifiedSettings from "./components/settings/UnifiedSettings";
@@ -876,6 +876,8 @@ function App() {
     [tauriAvailable]
   );
 
+  // Unused - keeping for future use
+  // @ts-ignore - TS6133: Keeping for future implementation
   const handleRemoveNativeTerminal = useCallback(
     async (terminal: NativeTerminal) => {
       if (!tauriAvailable) {
@@ -896,6 +898,8 @@ function App() {
     [tauriAvailable]
   );
 
+  // Unused - keeping for future use
+  // @ts-ignore - TS6133: Keeping for future implementation
   const handleFocusNativeTerminal = useCallback(
     async (terminal: NativeTerminal) => {
       if (!tauriAvailable) {
@@ -926,6 +930,8 @@ function App() {
     [tauriAvailable]
   );
 
+  // Unused - keeping for future use
+  // @ts-ignore - TS6133: Keeping for future implementation
   const handleOpenNativeTerminal = useCallback(
     async (terminal: NativeTerminal) => {
       if (!tauriAvailable) {
@@ -1014,9 +1020,9 @@ function App() {
       setShowPerformanceMonitor(event.payload.show_performance_monitor);
     });
 
-    // Listen for menu event to open AI Settings
+    // Listen for menu event to open Settings (formerly AI Settings)
     const unlistenAISettingsPromise = listen("open-ai-settings", () => {
-      setShowAISettings(true);
+      setShowSettings(true);
     });
 
     const unlistenWatchIntroPromise = listen("watch-intro", () => {
@@ -3179,16 +3185,6 @@ function App() {
               console.error("Failed to focus native terminal:", error);
             }
           }}
-          onCloseNativeTerminal={async (terminal) => {
-            try {
-              await invoke("close_native_terminal", {
-                name: terminal.name,
-                app: terminal.app,
-              });
-            } catch (error) {
-              console.error("Failed to close native terminal:", error);
-            }
-          }}
         />
 
         <NewTerminalModal
@@ -3262,6 +3258,7 @@ function App() {
             }
           }}
           explorerPath={explorerPath}
+          processes={[]} // TODO: Implement process tracking
         />
 
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>

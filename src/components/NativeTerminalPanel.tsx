@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { NativeTerminal, NativeTerminalApp } from "../types";
+import type { NativeTerminal } from "../types";
 import { toast } from "sonner";
 
 interface NativeTerminalPanelProps {
