@@ -10,8 +10,11 @@ interface TerminalGroupProps {
   activeId: string | null
   canGroupMoveUp: boolean
   canGroupMoveDown: boolean
+  // Phase 4: AgentChat display data (optional for backward compatibility)
+  agentChatName?: string
+  agentChatColor?: string
   onToggle: () => void
-  onSelect: (id: string) => void
+  onSelect: (terminal: TerminalInfo) => void // Phase 4: Changed signature to pass full terminal
   onClose: (id: string) => void
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void
   onMoveUp: (id: string) => void
@@ -27,6 +30,8 @@ export default function TerminalGroup({
   activeId,
   canGroupMoveUp,
   canGroupMoveDown,
+  agentChatName,
+  agentChatColor,
   onToggle,
   onSelect,
   onClose,
@@ -44,6 +49,9 @@ export default function TerminalGroup({
         isCollapsed={isCollapsed}
         canMoveUp={canGroupMoveUp}
         canMoveDown={canGroupMoveDown}
+        // Phase 4: Pass AgentChat display data
+        agentChatName={agentChatName}
+        agentChatColor={agentChatColor}
         onToggle={onToggle}
         onMoveUp={() => onMoveGroupUp(cwd)}
         onMoveDown={() => onMoveGroupDown(cwd)}
@@ -70,14 +78,14 @@ export default function TerminalGroup({
                 key={terminal.id}
                 className={itemClasses}
                 style={{ '--item-index': index } as React.CSSProperties}
-                onClick={() => onSelect(terminal.id)}
+                onClick={() => onSelect(terminal)} // Phase 4: Pass terminal object
                 onContextMenu={(event) => onContextMenu(event, terminal)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
-                    onSelect(terminal.id)
+                    onSelect(terminal) // Phase 4: Pass terminal object
                   }
                 }}
               >

@@ -1,9 +1,35 @@
+// NativeTerminal: Semplice entry per terminale nativo Mac
+// Rappresenta un terminale che viene aperto nell'app Terminal.app del Mac
+export interface NativeTerminal {
+  id: string;
+  name: string;
+  app: NativeTerminalApp;
+  color: string;
+  directory: string;
+  isOpen: boolean; // Se la finestra del terminale è aperta
+  pid?: number; // Process ID del terminale (se disponibile)
+  createdAt: number;
+}
+
+export type NativeTerminalApp = "Terminal" | "iTerm" | "Warp" | "WezTerm" | "Hyper" | "Alacritty";
+
+// AgentChat: Container for multiple terminal tabs
+// Represents a workspace/project with its own directory and terminals
+export interface AgentChat {
+  id: string;
+  name: string;
+  color: string;
+  cwd: string;
+  createdAt: number;
+}
+
 export interface TerminalInfo {
   id: string;
   label: string;
   color: string;
   cwd: string;
   alive: boolean;
+  // NO agentChatId - terminals are independent, only grouped by cwd in UI
   status?: "idle" | "busy";
   needsAttention?: boolean;
   hasResponded?: boolean;           // Ha già risposto alla richiesta corrente?

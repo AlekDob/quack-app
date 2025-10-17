@@ -7,6 +7,7 @@ import {
   BashWidget,
   ReadWidget,
   GrepWidget,
+  ExitPlanModeWidget,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import { getAgentAvatar } from '../utils/agentAvatars';
@@ -147,6 +148,17 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   pattern={input.pattern}
                   path={input.path}
                   result={toolResult}
+                />
+              );
+            }
+
+            // ExitPlanMode tool
+            if (toolName === 'exitplanmode' && input?.plan) {
+              return (
+                <ExitPlanModeWidget
+                  key={idx}
+                  plan={input.plan}
+                  defaultExpanded={true}
                 />
               );
             }

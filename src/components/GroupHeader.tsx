@@ -6,6 +6,9 @@ interface GroupHeaderProps {
   isCollapsed: boolean
   canMoveUp: boolean
   canMoveDown: boolean
+  // Phase 4: AgentChat display data (optional for backward compatibility)
+  agentChatName?: string
+  agentChatColor?: string
   onToggle: () => void
   onMoveUp: () => void
   onMoveDown: () => void
@@ -45,11 +48,16 @@ export default function GroupHeader({
   isCollapsed,
   canMoveUp,
   canMoveDown,
+  agentChatName,
+  agentChatColor,
   onToggle,
   onMoveUp,
   onMoveDown
 }: GroupHeaderProps) {
   const smartPath = useMemo(() => getSmartPath(cwd), [cwd])
+
+  // Phase 4: Use AgentChat name if available, otherwise fall back to smart path
+  const displayName = agentChatName || smartPath
 
   return (
     <div className="group-header-wrapper">
@@ -58,6 +66,7 @@ export default function GroupHeader({
         className={`group-header ${isCollapsed ? 'collapsed' : 'expanded'}`}
         onClick={onToggle}
         title={cwd}
+        style={agentChatColor ? { '--agent-color': agentChatColor } as React.CSSProperties : undefined}
       >
         <span className={`group-chevron ${isCollapsed ? '' : 'open'}`} aria-hidden="true">
           ▼
@@ -72,7 +81,7 @@ export default function GroupHeader({
             strokeLinejoin="round"
           />
         </svg>
-        <span className="group-path">{smartPath}</span>
+        <span className="group-path">{displayName}</span>
         <span className="group-count">[{count}]</span>
       </button>
       <div className="group-reorder-controls">

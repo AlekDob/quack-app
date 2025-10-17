@@ -1,8 +1,7 @@
 import { useState, useMemo, type MouseEvent } from "react";
 import TerminalGroup from "./TerminalGroup";
 import ContextMenu from "./ContextMenu";
-import TerminalActivityBar from "./TerminalActivityBar";
-import type { TerminalInfo } from "../types";
+import type { TerminalInfo, AgentChat } from "../types";
 
 const normalize = (value: string) => value.toLowerCase();
 const fuzzyMatch = (query: string, target: string) => {
@@ -30,15 +29,21 @@ interface TerminalSidebarProps {
   activeId: string | null;
   creating: boolean;
   collapsedGroups: Set<string>;
-  onAdd: () => void;
+  // Phase 4: AgentChat props
+  agentChats: AgentChat[];
+  activeAgentChatId: string | null;
+  onSelectAgentChat: (agentChatId: string | null) => void;
+  onDeleteAgentChat: (agentChatId: string) => void;
+  onUpdateAgentChat: (agentChatId: string, updates: Partial<Omit<AgentChat, 'id'>>) => void;
+  onCreateAgent: () => void; // NEW: Create AgentChat only (no terminal)
+  // Terminal props
+  onAdd: () => void; // Will be used by "+" button for terminal creation
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onColorChange: (id: string, color: string) => void;
   onEdit: (terminal: TerminalInfo) => void;
   onToggleGroup: (cwd: string) => void;
   onReorder: (reorderedIds: string[]) => void;
-  onToggleProcesses: () => void;
-  processesOpen: boolean;
 }
 
 export default function TerminalSidebar({
@@ -46,6 +51,14 @@ export default function TerminalSidebar({
   activeId,
   creating,
   collapsedGroups,
+  // AgentChat props (unused - kept for backward compatibility)
+  agentChats: _agentChats,
+  activeAgentChatId: _activeAgentChatId,
+  onSelectAgentChat: _onSelectAgentChat,
+  onDeleteAgentChat: _onDeleteAgentChat,
+  onUpdateAgentChat: _onUpdateAgentChat,
+  onCreateAgent,
+  // Terminal props
   onAdd,
   onSelect,
   onClose,
@@ -53,51 +66,44 @@ export default function TerminalSidebar({
   onEdit,
   onToggleGroup,
   onReorder,
-  onToggleProcesses,
-  processesOpen,
 }: TerminalSidebarProps) {
   void _onColorChange;
+  void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
+  void _onUpdateAgentChat; // Will be used in rename functionality (Phase 4)
+  void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     terminal: TerminalInfo;
   } | null>(null);
 
+  // Filter terminals by query only
   const filteredTerminals = useMemo(() => {
     return terminals.filter((terminal) => fuzzyMatch(query, terminal.label));
   }, [terminals, query]);
 
-  // Group terminals by cwd
-  const { groups, ungrouped } = useMemo(() => {
+  // SIMPLE: Group terminals by cwd only!
+  const cwdGroups = useMemo(() => {
     const groupMap: Record<string, TerminalInfo[]> = {};
-    const ungroupedList: TerminalInfo[] = [];
 
     filteredTerminals.forEach((terminal) => {
-      const cwdKey = terminal.cwd;
-      if (!groupMap[cwdKey]) {
-        groupMap[cwdKey] = [];
+      const cwd = terminal.cwd || 'unknown';
+      if (!groupMap[cwd]) {
+        groupMap[cwd] = [];
       }
-      groupMap[cwdKey].push(terminal);
+      groupMap[cwd].push(terminal);
     });
 
-    // Separate grouped (2+ terminals) from ungrouped (1 terminal)
-    const groupedEntries: [string, TerminalInfo[]][] = [];
-    Object.entries(groupMap).forEach(([cwd, terms]) => {
-      if (terms.length > 1) {
-        groupedEntries.push([cwd, terms]);
-      } else {
-        ungroupedList.push(...terms);
-      }
-    });
+    // Just return cwd groups - no AgentChat mapping!
+    const groups: Array<[string, TerminalInfo[]]> = Object.entries(groupMap);
 
-    // Mantieni ordine originale, non riordinare automaticamente
-    // groupedEntries.sort(...) rimosso per preservare ordine fisso
-
-    return {
-      groups: groupedEntries,
-      ungrouped: ungroupedList,
-    };
+    return { groups };
   }, [filteredTerminals]);
+
+  // SIMPLE: Just select terminal - no AgentChat logic!
+  const handleSelectTerminal = (terminal: TerminalInfo) => {
+    onSelect(terminal.id);
+  };
 
   const handleContextMenu = (event: MouseEvent, terminal: TerminalInfo) => {
     event.preventDefault();
@@ -133,46 +139,40 @@ export default function TerminalSidebar({
     onReorder(reordered);
   };
 
-  // Handlers per muovere gruppi interi
+  // SIMPLE: Move groups by cwd
   const handleMoveGroupUp = (cwd: string) => {
-    // Trova tutti i terminali del gruppo
-    const groupTerminals = groups.find(([c]) => c === cwd)?.[1] || [];
+    // Find all terminals in this cwd group
+    const groupTerminals = cwdGroups.groups.find(([groupCwd]) => groupCwd === cwd)?.[1] || [];
     if (groupTerminals.length === 0) return;
 
-    // Trova l'indice del primo terminale del gruppo nell'array globale
     const firstTerminalId = groupTerminals[0].id;
     const currentIds = terminals.map((t) => t.id);
     const firstIndex = currentIds.indexOf(firstTerminalId);
 
-    if (firstIndex <= 0) return; // Già in cima
+    if (firstIndex <= 0) return; // Already at top
 
-    // Rimuovi tutti i terminali del gruppo
-    const groupIds = groupTerminals.map(t => t.id);
-    const withoutGroup = currentIds.filter(id => !groupIds.includes(id));
+    const groupIds = groupTerminals.map((t) => t.id);
+    const withoutGroup = currentIds.filter((id) => !groupIds.includes(id));
 
-    // Reinserisci il gruppo una posizione prima
     const reordered = [...withoutGroup];
     reordered.splice(firstIndex - 1, 0, ...groupIds);
     onReorder(reordered);
   };
 
   const handleMoveGroupDown = (cwd: string) => {
-    // Trova tutti i terminali del gruppo
-    const groupTerminals = groups.find(([c]) => c === cwd)?.[1] || [];
+    // Find all terminals in this cwd group
+    const groupTerminals = cwdGroups.groups.find(([groupCwd]) => groupCwd === cwd)?.[1] || [];
     if (groupTerminals.length === 0) return;
 
-    // Trova l'indice dell'ultimo terminale del gruppo nell'array globale
     const lastTerminalId = groupTerminals[groupTerminals.length - 1].id;
     const currentIds = terminals.map((t) => t.id);
     const lastIndex = currentIds.indexOf(lastTerminalId);
 
-    if (lastIndex === -1 || lastIndex >= currentIds.length - 1) return; // Già in fondo
+    if (lastIndex === -1 || lastIndex >= currentIds.length - 1) return; // Already at bottom
 
-    // Rimuovi tutti i terminali del gruppo
-    const groupIds = groupTerminals.map(t => t.id);
-    const withoutGroup = currentIds.filter(id => !groupIds.includes(id));
+    const groupIds = groupTerminals.map((t) => t.id);
+    const withoutGroup = currentIds.filter((id) => !groupIds.includes(id));
 
-    // Reinserisci il gruppo una posizione dopo
     const reordered = [...withoutGroup];
     reordered.splice(lastIndex, 0, ...groupIds);
     onReorder(reordered);
@@ -185,7 +185,7 @@ export default function TerminalSidebar({
           <button
             type="button"
             className="sidebar-button"
-            onClick={onAdd}
+            onClick={onCreateAgent}
             disabled={creating}
           >
             {creating ? "Creating…" : "New"}
@@ -205,133 +205,51 @@ export default function TerminalSidebar({
       </div>
 
       <div className="sidebar-list">
-        {/* Render grouped terminals */}
-        {groups.map(([cwd, groupTerminals]) => {
-          // Calcola se il gruppo può muoversi su/giù
+        {/* SIMPLE: Render cwd-based groups */}
+        {cwdGroups.groups.map(([cwd, groupTerminals]) => {
           const firstTerminalId = groupTerminals[0]?.id;
           const lastTerminalId = groupTerminals[groupTerminals.length - 1]?.id;
-          const firstIndex = terminals.findIndex(t => t.id === firstTerminalId);
-          const lastIndex = terminals.findIndex(t => t.id === lastTerminalId);
+          const firstIndex = firstTerminalId ? terminals.findIndex(t => t.id === firstTerminalId) : -1;
+          const lastIndex = lastTerminalId ? terminals.findIndex(t => t.id === lastTerminalId) : -1;
 
           const canGroupMoveUp = firstIndex > 0;
-          const canGroupMoveDown = lastIndex < terminals.length - 1;
+          const canGroupMoveDown = lastIndex >= 0 && lastIndex < terminals.length - 1;
+
+          const isCollapsed = collapsedGroups.has(cwd);
 
           return (
             <TerminalGroup
               key={cwd}
               cwd={cwd}
               terminals={groupTerminals}
-              isCollapsed={collapsedGroups.has(cwd)}
+              isCollapsed={isCollapsed}
               activeId={activeId}
               canGroupMoveUp={canGroupMoveUp}
               canGroupMoveDown={canGroupMoveDown}
               onToggle={() => onToggleGroup(cwd)}
-              onSelect={onSelect}
+              onSelect={handleSelectTerminal}
               onClose={onClose}
               onContextMenu={handleContextMenu}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
-              onMoveGroupUp={handleMoveGroupUp}
-              onMoveGroupDown={handleMoveGroupDown}
+              onMoveGroupUp={() => handleMoveGroupUp(cwd)}
+              onMoveGroupDown={() => handleMoveGroupDown(cwd)}
             />
           );
         })}
 
-        {/* Render ungrouped terminals */}
-        {ungrouped.map((terminal) => {
-          const active = terminal.id === activeId;
-          const itemClasses = [
-            "terminal-item",
-            "terminal-item-ungrouped",
-            active ? "active" : "",
-            terminal.alive ? "" : "inactive",
-          ]
-            .filter(Boolean)
-            .join(" ");
-
-          const terminalIndex = terminals.findIndex(t => t.id === terminal.id);
-          const canMoveUp = terminalIndex > 0;
-          const canMoveDown = terminalIndex < terminals.length - 1;
-
-          return (
-            <div
-              key={terminal.id}
-              className={itemClasses}
-              onClick={() => onSelect(terminal.id)}
-              onContextMenu={(event) => handleContextMenu(event, terminal)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(terminal.id);
-                }
-              }}
-            >
-              <TerminalActivityBar terminal={terminal} />
-              <div className="terminal-reorder-controls">
-                <button
-                  type="button"
-                  className="terminal-reorder-btn"
-                  disabled={!canMoveUp}
-                  aria-label="Sposta su"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleMoveUp(terminal.id);
-                  }}
-                >
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  className="terminal-reorder-btn"
-                  disabled={!canMoveDown}
-                  aria-label="Sposta giù"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleMoveDown(terminal.id);
-                  }}
-                >
-                  ▼
-                </button>
-              </div>
-              <button
-                type="button"
-                className="terminal-close"
-                aria-label={`Chiudi ${terminal.label}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClose(terminal.id);
-                }}
-              >
-                ×
-              </button>
-            </div>
-          );
-        })}
-
+        {/* Empty state */}
         {terminals.length === 0 && (
           <div className="empty-state">
             <div>🦆 Quack quack!</div>
-            <div>No active agents</div>
+            <div>No terminals</div>
           </div>
         )}
 
-        {terminals.length > 0 && filteredTerminals.length === 0 && (
-          <div className="empty-state">No agents found</div>
+        {terminals.length > 0 && cwdGroups.groups.length === 0 && (
+          <div className="empty-state">No terminals found</div>
         )}
       </div>
-
-  <div className="sidebar-footer">
-    <button
-      type="button"
-      className={`sidebar-footer-button ${processesOpen ? "active" : ""}`}
-      onClick={onToggleProcesses}
-    >
-      <span className="sidebar-footer-dot" aria-hidden="true" />
-      Processes
-    </button>
-  </div>
 
       {/* Context menu */}
       {contextMenu && (

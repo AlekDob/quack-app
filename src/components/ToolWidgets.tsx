@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DiffViewer from './DiffViewer';
 import TodoWidget from './TodoWidget';
+import PlanWidget from './PlanWidget';
 import type { ToolDiff, DiffLine, TodoItem } from '../types';
 
 // Helper function to convert old/new strings to ToolDiff
@@ -488,4 +489,12 @@ export const TodoWriteWidget: React.FC<{
   defaultExpanded?: boolean;
 }> = ({ todos, defaultExpanded = true }) => {
   return <TodoWidget todos={todos} defaultExpanded={defaultExpanded} />;
+};
+
+// ExitPlanMode widget
+export const ExitPlanModeWidget: React.FC<{
+  plan: string;
+  defaultExpanded?: boolean;
+}> = ({ plan, defaultExpanded = true }) => {
+  return <PlanWidget plan={plan} defaultExpanded={defaultExpanded} />;
 };

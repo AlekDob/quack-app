@@ -18,9 +18,10 @@ import SidePanel from "./components/SidePanel";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer from "./components/FilePreviewDrawer";
 import GitPanel from "./components/GitPanel";
-import ProcessesDrawer from "./components/ProcessesDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
+import { NativeTerminalPanel } from "./components/NativeTerminalPanel";
+import { AddNativeTerminalModal } from "./components/AddNativeTerminalModal";
 import PreviewDrawer from "./components/PreviewDrawer";
 import AISettingsPanel from "./components/AISettingsPanel";
 import PerformanceMonitor from "./components/PerformanceMonitor";
@@ -33,15 +34,17 @@ import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 
 import type {
+  AgentChat,
   DirectoryEntry,
   DirectoryListing,
   GitCommitEntry,
   GitStatusEntry,
   GitStatusSummary,
+  NativeTerminal,
+  NativeTerminalApp,
   TerminalExitEvent,
   TerminalInfo,
   SavedCommand,
-  ProcessInfo,
   TerminalContext,
   AgentInfo,
   AgentDetails,
@@ -97,18 +100,39 @@ const chunkContainsPrompt = (text: string): boolean => {
   return PROMPT_REGEX.test(lines[lines.length - 1]);
 };
 
+// Debounce utility for auto-save
+function debounce<T extends (...args: unknown[]) => void>(
+  func: T,
+  wait: number
+): T & { cancel: () => void } {
+  let timeout: NodeJS.Timeout | null = null;
+
+  const debounced = (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+
+  debounced.cancel = () => {
+    if (timeout) clearTimeout(timeout);
+  };
+
+  return debounced as T & { cancel: () => void };
+}
+
 const STORAGE_KEY = "terminals";
 
 const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
   try {
     const store = await Store.load("quack-terminals.json");
-    const metadata: TerminalMetadata[] = terminals.map((t) => ({
+    // SIMPLE: Save terminal metadata only
+    const metadata = terminals.map((t) => ({
       label: t.label,
       color: t.color,
       cwd: t.cwd,
     }));
     await store.set(STORAGE_KEY, metadata);
     await store.save();
+    console.log(`Saved ${metadata.length} terminals`);
   } catch (error) {
     console.warn("Unable to save terminals", error);
   }
@@ -124,6 +148,80 @@ const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
     return [];
   }
 };
+
+// ============================================
+// Native Terminal Storage Functions
+// ============================================
+const NATIVE_TERMINALS_STORAGE_KEY = "nativeTerminals";
+
+const saveNativeTerminalsToStorage = async (terminals: NativeTerminal[]) => {
+  try {
+    const store = await Store.load("quack-terminals.json");
+    // Mark all as closed on save (they might not be running when app restarts)
+    const metadata = terminals.map((t) => ({
+      ...t,
+      isOpen: false,
+      pid: undefined,
+    }));
+    await store.set(NATIVE_TERMINALS_STORAGE_KEY, metadata);
+    await store.save();
+    console.log(`Saved ${metadata.length} native terminals`);
+  } catch (error) {
+    console.warn("Unable to save native terminals", error);
+  }
+};
+
+const loadNativeTerminalsFromStorage = async (): Promise<NativeTerminal[]> => {
+  try {
+    const store = await Store.load("quack-terminals.json");
+    const stored = await store.get<NativeTerminal[]>(NATIVE_TERMINALS_STORAGE_KEY);
+    return stored ?? [];
+  } catch (error) {
+    console.warn("Unable to load saved native terminals", error);
+    return [];
+  }
+};
+
+// ============================================
+// AgentChat Storage Functions (Phase 1)
+// ============================================
+
+const AGENT_CHATS_KEY = "agentChats";
+// No migration keys needed anymore!
+
+const saveAgentChatsToStorage = async (chats: AgentChat[]): Promise<void> => {
+  try {
+    const store = await Store.load("quack-agent-chats.json");
+    await store.set(AGENT_CHATS_KEY, chats);
+    await store.save();
+    console.log(`Saved ${chats.length} AgentChats to storage`);
+  } catch (error) {
+    console.error("Failed to save AgentChats:", error);
+    toast.error("Failed to save workspace configuration");
+  }
+};
+
+const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
+  try {
+    const store = await Store.load("quack-agent-chats.json");
+    const stored = await store.get<AgentChat[]>(AGENT_CHATS_KEY);
+    if (stored) {
+      console.log(`Loaded ${stored.length} AgentChats from storage`);
+      return stored;
+    }
+    return [];
+  } catch (error) {
+    console.warn("Unable to load AgentChats:", error);
+    return [];
+  }
+};
+
+// NO storage for activeAgentChat - not needed!
+
+// ============================================
+// Migration System (Phase 2)
+// ============================================
+// NO migration needed! Terminals are independent entities, grouped only by cwd in the UI
 
 function App() {
   // Load assets INSIDE the component, not at module level
@@ -152,11 +250,20 @@ function App() {
     }
   });
 
+  // AgentChat state (workspace containers for terminal tabs)
+  // AgentChats kept for UI grouping only - NOT linked to terminals!
+  const [agentChats, setAgentChats] = useState<AgentChat[]>([]);
+
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // Native Terminals state (Mac Terminal.app integration)
+  const [nativeTerminals, setNativeTerminals] = useState<NativeTerminal[]>([]);
+  const [showAddNativeTerminalModal, setShowAddNativeTerminalModal] = useState(false);
+
   // Derived state - moved here to fix TypeScript hoisting errors
-  const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat
+  const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat (Quack Agency)
+
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
     [activeId, terminals]
@@ -190,7 +297,6 @@ function App() {
   const [formattingPreview, setFormattingPreview] = useState(false);
   const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
-  const [showProcessesDrawer, setShowProcessesDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
@@ -244,7 +350,6 @@ function App() {
   const NOTIFICATION_TIMEOUT_MS = 60000; // 1 minute - for notifications only
   const VISUAL_IDLE_DELAY_MS = 400; // Delay before showing idle status (prevents flickering)
   const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
-  const [activeProcesses, setActiveProcesses] = useState<ProcessInfo[]>([]);
   const [savedCommandsDrawerOpen, setSavedCommandsDrawerOpen] = useState(false);
   const [savedCommandModalOpen, setSavedCommandModalOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(
@@ -660,19 +765,130 @@ function App() {
     }
   }, []);
 
-  const loadActiveProcesses = useCallback(async () => {
-    if (!tauriAvailable) {
-      return;
-    }
+  // Native Terminal handlers
+  const handleAddNativeTerminal = useCallback(
+    async (name: string, directory: string, color: string, app: NativeTerminalApp) => {
+      if (!tauriAvailable) {
+        toast.error("Tauri is not available");
+        return;
+      }
 
-    try {
-      const processes = await invoke<ProcessInfo[]>('get_active_processes');
-      setActiveProcesses(processes);
-    } catch (error) {
-      console.error('Failed to load active processes:', error);
-      setActiveProcesses([]);
-    }
-  }, [tauriAvailable]);
+      try {
+        const result = await invoke<{ success: boolean; pid?: number }>(
+          "open_native_terminal",
+          { name, directory: directory || undefined, app }
+        );
+
+        if (result.success) {
+          const newTerminal: NativeTerminal = {
+            id: crypto.randomUUID(),
+            name,
+            app,
+            color,
+            directory,
+            isOpen: true,
+            pid: result.pid,
+            createdAt: Date.now(),
+          };
+
+          setNativeTerminals((prev) => [...prev, newTerminal]);
+          toast.success(`Terminal "${name}" opened successfully`);
+        } else {
+          toast.error("Failed to open terminal");
+        }
+      } catch (error) {
+        console.error("Failed to open native terminal:", error);
+        toast.error(
+          `Failed to open terminal: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+      }
+    },
+    [tauriAvailable]
+  );
+
+  const handleRemoveNativeTerminal = useCallback(
+    async (terminal: NativeTerminal) => {
+      if (!tauriAvailable) {
+        return;
+      }
+
+      try {
+        // Try to close the terminal window
+        await invoke("close_native_terminal", { name: terminal.name, app: terminal.app });
+      } catch (error) {
+        console.warn("Failed to close terminal window:", error);
+      }
+
+      // Remove from list regardless of whether close succeeded
+      setNativeTerminals((prev) => prev.filter((t) => t.id !== terminal.id));
+      toast.success(`Terminal "${terminal.name}" removed`);
+    },
+    [tauriAvailable]
+  );
+
+  const handleFocusNativeTerminal = useCallback(
+    async (terminal: NativeTerminal) => {
+      if (!tauriAvailable) {
+        return;
+      }
+
+      try {
+        const result = await invoke<{ success: boolean }>(
+          "focus_native_terminal",
+          { name: terminal.name, app: terminal.app }
+        );
+
+        if (result.success) {
+          // Update isOpen state
+          setNativeTerminals((prev) =>
+            prev.map((t) =>
+              t.id === terminal.id ? { ...t, isOpen: true } : t
+            )
+          );
+        } else {
+          toast.error("Terminal window not found");
+        }
+      } catch (error) {
+        console.error("Failed to focus terminal:", error);
+        toast.error("Failed to bring terminal to front");
+      }
+    },
+    [tauriAvailable]
+  );
+
+  const handleOpenNativeTerminal = useCallback(
+    async (terminal: NativeTerminal) => {
+      if (!tauriAvailable) {
+        return;
+      }
+
+      try {
+        const result = await invoke<{ success: boolean; pid?: number }>(
+          "open_native_terminal",
+          {
+            name: terminal.name,
+            directory: terminal.directory || undefined,
+            app: terminal.app,
+          }
+        );
+
+        if (result.success) {
+          setNativeTerminals((prev) =>
+            prev.map((t) =>
+              t.id === terminal.id
+                ? { ...t, isOpen: true, pid: result.pid }
+                : t
+            )
+          );
+          toast.success(`Terminal "${terminal.name}" reopened`);
+        }
+      } catch (error) {
+        console.error("Failed to open terminal:", error);
+        toast.error("Failed to open terminal");
+      }
+    },
+    [tauriAvailable]
+  );
 
   const showIntroReplay = useCallback(() => {
     if (introReplayTimeoutRef.current) {
@@ -748,26 +964,7 @@ function App() {
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
-    // Performance: NON fare polling continuo dei processi - carica solo quando necessario
-    // Il drawer ProcessesDrawer chiamerà loadActiveProcesses quando aperto
   }, [loadSavedCommands, showIntroReplay, tauriAvailable]);
-
-  // Performance: Carica processi solo quando drawer è aperto (on-demand invece di polling)
-  useEffect(() => {
-    if (!tauriAvailable || !showProcessesDrawer) {
-      return;
-    }
-
-    // Caricamento iniziale
-    void loadActiveProcesses();
-
-    // Polling solo quando drawer è aperto (ogni 5 secondi invece di 3)
-    const interval = setInterval(() => {
-      void loadActiveProcesses();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [loadActiveProcesses, showProcessesDrawer, tauriAvailable]);
 
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
@@ -790,6 +987,46 @@ function App() {
     }
   }, [hasBootstrapped, tauriAvailable, terminals]);
 
+  // Auto-save Native Terminals when they change
+  useEffect(() => {
+    if (!tauriAvailable || !hasBootstrapped) {
+      return;
+    }
+
+    if (nativeTerminals.length > 0) {
+      void saveNativeTerminalsToStorage(nativeTerminals);
+    } else {
+      // If no native terminals, clean up storage
+      void (async () => {
+        try {
+          const store = await Store.load("quack-terminals.json");
+          await store.delete(NATIVE_TERMINALS_STORAGE_KEY);
+          await store.save();
+        } catch {
+          // Ignore errors
+        }
+      })();
+    }
+  }, [hasBootstrapped, tauriAvailable, nativeTerminals]);
+
+  // Auto-save AgentChats when they change (Phase 1)
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const saveDebounced = debounce(() => {
+      if (agentChats.length > 0) {
+        void saveAgentChatsToStorage(agentChats);
+      }
+    }, 1000);
+
+    saveDebounced();
+
+    return () => {
+      saveDebounced.cancel();
+    };
+  }, [agentChats, tauriAvailable]);
+
+  // Auto-save active AgentChat when it changes (Phase 1)
   const ensureNotificationPermission =
     useCallback(async (): Promise<boolean> => {
       if (!tauriAvailable) {
@@ -1548,6 +1785,8 @@ function App() {
         const savedMetadata = await loadTerminalsFromStorage();
 
         if (savedMetadata.length > 0) {
+          console.log(`Found ${savedMetadata.length} saved terminals`);
+
           // Recreate terminals from saved metadata
           const recreated: TerminalInfo[] = [];
           for (const metadata of savedMetadata) {
@@ -1557,13 +1796,18 @@ function App() {
                 color: metadata.color,
                 cwd: metadata.cwd,
               });
-              recreated.push({
+
+              // Preserve agentChatId if it exists
+              const terminalWithState: TerminalInfo = {
                 ...terminal,
                 status: "idle" as const,
                 needsAttention: false,
                 hasResponded: false,
                 responseStartTime: null,
-              });
+              };
+
+              recreated.push(terminalWithState);
+              console.log(`Recreated terminal: ${terminal.label}`);
             } catch (error) {
               console.warn(
                 `Unable to recreate terminal ${metadata.label}`,
@@ -1572,30 +1816,30 @@ function App() {
             }
           }
 
+          // SIMPLE: Just load terminals - no migration needed!
+          setTerminals(recreated);
+
+          // Load AgentChats for UI grouping (optional)
+          const existingChats = await loadAgentChatsFromStorage();
+          if (existingChats.length > 0) {
+            setAgentChats(existingChats);
+          }
+
+          // Set first terminal as active if we have any
           if (recreated.length > 0) {
-            setTerminals(recreated);
             setActiveId(recreated[0].id);
             await loadDirectory(recreated[0].cwd);
-          } else {
-            // Fallback: create a default terminal
-            const initial = await invoke<TerminalInfo>("create_terminal", {
-              label: "Terminal 1",
-              color: COLORS[0],
-              cwd: null,
-            });
-            const initialWithState = {
-              ...initial,
-              status: "idle" as const,
-              needsAttention: false,
-              hasResponded: false,
-              responseStartTime: null,
-            };
-            setTerminals([initialWithState]);
-            setActiveId(initialWithState.id);
-            await loadDirectory(initialWithState.cwd);
           }
         } else {
-          // No saved terminals, create a default one
+          console.log('No saved terminals found');
+
+          // Load any existing AgentChats even if no terminals (optional UI grouping)
+          const existingChats = await loadAgentChatsFromStorage();
+          if (existingChats.length > 0) {
+            setAgentChats(existingChats);
+          }
+
+          // Create a default terminal
           const initial = await invoke<TerminalInfo>("create_terminal", {
             label: "Terminal 1",
             color: COLORS[0],
@@ -1617,6 +1861,19 @@ function App() {
       } finally {
         setBooting(false);
         setHasBootstrapped(true);
+
+        // Load saved native terminals (non-blocking, after app is ready)
+        void (async () => {
+          try {
+            const savedNativeTerminals = await loadNativeTerminalsFromStorage();
+            if (savedNativeTerminals.length > 0) {
+              console.log(`Found ${savedNativeTerminals.length} saved native terminals`);
+              setNativeTerminals(savedNativeTerminals);
+            }
+          } catch (error) {
+            console.warn("Unable to load saved native terminals", error);
+          }
+        })();
       }
     };
 
@@ -1851,12 +2108,13 @@ function App() {
         setShowNewTerminalModal(false);
         setEditingTerminal(null);
       } else {
-        // Create new terminal
+        // Create new terminal - SIMPLE! No AgentChat logic
         const created = await invoke<TerminalInfo>("create_terminal", {
           label: trimmedName,
           color: newTerminalColor,
           cwd: trimmedPath,
         });
+
         const createdWithState: TerminalInfo = {
           ...created,
           status: "idle",
@@ -1864,11 +2122,14 @@ function App() {
           hasResponded: false,
           responseStartTime: null,
         };
+
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
         clearTerminalAttention(createdWithState.id);
         setShowNewTerminalModal(false);
         await loadDirectory(createdWithState.cwd);
+
+        console.log(`Created terminal "${trimmedName}" with cwd="${trimmedPath}"`);
       }
     } catch (error) {
       console.error("Unable to save terminal", error);
@@ -1889,9 +2150,17 @@ function App() {
     tauriAvailable,
   ]);
 
-  // Quick create terminal - no modal, instant like VSCode
+  // Quick create terminal - no modal, instant like VSCode (Phase 3 - AgentChat integration)
   const handleQuickCreateTerminal = useCallback(async () => {
     if (!tauriAvailable || creatingTerminal) {
+      return;
+    }
+
+    // Require an active terminal to know which cwd to use
+    const activeTerminal = terminals.find((t) => t.id === activeId);
+    if (!activeTerminal) {
+      // No active terminal - open modal to create first one
+      handleOpenNewTerminalModal();
       return;
     }
 
@@ -1911,9 +2180,8 @@ function App() {
       // Pick random color from COLORS array
       const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
 
-      // IMPORTANT: Always use active terminal's CWD to group under same agent
-      // Only fallback to explorerPath if there are NO terminals at all
-      const cwd = activeTerminal?.cwd ?? (terminals.length === 0 ? (explorerPath || null) : null);
+      // SIMPLE: Use active terminal's CWD (same root of work)
+      const cwd = activeTerminal.cwd;
 
       // Create terminal immediately
       const created = await invoke<TerminalInfo>("create_terminal", {
@@ -1930,14 +2198,16 @@ function App() {
         responseStartTime: null,
       };
 
+      console.log(`[QuickCreate] Created terminal "${autoName}" with cwd="${cwd}"`);
+
       setTerminals((prev) => [...prev, createdWithState]);
       setActiveId(createdWithState.id);
       clearTerminalAttention(createdWithState.id);
 
-      // Load directory if we have a cwd
-      if (createdWithState.cwd) {
-        await loadDirectory(createdWithState.cwd);
-      }
+      // Load directory
+      await loadDirectory(createdWithState.cwd);
+
+      console.log(`Quick-created terminal "${autoName}"`);
     } catch (error) {
       console.error("Unable to quick create terminal", error);
       toast.error("Failed to create terminal");
@@ -1948,8 +2218,8 @@ function App() {
     tauriAvailable,
     creatingTerminal,
     terminals,
-    activeTerminal,
-    explorerPath,
+    activeId,
+    handleOpenNewTerminalModal,
     clearTerminalAttention,
     loadDirectory,
   ]);
@@ -2034,6 +2304,12 @@ function App() {
     ]
   );
 
+
+  // ============================================
+  // AgentChat Management Handlers (Phase 1)
+  // ============================================
+
+  // NO AgentChat handlers needed - terminals are independent!
 
   const handleOpenPreviewDrawer = useCallback(() => {
     setShowPreviewDrawer(true);
@@ -2664,6 +2940,14 @@ function App() {
           activeId={activeId}
           creating={creatingTerminal}
           collapsedGroups={collapsedGroups}
+          // AgentChats for UI grouping (optional)
+          agentChats={agentChats}
+          activeAgentChatId={null}
+          onSelectAgentChat={() => {}}
+          onDeleteAgentChat={() => {}}
+          onUpdateAgentChat={() => {}}
+          onCreateAgent={handleOpenNewTerminalModal}
+          // Terminal props
           onAdd={handleOpenNewTerminalModal}
           onSelect={handleSelectTerminal}
           onClose={handleCloseTerminal}
@@ -2671,10 +2955,6 @@ function App() {
           onEdit={handleEditTerminal}
           onToggleGroup={handleToggleGroup}
           onReorder={handleReorderTerminals}
-          onToggleProcesses={() =>
-            setShowProcessesDrawer((value) => !value)
-          }
-          processesOpen={showProcessesDrawer}
         />
 
         <section className="terminal-pane">
@@ -2782,6 +3062,53 @@ function App() {
           }
           savedCommandsOpen={savedCommandsDrawerOpen}
           onCreateTerminal={handleQuickCreateTerminal}
+          // Native Terminals props
+          nativeTerminals={nativeTerminals}
+          onAddNativeTerminal={() => setShowAddNativeTerminalModal(true)}
+          onRemoveNativeTerminal={async (id) => {
+            const terminal = nativeTerminals.find((t) => t.id === id);
+            if (!terminal) return;
+            try {
+              await invoke("close_native_terminal", {
+                name: terminal.name,
+                app: terminal.app,
+              });
+              setNativeTerminals((prev) => prev.filter((t) => t.id !== id));
+            } catch (error) {
+              console.error("Failed to close native terminal:", error);
+            }
+          }}
+          onOpenNativeTerminal={async (terminal) => {
+            try {
+              await invoke("open_native_terminal", {
+                name: terminal.name,
+                directory: terminal.directory,
+                app: terminal.app,
+              });
+            } catch (error) {
+              console.error("Failed to open native terminal:", error);
+            }
+          }}
+          onFocusNativeTerminal={async (terminal) => {
+            try {
+              await invoke("focus_native_terminal", {
+                name: terminal.name,
+                app: terminal.app,
+              });
+            } catch (error) {
+              console.error("Failed to focus native terminal:", error);
+            }
+          }}
+          onCloseNativeTerminal={async (terminal) => {
+            try {
+              await invoke("close_native_terminal", {
+                name: terminal.name,
+                app: terminal.app,
+              });
+            } catch (error) {
+              console.error("Failed to close native terminal:", error);
+            }
+          }}
         />
 
         <NewTerminalModal
@@ -2842,13 +3169,6 @@ function App() {
           onClose={() => setSavedCommandsDrawerOpen(false)}
         />
 
-        <ProcessesDrawer
-          open={showProcessesDrawer}
-          processes={activeProcesses}
-          onClose={() => setShowProcessesDrawer(false)}
-          onRefresh={loadActiveProcesses}
-          onFocusTerminal={handleSelectTerminal}
-        />
         <PreviewDrawer
           open={showPreviewDrawer}
           onClose={() => setShowPreviewDrawer(false)}
@@ -2862,7 +3182,6 @@ function App() {
             }
           }}
           explorerPath={explorerPath}
-          processes={activeProcesses}
         />
 
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
@@ -2928,6 +3247,16 @@ function App() {
             setSavedCommandModalOpen(false);
             setEditingCommand(null);
           }}
+        />
+
+        <AddNativeTerminalModal
+          isOpen={showAddNativeTerminalModal}
+          onClose={() => setShowAddNativeTerminalModal(false)}
+          onConfirm={async (name, directory, color, app) => {
+            await handleAddNativeTerminal(name, directory, color, app);
+            setShowAddNativeTerminalModal(false);
+          }}
+          defaultDirectory={explorerPath || activeTerminal?.cwd || ""}
         />
 
         {showAISettings && (

@@ -5,15 +5,16 @@ import { CommandsPanel } from "./CommandsPanel";
 import ContextPanel from "./ContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo } from "../types";
+import { NativeTerminalPanel } from "./NativeTerminalPanel";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo, NativeTerminal } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, Commands, Context, Terminal
+ * Tabs: File Explorer, Agents, Commands, Context, Terminal, Native Terminals
  */
 
-type TabId = "explorer" | "agents" | "commands" | "context" | "terminal";
+type TabId = "explorer" | "agents" | "commands" | "context" | "terminal" | "native-terminals";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -99,6 +100,25 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  nativeTerminals: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 8l2 2-2 2M10 12h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -141,6 +161,14 @@ interface SidePanelProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onCreateTerminal: () => void;
+
+  // Native Terminals props
+  nativeTerminals: NativeTerminal[];
+  onAddNativeTerminal: () => void;
+  onRemoveNativeTerminal: (id: string) => void;
+  onOpenNativeTerminal: (terminal: NativeTerminal) => void;
+  onFocusNativeTerminal: (terminal: NativeTerminal) => void;
+  onCloseNativeTerminal: (terminal: NativeTerminal) => void;
 }
 
 export default function SidePanel({
@@ -183,6 +211,14 @@ export default function SidePanel({
   onToggleSavedCommands,
   savedCommandsOpen,
   onCreateTerminal,
+
+  // Native Terminals
+  nativeTerminals,
+  onAddNativeTerminal,
+  onRemoveNativeTerminal,
+  onOpenNativeTerminal,
+  onFocusNativeTerminal,
+  onCloseNativeTerminal,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("explorer");
 
@@ -215,6 +251,13 @@ export default function SidePanel({
       label: "Terminal",
       icon: icons.terminal,
     },
+    {
+      id: "native-terminals" as TabId,
+      label: "Native Terminals",
+      icon: icons.nativeTerminals,
+      badge: nativeTerminals.length,
+      hasContent: nativeTerminals.length > 0,
+    },
   ];
 
   return (
@@ -222,7 +265,7 @@ export default function SidePanel({
       <div className="side-panel-tabs">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
-          const hasAgents = tab.id === "agents" && tab.hasContent;
+          const hasContent = tab.hasContent;
 
           return (
             <button
@@ -234,10 +277,10 @@ export default function SidePanel({
               aria-label={tab.label}
             >
               <span className="tab-icon">{tab.icon}</span>
-              {tab.id === "agents" && typeof tab.badge === "number" && (
+              {typeof tab.badge === "number" && tab.badge > 0 && (
                 <span
                   className={`side-panel-tab-badge ${
-                    hasAgents ? "has-content" : ""
+                    hasContent ? "has-content" : ""
                   }`}
                 >
                   {tab.badge}
@@ -363,6 +406,19 @@ export default function SidePanel({
                 <p>Click + to create a new terminal</p>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "native-terminals" && (
+          <div className="side-panel-pane">
+            <NativeTerminalPanel
+              terminals={nativeTerminals}
+              onAdd={onAddNativeTerminal}
+              onRemove={onRemoveNativeTerminal}
+              onOpen={onOpenNativeTerminal}
+              onFocus={onFocusNativeTerminal}
+              onClose={onCloseNativeTerminal}
+            />
           </div>
         )}
       </div>

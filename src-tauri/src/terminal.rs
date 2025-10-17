@@ -123,11 +123,11 @@ fn update_terminal_port(id: &str, port: u16) {
 #[tauri::command]
 pub fn create_terminal(
   app: AppHandle,
-  color: Option<String>,
   label: Option<String>,
+  color: Option<String>,
   cwd: Option<String>,
 ) -> Result<TerminalInfo, String> {
-  create_terminal_impl(&app, color, label, cwd).map_err(|err| err.to_string())
+  create_terminal_impl(&app, label, color, cwd).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -212,8 +212,8 @@ pub fn update_terminal(
 
 fn create_terminal_impl(
   app: &AppHandle,
-  color: Option<String>,
   label: Option<String>,
+  color: Option<String>,
   cwd_input: Option<String>,
 ) -> Result<TerminalInfo> {
   let default_color = color.unwrap_or_else(|| "#4ecdc4".to_string());

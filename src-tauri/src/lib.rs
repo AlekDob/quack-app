@@ -15,6 +15,7 @@ mod claude_oauth;
 mod commands;
 mod fs;
 mod git;
+mod native_terminal;
 mod preferences;
 mod preview;
 mod slash_commands;
@@ -294,6 +295,9 @@ pub fn run() {
             terminal::close_terminal,
             terminal::set_terminal_color,
             terminal::update_terminal,
+            native_terminal::open_native_terminal,
+            native_terminal::focus_native_terminal,
+            native_terminal::close_native_terminal,
             commands::load_saved_commands,
             commands::save_command,
             commands::update_command,
