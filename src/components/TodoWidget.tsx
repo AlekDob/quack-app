@@ -24,23 +24,34 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }
     switch (status) {
       case 'completed':
         return (
-          <svg className="todo-status-icon completed" width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" fill="#22c55e" stroke="#22c55e" strokeWidth="1.5"/>
-            <path d="M6 10l3 3 5-6" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <div className="todo-status-icon-wrapper completed">
+            <svg className="todo-status-icon completed" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="11" fill="#10b981" opacity="0.15"/>
+              <circle cx="12" cy="12" r="10" fill="#10b981" stroke="#10b981" strokeWidth="2"/>
+              <path d="M7 12l3.5 3.5 6.5-7" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
         );
       case 'in_progress':
         return (
-          <svg className="todo-status-icon in-progress" width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" stroke="#3b82f6" strokeWidth="2" fill="none" strokeDasharray="56.5" strokeDashoffset="14" className="rotating-circle"/>
-            <circle cx="10" cy="10" r="9" stroke="#3b82f6" strokeWidth="2" fill="none" opacity="0.2"/>
-          </svg>
+          <div className="todo-status-icon-wrapper in-progress">
+            <svg className="todo-status-icon in-progress" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="11" fill="#3b82f6" opacity="0.1"/>
+              <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2.5" fill="none" strokeDasharray="63" strokeDashoffset="16" className="rotating-circle"/>
+              <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2.5" fill="none" opacity="0.15"/>
+              <circle cx="12" cy="12" r="3" fill="#3b82f6" className="pulsing-dot"/>
+            </svg>
+          </div>
         );
       case 'pending':
         return (
-          <svg className="todo-status-icon pending" width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="9" stroke="#6b7280" strokeWidth="2" fill="none"/>
-          </svg>
+          <div className="todo-status-icon-wrapper pending">
+            <svg className="todo-status-icon pending" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="11" fill="#6b7280" opacity="0.08"/>
+              <circle cx="12" cy="12" r="10" stroke="#6b7280" strokeWidth="2" fill="none" strokeDasharray="4 4"/>
+              <circle cx="12" cy="12" r="2" fill="#6b7280" opacity="0.5"/>
+            </svg>
+          </div>
         );
     }
   };
