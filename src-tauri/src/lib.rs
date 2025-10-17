@@ -15,6 +15,7 @@ mod claude_oauth;
 mod commands;
 mod fs;
 mod git;
+mod notifications;
 mod native_terminal;
 mod preferences;
 mod preview;
@@ -330,6 +331,9 @@ pub fn run() {
             ai::get_token_usage_stats,
             ai::get_prompt_engineering_questions,
             ai::improve_prompt_with_answers,
+            notifications::send_ai_completion_notification,
+            notifications::send_telegram_test,
+            notifications::send_ntfy_test,
             preferences::get_preferences,
             preferences::set_preference,
             preferences::toggle_performance_monitor,
@@ -342,6 +346,12 @@ pub fn run() {
             preferences::get_background_image,
             preferences::set_background_image,
             preferences::list_available_backgrounds,
+            preferences::set_telegram_config,
+            preferences::get_telegram_config,
+            preferences::set_ntfy_topic,
+            preferences::get_ntfy_topic,
+            preferences::set_mobile_notifications_enabled,
+            preferences::get_mobile_notifications_enabled,
             claude_auth::get_claude_cli_credentials,
             claude_auth::check_claude_cli_auth,
             claude_auth::get_credentials_path,

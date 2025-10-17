@@ -13,6 +13,15 @@ pub struct AppPreferences {
     pub ai_model: String,
     #[serde(default = "default_background")]
     pub background_image: String,
+    // Mobile notifications settings
+    #[serde(default)]
+    pub telegram_bot_token: Option<String>,
+    #[serde(default)]
+    pub telegram_chat_id: Option<String>,
+    #[serde(default)]
+    pub ntfy_topic: Option<String>,
+    #[serde(default)]
+    pub enable_mobile_notifications: bool,
 }
 
 fn default_ai_model() -> String {
@@ -31,6 +40,10 @@ impl Default for AppPreferences {
             claude_api_key: None,
             ai_model: default_ai_model(),
             background_image: default_background(),
+            telegram_bot_token: None,
+            telegram_chat_id: None,
+            ntfy_topic: None,
+            enable_mobile_notifications: false,
         }
     }
 }
@@ -287,4 +300,109 @@ pub async fn list_available_backgrounds(app: AppHandle) -> Result<Vec<String>, S
 
     backgrounds.sort();
     Ok(backgrounds)
+}
+
+// Mobile Notifications Preferences
+#[tauri::command]
+pub async fn set_telegram_config(
+    app: AppHandle,
+    token: String,
+    chat_id: String,
+) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.telegram_bot_token = Some(token);
+    prefs.telegram_chat_id = Some(chat_id);
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_telegram_config(app: AppHandle) -> Result<(Option<String>, Option<String>), String> {
+    let prefs = get_preferences(app).await?;
+    Ok((prefs.telegram_bot_token, prefs.telegram_chat_id))
+}
+
+#[tauri::command]
+pub async fn set_ntfy_topic(app: AppHandle, topic: String) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.ntfy_topic = Some(topic);
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_ntfy_topic(app: AppHandle) -> Result<Option<String>, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.ntfy_topic)
+}
+
+#[tauri::command]
+pub async fn set_mobile_notifications_enabled(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.enable_mobile_notifications = enabled;
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_mobile_notifications_enabled(app: AppHandle) -> Result<bool, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.enable_mobile_notifications)
 }
