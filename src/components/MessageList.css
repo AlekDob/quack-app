@@ -3,6 +3,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  position: relative;
 }
 
 .message-list-content {
@@ -95,4 +96,46 @@
 
 .message-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* Scroll to bottom button */
+.scroll-to-bottom-button {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(77, 212, 179, 0.9);
+  border: none;
+  color: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  z-index: 10;
+  animation: scrollButtonFadeIn 0.2s ease;
+}
+
+.scroll-to-bottom-button:hover {
+  background: rgba(77, 212, 179, 1);
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(77, 212, 179, 0.4);
+}
+
+.scroll-to-bottom-button:active {
+  transform: scale(0.95);
+}
+
+@keyframes scrollButtonFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -790,7 +790,21 @@ function App() {
         thinkingMode: 'auto',
         permissionMode: 'bypass',
       };
-      newMap.set(activeId, { ...current, ...updates });
+
+      // Auto-switch model based on permission mode if permission mode is being changed
+      let finalUpdates = { ...updates };
+      if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
+        // When switching to plan mode → use opus
+        if (updates.permissionMode === 'plan') {
+          finalUpdates.model = 'opus';
+        }
+        // When switching to bypass mode → use sonnet
+        else if (updates.permissionMode === 'bypass') {
+          finalUpdates.model = 'sonnet';
+        }
+      }
+
+      newMap.set(activeId, { ...current, ...finalUpdates });
       return newMap;
     });
   }, [activeId]);

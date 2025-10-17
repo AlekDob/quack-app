@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
@@ -14,17 +14,49 @@ interface MessageListProps {
 export default function MessageList({ messages, loading, onFilePathClick }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Check if user is at bottom of scroll
+  const checkIfAtBottom = useCallback(() => {
+    if (!scrollRef.current) return true;
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    // Consider "at bottom" if within 100px from bottom
+    return distanceFromBottom < 100;
+  }, []);
+
+  // Handle scroll events to show/hide scroll button
+  const handleScroll = useCallback(() => {
+    const isAtBottom = checkIfAtBottom();
+    setShowScrollButton(!isAtBottom);
+  }, [checkIfAtBottom]);
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    if (!scrollRef.current) return;
+
+    scrollRef.current.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: 'smooth'
+    });
+  }, []);
+
+  // Auto-scroll to bottom when new messages arrive (only if already at bottom)
   useEffect(() => {
     if (messages.length > prevMessagesLengthRef.current && scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      const isAtBottom = checkIfAtBottom();
+
+      if (isAtBottom) {
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }
     prevMessagesLengthRef.current = messages.length;
-  }, [messages.length]);
+  }, [messages.length, checkIfAtBottom]);
 
   if (messages.length === 0 && !loading) {
     return (
@@ -37,7 +69,7 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
   }
 
   return (
-    <div className="message-list" ref={scrollRef}>
+    <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
       <div className="message-list-content">
         {messages.map((message) => (
           <ChatMessage
@@ -48,6 +80,26 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
         ))}
         {loading && <SkeletonMessage />}
       </div>
+      {showScrollButton && (
+        <button
+          className="scroll-to-bottom-button"
+          onClick={scrollToBottom}
+          aria-label="Scroll to bottom"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M10 14L5 9L6.5 7.5L10 11L13.5 7.5L15 9L10 14Z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
