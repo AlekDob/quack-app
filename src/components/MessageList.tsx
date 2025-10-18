@@ -43,20 +43,34 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
     });
   }, []);
 
-  // Auto-scroll to bottom when new messages arrive (only if already at bottom)
+  // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {
-    if (messages.length > prevMessagesLengthRef.current && scrollRef.current) {
-      const isAtBottom = checkIfAtBottom();
+    if (!scrollRef.current) return;
 
-      if (isAtBottom) {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
+    const isAtBottom = checkIfAtBottom();
+    const hasNewMessage = messages.length > prevMessagesLengthRef.current;
+    const lastMessage = messages[messages.length - 1];
+
+    // Determine if we should auto-scroll
+    let shouldAutoScroll = false;
+
+    if (hasNewMessage) {
+      // Always auto-scroll for user messages or if already at bottom
+      shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
+    } else if (loading && isAtBottom) {
+      // During streaming, keep scrolling if user is at bottom
+      shouldAutoScroll = true;
     }
+
+    if (shouldAutoScroll) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+
     prevMessagesLengthRef.current = messages.length;
-  }, [messages.length, checkIfAtBottom]);
+  }, [messages, loading, checkIfAtBottom]);
 
   if (messages.length === 0 && !loading) {
     return (
