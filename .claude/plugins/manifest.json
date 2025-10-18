@@ -1,0 +1,20 @@
+[
+  {
+    "id": "business-marketing-security-auditor",
+    "name": "Security Auditor",
+    "description": "Comprehensive security audit agent for your codebase",
+    "category": "agent",
+    "version": "1.0.0",
+    "author": "davila7",
+    "repository": "https://github.com/davila7/claude-code-templates",
+    "installed": true,
+    "source": "davila7",
+    "metadata": {
+      "icon": "🔒",
+      "tags": [
+        "security",
+        "audit"
+      ]
+    }
+  }
+]

@@ -448,3 +448,26 @@ export interface MCPTemplate {
   icon: string;
   config: MCPServerConfig;
 }
+
+// Plugin Marketplace types
+export type PluginCategory = 'agent' | 'command' | 'hook' | 'setting' | 'mcp' | 'stack';
+export type PluginSource = 'davila7' | 'aitmpl' | 'custom';
+
+export interface PluginMetadata {
+  icon?: string;
+  tags: string[];
+  dependencies?: string[];
+}
+
+export interface Plugin {
+  id: string;
+  name: string;
+  description: string;
+  category: PluginCategory;
+  version: string;
+  author: string;
+  repository?: string;
+  installed: boolean;
+  source: PluginSource;
+  metadata: PluginMetadata;
+}

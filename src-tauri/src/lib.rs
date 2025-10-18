@@ -18,6 +18,7 @@ mod git;
 mod mcp;
 mod notifications;
 mod native_terminal;
+mod plugins;
 mod preferences;
 mod preview;
 mod slash_commands;
@@ -370,7 +371,12 @@ pub fn run() {
             mcp::save_mcp_server,
             mcp::delete_mcp_server,
             mcp::get_mcp_templates,
-            mcp::test_mcp_connection
+            mcp::test_mcp_connection,
+            plugins::list_available_plugins,
+            plugins::list_installed_plugins,
+            plugins::install_plugin,
+            plugins::uninstall_plugin,
+            plugins::search_plugins
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

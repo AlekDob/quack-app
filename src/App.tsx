@@ -18,6 +18,7 @@ import SidePanel from "./components/SidePanel";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer from "./components/FilePreviewDrawer";
 import GitPanel from "./components/GitPanel";
+import PluginsPanel from "./components/PluginsPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
@@ -298,6 +299,7 @@ function App() {
   const [formattingPreview, setFormattingPreview] = useState(false);
   const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
+  const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
@@ -3071,6 +3073,13 @@ function App() {
                 </button>
               <button
                 type="button"
+                className={`git-tab-button ${showPluginsDrawer ? "active" : ""}`}
+                onClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
+              >
+                Plugins
+              </button>
+              <button
+                type="button"
                 className="git-tab-button"
                 onClick={handleOpenPreviewDrawer}
               >
@@ -3301,6 +3310,26 @@ function App() {
               onCommit={handleCommit}
               committing={committing}
             />
+          </div>
+        </div>
+
+        <div className={`git-drawer ${showPluginsDrawer ? "open" : ""}`}>
+          <div
+            className="git-drawer-backdrop"
+            onClick={() => setShowPluginsDrawer(false)}
+          />
+          <div className="git-drawer-panel">
+            <header className="git-drawer-header">
+              <h2>Plugin Marketplace</h2>
+              <button
+                type="button"
+                className="git-drawer-close"
+                onClick={() => setShowPluginsDrawer(false)}
+              >
+                ✕
+              </button>
+            </header>
+            <PluginsPanel workingDir={explorerPath || undefined} />
           </div>
         </div>
 
