@@ -40,6 +40,8 @@ export default function AgentsPanel({
   onRefresh,
 }: AgentsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [globalExpanded, setGlobalExpanded] = useState(true);
+  const [projectExpanded, setProjectExpanded] = useState(true);
 
   const getAgentColor = (colorName: string): string => {
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
@@ -215,36 +217,21 @@ export default function AgentsPanel({
             {/* Global Agents Section */}
             {filteredAgents.filter((a) => a.scope === "global").length > 0 && (
               <div>
-                <div
-                  className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
-                  style={{
-                    color: "rgba(255, 255, 255, 0.7)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setGlobalExpanded(!globalExpanded)}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mr-2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="2" y1="12" x2="22" y2="12" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  <span className={`transition-transform ${globalExpanded ? 'rotate-90' : ''}`}>▶</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
                   </svg>
-                  Global Agents
-                  <span
-                    className="ml-2 text-xs opacity-60"
-                    style={{ fontWeight: "normal" }}
-                  >
-                    (from ~/.claude/agents/)
-                  </span>
-                </div>
+                  <span>Global Agents</span>
+                  <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "global").length}</span>
+                </button>
+                {globalExpanded && (
                 <div className="space-y-2">
                   {filteredAgents
                     .filter((a) => a.scope === "global")
@@ -376,40 +363,26 @@ export default function AgentsPanel({
                       </div>
                     ))}
                 </div>
+                )}
               </div>
             )}
 
             {/* Project Agents Section */}
             {filteredAgents.filter((a) => a.scope === "project").length > 0 && (
               <div>
-                <div
-                  className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
-                  style={{
-                    color: "rgba(255, 255, 255, 0.7)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setProjectExpanded(!projectExpanded)}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mr-2"
-                  >
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  <span className={`transition-transform ${projectExpanded ? 'rotate-90' : ''}`}>▶</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                   </svg>
-                  Project Agents
-                  <span
-                    className="ml-2 text-xs opacity-60"
-                    style={{ fontWeight: "normal" }}
-                  >
-                    (from .claude/agents/)
-                  </span>
-                </div>
+                  <span>Project Agents</span>
+                  <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "project").length}</span>
+                </button>
+                {projectExpanded && (
                 <div className="space-y-2">
                   {filteredAgents
                     .filter((a) => a.scope === "project")
@@ -541,6 +514,7 @@ export default function AgentsPanel({
                       </div>
                     ))}
                 </div>
+                )}
               </div>
             )}
           </div>
