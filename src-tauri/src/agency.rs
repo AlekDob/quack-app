@@ -66,6 +66,46 @@ pub fn save_agent(
         .map_err(|err| err.to_string())
 }
 
+/// Save only the content of an agent file (preserving frontmatter)
+#[tauri::command]
+pub fn save_agent_content(
+    name: String,
+    content: String,
+    model: String,
+    color: String,
+    description: String,
+    scope: Option<String>,
+    working_dir: Option<String>,
+) -> Result<String, String> {
+    save_agent_content_impl(name, content, model, color, description, scope, working_dir)
+        .map_err(|err| err.to_string())
+}
+
+/// Delete an agent file
+#[tauri::command]
+pub fn delete_agent(
+    name: String,
+    scope: Option<String>,
+    working_dir: Option<String>,
+) -> Result<(), String> {
+    delete_agent_impl(name, scope, working_dir).map_err(|err| err.to_string())
+}
+
+/// Create a new agent file
+#[tauri::command]
+pub fn create_agent(
+    name: String,
+    description: String,
+    model: String,
+    color: String,
+    content: String,
+    scope: String,
+    working_dir: Option<String>,
+) -> Result<String, String> {
+    create_agent_impl(name, description, model, color, content, scope, working_dir)
+        .map_err(|err| err.to_string())
+}
+
 fn list_agents_impl(working_dir: Option<String>) -> Result<Vec<AgentInfo>> {
     let mut agents = Vec::new();
 
@@ -383,4 +423,194 @@ fn create_agents_directory_impl(working_dir: Option<String>) -> Result<String> {
 
     log::info!("Created agents directory at: {:?}", agents_dir);
     Ok(agents_dir.to_string_lossy().to_string())
+}
+
+fn save_agent_content_impl(
+    name: String,
+    new_content: String,
+    new_model: String,
+    new_color: String,
+    new_description: String,
+    scope: Option<String>,
+    working_dir: Option<String>,
+) -> Result<String> {
+    // Determine which directory to use based on scope
+    let agents_dir = match scope.as_deref() {
+        Some("global") => {
+            // Global agents: ~/.claude/agents/
+            let home = std::env::var("HOME")
+                .context("Unable to get HOME directory")?;
+            PathBuf::from(home).join(".claude").join("agents")
+        }
+        _ => {
+            // Project agents: .claude/agents/ in working directory
+            let current = if let Some(dir) = working_dir {
+                PathBuf::from(dir)
+            } else {
+                std::env::current_dir()
+                    .context("Unable to get current working directory")?
+            };
+            current.join(".claude").join("agents")
+        }
+    };
+
+    if !agents_dir.exists() {
+        return Err(anyhow!(
+            "Agents directory not found at: {:?}",
+            agents_dir
+        ));
+    }
+
+    let agent_path = agents_dir.join(format!("{}.md", name));
+
+    if !agent_path.exists() {
+        return Err(anyhow!(
+            "Agent file not found: {} in {:?}",
+            name,
+            agents_dir
+        ));
+    }
+
+    // Read existing file to preserve name from frontmatter
+    let existing_content = fs::read_to_string(&agent_path)
+        .with_context(|| format!("Unable to read agent file: {:?}", agent_path))?;
+
+    let (frontmatter, _) = extract_frontmatter(&existing_content)?;
+
+    // Build the new file content with preserved name, updated description/model/color
+    let mut file_content = String::new();
+    file_content.push_str("---\n");
+    file_content.push_str(&format!("name: {}\n", frontmatter.name));
+    if !new_description.is_empty() {
+        file_content.push_str(&format!("description: {}\n", new_description));
+    }
+    file_content.push_str(&format!("model: {}\n", new_model));
+    file_content.push_str(&format!("color: {}\n", new_color));
+    file_content.push_str("---\n");
+    file_content.push_str("\n");
+    file_content.push_str(&new_content);
+
+    // Write the file
+    fs::write(&agent_path, file_content)
+        .with_context(|| format!("Failed to write agent file: {:?}", agent_path))?;
+
+    log::info!("Agent content saved successfully: {}", name);
+    Ok(agent_path.to_string_lossy().to_string())
+}
+
+fn delete_agent_impl(
+    name: String,
+    scope: Option<String>,
+    working_dir: Option<String>,
+) -> Result<()> {
+    // Determine which directory to use based on scope
+    let agents_dir = match scope.as_deref() {
+        Some("global") => {
+            // Global agents: ~/.claude/agents/
+            let home = std::env::var("HOME")
+                .context("Unable to get HOME directory")?;
+            PathBuf::from(home).join(".claude").join("agents")
+        }
+        _ => {
+            // Project agents: .claude/agents/ in working directory
+            let current = if let Some(dir) = working_dir {
+                PathBuf::from(dir)
+            } else {
+                std::env::current_dir()
+                    .context("Unable to get current working directory")?
+            };
+            current.join(".claude").join("agents")
+        }
+    };
+
+    if !agents_dir.exists() {
+        return Err(anyhow!(
+            "Agents directory not found at: {:?}",
+            agents_dir
+        ));
+    }
+
+    let agent_path = agents_dir.join(format!("{}.md", name));
+
+    if !agent_path.exists() {
+        return Err(anyhow!(
+            "Agent file not found: {} in {:?}",
+            name,
+            agents_dir
+        ));
+    }
+
+    // Delete the agent file
+    fs::remove_file(&agent_path)
+        .with_context(|| format!("Failed to delete agent file: {:?}", agent_path))?;
+
+    log::info!("Agent deleted successfully: {}", name);
+    Ok(())
+}
+
+fn create_agent_impl(
+    name: String,
+    description: String,
+    model: String,
+    color: String,
+    content: String,
+    scope: String,
+    working_dir: Option<String>,
+) -> Result<String> {
+    // Determine which directory to use based on scope
+    let agents_dir = match scope.as_str() {
+        "global" => {
+            // Global agents: ~/.claude/agents/
+            let home = std::env::var("HOME")
+                .context("Unable to get HOME directory")?;
+            PathBuf::from(home).join(".claude").join("agents")
+        }
+        _ => {
+            // Project agents: .claude/agents/ in working directory
+            let current = if let Some(dir) = working_dir {
+                PathBuf::from(dir)
+            } else {
+                std::env::current_dir()
+                    .context("Unable to get current working directory")?
+            };
+            current.join(".claude").join("agents")
+        }
+    };
+
+    // Create agents directory if it doesn't exist
+    if !agents_dir.exists() {
+        fs::create_dir_all(&agents_dir)
+            .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
+    }
+
+    let agent_path = agents_dir.join(format!("{}.md", name));
+
+    // Check if agent already exists
+    if agent_path.exists() {
+        return Err(anyhow!(
+            "Agent '{}' already exists in {:?}",
+            name,
+            agents_dir
+        ));
+    }
+
+    // Build the new file content with frontmatter
+    let mut file_content = String::new();
+    file_content.push_str("---\n");
+    file_content.push_str(&format!("name: {}\n", name));
+    if !description.is_empty() {
+        file_content.push_str(&format!("description: {}\n", description));
+    }
+    file_content.push_str(&format!("model: {}\n", model));
+    file_content.push_str(&format!("color: {}\n", color));
+    file_content.push_str("---\n");
+    file_content.push_str("\n");
+    file_content.push_str(&content);
+
+    // Write the file
+    fs::write(&agent_path, file_content)
+        .with_context(|| format!("Failed to write agent file: {:?}", agent_path))?;
+
+    log::info!("Agent created successfully: {} at {:?}", name, agent_path);
+    Ok(agent_path.to_string_lossy().to_string())
 }

@@ -43,13 +43,13 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     };
 
     const processInlineMarkdown = (line: string): string => {
-      // Bold: **text** or __text__
+      // Bold: **text** or __text__ (must be processed BEFORE italic)
       line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       line = line.replace(/__(.+?)__/g, '<strong>$1</strong>');
 
-      // Italic: *text* or _text_
-      line = line.replace(/\*(.+?)\*/g, '<em>$1</em>');
-      line = line.replace(/_(.+?)_/g, '<em>$1</em>');
+      // Italic: *text* or _text_ (after bold to avoid conflicts)
+      line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+      line = line.replace(/(?<!_)_([^_]+)_(?!_)/g, '<em>$1</em>');
 
       // Inline code: `code`
       line = line.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');

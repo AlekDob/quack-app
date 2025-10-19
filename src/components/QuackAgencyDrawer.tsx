@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { AgentInfo, AgentDetails } from "../types";
 import QuackAgencySetupWizard from "./QuackAgencySetupWizard";
+import MarkdownText from "./MarkdownText";
+import CodeEditor from "./CodeEditor";
 
 interface QuackAgencyDrawerProps {
   open: boolean;
@@ -65,6 +67,30 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  delete: (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M8 3.5V2h4v1.5M3 5.5h14M16 5.5l-.5 10a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L4 5.5M8 8v6M12 8v6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  plus: (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M10 4v12M4 10h12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 export default function QuackAgencyDrawer({
@@ -84,16 +110,20 @@ export default function QuackAgencyDrawer({
   const [isSaving, setIsSaving] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Track previous open state to detect drawer opening
   const prevOpenRef = useRef(open);
 
-  // Edit form state
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editModel, setEditModel] = useState("");
-  const [editColor, setEditColor] = useState("");
+  // Edit form state (content, model, color, description)
   const [editContent, setEditContent] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
+  const [editModel, setEditModel] = useState("");
+  const [originalModel, setOriginalModel] = useState("");
+  const [editColor, setEditColor] = useState("");
+  const [originalColor, setOriginalColor] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [originalDescription, setOriginalDescription] = useState("");
 
   const handleAgentClick = (agent: AgentInfo) => {
     setIsAnimating(true);
@@ -108,30 +138,65 @@ export default function QuackAgencyDrawer({
     setIsEditing(false);
   };
 
-  const handleBackToList = () => {
-    setIsAnimating(true);
-
-    setTimeout(() => {
-      setViewMode("list");
-      setIsEditing(false);
-      setIsAnimating(false);
-    }, 200);
-  };
-
   const handleEdit = () => {
     if (!selectedAgent) return;
 
-    // Populate edit fields with current values
-    setEditName(selectedAgent.name);
-    setEditDescription(selectedAgent.description);
-    setEditModel(selectedAgent.model);
-    setEditColor(selectedAgent.color);
+    // Populate edit form with current values
     setEditContent(selectedAgent.content);
+    setOriginalContent(selectedAgent.content);
+    setEditModel(selectedAgent.model);
+    setOriginalModel(selectedAgent.model);
+    setEditColor(selectedAgent.color);
+    setOriginalColor(selectedAgent.color);
+    setEditDescription(selectedAgent.description);
+    setOriginalDescription(selectedAgent.description);
+    setHasChanges(false);
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
+    setHasChanges(false);
+  };
+
+  const handleContentChange = (newContent: string) => {
+    setEditContent(newContent);
+    setHasChanges(
+      newContent !== originalContent ||
+      editModel !== originalModel ||
+      editColor !== originalColor ||
+      editDescription !== originalDescription
+    );
+  };
+
+  const handleModelChange = (newModel: string) => {
+    setEditModel(newModel);
+    setHasChanges(
+      editContent !== originalContent ||
+      newModel !== originalModel ||
+      editColor !== originalColor ||
+      editDescription !== originalDescription
+    );
+  };
+
+  const handleColorChange = (newColor: string) => {
+    setEditColor(newColor);
+    setHasChanges(
+      editContent !== originalContent ||
+      editModel !== originalModel ||
+      newColor !== originalColor ||
+      editDescription !== originalDescription
+    );
+  };
+
+  const handleDescriptionChange = (newDescription: string) => {
+    setEditDescription(newDescription);
+    setHasChanges(
+      editContent !== originalContent ||
+      editModel !== originalModel ||
+      editColor !== originalColor ||
+      newDescription !== originalDescription
+    );
   };
 
   const handleSave = async () => {
@@ -140,44 +205,69 @@ export default function QuackAgencyDrawer({
     setIsSaving(true);
 
     try {
-      await invoke("save_agent", {
-        originalName: selectedAgent.name,
-        name: editName,
-        description: editDescription,
+      // Get the scope from the selected agent
+      const scope = agents.find(a => a.name === selectedAgent.name)?.scope || "project";
+
+      // Save content, model, color, and description
+      await invoke("save_agent_content", {
+        name: selectedAgent.name,
+        content: editContent,
         model: editModel,
         color: editColor,
-        content: editContent,
+        description: editDescription,
+        scope: scope,
         workingDir,
       });
 
       // Refresh agents list
       onRefresh();
 
-      // Update selected agent
-      const updatedAgent: AgentDetails = {
-        name: editName,
-        description: editDescription,
-        model: editModel,
-        color: editColor,
-        scope: selectedAgent.scope,
-        file_path: selectedAgent.file_path,
-        content: editContent,
-      };
-
       // Exit edit mode
       setIsEditing(false);
+      setHasChanges(false);
 
-      // If name changed, re-select the agent
-      if (editName !== selectedAgent.name) {
-        setTimeout(() => {
-          onSelectAgent(updatedAgent);
-        }, 100);
-      }
+      // Re-select the agent to refresh the view
+      setTimeout(() => {
+        const agentToSelect = agents.find(a => a.name === selectedAgent.name);
+        if (agentToSelect) {
+          onSelectAgent(agentToSelect);
+        }
+      }, 100);
     } catch (error) {
       console.error("Failed to save agent:", error);
       alert(`Failed to save agent: ${error}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedAgent) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the agent "${selectedAgent.name.replace(/-/g, " ")}"?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const scope = agents.find(a => a.name === selectedAgent.name)?.scope || "project";
+
+      await invoke("delete_agent", {
+        name: selectedAgent.name,
+        scope: scope,
+        workingDir,
+      });
+
+      // Refresh agents list
+      onRefresh();
+
+      // Return to list view
+      setViewMode("list");
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to delete agent:", error);
+      alert(`Failed to delete agent: ${error}`);
     }
   };
 
@@ -213,15 +303,26 @@ export default function QuackAgencyDrawer({
           <div className="quack-agency-header-content">
             <h2>Quack Agency</h2>
             {viewMode === "detail" && selectedAgent && !isEditing && (
-              <button
-                type="button"
-                className="quack-agency-edit-header-button"
-                onClick={handleEdit}
-                title="Edit Agent"
-              >
-                {icons.edit}
-                <span>Edit</span>
-              </button>
+              <div className="quack-agency-header-buttons">
+                <button
+                  type="button"
+                  className="quack-agency-edit-header-button"
+                  onClick={handleEdit}
+                  title="Edit Agent"
+                >
+                  {icons.edit}
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  className="quack-agency-delete-header-button"
+                  onClick={handleDelete}
+                  title="Delete Agent"
+                >
+                  {icons.delete}
+                  <span>Delete</span>
+                </button>
+              </div>
             )}
           </div>
           <button
@@ -351,130 +452,135 @@ export default function QuackAgencyDrawer({
 
           {!loading && !error && viewMode === "detail" && selectedAgent && (
             <div className={`quack-agency-detail ${isAnimating ? "animating" : ""}`}>
-              <button
-                type="button"
-                className="quack-agency-back-button"
-                onClick={handleBackToList}
-              >
-                {icons.back}
-                <span>Back to list</span>
-              </button>
-
               {!isEditing ? (
                 <>
                   <div className="agent-detail-header">
+                    {/* Avatar small on the left */}
+                    <img
+                      src="/agent-setting.jpeg"
+                      alt="Agent avatar"
+                      className="agent-detail-avatar-small"
+                    />
+
                     <div className="agent-detail-title">
-                      <span
-                        className="agent-detail-badge"
-                        style={{
-                          backgroundColor: getAgentColor(selectedAgent.color),
-                        }}
-                      />
-                      <h3>{selectedAgent.name.replace(/-/g, " ")}</h3>
-                    </div>
-                    <div className="agent-detail-meta">
-                      <span className="agent-detail-model">
-                        Model: {selectedAgent.model}
-                      </span>
+                      <div className="agent-detail-title-row">
+                        <span
+                          className="agent-detail-badge"
+                          style={{
+                            backgroundColor: getAgentColor(selectedAgent.color),
+                          }}
+                        />
+                        <h3>{selectedAgent.name.replace(/-/g, " ")}</h3>
+                      </div>
+                      <div className="agent-detail-meta">
+                        <span className="agent-detail-model">
+                          Model: {selectedAgent.model}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="agent-detail-description">
-                    <strong>Description:</strong>
-                    <p>{selectedAgent.description}</p>
-                  </div>
-
-                  <div className="agent-detail-content">
-                    <strong>Full Documentation:</strong>
-                    <div className="agent-detail-markdown">
-                      {selectedAgent.content.split("\n").map((line, index) => (
-                        <p key={index}>{line}</p>
-                      ))}
-                    </div>
+                  {/* Unified Markdown Content */}
+                  <div className="agent-detail-markdown-viewer">
+                    <MarkdownText>
+                      {selectedAgent.description
+                        ? `**${selectedAgent.description}**\n\n${selectedAgent.content}`
+                        : selectedAgent.content}
+                    </MarkdownText>
                   </div>
                 </>
               ) : (
                 <div className="agent-edit-form">
-                  <h3>Edit Agent</h3>
-
-                  <div className="agent-form-field">
-                    <label htmlFor="agent-name">Name</label>
-                    <input
-                      id="agent-name"
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      placeholder="Agent name"
-                    />
-                  </div>
-
-                  <div className="agent-form-field">
-                    <label htmlFor="agent-description">Description</label>
-                    <textarea
-                      id="agent-description"
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      placeholder="Agent description"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="agent-form-field">
-                    <label htmlFor="agent-model">Model</label>
-                    <input
-                      id="agent-model"
-                      type="text"
-                      value={editModel}
-                      onChange={(e) => setEditModel(e.target.value)}
-                      placeholder="e.g., claude-sonnet-4-5-20250929"
-                    />
-                  </div>
-
-                  <div className="agent-form-field">
-                    <label htmlFor="agent-color">Color</label>
-                    <div className="agent-color-selector">
-                      {Object.keys(AGENT_COLORS).map((colorName) => (
+                  <div className="agent-edit-header">
+                    <h3>Edit Agent Documentation</h3>
+                    <div className="agent-edit-actions">
+                      <button
+                        type="button"
+                        className="agent-cancel-button"
+                        onClick={handleCancelEdit}
+                        disabled={isSaving}
+                      >
+                        <span>Cancel</span>
+                      </button>
+                      {hasChanges && (
                         <button
-                          key={colorName}
                           type="button"
-                          className={`agent-color-option ${editColor === colorName ? "selected" : ""}`}
-                          style={{ backgroundColor: AGENT_COLORS[colorName] }}
-                          onClick={() => setEditColor(colorName)}
-                          title={colorName}
-                        />
-                      ))}
+                          className="agent-save-button"
+                          onClick={handleSave}
+                          disabled={isSaving}
+                        >
+                          {icons.save}
+                          <span>{isSaving ? "Saving..." : "Save"}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="agent-form-field">
-                    <label htmlFor="agent-content">Full Documentation</label>
-                    <textarea
-                      id="agent-content"
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      placeholder="Agent documentation content"
-                      rows={12}
-                    />
+                  {/* Description, Model and Color Selectors */}
+                  <div className="agent-edit-fields">
+                    <div className="agent-edit-field">
+                      <label className="agent-edit-label">Description:</label>
+                      <input
+                        type="text"
+                        className="agent-description-input"
+                        value={editDescription}
+                        onChange={(e) => handleDescriptionChange(e.target.value)}
+                        disabled={isSaving}
+                        placeholder="Agent description..."
+                      />
+                    </div>
+
+                    <div className="agent-edit-field">
+                      <label className="agent-edit-label">Model:</label>
+                      <select
+                        className="agent-model-select"
+                        value={editModel}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        disabled={isSaving}
+                      >
+                        <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
+                        <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
+                        <option value="claude-sonnet-3-5-20241022">claude-sonnet-3-5-20241022</option>
+                        <option value="claude-haiku-3-5-20241022">claude-haiku-3-5-20241022</option>
+                      </select>
+                    </div>
+
+                    <div className="agent-edit-field">
+                      <label className="agent-edit-label">Color:</label>
+                      <div className="agent-color-picker-container">
+                        <div className="agent-color-swatches">
+                          {Object.entries(AGENT_COLORS).map(([colorName, colorValue]) => (
+                            <button
+                              key={colorName}
+                              type="button"
+                              className={`agent-color-swatch ${editColor.toLowerCase() === colorName ? "selected" : ""}`}
+                              style={{ backgroundColor: colorValue }}
+                              onClick={() => handleColorChange(colorName)}
+                              disabled={isSaving}
+                              title={colorName}
+                            />
+                          ))}
+                        </div>
+                        <input
+                          type="color"
+                          className="agent-custom-color-picker"
+                          value={AGENT_COLORS[editColor.toLowerCase()] || editColor}
+                          onChange={(e) => handleColorChange(e.target.value)}
+                          disabled={isSaving}
+                          title="Custom color"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="agent-form-actions">
-                    <button
-                      type="button"
-                      className="agent-cancel-button"
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
-                    >
-                      <span>Cancel</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="agent-save-button"
-                      onClick={handleSave}
-                      disabled={isSaving}
-                    >
-                      {icons.save}
-                      <span>{isSaving ? "Saving..." : "Save Agent"}</span>
-                    </button>
+                  <div className="agent-markdown-editor">
+                    <CodeEditor
+                      content={editContent}
+                      filename={`${selectedAgent.name}.md`}
+                      onChange={handleContentChange}
+                      language="markdown"
+                      readOnly={false}
+                    />
                   </div>
                 </div>
               )}

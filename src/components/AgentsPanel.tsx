@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
 import { getAgentAvatar } from "../utils/agentAvatars";
+import { NewAgentModal } from "./NewAgentModal";
 
 /**
  * Agents Panel - Inline list view of agents
@@ -17,6 +18,14 @@ interface AgentsPanelProps {
   onSelectAgent: (agent: AgentInfo) => void;
   onUseAgent: (agent: AgentInfo) => void;
   onRefresh: () => void;
+  onCreateAgent: (
+    name: string,
+    description: string,
+    model: string,
+    color: string,
+    content: string,
+    scope: 'global' | 'project'
+  ) => Promise<void>;
 }
 
 // Agent color mapping
@@ -38,10 +47,12 @@ export default function AgentsPanel({
   onSelectAgent,
   onUseAgent,
   onRefresh,
+  onCreateAgent,
 }: AgentsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const getAgentColor = (colorName: string): string => {
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
@@ -52,6 +63,19 @@ export default function AgentsPanel({
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleCreateAgent = async (
+    name: string,
+    description: string,
+    model: string,
+    color: string,
+    content: string,
+    scope: 'global' | 'project'
+  ) => {
+    await onCreateAgent(name, description, model, color, content, scope);
+    setModalOpen(false);
+    onRefresh();
+  };
 
   return (
     <div className="agents-panel">
@@ -88,30 +112,39 @@ export default function AgentsPanel({
         </button>
       </div>
 
-      {/* Search */}
+      {/* Search and New Agent Button */}
       {agents.length > 0 && (
         <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}>
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search agents..."
-              className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
-            />
-            <svg
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          <div className="flex items-center gap-2 mb-0">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search agents..."
+                className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
               />
-            </svg>
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="px-3 py-2 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200 whitespace-nowrap"
+            >
+              + New Agent
+            </button>
           </div>
         </div>
       )}
@@ -541,6 +574,13 @@ export default function AgentsPanel({
           )}
         </div>
       )}
+
+      {/* New Agent Modal */}
+      <NewAgentModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={handleCreateAgent}
+      />
     </div>
   );
 }

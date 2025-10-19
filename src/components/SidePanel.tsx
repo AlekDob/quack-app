@@ -165,6 +165,14 @@ interface SidePanelProps {
   onSelectAgent: (agent: AgentInfo) => void;
   onUseAgent: (agent: AgentInfo) => void;
   onRefreshAgents: () => void;
+  onCreateAgent: (
+    name: string,
+    description: string,
+    model: string,
+    color: string,
+    content: string,
+    scope: 'global' | 'project'
+  ) => Promise<void>;
 
   // Commands props
   onUseCommand: (command: SlashCommand) => void;
@@ -214,6 +222,7 @@ export default function SidePanel({
   onSelectAgent,
   onUseAgent,
   onRefreshAgents,
+  onCreateAgent,
 
   // Commands
   onUseCommand,
@@ -345,6 +354,7 @@ export default function SidePanel({
               onSelectAgent={onSelectAgent}
               onUseAgent={onUseAgent}
               onRefresh={onRefreshAgents}
+              onCreateAgent={onCreateAgent}
             />
           </div>
         )}

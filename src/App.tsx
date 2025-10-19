@@ -1607,6 +1607,42 @@ function App() {
     });
   }, []);
 
+  const handleCreateAgent = useCallback(async (
+    name: string,
+    description: string,
+    model: string,
+    color: string,
+    content: string,
+    scope: 'global' | 'project'
+  ) => {
+    if (!tauriAvailable) {
+      return;
+    }
+    try {
+      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      await invoke<string>("create_agent", {
+        name,
+        description,
+        model,
+        color,
+        content,
+        scope,
+        workingDir,
+      });
+      toast.success(`Agent created successfully: ${name}`, {
+        description: `New agent "${name}" has been added`,
+        duration: 3000,
+      });
+      // Refresh agents list
+      void loadAgents();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create agent: ${message}`, {
+        duration: 5000,
+      });
+    }
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath, loadAgents]);
+
   const handleUseCommand = useCallback((command: { name: string; description: string }) => {
     // Set pending slash command to trigger insertion in ChatInput
     setPendingSlashCommand(command);
@@ -3164,6 +3200,7 @@ function App() {
           onSelectAgent={handleSelectAgent}
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
+          onCreateAgent={handleCreateAgent}
           // Commands props
           onUseCommand={handleUseCommand}
           // Terminal props
