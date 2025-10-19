@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
 import { getAgentAvatar } from "../utils/agentAvatars";
 
@@ -38,9 +39,17 @@ export default function AgentsPanel({
   onUseAgent,
   onRefresh,
 }: AgentsPanelProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
   const getAgentColor = (colorName: string): string => {
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
   };
+
+  // Filter agents based on search query
+  const filteredAgents = agents.filter(agent =>
+    agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    agent.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="agents-panel">
@@ -76,6 +85,34 @@ export default function AgentsPanel({
           {loading ? "..." : "↻ Refresh"}
         </button>
       </div>
+
+      {/* Search */}
+      {agents.length > 0 && (
+        <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search agents..."
+              className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+            />
+            <svg
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
@@ -155,10 +192,28 @@ export default function AgentsPanel({
           </div>
         )}
 
-        {!loading && !error && agents.length > 0 && (
+        {!loading && !error && agents.length > 0 && filteredAgents.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <div className="text-5xl mb-4">🔍</div>
+            <h4
+              className="text-base font-semibold mb-2"
+              style={{ color: "rgba(255, 255, 255, 0.7)" }}
+            >
+              No agents match your search
+            </h4>
+            <p
+              className="text-sm"
+              style={{ color: "rgba(255, 255, 255, 0.5)" }}
+            >
+              Try a different search term
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && filteredAgents.length > 0 && (
           <div className="p-3 space-y-4">
             {/* Global Agents Section */}
-            {agents.filter((a) => a.scope === "global").length > 0 && (
+            {filteredAgents.filter((a) => a.scope === "global").length > 0 && (
               <div>
                 <div
                   className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
@@ -191,7 +246,7 @@ export default function AgentsPanel({
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {agents
+                  {filteredAgents
                     .filter((a) => a.scope === "global")
                     .map((agent) => (
                       <div
@@ -325,7 +380,7 @@ export default function AgentsPanel({
             )}
 
             {/* Project Agents Section */}
-            {agents.filter((a) => a.scope === "project").length > 0 && (
+            {filteredAgents.filter((a) => a.scope === "project").length > 0 && (
               <div>
                 <div
                   className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
@@ -356,7 +411,7 @@ export default function AgentsPanel({
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {agents
+                  {filteredAgents
                     .filter((a) => a.scope === "project")
                     .map((agent) => (
                       <div
@@ -501,7 +556,15 @@ export default function AgentsPanel({
             color: "rgba(255, 255, 255, 0.5)",
           }}
         >
-          {agents.length} {agents.length === 1 ? "agent" : "agents"} active
+          {searchQuery.trim() ? (
+            <>
+              {filteredAgents.length} of {agents.length} {agents.length === 1 ? "agent" : "agents"}
+            </>
+          ) : (
+            <>
+              {agents.length} {agents.length === 1 ? "agent" : "agents"} active
+            </>
+          )}
         </div>
       )}
     </div>

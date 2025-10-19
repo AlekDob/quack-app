@@ -12,6 +12,7 @@ pub struct SlashCommand {
     pub is_builtin: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<Vec<String>>,
+    pub scope: String, // "global" | "project" | "builtin"
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,6 +31,7 @@ fn get_builtin_commands() -> Vec<SlashCommand> {
             content: "Display help information for Claude Code".to_string(),
             is_builtin: true,
             parameters: None,
+            scope: "builtin".to_string(),
         },
         SlashCommand {
             name: "clear".to_string(),
@@ -37,6 +39,7 @@ fn get_builtin_commands() -> Vec<SlashCommand> {
             content: "Clear all messages from the current session".to_string(),
             is_builtin: true,
             parameters: None,
+            scope: "builtin".to_string(),
         },
         SlashCommand {
             name: "reset".to_string(),
@@ -44,6 +47,7 @@ fn get_builtin_commands() -> Vec<SlashCommand> {
             content: "Start a new conversation from scratch".to_string(),
             is_builtin: true,
             parameters: None,
+            scope: "builtin".to_string(),
         },
         SlashCommand {
             name: "model".to_string(),
@@ -51,6 +55,7 @@ fn get_builtin_commands() -> Vec<SlashCommand> {
             content: "Change the active Claude model (sonnet, opus, etc.)".to_string(),
             is_builtin: true,
             parameters: Some(vec!["model_name".to_string()]),
+            scope: "builtin".to_string(),
         },
         SlashCommand {
             name: "session".to_string(),
@@ -58,6 +63,7 @@ fn get_builtin_commands() -> Vec<SlashCommand> {
             content: "Create, save, or load conversation sessions".to_string(),
             is_builtin: true,
             parameters: Some(vec!["action".to_string(), "session_id".to_string()]),
+            scope: "builtin".to_string(),
         },
     ]
 }
@@ -115,17 +121,12 @@ fn parse_frontmatter(content: &str) -> (Option<String>, Option<String>, Option<V
     (name, description, parameters, body)
 }
 
-/// List all slash commands (builtin + custom)
-#[tauri::command]
-pub fn list_slash_commands(_app: AppHandle, base_path: String) -> Result<SlashCommandsResponse, String> {
-    let builtin = get_builtin_commands();
-    let mut custom = Vec::new();
+/// Read commands from a directory with specified scope
+fn read_commands_from_dir(dir_path: &PathBuf, scope: &str) -> Vec<SlashCommand> {
+    let mut commands = Vec::new();
 
-    // Read custom commands from .claude/commands/
-    let commands_dir = PathBuf::from(&base_path).join(".claude/commands");
-
-    if commands_dir.exists() && commands_dir.is_dir() {
-        match fs::read_dir(&commands_dir) {
+    if dir_path.exists() && dir_path.is_dir() {
+        match fs::read_dir(dir_path) {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
@@ -144,22 +145,59 @@ pub fn list_slash_commands(_app: AppHandle, base_path: String) -> Result<SlashCo
                                 "Custom command".to_string()
                             });
 
-                            custom.push(SlashCommand {
+                            commands.push(SlashCommand {
                                 name: cmd_name,
                                 description: cmd_description,
                                 content: body,
                                 is_builtin: false,
                                 parameters,
+                                scope: scope.to_string(),
                             });
                         }
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Failed to read commands directory: {}", e);
+                eprintln!("🦆 Failed to read commands directory {:?}: {}", dir_path, e);
             }
         }
     }
+
+    commands
+}
+
+/// List all slash commands (builtin + global + project custom)
+#[tauri::command]
+pub fn list_slash_commands(_app: AppHandle, base_path: String) -> Result<SlashCommandsResponse, String> {
+    let builtin = get_builtin_commands();
+    let mut custom = Vec::new();
+
+    // 1. Read GLOBAL commands from ~/.claude/commands/
+    if let Ok(home_dir) = std::env::var("HOME") {
+        let global_commands_dir = PathBuf::from(home_dir).join(".claude/commands");
+        log::info!("🦆 Reading global commands from: {:?}", global_commands_dir);
+        let global_commands = read_commands_from_dir(&global_commands_dir, "global");
+        log::info!("🦆 Found {} global commands", global_commands.len());
+        custom.extend(global_commands);
+    }
+
+    // 2. Read PROJECT commands from .claude/commands/
+    let project_commands_dir = PathBuf::from(&base_path).join(".claude/commands");
+    log::info!("🦆 Reading project commands from: {:?}", project_commands_dir);
+    let project_commands = read_commands_from_dir(&project_commands_dir, "project");
+    log::info!("🦆 Found {} project commands", project_commands.len());
+    custom.extend(project_commands);
+
+    // Sort commands: builtin first, then global, then project, then alphabetically by name
+    custom.sort_by(|a, b| {
+        match (a.scope.as_str(), b.scope.as_str()) {
+            ("global", "project") => std::cmp::Ordering::Less,
+            ("project", "global") => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        }
+    });
+
+    log::info!("🦆 Total custom commands: {}", custom.len());
 
     Ok(SlashCommandsResponse { builtin, custom })
 }

@@ -7,6 +7,7 @@ export interface SlashCommand {
   content: string;
   isBuiltin: boolean;
   parameters?: string[];
+  scope: string; // "global" | "project" | "builtin"
 }
 
 export interface SlashCommandsResponse {

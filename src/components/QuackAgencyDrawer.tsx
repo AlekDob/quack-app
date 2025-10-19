@@ -159,6 +159,7 @@ export default function QuackAgencyDrawer({
         description: editDescription,
         model: editModel,
         color: editColor,
+        scope: selectedAgent.scope,
         file_path: selectedAgent.file_path,
         content: editContent,
       };

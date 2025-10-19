@@ -38,7 +38,12 @@ export function CommandsList({
   onDeleteCommand
 }: CommandsListProps) {
   const [builtinExpanded, setBuiltinExpanded] = useState(true);
-  const [customExpanded, setCustomExpanded] = useState(true);
+  const [globalExpanded, setGlobalExpanded] = useState(true);
+  const [projectExpanded, setProjectExpanded] = useState(true);
+
+  // Group custom commands by scope
+  const globalCommands = customCommands.filter(cmd => cmd.scope === 'global');
+  const projectCommands = customCommands.filter(cmd => cmd.scope === 'project');
 
   return (
     <div className="flex flex-col gap-4">
@@ -69,23 +74,26 @@ export function CommandsList({
         )}
       </div>
 
-      {/* Custom Commands Section */}
-      <div>
-        <SectionHeader
-          title="Custom Commands"
-          count={customCommands.length}
-          expanded={customExpanded}
-          onToggle={() => setCustomExpanded(!customExpanded)}
-        />
-        {customExpanded && (
-          <div className="mt-2 space-y-1">
-            {customCommands.length === 0 ? (
-              <div className="px-3 py-6 text-center">
-                <p className="text-xs text-white/30">No custom commands yet</p>
-                <p className="text-xs text-white/20 mt-1">Click "New Command" to create one</p>
-              </div>
-            ) : (
-              customCommands.map((command) => (
+      {/* Global Commands Section */}
+      {globalCommands.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setGlobalExpanded(!globalExpanded)}
+            className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <span className={`transition-transform ${globalExpanded ? 'rotate-90' : ''}`}>▶</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" strokeWidth={2} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
+            </svg>
+            <span>Global Commands</span>
+            <span className="ml-auto text-xs text-white/40">{globalCommands.length}</span>
+          </button>
+          {globalExpanded && (
+            <div className="mt-2 space-y-1">
+              {globalCommands.map((command) => (
                 <CommandItem
                   key={command.name}
                   command={command}
@@ -93,11 +101,42 @@ export function CommandsList({
                   onEdit={onEditCommand}
                   onDelete={onDeleteCommand}
                 />
-              ))
-            )}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Project Commands Section */}
+      {projectCommands.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setProjectExpanded(!projectExpanded)}
+            className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <span className={`transition-transform ${projectExpanded ? 'rotate-90' : ''}`}>▶</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span>Project Commands</span>
+            <span className="ml-auto text-xs text-white/40">{projectCommands.length}</span>
+          </button>
+          {projectExpanded && (
+            <div className="mt-2 space-y-1">
+              {projectCommands.map((command) => (
+                <CommandItem
+                  key={command.name}
+                  command={command}
+                  onUse={onUseCommand}
+                  onEdit={onEditCommand}
+                  onDelete={onDeleteCommand}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
