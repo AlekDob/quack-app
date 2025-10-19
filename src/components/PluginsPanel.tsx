@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Plugin, PluginCategory } from "../types";
+import type { Plugin, PluginCategory, PluginScope } from "../types";
 import PluginCard from "./PluginCard";
 
 /**
@@ -78,9 +78,9 @@ export default function PluginsPanel({
   );
 
   const handleInstall = useCallback(
-    async (plugin: Plugin) => {
+    async (plugin: Plugin, scope: PluginScope) => {
       try {
-        await invoke("install_plugin", { plugin, workingDir });
+        await invoke("install_plugin", { plugin, scope, workingDir });
         await loadPlugins();
         onRefresh?.();
       } catch (err) {
@@ -238,7 +238,7 @@ export default function PluginsPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-12">
         {loading && (
           <div
             className="flex items-center justify-center py-8 text-sm"
@@ -293,7 +293,7 @@ export default function PluginsPanel({
         )}
 
         {!loading && !error && filteredPlugins.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-8">
             {filteredPlugins.map((plugin) => (
               <PluginCard
                 key={plugin.id}
@@ -432,7 +432,7 @@ export default function PluginsPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    handleInstall(selectedPlugin);
+                    handleInstall(selectedPlugin, "project");
                     setSelectedPlugin(null);
                   }}
                   className="flex-1 px-4 py-2 rounded text-sm font-medium transition-all duration-200"
@@ -442,7 +442,7 @@ export default function PluginsPanel({
                     color: "#f28c52",
                   }}
                 >
-                  Install
+                  Install (Project)
                 </button>
               )}
             </div>

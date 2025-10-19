@@ -1632,6 +1632,30 @@ function App() {
     void loadAgents();
   }, [loadAgents, tauriAvailable]);
 
+  // Listen for plugin installation/uninstallation events and refresh agents list
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    const unlistenInstalled = listen('plugin-installed', (event) => {
+      console.log('🦆 Plugin installed event received:', event.payload);
+      void loadAgents();
+      toast.success('Plugin installed successfully! Agents list updated.');
+    });
+
+    const unlistenUninstalled = listen('plugin-uninstalled', () => {
+      console.log('🦆 Plugin uninstalled event received');
+      void loadAgents();
+      toast.info('Plugin uninstalled. Agents list updated.');
+    });
+
+    return () => {
+      void unlistenInstalled.then((fn) => fn());
+      void unlistenUninstalled.then((fn) => fn());
+    };
+  }, [loadAgents, tauriAvailable]);
+
   // Helper to apply background (image or gradient)
   const applyBackground = useCallback((backgroundName: string) => {
     // Check if it's a gradient

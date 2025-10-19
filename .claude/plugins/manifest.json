@@ -16,5 +16,60 @@
         "audit"
       ]
     }
+  },
+  {
+    "id": "documentation-generator",
+    "name": "Documentation Generator",
+    "description": "Automated documentation generation with API docs, technical writing, and content management",
+    "category": "agent",
+    "version": "1.0.0",
+    "author": "Daniel Avila",
+    "repository": "https://github.com/davila7/claude-code-templates",
+    "installed": true,
+    "source": "davila7",
+    "metadata": {
+      "tags": []
+    },
+    "scope": "project"
+  },
+  {
+    "id": "git-workflow",
+    "name": "Git Workflow",
+    "description": "Git workflow automation: feature, release, and hotfix commands with git specialists",
+    "category": "agent",
+    "version": "1.0.0",
+    "author": "Daniel Avila",
+    "repository": "https://github.com/davila7/claude-code-templates",
+    "installed": true,
+    "source": "davila7",
+    "metadata": {
+      "tags": [
+        "git",
+        "workflow",
+        "automation"
+      ]
+    },
+    "scope": "project"
+  },
+  {
+    "id": "testing-suite",
+    "name": "Testing Suite",
+    "description": "Comprehensive testing toolkit with E2E, unit, integration, and visual testing automation",
+    "category": "agent",
+    "version": "1.0.0",
+    "author": "Daniel Avila",
+    "repository": "https://github.com/davila7/claude-code-templates",
+    "installed": true,
+    "source": "davila7",
+    "metadata": {
+      "tags": [
+        "testing",
+        "qa",
+        "e2e",
+        "automation",
+        "quality"
+      ]
+    },
+    "scope": "project"
   }
 ]

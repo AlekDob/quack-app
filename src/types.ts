@@ -450,8 +450,9 @@ export interface MCPTemplate {
 }
 
 // Plugin Marketplace types
-export type PluginCategory = 'agent' | 'command' | 'hook' | 'setting' | 'mcp' | 'stack';
+export type PluginCategory = 'agent' | 'command' | 'hook' | 'setting' | 'mcp' | 'stack' | 'skill';
 export type PluginSource = 'davila7' | 'aitmpl' | 'custom';
+export type PluginScope = 'global' | 'project';
 
 export interface PluginMetadata {
   icon?: string;
@@ -470,4 +471,5 @@ export interface Plugin {
   installed: boolean;
   source: PluginSource;
   metadata: PluginMetadata;
+  scope?: PluginScope;
 }

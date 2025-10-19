@@ -1,4 +1,5 @@
-import type { Plugin } from "../types";
+import { useState } from "react";
+import type { Plugin, PluginScope } from "../types";
 
 /**
  * Plugin Card - Individual plugin display with install/uninstall actions
@@ -6,7 +7,7 @@ import type { Plugin } from "../types";
 
 interface PluginCardProps {
   plugin: Plugin;
-  onInstall: (plugin: Plugin) => void;
+  onInstall: (plugin: Plugin, scope: PluginScope) => void;
   onUninstall: (pluginId: string) => void;
   onViewDetails: (plugin: Plugin) => void;
 }
@@ -17,6 +18,9 @@ export default function PluginCard({
   onUninstall,
   onViewDetails,
 }: PluginCardProps) {
+  const [selectedScope, setSelectedScope] = useState<PluginScope>("project");
+  const [isInstalling, setIsInstalling] = useState(false);
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case "agent":
@@ -174,13 +178,25 @@ export default function PluginCard({
           </div>
           {plugin.installed && (
             <div
-              className="px-2 py-1 rounded text-xs font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
               style={{
                 background: "rgba(16, 185, 129, 0.1)",
                 color: "#10b981",
               }}
             >
-              Installed
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              {plugin.scope ? `Installed (${plugin.scope === 'global' ? 'Global' : 'Project'})` : 'Installed'}
             </div>
           )}
         </div>
@@ -234,11 +250,11 @@ export default function PluginCard({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         <button
           type="button"
           onClick={() => onViewDetails(plugin)}
-          className="flex-1 px-3 py-2 rounded text-sm font-medium transition-all duration-200"
+          className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all duration-200"
           style={{
             background: "rgba(255, 255, 255, 0.05)",
             border: "1px solid rgba(255, 255, 255, 0.12)",
@@ -257,7 +273,7 @@ export default function PluginCard({
           <button
             type="button"
             onClick={() => onUninstall(plugin.id)}
-            className="flex-1 px-3 py-2 rounded text-sm font-medium transition-all duration-200"
+            className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all duration-200"
             style={{
               background: "rgba(239, 68, 68, 0.1)",
               border: "1px solid rgba(239, 68, 68, 0.3)",
@@ -275,26 +291,73 @@ export default function PluginCard({
             Uninstall
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => onInstall(plugin)}
-            className="flex-1 px-3 py-2 rounded text-sm font-medium transition-all duration-200"
-            style={{
-              background: "rgba(242, 140, 82, 0.1)",
-              border: "1px solid rgba(242, 140, 82, 0.3)",
-              color: "#f28c52",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
-              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
-              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
-            }}
-          >
-            Install
-          </button>
+          <div className="flex-1 flex gap-1.5">
+            <select
+              value={selectedScope}
+              onChange={(e) => setSelectedScope(e.target.value as PluginScope)}
+              className="px-1.5 py-1.5 rounded text-xs font-medium transition-all duration-200"
+              style={{
+                background: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "rgba(255, 255, 255, 0.9)",
+                cursor: "pointer",
+                minWidth: "70px",
+              }}
+              disabled={isInstalling}
+            >
+              <option value="project">Project</option>
+              <option value="global">Global</option>
+            </select>
+            <button
+              type="button"
+              onClick={async () => {
+                setIsInstalling(true);
+                try {
+                  await onInstall(plugin, selectedScope);
+                } finally {
+                  setIsInstalling(false);
+                }
+              }}
+              disabled={isInstalling}
+              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+              style={{
+                background: "rgba(242, 140, 82, 0.1)",
+                border: "1px solid rgba(242, 140, 82, 0.3)",
+                color: "#f28c52",
+              }}
+              onMouseEnter={(e) => {
+                if (!isInstalling) {
+                  e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
+                e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
+              }}
+            >
+              {isInstalling ? (
+                <>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="animate-spin"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  Installing...
+                </>
+              ) : (
+                "Install"
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>
