@@ -10,6 +10,7 @@ pub struct AgentInfo {
     pub model: String,
     pub color: String,
     pub file_path: String,
+    pub scope: String, // "global" or "project"
 }
 
 #[derive(Serialize, Clone)]
@@ -30,8 +31,12 @@ pub fn list_agents(working_dir: Option<String>) -> Result<Vec<AgentInfo>, String
 
 /// Get detailed information about a specific agent
 #[tauri::command]
-pub fn get_agent_details(name: String, working_dir: Option<String>) -> Result<AgentDetails, String> {
-    get_agent_details_impl(name, working_dir).map_err(|err| err.to_string())
+pub fn get_agent_details(
+    name: String,
+    working_dir: Option<String>,
+    scope: Option<String>,
+) -> Result<AgentDetails, String> {
+    get_agent_details_impl(name, working_dir, scope).map_err(|err| err.to_string())
 }
 
 /// Check if .claude/agents directory exists in the given path
@@ -62,60 +67,36 @@ pub fn save_agent(
 }
 
 fn list_agents_impl(working_dir: Option<String>) -> Result<Vec<AgentInfo>> {
-    // Use provided working directory or current directory
-    let current = if let Some(dir) = working_dir {
-        PathBuf::from(dir)
-    } else {
-        std::env::current_dir()
-            .context("Unable to get current working directory")?
-    };
-
-    // Look for .claude/agents ONLY in the specified directory (don't traverse up)
-    let agents_dir = current.join(".claude").join("agents");
-
-    if !agents_dir.exists() {
-        return Err(anyhow!("Agents directory not found in: {:?}. Please setup Quack Agency for this project.", current));
-    }
-
-    log::info!("Found agents directory at: {:?}", agents_dir);
-
     let mut agents = Vec::new();
 
-    // Read all .md files in agents directory
-    let entries = fs::read_dir(&agents_dir)
-        .with_context(|| format!("Unable to read agents directory: {:?}", agents_dir))?;
+    // 1. Read GLOBAL agents from ~/.claude/agents/
+    if let Ok(home_dir) = std::env::var("HOME") {
+        let global_agents_dir = PathBuf::from(home_dir).join(".claude").join("agents");
 
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
+        if global_agents_dir.exists() {
+            log::info!("Found global agents directory at: {:?}", global_agents_dir);
 
-        log::info!("Checking file: {:?}", path);
+            if let Ok(entries) = fs::read_dir(&global_agents_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
 
-        // Only process .md files
-        if path.extension().and_then(|s| s.to_str()) == Some("md") {
-            log::info!("Processing .md file: {:?}", path);
-            match parse_agent_file(&path) {
-                Ok(agent_info) => {
-                    log::info!("Successfully parsed agent: {}", agent_info.name);
-                    agents.push(agent_info);
-                }
-                Err(e) => {
-                    log::error!("Failed to parse agent file {:?}: {}", path, e);
+                    if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                        match parse_agent_file_with_scope(&path, "global") {
+                            Ok(agent_info) => {
+                                log::info!("Successfully parsed global agent: {}", agent_info.name);
+                                agents.push(agent_info);
+                            }
+                            Err(e) => {
+                                log::error!("Failed to parse global agent file {:?}: {}", path, e);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    log::info!("Total agents found: {}", agents.len());
-
-    // Sort agents alphabetically by name
-    agents.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-    Ok(agents)
-}
-
-fn get_agent_details_impl(name: String, working_dir: Option<String>) -> Result<AgentDetails> {
-    // Use provided working directory or current directory
+    // 2. Read PROJECT agents from .claude/agents/
     let current = if let Some(dir) = working_dir {
         PathBuf::from(dir)
     } else {
@@ -123,18 +104,88 @@ fn get_agent_details_impl(name: String, working_dir: Option<String>) -> Result<A
             .context("Unable to get current working directory")?
     };
 
-    // Look for .claude/agents ONLY in the specified directory (don't traverse up)
-    let agents_dir = current.join(".claude").join("agents");
+    let project_agents_dir = current.join(".claude").join("agents");
+
+    if project_agents_dir.exists() {
+        log::info!("Found project agents directory at: {:?}", project_agents_dir);
+
+        let entries = fs::read_dir(&project_agents_dir)
+            .with_context(|| format!("Unable to read agents directory: {:?}", project_agents_dir))?;
+
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+
+            // Only process .md files
+            if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                match parse_agent_file_with_scope(&path, "project") {
+                    Ok(agent_info) => {
+                        log::info!("Successfully parsed project agent: {}", agent_info.name);
+                        agents.push(agent_info);
+                    }
+                    Err(e) => {
+                        log::error!("Failed to parse project agent file {:?}: {}", path, e);
+                    }
+                }
+            }
+        }
+    }
+
+    log::info!("Total agents found: {} (global + project)", agents.len());
+
+    // Sort agents: first by scope (global first), then by name
+    agents.sort_by(|a, b| {
+        match (a.scope.as_str(), b.scope.as_str()) {
+            ("global", "project") => std::cmp::Ordering::Less,
+            ("project", "global") => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        }
+    });
+
+    Ok(agents)
+}
+
+fn get_agent_details_impl(
+    name: String,
+    working_dir: Option<String>,
+    scope: Option<String>,
+) -> Result<AgentDetails> {
+    // Determine which directory to use based on scope
+    let agents_dir = match scope.as_deref() {
+        Some("global") => {
+            // Global agents: ~/.claude/agents/
+            let home = std::env::var("HOME")
+                .context("Unable to get HOME directory")?;
+            PathBuf::from(home).join(".claude").join("agents")
+        }
+        _ => {
+            // Project agents: .claude/agents/ in working directory
+            let current = if let Some(dir) = working_dir {
+                PathBuf::from(dir)
+            } else {
+                std::env::current_dir()
+                    .context("Unable to get current working directory")?
+            };
+            current.join(".claude").join("agents")
+        }
+    };
 
     if !agents_dir.exists() {
-        return Err(anyhow!("Agents directory not found in: {:?}. Please setup Quack Agency for this project.", current));
+        return Err(anyhow!(
+            "Agents directory not found at: {:?}",
+            agents_dir
+        ));
     }
 
     // Try to find the agent file
     let agent_path = agents_dir.join(format!("{}.md", name));
 
     if !agent_path.exists() {
-        return Err(anyhow!("Agent file not found: {}", name));
+        return Err(anyhow!(
+            "Agent file not found: {} in {:?}",
+            name,
+            agents_dir
+        ));
     }
 
     parse_agent_file_with_content(&agent_path)
@@ -142,6 +193,11 @@ fn get_agent_details_impl(name: String, working_dir: Option<String>) -> Result<A
 
 /// Parse agent file and extract frontmatter + content
 fn parse_agent_file(path: &PathBuf) -> Result<AgentInfo> {
+    parse_agent_file_with_scope(path, "project")
+}
+
+/// Parse agent file with scope
+fn parse_agent_file_with_scope(path: &PathBuf, scope: &str) -> Result<AgentInfo> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Unable to read agent file: {:?}", path))?;
 
@@ -153,6 +209,7 @@ fn parse_agent_file(path: &PathBuf) -> Result<AgentInfo> {
         model: frontmatter.model,
         color: frontmatter.color,
         file_path: path.to_string_lossy().to_string(),
+        scope: scope.to_string(),
     })
 }
 

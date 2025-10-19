@@ -183,6 +183,7 @@ export interface AgentInfo {
   model: string;
   color: string;
   file_path: string;
+  scope: string; // "global" or "project"
 }
 
 export interface AgentDetails extends AgentInfo {

@@ -156,134 +156,338 @@ export default function AgentsPanel({
         )}
 
         {!loading && !error && agents.length > 0 && (
-          <div className="p-3 space-y-2">
-            {agents.map((agent) => (
-              <div
-                key={agent.name}
-                className="rounded-lg border transition-all duration-200"
-                style={{
-                  background: "rgba(12, 16, 24, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                {/* Main clickable area for details */}
-                <button
-                  type="button"
-                  onClick={() => onSelectAgent(agent)}
-                  className="w-full flex items-center gap-3 p-3 text-left transition-all duration-200"
-                  onMouseEnter={(e) => {
-                    const parent = e.currentTarget.parentElement;
-                    if (parent) {
-                      parent.style.background = "rgba(242, 140, 82, 0.08)";
-                      parent.style.borderColor = "rgba(242, 140, 82, 0.2)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const parent = e.currentTarget.parentElement;
-                    if (parent) {
-                      parent.style.background = "rgba(12, 16, 24, 0.6)";
-                      parent.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                    }
+          <div className="p-3 space-y-4">
+            {/* Global Agents Section */}
+            {agents.filter((a) => a.scope === "global").length > 0 && (
+              <div>
+                <div
+                  className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
+                  style={{
+                    color: "rgba(255, 255, 255, 0.7)",
+                    background: "rgba(255, 255, 255, 0.05)",
                   }}
                 >
-                  {/* Agent Avatar or Badge */}
-                  {(() => {
-                    const avatarPath = getAgentAvatar(agent.name);
-                    if (avatarPath) {
-                      return (
-                        <div
-                          className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.05)",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-2"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  Global Agents
+                  <span
+                    className="ml-2 text-xs opacity-60"
+                    style={{ fontWeight: "normal" }}
+                  >
+                    (from ~/.claude/agents/)
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {agents
+                    .filter((a) => a.scope === "global")
+                    .map((agent) => (
+                      <div
+                        key={agent.name}
+                        className="rounded-lg border transition-all duration-200"
+                        style={{
+                          background: "rgba(12, 16, 24, 0.6)",
+                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                        }}
+                      >
+                        {/* Main clickable area for details */}
+                        <button
+                          type="button"
+                          onClick={() => onSelectAgent(agent)}
+                          className="w-full flex items-center gap-3 p-3 text-left transition-all duration-200"
+                          onMouseEnter={(e) => {
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              parent.style.background = "rgba(242, 140, 82, 0.08)";
+                              parent.style.borderColor = "rgba(242, 140, 82, 0.2)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              parent.style.background = "rgba(12, 16, 24, 0.6)";
+                              parent.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                            }
                           }}
                         >
-                          <img
-                            src={avatarPath}
-                            alt={agent.name}
+                          {/* Agent Avatar or Badge */}
+                          {(() => {
+                            const avatarPath = getAgentAvatar(agent.name);
+                            if (avatarPath) {
+                              return (
+                                <div
+                                  className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
+                                  style={{
+                                    background: "rgba(255, 255, 255, 0.05)",
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                  }}
+                                >
+                                  <img
+                                    src={avatarPath}
+                                    alt={agent.name}
+                                    style={{
+                                      width: "110%",
+                                      height: "110%",
+                                      objectFit: "contain",
+                                      objectPosition: "center",
+                                      transform: "scale(1.1)",
+                                    }}
+                                  />
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{
+                                  backgroundColor: getAgentColor(agent.color),
+                                }}
+                              />
+                            );
+                          })()}
+
+                          {/* Agent Info */}
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className="text-sm font-medium mb-0.5 truncate"
+                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
+                            >
+                              {agent.name.replace(/-/g, " ")}
+                            </div>
+                            <div
+                              className="text-xs truncate"
+                              style={{ color: "rgba(255, 255, 255, 0.5)" }}
+                            >
+                              {agent.description.substring(0, 60)}
+                              {agent.description.length > 60 ? "..." : ""}
+                            </div>
+                          </div>
+
+                          {/* Model badge */}
+                          <div
+                            className="px-2 py-1 rounded text-xs font-mono flex-shrink-0"
                             style={{
-                              width: "110%",
-                              height: "110%",
-                              objectFit: "contain",
-                              objectPosition: "center",
-                              transform: "scale(1.1)",
+                              background: "rgba(242, 140, 82, 0.1)",
+                              color: "#f28c52",
                             }}
-                          />
+                          >
+                            {agent.model}
+                          </div>
+                        </button>
+
+                        {/* Use this agent button */}
+                        <div
+                          className="px-3 pb-3"
+                          style={{
+                            borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUseAgent(agent);
+                            }}
+                            className="w-full px-3 py-1.5 mt-2 rounded text-xs font-medium transition-all duration-200"
+                            style={{
+                              background: "rgba(242, 140, 82, 0.1)",
+                              border: "1px solid rgba(242, 140, 82, 0.3)",
+                              color: "#f28c52",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
+                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
+                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
+                            }}
+                          >
+                            Use this agent
+                          </button>
                         </div>
-                      );
-                    }
-                    return (
-                      <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{
-                          backgroundColor: getAgentColor(agent.color),
-                        }}
-                      />
-                    );
-                  })()}
-
-                  {/* Agent Info */}
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className="text-sm font-medium mb-0.5 truncate"
-                      style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                    >
-                      {agent.name.replace(/-/g, " ")}
-                    </div>
-                    <div
-                      className="text-xs truncate"
-                      style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                    >
-                      {agent.description.substring(0, 60)}
-                      {agent.description.length > 60 ? "..." : ""}
-                    </div>
-                  </div>
-
-                  {/* Model badge */}
-                  <div
-                    className="px-2 py-1 rounded text-xs font-mono flex-shrink-0"
-                    style={{
-                      background: "rgba(242, 140, 82, 0.1)",
-                      color: "#f28c52",
-                    }}
-                  >
-                    {agent.model}
-                  </div>
-                </button>
-
-                {/* Use this agent button */}
-                <div
-                  className="px-3 pb-3"
-                  style={{
-                    borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUseAgent(agent);
-                    }}
-                    className="w-full px-3 py-1.5 mt-2 rounded text-xs font-medium transition-all duration-200"
-                    style={{
-                      background: "rgba(242, 140, 82, 0.1)",
-                      border: "1px solid rgba(242, 140, 82, 0.3)",
-                      color: "#f28c52",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
-                      e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
-                      e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
-                    }}
-                  >
-                    Use this agent
-                  </button>
+                      </div>
+                    ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Project Agents Section */}
+            {agents.filter((a) => a.scope === "project").length > 0 && (
+              <div>
+                <div
+                  className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
+                  style={{
+                    color: "rgba(255, 255, 255, 0.7)",
+                    background: "rgba(255, 255, 255, 0.05)",
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-2"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Project Agents
+                  <span
+                    className="ml-2 text-xs opacity-60"
+                    style={{ fontWeight: "normal" }}
+                  >
+                    (from .claude/agents/)
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {agents
+                    .filter((a) => a.scope === "project")
+                    .map((agent) => (
+                      <div
+                        key={agent.name}
+                        className="rounded-lg border transition-all duration-200"
+                        style={{
+                          background: "rgba(12, 16, 24, 0.6)",
+                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                        }}
+                      >
+                        {/* Main clickable area for details */}
+                        <button
+                          type="button"
+                          onClick={() => onSelectAgent(agent)}
+                          className="w-full flex items-center gap-3 p-3 text-left transition-all duration-200"
+                          onMouseEnter={(e) => {
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              parent.style.background = "rgba(242, 140, 82, 0.08)";
+                              parent.style.borderColor = "rgba(242, 140, 82, 0.2)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              parent.style.background = "rgba(12, 16, 24, 0.6)";
+                              parent.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                            }
+                          }}
+                        >
+                          {/* Agent Avatar or Badge */}
+                          {(() => {
+                            const avatarPath = getAgentAvatar(agent.name);
+                            if (avatarPath) {
+                              return (
+                                <div
+                                  className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
+                                  style={{
+                                    background: "rgba(255, 255, 255, 0.05)",
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                  }}
+                                >
+                                  <img
+                                    src={avatarPath}
+                                    alt={agent.name}
+                                    style={{
+                                      width: "110%",
+                                      height: "110%",
+                                      objectFit: "contain",
+                                      objectPosition: "center",
+                                      transform: "scale(1.1)",
+                                    }}
+                                  />
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{
+                                  backgroundColor: getAgentColor(agent.color),
+                                }}
+                              />
+                            );
+                          })()}
+
+                          {/* Agent Info */}
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className="text-sm font-medium mb-0.5 truncate"
+                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
+                            >
+                              {agent.name.replace(/-/g, " ")}
+                            </div>
+                            <div
+                              className="text-xs truncate"
+                              style={{ color: "rgba(255, 255, 255, 0.5)" }}
+                            >
+                              {agent.description.substring(0, 60)}
+                              {agent.description.length > 60 ? "..." : ""}
+                            </div>
+                          </div>
+
+                          {/* Model badge */}
+                          <div
+                            className="px-2 py-1 rounded text-xs font-mono flex-shrink-0"
+                            style={{
+                              background: "rgba(242, 140, 82, 0.1)",
+                              color: "#f28c52",
+                            }}
+                          >
+                            {agent.model}
+                          </div>
+                        </button>
+
+                        {/* Use this agent button */}
+                        <div
+                          className="px-3 pb-3"
+                          style={{
+                            borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUseAgent(agent);
+                            }}
+                            className="w-full px-3 py-1.5 mt-2 rounded text-xs font-medium transition-all duration-200"
+                            style={{
+                              background: "rgba(242, 140, 82, 0.1)",
+                              border: "1px solid rgba(242, 140, 82, 0.3)",
+                              color: "#f28c52",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
+                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
+                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
+                            }}
+                          >
+                            Use this agent
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

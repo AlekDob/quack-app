@@ -1587,6 +1587,7 @@ function App() {
       const details = await invoke<AgentDetails>("get_agent_details", {
         name: agentInfo.name,
         workingDir,
+        scope: agentInfo.scope, // ← AGGIUNTO: passa lo scope (global/project)
       });
       setSelectedAgent(details);
       setShowQuackAgencyDrawer(true); // Apre il drawer quando si seleziona un agent
