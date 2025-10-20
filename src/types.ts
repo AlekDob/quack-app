@@ -77,6 +77,16 @@ export interface DirectoryListing {
   entries: DirectoryEntry[];
 }
 
+export interface SearchResult {
+  name: string;
+  path: string;
+  relative_path: string;
+  is_dir: boolean;
+  is_symlink: boolean;
+  score: number;
+  depth: number;
+}
+
 export interface GitStatusEntry {
   path: string;
   original_path: string | null;

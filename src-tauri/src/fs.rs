@@ -5,6 +5,9 @@ use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
 use serde::Serialize;
 use uuid::Uuid;
+use walkdir::WalkDir;
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 #[derive(Serialize)]
 pub struct DirectoryEntry {
@@ -25,6 +28,17 @@ pub struct FileMetadata {
     pub size: u64,
     pub is_dir: bool,
     pub is_symlink: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub struct SearchResult {
+    pub name: String,
+    pub path: String,
+    pub relative_path: String,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+    pub score: i64,
+    pub depth: usize,
 }
 
 const MAX_PREVIEW_SIZE: u64 = 3 * 1024 * 1024;
@@ -67,6 +81,16 @@ pub fn save_clipboard_file(
     suggested_name: Option<String>,
 ) -> Result<String, String> {
     save_clipboard_file_impl(data_base64, extension, suggested_name).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn search_files_recursive(
+    path: String,
+    query: String,
+    max_results: Option<usize>,
+    max_depth: Option<usize>,
+) -> Result<Vec<SearchResult>, String> {
+    search_files_recursive_impl(path, query, max_results, max_depth).map_err(|err| err.to_string())
 }
 
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
@@ -270,4 +294,114 @@ fn sanitize_filename(name: &str) -> Option<String> {
     } else {
         Some(sanitized.replace(' ', "_"))
     }
+}
+
+fn search_files_recursive_impl(
+    path: String,
+    query: String,
+    max_results: Option<usize>,
+    max_depth: Option<usize>,
+) -> Result<Vec<SearchResult>> {
+    let root_path = PathBuf::from(&path);
+    if !root_path.exists() {
+        return Err(anyhow!("Path does not exist: {:?}", root_path));
+    }
+
+    let canonical_root = fs::canonicalize(&root_path)
+        .with_context(|| format!("Cannot canonicalize path {:?}", root_path))?;
+
+    let matcher = SkimMatcherV2::default();
+    let max_results = max_results.unwrap_or(100);
+    let max_depth = max_depth.unwrap_or(10);
+
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    // Skip common directories that should be ignored
+    let ignore_dirs = [
+        "node_modules",
+        ".git",
+        "target",
+        "dist",
+        "build",
+        ".next",
+        ".cache",
+        "coverage",
+        ".turbo",
+        ".vscode",
+        ".idea",
+    ];
+
+    let walker = WalkDir::new(&canonical_root)
+        .max_depth(max_depth)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            // Skip ignored directories
+            if entry.file_type().is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    return !ignore_dirs.contains(&name);
+                }
+            }
+            true
+        });
+
+    for entry in walker {
+        // Early exit if we have enough results
+        if results.len() >= max_results {
+            break;
+        }
+
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue, // Skip entries we can't read
+        };
+
+        let file_path = entry.path();
+
+        // Skip the root directory itself
+        if file_path == canonical_root {
+            continue;
+        }
+
+        let file_name = match entry.file_name().to_str() {
+            Some(name) => name,
+            None => continue, // Skip non-UTF8 filenames
+        };
+
+        // Calculate relative path from root
+        let relative_path = match file_path.strip_prefix(&canonical_root) {
+            Ok(rel) => rel.to_string_lossy().to_string(),
+            Err(_) => continue,
+        };
+
+        // Fuzzy match against query
+        if let Some(score) = matcher.fuzzy_match(file_name, &query) {
+            let metadata = match fs::symlink_metadata(file_path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            let depth = file_path.components().count() - canonical_root.components().count();
+
+            results.push(SearchResult {
+                name: file_name.to_string(),
+                path: file_path.to_string_lossy().to_string(),
+                relative_path,
+                is_dir: metadata.is_dir(),
+                is_symlink: metadata.is_symlink(),
+                score,
+                depth,
+            });
+        }
+    }
+
+    // Sort by score (highest first), then by depth (shallowest first)
+    results.sort_by(|a, b| {
+        b.score.cmp(&a.score).then_with(|| a.depth.cmp(&b.depth))
+    });
+
+    // Truncate to max_results
+    results.truncate(max_results);
+
+    Ok(results)
 }

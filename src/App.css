@@ -2942,6 +2942,19 @@ button.directory-chooser:hover {
   text-align: left;
 }
 
+/* Search result path hint */
+.explorer-path-hint {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: #8791a5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  font-family: "JetBrains Mono", "SF Mono", "Monaco", "Fira Code", monospace;
+  opacity: 0.7;
+}
+
 /* File modificati - statistiche Git */
 .explorer-git-stats {
   display: flex;
@@ -2972,6 +2985,17 @@ button.directory-chooser:hover {
 /* Sezioni dell'explorer */
 .explorer-section {
   display: block;
+}
+
+.search-results-section {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.search-results-section .explorer-section-title {
+  font-weight: 600;
+  color: #fbbf24;
 }
 
 .modified-files-section {

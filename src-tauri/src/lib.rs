@@ -321,6 +321,7 @@ pub fn run() {
             fs::stat_file,
             fs::read_file_preview,
             fs::save_clipboard_file,
+            fs::search_files_recursive,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,

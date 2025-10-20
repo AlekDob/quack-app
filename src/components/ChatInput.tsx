@@ -12,7 +12,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getAgentAvatar } from '../utils/agentAvatars';
 import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
 import duckAvatar from '../../images/duck.png';
-import type { ChatAttachment, AgentInfo } from '../types';
+import type { ChatAttachment, AgentInfo, SearchResult } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
 import './ChatInput.css';
@@ -94,6 +94,11 @@ export default function ChatInput({
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [atMentionStart, setAtMentionStart] = useState(-1);
 
+  // File search state for @ mentions
+  const [fileSearchResults, setFileSearchResults] = useState<SearchResult[]>([]);
+  const [isSearchingFiles, setIsSearchingFiles] = useState(false);
+  const fileSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Slash command autocomplete state
   const [showCommandAutocomplete, setShowCommandAutocomplete] = useState(false);
   const [commandFilter, setCommandFilter] = useState('');
@@ -122,6 +127,49 @@ export default function ChatInput({
       return name.includes(filter) || description.includes(filter);
     });
   }, [agents, showAgentAutocomplete, agentFilter]);
+
+  // Search files when @ mention is active
+  useEffect(() => {
+    // Clear previous timeout
+    if (fileSearchTimeoutRef.current) {
+      clearTimeout(fileSearchTimeoutRef.current);
+    }
+
+    // Only search files if @ autocomplete is showing and we have basePath
+    if (!showAgentAutocomplete || !basePath || !agentFilter.trim()) {
+      setFileSearchResults([]);
+      setIsSearchingFiles(false);
+      return;
+    }
+
+    // Debounce file search by 300ms
+    fileSearchTimeoutRef.current = setTimeout(() => {
+      setIsSearchingFiles(true);
+
+      invoke<SearchResult[]>("search_files_recursive", {
+        path: basePath,
+        query: agentFilter.trim(),
+        maxResults: 20, // Limit to 20 files for @ mentions
+        maxDepth: 10,
+      })
+        .then((results) => {
+          setFileSearchResults(results);
+        })
+        .catch((err) => {
+          console.error("File search error:", err);
+          setFileSearchResults([]);
+        })
+        .finally(() => {
+          setIsSearchingFiles(false);
+        });
+    }, 300);
+
+    return () => {
+      if (fileSearchTimeoutRef.current) {
+        clearTimeout(fileSearchTimeoutRef.current);
+      }
+    };
+  }, [showAgentAutocomplete, agentFilter, basePath]);
 
   // Filter commands based on current / command
   const filteredCommands = useMemo(() => {
@@ -216,6 +264,33 @@ export default function ChatInput({
     setShowAgentAutocomplete(false);
     setAgentFilter('');
     setAtMentionStart(-1);
+    setFileSearchResults([]);
+
+    // Focus back to textarea and position cursor after mention
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeMention.length + fullMention.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [input, atMentionStart, setInput]);
+
+  // Select a file from autocomplete
+  const selectFile = useCallback((file: SearchResult) => {
+    if (!textareaRef.current) return;
+
+    // Replace the partial @mention with file path (use relative_path for cleaner display)
+    const beforeMention = input.substring(0, atMentionStart);
+    const afterMention = input.substring(textareaRef.current.selectionStart);
+    const fullMention = `@file:${file.relative_path} `;
+    const newInput = beforeMention + fullMention + afterMention;
+
+    setInput(newInput);
+    setShowAgentAutocomplete(false);
+    setAgentFilter('');
+    setAtMentionStart(-1);
+    setFileSearchResults([]);
 
     // Focus back to textarea and position cursor after mention
     setTimeout(() => {
@@ -612,29 +687,42 @@ export default function ChatInput({
       }
     }
 
-    // Handle agent autocomplete navigation
-    if (showAgentAutocomplete && filteredAgents.length > 0) {
+    // Handle agent/file autocomplete navigation
+    if (showAgentAutocomplete && (filteredAgents.length > 0 || fileSearchResults.length > 0)) {
+      const totalItems = filteredAgents.length + fileSearchResults.length;
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedAgentIndex((prev) => (prev + 1) % filteredAgents.length);
+        setSelectedAgentIndex((prev) => (prev + 1) % totalItems);
         return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedAgentIndex((prev) => (prev - 1 + filteredAgents.length) % filteredAgents.length);
+        setSelectedAgentIndex((prev) => (prev - 1 + totalItems) % totalItems);
         return;
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        const selectedAgent = filteredAgents[selectedAgentIndex];
-        if (selectedAgent) {
-          selectAgent(selectedAgent);
+
+        // Check if selecting an agent or a file
+        if (selectedAgentIndex < filteredAgents.length) {
+          const selectedAgent = filteredAgents[selectedAgentIndex];
+          if (selectedAgent) {
+            selectAgent(selectedAgent);
+          }
+        } else {
+          const fileIndex = selectedAgentIndex - filteredAgents.length;
+          const selectedFile = fileSearchResults[fileIndex];
+          if (selectedFile) {
+            selectFile(selectedFile);
+          }
         }
         return;
       }
       if (e.key === 'Escape') {
         e.preventDefault();
         setShowAgentAutocomplete(false);
+        setFileSearchResults([]);
         return;
       }
     }
@@ -690,34 +778,95 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Agent autocomplete dropdown */}
-      {showAgentAutocomplete && filteredAgents.length > 0 && (
-        <div className="agent-autocomplete">
-          {filteredAgents.map((agent, index) => (
-            <button
-              key={agent.name}
-              type="button"
-              className={`agent-autocomplete-item ${selectedAgentIndex === index ? 'selected' : ''}`}
-              onClick={() => selectAgent(agent)}
-              onMouseEnter={() => setSelectedAgentIndex(index)}
-            >
-              <div
-                className="agent-autocomplete-badge"
-                style={{ backgroundColor: getAgentColor(agent.color) }}
-              />
-              <div className="agent-autocomplete-info">
-                <div className="agent-autocomplete-name">
-                  {agent.name.replace(/-/g, ' ')}
-                </div>
-                <div className="agent-autocomplete-description">
-                  {agent.description.length > 50
-                    ? `${agent.description.substring(0, 50)}...`
-                    : agent.description}
-                </div>
+      {/* Agent & File autocomplete dropdown */}
+      {showAgentAutocomplete && (filteredAgents.length > 0 || fileSearchResults.length > 0) && (
+        <div className="agent-autocomplete mention-autocomplete">
+          {/* Agents Section */}
+          {filteredAgents.length > 0 && (
+            <div className="mention-section">
+              <div className="mention-section-header">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 13c0-2.5 2.5-4 6-4s6 1.5 6 4v2H2v-2Z" opacity="0.8"/>
+                </svg>
+                <span>Agents</span>
               </div>
-              <div className="agent-autocomplete-model">{agent.model}</div>
-            </button>
-          ))}
+              {filteredAgents.map((agent, index) => (
+                <button
+                  key={agent.name}
+                  type="button"
+                  className={`agent-autocomplete-item ${selectedAgentIndex === index ? 'selected' : ''}`}
+                  onClick={() => selectAgent(agent)}
+                  onMouseEnter={() => setSelectedAgentIndex(index)}
+                >
+                  <div
+                    className="agent-autocomplete-badge"
+                    style={{ backgroundColor: getAgentColor(agent.color) }}
+                  />
+                  <div className="agent-autocomplete-info">
+                    <div className="agent-autocomplete-name">
+                      {agent.name.replace(/-/g, ' ')}
+                    </div>
+                    <div className="agent-autocomplete-description">
+                      {agent.description.length > 50
+                        ? `${agent.description.substring(0, 50)}...`
+                        : agent.description}
+                    </div>
+                  </div>
+                  <div className="agent-autocomplete-model">{agent.model}</div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Files Section */}
+          {fileSearchResults.length > 0 && (
+            <div className="mention-section">
+              <div className="mention-section-header">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M9 1H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6L9 1Z" opacity="0.8"/>
+                  <path d="M9 1v5h5"/>
+                </svg>
+                <span>Files</span>
+              </div>
+              {fileSearchResults.map((file, index) => {
+                const globalIndex = filteredAgents.length + index;
+                return (
+                  <button
+                    key={file.path}
+                    type="button"
+                    className={`agent-autocomplete-item file-item ${selectedAgentIndex === globalIndex ? 'selected' : ''}`}
+                    onClick={() => selectFile(file)}
+                    onMouseEnter={() => setSelectedAgentIndex(globalIndex)}
+                  >
+                    <div className="agent-autocomplete-badge file-badge">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M9 1H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6L9 1Z" opacity="0.5"/>
+                        <path d="M9 1v5h5"/>
+                      </svg>
+                    </div>
+                    <div className="agent-autocomplete-info">
+                      <div className="agent-autocomplete-name">
+                        {file.name}
+                      </div>
+                      <div className="agent-autocomplete-description file-path">
+                        {file.relative_path}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Loading state for file search */}
+          {isSearchingFiles && fileSearchResults.length === 0 && (
+            <div className="mention-section">
+              <div className="mention-loading">
+                <div className="mention-loading-spinner" />
+                <span>Searching files...</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div className="chat-input-wrapper">

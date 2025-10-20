@@ -113,6 +113,78 @@
   background: rgba(77, 212, 179, 0.12);
 }
 
+/* Mention autocomplete sections */
+.mention-autocomplete {
+  max-height: 400px;
+}
+
+.mention-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mention-section:last-child {
+  border-bottom: none;
+}
+
+.mention-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 6px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mention-section-header svg {
+  opacity: 0.6;
+}
+
+/* File-specific styling */
+.file-badge {
+  background: rgba(139, 92, 246, 0.15);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: #8b5cf6;
+}
+
+.file-path {
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Loading state */
+.mention-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.mention-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #f28c52;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .chat-input-wrapper {
   display: flex;
   flex-direction: column;

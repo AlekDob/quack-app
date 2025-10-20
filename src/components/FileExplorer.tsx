@@ -53,7 +53,8 @@ const fuzzyMatch = (query: string, target: string) => {
   return queryIndex === normalizedQuery.length;
 };
 
-import type { DirectoryEntry, GitStatusEntry } from "../types";
+import type { DirectoryEntry, GitStatusEntry, SearchResult } from "../types";
+import { invoke } from "@tauri-apps/api/core";
 
 interface FileExplorerProps {
   rootPath: string | null;
@@ -83,12 +84,15 @@ function FileExplorer({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     entry: DirectoryEntry;
   } | null>(null);
   const prefetchedDirectoriesRef = useRef<Set<string>>(new Set());
   const loadingNodesRef = useRef<Set<string>>(new Set());
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const rootEntries = useMemo(() => {
     if (!rootPath) {
@@ -263,6 +267,49 @@ function FileExplorer({
     [onLoadChildren]
   );
 
+  // Recursive search effect
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If query is empty, clear results
+    if (!query.trim() || !rootPath) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Debounce search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      setIsSearching(true);
+
+      invoke<SearchResult[]>("search_files_recursive", {
+        path: rootPath,
+        query: query.trim(),
+        maxResults: 100,
+        maxDepth: 10,
+      })
+        .then((results) => {
+          setSearchResults(results);
+        })
+        .catch((err) => {
+          console.error("Search error:", err);
+          setSearchResults([]);
+        })
+        .finally(() => {
+          setIsSearching(false);
+        });
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [query, rootPath]);
+
   const handleToggleDirectory = useCallback(
     async (entry: DirectoryEntry) => {
       if (!entry.is_dir) {
@@ -413,6 +460,60 @@ function FileExplorer({
     ]
   );
 
+  const renderSearchResult = useCallback(
+    (result: SearchResult) => {
+      const isActiveFile = activeFilePath === result.path;
+
+      // Convert SearchResult to DirectoryEntry for compatibility
+      const entry: DirectoryEntry = {
+        name: result.name,
+        path: result.path,
+        is_dir: result.is_dir,
+        is_symlink: result.is_symlink,
+      };
+
+      const rowClass = [
+        "explorer-row",
+        result.is_dir ? "directory" : "file",
+        isActiveFile ? "active file-open" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      // Depth indicator (indentation based on depth)
+      const paddingLeft = 12 + result.depth * 8;
+
+      return (
+        <button
+          key={result.path}
+          type="button"
+          className={rowClass}
+          style={{ paddingLeft: `${paddingLeft}px` }}
+          title={result.relative_path}
+          onClick={() => onOpenFile(entry)}
+          onContextMenu={(event) => handleContextMenu(event, entry)}
+        >
+          <span className="explorer-expander placeholder" aria-hidden="true" />
+          <span
+            className={`explorer-icon ${
+              result.is_dir
+                ? "folder"
+                : result.is_symlink
+                  ? "symlink"
+                  : "file"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="explorer-name">{result.name}</span>
+          <span className="explorer-path-hint" title={result.relative_path}>
+            {result.relative_path}
+          </span>
+        </button>
+      );
+    },
+    [activeFilePath, handleContextMenu, onOpenFile]
+  );
+
   const renderModifiedFile = useCallback(
     (item: {
       entry: DirectoryEntry;
@@ -496,38 +597,66 @@ function FileExplorer({
         />
       </div>
 
-      <div className={`explorer-content ${loading ? "loading" : ""}`}>
+      <div className={`explorer-content ${loading || isSearching ? "loading" : ""}`}>
         {rootPath && <div className="explorer-root-label">{rootLabel}</div>}
-        {(!rootEntries || rootEntries.length === 0) && !loading ? (
-          <div className="empty-state">Empty folder</div>
-        ) : (
-          <div className="explorer-tree">
-            {/* Modified Files Group */}
-            {allModifiedFiles.length > 0 && (
-              <div className="explorer-section modified-files-section">
-                <div className="explorer-section-header">
-                  <span className="explorer-section-title">
-                    Modified Files
-                  </span>
-                  <span className="explorer-section-count">
-                    {allModifiedFiles.length}
-                  </span>
-                </div>
-                <div className="explorer-section-content">
-                  {allModifiedFiles
-                    .filter((item) => fuzzyMatch(query, item.displayPath))
-                    .map((item) => renderModifiedFile(item))}
-                </div>
-              </div>
-            )}
 
-            {/* Normal Files Tree */}
-            {rootEntries && rootEntries.length > 0 && (
-              <div className="explorer-section">
-                {rootEntries && renderEntries(rootEntries, 0, true)}
+        {/* Show search results when query is active */}
+        {query.trim() && searchResults.length > 0 && (
+          <div className="explorer-tree">
+            <div className="explorer-section search-results-section">
+              <div className="explorer-section-header">
+                <span className="explorer-section-title">
+                  🔍 Search Results
+                </span>
+                <span className="explorer-section-count">
+                  {searchResults.length}
+                </span>
+              </div>
+              <div className="explorer-section-content">
+                {searchResults.map((result) => renderSearchResult(result))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Show "no results" message when searching but nothing found */}
+        {query.trim() && searchResults.length === 0 && !isSearching && (
+          <div className="empty-state">No files matching "{query}"</div>
+        )}
+
+        {/* Show regular tree when NOT searching */}
+        {!query.trim() && (
+          <>
+            {(!rootEntries || rootEntries.length === 0) && !loading ? (
+              <div className="empty-state">Empty folder</div>
+            ) : (
+              <div className="explorer-tree">
+                {/* Modified Files Group */}
+                {allModifiedFiles.length > 0 && (
+                  <div className="explorer-section modified-files-section">
+                    <div className="explorer-section-header">
+                      <span className="explorer-section-title">
+                        Modified Files
+                      </span>
+                      <span className="explorer-section-count">
+                        {allModifiedFiles.length}
+                      </span>
+                    </div>
+                    <div className="explorer-section-content">
+                      {allModifiedFiles.map((item) => renderModifiedFile(item))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Normal Files Tree */}
+                {rootEntries && rootEntries.length > 0 && (
+                  <div className="explorer-section">
+                    {rootEntries && renderEntries(rootEntries, 0, true)}
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
