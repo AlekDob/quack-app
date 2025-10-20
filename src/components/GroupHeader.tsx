@@ -89,7 +89,7 @@ export default function GroupHeader({
           type="button"
           className="terminal-reorder-btn"
           disabled={!canMoveUp}
-          aria-label="Sposta gruppo su"
+          aria-label="Move group up"
           onClick={(e) => {
             e.stopPropagation()
             onMoveUp()
@@ -101,7 +101,7 @@ export default function GroupHeader({
           type="button"
           className="terminal-reorder-btn"
           disabled={!canMoveDown}
-          aria-label="Sposta gruppo giù"
+          aria-label="Move group down"
           onClick={(e) => {
             e.stopPropagation()
             onMoveDown()

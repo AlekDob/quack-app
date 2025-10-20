@@ -42,6 +42,7 @@ interface TerminalSidebarProps {
   onClose: (id: string) => void;
   onColorChange: (id: string, color: string) => void;
   onEdit: (terminal: TerminalInfo) => void;
+  onDuplicate: (terminal: TerminalInfo) => void;
   onToggleGroup: (cwd: string) => void;
   onReorder: (reorderedIds: string[]) => void;
   onOpenSettings?: () => void; // NEW: Open settings panel
@@ -65,6 +66,7 @@ export default function TerminalSidebar({
   onClose,
   onColorChange: _onColorChange,
   onEdit,
+  onDuplicate,
   onToggleGroup,
   onReorder,
   onOpenSettings,
@@ -263,6 +265,7 @@ export default function TerminalSidebar({
           onCopyPath={() => {
             // Copy handled inside ContextMenu
           }}
+          onDuplicate={() => onDuplicate(contextMenu.terminal)}
           onCloseTerminal={() => onClose(contextMenu.terminal.id)}
         />
       )}

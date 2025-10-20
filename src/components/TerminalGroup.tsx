@@ -95,7 +95,7 @@ export default function TerminalGroup({
                     type="button"
                     className="terminal-reorder-btn"
                     disabled={!canMoveUp}
-                    aria-label="Sposta su"
+                    aria-label="Move up"
                     onClick={(event) => {
                       event.stopPropagation()
                       onMoveUp(terminal.id)
@@ -107,7 +107,7 @@ export default function TerminalGroup({
                     type="button"
                     className="terminal-reorder-btn"
                     disabled={!canMoveDown}
-                    aria-label="Sposta giù"
+                    aria-label="Move down"
                     onClick={(event) => {
                       event.stopPropagation()
                       onMoveDown(terminal.id)
@@ -119,7 +119,7 @@ export default function TerminalGroup({
                 <button
                   type="button"
                   className="terminal-close"
-                  aria-label={`Chiudi ${terminal.label}`}
+                  aria-label={`Close ${terminal.label}`}
                   onClick={(event) => {
                     event.stopPropagation()
                     onClose(terminal.id)

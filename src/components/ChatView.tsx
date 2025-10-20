@@ -96,6 +96,19 @@ export default function ChatView({
         return;
       }
 
+      // Tab to cycle thinking modes
+      if (e.key === 'Tab' && !e.shiftKey && !isLoading && onThinkingModeChange) {
+        e.preventDefault();
+
+        // Cycle through thinking modes in order: Auto → Think → Think Hard → Think Harder → Ultra Think
+        const modes: ThinkingMode[] = ['auto', 'think', 'hard', 'harder', 'ultra'];
+        const currentIndex = modes.indexOf(thinkingMode);
+        const nextIndex = (currentIndex + 1) % modes.length;
+        onThinkingModeChange(modes[nextIndex]);
+
+        console.log(`Switched to ${modes[nextIndex]} thinking mode`);
+      }
+
       // Shift+Tab to cycle permission modes
       if (e.key === 'Tab' && e.shiftKey && !isLoading && onPermissionModeChange) {
         e.preventDefault();
@@ -112,7 +125,7 @@ export default function ChatView({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [permissionMode, isLoading, onPermissionModeChange]);
+  }, [thinkingMode, permissionMode, isLoading, onThinkingModeChange, onPermissionModeChange]);
 
   return (
     <div className="chat-view">

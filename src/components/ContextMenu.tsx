@@ -8,6 +8,7 @@ interface ContextMenuProps {
   onClose: () => void
   onCopyPath?: () => void
   onCloseTerminal?: () => void
+  onDuplicate?: () => void
 }
 
 export default function ContextMenu({
@@ -17,6 +18,7 @@ export default function ContextMenu({
   onClose,
   onCopyPath,
   onCloseTerminal,
+  onDuplicate,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -96,7 +98,7 @@ export default function ContextMenu({
           onClose()
         }}
       >
-        <span>Modifica terminale</span>
+        <span>Edit Agent</span>
       </button>
 
       {onCopyPath && (
@@ -105,7 +107,20 @@ export default function ContextMenu({
           className="context-menu-item"
           onClick={handleCopyPath}
         >
-          <span>Copia percorso</span>
+          <span>Copy Path</span>
+        </button>
+      )}
+
+      {onDuplicate && (
+        <button
+          type="button"
+          className="context-menu-item"
+          onClick={() => {
+            onDuplicate()
+            onClose()
+          }}
+        >
+          <span>Duplicate Agent</span>
         </button>
       )}
 
@@ -117,7 +132,7 @@ export default function ContextMenu({
           className="context-menu-item context-menu-item-danger"
           onClick={handleCloseTerminal}
         >
-          <span>Chiudi terminale</span>
+          <span>Close Agent</span>
         </button>
       )}
     </div>

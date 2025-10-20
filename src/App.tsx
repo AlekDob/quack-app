@@ -2258,6 +2258,57 @@ function App() {
     setShowNewTerminalModal(true);
   }, []);
 
+  const handleDuplicateTerminal = useCallback(async (terminal: TerminalInfo) => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      // Generate new name: "Terminal Copy" or "Terminal Copy 2"
+      const baseName = terminal.label;
+      const copyPattern = /^(.+?)(?: Copy(?: (\d+))?)?$/;
+      const match = baseName.match(copyPattern);
+
+      let newName: string;
+      if (match) {
+        const originalName = match[1];
+        const existingCopyNumber = match[2] ? parseInt(match[2], 10) : 0;
+
+        if (existingCopyNumber > 0) {
+          newName = `${originalName} Copy ${existingCopyNumber + 1}`;
+        } else if (baseName.endsWith(' Copy')) {
+          newName = `${originalName} Copy 2`;
+        } else {
+          newName = `${baseName} Copy`;
+        }
+      } else {
+        newName = `${baseName} Copy`;
+      }
+
+      // Create new terminal with same color and cwd
+      const created = await invoke<TerminalInfo>("create_terminal", {
+        label: newName,
+        color: terminal.color,
+        cwd: terminal.cwd,
+      });
+
+      const createdWithState: TerminalInfo = {
+        ...created,
+        status: "idle",
+        needsAttention: false,
+        hasResponded: false,
+        responseStartTime: null,
+      };
+
+      setTerminals((prev) => [...prev, createdWithState]);
+      setActiveId(created.id);
+      toast.success(`Agent duplicated: ${newName}`);
+    } catch (error) {
+      console.error("Failed to duplicate agent:", error);
+      toast.error("Failed to duplicate agent");
+    }
+  }, [tauriAvailable]);
+
   const handleReorderTerminals = useCallback((reorderedIds: string[]) => {
     setTerminals((prev) => {
       // Crea una mappa per accesso rapido
@@ -3225,6 +3276,7 @@ function App() {
           onClose={handleCloseTerminal}
           onColorChange={handleColorChange}
           onEdit={handleEditTerminal}
+          onDuplicate={handleDuplicateTerminal}
           onToggleGroup={handleToggleGroup}
           onReorder={handleReorderTerminals}
           onOpenSettings={() => setShowSettings(true)}
