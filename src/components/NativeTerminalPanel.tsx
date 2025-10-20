@@ -9,6 +9,7 @@ interface NativeTerminalPanelProps {
   onRemove: (id: string) => void;
   onFocus: (terminal: NativeTerminal) => void;
   onOpen: (terminal: NativeTerminal) => void;
+  onMarkClosed: (id: string) => void; // New callback to mark terminal as closed
 }
 
 interface NativeTerminalResult {
@@ -23,6 +24,7 @@ export function NativeTerminalPanel({
   onRemove,
   onFocus,
   onOpen,
+  onMarkClosed,
 }: NativeTerminalPanelProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -44,9 +46,10 @@ export function NativeTerminalPanel({
             toast.success(`Focused: ${terminal.name}`);
             onFocus(terminal);
           } else {
-            // Finestra non trovata - potrebbe essere chiusa
-            toast.info(`Terminal window not found. Opening new window...`);
-            await handleOpenTerminal(terminal);
+            // Finestra non trovata - segna come chiuso (user must remove or reopen manually)
+            toast.warning(`Terminal window not found. It may have been closed. Click again to reopen or remove it.`);
+            // Mark as closed so next click will reopen
+            onMarkClosed(terminal.id);
           }
         } else {
           // Terminale non aperto - aprilo
@@ -59,7 +62,7 @@ export function NativeTerminalPanel({
         setLoading(null);
       }
     },
-    [loading, onFocus, onOpen]
+    [loading, onFocus, onOpen, onMarkClosed]
   );
 
   const handleOpenTerminal = async (terminal: NativeTerminal) => {
@@ -106,7 +109,7 @@ export function NativeTerminalPanel({
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
         <div className="flex items-center justify-between">

@@ -3489,26 +3489,27 @@ function App() {
               console.error("Failed to close native terminal:", error);
             }
           }}
-          onOpenNativeTerminal={async (terminal) => {
-            try {
-              await invoke("open_native_terminal", {
-                name: terminal.name,
-                directory: terminal.directory,
-                app: terminal.app,
-              });
-            } catch (error) {
-              console.error("Failed to open native terminal:", error);
-            }
+          onOpenNativeTerminal={(terminal) => {
+            // Aggiorna solo lo stato - l'invoke è già fatto in NativeTerminalPanel
+            setNativeTerminals((prev) =>
+              prev.map((t) =>
+                t.id === terminal.id ? { ...t, isOpen: true } : t
+              )
+            );
           }}
-          onFocusNativeTerminal={async (terminal) => {
-            try {
-              await invoke("focus_native_terminal", {
-                name: terminal.name,
-                app: terminal.app,
-              });
-            } catch (error) {
-              console.error("Failed to focus native terminal:", error);
-            }
+          onFocusNativeTerminal={(terminal) => {
+            // Aggiorna solo lo stato - l'invoke è già fatto in NativeTerminalPanel
+            setNativeTerminals((prev) =>
+              prev.map((t) =>
+                t.id === terminal.id ? { ...t, isOpen: true } : t
+              )
+            );
+          }}
+          onMarkClosedNativeTerminal={(id) => {
+            // Mark terminal as closed when focus fails (window was closed externally)
+            setNativeTerminals((prev) =>
+              prev.map((t) => (t.id === id ? { ...t, isOpen: false } : t))
+            );
           }}
         />
 
