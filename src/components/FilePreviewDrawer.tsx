@@ -1,5 +1,8 @@
 import { memo, useState, useCallback, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import CodeEditor, { type DiffInfo } from "./CodeEditor";
+import RevealInFinderButton from "./RevealInFinderButton";
 
 interface FilePreviewDrawerProps {
   open: boolean;
@@ -37,7 +40,7 @@ function FilePreviewDrawer({
   const handleToggleEdit = useCallback(() => {
     if (isEditing && hasUnsavedChanges) {
       const confirmDiscard = window.confirm(
-        "Hai modifiche non salvate. Vuoi scartarle?"
+        "You have unsaved changes. Do you want to discard them?"
       );
       if (!confirmDiscard) return;
     }
@@ -45,6 +48,18 @@ function FilePreviewDrawer({
     setEditedContent(content);
     setHasUnsavedChanges(false);
   }, [isEditing, hasUnsavedChanges, content]);
+
+  const handleOpenInEditor = useCallback(async () => {
+    if (!path) return;
+
+    try {
+      await invoke("open_file_in_editor", { path });
+      toast.success("File opened in default editor");
+    } catch (error) {
+      console.error("Failed to open file in editor:", error);
+      toast.error("Failed to open file in editor");
+    }
+  }, [path]);
 
   const handleContentChange = useCallback(
     (newContent: string) => {
@@ -98,24 +113,27 @@ function FilePreviewDrawer({
               className="preview-action"
               onClick={onRefresh}
               disabled={loading || formatting}
+              title="Reload file from disk"
             >
-              Ricarica
+              Reload
             </button>
             <button
               type="button"
               className="preview-action"
               onClick={onFormat}
               disabled={loading || formatting || isEditing}
+              title="Format code"
             >
-              {formatting ? "Formatto…" : "Formatta"}
+              {formatting ? "Formatting…" : "Format"}
             </button>
             <button
               type="button"
               className={`preview-action ${isEditing ? "active" : ""}`}
               onClick={handleToggleEdit}
               disabled={loading}
+              title={isEditing ? "Switch to preview mode" : "Switch to edit mode"}
             >
-              {isEditing ? "Anteprima" : "Modifica"}
+              {isEditing ? "Preview" : "Edit"}
             </button>
             {isEditing && onSave && (
               <button
@@ -123,18 +141,33 @@ function FilePreviewDrawer({
                 className="preview-action save"
                 onClick={() => handleSave()}
                 disabled={!hasUnsavedChanges}
+                title={hasUnsavedChanges ? "Save changes" : "No changes to save"}
               >
-                {hasUnsavedChanges ? "Salva *" : "Salvato"}
+                {hasUnsavedChanges ? "Save *" : "Saved"}
               </button>
             )}
-            <button type="button" className="preview-close" onClick={onClose}>
-              Chiudi
+            {path && (
+              <>
+                <button
+                  type="button"
+                  className="preview-action"
+                  onClick={handleOpenInEditor}
+                  disabled={loading}
+                  title="Open in default IDE"
+                >
+                  Open with IDE
+                </button>
+                <RevealInFinderButton path={path} className="preview-action" />
+              </>
+            )}
+            <button type="button" className="preview-close" onClick={onClose} title="Close preview">
+              Close
             </button>
           </div>
         </header>
         <div className="preview-content" data-loading={loading}>
           {loading ? (
-            <div className="preview-placeholder">Lettura file…</div>
+            <div className="preview-placeholder">Loading file…</div>
           ) : error ? (
             <div className="preview-placeholder">{error}</div>
           ) : isEditing ? (

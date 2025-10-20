@@ -655,7 +655,7 @@ button.directory-chooser:hover {
 .preview-drawer-panel {
   position: relative;
   height: 100%;
-  width: min(70vw, 1080px);
+  width: 90vw;
   min-width: 420px;
   background: rgba(18, 20, 27, 0.97);
   border-left: 1px solid var(--panel-border-strong);
@@ -6731,6 +6731,12 @@ button.directory-chooser:hover {
 
 .reveal-in-finder-button:hover svg {
   opacity: 1;
+}
+
+/* Match font size when used as preview-action */
+.preview-action.reveal-in-finder-button {
+  font-size: 0.74rem;
+  padding: 0.32rem 0.7rem;
 }
 
 /* File Explorer Header with Reveal Button */

@@ -405,3 +405,108 @@ fn search_files_recursive_impl(
 
     Ok(results)
 }
+
+#[tauri::command]
+pub fn open_file_in_editor(path: String) -> Result<(), String> {
+    open_file_in_editor_impl(path).map_err(|err| err.to_string())
+}
+
+fn open_file_in_editor_impl(path: String) -> Result<()> {
+    let file_path = PathBuf::from(&path);
+
+    if !file_path.exists() {
+        return Err(anyhow!("File does not exist: {:?}", file_path));
+    }
+
+    // Use platform-specific command to open file with code editor
+    #[cfg(target_os = "macos")]
+    {
+        // Try common code editors in priority order
+        let editors = [
+            "com.todesktop.230313mzl4w4u92", // Cursor
+            "com.microsoft.VSCode",           // VS Code
+            "com.sublimetext.4",              // Sublime Text
+            "com.apple.TextEdit",             // TextEdit (fallback)
+        ];
+
+        let mut opened = false;
+        for bundle_id in &editors {
+            let result = std::process::Command::new("open")
+                .arg("-b")
+                .arg(bundle_id)
+                .arg(&file_path)
+                .spawn();
+
+            if result.is_ok() {
+                opened = true;
+                break;
+            }
+        }
+
+        if !opened {
+            // Final fallback: use default text editor
+            std::process::Command::new("open")
+                .arg("-t")
+                .arg(&file_path)
+                .spawn()
+                .with_context(|| format!("Failed to open file {:?}", file_path))?;
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try common Linux code editors
+        let editors = ["code", "subl", "gedit", "nano"];
+
+        let mut opened = false;
+        for editor in &editors {
+            let result = std::process::Command::new(editor)
+                .arg(&file_path)
+                .spawn();
+
+            if result.is_ok() {
+                opened = true;
+                break;
+            }
+        }
+
+        if !opened {
+            std::process::Command::new("xdg-open")
+                .arg(&file_path)
+                .spawn()
+                .with_context(|| format!("Failed to open file {:?}", file_path))?;
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Try common Windows code editors
+        let editors = [
+            "code.cmd",      // VS Code
+            "cursor.cmd",    // Cursor
+            "subl.exe",      // Sublime Text
+            "notepad++.exe", // Notepad++
+        ];
+
+        let mut opened = false;
+        for editor in &editors {
+            let result = std::process::Command::new(editor)
+                .arg(&file_path)
+                .spawn();
+
+            if result.is_ok() {
+                opened = true;
+                break;
+            }
+        }
+
+        if !opened {
+            std::process::Command::new("cmd")
+                .args(&["/C", "start", "", path.as_str()])
+                .spawn()
+                .with_context(|| format!("Failed to open file {:?}", file_path))?;
+        }
+    }
+
+    Ok(())
+}
