@@ -484,3 +484,39 @@ export interface Plugin {
   metadata: PluginMetadata;
   scope?: PluginScope;
 }
+
+// Usage Tracking types (Claude Agent SDK cost tracking)
+export interface UsageStats {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+export interface SessionUsage {
+  session_id: string;
+  agent_name: string;
+  started_at: number;
+  last_updated: number;
+  total_cost_usd: number;
+  step_count: number;
+  usage: UsageStats;
+}
+
+export interface AgentUsageSummary {
+  agent_name: string;
+  total_sessions: number;
+  total_cost_usd: number;
+  total_steps: number;
+  usage: UsageStats;
+  last_used: number;
+}
+
+export interface DailyUsageSummary {
+  date: string; // YYYY-MM-DD
+  total_cost_usd: number;
+  total_steps: number;
+  session_count: number;
+  usage: UsageStats;
+  agents: Record<string, AgentUsageSummary>;
+}

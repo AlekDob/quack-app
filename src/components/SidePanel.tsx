@@ -7,15 +7,16 @@ import ContextPanel from "./ContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
 import { NativeTerminalPanel } from "./NativeTerminalPanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo, NativeTerminal } from "../types";
+import UsagePanel from "./UsagePanel";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo, NativeTerminal, SessionUsage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, MCP, Commands, Context, Terminal, Native Terminals
+ * Tabs: File Explorer, Agents, MCP, Commands, Context, Terminal, Native Terminals, Usage
  */
 
-type TabId = "explorer" | "agents" | "mcp" | "commands" | "context" | "terminal" | "native-terminals";
+type TabId = "explorer" | "agents" | "mcp" | "commands" | "context" | "terminal" | "native-terminals" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -140,6 +141,33 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  usage: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M3 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 10h6M7 13h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="10" cy="7" r="0.5" fill="currentColor" />
+      <path
+        d="M12 6l1 2-1 2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -204,6 +232,10 @@ interface SidePanelProps {
   onOpenNativeTerminal: (terminal: NativeTerminal) => void;
   onFocusNativeTerminal: (terminal: NativeTerminal) => void;
   onMarkClosedNativeTerminal: (id: string) => void;
+
+  // Usage props
+  usageSessions: SessionUsage[];
+  onClearUsage?: () => void;
 }
 
 export default function SidePanel({
@@ -261,6 +293,10 @@ export default function SidePanel({
   onOpenNativeTerminal,
   onFocusNativeTerminal,
   onMarkClosedNativeTerminal,
+
+  // Usage
+  usageSessions,
+  onClearUsage,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("explorer");
 
@@ -305,6 +341,13 @@ export default function SidePanel({
       icon: icons.nativeTerminals,
       badge: nativeTerminals.length,
       hasContent: nativeTerminals.length > 0,
+    },
+    {
+      id: "usage" as TabId,
+      label: "Usage",
+      icon: icons.usage,
+      badge: usageSessions.length,
+      hasContent: usageSessions.length > 0,
     },
   ];
 
@@ -488,6 +531,15 @@ export default function SidePanel({
                 onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
               />
             </div>
+          </div>
+        )}
+
+        {activeTab === "usage" && (
+          <div className="side-panel-pane">
+            <UsagePanel
+              sessions={usageSessions}
+              onClearUsage={onClearUsage}
+            />
           </div>
         )}
       </div>

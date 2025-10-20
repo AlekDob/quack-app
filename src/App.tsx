@@ -53,6 +53,8 @@ import type {
   ChatMessage,
   ClaudeEvent,
   AgentChatSettings,
+  SessionUsage,
+  UsageStats,
 } from "./types";
 
 interface TerminalMetadata {
@@ -390,6 +392,61 @@ function App() {
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
+  // Usage tracking - cost and token usage from Claude Agent SDK
+  const [usageSessions, setUsageSessions] = useState<SessionUsage[]>([]);
+
+  // Track usage from Claude Agent SDK response
+  const trackUsage = useCallback((
+    agentId: string,
+    agentName: string,
+    sessionId: string,
+    totalCostUsd: number,
+    usage?: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
+  ) => {
+    const now = Date.now();
+
+    setUsageSessions((prev) => {
+      const existingSession = prev.find((s) => s.session_id === sessionId);
+
+      if (existingSession) {
+        // Update existing session
+        return prev.map((s) =>
+          s.session_id === sessionId
+            ? {
+                ...s,
+                last_updated: now,
+                total_cost_usd: totalCostUsd,
+                step_count: s.step_count + 1,
+                usage: usage || s.usage,
+              }
+            : s
+        );
+      } else {
+        // Create new session
+        const newSession: SessionUsage = {
+          session_id: sessionId,
+          agent_name: agentName,
+          started_at: now,
+          last_updated: now,
+          total_cost_usd: totalCostUsd,
+          step_count: 1,
+          usage: usage || {
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+          },
+        };
+        return [...prev, newSession];
+      }
+    });
+  }, []);
+
+  // Clear all usage data
+  const handleClearUsage = useCallback(() => {
+    setUsageSessions([]);
+  }, []);
+
   // Initialize chat on mount
   useEffect(() => {
     if (tauriAvailable) {
@@ -631,7 +688,12 @@ function App() {
 
       // Race between invoke and abort
       const response = await Promise.race([
-        invoke<{ result: string; session_id: string; total_cost_usd: number }>('send_message_via_sdk_streaming', {
+        invoke<{
+          result: string;
+          session_id: string;
+          total_cost_usd: number;
+          usage: UsageStats;
+        }>('send_message_via_sdk_streaming', {
           agentId: activeId,
           request: {
             prompt,
@@ -684,8 +746,17 @@ function App() {
       ];
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
 
-      // Notify that agent response is complete
+      // Track usage from Claude Agent SDK (with full token details!)
       const agentLabel = activeAgent?.name || `Agent ${activeId}`;
+      trackUsage(
+        activeId,
+        agentLabel,
+        response.session_id,
+        response.total_cost_usd,
+        response.usage  // ✅ Now passing full usage stats from Rust backend!
+      );
+
+      // Notify that agent response is complete
       notifyAgentReadyRef.current({ id: activeId, label: agentLabel });
 
       // Reset active agent after sending message
@@ -3511,6 +3582,9 @@ function App() {
               prev.map((t) => (t.id === id ? { ...t, isOpen: false } : t))
             );
           }}
+          // Usage props
+          usageSessions={usageSessions}
+          onClearUsage={handleClearUsage}
         />
 
         <NewTerminalModal
