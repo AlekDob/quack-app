@@ -21,6 +21,8 @@ interface ChatViewProps {
   onFilePathClick?: (path: string) => void;
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
+  pendingFileMention?: { name: string; path: string; relativePath: string } | null;
+  onFileMentionInserted?: () => void;
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
   basePath?: string;
@@ -46,6 +48,8 @@ export default function ChatView({
   onFilePathClick,
   pendingAgentMention,
   onMentionInserted,
+  pendingFileMention,
+  onFileMentionInserted,
   pendingSlashCommand,
   onCommandInserted,
   basePath,
@@ -127,6 +131,8 @@ export default function ChatView({
           onClearAgent={onClearAgent}
           pendingAgentMention={pendingAgentMention}
           onMentionInserted={onMentionInserted}
+          pendingFileMention={pendingFileMention}
+          onFileMentionInserted={onFileMentionInserted}
           pendingSlashCommand={pendingSlashCommand}
           onCommandInserted={onCommandInserted}
           basePath={basePath}

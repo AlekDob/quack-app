@@ -65,6 +65,7 @@ interface FileExplorerProps {
   activeFilePath: string | null;
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
+  onMentionFile?: (filePath: string, fileName: string) => void;
   modifiedEntries: GitStatusEntry[] | null;
   gitRootPath: string | null;
 }
@@ -78,6 +79,7 @@ function FileExplorer({
   activeFilePath,
   onOpenFile,
   onLoadChildren,
+  onMentionFile,
   modifiedEntries,
   gitRootPath,
 }: FileExplorerProps) {
@@ -406,6 +408,8 @@ function FileExplorer({
                   }
                 }}
                 onContextMenu={(event) => handleContextMenu(event, entry)}
+                draggable={!isDirectory}
+                onDragStart={(event) => handleDragStart(event, entry)}
               >
                 <span
                   className={`explorer-expander ${
@@ -436,6 +440,20 @@ function FileExplorer({
                     {displayCount}
                   </span>
                 )}
+                {!isDirectory && onMentionFile && (
+                  <button
+                    type="button"
+                    className="explorer-mention-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMentionFile(entry.path, entry.name);
+                    }}
+                    title="Insert @file mention in chat"
+                    aria-label="Mention file in chat"
+                  >
+                    @
+                  </button>
+                )}
               </button>
               {isDirectory &&
                 isExpanded &&
@@ -459,6 +477,25 @@ function FileExplorer({
       tree,
     ]
   );
+
+  const handleDragStart = useCallback((event: React.DragEvent, entry: DirectoryEntry) => {
+    // Only allow dragging files, not directories
+    if (entry.is_dir) {
+      event.preventDefault();
+      return;
+    }
+
+    // Set the file data for drag & drop
+    const fileData = JSON.stringify({
+      type: 'file',
+      name: entry.name,
+      path: entry.path,
+    });
+
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/quack-file', fileData);
+    event.dataTransfer.setData('text/plain', entry.path); // Fallback
+  }, []);
 
   const renderSearchResult = useCallback(
     (result: SearchResult) => {
@@ -492,6 +529,8 @@ function FileExplorer({
           title={result.relative_path}
           onClick={() => onOpenFile(entry)}
           onContextMenu={(event) => handleContextMenu(event, entry)}
+          draggable={!result.is_dir}
+          onDragStart={(event) => handleDragStart(event, entry)}
         >
           <span className="explorer-expander placeholder" aria-hidden="true" />
           <span
@@ -508,10 +547,24 @@ function FileExplorer({
           <span className="explorer-path-hint" title={result.relative_path}>
             {result.relative_path}
           </span>
+          {!result.is_dir && onMentionFile && (
+            <button
+              type="button"
+              className="explorer-mention-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMentionFile(result.path, result.name);
+              }}
+              title="Insert @file mention in chat"
+              aria-label="Mention file in chat"
+            >
+              @
+            </button>
+          )}
         </button>
       );
     },
-    [activeFilePath, handleContextMenu, onOpenFile]
+    [activeFilePath, handleContextMenu, onOpenFile, handleDragStart, onMentionFile]
   );
 
   const renderModifiedFile = useCallback(
@@ -563,6 +616,8 @@ function FileExplorer({
           title={displayPath}
           onClick={() => onOpenFile(entry)}
           onContextMenu={(event) => handleContextMenu(event, entry)}
+          draggable={!isDeletedFile}
+          onDragStart={(event) => handleDragStart(event, entry)}
         >
           <span className="explorer-expander placeholder" aria-hidden="true" />
           <span className={iconClass} aria-hidden="true" />
@@ -573,10 +628,24 @@ function FileExplorer({
               {deletions > 0 && <span className="deletions">-{deletions}</span>}
             </span>
           )}
+          {!isDeletedFile && onMentionFile && (
+            <button
+              type="button"
+              className="explorer-mention-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMentionFile(entry.path, entry.name);
+              }}
+              title="Insert @file mention in chat"
+              aria-label="Mention file in chat"
+            >
+              @
+            </button>
+          )}
         </button>
       );
     },
-    [activeFilePath, handleContextMenu, onOpenFile]
+    [activeFilePath, handleContextMenu, onOpenFile, onMentionFile]
   );
 
   return (

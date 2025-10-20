@@ -152,6 +152,7 @@ interface SidePanelProps {
   activeFilePath: string | null;
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
+  onMentionFile?: (filePath: string, fileName: string) => void;
   modifiedEntries: GitStatusEntry[] | null;
   gitRootPath: string | null;
 
@@ -213,6 +214,7 @@ export default function SidePanel({
   activeFilePath,
   onOpenFile,
   onLoadChildren,
+  onMentionFile,
   modifiedEntries,
   gitRootPath,
 
@@ -344,6 +346,7 @@ export default function SidePanel({
             activeFilePath={activeFilePath}
             onOpenFile={onOpenFile}
             onLoadChildren={onLoadChildren}
+            onMentionFile={onMentionFile}
             modifiedEntries={modifiedEntries}
             gitRootPath={gitRootPath}
           />

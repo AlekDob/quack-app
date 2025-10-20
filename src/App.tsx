@@ -710,6 +710,7 @@ function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
   // activeAgent moved to top of component for TypeScript hoisting
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
+  const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string } | null>(null); // File to insert as @file mention
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -1611,6 +1612,28 @@ function App() {
       duration: 2000,
     });
   }, []);
+
+  const handleMentionFile = useCallback((filePath: string, fileName: string) => {
+    // Calculate relative path from explorerRoot
+    const basePath = explorerRoot ?? explorerPath;
+    let relativePath = filePath;
+
+    if (basePath && filePath.startsWith(basePath)) {
+      relativePath = filePath.substring(basePath.length).replace(/^\//, '');
+    }
+
+    // Set pending file mention for ChatInput to pick up
+    setPendingFileMention({
+      name: fileName,
+      path: filePath,
+      relativePath: relativePath,
+    });
+
+    toast.success(`File mention added: @file:${relativePath}`, {
+      description: 'File reference inserted in chat input',
+      duration: 2000,
+    });
+  }, [explorerRoot, explorerPath]);
 
   const handleCreateAgent = useCallback(async (
     name: string,
@@ -3172,6 +3195,8 @@ function App() {
               onFilePathClick={handleFilePathClick}
               pendingAgentMention={pendingAgentMention}
               onMentionInserted={() => setPendingAgentMention(null)}
+              pendingFileMention={pendingFileMention}
+              onFileMentionInserted={() => setPendingFileMention(null)}
               pendingSlashCommand={pendingSlashCommand}
               onCommandInserted={() => setPendingSlashCommand(null)}
               basePath={explorerRoot ?? explorerPath}
@@ -3198,6 +3223,7 @@ function App() {
           activeFilePath={previewFile?.path ?? null}
           onOpenFile={handleOpenFilePreview}
           onLoadChildren={fetchDirectoryChildren}
+          onMentionFile={handleMentionFile}
           modifiedEntries={stableModifiedEntries}
           gitRootPath={explorerRoot}
           // Agents props

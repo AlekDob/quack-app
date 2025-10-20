@@ -48,6 +48,8 @@ interface ChatInputProps {
   onClearAgent?: () => void;
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
+  pendingFileMention?: { name: string; path: string; relativePath: string } | null;
+  onFileMentionInserted?: () => void;
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
   basePath?: string;
@@ -63,6 +65,8 @@ export default function ChatInput({
   agents,
   pendingAgentMention,
   onMentionInserted,
+  pendingFileMention,
+  onFileMentionInserted,
   pendingSlashCommand,
   onCommandInserted,
   basePath,
@@ -98,6 +102,9 @@ export default function ChatInput({
   const [fileSearchResults, setFileSearchResults] = useState<SearchResult[]>([]);
   const [isSearchingFiles, setIsSearchingFiles] = useState(false);
   const fileSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Drag & drop state
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Slash command autocomplete state
   const [showCommandAutocomplete, setShowCommandAutocomplete] = useState(false);
@@ -367,6 +374,38 @@ export default function ChatInput({
       onMentionInserted();
     }
   }, [pendingAgentMention, onMentionInserted, input, setInput]);
+
+  // Insert file mention when requested from FileExplorer
+  useEffect(() => {
+    if (!pendingFileMention || !textareaRef.current) return;
+
+    // Insert @file:path at current cursor position
+    const cursorPos = textareaRef.current.selectionStart;
+    const beforeCursor = input.substring(0, cursorPos);
+    const afterCursor = input.substring(cursorPos);
+
+    // Add space before @ if needed
+    const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+    const prefix = needsSpaceBefore ? ' ' : '';
+    const mention = `${prefix}@file:${pendingFileMention.relativePath} `;
+    const newInput = beforeCursor + mention + afterCursor;
+
+    setInput(newInput);
+
+    // Position cursor after mention
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeCursor.length + mention.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+
+    // Notify parent that file mention was inserted
+    if (onFileMentionInserted) {
+      onFileMentionInserted();
+    }
+  }, [pendingFileMention, onFileMentionInserted, input, setInput]);
 
   // Insert slash command when requested from panel
   useEffect(() => {
@@ -659,6 +698,125 @@ export default function ChatInput({
     setError(null);
   };
 
+  // Drag & drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    console.log('[DragEnter] Event triggered!', e.dataTransfer.types);
+    e.preventDefault(); // Essential to allow drop
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    console.log('[DragOver] Event triggered!', e.dataTransfer.types);
+    e.preventDefault(); // Essential to allow drop - DON'T stopPropagation!
+
+    // Check if it's a file being dragged
+    const hasQuackFile = e.dataTransfer.types.includes('application/quack-file');
+    const hasTextPlain = e.dataTransfer.types.includes('text/plain');
+
+    console.log('[DragOver] Has quack-file:', hasQuackFile, 'Has text/plain:', hasTextPlain);
+
+    if (hasQuackFile || hasTextPlain) {
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    // Only set dragOver to false if leaving the container entirely
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // DON'T stopPropagation!
+    setIsDragOver(false);
+
+    console.log('[Drop] Event received', e.dataTransfer.types);
+
+    if (!textareaRef.current) return;
+
+    // Try to get the dropped file data (try both formats)
+    let fileDataStr = e.dataTransfer.getData('application/quack-file');
+    console.log('[Drop] application/quack-file data:', fileDataStr);
+
+    // Fallback to text/plain if custom format fails
+    if (!fileDataStr) {
+      const plainText = e.dataTransfer.getData('text/plain');
+      console.log('[Drop] text/plain fallback:', plainText);
+
+      if (plainText) {
+        // Try to parse as JSON first
+        try {
+          const parsed = JSON.parse(plainText);
+          if (parsed.type === 'file' && parsed.path) {
+            fileDataStr = plainText;
+          }
+        } catch {
+          // If it's just a file path string, create the structure
+          fileDataStr = JSON.stringify({
+            type: 'file',
+            name: plainText.split(/[\\/]/).pop() || 'file',
+            path: plainText,
+          });
+        }
+      }
+    }
+
+    if (!fileDataStr) {
+      console.error('[Drop] No file data found');
+      return;
+    }
+
+    try {
+      const fileData = JSON.parse(fileDataStr) as { type: string; name: string; path: string };
+      console.log('[Drop] Parsed file data:', fileData);
+
+      if (fileData.type !== 'file') {
+        console.error('[Drop] Invalid file type:', fileData.type);
+        return;
+      }
+
+      // Calculate relative path if basePath is available
+      let relativePath = fileData.path;
+      if (basePath && fileData.path.startsWith(basePath)) {
+        relativePath = fileData.path.substring(basePath.length).replace(/^\//, '');
+      }
+
+      console.log('[Drop] Relative path:', relativePath);
+
+      // Insert @file:path at cursor position
+      const cursorPos = textareaRef.current.selectionStart;
+      const beforeCursor = input.substring(0, cursorPos);
+      const afterCursor = input.substring(cursorPos);
+
+      // Add space before @ if needed
+      const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+      const prefix = needsSpaceBefore ? ' ' : '';
+      const mention = `${prefix}@file:${relativePath} `;
+      const newInput = beforeCursor + mention + afterCursor;
+
+      console.log('[Drop] New input:', newInput);
+      setInput(newInput);
+
+      // Position cursor after mention
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newCursorPos = beforeCursor.length + mention.length;
+          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 0);
+    } catch (err) {
+      console.error('Failed to parse dropped file data:', err, fileDataStr);
+    }
+  }, [input, setInput, basePath]);
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Handle command autocomplete navigation
     if (showCommandAutocomplete && filteredCommands.length > 0) {
@@ -741,7 +899,12 @@ export default function ChatInput({
   };
 
   return (
-    <div className="chat-input-container">
+    <div
+      className={`chat-input-container ${isDragOver ? 'drag-over' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {/* Command autocomplete dropdown */}
       {showCommandAutocomplete && filteredCommands.length > 0 && (
         <div className="agent-autocomplete command-autocomplete">
@@ -869,7 +1032,10 @@ export default function ChatInput({
           )}
         </div>
       )}
-      <div className="chat-input-wrapper">
+      <div
+        className="chat-input-wrapper"
+        onDragLeave={handleDragLeave}
+      >
         {/* Show agent mention chips */}
         {(() => {
           const mentions = parseAgentMentions(input);
