@@ -6,6 +6,7 @@ interface TerminalToolBarProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onCreateTerminal: () => void;
+  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 }
 
 export default function TerminalToolBar({
@@ -13,6 +14,7 @@ export default function TerminalToolBar({
   onToggleSavedCommands,
   savedCommandsOpen,
   onCreateTerminal,
+  onQuickLaunchNativeTerminal,
 }: TerminalToolBarProps) {
   const tools = [
     {
@@ -82,7 +84,11 @@ export default function TerminalToolBar({
           onClick={() => {
             if (tool.type === "saved") {
               onToggleSavedCommands();
+            } else if (tool.type === "command" && onQuickLaunchNativeTerminal) {
+              // AI tool buttons (Claude Code, Factory AI, Codex) create native terminals
+              onQuickLaunchNativeTerminal(tool.command, tool.label);
             } else {
+              // Fallback to execute command in internal terminal
               onExecuteCommand(tool.command, tool.label);
             }
           }}

@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { NativeTerminalApp, TerminalAppInfo } from "../types";
+import type { NativeTerminalApp, TerminalAppInfo, SavedCommand } from "../types";
 
 interface AddNativeTerminalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (name: string, directory: string, color: string, app: NativeTerminalApp) => void;
+  onConfirm: (name: string, directory: string, color: string, app: NativeTerminalApp, savedCommand?: SavedCommand) => void;
   defaultDirectory?: string;
+  savedCommands?: SavedCommand[];
 }
 
 const PRESET_COLORS = [
@@ -30,6 +31,7 @@ export function AddNativeTerminalModal({
   onClose,
   onConfirm,
   defaultDirectory,
+  savedCommands = [],
 }: AddNativeTerminalModalProps) {
   const [name, setName] = useState("");
   const [directory, setDirectory] = useState(defaultDirectory || "");
@@ -39,6 +41,7 @@ export function AddNativeTerminalModal({
   const [selectedApp, setSelectedApp] = useState<NativeTerminalApp>("Terminal");
   const [availableApps, setAvailableApps] = useState<TerminalAppInfo[]>([]);
   const [loadingApps, setLoadingApps] = useState(false);
+  const [selectedCommandId, setSelectedCommandId] = useState<string>("");
 
   // Load available terminal apps when modal opens
   useEffect(() => {
@@ -74,6 +77,7 @@ export function AddNativeTerminalModal({
       setColor(PRESET_COLORS[0]);
       setCustomColor("");
       setShowColorPicker(false);
+      setSelectedCommandId("");
     }
   }, [isOpen, defaultDirectory]);
 
@@ -111,9 +115,13 @@ export function AddNativeTerminalModal({
     }
 
     const finalColor = showColorPicker && customColor ? customColor : color;
-    onConfirm(trimmedName, trimmedPath, finalColor, selectedApp);
+    const selectedCommand = selectedCommandId
+      ? savedCommands.find((cmd) => cmd.id === selectedCommandId)
+      : undefined;
+
+    onConfirm(trimmedName, trimmedPath, finalColor, selectedApp, selectedCommand);
     onClose();
-  }, [name, directory, color, customColor, showColorPicker, selectedApp, onConfirm, onClose]);
+  }, [name, directory, color, customColor, showColorPicker, selectedApp, selectedCommandId, savedCommands, onConfirm, onClose]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -264,6 +272,34 @@ export function AddNativeTerminalModal({
             </select>
           )}
         </div>
+
+        {/* Saved Command Selection */}
+        {savedCommands.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm text-white/70 mb-2">
+              Startup Command <span className="text-white/40">(optional)</span>
+            </label>
+            <select
+              value={selectedCommandId}
+              onChange={(e) => setSelectedCommandId(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#0e639c]"
+            >
+              <option value="" className="bg-[#1e1e1e] text-white">
+                None - Empty terminal
+              </option>
+              {savedCommands.map((command) => (
+                <option key={command.id} value={command.id} className="bg-[#1e1e1e] text-white">
+                  {command.name} ({command.category})
+                </option>
+              ))}
+            </select>
+            {selectedCommandId && (
+              <div className="mt-2 px-3 py-2 bg-white/3 border border-white/5 rounded text-white/50 text-xs font-mono">
+                {savedCommands.find((cmd) => cmd.id === selectedCommandId)?.command}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">

@@ -25,6 +25,7 @@ struct NativeTerminalRequest {
     name: String,
     directory: Option<String>,
     app: Option<String>,
+    command: Option<String>,
 }
 
 fn resolve_app(app: Option<String>) -> String {
@@ -156,8 +157,9 @@ pub fn open_native_terminal(
     name: String,
     directory: Option<String>,
     app: Option<String>,
+    command: Option<String>,
 ) -> Result<NativeTerminalResult, String> {
-    let request = NativeTerminalRequest { name, directory, app };
+    let request = NativeTerminalRequest { name, directory, app, command };
     open_native_terminal_impl(request).map_err(|err| err.to_string())
 }
 
@@ -186,6 +188,14 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
 
     let escaped_dir = dir.replace("'", "\\'");
     let escaped_name = request.name.replace("'", "\\'");
+    let escaped_command = request.command.as_ref().map(|cmd| cmd.replace("'", "\\'"));
+
+    // Build the command string to execute
+    let command_str = if let Some(ref cmd) = escaped_command {
+        format!("cd '{}' && clear && {}", escaped_dir, cmd)
+    } else {
+        format!("cd '{}' && clear && echo 'Terminal: {}'", escaped_dir, escaped_name)
+    };
 
     let applescript = match app.as_str() {
         "iTerm" | "iTerm2" => format!(
@@ -195,18 +205,16 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
                 try
                     tell current window
                         create tab with default profile
-                        tell current session to write text "cd '{}' && clear && echo 'Terminal: {}'"
+                        tell current session to write text "{}"
                     end tell
                 on error
                     create window with default profile
-                    tell current window's current session to write text "cd '{}' && clear && echo 'Terminal: {}'"
+                    tell current window's current session to write text "{}"
                 end try
             end tell
             "#,
-            escaped_dir,
-            escaped_name,
-            escaped_dir,
-            escaped_name,
+            command_str,
+            command_str,
         ),
         "Warp" => {
             // Warp doesn't support AppleScript well, so we use 'open' command with URL scheme
@@ -279,8 +287,26 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
                     }
                 });
         },
-        "Terminal" => format!(
-            r#"
+        "Terminal" => {
+            let terminal_command = if escaped_command.is_some() {
+                // If we have a command, execute it
+                format!(
+                    r#"
+            tell application "Terminal"
+                activate
+                -- Do everything in a single do script to avoid opening multiple windows
+                set newTab to do script "{}"
+                -- Also set custom title property for reliable searching later
+                set custom title of newTab to "Terminal: {}"
+            end tell
+            "#,
+                    command_str,
+                    escaped_name,
+                )
+            } else {
+                // No command, use the default behavior with custom prompt
+                format!(
+                    r#"
             tell application "Terminal"
                 activate
                 -- Do everything in a single do script to avoid opening multiple windows
@@ -289,20 +315,22 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
                 set custom title of newTab to "Terminal: {}"
             end tell
             "#,
-            escaped_dir,
-            escaped_name,
-            escaped_name,
-        ),
+                    escaped_dir,
+                    escaped_name,
+                    escaped_name,
+                )
+            };
+            terminal_command
+        },
         _ => format!(
             r#"
             tell application "{}"
                 activate
-                do script "cd '{}' && clear && echo 'Terminal: {}' && exec $SHELL"
+                do script "{}"
             end tell
             "#,
             sanitize_app_name(&app),
-            escaped_dir,
-            escaped_name,
+            command_str,
         ),
     };
 

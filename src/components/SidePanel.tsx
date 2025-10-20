@@ -195,6 +195,7 @@ interface SidePanelProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onCreateTerminal: () => void;
+  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 
   // Native Terminals props
   nativeTerminals: NativeTerminal[];
@@ -250,6 +251,7 @@ export default function SidePanel({
   onToggleSavedCommands,
   savedCommandsOpen,
   onCreateTerminal,
+  onQuickLaunchNativeTerminal,
 
   // Native Terminals
   nativeTerminals,
@@ -289,14 +291,15 @@ export default function SidePanel({
       label: "Context",
       icon: icons.context,
     },
-    {
-      id: "terminal" as TabId,
-      label: "Terminal",
-      icon: icons.terminal,
-    },
+    // Terminal tab hidden - integrated into native-terminals
+    // {
+    //   id: "terminal" as TabId,
+    //   label: "Terminal",
+    //   icon: icons.terminal,
+    // },
     {
       id: "native-terminals" as TabId,
-      label: "Native Terminals",
+      label: "Terminals", // Renamed from "Native Terminals"
       icon: icons.nativeTerminals,
       badge: nativeTerminals.length,
       hasContent: nativeTerminals.length > 0,
@@ -464,14 +467,24 @@ export default function SidePanel({
         )}
 
         {activeTab === "native-terminals" && (
-          <div className="side-panel-pane">
-            <NativeTerminalPanel
-              terminals={nativeTerminals}
-              onAdd={onAddNativeTerminal}
-              onRemove={onRemoveNativeTerminal}
-              onOpen={onOpenNativeTerminal}
-              onFocus={onFocusNativeTerminal}
-            />
+          <div className="side-panel-pane terminal-panel-pane">
+            <div className="terminal-container-with-iconbar">
+              <NativeTerminalPanel
+                terminals={nativeTerminals}
+                onAdd={onAddNativeTerminal}
+                onRemove={onRemoveNativeTerminal}
+                onOpen={onOpenNativeTerminal}
+                onFocus={onFocusNativeTerminal}
+              />
+              {/* Saved Commands Bar integrated */}
+              <TerminalToolBar
+                onExecuteCommand={onExecuteCommand}
+                onToggleSavedCommands={onToggleSavedCommands}
+                savedCommandsOpen={savedCommandsOpen}
+                onCreateTerminal={onAddNativeTerminal}
+                onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
+              />
+            </div>
           </div>
         )}
       </div>

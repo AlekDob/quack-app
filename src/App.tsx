@@ -945,16 +945,25 @@ function App() {
 
   // Native Terminal handlers
   const handleAddNativeTerminal = useCallback(
-    async (name: string, directory: string, color: string, app: NativeTerminalApp) => {
+    async (name: string, directory: string, color: string, app: NativeTerminalApp, savedCommand?: SavedCommand) => {
       if (!tauriAvailable) {
         toast.error("Tauri is not available");
         return;
       }
 
       try {
+        // If a saved command is provided, use its command and cwd
+        const finalDirectory = savedCommand?.cwd || directory;
+        const commandToExecute = savedCommand?.command;
+
         const result = await invoke<{ success: boolean; pid?: number }>(
           "open_native_terminal",
-          { name, directory: directory || undefined, app }
+          {
+            name,
+            directory: finalDirectory || undefined,
+            app,
+            command: commandToExecute || undefined
+          }
         );
 
         if (result.success) {
@@ -963,14 +972,18 @@ function App() {
             name,
             app,
             color,
-            directory,
+            directory: finalDirectory,
             isOpen: true,
             pid: result.pid,
             createdAt: Date.now(),
           };
 
           setNativeTerminals((prev) => [...prev, newTerminal]);
-          toast.success(`Terminal "${name}" opened successfully`);
+          if (savedCommand) {
+            toast.success(`Terminal "${name}" opened with command "${savedCommand.name}"`);
+          } else {
+            toast.success(`Terminal "${name}" opened successfully`);
+          }
         } else {
           toast.error("Failed to open terminal");
         }
@@ -982,6 +995,50 @@ function App() {
       }
     },
     [tauriAvailable]
+  );
+
+  // Quick-launch native terminal with AI tool command (Claude Code, Factory AI, Codex)
+  const handleQuickLaunchNativeTerminal = useCallback(
+    async (command: string, label: string) => {
+      // Preset color palette for random selection
+      const colors = [
+        "#4ecdc4",
+        "#ff6b6b",
+        "#95e1d3",
+        "#f38181",
+        "#aa96da",
+        "#fcbad3",
+        "#a8d8ea",
+        "#ffb5e8",
+        "#c7ceea",
+        "#ffd3b6",
+        "#d4a5a5",
+      ];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+      // Get current directory (prefer explorerPath, fallback to activeTerminal cwd or home)
+      const currentDirectory = explorerPath || activeTerminal?.cwd || "";
+
+      // Create a SavedCommand object for the AI tool
+      const aiToolCommand: SavedCommand = {
+        id: crypto.randomUUID(),
+        name: label,
+        command,
+        cwd: currentDirectory,
+        color: randomColor,
+        category: "dev",
+      };
+
+      // Launch native terminal with the command
+      await handleAddNativeTerminal(
+        label,
+        currentDirectory,
+        randomColor,
+        "Terminal", // Default to Terminal.app (user can change this later in settings)
+        aiToolCommand
+      );
+    },
+    [explorerPath, activeTerminal, handleAddNativeTerminal]
   );
 
   // Unused - keeping for future use
@@ -3415,6 +3472,7 @@ function App() {
           }
           savedCommandsOpen={savedCommandsDrawerOpen}
           onCreateTerminal={handleQuickCreateTerminal}
+          onQuickLaunchNativeTerminal={handleQuickLaunchNativeTerminal}
           // Native Terminals props
           nativeTerminals={nativeTerminals}
           onAddNativeTerminal={() => setShowAddNativeTerminalModal(true)}
@@ -3616,11 +3674,12 @@ function App() {
         <AddNativeTerminalModal
           isOpen={showAddNativeTerminalModal}
           onClose={() => setShowAddNativeTerminalModal(false)}
-          onConfirm={async (name, directory, color, app) => {
-            await handleAddNativeTerminal(name, directory, color, app);
+          onConfirm={async (name, directory, color, app, savedCommand) => {
+            await handleAddNativeTerminal(name, directory, color, app, savedCommand);
             setShowAddNativeTerminalModal(false);
           }}
           defaultDirectory={explorerPath || activeTerminal?.cwd || ""}
+          savedCommands={savedCommands}
         />
 
         {showSettings && (
