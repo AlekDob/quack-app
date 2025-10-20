@@ -9,21 +9,24 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   outline: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .chat-settings-trigger:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(242, 140, 82, 0.5);
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 6px rgba(242, 140, 82, 0.2);
+  transform: translateY(-1px);
 }
 
 .chat-settings-trigger:disabled {
@@ -145,4 +148,42 @@
 .chat-settings-select option[value="bypass"] {
   background: linear-gradient(90deg, rgba(248, 113, 113, 0.2) 0%, transparent 100%);
   border-left: 3px solid #f87171;
+}
+
+/* Clear conversation button */
+.chat-settings-actions {
+  padding: 8px 0 4px 0;
+}
+
+.chat-settings-clear-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  color: rgba(239, 68, 68, 0.9);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.chat-settings-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  transform: translateY(-1px);
+}
+
+.chat-settings-clear-btn:active {
+  transform: translateY(0);
+}
+
+.chat-settings-clear-btn svg {
+  flex-shrink: 0;
 }

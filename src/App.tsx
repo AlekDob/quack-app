@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
 import {
   isPermissionGranted,
   requestPermission,
@@ -773,6 +773,35 @@ function App() {
   const getLastPromptForAgent = useCallback(() => {
     if (!activeId) return '';
     return lastPromptsRef.current.get(activeId) || '';
+  }, [activeId]);
+
+  // Clear conversation for current agent
+  const clearCurrentAgentConversation = useCallback(async () => {
+    if (!activeId) return;
+
+    // Show confirmation dialog
+    const confirmed = await confirm('Are you sure you want to clear this conversation? This action cannot be undone.', {
+      title: 'Clear Conversation',
+      kind: 'warning',
+    });
+
+    if (!confirmed) return;
+
+    // Clear messages
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      newSessions.set(activeId, []);
+      return newSessions;
+    });
+
+    // Clear conversation history
+    chatConversationHistoryRef.current.set(activeId, []);
+
+    // Clear last prompt
+    lastPromptsRef.current.delete(activeId);
+
+    // Show success toast
+    toast.success('Conversation cleared');
   }, [activeId]);
 
   // Quack Agency state
@@ -3283,6 +3312,8 @@ function App() {
               // Streaming control
               onAbortStream={abortStreamForAgent}
               lastPrompt={getLastPromptForAgent()}
+              // Conversation management
+              onClearConversation={clearCurrentAgentConversation}
             />
           </div>
         </section>

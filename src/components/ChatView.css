@@ -17,6 +17,45 @@
   flex-shrink: 0;
 }
 
+.chat-view-footer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 6px;
+  color: rgba(248, 113, 113, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.chat-clear-btn:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: rgba(248, 113, 113, 1);
+  transform: translateY(-1px);
+}
+
+.chat-clear-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.chat-clear-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .active-agent-indicator {
   display: inline-flex;
   align-items: center;

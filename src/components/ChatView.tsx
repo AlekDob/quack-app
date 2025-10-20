@@ -38,6 +38,8 @@ interface ChatViewProps {
   // Streaming control
   onAbortStream?: () => void;
   lastPrompt?: string;
+  // Conversation management
+  onClearConversation?: () => void;
 }
 
 export default function ChatView({
@@ -68,6 +70,8 @@ export default function ChatView({
   // Streaming control
   onAbortStream,
   lastPrompt,
+  // Conversation management
+  onClearConversation,
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -118,15 +122,30 @@ export default function ChatView({
         onFilePathClick={onFilePathClick}
       />
       <div className="chat-view-footer">
-        <ChatSettingsMenu
-          model={model}
-          thinkingMode={thinkingMode}
-          permissionMode={permissionMode}
-          onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5')}
-          onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
-          onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
-          disabled={isLoading}
-        />
+        <div className="chat-view-footer-controls">
+          <ChatSettingsMenu
+            model={model}
+            thinkingMode={thinkingMode}
+            permissionMode={permissionMode}
+            onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5')}
+            onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
+            onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
+            disabled={isLoading}
+          />
+          {messages.length > 0 && onClearConversation && (
+            <button
+              className="chat-clear-btn"
+              onClick={onClearConversation}
+              disabled={isLoading}
+              title="Clear Conversation"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          )}
+        </div>
         <ChatInput
           onSend={handleSend}
           disabled={isLoading}
