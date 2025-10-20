@@ -27,17 +27,6 @@ interface AgentsPanelProps {
   ) => Promise<void>;
 }
 
-// Agent color mapping
-const AGENT_COLORS: Record<string, string> = {
-  blue: "#4A9EFF",
-  purple: "#A855F7",
-  green: "#10B981",
-  orange: "#F59E0B",
-  yellow: "#EAB308",
-  red: "#EF4444",
-  pink: "#EC4899",
-};
-
 export default function AgentsPanel({
   agents,
   loading,
@@ -52,10 +41,6 @@ export default function AgentsPanel({
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-
-  const getAgentColor = (colorName: string): string => {
-    return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
-  };
 
   // Filter agents based on search query
   const filteredAgents = agents.filter(agent =>
