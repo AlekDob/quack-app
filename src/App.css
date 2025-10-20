@@ -6159,10 +6159,10 @@ button.directory-chooser:hover {
 }
 
 /* Agent Detail Avatar (Cyberduck Image) */
-/* Avatar in header (small) */
+/* Avatar in header (larger) */
 .agent-detail-avatar-small {
-  width: 42px;
-  height: 42px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(242, 140, 82, 0.3);
@@ -6294,6 +6294,9 @@ button.directory-chooser:hover {
   font-size: 0.9375rem;
   font-family: inherit;
   transition: all 0.2s ease;
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .agent-description-input:hover {
@@ -6630,6 +6633,52 @@ button.directory-chooser:hover {
 .info-link:hover {
   color: #ff9f66;
   text-decoration: underline;
+}
+
+/* Reveal in Finder Button */
+.reveal-in-finder-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reveal-in-finder-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.reveal-in-finder-button svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.reveal-in-finder-button:hover svg {
+  opacity: 1;
+}
+
+/* File Explorer Header with Reveal Button */
+.explorer-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.explorer-header-top .reveal-in-finder-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  min-width: auto;
 }
 
 /* API Key Input */
@@ -6993,4 +7042,100 @@ button.directory-chooser:hover {
   opacity: 0.6;
   line-height: 1;
   padding-left: 28px; /* Aligns with label (icon width + gap) */
+}
+
+/* ========================================
+   Context Panel Styles
+   ======================================== */
+
+.context-section {
+  margin-bottom: 1rem;
+}
+
+.context-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.context-section-header:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.context-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.context-section-arrow {
+  transition: transform 0.2s ease;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.context-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  margin-left: auto;
+}
+
+.context-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.context-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(2px);
+}
+
+.context-item-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.context-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.context-item-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

@@ -177,6 +177,10 @@ interface SidePanelProps {
   // Commands props
   onUseCommand: (command: SlashCommand) => void;
 
+  // Context props
+  tauriAvailable: boolean;
+  onOpenContextDrawer: (scope: string) => void;
+
   // Terminal props
   activeTerminalId: string | null;
   terminals: TerminalInfo[];
@@ -226,6 +230,10 @@ export default function SidePanel({
 
   // Commands
   onUseCommand,
+
+  // Context
+  tauriAvailable,
+  onOpenContextDrawer,
 
   // Terminal
   activeTerminalId,
@@ -376,7 +384,10 @@ export default function SidePanel({
 
         {activeTab === "context" && (
           <div className="side-panel-pane">
-            <ContextPanel />
+            <ContextPanel
+              tauriAvailable={tauriAvailable}
+              onOpenContextDrawer={onOpenContextDrawer}
+            />
           </div>
         )}
 

@@ -13,6 +13,7 @@ mod claude_auth;
 mod claude_cli;
 mod claude_oauth;
 mod commands;
+mod context;
 mod fs;
 mod git;
 mod mcp;
@@ -21,6 +22,7 @@ mod native_terminal;
 mod plugins;
 mod preferences;
 mod preview;
+mod reveal;
 mod slash_commands;
 mod terminal;
 
@@ -309,6 +311,9 @@ pub fn run() {
             commands::save_command,
             commands::update_command,
             commands::delete_command,
+            context::list_claude_md_files,
+            context::get_claude_md_details,
+            context::save_claude_md_content,
             fs::list_directory,
             fs::get_home_directory,
             fs::read_file_content,
@@ -379,7 +384,8 @@ pub fn run() {
             plugins::list_installed_plugins,
             plugins::install_plugin,
             plugins::uninstall_plugin,
-            plugins::search_plugins
+            plugins::search_plugins,
+            reveal::reveal_in_finder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

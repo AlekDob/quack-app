@@ -28,6 +28,7 @@ import UnifiedSettings from "./components/settings/UnifiedSettings";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
 import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
+import ContextDrawer from "./components/ContextDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
@@ -713,6 +714,10 @@ function App() {
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
+
+  // Context drawer state
+  const [showContextDrawer, setShowContextDrawer] = useState(false);
+  const [contextScope, setContextScope] = useState<string | null>(null);
 
   // activeTerminal moved to top of component for TypeScript hoisting
 
@@ -1642,6 +1647,11 @@ function App() {
       });
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath, loadAgents]);
+
+  const handleOpenContextDrawer = useCallback((scope: string) => {
+    setContextScope(scope);
+    setShowContextDrawer(true);
+  }, []);
 
   const handleUseCommand = useCallback((command: { name: string; description: string }) => {
     // Set pending slash command to trigger insertion in ChatInput
@@ -3203,6 +3213,9 @@ function App() {
           onCreateAgent={handleCreateAgent}
           // Commands props
           onUseCommand={handleUseCommand}
+          // Context props
+          tauriAvailable={tauriAvailable}
+          onOpenContextDrawer={handleOpenContextDrawer}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}
@@ -3457,6 +3470,13 @@ function App() {
           onClose={() => setShowQuackAgencyDrawer(false)}
           onSelectAgent={handleSelectAgent}
           onRefresh={loadAgents}
+        />
+
+        <ContextDrawer
+          open={showContextDrawer}
+          scope={contextScope}
+          workingDir={activeTerminal?.cwd ?? explorerPath}
+          onClose={() => setShowContextDrawer(false)}
         />
 
         <BackgroundsModal

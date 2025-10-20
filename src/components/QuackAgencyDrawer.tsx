@@ -4,6 +4,7 @@ import type { AgentInfo, AgentDetails } from "../types";
 import QuackAgencySetupWizard from "./QuackAgencySetupWizard";
 import MarkdownText from "./MarkdownText";
 import CodeEditor from "./CodeEditor";
+import RevealInFinderButton from "./RevealInFinderButton";
 
 interface QuackAgencyDrawerProps {
   open: boolean;
@@ -520,13 +521,13 @@ export default function QuackAgencyDrawer({
                   <div className="agent-edit-fields">
                     <div className="agent-edit-field">
                       <label className="agent-edit-label">Description:</label>
-                      <input
-                        type="text"
+                      <textarea
                         className="agent-description-input"
                         value={editDescription}
                         onChange={(e) => handleDescriptionChange(e.target.value)}
                         disabled={isSaving}
                         placeholder="Agent description..."
+                        rows={3}
                       />
                     </div>
 
@@ -590,7 +591,14 @@ export default function QuackAgencyDrawer({
 
         <footer className="quack-agency-drawer-footer">
           <div className="quack-agency-drawer-stats">
-            {agents.length} {agents.length === 1 ? "agent" : "agents"} active
+            {viewMode === "detail" && selectedAgent ? (
+              <>
+                <span>{selectedAgent.file_path}</span>
+                <RevealInFinderButton path={selectedAgent.file_path} iconOnly />
+              </>
+            ) : (
+              <span>{agents.length} {agents.length === 1 ? "agent" : "agents"} active</span>
+            )}
           </div>
           <button type="button" onClick={onRefresh} disabled={loading}>
             {icons.refresh}

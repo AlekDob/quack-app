@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
-import { getAgentAvatar } from "../utils/agentAvatars";
 import { NewAgentModal } from "./NewAgentModal";
 
 /**
@@ -298,40 +297,25 @@ export default function AgentsPanel({
                           }}
                         >
                           {/* Agent Avatar or Badge */}
-                          {(() => {
-                            const avatarPath = getAgentAvatar(agent.name);
-                            if (avatarPath) {
-                              return (
-                                <div
-                                  className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
-                                  style={{
-                                    background: "rgba(255, 255, 255, 0.05)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                  }}
-                                >
-                                  <img
-                                    src={avatarPath}
-                                    alt={agent.name}
-                                    style={{
-                                      width: "110%",
-                                      height: "110%",
-                                      objectFit: "contain",
-                                      objectPosition: "center",
-                                      transform: "scale(1.1)",
-                                    }}
-                                  />
-                                </div>
-                              );
-                            }
-                            return (
-                              <div
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{
-                                  backgroundColor: getAgentColor(agent.color),
-                                }}
-                              />
-                            );
-                          })()}
+                          <div
+                            className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.05)",
+                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                            }}
+                          >
+                            <img
+                              src="/images/cyberduck.png"
+                              alt={agent.name}
+                              style={{
+                                width: "110%",
+                                height: "110%",
+                                objectFit: "contain",
+                                objectPosition: "center",
+                                transform: "scale(1.1)",
+                              }}
+                            />
+                          </div>
 
                           {/* Agent Info */}
                           <div className="flex-1 min-w-0">
@@ -449,40 +433,25 @@ export default function AgentsPanel({
                           }}
                         >
                           {/* Agent Avatar or Badge */}
-                          {(() => {
-                            const avatarPath = getAgentAvatar(agent.name);
-                            if (avatarPath) {
-                              return (
-                                <div
-                                  className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
-                                  style={{
-                                    background: "rgba(255, 255, 255, 0.05)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                  }}
-                                >
-                                  <img
-                                    src={avatarPath}
-                                    alt={agent.name}
-                                    style={{
-                                      width: "110%",
-                                      height: "110%",
-                                      objectFit: "contain",
-                                      objectPosition: "center",
-                                      transform: "scale(1.1)",
-                                    }}
-                                  />
-                                </div>
-                              );
-                            }
-                            return (
-                              <div
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{
-                                  backgroundColor: getAgentColor(agent.color),
-                                }}
-                              />
-                            );
-                          })()}
+                          <div
+                            className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.05)",
+                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                            }}
+                          >
+                            <img
+                              src="/images/cyberduck.png"
+                              alt={agent.name}
+                              style={{
+                                width: "110%",
+                                height: "110%",
+                                objectFit: "contain",
+                                objectPosition: "center",
+                                transform: "scale(1.1)",
+                              }}
+                            />
+                          </div>
 
                           {/* Agent Info */}
                           <div className="flex-1 min-w-0">

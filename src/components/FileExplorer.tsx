@@ -9,6 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import FileContextMenu from "./FileContextMenu";
+import RevealInFinderButton from "./RevealInFinderButton";
 
 const normalize = (value: string) => value.toLowerCase();
 const normalizePathValue = (value: string) =>
@@ -480,7 +481,10 @@ function FileExplorer({
   return (
     <aside className="file-explorer">
       <div className="explorer-header">
-        <h2 className="explorer-title">File Explorer</h2>
+        <div className="explorer-header-top">
+          <h2 className="explorer-title">File Explorer</h2>
+          {activePath && <RevealInFinderButton path={activePath} iconOnly />}
+        </div>
         <span className="explorer-path">{activePath}</span>
         {error && <span className="explorer-error">{error}</span>}
         <input
