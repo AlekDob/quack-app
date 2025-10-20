@@ -24,6 +24,12 @@ export function useClaudeChat() {
   // Store the Claude SDK session ID for resume
   const claudeSessionId = useRef<string | undefined>(undefined);
 
+  // Store abort controller for canceling streams
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Store last prompt for restoration on abort
+  const lastPromptRef = useRef<string>('');
+
   // Initialize (SDK doesn't need initialization)
   const initialize = useCallback(async () => {
     setIsConfigured(true);
@@ -34,6 +40,12 @@ export function useClaudeChat() {
   // Send message to Claude using the SDK with streaming
   const sendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
+
+    // Save the prompt for restoration on abort
+    lastPromptRef.current = content;
+
+    // Create abort controller for this stream
+    abortControllerRef.current = new AbortController();
 
     // Create user message
     const attachments = options?.attachments ?? [];
@@ -70,6 +82,7 @@ export function useClaudeChat() {
         permissionMode: options?.permissionMode || 'bypass',
         sessionId: claudeSessionId.current, // Resume previous session if exists
         workingDirectory: options?.workingDirectory,
+        signal: abortControllerRef.current?.signal, // Pass abort signal
       });
 
       const events: ClaudeEvent[] = [];
@@ -145,35 +158,69 @@ export function useClaudeChat() {
     } catch (err) {
       console.error('[useClaudeChat] Error streaming message:', err);
 
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'string'
-            ? err
-            : 'Unknown error';
+      // Check if this was an abort
+      if (abortControllerRef.current?.signal.aborted) {
+        console.log('[useClaudeChat] Stream was aborted by user');
 
-      // Update message with error
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
-                status: 'error' as const,
-                error: errorMessage,
-              }
-            : msg
-        )
-      );
+        // Update message with aborted status
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: 'Stream stopped by user',
+                  status: 'error' as const,
+                  error: 'Aborted',
+                }
+              : msg
+          )
+        );
+      } else {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : 'Unknown error';
+
+        // Update message with error
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
+                  status: 'error' as const,
+                  error: errorMessage,
+                }
+              : msg
+          )
+        );
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null; // Clean up
     }
   }, [isLoading]);
+
+  // Abort current streaming
+  const abortStream = useCallback(() => {
+    if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+      console.log('[useClaudeChat] Aborting stream...');
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  // Get last prompt (for restoration on abort)
+  const getLastPrompt = useCallback(() => {
+    return lastPromptRef.current;
+  }, []);
 
   // Clear conversation and reset session
   const clearConversation = useCallback(() => {
     setMessages([]);
     claudeSessionId.current = undefined; // Clear session ID to start fresh
+    lastPromptRef.current = ''; // Clear last prompt
   }, []);
 
   // Get current session ID (useful for debugging)
@@ -187,6 +234,8 @@ export function useClaudeChat() {
     isConfigured,
     error,
     sendMessage,
+    abortStream,
+    getLastPrompt,
     clearConversation,
     initialize,
     getCurrentSessionId,

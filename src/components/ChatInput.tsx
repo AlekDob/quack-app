@@ -56,6 +56,10 @@ interface ChatInputProps {
   // Controlled input value
   inputValue?: string;
   onInputChange?: (value: string) => void;
+  // Streaming control
+  isStreaming?: boolean;
+  onAbort?: () => void;
+  lastPrompt?: string;
 }
 
 export default function ChatInput({
@@ -72,6 +76,9 @@ export default function ChatInput({
   basePath,
   inputValue: controlledInputValue,
   onInputChange: controlledOnInputChange,
+  isStreaming = false,
+  onAbort,
+  lastPrompt,
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
@@ -698,6 +705,26 @@ export default function ChatInput({
     setError(null);
   };
 
+  const handleStop = () => {
+    if (onAbort) {
+      onAbort();
+
+      // Restore last prompt
+      if (lastPrompt) {
+        setInput(lastPrompt);
+
+        // Focus textarea and move cursor to end
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            const length = lastPrompt.length;
+            textareaRef.current.setSelectionRange(length, length);
+          }
+        }, 0);
+      }
+    }
+  };
+
   // Drag & drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     console.log('[DragEnter] Event triggered!', e.dataTransfer.types);
@@ -1113,30 +1140,53 @@ export default function ChatInput({
           </button>
           <button
             type="button"
-            className="chat-input-send"
+            className={`chat-input-send ${isStreaming ? 'streaming' : ''}`}
             onClick={() => {
-              void handleSend();
+              if (isStreaming) {
+                handleStop();
+              } else {
+                void handleSend();
+              }
             }}
-            disabled={disabled || (!input.trim() && attachments.length === 0)}
-            data-tooltip="Send (⌘+Enter)"
-            aria-label="Send message"
+            disabled={!isStreaming && (disabled || (!input.trim() && attachments.length === 0))}
+            data-tooltip={isStreaming ? 'Stop streaming' : 'Send (⌘+Enter)'}
+            aria-label={isStreaming ? 'Stop streaming' : 'Send message'}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
+            {isStreaming ? (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
                 fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  x="3"
+                  y="3"
+                  width="10"
+                  height="10"
+                  rx="1"
+                  fill="currentColor"
+                />
+              </svg>
+            ) : (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
+                  fill="currentColor"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
           </button>
           </div>
         </div>

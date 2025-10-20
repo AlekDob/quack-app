@@ -13,6 +13,7 @@ export interface ClaudeSDKOptions {
     args: string[];
     env?: Record<string, string>;
   }>;
+  signal?: AbortSignal; // AbortSignal to cancel the stream
 }
 
 /**
@@ -155,6 +156,12 @@ export async function* streamClaudeMessage(
 
     // Stream events
     for await (const event of stream) {
+      // Check if stream was aborted
+      if (options.signal?.aborted) {
+        console.log('[claudeSDK] Stream aborted by user');
+        break;
+      }
+
       // Convert SDK event to our ClaudeEvent format
       const claudeEvent = convertSDKEventToClaudeEvent(event);
 

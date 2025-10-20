@@ -35,6 +35,9 @@ interface ChatViewProps {
   onThinkingModeChange?: (mode: ThinkingMode) => void;
   permissionMode?: PermissionMode;
   onPermissionModeChange?: (mode: PermissionMode) => void;
+  // Streaming control
+  onAbortStream?: () => void;
+  lastPrompt?: string;
 }
 
 export default function ChatView({
@@ -62,6 +65,9 @@ export default function ChatView({
   onThinkingModeChange,
   permissionMode = 'bypass',
   onPermissionModeChange,
+  // Streaming control
+  onAbortStream,
+  lastPrompt,
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -139,6 +145,10 @@ export default function ChatView({
           // Controlled input draft
           inputValue={inputDraft}
           onInputChange={onInputDraftChange}
+          // Streaming control
+          isStreaming={isLoading}
+          onAbort={onAbortStream}
+          lastPrompt={lastPrompt}
         />
       </div>
     </div>

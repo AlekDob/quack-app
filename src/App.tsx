@@ -383,6 +383,10 @@ function App() {
   const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
   const [isChatConfigured, setIsChatConfigured] = useState(false);
 
+  // Abort controllers and last prompts for each agent
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const lastPromptsRef = useRef<Map<string, string>>(new Map());
+
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
@@ -509,6 +513,13 @@ function App() {
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !activeId) return;
 
+    // Save the prompt for restoration on abort
+    lastPromptsRef.current.set(activeId, content);
+
+    // Create abort controller for this stream
+    const abortController = new AbortController();
+    abortControllersRef.current.set(activeId, abortController);
+
     // Check if chat is configured
     if (!isChatConfigured) {
       const errorMessage: ChatMessage = {
@@ -607,23 +618,38 @@ function App() {
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
       const workingDir = activeTerminal?.cwd ?? explorerPath;
-      const response = await invoke<{ result: string; session_id: string; total_cost_usd: number }>('send_message_via_sdk_streaming', {
-        agentId: activeId,
-        request: {
-          prompt,
-          model: options?.model || 'sonnet',
-          thinkingMode: options?.thinkingMode,
-          permissionMode: options?.permissionMode,
-          attachments: attachments.map(a => a.path),
-          agents: activeAgent ? [{
-            name: activeAgent.name,
-            description: activeAgent.description,
-            model: activeAgent.model,
-            filePath: activeAgent.file_path,
-          }] : undefined,
-          cwd: workingDir,
-        },
+
+      // Create abort promise that rejects when signal is aborted
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (abortController.signal.aborted) {
+          reject(new Error('Aborted'));
+        }
+        abortController.signal.addEventListener('abort', () => {
+          reject(new Error('Aborted'));
+        });
       });
+
+      // Race between invoke and abort
+      const response = await Promise.race([
+        invoke<{ result: string; session_id: string; total_cost_usd: number }>('send_message_via_sdk_streaming', {
+          agentId: activeId,
+          request: {
+            prompt,
+            model: options?.model || 'sonnet',
+            thinkingMode: options?.thinkingMode,
+            permissionMode: options?.permissionMode,
+            attachments: attachments.map(a => a.path),
+            agents: activeAgent ? [{
+              name: activeAgent.name,
+              description: activeAgent.description,
+              model: activeAgent.model,
+              filePath: activeAgent.file_path,
+            }] : undefined,
+            cwd: workingDir,
+          },
+        }),
+        abortPromise,
+      ]);
 
       // Update message with final result
       setChatSessions((prev) => {
@@ -668,32 +694,57 @@ function App() {
     } catch (err) {
       console.error('Error calling Claude SDK:', err);
 
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'string'
-            ? err
-            : 'Unknown error';
+      // Check if this was an abort
+      if (abortController.signal.aborted) {
+        console.log('[sendMessageForAgent] Stream was aborted by user');
 
-      // Update message with error
-      setChatSessions((prev) => {
-        const newSessions = new Map(prev);
-        const agentMessages = newSessions.get(activeId) ?? [];
-        newSessions.set(
-          activeId,
-          agentMessages.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
-                  status: 'error' as const,
-                  error: errorMessage,
-                }
-              : msg
-          )
-        );
-        return newSessions;
-      });
+        // Update message with aborted status
+        setChatSessions((prev) => {
+          const newSessions = new Map(prev);
+          const agentMessages = newSessions.get(activeId) ?? [];
+          newSessions.set(
+            activeId,
+            agentMessages.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content: 'Stream stopped by user',
+                    status: 'error' as const,
+                    error: 'Aborted',
+                  }
+                : msg
+            )
+          );
+          return newSessions;
+        });
+      } else {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : 'Unknown error';
+
+        // Update message with error
+        setChatSessions((prev) => {
+          const newSessions = new Map(prev);
+          const agentMessages = newSessions.get(activeId) ?? [];
+          newSessions.set(
+            activeId,
+            agentMessages.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
+                    status: 'error' as const,
+                    error: errorMessage,
+                  }
+                : msg
+            )
+          );
+          return newSessions;
+        });
+      }
     } finally {
       // Clear loading for this agent
       setChatLoadingMap((prev) => {
@@ -701,8 +752,28 @@ function App() {
         newMap.set(activeId, false);
         return newMap;
       });
+
+      // Clean up abort controller
+      abortControllersRef.current.delete(activeId);
     }
   }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath]);
+
+  // Abort streaming for specific agent
+  const abortStreamForAgent = useCallback(() => {
+    if (!activeId) return;
+
+    const abortController = abortControllersRef.current.get(activeId);
+    if (abortController && !abortController.signal.aborted) {
+      console.log('[abortStreamForAgent] Aborting stream for agent:', activeId);
+      abortController.abort();
+    }
+  }, [activeId]);
+
+  // Get last prompt for specific agent
+  const getLastPromptForAgent = useCallback(() => {
+    if (!activeId) return '';
+    return lastPromptsRef.current.get(activeId) || '';
+  }, [activeId]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -3209,6 +3280,9 @@ function App() {
               onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
               permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
               onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
+              // Streaming control
+              onAbortStream={abortStreamForAgent}
+              lastPrompt={getLastPromptForAgent()}
             />
           </div>
         </section>
