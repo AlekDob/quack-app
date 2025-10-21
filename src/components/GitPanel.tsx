@@ -27,6 +27,7 @@ interface GitPanelProps {
   onCommitMessageChange: (message: string) => void
   onCommit: () => void
   committing: boolean
+  onGenerateCommitMessage: () => Promise<void>
 }
 
 const statusBadgeClass = (kind: 'staged' | 'working') =>
@@ -155,6 +156,7 @@ function GitPanel({
   onCommitMessageChange,
   onCommit,
   committing,
+  onGenerateCommitMessage,
 }: GitPanelProps) {
   const groupedEntries = useMemo(() => {
     const entries = summary?.entries ?? []
@@ -432,7 +434,40 @@ function GitPanel({
               </div>
 
               <div className="git-commit-box">
-                <h3>Commit</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <h3 style={{ margin: 0 }}>Commit</h3>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.35rem 0.65rem',
+                      background: 'rgba(139, 92, 246, 0.12)',
+                      border: '1px solid rgba(139, 92, 246, 0.25)',
+                      borderRadius: '5px',
+                      color: '#a78bfa',
+                      fontSize: '0.7rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onClick={onGenerateCommitMessage}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.18)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.12)';
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.25)';
+                    }}
+                    disabled={groupedEntries.staged.length === 0}
+                    title="Generate commit message with AI"
+                  >
+                    <span>✨</span>
+                    <span>AI Generate</span>
+                  </button>
+                </div>
                 <textarea
                   className="git-commit-message"
                   placeholder="Commit message"
@@ -456,16 +491,5 @@ function GitPanel({
   )
 }
 
-// Performance: Memo per evitare re-render quando cambiano solo terminali
-export default memo(GitPanel, (prevProps, nextProps) => {
-  // Re-render solo se dati git cambiano
-  return (
-    prevProps.summary === nextProps.summary &&
-    prevProps.loading === nextProps.loading &&
-    prevProps.error === nextProps.error &&
-    prevProps.selected === nextProps.selected &&
-    prevProps.diffContent === nextProps.diffContent &&
-    prevProps.diffView === nextProps.diffView &&
-    prevProps.committing === nextProps.committing
-  )
-})
+// Performance: Memo rimosso temporaneamente per debug input
+export default GitPanel

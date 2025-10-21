@@ -3262,6 +3262,144 @@ function App() {
     tauriAvailable,
   ]);
 
+  const handleGenerateCommitMessage = useCallback(async () => {
+    if (!tauriAvailable || !gitSummary) {
+      return;
+    }
+
+    try {
+      // Get diff of all staged files
+      const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      const stagedEntries = gitSummary.entries.filter(e => e.staged_status);
+
+      if (stagedEntries.length === 0) {
+        return;
+      }
+
+      // Get diffs for all staged files
+      const diffs = await Promise.all(
+        stagedEntries.map(async (entry) => {
+          try {
+            const diff = await invoke<string>("git_diff", {
+              path: entry.path,
+              rootPath,
+              staged: true,
+            });
+            return `File: ${entry.path}\n${diff}`;
+          } catch (error) {
+            return `File: ${entry.path}\n(Failed to get diff)`;
+          }
+        })
+      );
+
+      const fullDiff = diffs.join("\n\n");
+
+      // Build AI prompt with git diff
+      const stagedFilesList = stagedEntries.map(e => `- ${e.path} (${e.staged_status})`).join('\n');
+
+      const aiPrompt = `I need you to analyze these staged git changes and help me commit them.
+
+**Staged files:**
+${stagedFilesList}
+
+**Git diff:**
+\`\`\`diff
+${fullDiff}
+\`\`\`
+
+Please:
+1. Analyze the changes and suggest a clear, concise commit message following conventional commit format (feat/fix/docs/style/refactor/test/chore)
+2. After I approve the message, you can commit the changes using the Bash tool with: \`git commit -m "your message"\`
+3. Optionally, ask if I want to push the changes as well
+
+Start by suggesting the commit message.`;
+
+      // Check if "git-manager" agent already exists
+      let gitManagerAgent = agents.find(a => a.name === "git-manager");
+
+      // If not exists, create it
+      if (!gitManagerAgent) {
+        const agentContent = `# Git Manager Agent
+
+You are a specialized Git operations manager. Your role is to:
+
+1. **Analyze Git diffs** and suggest clear, concise commit messages
+2. **Follow conventional commit format** (feat/fix/docs/style/refactor/test/chore)
+3. **Execute git operations** using the Bash tool when approved
+4. **Suggest git best practices** for commits and version control
+
+When analyzing changes:
+- Focus on the "why" rather than the "what"
+- Keep commit messages concise but descriptive
+- Group related changes logically
+- Suggest breaking up large commits if needed
+
+You have access to all Bash tools to execute git commands like:
+- \`git commit -m "message"\`
+- \`git push\`
+- \`git log\`
+- etc.`;
+
+        await invoke<string>("create_agent", {
+          name: "git-manager",
+          description: "Specialized agent for Git operations, commit message generation, and version control best practices",
+          model: "sonnet",
+          color: "#10b981", // Green color for git
+          content: agentContent,
+          scope: "project",
+          workingDir: rootPath,
+        });
+
+        // Reload agents list
+        await loadAgents();
+
+        // Find the newly created agent
+        // Note: we need to wait a bit for the agents list to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const updatedAgents = await invoke<AgentInfo[]>("list_agents", {
+          workingDir: rootPath
+        });
+        gitManagerAgent = updatedAgents.find(a => a.name === "git-manager");
+
+        if (!gitManagerAgent) {
+          throw new Error("Failed to create git-manager agent");
+        }
+
+        toast.success("Git Manager agent created!", {
+          description: "Opening chat with git-manager...",
+          duration: 2000,
+        });
+      }
+
+      // Close Git drawer
+      setShowGitDrawer(false);
+
+      // Set the Git Manager agent as active agent for the next message
+      setActiveAgent(gitManagerAgent);
+
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Send the prompt with the Git Manager agent active
+      // This will use the current chat session with git-manager agent
+      await sendMessageForAgent(aiPrompt);
+
+      // Show success toast
+      toast.success("Git analysis started", {
+        description: "git-manager agent is analyzing your changes...",
+        duration: 3000,
+      });
+
+    } catch (error) {
+      console.error("Error generating commit message:", error);
+      setGitError(error instanceof Error ? error.message : String(error));
+      toast.error("Failed to create Git Manager agent", {
+        description: error instanceof Error ? error.message : String(error),
+        duration: 4000,
+      });
+    }
+  }, [tauriAvailable, gitSummary, activeTerminal, explorerPath, agents, sendMessageForAgent, loadAgents]);
+
   const handleDiffViewChange = useCallback((view: "worktree" | "staged") => {
     setDiffView(view);
   }, []);
@@ -3745,6 +3883,7 @@ function App() {
               onCommitMessageChange={setCommitMessage}
               onCommit={handleCommit}
               committing={committing}
+              onGenerateCommitMessage={handleGenerateCommitMessage}
             />
           </div>
         </div>
