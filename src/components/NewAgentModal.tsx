@@ -24,6 +24,35 @@ const AGENT_COLORS: Record<string, string> = {
   pink: "#EC4899",
 };
 
+// Random agent names for default naming
+const AGENT_NAMES = [
+  'Agent Jack',
+  'Agent Mike',
+  'Agent Julie',
+  'Agent John',
+  'Agent Scott',
+  'Agent Carmelo',
+  'Agent Giuseppe',
+  'Agent Roberta',
+  'Agent Charlie',
+  'Agent Alex',
+  'Agent Sam',
+  'Agent Jordan',
+  'Agent Taylor',
+  'Agent Morgan',
+  'Agent Casey',
+  'Agent Riley',
+  'Agent Quinn',
+  'Agent Avery',
+  'Agent Parker',
+  'Agent Skylar',
+];
+
+// Get random agent name
+const getRandomAgentName = () => {
+  return AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
+};
+
 export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -37,7 +66,7 @@ export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setName('');
+      setName(getRandomAgentName()); // Set random agent name
       setDescription('');
       setModel('claude-sonnet-4-20250514');
       setColor('blue');
@@ -105,11 +134,11 @@ export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="my-custom-agent"
+              placeholder="Agent Jack"
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
             />
             <p className="text-xs text-white/30 mt-1">
-              Use lowercase with hyphens (e.g., "my-custom-agent")
+              Give your agent a memorable name (e.g., "Agent Jack")
             </p>
           </div>
 

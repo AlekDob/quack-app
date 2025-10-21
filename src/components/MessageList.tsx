@@ -44,22 +44,34 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
     });
   }, []);
 
-  // Scroll to bottom when switching to a different chat (first message ID changes)
+  // Scroll to bottom when component first mounts (when switching chat)
+  // This is triggered when ChatView's key changes and creates a new MessageList instance
   useEffect(() => {
     if (!scrollRef.current || messages.length === 0) return;
 
-    const currentFirstMessageId = messages[0]?.id ?? null;
-    const hasChangedChat = currentFirstMessageId !== prevFirstMessageIdRef.current;
+    // Wait for DOM to finish rendering, then scroll to bottom
+    // Using 100ms delay to ensure all messages are mounted
+    const timeoutId = setTimeout(() => {
+      if (scrollRef.current) {
+        const scrollHeight = scrollRef.current.scrollHeight;
+        const clientHeight = scrollRef.current.clientHeight;
 
-    if (hasChangedChat && currentFirstMessageId !== null) {
-      // Chat switched - scroll to bottom immediately
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'instant' // Instant scroll when switching chats
-      });
-      prevFirstMessageIdRef.current = currentFirstMessageId;
-    }
-  }, [messages]);
+        scrollRef.current.scrollTo({
+          top: scrollHeight,
+          behavior: 'smooth' // Smooth scroll animation when switching chats
+        });
+
+        console.log('[MessageList] Component mounted - scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'scrolling to:', scrollHeight);
+      }
+    }, 100);
+
+    // Initialize refs
+    prevFirstMessageIdRef.current = messages[0]?.id ?? null;
+    prevMessagesLengthRef.current = messages.length;
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array = run only once on mount
 
   // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {
@@ -75,8 +87,9 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
     if (hasNewMessage) {
       // Always auto-scroll for user messages or if already at bottom
       shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
-    } else if (loading && isAtBottom) {
-      // During streaming, keep scrolling if user is at bottom
+    } else if (loading) {
+      // During streaming, ALWAYS scroll to keep up with new content
+      // This ensures we see Claude's response as it types
       shouldAutoScroll = true;
     }
 

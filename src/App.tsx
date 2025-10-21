@@ -224,6 +224,36 @@ const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
 // NO storage for activeAgentChat - not needed!
 
 // ============================================
+// Random Agent Names
+// ============================================
+const AGENT_NAMES = [
+  'Agent Jack',
+  'Agent Mike',
+  'Agent Julie',
+  'Agent John',
+  'Agent Scott',
+  'Agent Carmelo',
+  'Agent Giuseppe',
+  'Agent Roberta',
+  'Agent Charlie',
+  'Agent Alex',
+  'Agent Sam',
+  'Agent Jordan',
+  'Agent Taylor',
+  'Agent Morgan',
+  'Agent Casey',
+  'Agent Riley',
+  'Agent Quinn',
+  'Agent Avery',
+  'Agent Parker',
+  'Agent Skylar',
+];
+
+const getRandomAgentName = () => {
+  return AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
+};
+
+// ============================================
 // Migration System (Phase 2)
 // ============================================
 // NO migration needed! Terminals are independent entities, grouped only by cwd in the UI
@@ -2455,7 +2485,7 @@ function App() {
     setNewTerminalError(null);
     const index = terminals.length;
     const defaultColor = COLORS[index % COLORS.length];
-    setNewTerminalName(`Terminal ${index + 1}`);
+    setNewTerminalName(getRandomAgentName()); // Random agent name instead of "Terminal X"
     setNewTerminalColor(defaultColor);
     const fallbackPath = activeTerminal?.cwd ?? explorerPath ?? "";
     setNewTerminalPath(fallbackPath);
