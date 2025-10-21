@@ -139,23 +139,36 @@ pub struct ToolDiffEvent {
     pub lines: Vec<ToolDiffLine>,
 }
 
+/// Find the Claude CLI executable path
+fn find_claude_cli_path() -> Option<String> {
+    // Common paths where claude CLI might be installed
+    let common_paths = vec![
+        "claude",                           // Try PATH first
+        "/opt/homebrew/bin/claude",         // Homebrew on Apple Silicon
+        "/usr/local/bin/claude",            // Homebrew on Intel Mac
+        "/opt/local/bin/claude",            // MacPorts
+        "/usr/bin/claude",                  // System-wide install
+    ];
+
+    for path in common_paths {
+        let output = std::process::Command::new(path)
+            .arg("--version")
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                return Some(path.to_string());
+            }
+        }
+    }
+
+    None
+}
+
 /// Check if Claude CLI is available and authenticated
 #[tauri::command]
 pub fn check_claude_cli_available() -> Result<bool, String> {
-    let output = std::process::Command::new("claude")
-        .arg("--version")
-        .output();
-
-    match output {
-        Ok(output) => {
-            if output.status.success() {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        }
-        Err(_) => Ok(false),
-    }
+    Ok(find_claude_cli_path().is_some())
 }
 
 /// Send a message to Claude via CLI
@@ -222,8 +235,12 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         }
     }
 
+    // Find Claude CLI path
+    let claude_path = find_claude_cli_path()
+        .ok_or_else(|| "Claude CLI not found. Please ensure it's installed and in your PATH.".to_string())?;
+
     // Prepare the command
-    let mut command = Command::new("claude");
+    let mut command = Command::new(claude_path);
     command
         .arg("--print")
         .arg("--output-format")
@@ -408,8 +425,12 @@ pub async fn send_message_via_cli_streaming(
         }
     }
 
+    // Find Claude CLI path
+    let claude_path = find_claude_cli_path()
+        .ok_or_else(|| "Claude CLI not found. Please ensure it's installed and in your PATH.".to_string())?;
+
     // Prepare the command with verbose mode for tool tracking
-    let mut command = Command::new("claude");
+    let mut command = Command::new(claude_path);
     command
         .arg("--verbose")
         .arg("--output-format")
