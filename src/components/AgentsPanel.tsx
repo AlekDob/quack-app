@@ -261,11 +261,9 @@ export default function AgentsPanel({
                           border: "1px solid rgba(255, 255, 255, 0.08)",
                         }}
                       >
-                        {/* Main clickable area for details */}
-                        <button
-                          type="button"
-                          onClick={() => onSelectAgent(agent)}
-                          className="w-full flex items-center gap-3 p-3 text-left transition-all duration-200"
+                        {/* Agent card with avatar on left, content in middle, Use button on right */}
+                        <div
+                          className="w-full flex items-start gap-3 p-3 transition-all duration-200"
                           onMouseEnter={(e) => {
                             const parent = e.currentTarget.parentElement;
                             if (parent) {
@@ -281,70 +279,70 @@ export default function AgentsPanel({
                             }
                           }}
                         >
-                          {/* Agent Avatar or Badge */}
-                          <div
-                            className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
+                          {/* Larger Agent Avatar - 56px (w-14 h-14) with colored border */}
+                          <button
+                            type="button"
+                            onClick={() => onSelectAgent(agent)}
+                            className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity"
                             style={{
                               background: "rgba(255, 255, 255, 0.05)",
-                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                              border: `1px solid ${agent.color}`,
+                              boxShadow: `0 0 8px ${agent.color}40`,
                             }}
                           >
                             <img
-                              src="/images/cyberduck.png"
+                              src="/images/agent-setting.jpeg"
                               alt={agent.name}
                               style={{
-                                width: "110%",
-                                height: "110%",
-                                objectFit: "contain",
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
                                 objectPosition: "center",
-                                transform: "scale(1.1)",
                               }}
                             />
-                          </div>
+                          </button>
 
-                          {/* Agent Info */}
-                          <div className="flex-1 min-w-0">
+                          {/* Agent Info - 3 lines */}
+                          <div className="flex-1 min-w-0 flex flex-col gap-1">
+                            {/* Line 1: Model tag */}
                             <div
-                              className="text-sm font-medium mb-0.5 truncate"
+                              className="px-1.5 py-0.5 rounded text-[10px] font-mono self-start"
+                              style={{
+                                background: "rgba(242, 140, 82, 0.1)",
+                                color: "#f28c52",
+                              }}
+                            >
+                              {agent.model}
+                            </div>
+
+                            {/* Line 2: Agent Name - clickable */}
+                            <button
+                              type="button"
+                              onClick={() => onSelectAgent(agent)}
+                              className="text-sm font-medium text-left hover:opacity-80 transition-opacity"
                               style={{ color: "rgba(255, 255, 255, 0.9)" }}
                             >
                               {agent.name.replace(/-/g, " ")}
-                            </div>
+                            </button>
+
+                            {/* Line 3: Description */}
                             <div
                               className="text-xs truncate"
                               style={{ color: "rgba(255, 255, 255, 0.5)" }}
                             >
-                              {agent.description.substring(0, 60)}
-                              {agent.description.length > 60 ? "..." : ""}
+                              {agent.description.substring(0, 45)}
+                              {agent.description.length > 45 ? "..." : ""}
                             </div>
                           </div>
 
-                          {/* Model badge */}
-                          <div
-                            className="px-2 py-1 rounded text-xs font-mono flex-shrink-0"
-                            style={{
-                              background: "rgba(242, 140, 82, 0.1)",
-                              color: "#f28c52",
-                            }}
-                          >
-                            {agent.model}
-                          </div>
-                        </button>
-
-                        {/* Use this agent button */}
-                        <div
-                          className="px-3 pb-3"
-                          style={{
-                            borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-                          }}
-                        >
+                          {/* Smaller "Use" button on right */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onUseAgent(agent);
                             }}
-                            className="w-full px-3 py-1.5 mt-2 rounded text-xs font-medium transition-all duration-200"
+                            className="px-2.5 py-1.5 rounded text-xs font-medium flex-shrink-0 self-start transition-all duration-200"
                             style={{
                               background: "rgba(242, 140, 82, 0.1)",
                               border: "1px solid rgba(242, 140, 82, 0.3)",
@@ -359,7 +357,7 @@ export default function AgentsPanel({
                               e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
                             }}
                           >
-                            Use this agent
+                            Use
                           </button>
                         </div>
                       </div>
@@ -397,11 +395,9 @@ export default function AgentsPanel({
                           border: "1px solid rgba(255, 255, 255, 0.08)",
                         }}
                       >
-                        {/* Main clickable area for details */}
-                        <button
-                          type="button"
-                          onClick={() => onSelectAgent(agent)}
-                          className="w-full flex items-center gap-3 p-3 text-left transition-all duration-200"
+                        {/* Agent card with avatar on left, content in middle, Use button on right */}
+                        <div
+                          className="w-full flex items-start gap-3 p-3 transition-all duration-200"
                           onMouseEnter={(e) => {
                             const parent = e.currentTarget.parentElement;
                             if (parent) {
@@ -417,70 +413,70 @@ export default function AgentsPanel({
                             }
                           }}
                         >
-                          {/* Agent Avatar or Badge */}
-                          <div
-                            className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
+                          {/* Larger Agent Avatar - 56px (w-14 h-14) with colored border */}
+                          <button
+                            type="button"
+                            onClick={() => onSelectAgent(agent)}
+                            className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity"
                             style={{
                               background: "rgba(255, 255, 255, 0.05)",
-                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                              border: `1px solid ${agent.color}`,
+                              boxShadow: `0 0 8px ${agent.color}40`,
                             }}
                           >
                             <img
-                              src="/images/cyberduck.png"
+                              src="/images/agent-setting.jpeg"
                               alt={agent.name}
                               style={{
-                                width: "110%",
-                                height: "110%",
-                                objectFit: "contain",
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
                                 objectPosition: "center",
-                                transform: "scale(1.1)",
                               }}
                             />
-                          </div>
+                          </button>
 
-                          {/* Agent Info */}
-                          <div className="flex-1 min-w-0">
+                          {/* Agent Info - 3 lines */}
+                          <div className="flex-1 min-w-0 flex flex-col gap-1">
+                            {/* Line 1: Model tag */}
                             <div
-                              className="text-sm font-medium mb-0.5 truncate"
+                              className="px-1.5 py-0.5 rounded text-[10px] font-mono self-start"
+                              style={{
+                                background: "rgba(242, 140, 82, 0.1)",
+                                color: "#f28c52",
+                              }}
+                            >
+                              {agent.model}
+                            </div>
+
+                            {/* Line 2: Agent Name - clickable */}
+                            <button
+                              type="button"
+                              onClick={() => onSelectAgent(agent)}
+                              className="text-sm font-medium text-left hover:opacity-80 transition-opacity"
                               style={{ color: "rgba(255, 255, 255, 0.9)" }}
                             >
                               {agent.name.replace(/-/g, " ")}
-                            </div>
+                            </button>
+
+                            {/* Line 3: Description */}
                             <div
                               className="text-xs truncate"
                               style={{ color: "rgba(255, 255, 255, 0.5)" }}
                             >
-                              {agent.description.substring(0, 60)}
-                              {agent.description.length > 60 ? "..." : ""}
+                              {agent.description.substring(0, 45)}
+                              {agent.description.length > 45 ? "..." : ""}
                             </div>
                           </div>
 
-                          {/* Model badge */}
-                          <div
-                            className="px-2 py-1 rounded text-xs font-mono flex-shrink-0"
-                            style={{
-                              background: "rgba(242, 140, 82, 0.1)",
-                              color: "#f28c52",
-                            }}
-                          >
-                            {agent.model}
-                          </div>
-                        </button>
-
-                        {/* Use this agent button */}
-                        <div
-                          className="px-3 pb-3"
-                          style={{
-                            borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-                          }}
-                        >
+                          {/* Smaller "Use" button on right */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onUseAgent(agent);
                             }}
-                            className="w-full px-3 py-1.5 mt-2 rounded text-xs font-medium transition-all duration-200"
+                            className="px-2.5 py-1.5 rounded text-xs font-medium flex-shrink-0 self-start transition-all duration-200"
                             style={{
                               background: "rgba(242, 140, 82, 0.1)",
                               border: "1px solid rgba(242, 140, 82, 0.3)",
@@ -495,7 +491,7 @@ export default function AgentsPanel({
                               e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
                             }}
                           >
-                            Use this agent
+                            Use
                           </button>
                         </div>
                       </div>
