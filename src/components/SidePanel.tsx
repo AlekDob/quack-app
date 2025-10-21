@@ -342,13 +342,14 @@ export default function SidePanel({
       badge: nativeTerminals.length,
       hasContent: nativeTerminals.length > 0,
     },
-    {
-      id: "usage" as TabId,
-      label: "Usage",
-      icon: icons.usage,
-      badge: usageSessions.length,
-      hasContent: usageSessions.length > 0,
-    },
+    // Usage tab removed - button moved to ToolBar
+    // {
+    //   id: "usage" as TabId,
+    //   label: "Usage",
+    //   icon: icons.usage,
+    //   badge: usageSessions.length,
+    //   hasContent: usageSessions.length > 0,
+    // },
   ];
 
   return (
@@ -539,6 +540,8 @@ export default function SidePanel({
             <UsagePanel
               sessions={usageSessions}
               onClearUsage={onClearUsage}
+              isActive={activeTab === "usage"}
+              currentCwd={workingDir}
             />
           </div>
         )}

@@ -3459,6 +3459,21 @@ function App() {
               >
                 Preview
               </button>
+              <button
+                type="button"
+                className="git-tab-button"
+                onClick={async () => {
+                  try {
+                    const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
+                    await invoke("open_claude_usage_in_terminal", { cwd });
+                  } catch (error) {
+                    console.error("Failed to open claude usage:", error);
+                  }
+                }}
+                title="Open Claude usage in terminal"
+              >
+                Usage
+              </button>
               </div>
             </div>
           </div>

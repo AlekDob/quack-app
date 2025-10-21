@@ -520,3 +520,22 @@ export interface DailyUsageSummary {
   usage: UsageStats;
   agents: Record<string, AgentUsageSummary>;
 }
+
+// Plan Usage types (Pro/Team plan percentages via CLI parsing)
+export interface PlanUsageData {
+  current_session: SessionPlanUsage;
+  current_week: WeeklyPlanUsage;
+  reset_time?: string;
+  last_updated: number;
+}
+
+export interface SessionPlanUsage {
+  percentage: number;
+  model?: string;
+}
+
+export interface WeeklyPlanUsage {
+  all_models: number;
+  opus?: number;
+  sonnet?: number;
+}

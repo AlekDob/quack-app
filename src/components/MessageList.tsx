@@ -14,6 +14,7 @@ interface MessageListProps {
 export default function MessageList({ messages, loading, onFilePathClick }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
+  const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Check if user is at bottom of scroll
@@ -42,6 +43,23 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
       behavior: 'smooth'
     });
   }, []);
+
+  // Scroll to bottom when switching to a different chat (first message ID changes)
+  useEffect(() => {
+    if (!scrollRef.current || messages.length === 0) return;
+
+    const currentFirstMessageId = messages[0]?.id ?? null;
+    const hasChangedChat = currentFirstMessageId !== prevFirstMessageIdRef.current;
+
+    if (hasChangedChat && currentFirstMessageId !== null) {
+      // Chat switched - scroll to bottom immediately
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'instant' // Instant scroll when switching chats
+      });
+      prevFirstMessageIdRef.current = currentFirstMessageId;
+    }
+  }, [messages]);
 
   // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {

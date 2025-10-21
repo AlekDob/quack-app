@@ -12,6 +12,7 @@ mod ai;
 mod claude_auth;
 mod claude_cli;
 mod claude_oauth;
+mod claude_usage;
 mod commands;
 mod context;
 mod fs;
@@ -387,7 +388,9 @@ pub fn run() {
             plugins::install_plugin,
             plugins::uninstall_plugin,
             plugins::search_plugins,
-            reveal::reveal_in_finder
+            reveal::reveal_in_finder,
+            claude_usage::get_claude_plan_usage,
+            claude_usage::open_claude_usage_in_terminal
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

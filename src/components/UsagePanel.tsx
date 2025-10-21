@@ -1,16 +1,52 @@
-import { useMemo } from "react";
-import type { SessionUsage, AgentUsageSummary, DailyUsageSummary } from "../types";
+import { useMemo, useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import type { SessionUsage, AgentUsageSummary, DailyUsageSummary, PlanUsageData } from "../types";
 
 interface UsagePanelProps {
   sessions: SessionUsage[];
   onClearUsage?: () => void;
+  isActive?: boolean;
+  currentCwd?: string;
 }
 
 /**
  * Usage Panel - Cost tracking for Claude Agent SDK
  * Based on https://docs.claude.com/en/api/agent-sdk/cost-tracking
  */
-export default function UsagePanel({ sessions, onClearUsage }: UsagePanelProps) {
+export default function UsagePanel({ sessions, onClearUsage, isActive, currentCwd }: UsagePanelProps) {
+  const [planUsage, setPlanUsage] = useState<PlanUsageData | null>(null);
+  const [loadingPlanUsage, setLoadingPlanUsage] = useState(false);
+  const [planUsageError, setPlanUsageError] = useState<string | null>(null);
+
+  const fetchPlanUsage = async () => {
+    setLoadingPlanUsage(true);
+    setPlanUsageError(null);
+    try {
+      const data = await invoke<PlanUsageData>("get_claude_plan_usage");
+      setPlanUsage(data);
+    } catch (error) {
+      console.error("Failed to fetch plan usage:", error);
+      setPlanUsageError(error as string);
+    } finally {
+      setLoadingPlanUsage(false);
+    }
+  };
+
+  const openPlanUsageInTerminal = async () => {
+    try {
+      const cwd = currentCwd || process.env.HOME || "~";
+      await invoke("open_claude_usage_in_terminal", { cwd });
+    } catch (error) {
+      console.error("Failed to open terminal:", error);
+    }
+  };
+
+  // Fetch plan usage when tab becomes active (only once)
+  useEffect(() => {
+    if (isActive && !planUsage && !loadingPlanUsage) {
+      fetchPlanUsage();
+    }
+  }, [isActive]);
   // Calculate daily summaries from session data
   const dailySummaries = useMemo(() => {
     const summariesMap: Record<string, DailyUsageSummary> = {};
@@ -184,6 +220,121 @@ export default function UsagePanel({ sessions, onClearUsage }: UsagePanelProps) 
           >
             Clear
           </button>
+        )}
+      </div>
+
+      {/* Plan Usage Section */}
+      <div className="usage-plan-card">
+        <button
+          type="button"
+          className="usage-plan-terminal-button w-full"
+          onClick={openPlanUsageInTerminal}
+          title="Open in Terminal"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+          See your plan usage
+        </button>
+
+        {loadingPlanUsage && (
+          <div className="usage-plan-loading">Loading plan usage...</div>
+        )}
+
+        {planUsageError && (
+          <div className="usage-plan-error">
+            <div className="usage-plan-error-title">Unable to load plan usage</div>
+            <div className="usage-plan-error-message">{planUsageError}</div>
+            <div className="usage-plan-error-hint">
+              Make sure <code>claude</code> CLI is installed and authenticated.
+            </div>
+          </div>
+        )}
+
+        {planUsage && !planUsageError && (
+          <div className="usage-plan-data">
+            {/* Current Session */}
+            <div className="usage-plan-item">
+              <div className="usage-plan-item-label">
+                Current Session {planUsage.current_session.model && `(${planUsage.current_session.model})`}
+              </div>
+              <div className="usage-plan-progress">
+                <div className="usage-plan-progress-bar">
+                  <div
+                    className="usage-plan-progress-fill"
+                    style={{ width: `${planUsage.current_session.percentage}%` }}
+                  />
+                </div>
+                <div className="usage-plan-percentage">
+                  {planUsage.current_session.percentage.toFixed(1)}% used
+                </div>
+              </div>
+            </div>
+
+            {/* Current Week - All Models */}
+            <div className="usage-plan-item">
+              <div className="usage-plan-item-label">Current Week (All Models)</div>
+              <div className="usage-plan-progress">
+                <div className="usage-plan-progress-bar">
+                  <div
+                    className="usage-plan-progress-fill"
+                    style={{ width: `${planUsage.current_week.all_models}%` }}
+                  />
+                </div>
+                <div className="usage-plan-percentage">
+                  {planUsage.current_week.all_models.toFixed(1)}% used
+                </div>
+              </div>
+            </div>
+
+            {/* Current Week - Opus */}
+            {planUsage.current_week.opus !== undefined && planUsage.current_week.opus !== null && (
+              <div className="usage-plan-item">
+                <div className="usage-plan-item-label">Current Week (Opus)</div>
+                <div className="usage-plan-progress">
+                  <div className="usage-plan-progress-bar">
+                    <div
+                      className="usage-plan-progress-fill opus"
+                      style={{ width: `${planUsage.current_week.opus}%` }}
+                    />
+                  </div>
+                  <div className="usage-plan-percentage">
+                    {planUsage.current_week.opus.toFixed(1)}% used
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Current Week - Sonnet */}
+            {planUsage.current_week.sonnet !== undefined && planUsage.current_week.sonnet !== null && (
+              <div className="usage-plan-item">
+                <div className="usage-plan-item-label">Current Week (Sonnet)</div>
+                <div className="usage-plan-progress">
+                  <div className="usage-plan-progress-bar">
+                    <div
+                      className="usage-plan-progress-fill sonnet"
+                      style={{ width: `${planUsage.current_week.sonnet}%` }}
+                    />
+                  </div>
+                  <div className="usage-plan-percentage">
+                    {planUsage.current_week.sonnet.toFixed(1)}% used
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Reset Time */}
+            {planUsage.reset_time && (
+              <div className="usage-plan-reset">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>Resets: {planUsage.reset_time}</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
