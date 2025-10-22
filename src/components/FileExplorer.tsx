@@ -169,6 +169,30 @@ function FileExplorer({
     });
   }, [rootPath]);
 
+  // Auto-refresh: Reload expanded directories every 3 seconds
+  useEffect(() => {
+    if (!rootPath) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // Reload all expanded directories to detect filesystem changes
+      const expandedPaths = Array.from(expanded);
+      for (const path of expandedPaths) {
+        // Skip if already loading
+        if (loadingNodes.has(path)) {
+          continue;
+        }
+        // Reload directory silently
+        void onLoadChildren(path).catch(() => {
+          // Ignore errors during auto-refresh
+        });
+      }
+    }, 3000); // Refresh every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [rootPath, expanded, loadingNodes, onLoadChildren]);
+
   const ensureExpanded = useCallback((path: string) => {
     setExpanded((previous) => {
       if (previous.has(path)) {
@@ -440,19 +464,24 @@ function FileExplorer({
                     {displayCount}
                   </span>
                 )}
-                {!isDirectory && onMentionFile && (
-                  <button
-                    type="button"
-                    className="explorer-mention-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMentionFile(entry.path, entry.name);
-                    }}
-                    title="Insert @file mention in chat"
-                    aria-label="Mention file in chat"
-                  >
-                    @
-                  </button>
+                {!isDirectory && (
+                  <div className="explorer-file-actions">
+                    <RevealInFinderButton path={entry.path} iconOnly />
+                    {onMentionFile && (
+                      <button
+                        type="button"
+                        className="explorer-mention-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMentionFile(entry.path, entry.name);
+                        }}
+                        title="Insert @file mention in chat"
+                        aria-label="Mention file in chat"
+                      >
+                        @
+                      </button>
+                    )}
+                  </div>
                 )}
               </button>
               {isDirectory &&
@@ -547,19 +576,24 @@ function FileExplorer({
           <span className="explorer-path-hint" title={result.relative_path}>
             {result.relative_path}
           </span>
-          {!result.is_dir && onMentionFile && (
-            <button
-              type="button"
-              className="explorer-mention-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMentionFile(result.path, result.name);
-              }}
-              title="Insert @file mention in chat"
-              aria-label="Mention file in chat"
-            >
-              @
-            </button>
+          {!result.is_dir && (
+            <div className="explorer-file-actions">
+              <RevealInFinderButton path={result.path} iconOnly />
+              {onMentionFile && (
+                <button
+                  type="button"
+                  className="explorer-mention-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMentionFile(result.path, result.name);
+                  }}
+                  title="Insert @file mention in chat"
+                  aria-label="Mention file in chat"
+                >
+                  @
+                </button>
+              )}
+            </div>
           )}
         </button>
       );
@@ -628,19 +662,24 @@ function FileExplorer({
               {deletions > 0 && <span className="deletions">-{deletions}</span>}
             </span>
           )}
-          {!isDeletedFile && onMentionFile && (
-            <button
-              type="button"
-              className="explorer-mention-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMentionFile(entry.path, entry.name);
-              }}
-              title="Insert @file mention in chat"
-              aria-label="Mention file in chat"
-            >
-              @
-            </button>
+          {!isDeletedFile && (
+            <div className="explorer-file-actions">
+              <RevealInFinderButton path={entry.path} iconOnly />
+              {onMentionFile && (
+                <button
+                  type="button"
+                  className="explorer-mention-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMentionFile(entry.path, entry.name);
+                  }}
+                  title="Insert @file mention in chat"
+                  aria-label="Mention file in chat"
+                >
+                  @
+                </button>
+              )}
+            </div>
           )}
         </button>
       );

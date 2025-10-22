@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import CodeEditor, { type DiffInfo } from "./CodeEditor";
 import RevealInFinderButton from "./RevealInFinderButton";
+import MarkdownText from "./MarkdownText";
 
 interface FilePreviewDrawerProps {
   open: boolean;
@@ -86,6 +87,10 @@ function FilePreviewDrawer({
     setHasUnsavedChanges(false);
     setIsEditing(false);
   }, [path, content]);
+
+  // Check if file is markdown
+  const isMarkdownFile = filename?.toLowerCase().endsWith('.md') ?? false;
+
   if (!open) {
     return null;
   }
@@ -165,7 +170,7 @@ function FilePreviewDrawer({
             </button>
           </div>
         </header>
-        <div className="preview-content" data-loading={loading}>
+        <div className={`preview-content ${isMarkdownFile && !isEditing ? 'markdown-preview' : ''}`} data-loading={loading}>
           {loading ? (
             <div className="preview-placeholder">Loading file…</div>
           ) : error ? (
@@ -180,6 +185,10 @@ function FilePreviewDrawer({
                 onSave={handleSave}
                 diffInfo={diffInfo}
               />
+            </div>
+          ) : isMarkdownFile ? (
+            <div className="markdown-viewer">
+              <MarkdownText>{content}</MarkdownText>
             </div>
           ) : (
             <div className="editor-container">

@@ -770,6 +770,18 @@ button.directory-chooser:hover {
   overflow: auto;
 }
 
+/* Markdown preview styling - lighter background */
+.preview-content.markdown-preview {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.markdown-viewer {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .preview-placeholder {
   display: flex;
   align-items: center;
@@ -2807,6 +2819,20 @@ button.directory-chooser:hover {
   background: rgba(var(--accent-rgb), 0.18);
 }
 
+/* File actions container (Reveal in Finder + Mention @ buttons) */
+.explorer-file-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.explorer-row:hover .explorer-file-actions {
+  opacity: 1;
+}
+
 /* Mention @ button */
 .explorer-mention-btn {
   display: inline-flex;
@@ -2814,7 +2840,6 @@ button.directory-chooser:hover {
   justify-content: center;
   width: 18px;
   height: 18px;
-  margin-left: auto;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -2823,12 +2848,7 @@ button.directory-chooser:hover {
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
-  opacity: 0;
   transition: all 0.15s ease;
-}
-
-.explorer-row:hover .explorer-mention-btn {
-  opacity: 1;
 }
 
 .explorer-mention-btn:hover {

@@ -14,7 +14,8 @@ export default function RevealInFinderButton({
   iconOnly = false,
   label = 'Reveal in Finder',
 }: RevealInFinderButtonProps) {
-  const handleReveal = async () => {
+  const handleReveal = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening file when clicking reveal button
     try {
       await invoke('reveal_in_finder', { path });
     } catch (err) {

@@ -1,1 +1,0 @@
-ecco un test
