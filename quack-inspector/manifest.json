@@ -47,15 +47,15 @@
   "commands": {
     "toggle-inspector": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Q",
-        "mac": "Command+Shift+Q"
+        "default": "Alt+Shift+Q",
+        "mac": "Alt+Shift+Q"
       },
       "description": "Toggle Quack Inspector mode"
     },
     "copy-last-component": {
       "suggested_key": {
-        "default": "Ctrl+Shift+C",
-        "mac": "Command+Shift+C"
+        "default": "Alt+Shift+C",
+        "mac": "Alt+Shift+C"
       },
       "description": "Copy last inspected component for AI"
     }

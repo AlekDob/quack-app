@@ -689,7 +689,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
 
             // Show notification
-            showCopiedNotification(compact);
+            showCopiedNotification(compact, markdown);
           });
         });
         sendResponse({ success: true, enabled: true });
@@ -716,31 +716,141 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-function showCopiedNotification(componentName) {
+function showCopiedNotification(componentName, markdown) {
   const notification = document.createElement('div');
-  notification.textContent = `🦆 Copied: ${componentName}`;
+  notification.id = 'quack-copied-notification';
+
+  // Create notification content
+  const header = document.createElement('div');
+  header.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  `;
+  header.innerHTML = `
+    <span style="font-size: 18px;">🦆</span>
+    <strong style="flex: 1;">Copied to Clipboard!</strong>
+    <button id="quack-close-notification" style="
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      line-height: 1;
+    ">×</button>
+  `;
+
+  const content = document.createElement('div');
+  content.style.cssText = `
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    font-family: 'Monaco', 'Courier New', monospace;
+    color: rgba(255, 255, 255, 0.8);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    border-radius: 6px;
+  `;
+
+  // Format markdown preview (first 500 chars)
+  const preview = markdown.length > 500 ? markdown.substring(0, 500) + '...' : markdown;
+  content.textContent = preview;
+
+  notification.appendChild(header);
+  notification.appendChild(content);
+
   notification.style.cssText = `
     position: fixed;
     bottom: 20px;
     right: 20px;
     background: #1a1a1a;
     color: #fff;
-    padding: 12px 24px;
-    border-radius: 8px;
+    padding: 16px;
+    border-radius: 12px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
     z-index: 2147483649;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     border: 1px solid #FF6B35;
+    min-width: 400px;
+    max-width: 500px;
+    animation: quack-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
+
+  // Add animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes quack-slide-in {
+      from {
+        opacity: 0;
+        transform: translateX(100px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    @keyframes quack-slide-out {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(100px);
+      }
+    }
+    #quack-copied-notification::-webkit-scrollbar {
+      width: 6px;
+    }
+    #quack-copied-notification::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+    #quack-copied-notification::-webkit-scrollbar-thumb {
+      background: #FF6B35;
+      border-radius: 3px;
+    }
+  `;
+
+  if (!document.getElementById('quack-notification-styles')) {
+    style.id = 'quack-notification-styles';
+    document.head.appendChild(style);
+  }
 
   document.body.appendChild(notification);
 
+  // Close button handler
+  const closeBtn = document.getElementById('quack-close-notification');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      notification.style.animation = 'quack-slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    });
+  }
+
+  // Auto-remove after 5 seconds
   setTimeout(() => {
     if (notification.parentNode) {
-      notification.parentNode.removeChild(notification);
+      notification.style.animation = 'quack-slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
     }
-  }, 3000);
+  }, 5000);
 }
 
 console.log('🦆 Quack Inspector content script loaded');

@@ -45,6 +45,10 @@
       "../images",
       "node-sdk"
     ],
+    "deeplink": {
+      "schemes": ["quack"],
+      "protocols": ["quack"]
+    },
     "macOS": {
       "dmg": {
         "appPosition": {
