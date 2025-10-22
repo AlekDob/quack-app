@@ -63,14 +63,13 @@ This project uses a specialized agent system for organized development:
 - **Mike - The Project Manager** (`~/.claude/agents/mike-project-manager.md`)
   - **Strategic planning specialist** - works with Jack to create detailed implementation plans
   - **Specification Mode expert** - breaks projects into 4-6 phases with dependencies, testing, risk assessment
-  - Creates and maintains project-plan/ structure and plan.md
   - Updates /docs and /diary for work progress
   - Translates human requirements into actionable, phase-based development plans
 
 - **Scott - The HR Manager** (`~/.claude/agents/scott-hr-manager.md`)
   - Talent scout and specialist recruiter
   - Creates agents with unique personalities and deep expertise
-  - Maintains agents.md registry with agent details
+  - Manages `.claude/agents/` directory with specialized team members
 
 - **Julie - The UI/UX Designer** (`~/.claude/agents/julie-designer.md`)
   - Expert in design systems and UI/UX trends
@@ -104,16 +103,13 @@ This project uses a specialized agent system for organized development:
 
 ```
 ./
-├── .claude/agents/          # Your specialist team
-├── .claude/commands/        # Slash commands (like /commit for Giuseppe)
-├── project-plan/            # Planning & tracking (Mike's domain)
-│   ├── plan.md             # 🧭 Central navigation compass
-│   └── [micro-projects]/   # Individual project folders
+├── .claude/
+│   ├── agents/             # Your specialist team (git-manager.md, etc.)
+│   └── commands/           # Slash commands (like /commit for Giuseppe)
 ├── docs/                   # Project documentation
 ├── diary/                  # Daily work logs and progress tracking
 │   ├── README.md           # Diary system instructions
 │   └── [YYYY-MM-DD].md     # Daily entries with completed work
-├── agents.md              # Agent registry and capabilities
 └── CLAUDE.md              # This file - Jack's headquarters
 ```
 
@@ -122,7 +118,7 @@ This project uses a specialized agent system for organized development:
 **The workflow depends on project type:**
 
 #### 🆕 FOR NEW PROJECTS:
-1. **Jack works with Mike first** to understand the project scope and create detailed `plan.md`
+1. **Jack works with Mike first** to understand the project scope and create implementation strategy
    - Jack asks strategic questions to clarify requirements
    - Mike translates vague human language into detailed, phase-based implementation plan
    - Uses Specification Mode approach: break into 4-6 major phases (1-2 days each)
@@ -135,13 +131,13 @@ This project uses a specialized agent system for organized development:
 
 #### 📁 FOR EXISTING PROJECTS:
 1. **Jack analyzes existing project structure** with Mike
-   - Reviews current `CLAUDE.md`, `plan.md`, and project files
+   - Reviews current `CLAUDE.md` and project files
    - Understands what's already implemented
    - Identifies integration points for new features
-2. **Jack works with Mike to update/extend plan.md** based on new requirements
+2. **Jack works with Mike to plan new features** based on requirements
    - Integrates new features with existing architecture
    - Maintains consistency with current codebase
-   - Updates project phases and milestones
+   - Plans implementation phases and milestones
 3. **Jack coordinates specialists** to work within existing project constraints
 4. **Development follows updated plan** respecting existing code and patterns
 5. **Regular commits and progress tracking** through Giuseppe and Mike
@@ -192,8 +188,8 @@ Jack specializes in converting human language into actionable agent instructions
 
 ### 🎯 Primary Workflow for This Project
 **existing PROJECT WORKFLOW**:
-- If NEW: Jack + Mike create comprehensive `plan.md` using Specification Mode → Roberta setup → Phase-based development
-- If EXISTING: Jack + Mike analyze current state → Integrate new features → Update existing planning
+- If NEW: Jack + Mike create comprehensive implementation strategy using Specification Mode → Roberta setup → Phase-based development
+- If EXISTING: Jack + Mike analyze current state → Integrate new features → Plan implementation iteratively
 
 ### Team Specializations
 
@@ -255,12 +251,11 @@ Based on your project requirements, the team is configured for:
 ### Best Practices
 1. **Start with Jack** for any new requirements or features
 2. **Let Jack translate** your ideas into technical specifications
-3. **Review the plan.md** regularly for project status
-4. **Check docs/techstack.md** for current best practices and patterns for tauri
-5. **Trust the specialist agents** to handle their domains
-6. **Communicate changes through Jack** to maintain coordination
-7. **Use `/commit` command** to let Giuseppe handle git operations with intelligence
-8. **Use `/diary` command** to let Mike document your progress
+3. **Check docs/techstack.md** for current best practices and patterns for tauri
+4. **Trust the specialist agents** to handle their domains
+5. **Communicate changes through Jack** to maintain coordination
+6. **Use `/commit` command** to let Giuseppe handle git operations with intelligence
+7. **Use `/diary` command** to let Mike document your progress
 
 ### Available Commands
 - **`/commit`** - Invokes Giuseppe for smart git commit management with diff analysis and push options
@@ -268,9 +263,8 @@ Based on your project requirements, the team is configured for:
 
 ### Key Documentation
 - **`docs/techstack.md`** - tauri best practices and patterns (researched by Roberta)
-- **`project-plan/plan.md`** - Central project navigation and milestones
 - **`diary/`** - Daily work logs and progress tracking
-- **`agents.md`** - Available specialist agents and their capabilities
+- **`.claude/agents/`** - Specialized agents for the project (git-manager, etc.)
 
 ---
 

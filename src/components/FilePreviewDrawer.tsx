@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import CodeEditor, { type DiffInfo } from "./CodeEditor";
 import RevealInFinderButton from "./RevealInFinderButton";
 import MarkdownText from "./MarkdownText";
+import MermaidDiagram from "./MermaidDiagram";
 
 interface FilePreviewDrawerProps {
   open: boolean;
@@ -88,8 +89,9 @@ function FilePreviewDrawer({
     setIsEditing(false);
   }, [path, content]);
 
-  // Check if file is markdown
+  // Check if file is markdown or mermaid
   const isMarkdownFile = filename?.toLowerCase().endsWith('.md') ?? false;
+  const isMermaidFile = filename?.toLowerCase().endsWith('.mmd') ?? false;
 
   if (!open) {
     return null;
@@ -170,7 +172,7 @@ function FilePreviewDrawer({
             </button>
           </div>
         </header>
-        <div className={`preview-content ${isMarkdownFile && !isEditing ? 'markdown-preview' : ''}`} data-loading={loading}>
+        <div className={`preview-content ${(isMarkdownFile || isMermaidFile) && !isEditing ? 'markdown-preview' : ''}`} data-loading={loading}>
           {loading ? (
             <div className="preview-placeholder">Loading file…</div>
           ) : error ? (
@@ -189,6 +191,10 @@ function FilePreviewDrawer({
           ) : isMarkdownFile ? (
             <div className="markdown-viewer">
               <MarkdownText>{content}</MarkdownText>
+            </div>
+          ) : isMermaidFile ? (
+            <div className="mermaid-viewer">
+              <MermaidDiagram>{content}</MermaidDiagram>
             </div>
           ) : (
             <div className="editor-container">

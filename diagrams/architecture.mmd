@@ -1,45 +1,179 @@
 graph TD
   subgraph UI[React App]
+    %% Core Orchestration
+    APP[App - Main Orchestrator]
+
+    %% Terminal System
     TS[TerminalSidebar]
-    TV[TerminalView (xterm.js)]
-    FE[FileExplorer]
+    TV[TerminalView - xterm.js]
+    TB[TerminalToolBar]
+    TAB[TerminalActivityBar]
+    TG[TerminalGroup]
+    NTM[NewTerminalModal]
+
+    %% File System Components
+    FE[FileExplorer - 3s auto-refresh]
+    FPD[FilePreviewDrawer]
+    FCM[FileContextMenu]
+    RFB[RevealInFinderButton]
+
+    %% Preview Components
+    MT[MarkdownText - MD Renderer]
+    MD[MermaidDiagram - Mermaid Renderer]
+    CE[CodeEditor - Monaco]
+
+    %% Git Integration
     GP[GitPanel]
-    APP[App orchestrator]
+    DV[DiffViewer]
+    TL[Timeline - Git History]
+
+    %% AI Assistant System
+    AI[AIAssistant - Claude SDK]
+    CV[ChatView]
+    CI[ChatInput]
+    CM[ChatMessage]
+    SM[StreamMessage]
+    ML[MessageList]
+    AP[AgentsPanel]
+    AS[AISettingsPanel]
+    TW[ToolWidgets]
+    TC[ToolCallCard]
+
+    %% Quack Agency
+    QAD[QuackAgencyDrawer]
+    SW[SetupWizard]
+
+    %% Preview and Dev Tools
+    PP[PreviewPanel]
+    PD[PreviewDrawer]
+    PCD[ProcessesDrawer]
+
+    %% Common UI
+    TTB[TitleBar]
+    SP[SidePanel]
+    CP[ContextPanel]
+    DA[DuckAnimation]
   end
 
-  subgraph Tauri[Tauri (Rust)]
+  subgraph Tauri[Tauri - Rust Backend]
     CMD[Invoke Commands]
     EVT[Emit Events]
-    PTY[terminal.rs (portable-pty)]
-    FS[fs.rs]
-    GIT[git.rs -> git CLI]
-    AXUM[Axum HTTP server 127.0.0.1:6768]
+    PTY[terminal.rs - portable-pty]
+    FS[fs.rs - File Operations]
+    GIT[git.rs - Git CLI Interface]
+    AXUM[Axum HTTP - 127.0.0.1:6768]
   end
 
-  U[User] -->|input| TS
-  U -->|type| TV
+  subgraph Claude[Claude Agent SDK]
+    SDK[Claude SDK Service]
+    TOOLS[Tools - Read Write Edit Bash Grep]
+    AGENTS[Agent System]
+    SESSIONS[Session Management]
+  end
+
+  subgraph External[External Systems]
+    SHELL[(User Shell)]
+    DISK[(Local Filesystem)]
+    GITBIN[(Git Binary)]
+    CC[Claude Code Hooks]
+    FINDER[(macOS Finder)]
+    CLAUDEAPI[(Anthropic API)]
+  end
+
+  %% User Interactions
+  U[User] -->|types commands| TV
+  U -->|clicks files| FE
+  U -->|views previews| FPD
+  U -->|manages git| GP
+  U -->|chats with AI| CI
+  U -->|manages agents| AP
+
+  %% Core App Orchestration
   TS --> APP
+  TAB --> APP
   FE --> APP
   GP --> APP
+  AI --> APP
   APP --> TV
+  APP --> FPD
+  APP --> GP
 
-  TV -->|invoke write_to_terminal/resize| CMD
-  APP -->|invoke list_terminals/create/close/set_color| CMD
-  APP -->|invoke list_directory/read_file| CMD
-  APP -->|invoke git_*/diff| CMD
+  %% File Preview Flow
+  FPD -->|markdown files| MT
+  FPD -->|mermaid files| MD
+  FPD -->|code files| CE
+  FE -->|open file| FPD
+  FE -->|reveal in| RFB
+  RFB -->|open| FINDER
 
+  %% Terminal Management
+  TV -->|write resize| CMD
+  APP -->|create list close| CMD
+  APP -->|set color cwd| CMD
   CMD --> PTY
-  CMD --> FS
-  CMD --> GIT
-
-  PTY -->|stdout/stderr chunks| EVT
+  PTY -->|spawns| SHELL
+  PTY -->|stdout stderr| EVT
   EVT -->|terminal-data| TV
-  PTY -->|exit status| EVT
   EVT -->|terminal-exit| APP
 
-  AXUM -->|POST /terminal/status {id|label,status,notify}| EVT
-  EVT -->|external-terminal-status| APP
+  %% File System Operations
+  FE -->|list read| CMD
+  CMD --> FS
+  FS -->|reads writes| DISK
+  FE -->|auto refresh 3s| FS
 
-  GIT -->|spawns| git[(git binary)]
-  FS -->|reads| Disk[(local disk)]
-  PTY -->|spawns| Shell[(user shell)]
+  %% Git Operations
+  GP -->|status diff stage| CMD
+  GP -->|commit history| CMD
+  CMD --> GIT
+  GIT -->|executes| GITBIN
+  GP -->|AI commits| AI
+
+  %% AI Assistant Flow
+  AI -->|messages| CV
+  CV --> ML
+  CI -->|user input| AI
+  AI -->|stream| SDK
+  SDK -->|API calls| CLAUDEAPI
+  SDK -->|execute| TOOLS
+  TOOLS -->|file ops| FS
+  TOOLS -->|bash cmds| PTY
+  AI -->|manage| AGENTS
+  AGENTS -->|git-manager| GIT
+  AP -->|config| AGENTS
+  AS -->|settings| SDK
+  TW -->|display| TC
+  SM -->|streaming| ML
+
+  %% Session Management
+  AI -->|persist| SESSIONS
+  SESSIONS -->|resume| SDK
+
+  %% External Hooks
+  CC -->|status updates| AXUM
+  AXUM -->|POST terminal status| EVT
+  EVT -->|external-terminal-status| APP
+  APP -->|update status| TS
+
+  %% Quack Agency Setup
+  QAD --> SW
+  SW -->|creates| AGENTS
+  SW -->|configures| DISK
+
+  %% Preview System
+  PP -->|detect servers| PTY
+  PP -->|open preview| PD
+  PCD -->|monitor| PTY
+
+  %% Styling
+  classDef aiComponents fill:#9333ea,stroke:#7c3aed,color:#fff
+  classDef gitComponents fill:#059669,stroke:#047857,color:#fff
+  classDef terminalComponents fill:#0891b2,stroke:#0e7490,color:#fff
+  classDef fileComponents fill:#ea580c,stroke:#c2410c,color:#fff
+  classDef previewComponents fill:#e11d48,stroke:#be123c,color:#fff
+
+  class AI,CV,CI,CM,SM,ML,AP,AS,TW,TC,SDK,TOOLS,AGENTS,SESSIONS aiComponents
+  class GP,DV,TL,GIT,GITBIN gitComponents
+  class TS,TV,TB,TAB,TG,NTM,PTY,SHELL terminalComponents
+  class FE,FPD,FCM,RFB,MT,MD,CE,FS,DISK,FINDER fileComponents
+  class PP,PD,PCD previewComponents

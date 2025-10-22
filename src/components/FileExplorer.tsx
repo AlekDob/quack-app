@@ -648,7 +648,12 @@ function FileExplorer({
           className={rowClass}
           style={{ paddingLeft: "12px" }}
           title={displayPath}
-          onClick={() => onOpenFile(entry)}
+          onClick={() => {
+            // Don't open deleted files in preview drawer
+            if (!isDeletedFile) {
+              onOpenFile(entry);
+            }
+          }}
           onContextMenu={(event) => handleContextMenu(event, entry)}
           draggable={!isDeletedFile}
           onDragStart={(event) => handleDragStart(event, entry)}
