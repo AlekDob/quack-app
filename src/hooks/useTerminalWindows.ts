@@ -23,7 +23,9 @@ export function useTerminalWindows() {
 
   const createTerminalWindow = useCallback(
     async (options: TerminalWindowOptions = {}) => {
+      console.log('🦆 useTerminalWindows: createTerminalWindow called with options:', options);
       if (creating) {
+        console.log('🦆 useTerminalWindows: Already creating, returning');
         return;
       }
 
@@ -33,17 +35,23 @@ export function useTerminalWindows() {
         const timestamp = Date.now();
         const windowLabel = options.label || `terminal-window-${timestamp}`;
         const terminalId = `term-${timestamp}`;
+        console.log('🦆 useTerminalWindows: Generated windowLabel:', windowLabel, 'terminalId:', terminalId);
 
         // Create new terminal in Rust backend first
-        const cwd = options.cwd || await invoke<string>('get_home_dir');
+        console.log('🦆 useTerminalWindows: Getting home directory...');
+        const cwd = options.cwd || await invoke<string>('get_home_directory');
+        console.log('🦆 useTerminalWindows: cwd:', cwd);
 
+        console.log('🦆 useTerminalWindows: Creating terminal in backend...');
         await invoke('create_terminal', {
           id: terminalId,
           label: windowLabel,
           cwd,
         });
+        console.log('🦆 useTerminalWindows: Terminal created in backend');
 
         // Create new webview window with Tauri using terminal.html entry point
+        console.log('🦆 useTerminalWindows: Creating WebviewWindow...');
         const webview = new WebviewWindow(windowLabel, {
           url: `terminal.html?terminal=${terminalId}&cwd=${encodeURIComponent(cwd)}&color=${encodeURIComponent(options.color || '#f28c52')}`,
           title: windowLabel,
@@ -58,9 +66,11 @@ export function useTerminalWindows() {
         });
 
         // Wait for window to load
+        console.log('🦆 useTerminalWindows: Waiting for tauri://created event...');
         await webview.once('tauri://created', () => {
-          console.log('Terminal window created:', windowLabel);
+          console.log('🦆 useTerminalWindows: Terminal window created:', windowLabel);
         });
+        console.log('🦆 useTerminalWindows: tauri://created event received');
 
         const instance: TerminalWindowInstance = {
           id: windowLabel,

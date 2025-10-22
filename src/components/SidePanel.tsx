@@ -6,17 +6,17 @@ import { CommandsPanel } from "./CommandsPanel";
 import ContextPanel from "./ContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
-import { NativeTerminalPanel } from "./NativeTerminalPanel";
+import { TerminalWindowsPanel } from "./TerminalWindowsPanel";
 import UsagePanel from "./UsagePanel";
 import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo, NativeTerminal, SessionUsage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, MCP, Commands, Context, Terminal, Native Terminals, Usage
+ * Tabs: File Explorer, Agents, MCP, Commands, Context, Terminal, Terminal Windows, Usage
  */
 
-type TabId = "explorer" | "agents" | "mcp" | "commands" | "context" | "terminal" | "native-terminals" | "usage";
+type TabId = "explorer" | "agents" | "mcp" | "commands" | "context" | "terminal" | "terminal-windows" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -122,7 +122,7 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
-  nativeTerminals: (
+  terminalWindows: (
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
       <path
         d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z"
@@ -229,6 +229,7 @@ interface SidePanelProps {
   nativeTerminals: NativeTerminal[];
   onAddNativeTerminal: () => void;
   onRemoveNativeTerminal: (id: string) => void;
+  onUpdateNativeTerminal: (id: string, updates: Partial<NativeTerminal>) => void;
   onOpenNativeTerminal: (terminal: NativeTerminal) => void;
   onFocusNativeTerminal: (terminal: NativeTerminal) => void;
   onMarkClosedNativeTerminal: (id: string) => void;
@@ -290,6 +291,7 @@ export default function SidePanel({
   nativeTerminals,
   onAddNativeTerminal,
   onRemoveNativeTerminal,
+  onUpdateNativeTerminal,
   onOpenNativeTerminal,
   onFocusNativeTerminal,
   onMarkClosedNativeTerminal,
@@ -329,16 +331,16 @@ export default function SidePanel({
       label: "Context",
       icon: icons.context,
     },
-    // Terminal tab hidden - integrated into native-terminals
+    // Terminal tab hidden - integrated into terminal-windows
     // {
     //   id: "terminal" as TabId,
     //   label: "Terminal",
     //   icon: icons.terminal,
     // },
     {
-      id: "native-terminals" as TabId,
-      label: "Terminals", // Renamed from "Native Terminals"
-      icon: icons.nativeTerminals,
+      id: "terminal-windows" as TabId,
+      label: "Terminal Windows",
+      icon: icons.terminalWindows,
       badge: nativeTerminals.length,
       hasContent: nativeTerminals.length > 0,
     },
@@ -512,16 +514,14 @@ export default function SidePanel({
           </div>
         )}
 
-        {activeTab === "native-terminals" && (
+        {activeTab === "terminal-windows" && (
           <div className="side-panel-pane terminal-panel-pane">
             <div className="terminal-container-with-iconbar">
-              <NativeTerminalPanel
+              <TerminalWindowsPanel
                 terminals={nativeTerminals}
                 onAdd={onAddNativeTerminal}
                 onRemove={onRemoveNativeTerminal}
-                onOpen={onOpenNativeTerminal}
-                onFocus={onFocusNativeTerminal}
-                onMarkClosed={onMarkClosedNativeTerminal}
+                onUpdateTerminal={onUpdateNativeTerminal}
               />
               {/* Saved Commands Bar integrated */}
               <TerminalToolBar

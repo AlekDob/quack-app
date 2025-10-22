@@ -7798,3 +7798,59 @@ button.directory-chooser:hover {
   opacity: 0.6;
   flex-shrink: 0;
 }
+
+/* Terminal Drawer Styles */
+.terminal-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  pointer-events: none;
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
+}
+
+.terminal-drawer.open {
+  visibility: visible;
+  transition-delay: 0s;
+  pointer-events: auto;
+  z-index: 1260; /* Ensure open drawer is on top of other drawers */
+}
+
+.terminal-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.terminal-drawer.open .terminal-drawer-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.terminal-drawer-panel {
+  position: relative;
+  height: 100%;
+  width: 85vw; /* Fixed width for consistent sizing */
+  max-width: 85vw;
+  min-width: 85vw;
+  background: #181a21;
+  border-left: 1px solid var(--panel-border-strong);
+  box-shadow: -18px 0 48px rgba(6, 8, 18, 0.5);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.terminal-drawer.open .terminal-drawer-panel {
+  transform: translateX(0);
+}

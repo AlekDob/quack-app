@@ -22,7 +22,7 @@ import PluginsPanel from "./components/PluginsPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
-import { AddNativeTerminalModal } from "./components/AddNativeTerminalModal";
+import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
 import PreviewDrawer from "./components/PreviewDrawer";
 import UnifiedSettings from "./components/settings/UnifiedSettings";
 import PerformanceMonitor from "./components/PerformanceMonitor";
@@ -1045,57 +1045,35 @@ function App() {
   }, []);
 
   // Native Terminal handlers
-  const handleAddNativeTerminal = useCallback(
-    async (name: string, directory: string, color: string, app: NativeTerminalApp, savedCommand?: SavedCommand) => {
-      if (!tauriAvailable) {
-        toast.error("Tauri is not available");
-        return;
-      }
-
+  const handleAddTerminalWindow = useCallback(
+    async (name: string, directory: string, color: string, savedCommand?: SavedCommand) => {
       try {
-        // If a saved command is provided, use its command and cwd
+        // If a saved command is provided, use its cwd
         const finalDirectory = savedCommand?.cwd || directory;
-        const commandToExecute = savedCommand?.command;
 
-        const result = await invoke<{ success: boolean; pid?: number }>(
-          "open_native_terminal",
-          {
-            name,
-            directory: finalDirectory || undefined,
-            app,
-            command: commandToExecute || undefined
-          }
-        );
+        // Create terminal window entry (no Rust invoke needed - TerminalWindowsPanel handles window creation)
+        const newTerminal = {
+          id: crypto.randomUUID(),
+          name,
+          color,
+          directory: finalDirectory,
+        };
 
-        if (result.success) {
-          const newTerminal: NativeTerminal = {
-            id: crypto.randomUUID(),
-            name,
-            app,
-            color,
-            directory: finalDirectory,
-            isOpen: true,
-            pid: result.pid,
-            createdAt: Date.now(),
-          };
+        setNativeTerminals((prev) => [...prev, newTerminal]);
 
-          setNativeTerminals((prev) => [...prev, newTerminal]);
-          if (savedCommand) {
-            toast.success(`Terminal "${name}" opened with command "${savedCommand.name}"`);
-          } else {
-            toast.success(`Terminal "${name}" opened successfully`);
-          }
+        if (savedCommand) {
+          toast.success(`Terminal window "${name}" added with command "${savedCommand.name}"`);
         } else {
-          toast.error("Failed to open terminal");
+          toast.success(`Terminal window "${name}" added`);
         }
       } catch (error) {
-        console.error("Failed to open native terminal:", error);
+        console.error("Failed to add terminal window:", error);
         toast.error(
-          `Failed to open terminal: ${error instanceof Error ? error.message : "Unknown error"}`
+          `Failed to add terminal window: ${error instanceof Error ? error.message : "Unknown error"}`
         );
       }
     },
-    [tauriAvailable]
+    []
   );
 
   // Quick-launch native terminal with AI tool command (Claude Code, Factory AI, Codex)
@@ -1130,16 +1108,15 @@ function App() {
         category: "dev",
       };
 
-      // Launch native terminal with the command
-      await handleAddNativeTerminal(
+      // Launch terminal window with the command
+      await handleAddTerminalWindow(
         label,
         currentDirectory,
         randomColor,
-        "Terminal", // Default to Terminal.app (user can change this later in settings)
         aiToolCommand
       );
     },
-    [explorerPath, activeTerminal, handleAddNativeTerminal]
+    [explorerPath, activeTerminal, handleAddTerminalWindow]
   );
 
   // Unused - keeping for future use
@@ -3743,6 +3720,11 @@ You have access to all Bash tools to execute git commands like:
               console.error("Failed to close native terminal:", error);
             }
           }}
+          onUpdateNativeTerminal={(id, updates) => {
+            setNativeTerminals((prev) =>
+              prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+            );
+          }}
           onOpenNativeTerminal={(terminal) => {
             // Aggiorna solo lo stato - l'invoke è già fatto in NativeTerminalPanel
             setNativeTerminals((prev) =>
@@ -3930,11 +3912,11 @@ You have access to all Bash tools to execute git commands like:
           }}
         />
 
-        <AddNativeTerminalModal
+        <AddTerminalWindowModal
           isOpen={showAddNativeTerminalModal}
           onClose={() => setShowAddNativeTerminalModal(false)}
-          onConfirm={async (name, directory, color, app, savedCommand) => {
-            await handleAddNativeTerminal(name, directory, color, app, savedCommand);
+          onConfirm={async (name, directory, color, savedCommand) => {
+            await handleAddTerminalWindow(name, directory, color, savedCommand);
             setShowAddNativeTerminalModal(false);
           }}
           defaultDirectory={explorerPath || activeTerminal?.cwd || ""}
