@@ -44,7 +44,6 @@ import type {
   GitStatusEntry,
   GitStatusSummary,
   NativeTerminal,
-  NativeTerminalApp,
   TerminalExitEvent,
   TerminalInfo,
   SavedCommand,
@@ -428,7 +427,7 @@ function App() {
 
   // Track usage from Claude Agent SDK response
   const trackUsage = useCallback((
-    agentId: string,
+    _agentId: string,
     agentName: string,
     sessionId: string,
     totalCostUsd: number,
@@ -1072,11 +1071,14 @@ function App() {
         const finalDirectory = savedCommand?.cwd || directory;
 
         // Create terminal window entry (no Rust invoke needed - TerminalWindowsPanel handles window creation)
-        const newTerminal = {
+        const newTerminal: NativeTerminal = {
           id: crypto.randomUUID(),
           name,
           color,
           directory: finalDirectory,
+          app: 'Terminal',
+          isOpen: false,
+          createdAt: Date.now(),
         };
 
         setNativeTerminals((prev) => [...prev, newTerminal]);

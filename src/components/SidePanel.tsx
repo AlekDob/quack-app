@@ -292,9 +292,9 @@ export default function SidePanel({
   onAddNativeTerminal,
   onRemoveNativeTerminal,
   onUpdateNativeTerminal,
-  onOpenNativeTerminal,
-  onFocusNativeTerminal,
-  onMarkClosedNativeTerminal,
+  onOpenNativeTerminal: _onOpenNativeTerminal,
+  onFocusNativeTerminal: _onFocusNativeTerminal,
+  onMarkClosedNativeTerminal: _onMarkClosedNativeTerminal,
 
   // Usage
   usageSessions,
