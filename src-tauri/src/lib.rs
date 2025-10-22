@@ -15,6 +15,8 @@ mod claude_oauth;
 mod claude_usage;
 mod commands;
 mod context;
+mod deep_link;
+mod deep_link_commands;
 mod fs;
 mod git;
 mod mcp;
@@ -131,6 +133,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
@@ -390,7 +393,9 @@ pub fn run() {
             plugins::search_plugins,
             reveal::reveal_in_finder,
             claude_usage::get_claude_plan_usage,
-            claude_usage::open_claude_usage_in_terminal
+            claude_usage::open_claude_usage_in_terminal,
+            deep_link_commands::test_deep_link,
+            deep_link_commands::register_deep_link_handler
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

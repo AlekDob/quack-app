@@ -34,6 +34,7 @@ import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
+import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 
 import type {
   AgentChat,
@@ -492,6 +493,25 @@ function App() {
       void initialize();
     }
   }, [tauriAvailable]);
+
+  // Handle deep link file opening from Quack Inspector
+  useDeepLinkHandler(
+    useCallback(
+      (payload) => {
+        console.log('🦆 Opening file from deep link:', payload);
+        // Open file preview with the provided path
+        const fileName = payload.path.split('/').pop() || payload.path;
+        setPreviewFile({ name: fileName, path: payload.path });
+        setPreviewContent('');
+        setPreviewError(null);
+        // TODO: If line/column are provided, scroll to that position in the editor
+        if (payload.line) {
+          console.log(`🦆 TODO: Scroll to line ${payload.line}${payload.column ? `, column ${payload.column}` : ''}`);
+        }
+      },
+      []
+    )
+  );
 
   // Sync terminal status with chatLoadingMap and check if waiting for response
   useEffect(() => {

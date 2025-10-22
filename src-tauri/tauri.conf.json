@@ -31,6 +31,13 @@
       "csp": null
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["quack"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
@@ -45,10 +52,6 @@
       "../images",
       "node-sdk"
     ],
-    "deeplink": {
-      "schemes": ["quack"],
-      "protocols": ["quack"]
-    },
     "macOS": {
       "dmg": {
         "appPosition": {

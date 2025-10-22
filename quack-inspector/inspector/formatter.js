@@ -52,9 +52,11 @@ class MarkdownFormatter {
     lines.push(`**Component**: \`${info.componentName}\``);
     lines.push('');
 
-    // Source file
+    // Source file with deep link
     if (info.file && info.file !== 'Unknown') {
+      const deepLink = `quack://open-file?path=${encodeURIComponent(info.file)}${info.line ? `&line=${info.line}` : ''}${info.column ? `&column=${info.column}` : ''}`;
       lines.push(`**File**: \`${info.file}\``);
+      lines.push(`**Open in Quack**: [${info.file}${info.line ? `:${info.line}` : ''}](${deepLink})`);
       lines.push('');
     }
 
@@ -95,9 +97,11 @@ class MarkdownFormatter {
     lines.push(`**Component**: \`${info.componentName}\``);
     lines.push('');
 
-    // Source file
+    // Source file with deep link
     if (info.file && info.file !== 'Unknown') {
+      const deepLink = `quack://open-file?path=${encodeURIComponent(info.file)}${info.line ? `&line=${info.line}` : ''}${info.column ? `&column=${info.column}` : ''}`;
       lines.push(`**File**: \`${info.file}\``);
+      lines.push(`**Open in Quack**: [${info.file}${info.line ? `:${info.line}` : ''}](${deepLink})`);
       lines.push('');
     }
 
