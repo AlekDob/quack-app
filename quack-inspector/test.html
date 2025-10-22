@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quack Inspector Test Page</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #FF6B35 0%, #ff8a5c 100%);
+      color: white;
+      padding: 40px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .button {
+      background: #FF6B35;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .button:hover {
+      background: #ff5722;
+      transform: translateY(-2px);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #4CAF50;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-left: 10px;
+    }
+
+    code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🦆 Quack Inspector Test Page</h1>
+      <p>Use Quack Inspector to inspect the React components below!</p>
+    </div>
+
+    <div class="card">
+      <h2>How to Test</h2>
+      <ol>
+        <li>Install the Quack Inspector extension in Chrome</li>
+        <li>Click the Quack Inspector icon in your toolbar</li>
+        <li>Click "Start Inspecting"</li>
+        <li>Hover over and click any element below</li>
+        <li>Check your clipboard for AI-ready markdown!</li>
+      </ol>
+    </div>
+
+    <div id="root"></div>
+  </div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // Sample React Components
+    function WelcomeCard({ title, message }) {
+      return (
+        <div className="card">
+          <h2>{title}</h2>
+          <p>{message}</p>
+          <span className="badge">React Component</span>
+        </div>
+      );
+    }
+
+    function CounterButton() {
+      const [count, setCount] = useState(0);
+
+      return (
+        <div className="card">
+          <h3>Counter: {count}</h3>
+          <button
+            className="button"
+            onClick={() => setCount(count + 1)}
+          >
+            Increment
+          </button>
+          <p style={{ marginTop: '15px', color: '#666' }}>
+            This is a stateful React component with a <code>useState</code> hook
+          </p>
+        </div>
+      );
+    }
+
+    function ComponentList() {
+      const items = ['React', 'Vue', 'Angular', 'Generic HTML'];
+
+      return (
+        <div className="card">
+          <h3>Framework Support</h3>
+          <ul>
+            {items.map((item, index) => (
+              <li key={index} style={{ marginBottom: '8px' }}>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    function FeatureGrid() {
+      const features = [
+        { title: 'Component Detection', desc: 'Automatically detects React, Vue, and Angular components' },
+        { title: 'AI-Ready Output', desc: 'Generates markdown formatted for AI consumption' },
+        { title: 'Visual Inspector', desc: 'Click-to-inspect any element on the page' },
+        { title: 'Inspection History', desc: 'Keeps track of recently inspected components' }
+      ];
+
+      return (
+        <div>
+          <h2 style={{ marginTop: '40px', marginBottom: '20px' }}>Features</h2>
+          <div className="grid">
+            {features.map((feature, index) => (
+              <div key={index} className="card" style={{ margin: 0 }}>
+                <h4>{feature.title}</h4>
+                <p style={{ color: '#666', fontSize: '14px' }}>{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div>
+          <WelcomeCard
+            title="Welcome to Quack Inspector!"
+            message="Inspect any component below to see the magic ✨"
+          />
+
+          <CounterButton />
+
+          <ComponentList />
+
+          <FeatureGrid />
+
+          <div className="card" style={{ marginTop: '40px', background: '#f9f9f9' }}>
+            <h3>🎯 Pro Tip</h3>
+            <p>
+              Try inspecting the <code>CounterButton</code> component above.
+              You'll see its state, props, and even hook information!
+            </p>
+            <p style={{ marginTop: '10px' }}>
+              Use keyboard shortcut: <kbd style={{ background: '#333', color: 'white', padding: '4px 8px', borderRadius: '4px' }}>⌘ Shift Q</kbd>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

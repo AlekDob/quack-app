@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quack Inspector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🦆 Quack Inspector</h1>
+      <p class="subtitle">AI-powered component inspector</p>
+    </div>
+
+    <!-- Framework Detection -->
+    <div class="section">
+      <div class="framework-badge">
+        <span class="label">Framework:</span>
+        <span id="framework" class="value">Detecting...</span>
+      </div>
+    </div>
+
+    <!-- Main Action Button -->
+    <div class="section">
+      <button id="toggle-inspector" class="btn btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <span id="toggle-text">Start Inspecting</span>
+      </button>
+    </div>
+
+    <!-- Keyboard Shortcuts -->
+    <div class="section">
+      <h3 class="section-title">Keyboard Shortcuts</h3>
+      <div class="shortcuts">
+        <div class="shortcut">
+          <kbd>⌘ Shift Q</kbd>
+          <span>Toggle Inspector</span>
+        </div>
+        <div class="shortcut">
+          <kbd>⌘ Shift C</kbd>
+          <span>Copy Last Component</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspection History -->
+    <div class="section">
+      <div class="section-header">
+        <h3 class="section-title">Recent Inspections</h3>
+        <button id="clear-history" class="btn-text">Clear</button>
+      </div>
+      <div id="history" class="history">
+        <p class="empty-state">No inspections yet</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <a href="https://github.com/quack-inspector" target="_blank" class="link">
+        View on GitHub
+      </a>
+      <span class="version">v1.0.0</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
