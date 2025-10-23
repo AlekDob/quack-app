@@ -1,15 +1,13 @@
 .terminal-toolbar {
-  position: fixed;
-  bottom: -6px; /* Slightly lower to align with chat input buttons */
-  right: 0;
+  position: relative; /* Changed from fixed to relative for drawer integration */
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-start; /* Already aligned left */
   gap: 6px;
-  padding: 8px 12px;
+  padding: 12px 16px;
   background: transparent;
   border-top: none;
-  z-index: 100;
+  width: auto; /* Not full width, just content width */
 }
 
 .terminal-tool-button {

@@ -53,6 +53,10 @@
       "node-sdk"
     ],
     "macOS": {
+      "entitlements": "Entitlements.plist",
+      "exceptionDomain": "",
+      "frameworks": [],
+      "minimumSystemVersion": "10.15",
       "dmg": {
         "appPosition": {
           "x": 180,

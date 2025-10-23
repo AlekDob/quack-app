@@ -14,6 +14,8 @@ export interface ClaudeSDKOptions {
     env?: Record<string, string>;
   }>;
   signal?: AbortSignal; // AbortSignal to cancel the stream
+  timeout?: number; // Timeout in milliseconds (default: 5 minutes)
+  streamId?: string; // Unique identifier for this stream (for logging/debugging)
 }
 
 /**
@@ -84,14 +86,57 @@ export interface ClaudeSDKStreamEvent {
   };
 }
 
+// Session isolation: Track active streams per session to prevent conflicts
+const activeStreams = new Map<string, AbortController>();
+
 /**
  * Send a message to Claude using the official Claude Agent SDK
- * with real-time streaming support
+ * with real-time streaming support and proper session isolation
+ *
+ * IMPORTANT: Fixed to support multiple concurrent sessions without blocking
  */
 export async function* streamClaudeMessage(
   prompt: string,
   options: ClaudeSDKOptions = {}
 ): AsyncGenerator<ClaudeSDKStreamEvent> {
+  const startTime = Date.now();
+  const streamId = options.streamId || `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const timeout = options.timeout || 5 * 60 * 1000; // Default: 5 minutes
+
+  // Create unique session key for isolation
+  const sessionKey = options.sessionId || streamId;
+
+  console.log(`[claudeSDK:${streamId}] Starting stream for session: ${sessionKey} with timeout: ${timeout}ms`);
+
+  // Cancel any existing stream for this session
+  const existingController = activeStreams.get(sessionKey);
+  if (existingController) {
+    console.warn(`[claudeSDK:${streamId}] Cancelling existing stream for session: ${sessionKey}`);
+    existingController.abort();
+    activeStreams.delete(sessionKey);
+  }
+
+  // Create new abort controller for this session
+  const sessionAbortController = new AbortController();
+  activeStreams.set(sessionKey, sessionAbortController);
+
+  // Combine user abort signal with session abort signal
+  const combinedSignal = options.signal
+    ? AbortSignal.any([options.signal, sessionAbortController.signal])
+    : sessionAbortController.signal;
+
+  // Create timeout promise
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Stream timeout after ${timeout}ms`));
+    }, timeout);
+
+    // Clear timeout if signal is aborted
+    combinedSignal.addEventListener('abort', () => {
+      clearTimeout(timer);
+    });
+  });
+
   try {
     const {
       model = 'sonnet',
@@ -154,19 +199,56 @@ export async function* streamClaudeMessage(
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
-    // Stream events
-    for await (const event of stream) {
-      // Check if stream was aborted
-      if (options.signal?.aborted) {
-        console.log('[claudeSDK] Stream aborted by user');
+    // Stream events with timeout protection
+    const streamIterator = stream[Symbol.asyncIterator]();
+    let lastEventTime = Date.now();
+    let eventCount = 0;
+
+    while (true) {
+      // Check if aborted before processing
+      if (combinedSignal.aborted) {
+        console.log(`[claudeSDK:${streamId}] Stream aborted before event ${eventCount + 1}`);
         break;
       }
+
+      // Race between next event and timeout
+      let result;
+      try {
+        const nextEventPromise = streamIterator.next();
+        result = await Promise.race([
+          nextEventPromise,
+          timeoutPromise,
+        ]);
+      } catch (error) {
+        if (error instanceof Error && error.message?.includes('timeout')) {
+          console.error(`[claudeSDK:${streamId}] Stream timeout after ${eventCount} events, last event ${Date.now() - lastEventTime}ms ago`);
+        }
+        throw error;
+      }
+
+      // Check if stream is done
+      if (result.done) {
+        console.log(`[claudeSDK:${streamId}] Stream completed after ${eventCount} events in ${Date.now() - startTime}ms`);
+        break;
+      }
+
+      const event = result.value;
+      lastEventTime = Date.now();
+      eventCount++;
 
       // Convert SDK event to our ClaudeEvent format
       const claudeEvent = convertSDKEventToClaudeEvent(event);
 
       if (claudeEvent) {
         events.push(claudeEvent);
+
+        // Log significant events
+        if (claudeEvent.type === 'system') {
+          console.log(`[claudeSDK:${streamId}] System event - session: ${claudeEvent.session_id}`);
+        } else if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
+          const hasToolUse = claudeEvent.message.content.some(b => b.type === 'tool_use');
+          console.log(`[claudeSDK:${streamId}] Assistant event - ${claudeEvent.message.content.length} blocks${hasToolUse ? ' (includes tool use)' : ''}`);
+        }
 
         // Emit the event
         yield {
@@ -181,6 +263,7 @@ export async function* streamClaudeMessage(
             totalInputTokens = claudeEvent.usage.input_tokens;
             totalOutputTokens = claudeEvent.usage.output_tokens;
           }
+          console.log(`[claudeSDK:${streamId}] Result event - tokens: ${totalInputTokens}/${totalOutputTokens}, cost: $${claudeEvent.total_cost_usd || 0}`);
         }
       }
     }
@@ -197,11 +280,26 @@ export async function* streamClaudeMessage(
       },
     };
   } catch (error) {
-    console.error('Claude SDK error:', error);
+    const duration = Date.now() - startTime;
+    const isTimeout = error instanceof Error && error.message.includes('timeout');
+    const isAborted = combinedSignal.aborted;
+
+    console.error(`[claudeSDK:${streamId}] Error after ${duration}ms (aborted: ${isAborted}):`, error);
+
     yield {
       type: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error
+        ? (isTimeout ? `Stream timeout after ${Math.floor(duration / 1000)}s - the request took too long to complete`
+          : isAborted ? 'Stream cancelled by user'
+          : error.message)
+        : 'Unknown error',
     };
+  } finally {
+    const duration = Date.now() - startTime;
+    console.log(`[claudeSDK:${streamId}] Stream ended after ${duration}ms for session: ${sessionKey}`);
+
+    // Clean up active stream for this session
+    activeStreams.delete(sessionKey);
   }
 }
 
@@ -291,4 +389,23 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
   }
 
   return null;
+}
+
+/**
+ * Abort all active streams (useful for cleanup)
+ */
+export function abortAllStreams(): void {
+  console.log(`[claudeSDK] Aborting all ${activeStreams.size} active streams`);
+  activeStreams.forEach((controller, sessionKey) => {
+    console.log(`[claudeSDK] Aborting stream for session: ${sessionKey}`);
+    controller.abort();
+  });
+  activeStreams.clear();
+}
+
+/**
+ * Get count of active streams (for debugging)
+ */
+export function getActiveStreamCount(): number {
+  return activeStreams.size;
 }

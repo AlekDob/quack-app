@@ -69,12 +69,6 @@ export default function TerminalToolBar({
 
   return (
     <div className="terminal-toolbar">
-      {/* New Terminal Tab Button - primo pulsante a sinistra */}
-      <TerminalWindowButton onCreateTerminal={onCreateTerminal} />
-
-      {/* Separator */}
-      <div className="terminal-toolbar-separator" />
-
       {/* Existing tools */}
       {tools.map((tool) => (
         <button
@@ -84,11 +78,8 @@ export default function TerminalToolBar({
           onClick={() => {
             if (tool.type === "saved") {
               onToggleSavedCommands();
-            } else if (tool.type === "command" && onQuickLaunchNativeTerminal) {
-              // AI tool buttons (Claude Code, Factory AI, Codex) create native terminals
-              onQuickLaunchNativeTerminal(tool.command, tool.label);
-            } else {
-              // Fallback to execute command in internal terminal
+            } else if (tool.type === "command") {
+              // Execute command in the current drawer terminal
               onExecuteCommand(tool.command, tool.label);
             }
           }}

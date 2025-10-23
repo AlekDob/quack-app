@@ -416,8 +416,13 @@ function App() {
   const [isChatConfigured, setIsChatConfigured] = useState(false);
 
   // Abort controllers and last prompts for each agent
+  // Key format: `${activeId}-${messageId}` to prevent race conditions between concurrent streams
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const lastPromptsRef = useRef<Map<string, string>>(new Map());
+  // Track active streams per agent to prevent concurrency issues
+  const activeStreamsRef = useRef<Map<string, Set<string>>>(new Map());
+  // Track stream count for UI display (Map of agentId -> count)
+  const [activeStreamCounts, setActiveStreamCounts] = useState<Map<string, number>>(new Map());
 
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
@@ -619,12 +624,33 @@ function App() {
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !activeId) return;
 
+    // Generate unique message ID for this stream
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const streamKey = `${activeId}-${messageId}`;
+
+    console.log(`[sendMessage] Starting stream ${streamKey}`);
+
     // Save the prompt for restoration on abort
     lastPromptsRef.current.set(activeId, content);
 
-    // Create abort controller for this stream
+    // Create abort controller with composite key to prevent race conditions
     const abortController = new AbortController();
-    abortControllersRef.current.set(activeId, abortController);
+    abortControllersRef.current.set(streamKey, abortController);
+
+    // Track this stream as active for this agent
+    if (!activeStreamsRef.current.has(activeId)) {
+      activeStreamsRef.current.set(activeId, new Set());
+    }
+    activeStreamsRef.current.get(activeId)!.add(streamKey);
+
+    // Update stream count for UI
+    setActiveStreamCounts((prev) => {
+      const newCounts = new Map(prev);
+      newCounts.set(activeId, activeStreamsRef.current.get(activeId)!.size);
+      return newCounts;
+    });
+
+    console.log(`[sendMessage] Active streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
 
     // Check if chat is configured
     if (!isChatConfigured) {
@@ -873,20 +899,54 @@ function App() {
         return newMap;
       });
 
-      // Clean up abort controller
-      abortControllersRef.current.delete(activeId);
+      // Clean up abort controller with composite key
+      abortControllersRef.current.delete(streamKey);
+
+      // Remove from active streams
+      const activeStreams = activeStreamsRef.current.get(activeId);
+      if (activeStreams) {
+        activeStreams.delete(streamKey);
+        if (activeStreams.size === 0) {
+          activeStreamsRef.current.delete(activeId);
+        }
+      }
+
+      // Update stream count for UI
+      setActiveStreamCounts((prev) => {
+        const newCounts = new Map(prev);
+        const currentCount = activeStreamsRef.current.get(activeId)?.size || 0;
+        if (currentCount === 0) {
+          newCounts.delete(activeId);
+        } else {
+          newCounts.set(activeId, currentCount);
+        }
+        return newCounts;
+      });
+
+      console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
     }
   }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath]);
 
-  // Abort streaming for specific agent
+  // Abort streaming for specific agent - aborts ALL active streams for this agent
   const abortStreamForAgent = useCallback(() => {
     if (!activeId) return;
 
-    const abortController = abortControllersRef.current.get(activeId);
-    if (abortController && !abortController.signal.aborted) {
-      console.log('[abortStreamForAgent] Aborting stream for agent:', activeId);
-      abortController.abort();
+    const activeStreams = activeStreamsRef.current.get(activeId);
+    if (!activeStreams || activeStreams.size === 0) {
+      console.log('[abortStreamForAgent] No active streams for agent:', activeId);
+      return;
     }
+
+    console.log(`[abortStreamForAgent] Aborting ${activeStreams.size} stream(s) for agent: ${activeId}`);
+
+    // Abort all active streams for this agent
+    activeStreams.forEach((streamKey) => {
+      const abortController = abortControllersRef.current.get(streamKey);
+      if (abortController && !abortController.signal.aborted) {
+        console.log(`[abortStreamForAgent] Aborting stream: ${streamKey}`);
+        abortController.abort();
+      }
+    });
   }, [activeId]);
 
   // Get last prompt for specific agent
@@ -3007,16 +3067,22 @@ function App() {
   }, []);
 
   const handleExecuteAICommand = useCallback(
-    async (command: string, label: string) => {
-      if (!tauriAvailable || !activeId) {
+    async (command: string, label: string, terminalId?: string) => {
+      if (!tauriAvailable) {
+        return;
+      }
+      // Use provided terminalId or fallback to activeId
+      const targetId = terminalId || activeId;
+      if (!targetId) {
+        console.warn('No terminal ID available for command execution');
         return;
       }
       try {
         await invoke("write_to_terminal", {
-          id: activeId,
+          id: targetId,
           data: command + "\n",
         });
-        console.log(`AI command executed: ${label} -> ${command}`);
+        console.log(`AI command executed: ${label} -> ${command} in terminal ${targetId}`);
       } catch (error) {
         console.error("Error executing AI command", error);
       }
@@ -3586,6 +3652,21 @@ You have access to all Bash tools to execute git commands like:
                 </h2>
                 {import.meta.env.DEV && (
                   <span className="dev-badge">DEV</span>
+                )}
+                {/* Show active streams badge when > 0 */}
+                {activeId && (activeStreamCounts.get(activeId) || 0) > 0 && (
+                  <span
+                    className="dev-badge"
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      color: '#60a5fa',
+                      animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }}
+                    title={`${activeStreamCounts.get(activeId) || 0} active stream(s)`}
+                  >
+                    🌊 {activeStreamCounts.get(activeId)}
+                  </span>
                 )}
               </div>
               <div className="main-toolbar-right">

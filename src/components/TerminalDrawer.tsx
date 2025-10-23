@@ -5,6 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import '@xterm/xterm/css/xterm.css';
+import TerminalToolBar from './TerminalToolBar';
 
 // Global storage for xterm instances (outside React lifecycle)
 // Key: terminalId, Value: xterm instance + cleanup functions
@@ -23,6 +24,12 @@ interface TerminalDrawerProps {
   color: string;
   existingTerminalId?: string;
   onTerminalCreated?: (terminalId: string) => void;
+  // TerminalToolBar props
+  onExecuteCommand: (command: string, label: string, terminalId?: string) => void;
+  onToggleSavedCommands: () => void;
+  savedCommandsOpen: boolean;
+  onCreateTerminal: () => void;
+  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 }
 
 export function TerminalDrawer({
@@ -33,6 +40,11 @@ export function TerminalDrawer({
   color,
   existingTerminalId,
   onTerminalCreated,
+  onExecuteCommand,
+  onToggleSavedCommands,
+  savedCommandsOpen,
+  onCreateTerminal,
+  onQuickLaunchNativeTerminal,
 }: TerminalDrawerProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
@@ -247,6 +259,109 @@ export function TerminalDrawer({
         {/* Terminal */}
         <div className="flex-1 bg-[#1e1e1e] overflow-hidden">
           <div ref={terminalRef} className="w-full h-full" style={{ padding: '8px' }} />
+        </div>
+
+        {/* Footer with TerminalToolBar */}
+        <div className="border-t border-white/10 bg-[#181a21] flex justify-start">
+          <TerminalToolBar
+            onExecuteCommand={async (command, label) => {
+              // Execute command in THIS drawer's terminal - simulating user typing
+              const terminalId = currentTerminalIdRef.current;
+              console.log(`🦆 Executing command in terminal ${terminalId}:`, command);
+
+              if (!terminalId) {
+                console.error('❌ No terminal ID available');
+                return;
+              }
+
+              const instance = terminalInstances.get(terminalId);
+              if (!instance) {
+                console.error('❌ Terminal instance not found:', terminalId);
+                return;
+              }
+
+              try {
+                // ULTIMATE FIX: Simulate REAL user input by triggering xterm's textarea
+                // This will automatically trigger onData handler which sends to PTY
+                const textarea = instance.xterm.textarea;
+
+                if (textarea) {
+                  console.log('🦆 Simulating keyboard input via textarea...');
+
+                  // Focus the textarea first
+                  textarea.focus();
+                  instance.xterm.focus();
+
+                  // Method 1: Try simulating paste event (most reliable)
+                  const pasteEvent = new ClipboardEvent('paste', {
+                    clipboardData: new DataTransfer(),
+                    bubbles: true,
+                    cancelable: true
+                  });
+
+                  // Add text to clipboard data
+                  try {
+                    // @ts-ignore - clipboardData might be readonly
+                    pasteEvent.clipboardData?.setData('text/plain', command + '\n');
+                    textarea.dispatchEvent(pasteEvent);
+                    console.log('✅ Paste event dispatched');
+                  } catch (pasteError) {
+                    console.warn('⚠️ Paste approach failed, trying character simulation...');
+
+                    // Method 2: Fallback - simulate typing each character
+                    for (const char of command) {
+                      const keyEvent = new KeyboardEvent('keydown', {
+                        key: char,
+                        code: `Key${char.toUpperCase()}`,
+                        bubbles: true,
+                        cancelable: true
+                      });
+                      textarea.dispatchEvent(keyEvent);
+
+                      // Also dispatch keypress for compatibility
+                      const pressEvent = new KeyboardEvent('keypress', {
+                        key: char,
+                        code: `Key${char.toUpperCase()}`,
+                        bubbles: true,
+                        cancelable: true
+                      });
+                      textarea.dispatchEvent(pressEvent);
+
+                      // Small delay to simulate real typing
+                      await new Promise(resolve => setTimeout(resolve, 1));
+                    }
+
+                    // Simulate ENTER key
+                    const enterEvent = new KeyboardEvent('keydown', {
+                      key: 'Enter',
+                      code: 'Enter',
+                      keyCode: 13,
+                      bubbles: true,
+                      cancelable: true
+                    });
+                    textarea.dispatchEvent(enterEvent);
+                    console.log('✅ Character simulation completed');
+                  }
+
+                  console.log(`✅ Command simulated: ${label} -> ${command}`);
+                } else {
+                  console.error('❌ Textarea not found on xterm instance');
+                  // Fallback to old method if textarea not accessible
+                  instance.xterm.write(command + '\r\n');
+                  await invoke("write_to_terminal", {
+                    id: terminalId,
+                    data: command + '\r',
+                  });
+                }
+              } catch (error) {
+                console.error(`❌ Error executing command:`, error);
+              }
+            }}
+            onToggleSavedCommands={onToggleSavedCommands}
+            savedCommandsOpen={savedCommandsOpen}
+            onCreateTerminal={onCreateTerminal}
+            onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
+          />
         </div>
       </div>
     </div>

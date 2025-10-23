@@ -291,7 +291,7 @@ export default function AgentsPanel({
                             }}
                           >
                             <img
-                              src="/images/agent-setting.jpeg"
+                              src="/agent-setting.jpeg"
                               alt={agent.name}
                               style={{
                                 width: "100%",
@@ -425,7 +425,7 @@ export default function AgentsPanel({
                             }}
                           >
                             <img
-                              src="/images/agent-setting.jpeg"
+                              src="/agent-setting.jpeg"
                               alt={agent.name}
                               style={{
                                 width: "100%",

@@ -15,6 +15,11 @@ interface TerminalWindowsPanelProps {
   onAdd: () => void;
   onRemove: (id: string) => void;
   onUpdateTerminal: (id: string, updates: Partial<TerminalWindow>) => void;
+  // TerminalToolBar props for drawer integration
+  onExecuteCommand: (command: string, label: string, terminalId?: string) => void;
+  onToggleSavedCommands: () => void;
+  savedCommandsOpen: boolean;
+  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 }
 
 export function TerminalWindowsPanel({
@@ -22,6 +27,10 @@ export function TerminalWindowsPanel({
   onAdd,
   onRemove,
   onUpdateTerminal,
+  onExecuteCommand,
+  onToggleSavedCommands,
+  savedCommandsOpen,
+  onQuickLaunchNativeTerminal,
 }: TerminalWindowsPanelProps) {
   const [activeTerminal, setActiveTerminal] = useState<TerminalWindow | null>(null);
 
@@ -42,7 +51,7 @@ export function TerminalWindowsPanel({
       const latestTerminal = terminals.find(t => t.id === terminal.id) || terminal;
       console.log('🦆 Opening terminal:', latestTerminal.name, 'with terminalId:', latestTerminal.terminalId);
       setActiveTerminal(latestTerminal);
-      toast.success(`Opened: ${terminal.name}`);
+      // Removed notification: toast.success(`Opened: ${terminal.name}`);
     },
     [terminals]
   );
@@ -171,6 +180,11 @@ export function TerminalWindowsPanel({
           color={terminal.color}
           existingTerminalId={terminal.terminalId}
           onTerminalCreated={handleTerminalCreated}
+          onExecuteCommand={onExecuteCommand}
+          onToggleSavedCommands={onToggleSavedCommands}
+          savedCommandsOpen={savedCommandsOpen}
+          onCreateTerminal={onAdd}
+          onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
         />
       ))}
     </div>

@@ -75,7 +75,10 @@ export function useClaudeChat() {
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      // Stream message using Claude Agent SDK
+      // Generate unique stream ID for this chat instance
+      const streamId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Stream message using Claude Agent SDK with unique streamId
       const stream = streamClaudeMessage(content, {
         model: options?.model || 'sonnet',
         thinkingMode: options?.thinkingMode,
@@ -83,6 +86,7 @@ export function useClaudeChat() {
         sessionId: claudeSessionId.current, // Resume previous session if exists
         workingDirectory: options?.workingDirectory,
         signal: abortControllerRef.current?.signal, // Pass abort signal
+        streamId, // Pass unique stream ID for this chat
       });
 
       const events: ClaudeEvent[] = [];

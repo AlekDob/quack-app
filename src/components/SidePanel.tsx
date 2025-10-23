@@ -219,7 +219,7 @@ interface SidePanelProps {
   onSelectTerminal: (id: string) => void;
 
   // TerminalToolBar props
-  onExecuteCommand: (command: string, label: string) => void;
+  onExecuteCommand: (command: string, label: string, terminalId?: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onCreateTerminal: () => void;
@@ -522,15 +522,12 @@ export default function SidePanel({
                 onAdd={onAddNativeTerminal}
                 onRemove={onRemoveNativeTerminal}
                 onUpdateTerminal={onUpdateNativeTerminal}
-              />
-              {/* Saved Commands Bar integrated */}
-              <TerminalToolBar
                 onExecuteCommand={onExecuteCommand}
                 onToggleSavedCommands={onToggleSavedCommands}
                 savedCommandsOpen={savedCommandsOpen}
-                onCreateTerminal={onAddNativeTerminal}
                 onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
               />
+              {/* TerminalToolBar now integrated in drawer footer */}
             </div>
           </div>
         )}
