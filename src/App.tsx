@@ -1158,49 +1158,6 @@ function App() {
     []
   );
 
-  // Quick-launch native terminal with AI tool command (Claude Code, Factory AI, Codex)
-  const handleQuickLaunchNativeTerminal = useCallback(
-    async (command: string, label: string) => {
-      // Preset color palette for random selection
-      const colors = [
-        "#4ecdc4",
-        "#ff6b6b",
-        "#95e1d3",
-        "#f38181",
-        "#aa96da",
-        "#fcbad3",
-        "#a8d8ea",
-        "#ffb5e8",
-        "#c7ceea",
-        "#ffd3b6",
-        "#d4a5a5",
-      ];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-      // Get current directory (prefer explorerPath, fallback to activeTerminal cwd or home)
-      const currentDirectory = explorerPath || activeTerminal?.cwd || "";
-
-      // Create a SavedCommand object for the AI tool
-      const aiToolCommand: SavedCommand = {
-        id: crypto.randomUUID(),
-        name: label,
-        command,
-        cwd: currentDirectory,
-        color: randomColor,
-        category: "dev",
-      };
-
-      // Launch terminal window with the command
-      await handleAddTerminalWindow(
-        label,
-        currentDirectory,
-        randomColor,
-        aiToolCommand
-      );
-    },
-    [explorerPath, activeTerminal, handleAddTerminalWindow]
-  );
-
   // Unused - keeping for future use
   // @ts-ignore - TS6133: Keeping for future implementation
   const handleRemoveNativeTerminal = useCallback(
@@ -3806,7 +3763,6 @@ You have access to all Bash tools to execute git commands like:
           }
           savedCommandsOpen={savedCommandsDrawerOpen}
           onCreateTerminal={handleQuickCreateTerminal}
-          onQuickLaunchNativeTerminal={handleQuickLaunchNativeTerminal}
           // Native Terminals props
           nativeTerminals={nativeTerminals}
           onAddNativeTerminal={() => setShowAddNativeTerminalModal(true)}

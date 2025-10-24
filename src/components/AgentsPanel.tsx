@@ -263,7 +263,8 @@ export default function AgentsPanel({
                       >
                         {/* Agent card with avatar on left, content in middle, Use button on right */}
                         <div
-                          className="w-full flex items-start gap-3 p-3 transition-all duration-200"
+                          className="w-full flex items-start gap-3 p-3 transition-all duration-200 cursor-pointer"
+                          onClick={() => onSelectAgent(agent)}
                           onMouseEnter={(e) => {
                             const parent = e.currentTarget.parentElement;
                             if (parent) {
@@ -280,10 +281,8 @@ export default function AgentsPanel({
                           }}
                         >
                           {/* Larger Agent Avatar - 56px (w-14 h-14) with colored border */}
-                          <button
-                            type="button"
-                            onClick={() => onSelectAgent(agent)}
-                            className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity"
+                          <div
+                            className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
                             style={{
                               background: "rgba(255, 255, 255, 0.05)",
                               border: `1px solid ${agent.color}`,
@@ -300,7 +299,7 @@ export default function AgentsPanel({
                                 objectPosition: "center",
                               }}
                             />
-                          </button>
+                          </div>
 
                           {/* Agent Info - 3 lines */}
                           <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -315,15 +314,13 @@ export default function AgentsPanel({
                               {agent.model}
                             </div>
 
-                            {/* Line 2: Agent Name - clickable */}
-                            <button
-                              type="button"
-                              onClick={() => onSelectAgent(agent)}
-                              className="text-sm font-medium text-left hover:opacity-80 transition-opacity"
+                            {/* Line 2: Agent Name */}
+                            <div
+                              className="text-sm font-medium text-left"
                               style={{ color: "rgba(255, 255, 255, 0.9)" }}
                             >
                               {agent.name.replace(/-/g, " ")}
-                            </button>
+                            </div>
 
                             {/* Line 3: Description */}
                             <div
@@ -397,7 +394,8 @@ export default function AgentsPanel({
                       >
                         {/* Agent card with avatar on left, content in middle, Use button on right */}
                         <div
-                          className="w-full flex items-start gap-3 p-3 transition-all duration-200"
+                          className="w-full flex items-start gap-3 p-3 transition-all duration-200 cursor-pointer"
+                          onClick={() => onSelectAgent(agent)}
                           onMouseEnter={(e) => {
                             const parent = e.currentTarget.parentElement;
                             if (parent) {
@@ -414,10 +412,8 @@ export default function AgentsPanel({
                           }}
                         >
                           {/* Larger Agent Avatar - 56px (w-14 h-14) with colored border */}
-                          <button
-                            type="button"
-                            onClick={() => onSelectAgent(agent)}
-                            className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity"
+                          <div
+                            className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
                             style={{
                               background: "rgba(255, 255, 255, 0.05)",
                               border: `1px solid ${agent.color}`,
@@ -434,7 +430,7 @@ export default function AgentsPanel({
                                 objectPosition: "center",
                               }}
                             />
-                          </button>
+                          </div>
 
                           {/* Agent Info - 3 lines */}
                           <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -449,15 +445,13 @@ export default function AgentsPanel({
                               {agent.model}
                             </div>
 
-                            {/* Line 2: Agent Name - clickable */}
-                            <button
-                              type="button"
-                              onClick={() => onSelectAgent(agent)}
-                              className="text-sm font-medium text-left hover:opacity-80 transition-opacity"
+                            {/* Line 2: Agent Name */}
+                            <div
+                              className="text-sm font-medium text-left"
                               style={{ color: "rgba(255, 255, 255, 0.9)" }}
                             >
                               {agent.name.replace(/-/g, " ")}
-                            </button>
+                            </div>
 
                             {/* Line 3: Description */}
                             <div

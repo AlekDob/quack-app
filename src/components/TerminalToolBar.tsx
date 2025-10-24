@@ -1,20 +1,15 @@
 import './TerminalToolBar.css';
-import TerminalWindowButton from './TerminalWindowButton';
 
 interface TerminalToolBarProps {
   onExecuteCommand: (command: string, label: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
-  onCreateTerminal: () => void;
-  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 }
 
 export default function TerminalToolBar({
   onExecuteCommand,
   onToggleSavedCommands,
   savedCommandsOpen,
-  onCreateTerminal,
-  onQuickLaunchNativeTerminal,
 }: TerminalToolBarProps) {
   const tools = [
     {

@@ -16,10 +16,8 @@ interface TerminalWindowsPanelProps {
   onRemove: (id: string) => void;
   onUpdateTerminal: (id: string, updates: Partial<TerminalWindow>) => void;
   // TerminalToolBar props for drawer integration
-  onExecuteCommand: (command: string, label: string, terminalId?: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
-  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 }
 
 export function TerminalWindowsPanel({
@@ -27,10 +25,8 @@ export function TerminalWindowsPanel({
   onAdd,
   onRemove,
   onUpdateTerminal,
-  onExecuteCommand,
   onToggleSavedCommands,
   savedCommandsOpen,
-  onQuickLaunchNativeTerminal,
 }: TerminalWindowsPanelProps) {
   const [activeTerminal, setActiveTerminal] = useState<TerminalWindow | null>(null);
 
@@ -180,11 +176,8 @@ export function TerminalWindowsPanel({
           color={terminal.color}
           existingTerminalId={terminal.terminalId}
           onTerminalCreated={handleTerminalCreated}
-          onExecuteCommand={onExecuteCommand}
           onToggleSavedCommands={onToggleSavedCommands}
           savedCommandsOpen={savedCommandsOpen}
-          onCreateTerminal={onAdd}
-          onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
         />
       ))}
     </div>

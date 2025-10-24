@@ -223,7 +223,6 @@ interface SidePanelProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onCreateTerminal: () => void;
-  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 
   // Native Terminals props
   nativeTerminals: NativeTerminal[];
@@ -285,7 +284,6 @@ export default function SidePanel({
   onToggleSavedCommands,
   savedCommandsOpen,
   onCreateTerminal,
-  onQuickLaunchNativeTerminal,
 
   // Native Terminals
   nativeTerminals,
@@ -500,7 +498,6 @@ export default function SidePanel({
                       onExecuteCommand={onExecuteCommand}
                       onToggleSavedCommands={onToggleSavedCommands}
                       savedCommandsOpen={savedCommandsOpen}
-                      onCreateTerminal={onCreateTerminal}
                     />
                   </div>
                 );
@@ -522,10 +519,8 @@ export default function SidePanel({
                 onAdd={onAddNativeTerminal}
                 onRemove={onRemoveNativeTerminal}
                 onUpdateTerminal={onUpdateNativeTerminal}
-                onExecuteCommand={onExecuteCommand}
                 onToggleSavedCommands={onToggleSavedCommands}
                 savedCommandsOpen={savedCommandsOpen}
-                onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
               />
               {/* TerminalToolBar now integrated in drawer footer */}
             </div>

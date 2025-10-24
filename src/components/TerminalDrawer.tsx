@@ -25,11 +25,8 @@ interface TerminalDrawerProps {
   existingTerminalId?: string;
   onTerminalCreated?: (terminalId: string) => void;
   // TerminalToolBar props
-  onExecuteCommand: (command: string, label: string, terminalId?: string) => void;
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
-  onCreateTerminal: () => void;
-  onQuickLaunchNativeTerminal?: (command: string, label: string) => void;
 }
 
 export function TerminalDrawer({
@@ -40,11 +37,8 @@ export function TerminalDrawer({
   color,
   existingTerminalId,
   onTerminalCreated,
-  onExecuteCommand,
   onToggleSavedCommands,
   savedCommandsOpen,
-  onCreateTerminal,
-  onQuickLaunchNativeTerminal,
 }: TerminalDrawerProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
@@ -359,8 +353,6 @@ export function TerminalDrawer({
             }}
             onToggleSavedCommands={onToggleSavedCommands}
             savedCommandsOpen={savedCommandsOpen}
-            onCreateTerminal={onCreateTerminal}
-            onQuickLaunchNativeTerminal={onQuickLaunchNativeTerminal}
           />
         </div>
       </div>

@@ -546,8 +546,8 @@ function FileExplorer({
         .filter(Boolean)
         .join(" ");
 
-      // Depth indicator (indentation based on depth)
-      const paddingLeft = 12 + result.depth * 8;
+      // Search results - minimal padding for breathing room
+      const paddingLeft = 4;
 
       return (
         <button
@@ -561,7 +561,7 @@ function FileExplorer({
           draggable={!result.is_dir}
           onDragStart={(event) => handleDragStart(event, entry)}
         >
-          <span className="explorer-expander placeholder" aria-hidden="true" />
+          {/* No expander placeholder for search results - saves space */}
           <span
             className={`explorer-icon ${
               result.is_dir
@@ -572,10 +572,12 @@ function FileExplorer({
             }`}
             aria-hidden="true"
           />
-          <span className="explorer-name">{result.name}</span>
-          <span className="explorer-path-hint" title={result.relative_path}>
-            {result.relative_path}
-          </span>
+          <div className="explorer-file-info">
+            <span className="explorer-name">{result.name}</span>
+            <span className="explorer-path-hint" title={result.relative_path}>
+              {result.relative_path}
+            </span>
+          </div>
           {!result.is_dir && (
             <div className="explorer-file-actions">
               <RevealInFinderButton path={result.path} iconOnly />
