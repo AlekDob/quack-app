@@ -29,6 +29,7 @@ import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
 import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
 import ContextDrawer from "./components/ContextDrawer";
+import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
@@ -50,6 +51,7 @@ import type {
   TerminalContext,
   AgentInfo,
   AgentDetails,
+  SkillInfo,
   ChatMessage,
   ClaudeEvent,
   AgentChatSettings,
@@ -996,9 +998,19 @@ function App() {
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
 
+  // Skills state
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [skillsDirectoryExists, setSkillsDirectoryExists] = useState<boolean>(true);
+
   // Context drawer state
   const [showContextDrawer, setShowContextDrawer] = useState(false);
   const [contextScope, setContextScope] = useState<string | null>(null);
+
+  // Skills drawer state
+  const [showSkillDrawer, setShowSkillDrawer] = useState(false);
+  const [selectedSkill, setSelectedSkill] = useState<SkillInfo | null>(null);
 
   // activeTerminal moved to top of component for TypeScript hoisting
 
@@ -1887,6 +1899,58 @@ function App() {
     });
   }, []);
 
+  // Skills handlers
+  const loadSkills = useCallback(async () => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    setLoadingSkills(true);
+    setSkillsError(null);
+
+    try {
+      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+
+      // Check if skills directory exists
+      const dirExists = await invoke<boolean>("check_skills_directory", {
+        workingDir,
+      });
+      setSkillsDirectoryExists(dirExists);
+
+      if (!dirExists) {
+        setSkills([]);
+        setSkillsError(null); // Clear error if directory just doesn't exist
+        return;
+      }
+
+      const skillsList = await invoke<SkillInfo[]>("list_skills", {
+        workingDir,
+      });
+      setSkills(skillsList);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSkillsError(message);
+      setSkills([]);
+    } finally {
+      setLoadingSkills(false);
+    }
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+
+  const handleSelectSkill = useCallback(async (skillInfo: SkillInfo) => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      // Open the skill drawer with selected skill
+      setSelectedSkill(skillInfo);
+      setShowSkillDrawer(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to load skill: ${message}`);
+    }
+  }, [tauriAvailable]);
+
   const handleMentionFile = useCallback((filePath: string, fileName: string) => {
     // Calculate relative path from explorerRoot
     const basePath = explorerRoot ?? explorerPath;
@@ -1975,6 +2039,14 @@ function App() {
     }
     void loadAgents();
   }, [loadAgents, tauriAvailable]);
+
+  // Load Skills on startup
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+    void loadSkills();
+  }, [loadSkills, tauriAvailable]);
 
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
@@ -3742,6 +3814,13 @@ You have access to all Bash tools to execute git commands like:
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
           onCreateAgent={handleCreateAgent}
+          // Skills props
+          skills={skills}
+          loadingSkills={loadingSkills}
+          skillsError={skillsError}
+          skillsDirectoryExists={skillsDirectoryExists}
+          onSelectSkill={handleSelectSkill}
+          onRefreshSkills={loadSkills}
           // Commands props
           onUseCommand={handleUseCommand}
           // Context props
@@ -4019,6 +4098,13 @@ You have access to all Bash tools to execute git commands like:
           scope={contextScope}
           workingDir={activeTerminal?.cwd ?? explorerPath}
           onClose={() => setShowContextDrawer(false)}
+        />
+
+        <SkillDrawer
+          open={showSkillDrawer}
+          selectedSkill={selectedSkill}
+          workingDir={activeTerminal?.cwd ?? explorerPath}
+          onClose={() => setShowSkillDrawer(false)}
         />
 
         <BackgroundsModal

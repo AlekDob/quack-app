@@ -6542,6 +6542,60 @@ button.directory-chooser:hover {
   overflow: hidden;
 }
 
+/* Skill Files Section */
+.skill-files-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(12, 16, 24, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.skill-files-header {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.skill-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.skill-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.skill-file-item:hover {
+  background: rgba(242, 140, 82, 0.08);
+  border-color: rgba(242, 140, 82, 0.2);
+}
+
+.skill-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(242, 140, 82, 0.7);
+}
+
+.skill-file-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 /* ===================================
    Claude Auth Settings
    =================================== */

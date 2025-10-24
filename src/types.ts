@@ -200,6 +200,18 @@ export interface AgentDetails extends AgentInfo {
   content: string;
 }
 
+// Skills types (similar to Agents)
+export interface SkillInfo {
+  name: string;
+  description: string;
+  file_path: string;
+  scope: string; // "global" or "project"
+}
+
+export interface SkillDetails extends SkillInfo {
+  content: string;
+}
+
 // Quack Agency Setup Wizard types
 export interface SetupWizardData {
   userName: string;

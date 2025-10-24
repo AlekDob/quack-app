@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
+import SkillsPanel from "./SkillsPanel";
 import MCPPanel from "./MCPPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import ContextPanel from "./ContextPanel";
@@ -8,15 +9,15 @@ import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
 import { TerminalWindowsPanel } from "./TerminalWindowsPanel";
 import UsagePanel from "./UsagePanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, TerminalInfo, NativeTerminal, SessionUsage } from "../types";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, NativeTerminal, SessionUsage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, MCP, Commands, Context, Terminal, Terminal Windows, Usage
+ * Tabs: File Explorer, Agents, Skills, MCP, Commands, Context, Terminal, Terminal Windows, Usage
  */
 
-type TabId = "explorer" | "agents" | "mcp" | "commands" | "context" | "terminal" | "terminal-windows" | "usage";
+type TabId = "explorer" | "agents" | "skills" | "mcp" | "commands" | "context" | "terminal" | "terminal-windows" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -97,6 +98,24 @@ const icons: Record<string, ReactNode> = {
       />
       <path
         d="M6 8h8M6 11h8M6 14h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  skills: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M10 2l2 4 4.5 0.5-3.25 3 1 4.5-4.25-2.5-4.25 2.5 1-4.5L3.5 6.5 8 6z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 11v7"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -203,6 +222,14 @@ interface SidePanelProps {
     scope: 'global' | 'project'
   ) => Promise<void>;
 
+  // Skills props
+  skills: SkillInfo[];
+  loadingSkills: boolean;
+  skillsError: string | null;
+  skillsDirectoryExists: boolean;
+  onSelectSkill: (skill: SkillInfo) => void;
+  onRefreshSkills: () => void;
+
   // Commands props
   onUseCommand: (command: SlashCommand) => void;
 
@@ -264,6 +291,14 @@ export default function SidePanel({
   onRefreshAgents,
   onCreateAgent,
 
+  // Skills
+  skills,
+  loadingSkills,
+  skillsError,
+  skillsDirectoryExists,
+  onSelectSkill,
+  onRefreshSkills,
+
   // Commands
   onUseCommand,
 
@@ -313,6 +348,13 @@ export default function SidePanel({
       icon: icons.agents,
       badge: agents.length,
       hasContent: agents.length > 0,
+    },
+    {
+      id: "skills" as TabId,
+      label: "Skills",
+      icon: icons.skills,
+      badge: skills.length,
+      hasContent: skills.length > 0,
     },
     {
       id: "mcp" as TabId,
@@ -415,6 +457,19 @@ export default function SidePanel({
               onUseAgent={onUseAgent}
               onRefresh={onRefreshAgents}
               onCreateAgent={onCreateAgent}
+            />
+          </div>
+        )}
+
+        {activeTab === "skills" && (
+          <div className="side-panel-pane">
+            <SkillsPanel
+              skills={skills}
+              loading={loadingSkills}
+              error={skillsError}
+              directoryExists={skillsDirectoryExists}
+              onSelectSkill={onSelectSkill}
+              onRefresh={onRefreshSkills}
             />
           </div>
         )}

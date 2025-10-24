@@ -26,6 +26,7 @@ mod plugins;
 mod preferences;
 mod preview;
 mod reveal;
+mod skills;
 mod slash_commands;
 mod terminal;
 
@@ -299,6 +300,9 @@ pub fn run() {
             agency::check_agents_directory,
             agency::create_agents_directory,
             agency_setup::setup_quack_agency_full,
+            skills::list_skills,
+            skills::get_skill_details,
+            skills::check_skills_directory,
             terminal::create_terminal,
             terminal::list_terminals,
             terminal::get_active_processes,
