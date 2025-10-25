@@ -487,16 +487,10 @@ function App() {
   // Initialize chat on mount
   useEffect(() => {
     if (tauriAvailable) {
-      const initialize = async () => {
-        try {
-          const available = await invoke<boolean>('check_claude_cli_available');
-          setIsChatConfigured(available);
-        } catch (err) {
-          console.error('Failed to check Claude CLI:', err);
-          setIsChatConfigured(false);
-        }
-      };
-      void initialize();
+      // Since we now use Claude Agent SDK (Node.js) instead of CLI,
+      // we can assume chat is always configured. Errors will be handled
+      // at runtime if Node.js SDK is not available.
+      setIsChatConfigured(true);
     }
   }, [tauriAvailable]);
 
