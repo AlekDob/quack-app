@@ -328,18 +328,10 @@
 
 .todo-item.in_progress .todo-item-text {
   background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%);
-  background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 600;
-  animation: shimmer 3s linear infinite;
-}
-
-@keyframes shimmer {
-  to {
-    background-position: 200% center;
-  }
 }
 
 /* Loading pulse */

@@ -63,6 +63,8 @@ export default function SkillDrawer({
 }: SkillDrawerProps) {
   const [skillDetails, setSkillDetails] = useState<SkillDetails | null>(null);
   const [skillFiles, setSkillFiles] = useState<DirectoryEntry[]>([]);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [dirContents, setDirContents] = useState<Map<string, DirectoryEntry[]>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,9 +116,39 @@ export default function SkillDrawer({
     if (!open) {
       setSkillDetails(null);
       setSkillFiles([]);
+      setExpandedDirs(new Set());
+      setDirContents(new Map());
       setError(null);
     }
   }, [open]);
+
+  // Toggle directory expansion
+  const handleToggleDir = async (dirPath: string) => {
+    const newExpandedDirs = new Set(expandedDirs);
+
+    if (expandedDirs.has(dirPath)) {
+      // Collapse directory
+      newExpandedDirs.delete(dirPath);
+      setExpandedDirs(newExpandedDirs);
+    } else {
+      // Expand directory - load its contents if not already loaded
+      newExpandedDirs.add(dirPath);
+      setExpandedDirs(newExpandedDirs);
+
+      if (!dirContents.has(dirPath)) {
+        try {
+          const listing = await invoke<{ path: string; entries: DirectoryEntry[] }>("list_directory", {
+            path: dirPath,
+          });
+          const newDirContents = new Map(dirContents);
+          newDirContents.set(dirPath, listing.entries);
+          setDirContents(newDirContents);
+        } catch (err) {
+          console.error(`Failed to load directory ${dirPath}:`, err);
+        }
+      }
+    }
+  };
 
   return (
     <div className={`quack-agency-drawer ${open ? "open" : ""}`}>
@@ -188,17 +220,47 @@ export default function SkillDrawer({
                   </h4>
                   <div className="skill-files-list">
                     {skillFiles.map((file) => (
-                      <div
-                        key={file.path}
-                        className="skill-file-item"
-                        title={file.path}
-                      >
-                        <span className="skill-file-icon">
-                          {file.is_dir ? icons.folder : icons.file}
-                        </span>
-                        <span className="skill-file-name">{file.name}</span>
-                        {!file.is_dir && (
-                          <RevealInFinderButton path={file.path} iconOnly />
+                      <div key={file.path}>
+                        <div
+                          className={`skill-file-item ${file.is_dir ? 'skill-file-item-dir' : ''}`}
+                          title={file.path}
+                          onClick={() => file.is_dir && handleToggleDir(file.path)}
+                          style={{ cursor: file.is_dir ? 'pointer' : 'default' }}
+                        >
+                          {file.is_dir && (
+                            <span className="skill-file-chevron">
+                              {expandedDirs.has(file.path) ? '▼' : '▶'}
+                            </span>
+                          )}
+                          <span className="skill-file-icon">
+                            {file.is_dir ? icons.folder : icons.file}
+                          </span>
+                          <span className="skill-file-name">{file.name}</span>
+                          {!file.is_dir && (
+                            <RevealInFinderButton path={file.path} iconOnly />
+                          )}
+                        </div>
+
+                        {/* Nested files when directory is expanded */}
+                        {file.is_dir && expandedDirs.has(file.path) && dirContents.has(file.path) && (
+                          <div className="skill-file-nested">
+                            {dirContents.get(file.path)?.map((nestedFile) => (
+                              <div
+                                key={nestedFile.path}
+                                className="skill-file-item"
+                                title={nestedFile.path}
+                                style={{ paddingLeft: '2rem' }}
+                              >
+                                <span className="skill-file-icon">
+                                  {nestedFile.is_dir ? icons.folder : icons.file}
+                                </span>
+                                <span className="skill-file-name">{nestedFile.name}</span>
+                                {!nestedFile.is_dir && (
+                                  <RevealInFinderButton path={nestedFile.path} iconOnly />
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     ))}

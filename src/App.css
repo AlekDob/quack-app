@@ -5678,6 +5678,10 @@ button.directory-chooser:hover {
 }
 
 .quack-agency-drawer-stats {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.6);
 }
@@ -6594,6 +6598,31 @@ button.directory-chooser:hover {
   font-size: 0.85rem;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   color: rgba(255, 255, 255, 0.85);
+}
+
+.skill-file-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.skill-file-item-dir {
+  cursor: pointer;
+}
+
+.skill-file-item-dir:hover .skill-file-chevron {
+  color: rgba(242, 140, 82, 0.9);
+}
+
+.skill-file-nested {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 /* ===================================

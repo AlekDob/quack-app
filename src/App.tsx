@@ -552,75 +552,113 @@ function App() {
     });
   }, [chatLoadingMap, chatSessions]);
 
-  // Listen for Claude SDK streaming events from backend
+  // 🦆 FIX: Listen for Claude SDK streaming events from backend
+  // CRITICAL: Maintain persistent listeners for ALL active agents, not just the active one
+  // This prevents stream interruption when switching between agents during streaming
   useEffect(() => {
-    if (!tauriAvailable || !activeId) return;
+    if (!tauriAvailable) return;
 
-    const eventName = `claude-event:${activeId}`;
-    const unlistenPromise = listen<ClaudeEvent>(eventName, (event) => {
-      const claudeEvent = event.payload;
+    // Track all active listeners (Map of agentId -> unlisten function)
+    const listenersMap = new Map<string, () => void>();
 
-      // Update chat session with incoming events
-      setChatSessions((prev) => {
-        const newSessions = new Map(prev);
-        const agentMessages = newSessions.get(activeId) ?? [];
-        const lastMsg = agentMessages[agentMessages.length - 1];
+    // Get all agent IDs that have chat sessions
+    const activeAgentIds = Array.from(chatSessions.keys());
 
-        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
-          const updatedMessages = [...agentMessages];
-          updatedMessages[updatedMessages.length - 1] = {
-            ...lastMsg,
-            events: [...(lastMsg.events || []), claudeEvent],
-          };
-          newSessions.set(activeId, updatedMessages);
-        }
+    console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds);
 
-        return newSessions;
-      });
+    // Setup listener for each active agent
+    const setupPromises = activeAgentIds.map(async (agentId) => {
+      const eventName = `claude-event:${agentId}`;
 
-      // Auto-refresh FileExplorer when files are created/modified
-      if (claudeEvent.type === 'result') {
-        // Get all events from the last message to check for Write/Edit tools
-        setChatSessions((prev) => {
-          const agentMessages = prev.get(activeId) ?? [];
-          const lastMsg = agentMessages[agentMessages.length - 1];
+      try {
+        const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
+          const claudeEvent = event.payload;
 
-          if (lastMsg && lastMsg.events) {
-            let hasFileModifications = false;
+          console.log(`[Multi-Listener] Event received for agent ${agentId}:`, claudeEvent.type);
 
-            // Check assistant events for Write/Edit tool uses
-            lastMsg.events.forEach((evt) => {
-              if (evt.type === 'assistant' && evt.message?.content) {
-                evt.message.content.forEach((content) => {
-                  if (content.type === 'tool_use') {
-                    const toolName = content.name?.toLowerCase();
-                    const input = content.input as any;
+          // Update chat session with incoming events
+          setChatSessions((prev) => {
+            const newSessions = new Map(prev);
+            const agentMessages = newSessions.get(agentId) ?? [];
+            const lastMsg = agentMessages[agentMessages.length - 1];
 
-                    // Check if Write or Edit tools were used
-                    if ((toolName === 'write' && input?.file_path) ||
-                        (toolName === 'edit' && input?.file_path)) {
-                      hasFileModifications = true;
-                    }
+            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+              const updatedMessages = [...agentMessages];
+              updatedMessages[updatedMessages.length - 1] = {
+                ...lastMsg,
+                events: [...(lastMsg.events || []), claudeEvent],
+              };
+              newSessions.set(agentId, updatedMessages);
+            }
+
+            return newSessions;
+          });
+
+          // Auto-refresh FileExplorer when files are created/modified
+          if (claudeEvent.type === 'result') {
+            // Get all events from the last message to check for Write/Edit tools
+            setChatSessions((prev) => {
+              const agentMessages = prev.get(agentId) ?? [];
+              const lastMsg = agentMessages[agentMessages.length - 1];
+
+              if (lastMsg && lastMsg.events) {
+                let hasFileModifications = false;
+
+                // Check assistant events for Write/Edit tool uses
+                lastMsg.events.forEach((evt) => {
+                  if (evt.type === 'assistant' && evt.message?.content) {
+                    evt.message.content.forEach((content) => {
+                      if (content.type === 'tool_use') {
+                        const toolName = content.name?.toLowerCase();
+                        const input = content.input as any;
+
+                        // Check if Write or Edit tools were used
+                        if ((toolName === 'write' && input?.file_path) ||
+                            (toolName === 'edit' && input?.file_path)) {
+                          hasFileModifications = true;
+                        }
+                      }
+                    });
                   }
                 });
+
+                // Trigger FileExplorer refresh if files were modified
+                if (hasFileModifications) {
+                  setRefreshExplorerTrigger(prev => prev + 1);
+                }
               }
+
+              return prev;
             });
-
-            // Trigger FileExplorer refresh if files were modified
-            if (hasFileModifications) {
-              setRefreshExplorerTrigger(prev => prev + 1);
-            }
           }
-
-          return prev;
         });
+
+        listenersMap.set(agentId, unlisten);
+        console.log(`[Multi-Listener] Listener registered for agent: ${agentId}`);
+      } catch (error) {
+        console.error(`[Multi-Listener] Failed to setup listener for ${agentId}:`, error);
       }
     });
 
+    // Wait for all listeners to be setup
+    Promise.all(setupPromises).catch((error) => {
+      console.error('[Multi-Listener] Error setting up listeners:', error);
+    });
+
+    // Cleanup ALL listeners when component unmounts or chatSessions change
     return () => {
-      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
+      console.log('[Multi-Listener] Cleaning up listeners for:', Array.from(listenersMap.keys()));
+      listenersMap.forEach((unlisten, agentId) => {
+        try {
+          unlisten();
+          console.log(`[Multi-Listener] Listener removed for agent: ${agentId}`);
+        } catch (error) {
+          console.error(`[Multi-Listener] Error removing listener for ${agentId}:`, error);
+        }
+      });
+      listenersMap.clear();
     };
-  }, [tauriAvailable, activeId]);
+  }, [tauriAvailable, chatSessions]); // 🦆 Now depends on chatSessions, not activeId!
 
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
