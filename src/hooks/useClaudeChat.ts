@@ -21,6 +21,14 @@ export function useClaudeChat() {
   const [isConfigured, setIsConfigured] = useState(true); // SDK always available
   const [error, setError] = useState<string | null>(null);
 
+  // Track cumulative session tokens
+  const [sessionTokens, setSessionTokens] = useState({
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+  });
+
   // Store the Claude SDK session ID for resume
   const claudeSessionId = useRef<string | undefined>(undefined);
 
@@ -111,6 +119,17 @@ export function useClaudeChat() {
                 assistantContent += block.text;
               }
             }
+          }
+
+          // Track cumulative tokens from result events
+          if (event.type === 'result' && event.usage) {
+            const usage = event.usage; // Destructure to help TypeScript narrow the type
+            setSessionTokens(prev => ({
+              inputTokens: prev.inputTokens + usage.input_tokens,
+              outputTokens: prev.outputTokens + usage.output_tokens,
+              cacheCreationTokens: prev.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
+              cacheReadTokens: prev.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+            }));
           }
 
           // Update message with streaming content
@@ -225,6 +244,13 @@ export function useClaudeChat() {
     setMessages([]);
     claudeSessionId.current = undefined; // Clear session ID to start fresh
     lastPromptRef.current = ''; // Clear last prompt
+    // Reset session tokens
+    setSessionTokens({
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+    });
   }, []);
 
   // Get current session ID (useful for debugging)
@@ -243,5 +269,6 @@ export function useClaudeChat() {
     clearConversation,
     initialize,
     getCurrentSessionId,
+    sessionTokens,
   };
 }

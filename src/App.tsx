@@ -432,6 +432,15 @@ function App() {
   // Usage tracking - cost and token usage from Claude Agent SDK
   const [usageSessions, setUsageSessions] = useState<SessionUsage[]>([]);
 
+  // Token tracking per agent - cumulative session tokens for UI display
+  const [chatTokensMap, setChatTokensMap] = useState<Map<string, {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+  }>>(new Map());
+
+
   // Track usage from Claude Agent SDK response
   const trackUsage = useCallback((
     _agentId: string,
@@ -477,6 +486,9 @@ function App() {
         return [...prev, newSession];
       }
     });
+
+    // NOTE: chatTokensMap is now updated via claude-event listener with message ID de-duplication
+    // No need to update it here to avoid incorrect behavior
   }, []);
 
   // Clear all usage data
@@ -587,6 +599,38 @@ function App() {
 
             return newSessions;
           });
+
+          // Track tokens from result events - ACCUMULATE each turn's usage
+          // Note: result.usage contains tokens for the SINGLE turn, not cumulative session total
+          // We must manually accumulate across all turns to get total session usage
+          if (claudeEvent.type === 'result' && claudeEvent.usage) {
+            const usage = claudeEvent.usage;
+
+            setChatTokensMap((prev) => {
+              const newMap = new Map(prev);
+              const currentTokens = newMap.get(agentId) || {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheCreationTokens: 0,
+                cacheReadTokens: 0,
+              };
+
+              const updatedTokens = {
+                inputTokens: currentTokens.inputTokens + usage.input_tokens,
+                outputTokens: currentTokens.outputTokens + usage.output_tokens,
+                cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
+                cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+              };
+
+              newMap.set(agentId, updatedTokens);
+
+              const total = updatedTokens.inputTokens + updatedTokens.outputTokens +
+                           updatedTokens.cacheCreationTokens + updatedTokens.cacheReadTokens;
+              console.log(`[Token Tracking] Accumulated tokens for agent ${agentId}: ${total} total`, updatedTokens);
+
+              return newMap;
+            });
+          }
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -1015,6 +1059,13 @@ function App() {
     // Clear last prompt
     lastPromptsRef.current.delete(activeId);
 
+    // Clear tokens for this agent
+    setChatTokensMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(activeId);
+      return newMap;
+    });
+
     // Show success toast
     toast.success('Conversation cleared');
   }, [activeId]);
@@ -1055,6 +1106,20 @@ function App() {
   const currentAgentLoading = useMemo(() => {
     return activeId ? (chatLoadingMap.get(activeId) ?? false) : false;
   }, [activeId, chatLoadingMap]);
+
+  const currentAgentTokens = useMemo(() => {
+    return activeId ? (chatTokensMap.get(activeId) ?? {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+    }) : {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+    };
+  }, [activeId, chatTokensMap]);
 
   const selectedGitEntry = useMemo(() => {
     if (!gitSummary || !selectedGitPath) {
@@ -3839,6 +3904,8 @@ You have access to all Bash tools to execute git commands like:
               lastPrompt={getLastPromptForAgent()}
               // Conversation management
               onClearConversation={clearCurrentAgentConversation}
+              // Token usage tracking
+              sessionTokens={currentAgentTokens}
             />
           </div>
         </section>

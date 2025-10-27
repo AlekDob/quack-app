@@ -43,6 +43,79 @@ This command allows you to post real-time development updates to the Quack Disco
 /discord "😅 Spent 3 hours debugging scroll behavior - turns out I needed to track user intent vs auto-scroll separately. Now it works perfectly!"
 ```
 
+### 6. With Screenshot
+```bash
+/discord-screenshot "🎨 New UI design - check out the redesigned sidebar!" ~/Desktop/screenshot.png
+```
+
+### 7. With Video Demo
+```bash
+/discord-video "🎥 Live demo of the new terminal groups feature" ~/Desktop/demo.mp4
+```
+
+## Attaching Images and Videos
+
+Discord webhooks support file attachments (images, videos, GIFs) using multipart/form-data.
+
+### Method 1: Upload Image/Video File
+```bash
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -F "file=@/path/to/image.png" \
+  -F 'payload_json={"content": "🎨 Check out this screenshot!"}'
+```
+
+### Method 2: Quick Screenshot + Upload (macOS)
+```bash
+# Capture screenshot to temp file
+screencapture -x /tmp/quack-screenshot.png
+
+# Upload to Discord
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -F "file=@/tmp/quack-screenshot.png" \
+  -F 'payload_json={"content": "🎨 New UI design!"}'
+```
+
+### Method 3: Upload Video
+```bash
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -F "file=@/path/to/demo.mp4" \
+  -F 'payload_json={"content": "🎥 Feature demo!"}'
+```
+
+### Supported File Types
+- **Images**: PNG, JPG, GIF, WebP
+- **Videos**: MP4, MOV, WebM
+- **Size Limit**: 25MB per file (Discord webhook limit)
+- **Multiple Files**: You can attach up to 10 files per message using multiple `-F "file@=..."` flags
+
+### Advanced: Multiple Files
+```bash
+curl -X POST "$WEBHOOK_URL" \
+  -F "file=@screenshot1.png" \
+  -F "file=@screenshot2.png" \
+  -F 'payload_json={"content": "🎨 Before & After comparison"}'
+```
+
+### Quick Commands for Screenshots
+
+#### Interactive Screenshot (macOS)
+```bash
+# Take screenshot interactively, then upload
+screencapture -i /tmp/quack-screenshot.png && \
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -F "file=@/tmp/quack-screenshot.png" \
+  -F 'payload_json={"content": "🎨 '"$(date +"%H:%M")"' - UI update"}'
+```
+
+#### Window Screenshot (macOS)
+```bash
+# Capture specific window with Cmd+Shift+4, then Space, then click
+screencapture -w /tmp/quack-window.png && \
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -F "file=@/tmp/quack-window.png" \
+  -F 'payload_json={"content": "🖥️ Quack window preview"}'
+```
+
 ## Implementation
 
 When the user runs `/discord` with a message:
@@ -126,12 +199,16 @@ This command embodies the "building in public" philosophy:
 ## Future Enhancements
 
 Potential improvements for this command:
-- [ ] Screenshot attachment support
+- [x] **Screenshot attachment support** - Now available! Use `-F "file=@..."` with curl
+- [x] **Video attachment support** - Now available! Same method as screenshots
 - [ ] Rich embeds with formatted fields
 - [ ] Thread creation for discussions
 - [ ] Multiple webhook support (different channels)
 - [ ] Template presets for common update types
 - [ ] Interactive prompts for message composition
+- [ ] `/discord-screenshot` command wrapper for easier screenshot posting
+- [ ] `/discord-video` command wrapper for video uploads
+- [ ] Screen recording integration (e.g., `screencapture -v` for video)
 
 ## Metadata
 

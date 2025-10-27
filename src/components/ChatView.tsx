@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
+import TokenUsageIndicator from './TokenUsageIndicator';
 import type { ChatMessage, AgentInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -40,6 +41,13 @@ interface ChatViewProps {
   lastPrompt?: string;
   // Conversation management
   onClearConversation?: () => void;
+  // Token usage tracking
+  sessionTokens?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+  };
 }
 
 export default function ChatView({
@@ -72,6 +80,8 @@ export default function ChatView({
   lastPrompt,
   // Conversation management
   onClearConversation,
+  // Token usage tracking
+  sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 },
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -144,6 +154,17 @@ export default function ChatView({
             onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
             onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
             disabled={isLoading}
+          />
+          <TokenUsageIndicator
+            inputTokens={sessionTokens.inputTokens}
+            outputTokens={sessionTokens.outputTokens}
+            cacheCreationTokens={sessionTokens.cacheCreationTokens}
+            cacheReadTokens={sessionTokens.cacheReadTokens}
+            onCompact={() => {
+              // TODO: Implement /compact command trigger
+              console.log('Compact requested');
+            }}
+            onClear={onClearConversation}
           />
           {messages.length > 0 && onClearConversation && (
             <button

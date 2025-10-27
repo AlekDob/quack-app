@@ -27,8 +27,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   background: rgba(248, 113, 113, 0.1);
   border: 1px solid rgba(248, 113, 113, 0.3);
@@ -38,6 +38,7 @@
   transition: all 0.2s ease;
   outline: none;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .chat-clear-btn:hover:not(:disabled) {

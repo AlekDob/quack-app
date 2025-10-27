@@ -78,6 +78,7 @@ This project uses a specialized agent system for organized development:
 ### Available Commands
 - **`/commit`** - Invokes Giuseppe for smart git commit management with diff analysis and push options
 - **`/diary`** - Invokes Mike for documenting daily work progress and planning next steps
+- **`/code-review`** - Intelligent code review of uncommitted changes with security, performance, and quality analysis
 
 ### Key Documentation
 - **`docs/techstack.md`** - tauri best practices and patterns (researched by Roberta)
@@ -340,6 +341,21 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Working Directory Binding**: AI can operate in context of specific terminal's working directory
 - **Cost Tracking**: Real-time cost tracking with USD amounts and token usage
 - **Agents Panel**: Manage and configure subagents for parallel task execution
+
+### Code Review Skill (`/code-review`)
+- **Intelligent Analysis**: Comprehensive review of uncommitted Git changes with AI-powered insights
+- **Multi-Category Review**: Analyzes security, performance, code quality, maintainability, testing, and best practices
+- **Severity Levels**: Issues categorized as CRITICAL (🔴), WARNING (🟡), INFO (🟢), and SUGGESTION (💡)
+- **Quality Scoring**: Automated quality score (0-100) based on findings with actionable recommendations
+- **Command Options**:
+  - `--staged`: Review only staged changes (what will be committed)
+  - `--focus <categories>`: Focus on specific categories (e.g., `security,performance`)
+  - `--severity <level>`: Show only issues of specified severity or higher
+  - `--file <pattern>`: Review only files matching glob pattern
+  - `--summary`: Show summary statistics only
+- **Structured Output**: Detailed markdown reports with code snippets, line numbers, explanations, and suggested fixes
+- **Language-Aware**: Applies appropriate analysis rules based on file type (JS/TS, Python, Rust, etc.)
+- **Educational**: Provides clear explanations and links to resources for each finding
 
 ### Quack Agency Setup Wizard
 - Multi-step wizard for bootstrapping new projects with agent-based workflows

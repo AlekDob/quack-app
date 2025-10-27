@@ -365,10 +365,7 @@ export interface ClaudeResultEvent extends ClaudeEventBase {
   total_cost_usd?: number;
   cost_usd?: number;
   duration_ms?: number;
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-  };
+  usage?: UsageStats;
 }
 
 export type ClaudeEvent = ClaudeSystemEvent | ClaudeAssistantEvent | ClaudeUserEvent | ClaudeResultEvent;
