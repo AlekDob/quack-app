@@ -140,3 +140,34 @@
     transform: translateY(0);
   }
 }
+
+/* Scroll to top button (scroll to last user message) */
+.scroll-to-top-button {
+  position: fixed;
+  bottom: 100px;
+  right: 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.9); /* Indigo/purple color */
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  z-index: 10;
+  animation: scrollButtonFadeIn 0.2s ease;
+}
+
+.scroll-to-top-button:hover {
+  background: rgba(99, 102, 241, 1);
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.scroll-to-top-button:active {
+  transform: scale(0.95);
+}

@@ -139,29 +139,76 @@ pub struct ToolDiffEvent {
     pub lines: Vec<ToolDiffLine>,
 }
 
-/// Find the Claude CLI executable path
+/// Find the Claude CLI executable path with robust search including NVM and user directories
 fn find_claude_cli_path() -> Option<String> {
-    // Common paths where claude CLI might be installed
-    let common_paths = vec![
-        "claude",                           // Try PATH first
-        "/opt/homebrew/bin/claude",         // Homebrew on Apple Silicon
-        "/usr/local/bin/claude",            // Homebrew on Intel Mac
-        "/opt/local/bin/claude",            // MacPorts
-        "/usr/bin/claude",                  // System-wide install
+    // Strategy: Search in order of preference
+    // 1. Common system paths (Homebrew, MacPorts, system-wide)
+    // 2. User-specific paths (~/.local/bin, ~/bin)
+    // 3. NVM paths (~/.nvm/versions/node/*/bin/claude)
+    // 4. Fallback to 'which claude' to use system PATH
+
+    let mut search_paths: Vec<String> = vec![
+        // Standard package manager paths
+        "/opt/homebrew/bin/claude".to_string(),         // Homebrew on Apple Silicon
+        "/usr/local/bin/claude".to_string(),            // Homebrew on Intel Mac
+        "/opt/local/bin/claude".to_string(),            // MacPorts
+        "/usr/bin/claude".to_string(),                  // System-wide install
     ];
 
-    for path in common_paths {
-        let output = std::process::Command::new(path)
-            .arg("--version")
-            .output();
+    // Add user-specific paths
+    if let Ok(home) = std::env::var("HOME") {
+        search_paths.push(format!("{}/.local/bin/claude", home));
+        search_paths.push(format!("{}/bin/claude", home));
 
-        if let Ok(output) = output {
-            if output.status.success() {
-                return Some(path.to_string());
+        // Search in NVM directories
+        let nvm_base = format!("{}/.nvm/versions/node", home);
+        if let Ok(entries) = fs::read_dir(&nvm_base) {
+            for entry in entries.filter_map(Result::ok) {
+                let node_version_path = entry.path();
+                if node_version_path.is_dir() {
+                    let claude_path = node_version_path.join("bin/claude");
+                    if let Some(path_str) = claude_path.to_str() {
+                        search_paths.push(path_str.to_string());
+                    }
+                }
             }
         }
     }
 
+    // Try each search path
+    for path in &search_paths {
+        if Path::new(path).exists() {
+            // Verify it's executable by running --version
+            let output = std::process::Command::new(path)
+                .arg("--version")
+                .output();
+
+            if let Ok(output) = output {
+                if output.status.success() {
+                    log::info!("Found Claude CLI at: {}", path);
+                    return Some(path.to_string());
+                }
+            }
+        }
+    }
+
+    // Fallback: Try using 'which' to find claude in PATH
+    if let Ok(output) = std::process::Command::new("which")
+        .arg("claude")
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(path) = String::from_utf8(output.stdout) {
+                let path = path.trim();
+                if !path.is_empty() && Path::new(path).exists() {
+                    log::info!("Found Claude CLI via 'which' at: {}", path);
+                    return Some(path.to_string());
+                }
+            }
+        }
+    }
+
+    log::warn!("Claude CLI not found in any known location");
     None
 }
 

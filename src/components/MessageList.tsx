@@ -16,6 +16,7 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [showScrollToTopButton, setShowScrollToTopButton] = useState(false);
 
   // Check if user is at bottom of scroll
   const checkIfAtBottom = useCallback(() => {
@@ -28,11 +29,15 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
     return distanceFromBottom < 100;
   }, []);
 
-  // Handle scroll events to show/hide scroll button
+  // Handle scroll events to show/hide scroll buttons
   const handleScroll = useCallback(() => {
     const isAtBottom = checkIfAtBottom();
     setShowScrollButton(!isAtBottom);
-  }, [checkIfAtBottom]);
+
+    // Show "scroll to top" button only when at bottom AND there are user messages
+    const hasUserMessages = messages.some(m => m.role === 'user');
+    setShowScrollToTopButton(isAtBottom && hasUserMessages);
+  }, [checkIfAtBottom, messages]);
 
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -43,6 +48,33 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
       behavior: 'smooth'
     });
   }, []);
+
+  // Scroll to last user message function
+  const scrollToLastUserMessage = useCallback(() => {
+    if (!scrollRef.current) return;
+
+    // Find the last user message
+    const lastUserMessageIndex = messages.map((m, i) => ({ msg: m, index: i }))
+      .reverse()
+      .find(({ msg }) => msg.role === 'user')?.index;
+
+    if (lastUserMessageIndex === undefined) return;
+
+    // Find the DOM element for that message
+    const messageElements = scrollRef.current.querySelectorAll('.chat-message');
+    const targetElement = messageElements[lastUserMessageIndex] as HTMLElement;
+
+    if (targetElement) {
+      // Scroll to the top of the user message
+      const elementTop = targetElement.offsetTop;
+      const targetScroll = elementTop - 20; // 20px padding from top
+
+      scrollRef.current.scrollTo({
+        top: targetScroll,
+        behavior: 'smooth'
+      });
+    }
+  }, [messages]);
 
   // Scroll to bottom when component first mounts (when switching chat)
   // This is triggered when ChatView's key changes and creates a new MessageList instance
@@ -140,6 +172,26 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
           >
             <path
               d="M10 14L5 9L6.5 7.5L10 11L13.5 7.5L15 9L10 14Z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      )}
+      {showScrollToTopButton && (
+        <button
+          className="scroll-to-top-button"
+          onClick={scrollToLastUserMessage}
+          aria-label="Scroll to last message"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M10 6L5 11L6.5 12.5L10 9L13.5 12.5L15 11L10 6Z"
               fill="currentColor"
             />
           </svg>

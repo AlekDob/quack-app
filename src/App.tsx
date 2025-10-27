@@ -856,7 +856,7 @@ function App() {
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
 
       // Track usage from Claude Agent SDK (with full token details!)
-      const agentLabel = activeAgent?.name || `Agent ${activeId}`;
+      const agentLabel = activeTerminal?.label || activeAgent?.name || 'AI Assistant';
       trackUsage(
         activeId,
         agentLabel,
@@ -866,7 +866,8 @@ function App() {
       );
 
       // Notify that agent response is complete
-      notifyAgentReadyRef.current({ id: activeId, label: agentLabel });
+      const agentCwd = activeTerminal?.cwd || explorerPath || '';
+      notifyAgentReadyRef.current({ id: activeId, label: agentLabel, cwd: agentCwd });
 
       // Reset active agent after sending message
       // This ensures agent is only used for this message, not persistent
@@ -1473,21 +1474,32 @@ function App() {
       }
 
       try {
+        // Find the terminal to get its cwd and extract project name
+        const terminal = terminals.find(t => t.id === payload.id || t.label === payload.label);
+        const agentName = payload.label || "AI Assistant";
+
+        // Extract project name from cwd (last folder in path)
+        let projectName = "Project";
+        if (terminal?.cwd) {
+          const pathParts = terminal.cwd.split(/[/\\]/);
+          projectName = pathParts.filter(Boolean).pop() || "Project";
+        }
+
         await sendNotification({
           id: Number(Date.now() % 2147483647),
-          title: payload.label,
-          body: "Hey, you can do something here!",
+          title: projectName,
+          body: `${agentName}: Hey, you can do something here!`,
         });
       } catch (error) {
         console.warn("Unable to show notification", error);
       }
     },
-    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable]
+    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable, terminals]
   );
 
   // Notify when agent/chat completes response
   const notifyAgentReady = useCallback(
-    async (payload: { id: string; label: string }) => {
+    async (payload: { id: string; label: string; cwd?: string }) => {
       playQuackSound();
 
       // Show in-app toast notification
@@ -1510,10 +1522,19 @@ function App() {
       }
 
       try {
+        const agentName = payload.label || "AI Assistant";
+
+        // Extract project name from cwd (last folder in path)
+        let projectName = "Project";
+        if (payload.cwd) {
+          const pathParts = payload.cwd.split(/[/\\]/);
+          projectName = pathParts.filter(Boolean).pop() || "Project";
+        }
+
         await sendNotification({
           id: Number(Date.now() % 2147483647),
-          title: payload.label,
-          body: "Response completed! 🦆",
+          title: projectName,
+          body: `${agentName}: Response completed! 🦆`,
         });
       } catch (error) {
         console.warn("Unable to show notification", error);

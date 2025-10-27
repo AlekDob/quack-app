@@ -1,0 +1,26 @@
+{
+  "title": "Welcome to the Quack Community! 🦆",
+  "description": "We're excited to have you here! Quack is a multi-agentic desktop environment built on the Claude Agent SDK.",
+  "color": 5814783,
+  "fields": [
+    {
+      "name": "🚀 Getting Started",
+      "value": "• Check out <#documentation> for installation guides\n• Introduce yourself in <#general>\n• Share your projects in <#showcase>\n• Report bugs in <#troubleshooting>\n• Request features in <#feature-requests>",
+      "inline": false
+    },
+    {
+      "name": "📚 Resources",
+      "value": "• [Documentation](https://quack-app.com/docs)\n• [GitHub Repository](https://github.com/yourusername/quack-app)\n• [Tutorials](https://quack-app.com/tutorials)",
+      "inline": false
+    },
+    {
+      "name": "❓ Need Help?",
+      "value": "Ask in <#help> - our community is here to help!\n\nHappy quacking! 🦆",
+      "inline": false
+    }
+  ],
+  "footer": {
+    "text": "Quack Community • Version 1.0"
+  },
+  "timestamp": "{{timestamp}}"
+}
