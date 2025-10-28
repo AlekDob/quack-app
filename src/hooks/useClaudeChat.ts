@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { ChatAttachment, ChatMessage, ClaudeEvent } from '../types';
-import { streamClaudeMessage } from '../services/claudeSDK';
+import { streamClaudeMessage, abortSessionStream } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
@@ -241,16 +241,38 @@ export function useClaudeChat() {
 
   // Clear conversation and reset session
   const clearConversation = useCallback(() => {
+    console.log('[useClaudeChat] Clearing conversation and resetting session...');
+
+    // 1. Abort any active streams for this specific session
+    if (claudeSessionId.current) {
+      console.log('[useClaudeChat] Aborting active stream for session:', claudeSessionId.current);
+      abortSessionStream(claudeSessionId.current); // This will cancel only this session's stream
+    }
+
+    // 2. Abort current stream controller if any
+    if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+      console.log('[useClaudeChat] Aborting current stream controller');
+      abortControllerRef.current.abort();
+    }
+
+    // 3. Clear messages
     setMessages([]);
-    claudeSessionId.current = undefined; // Clear session ID to start fresh
-    lastPromptRef.current = ''; // Clear last prompt
-    // Reset session tokens
+
+    // 4. Clear session ID to start fresh (prevents SDK from resuming old session)
+    claudeSessionId.current = undefined;
+
+    // 5. Clear last prompt
+    lastPromptRef.current = '';
+
+    // 6. Reset session tokens
     setSessionTokens({
       inputTokens: 0,
       outputTokens: 0,
       cacheCreationTokens: 0,
       cacheReadTokens: 0,
     });
+
+    console.log('[useClaudeChat] Conversation cleared - new session will start fresh');
   }, []);
 
   // Get current session ID (useful for debugging)

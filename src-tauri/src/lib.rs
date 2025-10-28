@@ -29,6 +29,7 @@ mod reveal;
 mod skills;
 mod slash_commands;
 mod telegram_bot;
+mod telegram_central;
 mod terminal;
 
 // Global state for tracking Claude SDK session IDs per agent
@@ -136,7 +137,11 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            // Initialize Telegram Central Polling State
+            let telegram_state = telegram_central::TelegramPollingState::new(app.handle().clone());
+            app.manage(telegram_state);
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {
@@ -469,7 +474,14 @@ pub fn run() {
             deep_link_commands::register_deep_link_handler,
             telegram_bot::send_telegram_message,
             telegram_bot::send_telegram_notification_command,
-            telegram_bot::send_telegram_photo
+            telegram_bot::send_telegram_photo,
+            telegram_central::generate_unique_id,
+            telegram_central::generate_telegram_deep_link,
+            telegram_central::start_telegram_polling,
+            telegram_central::stop_telegram_polling,
+            preferences::save_telegram_link,
+            preferences::get_telegram_link,
+            preferences::initialize_central_bot_token
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

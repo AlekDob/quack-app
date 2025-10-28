@@ -31,13 +31,14 @@ import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
 import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
+import TelegramSetup from "./components/TelegramSetup";
 import ChatView from "./components/ChatView";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
-import { useTelegramBot } from "./hooks/useTelegramBot";
+// import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
 
 import type {
   AgentChat,
@@ -415,12 +416,17 @@ function App() {
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
 
+  // Telegram Central Bot state
+  const [showTelegramSetup, setShowTelegramSetup] = useState(false);
+
   // Multi-Chat state - one chat session per agent
   const [chatSessions, setChatSessions] = useState<Map<string, ChatMessage[]>>(new Map());
   const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
   const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
   // Agent metadata (name, cwd) for Telegram notifications
   const agentMetadataRef = useRef<Map<string, { name: string; cwd: string }>>(new Map());
+  // Last response text per agent for Telegram notifications
+  const lastAgentResponseRef = useRef<Map<string, string>>(new Map());
   const [isChatConfigured, setIsChatConfigured] = useState(false);
 
   // Abort controllers and last prompts for each agent
@@ -567,7 +573,9 @@ function App() {
   // 🦆 Ref to sendMessageForAgent function (to avoid circular dependency)
   const sendMessageForAgentRef = useRef<((content: string, options?: ChatSendOptions) => Promise<void>) | null>(null);
 
-  // 🦆 Telegram Bot integration hook (MUST be before Claude listeners to avoid circular dependency)
+  // 🦆 Telegram Bot integration hook (DEPRECATED - using Telegram Central Bot now)
+  // TODO: Remove this old webhook-based telegram system
+  /*
   const { sendStatusToTelegram, sendAgentNotification } = useTelegramBot({
     sessions: Array.from(chatSessions.values()).map((session) => ({
       id: session.id,
@@ -644,6 +652,7 @@ function App() {
       }
     }, []),
   });
+  */
 
   // 🦆 FIX: Listen for Claude SDK streaming events from backend
   // CRITICAL: Maintain persistent listeners for ALL active agents, not just the active one
@@ -682,6 +691,22 @@ function App() {
                 events: [...(lastMsg.events || []), claudeEvent],
               };
               newSessions.set(agentId, updatedMessages);
+
+              // Extract and save text content from assistant messages for Telegram notifications
+              if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
+                let textContent = '';
+                claudeEvent.message.content.forEach((content) => {
+                  if (content.type === 'text' && content.text) {
+                    textContent += content.text;
+                  }
+                });
+
+                if (textContent) {
+                  // Append to existing response text (streaming)
+                  const existingText = lastAgentResponseRef.current.get(agentId) || '';
+                  lastAgentResponseRef.current.set(agentId, existingText + textContent);
+                }
+              }
             }
 
             return newSessions;
@@ -747,27 +772,7 @@ function App() {
               hasMetadata: !!agentMetadata,
             });
 
-            if (agentSession && !claudeEvent.is_error && agentMetadata) {
-              // Get Telegram chat ID from preferences
-              invoke<[string | null, string | null]>('get_telegram_config')
-                .then(([_token, chatIdStr]) => {
-                  if (chatIdStr) {
-                    const chatId = parseInt(chatIdStr, 10);
-                    if (!isNaN(chatId)) {
-                      const agentName = agentMetadata.name;
-                      const workingDir = agentMetadata.cwd;
-                      // Format working directory to be more readable (replace home with ~)
-                      const formattedDir = workingDir.replace(/^\/Users\/[^/]+/, '~');
-                      const message = `🦆 *Agent Completed!*\n\nAgent: *${agentName}*\nWorking Dir: \`${formattedDir}\`\nSession ID: \`${agentId.slice(0, 8)}\`\n\nResult: ${claudeEvent.result || 'Success'}`;
-                      console.log('🦆 [Telegram] Sending notification:', { agentName, workingDir: formattedDir, chatId, agentId });
-                      sendAgentNotification(chatId, agentId, message, false);
-                    }
-                  }
-                })
-                .catch((error) => {
-                  console.error('🦆 Failed to get Telegram config for notification:', error);
-                });
-            }
+            // 🦆 Telegram notification now handled by notifyAgentReady in the "result" handler above
 
             // Get all events from the last message to check for Write/Edit tools
             setChatSessions((prev) => {
@@ -831,7 +836,7 @@ function App() {
       });
       listenersMap.clear();
     };
-  }, [tauriAvailable, chatSessions, sendAgentNotification]); // 🦆 Now depends on chatSessions, not activeId!
+  }, [tauriAvailable, chatSessions]); // 🦆 Now depends on chatSessions, not activeId!
 
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
@@ -971,6 +976,9 @@ function App() {
       timestamp: Date.now(),
       status: 'streaming',
     };
+
+    // Clear previous response text for this agent (new conversation turn)
+    lastAgentResponseRef.current.delete(activeId);
 
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
@@ -1720,14 +1728,46 @@ function App() {
       togglePipWindow();
     });
 
+    // Listen for Telegram /status command
+    const unlistenTelegramStatusPromise = listen<{ unique_id: string; telegram_chat_id: number }>(
+      "telegram-command-status",
+      async (event) => {
+        console.log("🦆 Telegram /status command received:", event.payload);
+        const { telegram_chat_id } = event.payload;
+
+        try {
+          // Get all active agents (terminals)
+          const activeAgents = terminals
+            .filter((t) => t.status === "busy" || t.status === "idle")
+            .map((t) => `• ${t.label} - ${t.status === "busy" ? "🟡 Working" : "🟢 Ready"}`)
+            .join("\n");
+
+          const message = activeAgents.length > 0
+            ? `🦆 *Active Agents* (${terminals.length})\n\n${activeAgents}`
+            : "🦆 No active agents.\n\nCreate a new terminal to get started!";
+
+          // Send status message to Telegram
+          await invoke("send_telegram_message", {
+            payload: {
+              chat_id: telegram_chat_id,
+              text: message,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to send Telegram status:", error);
+        }
+      }
+    );
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenTelegramStatusPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
-  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow]);
+  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, terminals]);
 
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
@@ -1896,6 +1936,50 @@ function App() {
           title: projectName,
           body: `${agentName}: Response completed! 🦆`,
         });
+
+        // Send Telegram notification if user is linked
+        try {
+          const [, chatId] = await invoke<[string | null, number | null]>("get_telegram_link");
+          if (chatId) {
+            // Get the last response text (if available)
+            const lastResponse = lastAgentResponseRef.current.get(payload.id) || '';
+
+            let message = '';
+
+            if (!lastResponse) {
+              // No text response (only tool calls)
+              message = `🦆 *${projectName}*\n\n${agentName}: Response completed!\n\n_Open Quack to view details_`;
+            } else if (lastResponse.length <= 1000) {
+              // Short response: send FULL text
+              // Clean up markdown formatting for Telegram
+              const cleanText = lastResponse
+                .replace(/```[\s\S]*?```/g, '[code block]')
+                .replace(/`([^`]+)`/g, '$1');
+
+              message = `🦆 *${projectName}*\n\n${agentName}:\n\n${cleanText}\n\n---\n_View in Quack for full context_`;
+            } else {
+              // Long response: send summary (first 300 chars)
+              const summary = lastResponse.substring(0, 297) + '...';
+              const cleanSummary = summary
+                .replace(/```[\s\S]*?```/g, '[code]')
+                .replace(/`([^`]+)`/g, '$1');
+
+              message = `🦆 *${projectName}*\n\n${agentName}:\n\n${cleanSummary}\n\n_Open Quack to view full response (${lastResponse.length} chars)_`;
+            }
+
+            await invoke("send_telegram_message", {
+              payload: {
+                chat_id: chatId,
+                text: message,
+              },
+            });
+
+            // Clear the saved response after sending notification
+            lastAgentResponseRef.current.delete(payload.id);
+          }
+        } catch (error) {
+          console.warn("Unable to send Telegram notification", error);
+        }
       } catch (error) {
         console.warn("Unable to show notification", error);
       }
@@ -2783,6 +2867,13 @@ function App() {
             hasResponded: false,
             responseStartTime: null,
           };
+
+          // Save metadata for Telegram notifications immediately
+          agentMetadataRef.current.set(initialWithState.id, {
+            name: "Terminal 1",
+            cwd: initialWithState.cwd,
+          });
+
           setTerminals([initialWithState]);
           setActiveId(initialWithState.id);
           await loadDirectory(initialWithState.cwd);
@@ -3105,6 +3196,12 @@ function App() {
           responseStartTime: null,
         };
 
+        // Save metadata for Telegram notifications immediately
+        agentMetadataRef.current.set(createdWithState.id, {
+          name: trimmedName,
+          cwd: trimmedPath,
+        });
+
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
         clearTerminalAttention(createdWithState.id);
@@ -3179,6 +3276,12 @@ function App() {
         hasResponded: false,
         responseStartTime: null,
       };
+
+      // Save metadata for Telegram notifications immediately
+      agentMetadataRef.current.set(createdWithState.id, {
+        name: autoName,
+        cwd: cwd,
+      });
 
       console.log(`[QuickCreate] Created terminal "${autoName}" with cwd="${cwd}"`);
 
@@ -4167,6 +4270,14 @@ You have access to all Bash tools to execute git commands like:
               >
                 Usage
               </button>
+              <button
+                type="button"
+                className={`git-tab-button ${showTelegramSetup ? "active" : ""}`}
+                onClick={() => setShowTelegramSetup(true)}
+                title="Connect Telegram Bot"
+              >
+                📱 Telegram
+              </button>
               </div>
             </div>
           </div>
@@ -4533,6 +4644,10 @@ You have access to all Bash tools to execute git commands like:
           onSelect={handleSelectBackground}
           onClose={() => setShowBackgroundsModal(false)}
         />
+
+        {showTelegramSetup && (
+          <TelegramSetup onClose={() => setShowTelegramSetup(false)} />
+        )}
       </div>
       {introReplayActive && (
         <div

@@ -392,6 +392,20 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
 }
 
 /**
+ * Abort stream for a specific session
+ */
+export function abortSessionStream(sessionId: string): void {
+  const controller = activeStreams.get(sessionId);
+  if (controller) {
+    console.log(`[claudeSDK] Aborting stream for session: ${sessionId}`);
+    controller.abort();
+    activeStreams.delete(sessionId);
+  } else {
+    console.log(`[claudeSDK] No active stream found for session: ${sessionId}`);
+  }
+}
+
+/**
  * Abort all active streams (useful for cleanup)
  */
 export function abortAllStreams(): void {

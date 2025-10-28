@@ -22,6 +22,11 @@ pub struct AppPreferences {
     pub ntfy_topic: Option<String>,
     #[serde(default)]
     pub enable_mobile_notifications: bool,
+    // Quack Central Bot settings
+    #[serde(default)]
+    pub telegram_unique_id: Option<String>,
+    #[serde(default)]
+    pub telegram_linked_chat_id: Option<i64>,
 }
 
 fn default_ai_model() -> String {
@@ -44,6 +49,8 @@ impl Default for AppPreferences {
             telegram_chat_id: None,
             ntfy_topic: None,
             enable_mobile_notifications: false,
+            telegram_unique_id: None,
+            telegram_linked_chat_id: None,
         }
     }
 }
@@ -405,4 +412,71 @@ pub async fn set_mobile_notifications_enabled(
 pub async fn get_mobile_notifications_enabled(app: AppHandle) -> Result<bool, String> {
     let prefs = get_preferences(app).await?;
     Ok(prefs.enable_mobile_notifications)
+}
+
+// Quack Central Bot Preferences
+#[tauri::command]
+pub async fn save_telegram_link(
+    app: AppHandle,
+    unique_id: String,
+    chat_id: i64,
+) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.telegram_unique_id = Some(unique_id);
+    prefs.telegram_linked_chat_id = Some(chat_id);
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    log::info!("🦆 Saved Telegram link: unique_id={}, chat_id={}", prefs.telegram_unique_id.as_ref().unwrap(), chat_id);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_telegram_link(app: AppHandle) -> Result<(Option<String>, Option<i64>), String> {
+    let prefs = get_preferences(app).await?;
+    Ok((prefs.telegram_unique_id, prefs.telegram_linked_chat_id))
+}
+
+/// Initialize Quack Central Bot token (called on first run or setup)
+#[tauri::command]
+pub async fn initialize_central_bot_token(app: AppHandle) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    // Always set the Quack Central Bot token (hardcoded for SaaS model)
+    prefs.telegram_bot_token = Some("8025889203:AAGo90Tu41u5irM1Sig3gGYc97syx6zmd20".to_string());
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    log::info!("🦆 Initialized Quack Central Bot token (@JackTheDuck_bot)");
+
+    Ok(())
 }
