@@ -1552,13 +1552,20 @@ function App() {
       setShowBackgroundsModal(true);
     });
 
+    // Listen for tray menu event to open PiP window
+    const unlistenOpenPipPromise = listen("open-pip-window", () => {
+      console.log("🦆 Tray menu: Opening PiP window");
+      togglePipWindow();
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
-  }, [loadSavedCommands, showIntroReplay, tauriAvailable]);
+  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow]);
 
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {

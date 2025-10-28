@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
-use tauri::{menu::MenuBuilder, AppHandle, Emitter, Manager};
+use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Manager, image::Image};
 
 mod agency;
 mod agency_setup;
@@ -179,6 +179,8 @@ pub fn run() {
                     .item(&ai_settings)
                     .item(&watch_intro)
                     .item(&backgrounds)
+                    .separator()
+                    .quit()
                     .build()?;
 
                 let edit_menu = SubmenuBuilder::new(app, "Edit")
@@ -232,6 +234,64 @@ pub fn run() {
                     }
                 });
             }
+
+            // Setup System Tray (Menu Bar) icon for macOS
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{MenuBuilder as TrayMenuBuilder, MenuItemBuilder};
+
+                // Load tray icon (duck icon for menu bar)
+                let tray_icon = include_bytes!("../icons/tray-icon.png");
+                // Decode PNG image to RGBA bytes
+                let img = image::load_from_memory(tray_icon)
+                    .expect("Failed to load tray icon")
+                    .to_rgba8();
+                let (width, height) = img.dimensions();
+                let tray_image = Image::new_owned(img.into_raw(), width, height);
+
+                // Create tray menu with active agents list
+                let show_app_item = MenuItemBuilder::with_id("show_app", "Open Quack")
+                    .build(app)?;
+
+                let show_pip_item = MenuItemBuilder::with_id("show_pip", "Show Active Agents")
+                    .build(app)?;
+
+                let quit_item = MenuItemBuilder::with_id("quit_tray", "Quit Quack")
+                    .build(app)?;
+
+                let tray_menu = TrayMenuBuilder::new(app)
+                    .item(&show_app_item)
+                    .item(&show_pip_item)
+                    .separator()
+                    .item(&quit_item)
+                    .build()?;
+
+                // Build tray icon
+                let _tray = TrayIconBuilder::new()
+                    .icon(tray_image)
+                    .menu(&tray_menu)
+                    .tooltip("Quack - Active Agents")
+                    .on_menu_event(move |app, event| {
+                        match event.id().as_ref() {
+                            "show_app" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                            "show_pip" => {
+                                // Emit event to open PiP window
+                                let _ = app.emit("open-pip-window", ());
+                            }
+                            "quit_tray" => {
+                                app.exit(0);
+                            }
+                            _ => {}
+                        }
+                    })
+                    .build(app)?;
+            }
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

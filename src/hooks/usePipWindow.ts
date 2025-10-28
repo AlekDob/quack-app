@@ -27,10 +27,21 @@ export function usePipWindow() {
 
   // Open PiP window
   const openPipWindow = useCallback(async () => {
-    if (pipWindow) {
-      // Already open, just focus it
-      await pipWindow.setFocus();
-      return;
+    // Check if window already exists (even if pipWindow state is stale)
+    try {
+      const allWindows = await WebviewWindow.getAll();
+      const existing = allWindows.find((w) => w.label === PIP_WINDOW_LABEL);
+
+      if (existing) {
+        // Window exists, just focus it and update state
+        console.log('🦆 PiP Window already exists, focusing...');
+        await existing.setFocus();
+        setIsPipOpen(true);
+        setPipWindow(existing);
+        return;
+      }
+    } catch (error) {
+      console.error('🦆 Failed to check existing PiP window:', error);
     }
 
     try {
@@ -78,15 +89,16 @@ export function usePipWindow() {
         setPipWindow(null);
       });
 
-      await webview.once('tauri://close-requested', async () => {
-        console.log('🦆 PiP Window close requested');
+      // Listen for window destroyed event (when window.close() is called)
+      await webview.once('tauri://destroyed', async () => {
+        console.log('🦆 PiP Window destroyed');
         setIsPipOpen(false);
         setPipWindow(null);
       });
     } catch (error) {
       console.error('🦆 Failed to open PiP window:', error);
     }
-  }, [pipWindow, store]);
+  }, [store]);
 
   // Close PiP window
   const closePipWindow = useCallback(async () => {
