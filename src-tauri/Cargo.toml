@@ -35,7 +35,7 @@ portable-pty = "0.8"
 uuid = { version = "1.10", features = ["serde", "v4"] }
 dirs = "5.0"
 regex = "1"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "multipart"] }
 base64 = "0.22"
 serde_yaml = "0.9"
 chrono = "0.4"

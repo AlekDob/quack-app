@@ -294,6 +294,13 @@ export interface ChatSession {
   claudeSessionId?: string; // Claude Agent SDK session ID for resume
 }
 
+// Simplified ClaudeSession for Telegram integration
+export interface ClaudeSession {
+  id: string;
+  name: string;
+  isStreaming: boolean;
+}
+
 export interface ClaudeSettings {
   apiKey: string;
   model: string;

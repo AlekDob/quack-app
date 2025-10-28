@@ -28,6 +28,7 @@ mod preview;
 mod reveal;
 mod skills;
 mod slash_commands;
+mod telegram_bot;
 mod terminal;
 
 // Global state for tracking Claude SDK session IDs per agent
@@ -328,15 +329,21 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                let state = HookState { app: app_handle };
+                let state = HookState { app: app_handle.clone() };
+
+                // Create combined router with both terminal hooks and Telegram webhook
+                let telegram_router = telegram_bot::create_telegram_router(app_handle.clone());
                 let router = Router::new()
                     .route("/terminal/status", post(handle_status_update))
-                    .with_state(state);
+                    .with_state(state)
+                    .merge(telegram_router);
 
                 let addr: SocketAddr = ([127, 0, 0, 1], 6768).into();
 
                 match tokio::net::TcpListener::bind(addr).await {
                     Ok(listener) => {
+                        log::info!("🦆 HTTP server started on http://127.0.0.1:6768");
+                        log::info!("🦆 Telegram webhook available at: http://127.0.0.1:6768/telegram/webhook");
                         if let Err(error) = axum::serve(listener, router.into_make_service()).await
                         {
                             log::error!("HTTP hook server error: {error}");
@@ -459,7 +466,10 @@ pub fn run() {
             claude_usage::get_claude_plan_usage,
             claude_usage::open_claude_usage_in_terminal,
             deep_link_commands::test_deep_link,
-            deep_link_commands::register_deep_link_handler
+            deep_link_commands::register_deep_link_handler,
+            telegram_bot::send_telegram_message,
+            telegram_bot::send_telegram_notification_command,
+            telegram_bot::send_telegram_photo
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

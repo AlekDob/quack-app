@@ -37,6 +37,7 @@ import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
+import { useTelegramBot } from "./hooks/useTelegramBot";
 
 import type {
   AgentChat,
@@ -418,6 +419,8 @@ function App() {
   const [chatSessions, setChatSessions] = useState<Map<string, ChatMessage[]>>(new Map());
   const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
   const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
+  // Agent metadata (name, cwd) for Telegram notifications
+  const agentMetadataRef = useRef<Map<string, { name: string; cwd: string }>>(new Map());
   const [isChatConfigured, setIsChatConfigured] = useState(false);
 
   // Abort controllers and last prompts for each agent
@@ -561,6 +564,87 @@ function App() {
     });
   }, [chatLoadingMap, chatSessions]);
 
+  // 🦆 Ref to sendMessageForAgent function (to avoid circular dependency)
+  const sendMessageForAgentRef = useRef<((content: string, options?: ChatSendOptions) => Promise<void>) | null>(null);
+
+  // 🦆 Telegram Bot integration hook (MUST be before Claude listeners to avoid circular dependency)
+  const { sendStatusToTelegram, sendAgentNotification } = useTelegramBot({
+    sessions: Array.from(chatSessions.values()).map((session) => ({
+      id: session.id,
+      name: session.title,
+      isStreaming: activeStreamCounts.get(session.id) ? activeStreamCounts.get(session.id)! > 0 : false,
+    })),
+    onNewAgent: useCallback(async (prompt: string, telegramChatId?: number) => {
+      // Create new agent chat
+      const newAgentId = `agent-${Date.now()}`;
+      const newAgent: AgentChat = {
+        id: newAgentId,
+        name: `Agent ${agentChats.length + 1}`,
+        color: COLORS[agentChats.length % COLORS.length],
+        cwd: explorerPath,
+        createdAt: Date.now(),
+      };
+
+      setAgentChats((prev) => [...prev, newAgent]);
+      setActiveId(newAgentId);
+
+      // Store agent metadata for Telegram notifications
+      agentMetadataRef.current.set(newAgentId, {
+        name: newAgent.name,
+        cwd: explorerPath,
+      });
+
+      // Initialize chat session
+      const newSession: ChatSession = {
+        id: newAgentId,
+        title: newAgent.name,
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        workingDirectory: explorerPath,
+      };
+
+      setChatSessions((prev) => new Map(prev).set(newAgentId, newSession));
+
+      // Send the initial prompt using the ref
+      if (sendMessageForAgentRef.current) {
+        await sendMessageForAgentRef.current(prompt);
+      }
+
+      return newAgentId;
+    }, [agentChats, explorerPath]),
+
+    onStopAgent: useCallback(async (sessionId: string) => {
+      // Find and abort the agent's streams
+      const streamKeys = Array.from(abortControllersRef.current.keys()).filter(key => key.startsWith(`${sessionId}-`));
+      streamKeys.forEach(key => {
+        const controller = abortControllersRef.current.get(key);
+        if (controller) {
+          controller.abort();
+          abortControllersRef.current.delete(key);
+        }
+      });
+
+      // Clean up active streams tracking
+      activeStreamsRef.current.delete(sessionId);
+
+      // Update stream count
+      setActiveStreamCounts((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(sessionId);
+        return newMap;
+      });
+    }, []),
+
+    onSendMessage: useCallback(async (sessionId: string, message: string) => {
+      // Set the agent as active and send message using the ref
+      setActiveId(sessionId);
+      if (sendMessageForAgentRef.current) {
+        await sendMessageForAgentRef.current(message);
+      }
+    }, []),
+  });
+
   // 🦆 FIX: Listen for Claude SDK streaming events from backend
   // CRITICAL: Maintain persistent listeners for ALL active agents, not just the active one
   // This prevents stream interruption when switching between agents during streaming
@@ -637,6 +721,54 @@ function App() {
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
+            // Send Telegram notification when agent completes
+            let agentMetadata = agentMetadataRef.current.get(agentId);
+
+            // FALLBACK: If metadata not found in ref, try to get from agentChats
+            if (!agentMetadata) {
+              const agentChat = agentChats.find(a => a.id === agentId);
+              if (agentChat) {
+                agentMetadata = {
+                  name: agentChat.name,
+                  cwd: agentChat.cwd,
+                };
+                // Save it for next time
+                agentMetadataRef.current.set(agentId, agentMetadata);
+              }
+            }
+
+            const agentSession = chatSessions.get(agentId);
+            console.log('🦆 [Telegram] Agent completed:', {
+              agentId,
+              agentName: agentMetadata?.name,
+              workingDir: agentMetadata?.cwd,
+              hasSession: !!agentSession,
+              isError: claudeEvent.is_error,
+              hasMetadata: !!agentMetadata,
+            });
+
+            if (agentSession && !claudeEvent.is_error && agentMetadata) {
+              // Get Telegram chat ID from preferences
+              invoke<[string | null, string | null]>('get_telegram_config')
+                .then(([_token, chatIdStr]) => {
+                  if (chatIdStr) {
+                    const chatId = parseInt(chatIdStr, 10);
+                    if (!isNaN(chatId)) {
+                      const agentName = agentMetadata.name;
+                      const workingDir = agentMetadata.cwd;
+                      // Format working directory to be more readable (replace home with ~)
+                      const formattedDir = workingDir.replace(/^\/Users\/[^/]+/, '~');
+                      const message = `🦆 *Agent Completed!*\n\nAgent: *${agentName}*\nWorking Dir: \`${formattedDir}\`\nSession ID: \`${agentId.slice(0, 8)}\`\n\nResult: ${claudeEvent.result || 'Success'}`;
+                      console.log('🦆 [Telegram] Sending notification:', { agentName, workingDir: formattedDir, chatId, agentId });
+                      sendAgentNotification(chatId, agentId, message, false);
+                    }
+                  }
+                })
+                .catch((error) => {
+                  console.error('🦆 Failed to get Telegram config for notification:', error);
+                });
+            }
+
             // Get all events from the last message to check for Write/Edit tools
             setChatSessions((prev) => {
               const agentMessages = prev.get(agentId) ?? [];
@@ -699,11 +831,16 @@ function App() {
       });
       listenersMap.clear();
     };
-  }, [tauriAvailable, chatSessions]); // 🦆 Now depends on chatSessions, not activeId!
+  }, [tauriAvailable, chatSessions, sendAgentNotification]); // 🦆 Now depends on chatSessions, not activeId!
 
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !activeId) return;
+
+    // Populate ref for Telegram integration (on first call)
+    if (!sendMessageForAgentRef.current) {
+      sendMessageForAgentRef.current = sendMessageForAgent;
+    }
 
     // Generate unique message ID for this stream
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -754,6 +891,31 @@ function App() {
 
     // Get current agent's chat session
     const currentMessages = chatSessions.get(activeId) ?? [];
+
+    // 🦆 Create AgentChat automatically if it doesn't exist (for UI-created agents)
+    if (!agentChats.find(a => a.id === activeId)) {
+      // Get terminal info for this activeId
+      const terminal = terminals.find(t => t.id === activeId);
+      if (terminal) {
+        const newAgentChat: AgentChat = {
+          id: activeId,
+          name: terminal.label,
+          color: terminal.color,
+          cwd: terminal.cwd,
+          createdAt: Date.now(),
+        };
+
+        setAgentChats((prev) => [...prev, newAgentChat]);
+
+        // Save metadata for Telegram notifications
+        agentMetadataRef.current.set(activeId, {
+          name: terminal.label,
+          cwd: terminal.cwd,
+        });
+
+        console.log('🦆 Auto-created AgentChat for UI-created agent:', newAgentChat);
+      }
+    }
 
     // Create user message
     const attachments = options?.attachments ?? [];
