@@ -37,7 +37,8 @@ export function usePipWindow() {
       // Load saved position/size from store (if available)
       let savedState: PipWindowState | null = null;
       if (store) {
-        savedState = await store.get<PipWindowState>(STORE_KEY_PIP_STATE);
+        const loadedState = await store.get<PipWindowState>(STORE_KEY_PIP_STATE);
+        savedState = loadedState || null;
       }
 
       // Default size and position

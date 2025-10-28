@@ -292,8 +292,8 @@ export default function SidePanel({
   onUseAgent,
   onRefreshAgents,
   onCreateAgent,
-  onTogglePip,
-  isPipOpen,
+  onTogglePip: _onTogglePip,
+  isPipOpen: _isPipOpen,
 
   // Skills
   skills,

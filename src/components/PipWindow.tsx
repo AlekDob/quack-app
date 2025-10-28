@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { emit } from '@tauri-apps/api/event';
-import { getCurrentWindow, Window } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import PipAgentCard from './PipAgentCard';
 import type { PipAgentState } from '../types';
 
 const PipWindow: React.FC = () => {
   const [agents, setAgents] = useState<PipAgentState[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [, setIsDragging] = useState(false);
 
   // Listen for agent state updates from main window
   useEffect(() => {
