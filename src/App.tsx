@@ -36,6 +36,7 @@ import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
+import { usePipWindow } from "./hooks/usePipWindow";
 
 import type {
   AgentChat,
@@ -48,6 +49,8 @@ import type {
   TerminalExitEvent,
   TerminalInfo,
   SavedCommand,
+  PipAgentState,
+  PipAgentStatus,
   TerminalContext,
   AgentInfo,
   AgentDetails,
@@ -1096,6 +1099,9 @@ function App() {
   const [showSkillDrawer, setShowSkillDrawer] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<SkillInfo | null>(null);
 
+  // PiP Window hook
+  const { isPipOpen, togglePipWindow, updatePipAgents, showPipWindow, hidePipWindow } = usePipWindow();
+
   // activeTerminal moved to top of component for TypeScript hoisting
 
   // Compute current agent's chat messages and loading state
@@ -1142,6 +1148,126 @@ function App() {
   ]);
 
   const gridTemplateColumns = "360px minmax(0, 1fr) 420px";
+
+  // Update PiP window with current agent states
+  useEffect(() => {
+    if (!isPipOpen) return;
+
+    const pipAgents: PipAgentState[] = [];
+
+    // For each active chat session, build PiP agent state
+    chatSessions.forEach((messages, agentId) => {
+      const terminal = terminals.find((t) => t.id === agentId);
+      if (!terminal) return;
+
+      // Determine agent status
+      let status: PipAgentStatus = 'idle';
+      let lastMessage: string | undefined;
+      let currentTool: string | undefined;
+      let toolsExecuted = 0;
+
+      // Check if agent is currently loading/streaming
+      const isLoading = chatLoadingMap.get(agentId) ?? false;
+      if (isLoading) {
+        status = 'streaming';
+      }
+
+      // Get last assistant message
+      const lastMsg = messages.filter((m) => m.role === 'assistant').pop();
+      if (lastMsg) {
+        // Extract last text from events
+        const lastEvent = lastMsg.events?.filter((e) => e.type === 'assistant').pop();
+        if (lastEvent && lastEvent.type === 'assistant') {
+          const textBlocks = lastEvent.message?.content?.filter((c: any) => c.type === 'text') ?? [];
+          if (textBlocks.length > 0) {
+            lastMessage = textBlocks[textBlocks.length - 1].text?.substring(0, 100);
+          }
+
+          // Count tools executed
+          const toolBlocks = lastEvent.message?.content?.filter((c: any) => c.type === 'tool_use') ?? [];
+          toolsExecuted = toolBlocks.length;
+
+          // Get current tool if any
+          if (toolBlocks.length > 0 && isLoading) {
+            currentTool = toolBlocks[toolBlocks.length - 1].name;
+            status = 'executing';
+          }
+        }
+
+        // Check for error
+        if (lastMsg.error) {
+          status = 'error';
+        }
+      }
+
+      // Check if thinking (no messages yet but loading)
+      if (messages.length === 0 && isLoading) {
+        status = 'thinking';
+      }
+
+      pipAgents.push({
+        agentId: terminal.id,
+        agentName: terminal.label,
+        color: terminal.color,
+        status,
+        lastMessage,
+        lastActivity: messages.length > 0 ? messages[messages.length - 1].timestamp : undefined,
+        toolsExecuted,
+        currentTool,
+      });
+    });
+
+    updatePipAgents(pipAgents);
+  }, [chatSessions, chatLoadingMap, terminals, isPipOpen, updatePipAgents]);
+
+  // Listen for click-to-focus events from PiP window
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const unlisten = listen<{ agentId: string; sessionId?: string }>('pip-agent-clicked', async (event) => {
+      const { agentId } = event.payload;
+      console.log('🦆 PiP agent clicked, focusing on agent:', agentId);
+
+      // Find the terminal for this agent
+      const terminal = terminals.find((t) => t.id === agentId);
+      if (terminal) {
+        // Switch to this terminal
+        setActiveId(terminal.id);
+
+        // Focus the main window
+        const window = getCurrentWindow();
+        await window.setFocus();
+      }
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [tauriAvailable, terminals]);
+
+  // Auto-show/hide PiP based on main window focus
+  useEffect(() => {
+    if (!tauriAvailable || !isPipOpen) return;
+
+    const window = getCurrentWindow();
+
+    // Listen for window focus events
+    const unlistenFocus = window.onFocusChanged(async ({ payload: focused }) => {
+      if (focused) {
+        // Main window gained focus - hide PiP
+        console.log('🦆 Main window focused, hiding PiP');
+        await hidePipWindow();
+      } else {
+        // Main window lost focus - show PiP
+        console.log('🦆 Main window unfocused, showing PiP');
+        await showPipWindow();
+      }
+    });
+
+    return () => {
+      unlistenFocus.then((fn) => fn());
+    };
+  }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
   // Agent Chat Settings helpers - get or create settings for current agent
   const getCurrentAgentSettings = useCallback((): AgentChatSettings => {
@@ -3778,6 +3904,9 @@ You have access to all Bash tools to execute git commands like:
           onDeleteAgentChat={() => {}}
           onUpdateAgentChat={() => {}}
           onCreateAgent={handleOpenNewTerminalModal}
+          // PiP props
+          onTogglePip={togglePipWindow}
+          isPipOpen={isPipOpen}
           // Terminal props
           onAdd={handleOpenNewTerminalModal}
           onSelect={handleSelectTerminal}
@@ -3934,6 +4063,8 @@ You have access to all Bash tools to execute git commands like:
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
           onCreateAgent={handleCreateAgent}
+          onTogglePip={togglePipWindow}
+          isPipOpen={isPipOpen}
           // Skills props
           skills={skills}
           loadingSkills={loadingSkills}

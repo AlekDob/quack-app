@@ -23,6 +23,7 @@ export default defineConfig(() => ({
         main: resolve(rootDir, 'index.html'),
         preview: resolve(rootDir, 'preview.html'),
         terminal: resolve(rootDir, 'terminal.html'),
+        pip: resolve(rootDir, 'pip.html'),
       },
     },
   },

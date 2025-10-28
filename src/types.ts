@@ -548,3 +548,26 @@ export interface WeeklyPlanUsage {
   opus?: number;
   sonnet?: number;
 }
+
+// PiP (Picture-in-Picture) Mode types
+export type PipAgentStatus = 'idle' | 'thinking' | 'streaming' | 'executing' | 'completed' | 'error';
+
+export interface PipAgentState {
+  agentId: string;
+  agentName: string;
+  color: string;
+  sessionId?: string;
+  status: PipAgentStatus;
+  lastMessage?: string;
+  lastActivity?: number;
+  toolsExecuted: number;
+  currentTool?: string;
+  progress?: number; // 0-100 for ongoing tasks
+  error?: string;
+}
+
+export interface PipWindowState {
+  agents: PipAgentState[];
+  position?: { x: number; y: number };
+  size?: { width: number; height: number };
+}

@@ -36,6 +36,9 @@ interface TerminalSidebarProps {
   onDeleteAgentChat: (agentChatId: string) => void;
   onUpdateAgentChat: (agentChatId: string, updates: Partial<Omit<AgentChat, 'id'>>) => void;
   onCreateAgent: () => void; // NEW: Create AgentChat only (no terminal)
+  // PiP props
+  onTogglePip?: () => void;
+  isPipOpen?: boolean;
   // Terminal props
   onAdd: () => void; // Will be used by "+" button for terminal creation
   onSelect: (id: string) => void;
@@ -60,6 +63,9 @@ export default function TerminalSidebar({
   onDeleteAgentChat: _onDeleteAgentChat,
   onUpdateAgentChat: _onUpdateAgentChat,
   onCreateAgent,
+  // PiP props
+  onTogglePip,
+  isPipOpen,
   // Terminal props
   onAdd,
   onSelect,
@@ -186,14 +192,40 @@ export default function TerminalSidebar({
       <div className="sidebar-header">
         <div className="sidebar-header-top">
           <span className="sidebar-title">Quack Agents</span>
-          <button
-            type="button"
-            className="sidebar-button"
-            onClick={onCreateAgent}
-            disabled={creating}
-          >
-            {creating ? "Creating…" : "New"}
-          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {/* PiP Mode Button */}
+            {onTogglePip && (
+              <button
+                type="button"
+                className="sidebar-button"
+                onClick={onTogglePip}
+                style={{
+                  background: isPipOpen ? 'rgba(242, 140, 82, 0.2)' : undefined,
+                  borderColor: isPipOpen ? 'rgba(242, 140, 82, 0.4)' : undefined,
+                  color: isPipOpen ? '#f28c52' : undefined,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title={isPipOpen ? 'Close PiP Mode' : 'Open PiP Mode'}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="2" />
+                  <rect x="8" y="8" width="8" height="8" rx="1" />
+                </svg>
+                PiP
+              </button>
+            )}
+            {/* New Agent Button */}
+            <button
+              type="button"
+              className="sidebar-button"
+              onClick={onCreateAgent}
+              disabled={creating}
+            >
+              {creating ? "Creating…" : "New"}
+            </button>
+          </div>
         </div>
         <input
           className="explorer-search"

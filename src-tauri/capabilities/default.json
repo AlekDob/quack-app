@@ -19,6 +19,10 @@
     "core:window:allow-set-size",
     "core:window:allow-set-title",
     "core:window:allow-create",
+    "core:window:allow-start-dragging",
+    "core:webview:allow-create-webview-window",
+    "core:webview:allow-create-webview",
+    "core:webview:default",
     "dialog:default",
     "notification:default",
     "store:default"

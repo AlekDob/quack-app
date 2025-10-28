@@ -221,6 +221,8 @@ interface SidePanelProps {
     content: string,
     scope: 'global' | 'project'
   ) => Promise<void>;
+  onTogglePip?: () => void;
+  isPipOpen?: boolean;
 
   // Skills props
   skills: SkillInfo[];
@@ -290,6 +292,8 @@ export default function SidePanel({
   onUseAgent,
   onRefreshAgents,
   onCreateAgent,
+  onTogglePip,
+  isPipOpen,
 
   // Skills
   skills,

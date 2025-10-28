@@ -71,7 +71,7 @@ export default function AgentsPanel({
         }}
       >
         <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
-          AI Agents
+          Sub Agents
         </h3>
         <button
           type="button"
