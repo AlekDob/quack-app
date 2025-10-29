@@ -24,6 +24,7 @@ Replaces the blocking `send_message_via_cli` with a streaming version that:
 #### Tool Detection Patterns
 
 The parser looks for these patterns in stderr:
+
 - `"Using tool: ToolName"`
 - `"Tool: ToolName"`
 - Tool names with "using" or "running" context
@@ -98,6 +99,7 @@ When events arrive, the appropriate message is found by `message_id` and its `to
 **File**: `src/components/ToolCallCard.tsx`
 
 Renders individual tool operations with:
+
 - Status indicator (🟡 running, ✅ completed, 🔴 error)
 - Tool icon (📖 Read, ✏️ Edit, 💻 Bash, etc.)
 - Collapsible result display
@@ -108,6 +110,7 @@ Renders individual tool operations with:
 **File**: `src/components/DiffViewer.tsx`
 
 Displays file changes for Edit tools:
+
 - Red background for removed lines (`-`)
 - Green background for added lines (`+`)
 - Gray for unchanged context

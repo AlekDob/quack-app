@@ -16,7 +16,8 @@ import "./sonner-custom.css";
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
 import NewTerminalModal from "./components/NewTerminalModal";
-import FilePreviewDrawer from "./components/FilePreviewDrawer";
+import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
+import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
@@ -33,6 +34,8 @@ import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
 import ChatView from "./components/ChatView";
+import TabBar, { type Tab } from "./components/TabBar";
+import ActionIcons from "./components/ActionIcons";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
@@ -339,10 +342,19 @@ function App() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [formattingPreview, setFormattingPreview] = useState(false);
   const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
+  const [previewHasUnsavedChanges, setPreviewHasUnsavedChanges] = useState(false);
+  const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Tab system state
+  const [tabs, setTabs] = useState<Tab[]>([
+    { id: 'chat', label: 'Chat', type: 'chat', closable: false }
+  ]);
+  const [activeTabId, setActiveTabId] = useState('chat');
+
   const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
     if (typeof window === "undefined") {
       return 960;
@@ -437,7 +449,7 @@ function App() {
   // Track active streams per agent to prevent concurrency issues
   const activeStreamsRef = useRef<Map<string, Set<string>>>(new Map());
   // Track stream count for UI display (Map of agentId -> count)
-  const [activeStreamCounts, setActiveStreamCounts] = useState<Map<string, number>>(new Map());
+  // const [activeStreamCounts, setActiveStreamCounts] = useState<Map<string, number>>(new Map());
 
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
@@ -638,11 +650,11 @@ function App() {
       activeStreamsRef.current.delete(sessionId);
 
       // Update stream count
-      setActiveStreamCounts((prev) => {
-        const newMap = new Map(prev);
-        newMap.delete(sessionId);
-        return newMap;
-      });
+      // setActiveStreamCounts((prev) => {
+      //   const newMap = new Map(prev);
+      //   newMap.delete(sessionId);
+      //   return newMap;
+      // });
     }, []),
 
     onSendMessage: useCallback(async (sessionId: string, message: string) => {
@@ -868,11 +880,11 @@ function App() {
     activeStreamsRef.current.get(activeId)!.add(streamKey);
 
     // Update stream count for UI
-    setActiveStreamCounts((prev) => {
-      const newCounts = new Map(prev);
-      newCounts.set(activeId, activeStreamsRef.current.get(activeId)!.size);
-      return newCounts;
-    });
+    // setActiveStreamCounts((prev) => {
+    //   const newCounts = new Map(prev);
+    //   newCounts.set(activeId, activeStreamsRef.current.get(activeId)!.size);
+    //   return newCounts;
+    // });
 
     console.log(`[sendMessage] Active streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
 
@@ -1165,16 +1177,16 @@ function App() {
       }
 
       // Update stream count for UI
-      setActiveStreamCounts((prev) => {
-        const newCounts = new Map(prev);
-        const currentCount = activeStreamsRef.current.get(activeId)?.size || 0;
-        if (currentCount === 0) {
-          newCounts.delete(activeId);
-        } else {
-          newCounts.set(activeId, currentCount);
-        }
-        return newCounts;
-      });
+      // setActiveStreamCounts((prev) => {
+      //   const newCounts = new Map(prev);
+      //   const currentCount = activeStreamsRef.current.get(activeId)?.size || 0;
+      //   if (currentCount === 0) {
+      //     newCounts.delete(activeId);
+      //   } else {
+      //     newCounts.set(activeId, currentCount);
+      //   }
+      //   return newCounts;
+      // });
 
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
     }
@@ -3427,6 +3439,29 @@ function App() {
       if (!tauriAvailable || entry.is_dir) {
         return;
       }
+
+      // Create or activate tab for this file
+      const fileTabId = `file-${entry.path}`;
+
+      setTabs((prevTabs) => {
+        const existingTab = prevTabs.find(t => t.id === fileTabId);
+        if (!existingTab) {
+          return [
+            ...prevTabs,
+            {
+              id: fileTabId,
+              label: entry.name,
+              type: 'file' as const,
+              closable: true,
+              filePath: entry.path,
+            }
+          ];
+        }
+        return prevTabs;
+      });
+      setActiveTabId(fileTabId);
+
+      // Load file content
       setPreviewFile({ name: entry.name, path: entry.path });
       setPreviewContent("");
       setPreviewImageData(null);
@@ -3463,7 +3498,7 @@ function App() {
 
           setPreviewImageData(`data:${mimeType};base64,${base64Data}`);
         } else {
-          // Load file content only for non-image files
+          // Load file content for non-image files
           const content = await invoke<string>("read_file_content", {
             path: entry.path,
           });
@@ -3496,15 +3531,14 @@ function App() {
               rootPath: explorerRoot,
             });
 
-            const diffInfo = parseDiff(diff);
-            setPreviewDiffInfo(diffInfo);
+            setPreviewDiffInfo(parseDiff(diff));
           } catch (diffError) {
             console.warn("Unable to load diff:", diffError);
-            // Don't block file opening if diff fails
           }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        console.error('Error loading file:', message);
         setPreviewError(message);
       } finally {
         setLoadingPreview(false);
@@ -3525,6 +3559,75 @@ function App() {
     // Use handleOpenFilePreview to actually load file content
     handleOpenFilePreview(fakeEntry);
   }, [handleOpenFilePreview]);
+
+  // Tab management handlers
+  const handleTabClick = useCallback((tabId: string) => {
+    setActiveTabId(tabId);
+
+    // If clicking a file tab, restore its preview
+    if (tabId.startsWith('file-')) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab?.filePath) {
+        const name = tab.label;
+        const path = tab.filePath;
+        const fakeEntry: DirectoryEntry = {
+          name,
+          path,
+          is_dir: false,
+          is_symlink: false,
+        };
+        handleOpenFilePreview(fakeEntry);
+      }
+    }
+  }, [tabs, handleOpenFilePreview]);
+
+  const handleTabClose = useCallback((tabId: string) => {
+    // Don't close the chat tab
+    if (tabId === 'chat') return;
+
+    setTabs((prevTabs) => {
+      const filtered = prevTabs.filter(t => t.id !== tabId);
+
+      // If closing active tab, switch to previous tab or chat
+      if (activeTabId === tabId) {
+        const closedIndex = prevTabs.findIndex(t => t.id === tabId);
+        const newActiveTab = filtered[Math.max(0, closedIndex - 1)];
+        setActiveTabId(newActiveTab?.id || 'chat');
+      }
+
+      return filtered;
+    });
+  }, [activeTabId]);
+
+  // Keyboard navigation for tabs (TAB key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // TAB to cycle through tabs (only when not focused in input)
+      if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        const target = e.target as HTMLElement;
+        // Don't interfere with input/textarea focus
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          return;
+        }
+
+        e.preventDefault();
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const nextIndex = (currentIndex + 1) % tabs.length;
+        setActiveTabId(tabs[nextIndex].id);
+      }
+
+      // CMD/CTRL + W to close active file tab
+      if (e.key === 'w' && (e.metaKey || e.ctrlKey)) {
+        if (activeTabId !== 'chat' && activeTabId.startsWith('file-')) {
+          e.preventDefault();
+          handleTabClose(activeTabId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tabs, activeTabId, handleTabClose]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!tauriAvailable || !previewFile) {
@@ -4252,97 +4355,36 @@ You have access to all Bash tools to execute git commands like:
         />
 
         <section className="terminal-pane">
-          <div className="main-toolbar">
-            <div className="main-toolbar-top">
-              <div className="main-toolbar-title">
-                <h2 className="main-toolbar-heading">
-                  🦆 {activeTerminal?.label ?? 'Claude Agent Chat'}
-                </h2>
-                {import.meta.env.DEV && (
-                  <span className="dev-badge">DEV</span>
-                )}
-                {/* Show active streams badge when > 0 */}
-                {activeId && (activeStreamCounts.get(activeId) || 0) > 0 && (
-                  <span
-                    className="dev-badge"
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.2)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      color: '#60a5fa',
-                      animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                    }}
-                    title={`${activeStreamCounts.get(activeId) || 0} active stream(s)`}
-                  >
-                    🌊 {activeStreamCounts.get(activeId)}
-                  </span>
-                )}
-              </div>
-              <div className="main-toolbar-right">
-                <div
-                  className="git-branch-indicator"
-                  title={
-                    gitSummary?.branch
-                      ? `Current branch: ${gitSummary.branch}`
-                      : "Current branch unavailable"
-                  }
-                >
-                  <span
-                    className="git-branch-indicator-dot"
-                    aria-hidden="true"
-                  />
-                  <span className="git-branch-indicator-name">
-                    {gitSummary?.branch ?? "—"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className={`git-tab-button ${showGitDrawer ? "active" : ""}`}
-                  onClick={() => setShowGitDrawer(!showGitDrawer)}
-                >
-                  Git
-                </button>
-              <button
-                type="button"
-                className={`git-tab-button ${showPluginsDrawer ? "active" : ""}`}
-                onClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
-              >
-                Plugins
-              </button>
-              <button
-                type="button"
-                className="git-tab-button"
-                onClick={handleOpenPreviewDrawer}
-              >
-                Preview
-              </button>
-              <button
-                type="button"
-                className="git-tab-button"
-                onClick={async () => {
-                  try {
-                    const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                    await invoke("open_claude_usage_in_terminal", { cwd });
-                  } catch (error) {
-                    console.error("Failed to open claude usage:", error);
-                  }
-                }}
-                title="Open Claude usage in terminal"
-              >
-                Usage
-              </button>
-              <button
-                type="button"
-                className={`git-tab-button ${showTelegramSetup ? "active" : ""}`}
-                onClick={() => setShowTelegramSetup(true)}
-                title="Connect Telegram Bot"
-              >
-                📱 Telegram
-              </button>
-              </div>
-            </div>
-          </div>
-          <div className="terminal-container">
-            <ChatView
+          <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Action Icons - aligned right above tabs */}
+            <ActionIcons
+              onGitClick={() => setShowGitDrawer(!showGitDrawer)}
+              onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
+              onPreviewClick={handleOpenPreviewDrawer}
+              onUsageClick={async () => {
+                try {
+                  const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
+                  await invoke("open_claude_usage_in_terminal", { cwd });
+                } catch (error) {
+                  console.error("Failed to open claude usage:", error);
+                }
+              }}
+              onTelegramClick={() => setShowTelegramSetup(true)}
+            />
+
+            {/* Tab Bar - VSCode style */}
+            <TabBar
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabClick={handleTabClick}
+              onTabClose={handleTabClose}
+            />
+
+            {/* Content Area - fills remaining space */}
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {/* Chat View - shown when chat tab is active */}
+              {activeTabId === 'chat' && (
+                <ChatView
               key={activeId ?? 'no-agent'}
               messages={currentAgentMessages}
               isLoading={currentAgentLoading}
@@ -4376,6 +4418,62 @@ You have access to all Bash tools to execute git commands like:
               // Token usage tracking
               sessionTokens={currentAgentTokens}
             />
+              )}
+
+              {/* File Preview - shown when file tab is active */}
+              {activeTabId.startsWith('file-') && (
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <FilePreviewDrawer
+                    ref={previewDrawerRef}
+                    open={true}
+                    filename={previewFile?.name ?? null}
+                    path={previewFile?.path ?? null}
+                    content={previewContent}
+                    loading={loadingPreview}
+                    error={previewError}
+                    formatting={formattingPreview}
+                    diffInfo={previewDiffInfo}
+                    onClose={() => setActiveTabId('chat')}
+                    onRefresh={handleRefreshPreview}
+                    onFormat={handleFormatPreview}
+                    onSave={handleSaveFile}
+                    onHasUnsavedChanges={setPreviewHasUnsavedChanges}
+                    imageData={previewImageData}
+                    embedded={true}
+                  />
+                  <FileActionButtons
+                    onRefresh={handleRefreshPreview}
+                    onFormat={handleFormatPreview}
+                    onSave={() => {
+                      previewDrawerRef.current?.triggerSave();
+                    }}
+                    onOpenIDE={async () => {
+                      if (!previewFile?.path) return;
+                      try {
+                        await invoke("open_file_in_editor", { path: previewFile.path });
+                        toast.success("File opened in default editor");
+                      } catch (error) {
+                        console.error("Failed to open file in editor:", error);
+                        toast.error("Failed to open file in editor");
+                      }
+                    }}
+                    onRevealFinder={async () => {
+                      if (!previewFile?.path) return;
+                      try {
+                        await invoke("reveal_in_finder", { path: previewFile.path });
+                      } catch (error) {
+                        console.error("Failed to reveal in Finder:", error);
+                        toast.error("Failed to reveal in Finder");
+                      }
+                    }}
+                    disabled={loadingPreview}
+                    formatting={formattingPreview}
+                    hasUnsavedChanges={previewHasUnsavedChanges}
+                    isImageFile={previewFile?.name ? ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'].some(ext => previewFile.name!.toLowerCase().endsWith(ext)) : false}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
@@ -4498,8 +4596,9 @@ You have access to all Bash tools to execute git commands like:
           onConfirm={handleConfirmNewTerminal}
         />
 
+        {/* FilePreviewDrawer overlay DISABLED - now using tab-embedded preview only */}
         <FilePreviewDrawer
-          open={previewFile !== null}
+          open={false}
           filename={previewFile?.name ?? null}
           path={previewFile?.path ?? null}
           content={previewContent}

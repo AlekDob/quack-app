@@ -770,6 +770,38 @@ button.directory-chooser:hover {
   overflow: auto;
 }
 
+/* Fix embedded preview - ensure full height for Monaco Editor */
+.file-preview-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.preview-embedded {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-embedded .preview-toolbar {
+  flex-shrink: 0;
+}
+
+.preview-embedded .preview-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0; /* Remove padding in embedded mode for full Monaco Editor height */
+  /* REMOVED overflow: hidden - was hiding Monaco Editor content */
+}
+
+.preview-embedded .editor-container {
+  flex: 1;
+  min-height: 0;
+  height: 100%; /* CRITICAL: Monaco Editor needs explicit height to render */
+}
+
 /* Markdown preview styling - lighter background */
 .preview-content.markdown-preview {
   background: rgba(255, 255, 255, 0.03);
@@ -1683,6 +1715,7 @@ button.directory-chooser:hover {
 .terminal-container {
   padding: 0;
   display: flex;
+  flex-direction: column; /* VSCode-style vertical layout: icons → tabs → content */
   min-width: 0;
   min-height: 0;
   flex: 1;
@@ -7975,4 +8008,99 @@ button.directory-chooser:hover {
 
 .terminal-drawer.open .terminal-drawer-panel {
   transform: translateX(0);
+}
+
+/* File Action Buttons - Fixed bottom right */
+.file-action-buttons {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(18, 20, 27, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+}
+
+.file-action-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0.6;
+}
+
+.file-action-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.file-action-btn:active {
+  transform: scale(0.95);
+}
+
+.file-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.file-action-btn.active {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.file-action-btn svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+
+/* File Action Button Tooltips - Immediate on hover */
+.file-action-btn {
+  position: relative;
+}
+
+.file-action-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: rgba(18, 20, 27, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10000;
+  backdrop-filter: blur(8px);
+}
+
+.file-action-btn:hover .file-action-tooltip {
+  opacity: 1;
+}
+
+/* Tooltip arrow */
+.file-action-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(18, 20, 27, 0.95);
 }
