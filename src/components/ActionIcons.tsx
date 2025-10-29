@@ -23,7 +23,6 @@ function ActionIcons({
         type="button"
         className="action-icon"
         onClick={onGitClick}
-        title="Git Panel"
         aria-label="Open Git panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -32,6 +31,7 @@ function ActionIcons({
             fill="currentColor"
           />
         </svg>
+        <span className="action-icon-tooltip">Git Panel</span>
       </button>
 
       {/* Plugins Icon */}
@@ -39,7 +39,6 @@ function ActionIcons({
         type="button"
         className="action-icon"
         onClick={onPluginsClick}
-        title="Agents & Plugins"
         aria-label="Open Agents & Plugins panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -48,6 +47,7 @@ function ActionIcons({
             fill="currentColor"
           />
         </svg>
+        <span className="action-icon-tooltip">Agents & Plugins</span>
       </button>
 
       {/* Preview Icon */}
@@ -55,7 +55,6 @@ function ActionIcons({
         type="button"
         className="action-icon"
         onClick={onPreviewClick}
-        title="Preview Panel"
         aria-label="Open Preview panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -64,6 +63,7 @@ function ActionIcons({
             fill="currentColor"
           />
         </svg>
+        <span className="action-icon-tooltip">Preview Panel</span>
       </button>
 
       {/* Usage Icon */}
@@ -71,15 +71,14 @@ function ActionIcons({
         type="button"
         className="action-icon"
         onClick={onUsageClick}
-        title="Cost & Usage"
         aria-label="Open Cost & Usage panel"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M8 1C4.1 1 1 4.1 1 8C1 11.9 4.1 15 8 15C11.9 15 15 11.9 15 8C15 4.1 11.9 1 8 1ZM9 11.5H7V10H9V11.5ZM9 8.5H7V4.5H9V8.5Z"
-            fill="currentColor"
-          />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
+        <span className="action-icon-tooltip">Cost & Usage</span>
       </button>
 
       {/* Telegram Icon */}
@@ -87,7 +86,6 @@ function ActionIcons({
         type="button"
         className="action-icon"
         onClick={onTelegramClick}
-        title="Telegram"
         aria-label="Open Telegram"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -100,6 +98,7 @@ function ActionIcons({
             fill="currentColor"
           />
         </svg>
+        <span className="action-icon-tooltip">Telegram</span>
       </button>
     </div>
   );

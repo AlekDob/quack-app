@@ -8104,3 +8104,41 @@ button.directory-chooser:hover {
   border: 4px solid transparent;
   border-top-color: rgba(18, 20, 27, 0.95);
 }
+
+/* Action Icons Tooltips - Immediate on hover */
+.action-icon {
+  position: relative;
+}
+
+.action-icon-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: rgba(18, 20, 27, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10000;
+  backdrop-filter: blur(8px);
+}
+
+.action-icon:hover .action-icon-tooltip {
+  opacity: 1;
+}
+
+/* Tooltip arrow pointing up */
+.action-icon-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: rgba(18, 20, 27, 0.95);
+}
