@@ -59,6 +59,16 @@
   background: var(--accent);
 }
 
+/* Color Indicator - Agent Badge */
+.tab-color-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
 /* Tab Label */
 .tab-label {
   flex: 1;

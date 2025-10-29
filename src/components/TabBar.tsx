@@ -7,6 +7,7 @@ export interface Tab {
   type: 'chat' | 'file';
   closable: boolean;
   filePath?: string;
+  color?: string; // Color indicator for chat tabs
 }
 
 interface TabBarProps {
@@ -38,6 +39,13 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose }: TabBarProps) {
           onClick={() => handleTabClick(tab)}
           title={tab.filePath || tab.label}
         >
+          {tab.color && (
+            <span
+              className="tab-color-indicator"
+              style={{ backgroundColor: tab.color }}
+              aria-hidden="true"
+            />
+          )}
           <span className="tab-label">{tab.label}</span>
           {tab.closable && (
             <button

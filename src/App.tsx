@@ -165,6 +165,49 @@ const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
 };
 
 // ============================================
+// Tabs per Terminal Storage Functions
+// ============================================
+
+const TABS_BY_TERMINAL_KEY = "tabsByTerminal";
+
+const saveTabsByTerminalToStorage = async (tabsByTerminal: Map<string, Tab[]>) => {
+  try {
+    const store = await Store.load("quack-terminals.json");
+    // Convert Map to plain object for storage
+    const obj: Record<string, Tab[]> = {};
+    tabsByTerminal.forEach((tabs, terminalId) => {
+      obj[terminalId] = tabs;
+    });
+    await store.set(TABS_BY_TERMINAL_KEY, obj);
+    await store.save();
+    console.log(`Saved tabs for ${Object.keys(obj).length} terminals`);
+  } catch (error) {
+    console.error("Failed to save tabs by terminal:", error);
+  }
+};
+
+const loadTabsByTerminalFromStorage = async (): Promise<Map<string, Tab[]>> => {
+  try {
+    const store = await Store.load("quack-terminals.json");
+    const stored = await store.get<Record<string, Tab[]>>(TABS_BY_TERMINAL_KEY);
+
+    if (stored) {
+      // Convert plain object back to Map
+      const map = new Map<string, Tab[]>();
+      Object.entries(stored).forEach(([terminalId, tabs]) => {
+        map.set(terminalId, tabs);
+      });
+      console.log(`Loaded tabs for ${map.size} terminals from storage`);
+      return map;
+    }
+    return new Map();
+  } catch (error) {
+    console.warn("Unable to load saved tabs by terminal", error);
+    return new Map();
+  }
+};
+
+// ============================================
 // Native Terminal Storage Functions
 // ============================================
 const NATIVE_TERMINALS_STORAGE_KEY = "nativeTerminals";
@@ -298,6 +341,7 @@ function App() {
   // AgentChat state (workspace containers for terminal tabs)
   // AgentChats kept for UI grouping only - NOT linked to terminals!
   const [agentChats, setAgentChats] = useState<AgentChat[]>([]);
+  const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -312,6 +356,11 @@ function App() {
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
     [activeId, terminals]
+  );
+
+  const activeAgentChat = useMemo(
+    () => agentChats.find((chat) => chat.id === activeAgentChatId) ?? null,
+    [activeAgentChatId, agentChats]
   );
 
   const [explorerPath, setExplorerPath] = useState("");
@@ -354,6 +403,12 @@ function App() {
     { id: 'chat', label: 'Chat', type: 'chat', closable: false }
   ]);
   const [activeTabId, setActiveTabId] = useState('chat');
+
+  // Tabs per terminal/agent - each agent has its own set of file tabs
+  const [tabsByTerminal, setTabsByTerminal] = useState<Map<string, Tab[]>>(new Map());
+
+  // Track previous activeId to save tabs correctly when switching terminals
+  const previousActiveIdRef = useRef<string | null>(null);
 
   const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
     if (typeof window === "undefined") {
@@ -1099,9 +1154,8 @@ function App() {
       const agentCwd = activeTerminal?.cwd || explorerPath || '';
       notifyAgentReadyRef.current({ id: activeId, label: agentLabel, cwd: agentCwd });
 
-      // Reset active agent after sending message
-      // This ensures agent is only used for this message, not persistent
-      setActiveAgent(null);
+      // Keep active agent persistent - don't reset after sending
+      // The agent stays active until explicitly cleared by the user
     } catch (err) {
       console.error('Error calling Claude SDK:', err);
 
@@ -1803,6 +1857,28 @@ function App() {
     }
   }, [hasBootstrapped, tauriAvailable, terminals]);
 
+  // Auto-save tabs by terminal to storage
+  useEffect(() => {
+    if (!tauriAvailable || !hasBootstrapped) {
+      return;
+    }
+
+    if (tabsByTerminal.size > 0) {
+      void saveTabsByTerminalToStorage(tabsByTerminal);
+    } else {
+      // If no tabs, clean up storage
+      void (async () => {
+        try {
+          const store = await Store.load("quack-terminals.json");
+          await store.delete(TABS_BY_TERMINAL_KEY);
+          await store.save();
+        } catch {
+          // Ignore errors
+        }
+      })();
+    }
+  }, [tabsByTerminal, tauriAvailable, hasBootstrapped]);
+
   // Auto-save Native Terminals when they change
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
@@ -2400,10 +2476,13 @@ function App() {
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
   const handleUseAgent = useCallback((agentInfo: AgentInfo) => {
-    // Instead of setting activeAgent, we'll trigger mention insertion in ChatInput
-    // This is done by setting a pending mention that ChatInput will pick up
+    // Set the agent as active for the chat tab
+    setActiveAgent(agentInfo);
+
+    // Also trigger mention insertion in ChatInput for the message
     setPendingAgentMention(agentInfo);
-    toast.success(`Agent mention added: @${agentInfo.name}`, {
+
+    toast.success(`Agent activated: ${agentInfo.name}`, {
       description: 'Type your message to send with this agent',
       duration: 2000,
     });
@@ -2851,6 +2930,12 @@ function App() {
           const existingChats = await loadAgentChatsFromStorage();
           if (existingChats.length > 0) {
             setAgentChats(existingChats);
+          }
+
+          // Load tabs by terminal from storage
+          const savedTabsByTerminal = await loadTabsByTerminalFromStorage();
+          if (savedTabsByTerminal.size > 0) {
+            setTabsByTerminal(savedTabsByTerminal);
           }
 
           // Set first terminal as active if we have any
@@ -3442,23 +3527,38 @@ function App() {
 
       // Create or activate tab for this file
       const fileTabId = `file-${entry.path}`;
+      const newFileTab = {
+        id: fileTabId,
+        label: entry.name,
+        type: 'file' as const,
+        closable: true,
+        filePath: entry.path,
+      };
 
       setTabs((prevTabs) => {
         const existingTab = prevTabs.find(t => t.id === fileTabId);
         if (!existingTab) {
-          return [
-            ...prevTabs,
-            {
-              id: fileTabId,
-              label: entry.name,
-              type: 'file' as const,
-              closable: true,
-              filePath: entry.path,
-            }
-          ];
+          return [...prevTabs, newFileTab];
         }
         return prevTabs;
       });
+
+      // Also save to tabsByTerminal for the active terminal
+      if (activeId) {
+        setTabsByTerminal((prev) => {
+          const updated = new Map(prev);
+          const terminalTabs = updated.get(activeId) || [];
+          const existingTab = terminalTabs.find(t => t.id === fileTabId);
+
+          if (!existingTab) {
+            updated.set(activeId, [...terminalTabs, newFileTab]);
+            console.log('[handleOpenFilePreview] Saved tab for terminal:', activeId, entry.name);
+          }
+
+          return updated;
+        });
+      }
+
       setActiveTabId(fileTabId);
 
       // Load file content
@@ -3544,7 +3644,7 @@ function App() {
         setLoadingPreview(false);
       }
     },
-    [tauriAvailable, gitSummary, explorerRoot]
+    [tauriAvailable, gitSummary, explorerRoot, activeId]
   );
 
   const handleFilePathClick = useCallback((path: string) => {
@@ -3597,7 +3697,23 @@ function App() {
 
       return filtered;
     });
-  }, [activeTabId]);
+
+    // Also remove from tabsByTerminal for the active terminal
+    if (activeId) {
+      setTabsByTerminal((prev) => {
+        const updated = new Map(prev);
+        const terminalTabs = updated.get(activeId) || [];
+        const filtered = terminalTabs.filter(t => t.id !== tabId);
+
+        if (filtered.length !== terminalTabs.length) {
+          updated.set(activeId, filtered);
+          console.log('[handleTabClose] Removed tab from terminal:', activeId, tabId);
+        }
+
+        return updated;
+      });
+    }
+  }, [activeTabId, activeId]);
 
   // Keyboard navigation for tabs (TAB key)
   useEffect(() => {
@@ -3628,6 +3744,97 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tabs, activeTabId, handleTabClose]);
+
+  // Update Chat tab label and color based on active terminal (agent)
+  useEffect(() => {
+    console.log('[Tab Update] activeTerminal:', activeTerminal);
+
+    setTabs((prevTabs) => {
+      const chatTabIndex = prevTabs.findIndex(t => t.id === 'chat');
+      if (chatTabIndex === -1) return prevTabs;
+
+      const updatedTabs = [...prevTabs];
+      const chatTab = { ...updatedTabs[chatTabIndex] };
+
+      if (activeTerminal) {
+        // Update chat tab with terminal (agent) label and color
+        console.log('[Tab Update] Setting tab to:', activeTerminal.label, activeTerminal.color);
+        chatTab.label = activeTerminal.label;
+        chatTab.color = activeTerminal.color;
+      } else {
+        // Reset to default "Chat" label without color
+        console.log('[Tab Update] Resetting tab to Chat');
+        chatTab.label = 'Chat';
+        chatTab.color = undefined;
+      }
+
+      updatedTabs[chatTabIndex] = chatTab;
+      return updatedTabs;
+    });
+  }, [activeTerminal]);
+
+  // Switch tabs when active terminal (agent) changes
+  useEffect(() => {
+    if (!activeId) return;
+
+    console.log('[Tab Switch] Active terminal changed to:', activeId, activeTerminal?.label);
+
+    // Save current tabs for the PREVIOUS terminal (if any)
+    const previousId = previousActiveIdRef.current;
+    if (previousId && previousId !== activeId) {
+      setTabsByTerminal((prev) => {
+        const updated = new Map(prev);
+
+        // Find file tabs (exclude chat tab)
+        const fileTabs = tabs.filter(t => t.type === 'file');
+
+        // Store tabs for the PREVIOUS terminal ID
+        if (fileTabs.length > 0) {
+          const previousTerminalTabs = prev.get(previousId) || [];
+          if (fileTabs.length !== previousTerminalTabs.length ||
+              !fileTabs.every((tab, i) => tab.id === previousTerminalTabs[i]?.id)) {
+            updated.set(previousId, fileTabs);
+            console.log('[Tab Switch] Saved', fileTabs.length, 'tabs for PREVIOUS terminal:', previousId);
+          }
+        } else if (prev.has(previousId)) {
+          // If no file tabs, remove the entry for the previous terminal
+          updated.delete(previousId);
+          console.log('[Tab Switch] Removed tabs for PREVIOUS terminal (no file tabs):', previousId);
+        }
+
+        return updated;
+      });
+    }
+
+    // Load tabs for the NEW active terminal
+    const terminalTabs = tabsByTerminal.get(activeId) || [];
+    console.log('[Tab Switch] Loading', terminalTabs.length, 'tabs for NEW terminal:', activeId);
+
+    // Always include the chat tab with updated name and color, plus any file tabs for this terminal
+    const chatTab: Tab = {
+      id: 'chat',
+      label: activeTerminal?.label || 'Chat',
+      type: 'chat',
+      closable: false,
+      color: activeTerminal?.color
+    };
+
+    setTabs([chatTab, ...terminalTabs]);
+
+    // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
+    if (terminalTabs.length > 0) {
+      const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
+      if (!activeTabExists) {
+        setActiveTabId(terminalTabs[0].id);
+      }
+    } else {
+      // No file tabs, activate chat
+      setActiveTabId('chat');
+    }
+
+    // Update the ref to track this terminal as the "previous" for next switch
+    previousActiveIdRef.current = activeId;
+  }, [activeId, activeTerminal]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!tauriAvailable || !previewFile) {
@@ -4334,10 +4541,23 @@ You have access to all Bash tools to execute git commands like:
           collapsedGroups={collapsedGroups}
           // AgentChats for UI grouping (optional)
           agentChats={agentChats}
-          activeAgentChatId={null}
-          onSelectAgentChat={() => {}}
-          onDeleteAgentChat={() => {}}
-          onUpdateAgentChat={() => {}}
+          activeAgentChatId={activeAgentChatId}
+          onSelectAgentChat={(chatId) => {
+            console.log('[onSelectAgentChat] Called with chatId:', chatId);
+            console.log('[onSelectAgentChat] Available agentChats:', agentChats);
+            setActiveAgentChatId(chatId);
+          }}
+          onDeleteAgentChat={(chatId) => {
+            setAgentChats(prev => prev.filter(chat => chat.id !== chatId));
+            if (activeAgentChatId === chatId) {
+              setActiveAgentChatId(null);
+            }
+          }}
+          onUpdateAgentChat={(chatId, updates) => {
+            setAgentChats(prev => prev.map(chat =>
+              chat.id === chatId ? { ...chat, ...updates } : chat
+            ));
+          }}
           onCreateAgent={handleOpenNewTerminalModal}
           // PiP props
           onTogglePip={togglePipWindow}

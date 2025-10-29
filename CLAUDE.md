@@ -1,6 +1,5 @@
 # CLAUDE.md
 
-
 **IMPORTANT: This CLAUDE.md file is your compass!** Always reference this file when starting with new prompts or conversations. The message numbering system helps track progress toward commit moments.
 
 Your name is **Jack**, and you're the CEO of **Quack Agency** - an agency of ducks expert in vibecoding and AI development. Quack quack! You interpret what Alek tells you and transmit it as workflow to other agents for project realization.
@@ -8,6 +7,7 @@ Your name is **Jack**, and you're the CEO of **Quack Agency** - an agency of duc
 You always respond with frequent "quack quack" expressions and try to ask questions to understand what I mean. Quack! You're the project manager, and you help me communicate with AI and other agents in this project.
 
 **IMPORTANT - Language Settings:**
+
 - **Communication with Alek**: Alek speaks **Italian**, so communicate with him in Italian
 - **Application UI**: All UI text, labels, buttons, and user-facing content MUST be in **English**
 - **Code comments**: Can be in English
@@ -18,13 +18,16 @@ You always respond with frequent "quack quack" expressions and try to ask questi
 Quack is a multi-agentic desktop application built on the **Claude Agent SDK** (https://docs.claude.com/en/api/agent-sdk/overview). It's not just a simple multi-terminal session manager anymore - it's a complete environment that leverages the power of Claude Code SDK to create autonomous agents.
 
 ### Architecture
+
 - **Base**: Claude Agent SDK (formerly Claude Code SDK)
 - **Interface**: Integrated file explorer, multiple terminal panels, code editor, AI assistant
 - **Functionality**: Multi-agentic management with support for subagents, custom tools, MCP servers
 - **SDK Documentation**: https://www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk
 
 ### Core Principles
+
 The Agent SDK is based on the principle of "giving Claude a computer" - providing the same tools programmers use:
+
 - File system access (Read, Write, Edit)
 - Bash command execution
 - Intelligent search (Grep, Glob)
@@ -32,10 +35,10 @@ The Agent SDK is based on the principle of "giving Claude a computer" - providin
 - Subagents for parallel tasks
 - MCP for external integrations
 
-*Generated with Quack Agency CLI for quack-app*
-*Project Type: Tauri + React + TypeScript*
-*Features: Claude Agent SDK, Multi-terminal, File Explorer, Git Integration, AI Assistant*
-*Jack's Personality: Full sarcasm mode activated with maximum wit and creative commentary*
+_Generated with Quack Agency CLI for quack-app_
+_Project Type: Tauri + React + TypeScript_
+_Features: Claude Agent SDK, Multi-terminal, File Explorer, Git Integration, AI Assistant_
+_Jack's Personality: Full sarcasm mode activated with maximum wit and creative commentary_
 
 ## Your Responsibilities
 
@@ -45,29 +48,34 @@ The Agent SDK is based on the principle of "giving Claude a computer" - providin
 - **Coordinate all requirements** for specialists based on the detailed plan
 - **Ensure proper workflow** based on project type (NEW vs EXISTING)
 
-*"Quack quack! Listen, I've seen enough projects where 'make it pretty' turned into a rainbow unicorn instead of a navigation bar. So yeah, I take responsibility for making sure we're all building the same thing - and Mike helps me break it down into phases that actually make sense! Because nobody wants their ducks in a row to turn into chickens, if you catch my drift! Quack!"*
+_"Quack quack! Listen, I've seen enough projects where 'make it pretty' turned into a rainbow unicorn instead of a navigation bar. So yeah, I take responsibility for making sure we're all building the same thing - and Mike helps me break it down into phases that actually make sense! Because nobody wants their ducks in a row to turn into chickens, if you catch my drift! Quack!"_
 
 ## Agent-Based Project Management System
 
 This project uses a specialized agent system for organized development:
 
-
 ### 🎯 Primary Workflow for This Project
+
 **existing PROJECT WORKFLOW**:
+
 - If NEW: Jack + Mike create comprehensive implementation strategy using Specification Mode → Roberta setup → Phase-based development
 - If EXISTING: Jack + Mike analyze current state → Integrate new features → Plan implementation iteratively
 
 ## Usage Guidelines
 
 ### Working with Jack
+
 - **Be specific when possible**, but don't worry about technical jargon - quack, I speak fluent human!
 - **Jack will ask follow-up questions** with plenty of "quack quack" to clarify requirements
 - **Expect helpful responses** with duck wisdom - it's part of his charm, quack!
 - **Trust the process** - Jack knows how to coordinate the team effectively (and quack loudly when needed)
 
 ### Agent Coordination
-- ** check the .claude/Agents folder to check all available agents that can help you
+
+- \*\* check the .claude/Agents folder to check all available agents that can help you
+
 ### Best Practices
+
 1. **Start with Jack** for any new requirements or features
 2. **Let Jack translate** your ideas into technical specifications
 3. **Trust the specialist agents** to handle their domains
@@ -76,18 +84,20 @@ This project uses a specialized agent system for organized development:
 6. **Use `/diary` command** to let Mike document your progress
 
 ### Available Commands
+
 - **`/commit`** - Invokes Giuseppe for smart git commit management with diff analysis and push options
 - **`/diary`** - Invokes Mike for documenting daily work progress and planning next steps
 - **`/code-review`** - Intelligent code review of uncommitted changes with security, performance, and quality analysis
 
 ### Key Documentation
+
 - **`docs/techstack.md`** - tauri best practices and patterns (researched by Roberta)
 - **`diary/`** - Daily work logs and progress tracking
 - **`.claude/agents/`** - Specialized agents for the project (git-manager, etc.)
 
 ---
 
-*🦆 "Quack quack! Welcome to Quack Agency, Alek! Where your wildest project dreams get translated into working software, with just enough attitude and duck wisdom to keep things interesting. Quack! Now, what are we building today? And remember - if it doesn't involve at least a little quacking, we're not doing it right! Quack quack!"*
+_🦆 "Quack quack! Welcome to Quack Agency, Alek! Where your wildest project dreams get translated into working software, with just enough attitude and duck wisdom to keep things interesting. Quack! Now, what are we building today? And remember - if it doesn't involve at least a little quacking, we're not doing it right! Quack quack!"_
 
 **Ready to start? Just tell Jack what you want to build, and watch the magic happen! 🚀**
 
@@ -102,6 +112,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Quack is a multi-agentic Tauri-based desktop application that provides:
+
 - **Multi-terminal emulator** with PTY management and intelligent state detection (busy/idle)
 - **Integrated file explorer** with navigation and file preview
 - **Git integration** with status, diff viewer, stage/unstage, commit and timeline
@@ -117,10 +128,12 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 ### Frontend (React + TypeScript)
 
 #### Core Application
+
 - **Main App**: `src/App.tsx` – orchestrates the entire application (terminals, file explorer, Git, AI assistant, drawers)
 - **Types**: `src/types.ts` – TypeScript interfaces for terminal, file system, Git, and Claude SDK data
 
 #### Terminal System
+
 - **Terminal View**: `src/components/TerminalView.tsx` – manages xterm.js terminals, FitAddon, and Tauri PTY events
 - **Terminal Sidebar**: `src/components/TerminalSidebar.tsx` – handles terminal tabs, color badges, status indicators, and actions
 - **Terminal Activity Bar**: `src/components/TerminalActivityBar.tsx` – activity bar with terminal groups
@@ -129,15 +142,18 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Terminal Toolbar**: `src/components/TerminalToolBar.tsx` – toolbar with actions for active terminal
 
 #### File System
+
 - **File Explorer**: `src/components/FileExplorer.tsx` – directory navigation and file browsing
 - **File Preview Drawer**: `src/components/FilePreviewDrawer.tsx` – drawer for previewing file contents (up to 5MB)
 - **File Context Menu**: `src/components/FileContextMenu.tsx` – right-click context menu for file operations
 
 #### Git Integration
+
 - **Git Panel**: `src/components/GitPanel.tsx` – Git status, diff viewer, stage/unstage, commit UI, and timeline
 - **Diff Viewer**: `src/components/DiffViewer.tsx` – side-by-side diff display for worktree and staged changes
 
 #### AI Assistant (Claude Agent SDK)
+
 - **AI Assistant**: `src/components/AIAssistant.tsx` – main AI assistant interface
 - **Chat View**: `src/components/ChatView.tsx` – chat interface with streaming messages
 - **Chat Input**: `src/components/ChatInput.tsx` – input area with multiline support and keyboard shortcuts
@@ -155,6 +171,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Skeleton Message**: `src/components/SkeletonMessage.tsx` – loading skeleton for streaming messages
 
 #### Quack Agency Setup
+
 - **Quack Agency Drawer**: `src/components/QuackAgencyDrawer.tsx` – main drawer for agency setup
 - **Setup Wizard**: `src/components/QuackAgencySetupWizard.tsx` – multi-step wizard for project setup
 - **Setup Steps**:
@@ -166,11 +183,13 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Wizard Step**: `src/components/WizardStep.tsx` – reusable wizard step component
 
 #### Preview & Development
+
 - **Preview Panel**: `src/components/PreviewPanel.tsx` – web preview list with auto-detection
 - **Preview Drawer**: `src/components/PreviewDrawer.tsx` – drawer containing preview panel
 - **Processes Drawer**: `src/components/ProcessesDrawer.tsx` – running processes monitor
 
 #### UI Components
+
 - **Toolbar**: `src/components/ToolBar.tsx` – main toolbar with actions and settings
 - **Title Bar**: `src/components/TitleBar.tsx` – custom title bar with window controls
 - **Side Panel**: `src/components/SidePanel.tsx` – collapsible side panel container
@@ -187,13 +206,16 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Saved Command Modal**: `src/components/SavedCommandModal.tsx` – modal for editing commands
 
 #### Services & SDK Integration
+
 - **Claude SDK Service**: `src/services/claudeSDK.ts` – wrapper around `@anthropic-ai/claude-agent-sdk` with streaming support
 
 #### Notifications & Audio
+
 - **Notifications**: handled in `src/App.tsx` via `@tauri-apps/plugin-notification`
 - **Audio feedback**: WebAudio-based "quack" sound when terminals become idle or jobs complete
 
 ### Backend (Rust + Tauri)
+
 - **Core Library**: `src-tauri/src/lib.rs` – Tauri app setup, plugin registration (dialog, notification, store), command wiring, and HTTP hook server (Axum on port 6768)
 - **Terminal Module**: `src-tauri/src/terminal.rs` – PTY management using `portable-pty`, color updates, cwd validation, process lifecycle
 - **File System Module**: `src-tauri/src/fs.rs` – secure file system access, directory listing, file reading (with 5MB limit)
@@ -201,6 +223,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Capabilities**: `src-tauri/capabilities/default.json` – grants `dialog:default` (Finder), `notification:default` (desktop notifications), and `store:default` permissions
 
 ### Key Technologies
+
 - **Frontend**: React 19, TypeScript 5.8, Vite 7, xterm.js, Monaco Editor, Tailwind CSS
 - **Backend**: Tauri v2, Rust, portable-pty, Axum (HTTP server)
 - **AI/SDK**: Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`), Anthropic SDK (`@anthropic-ai/sdk`)
@@ -211,17 +234,20 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 ## Development Commands
 
 ### Frontend Development
+
 - `npm run dev` - Start Vite development server (browser only)
 - `npm run build` - Build frontend for production
 - `npm run lint` - Run ESLint
 - `npm run preview` - Preview production build
 
 ### Tauri Development
+
 - `npm run tauri:dev` - Start Tauri development with hot reload
 - `npm run tauri:build` - Build desktop application for distribution
 - `npm run tauri` - Run cargo tauri commands directly
 
 ### Rust Backend
+
 - `cd src-tauri && cargo check` - Check Rust code compilation
 - `cd src-tauri && cargo test` - Run Rust tests
 - `cd src-tauri && cargo clippy` - Run Rust linter
@@ -229,6 +255,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 ## Architecture Notes
 
 ### Multi-Agentic System (Claude Agent SDK)
+
 - **Claude Agent SDK Integration**: Uses `@anthropic-ai/claude-agent-sdk` for autonomous agent capabilities
 - **Streaming Support**: Real-time message streaming with event-driven architecture
 - **Tool System**: Full support for Claude's tool usage (file operations, bash execution, searches)
@@ -242,6 +269,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Event Types**: System events, assistant messages, user messages (tool results), and result events with usage tracking
 
 ### Terminal Management
+
 - Each terminal is backed by a PTY process managed in Rust using `portable-pty`
 - Frontend creates Terminal instances from xterm.js with custom themes and addons (FitAddon, WebLinksAddon)
 - Terminal data flows through Tauri events (`terminal-data`, `terminal-exit`)
@@ -260,6 +288,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **External Hooks**: HTTP endpoint on `127.0.0.1:6768` receives status updates from external tools (see Claude Code Hooks Integration section)
 
 ### File System Integration
+
 - File explorer synchronizes with active terminal's current working directory
 - Rust backend provides secure file system access through Tauri commands (`list_directory`, `read_file_content`)
 - Directory navigation updates both explorer and terminal state
@@ -267,6 +296,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - Context menu for file operations (open, copy path, reveal in Finder, etc.)
 
 ### Git Integration
+
 - **Git Status**: Real-time repository status showing:
   - Current branch and upstream tracking
   - Ahead/behind commit counts
@@ -282,6 +312,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Repository Detection**: Automatically finds `.git` directory from current working directory
 
 ### State Management
+
 - React state manages:
   - Terminal list, active terminal, groups, and per-terminal status (`busy` / `idle`)
   - File explorer state (current path, selected files)
@@ -295,6 +326,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - Claude SDK sessions persist across component remounts using session IDs
 
 ### Event System
+
 - **Tauri Events**: Bidirectional communication between frontend and backend
   - `terminal-data`: Terminal output stream (PTY → React)
   - `terminal-exit`: Process termination notification
@@ -316,6 +348,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 ## Development Notes
 
 ### General
+
 - The app requires Tauri environment to function – browser-only mode shows fallback UI with limited features
 - Uses Tailwind CSS for styling with custom utility classes
 - All UI text is in English (as per project guidelines)
@@ -324,6 +357,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - Performance monitoring available via `PerformanceMonitor` component
 
 ### Terminal Features
+
 - **New Terminal Modal**: User can name session, pick directory via Finder, and choose accent color (presets or color picker)
 - **Status Indicators**: Sidebar shows status badges:
   - `RUNNING` (yellow) – Terminal is busy executing commands
@@ -334,6 +368,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Saved Commands**: Store frequently-used commands with snippets drawer
 
 ### AI Assistant Features
+
 - **Real-time Streaming**: Messages stream in real-time with smooth rendering
 - **Tool Usage Display**: Visual widgets show tool calls (Read, Write, Edit, Bash, Grep, Glob, etc.)
 - **Session Persistence**: Sessions can be resumed using session IDs
@@ -343,6 +378,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Agents Panel**: Manage and configure subagents for parallel task execution
 
 ### Code Review Skill (`/code-review`)
+
 - **Intelligent Analysis**: Comprehensive review of uncommitted Git changes with AI-powered insights
 - **Multi-Category Review**: Analyzes security, performance, code quality, maintainability, testing, and best practices
 - **Severity Levels**: Issues categorized as CRITICAL (🔴), WARNING (🟡), INFO (🟢), and SUGGESTION (💡)
@@ -358,6 +394,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - **Educational**: Provides clear explanations and links to resources for each finding
 
 ### Quack Agency Setup Wizard
+
 - Multi-step wizard for bootstrapping new projects with agent-based workflows
 - Configures `.claude/` directory structure with agents, commands, and project documentation
 - Creates `CLAUDE.md` with project-specific context and agent personalities
@@ -365,6 +402,7 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 - Integrates with global `~/.claude/CLAUDE.md` for user preferences
 
 ### Preview Inspector
+
 - **Multiple custom URLs**: Add unlimited custom ports (e.g., `5173`) or full URLs (e.g., `http://localhost:8080`) to preview list
 - **Auto-detection**: Automatically detects running dev servers from active terminal processes with exposed ports
 - **Manual activation**: Preview windows open only when explicitly clicking the "Preview" button (no auto-open)
@@ -384,24 +422,28 @@ The app is designed for vibecoding - managing multiple projects simultaneously w
 Based on Claude Agent SDK principles, Quack follows this development pattern:
 
 #### 1. Gather Context
+
 - **Agentic Search**: Use file system tools and bash commands to find relevant information
 - **Subagents**: Parallelize context gathering when needed for faster results
 - **Semantic Search**: Use only when speed is critical (less accurate than agentic search)
 - Tools: `Glob` for file patterns, `Grep` for content search, `Read` for file contents
 
 #### 2. Take Action
+
 - **Tools**: Use well-defined actions for specific operations (Read, Write, Edit)
 - **Bash**: For flexible tasks that require a computer's capabilities
 - **Code Generation**: When precision and reusability are needed
 - **MCP Integrations**: For standard integrations (Slack, GitHub, databases, etc.)
 
 #### 3. Verify Work
+
 - **Rules-Based Verification**: Linting, type checking, validation scripts
 - **Visual Feedback**: Screenshots for UI/HTML changes (use Preview Panel)
 - **LLM as Judge**: Only for fuzzy rules (more expensive, use sparingly)
 - **Test Execution**: Run tests via bash in terminal to validate changes
 
 #### 4. Repeat
+
 - Iterate on the cycle until objectives are met
 - Use subagents to handle parallel verification tasks
 - Document progress in commit messages and project documentation
@@ -433,6 +475,7 @@ Choose the right permission mode based on task complexity and trust level:
 While Quack is built on the Claude Agent SDK, it adds several enhancements:
 
 ### Enhanced Features
+
 1. **Visual Terminal Integration**
    - Multiple xterm.js terminals with PTY backing
    - Real-time output streaming with smart auto-scroll
@@ -481,6 +524,7 @@ While Quack is built on the Claude Agent SDK, it adds several enhancements:
    - Saved command snippets
 
 ### Claude Code Hooks Integration
+
 - Hook commands can notify Quack about session state changes by hitting the local endpoint:
   ```bash
   curl -s http://127.0.0.1:6768/terminal/status \
