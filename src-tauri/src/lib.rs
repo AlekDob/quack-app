@@ -400,6 +400,7 @@ pub fn run() {
             fs::write_file_content,
             fs::stat_file,
             fs::read_file_preview,
+            fs::read_image_as_base64,
             fs::save_clipboard_file,
             fs::search_files_recursive,
             fs::open_file_in_editor,

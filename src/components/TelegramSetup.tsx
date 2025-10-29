@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { open } from '@tauri-apps/plugin-shell';
+import { open as openUrl } from '@tauri-apps/plugin-shell';
 import './TelegramSetup.css';
 
 interface TelegramSetupProps {
+  open: boolean;
   onClose?: () => void;
 }
 
@@ -13,7 +14,7 @@ interface UserLinkedPayload {
   telegram_chat_id: number;
 }
 
-export default function TelegramSetup({ onClose }: TelegramSetupProps) {
+export default function TelegramSetup({ open, onClose }: TelegramSetupProps) {
   const [uniqueId, setUniqueId] = useState<string>('');
   const [deepLink, setDeepLink] = useState<string>('');
   const [isLinked, setIsLinked] = useState(false);
@@ -134,7 +135,7 @@ export default function TelegramSetup({ onClose }: TelegramSetupProps) {
 
   const handleOpenTelegram = async () => {
     try {
-      await open(deepLink);
+      await openUrl(deepLink);
     } catch (err) {
       setError('Failed to open Telegram link. Please copy and paste it manually.');
     }
@@ -146,7 +147,7 @@ export default function TelegramSetup({ onClose }: TelegramSetupProps) {
   };
 
   return (
-    <div className="telegram-setup-drawer open" role="dialog" aria-modal="true">
+    <div className={`telegram-setup-drawer ${open ? "open" : ""}`} role="dialog" aria-modal="true">
       <div
         className="telegram-setup-drawer-backdrop"
         onClick={onClose}

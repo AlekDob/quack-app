@@ -1,0 +1,188 @@
+/* ===================================
+   COMPACT FILE EXPLORER - VSCode Style
+   =================================== */
+
+/* Reduce overall font sizes */
+.file-explorer .explorer-title {
+  font-size: 0.7rem; /* 0.82rem → 0.7rem */
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.file-explorer .explorer-path {
+  font-size: 0.6rem; /* 0.62rem → 0.6rem */
+}
+
+.file-explorer .explorer-search {
+  font-size: 0.65rem; /* 0.68rem → 0.65rem */
+  padding: 0.3rem 0.5rem; /* Reduced padding */
+  cursor: text; /* Keep text cursor only in input */
+}
+
+.file-explorer .explorer-root-label {
+  font-size: 0.7rem; /* 0.74rem → 0.7rem */
+  font-weight: 600;
+  margin-bottom: 0.25rem; /* 0.35rem → 0.25rem */
+}
+
+/* Compact rows - minimal borders like VSCode */
+.file-explorer .explorer-row {
+  gap: 0.35rem; /* 0.45rem → 0.35rem */
+  padding: 0.15rem 0.4rem; /* 0.25rem 0.5rem → 0.15rem 0.4rem */
+  margin-bottom: 0; /* Remove margin between rows */
+  border-radius: 4px; /* 8px → 4px */
+  border: none; /* Remove heavy borders */
+  background: transparent; /* Start transparent */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none; /* Remove shadows */
+  transition: background 0.1s ease; /* Quick transition */
+  cursor: pointer !important; /* Fix cursor on search results */
+}
+
+/* Hover - subtle highlight like VSCode */
+.file-explorer .explorer-row:hover {
+  background: rgba(255, 255, 255, 0.05); /* Subtle */
+  border: none;
+}
+
+/* Active/selected - orange highlight */
+.file-explorer .explorer-row.active {
+  background: rgba(var(--accent-rgb), 0.12);
+  border: none;
+  color: inherit;
+}
+
+.file-explorer .explorer-row.file-open {
+  background: rgba(var(--accent-rgb), 0.15);
+  border: none;
+}
+
+/* File rows - no special background */
+.file-explorer .explorer-row.file {
+  background: transparent;
+}
+
+.file-explorer .explorer-row.file:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Compact expander */
+.file-explorer .explorer-expander {
+  width: 14px; /* 16px → 14px */
+  font-size: 0.7rem; /* 0.78rem → 0.7rem */
+}
+
+/* Icon size - compact */
+.file-explorer .explorer-icon {
+  width: 16px; /* 18px → 16px */
+  height: 16px;
+}
+
+/* File name - smaller */
+.file-explorer .explorer-name {
+  font-size: 0.68rem; /* 0.7rem → 0.68rem */
+  line-height: 1.4;
+}
+
+/* Count badge - smaller */
+.file-explorer .explorer-count {
+  font-size: 0.6rem;
+  padding: 0 0.3rem;
+}
+
+/* Reduce indentation per level */
+.file-explorer .explorer-row[style*="paddingLeft"] {
+  /* This will be overridden inline, but we set base */
+}
+
+/* Modified files section */
+.file-explorer .explorer-section-header {
+  padding: 0.3rem 0.4rem; /* Reduced */
+}
+
+.file-explorer .explorer-section-title {
+  font-size: 0.65rem; /* Smaller */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.file-explorer .explorer-section-count {
+  font-size: 0.6rem;
+}
+
+/* Search result path hint */
+.file-explorer .explorer-path-hint {
+  font-size: 0.6rem;
+}
+
+/* Git stats */
+.file-explorer .explorer-git-stats {
+  font-size: 0.6rem;
+}
+
+/* Compact file actions buttons */
+.file-explorer .explorer-file-actions {
+  gap: 4px; /* More breathing room between icons */
+}
+
+.file-explorer .explorer-mention-btn {
+  width: 16px; /* Slightly larger for better visibility */
+  height: 16px;
+  font-size: 0.6rem; /* Slightly larger @ symbol */
+  border-radius: 3px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Reveal in Finder button - minimal, no background */
+.file-explorer .reveal-in-finder-btn {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  padding: 0 !important;
+  border-radius: 0 !important; /* No border radius */
+  border: none !important; /* No border */
+  background: transparent !important; /* No background */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+}
+
+.file-explorer .reveal-in-finder-btn:hover {
+  background: transparent !important; /* Keep transparent on hover */
+  opacity: 0.7 !important; /* Just reduce opacity on hover */
+}
+
+.file-explorer .reveal-in-finder-btn svg {
+  width: 12px !important; /* Icon only, slightly larger for visibility */
+  height: 12px !important;
+  opacity: 0.6 !important; /* Subtle icon */
+}
+
+.file-explorer .reveal-in-finder-btn:hover svg {
+  opacity: 1 !important; /* Full opacity on hover */
+}
+
+/* Compact content padding */
+.file-explorer .explorer-content {
+  padding: 0.3rem 0.5rem 0.5rem; /* 0.45rem 0.75rem 0.85rem → reduced */
+}
+
+/* Header - more compact */
+.file-explorer .explorer-header {
+  padding: 0.7rem 0.85rem; /* 0.85rem 1rem → reduced */
+  gap: 0.25rem; /* 0.3rem → 0.25rem */
+}
+
+/* Empty state */
+.file-explorer .empty-state {
+  font-size: 0.7rem;
+  padding: 2rem 1rem;
+}

@@ -10,6 +10,8 @@ import {
 } from "react";
 import FileContextMenu from "./FileContextMenu";
 import RevealInFinderButton from "./RevealInFinderButton";
+import FileIcon from "./FileIcon";
+import "./FileExplorer.compact.css";
 
 const normalize = (value: string) => value.toLowerCase();
 const normalizePathValue = (value: string) =>
@@ -406,7 +408,7 @@ function FileExplorer({
             : isDirectory && isLoadingNode
               ? "…"
               : null;
-          const paddingLeft = 12 + depth * 14;
+          const paddingLeft = 8 + depth * 10; // Reduced from 12 + depth * 14 for compact VSCode style
 
           const rowClass = [
             "explorer-row",
@@ -448,15 +450,11 @@ function FileExplorer({
                   }}
                   aria-hidden="true"
                 />
-                <span
-                  className={`explorer-icon ${
-                    isDirectory
-                      ? "folder"
-                      : entry.is_symlink
-                        ? "symlink"
-                        : "file"
-                  }`}
-                  aria-hidden="true"
+                <FileIcon
+                  name={entry.name}
+                  isDirectory={isDirectory}
+                  isOpen={isExpanded}
+                  size={16}
                 />
                 <span className="explorer-name">{entry.name}</span>
                 {isDirectory && displayCount !== null && (
@@ -464,25 +462,24 @@ function FileExplorer({
                     {displayCount}
                   </span>
                 )}
-                {!isDirectory && (
-                  <div className="explorer-file-actions">
-                    <RevealInFinderButton path={entry.path} iconOnly />
-                    {onMentionFile && (
-                      <button
-                        type="button"
-                        className="explorer-mention-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMentionFile(entry.path, entry.name);
-                        }}
-                        title="Insert @file mention in chat"
-                        aria-label="Mention file in chat"
-                      >
-                        @
-                      </button>
-                    )}
-                  </div>
-                )}
+                {/* Show actions for both files AND directories */}
+                <div className="explorer-file-actions">
+                  <RevealInFinderButton path={entry.path} iconOnly />
+                  {onMentionFile && (
+                    <button
+                      type="button"
+                      className="explorer-mention-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMentionFile(entry.path, entry.name);
+                      }}
+                      title={isDirectory ? "Insert @folder mention in chat" : "Insert @file mention in chat"}
+                      aria-label={isDirectory ? "Mention folder in chat" : "Mention file in chat"}
+                    >
+                      @
+                    </button>
+                  )}
+                </div>
               </button>
               {isDirectory &&
                 isExpanded &&
@@ -562,15 +559,11 @@ function FileExplorer({
           onDragStart={(event) => handleDragStart(event, entry)}
         >
           {/* No expander placeholder for search results - saves space */}
-          <span
-            className={`explorer-icon ${
-              result.is_dir
-                ? "folder"
-                : result.is_symlink
-                  ? "symlink"
-                  : "file"
-            }`}
-            aria-hidden="true"
+          <FileIcon
+            name={result.name}
+            isDirectory={result.is_dir}
+            isOpen={false}
+            size={16}
           />
           <div className="explorer-file-info">
             <span className="explorer-name">{result.name}</span>
@@ -578,25 +571,24 @@ function FileExplorer({
               {result.relative_path}
             </span>
           </div>
-          {!result.is_dir && (
-            <div className="explorer-file-actions">
-              <RevealInFinderButton path={result.path} iconOnly />
-              {onMentionFile && (
-                <button
-                  type="button"
-                  className="explorer-mention-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMentionFile(result.path, result.name);
-                  }}
-                  title="Insert @file mention in chat"
-                  aria-label="Mention file in chat"
-                >
-                  @
-                </button>
-              )}
-            </div>
-          )}
+          {/* Show actions for both files AND directories */}
+          <div className="explorer-file-actions">
+            <RevealInFinderButton path={result.path} iconOnly />
+            {onMentionFile && (
+              <button
+                type="button"
+                className="explorer-mention-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMentionFile(result.path, result.name);
+                }}
+                title={result.is_dir ? "Insert @folder mention in chat" : "Insert @file mention in chat"}
+                aria-label={result.is_dir ? "Mention folder in chat" : "Mention file in chat"}
+              >
+                @
+              </button>
+            )}
+          </div>
         </button>
       );
     },
@@ -619,19 +611,15 @@ function FileExplorer({
       const isDeletedFile = gitEntry.staged_status === "Deleted" || gitEntry.unstaged_status === "Deleted";
       const isNewFile = gitEntry.is_untracked;
 
-      // Determina classe e icona in base al tipo
+      // Determina classe in base al tipo
       let fileType: string;
-      let iconClass: string;
 
       if (isDeletedFile) {
         fileType = "deleted-file";
-        iconClass = "explorer-icon file-deleted";
       } else if (isNewFile) {
         fileType = "new-file";
-        iconClass = "explorer-icon file-new";
       } else {
         fileType = "modified";
-        iconClass = "explorer-icon file-modified";
       }
 
       const rowClass = [
@@ -661,7 +649,12 @@ function FileExplorer({
           onDragStart={(event) => handleDragStart(event, entry)}
         >
           <span className="explorer-expander placeholder" aria-hidden="true" />
-          <span className={iconClass} aria-hidden="true" />
+          <FileIcon
+            name={entry.name}
+            isDirectory={false}
+            isOpen={false}
+            size={16}
+          />
           <span className="explorer-name">{displayPath}</span>
           {hasStats && (
             <span className="explorer-git-stats">
@@ -709,6 +702,10 @@ function FileExplorer({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search files or folders"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
         />
       </div>
 
@@ -721,7 +718,7 @@ function FileExplorer({
             <div className="explorer-section search-results-section">
               <div className="explorer-section-header">
                 <span className="explorer-section-title">
-                  🔍 Search Results
+                  Search Results
                 </span>
                 <span className="explorer-section-count">
                   {searchResults.length}

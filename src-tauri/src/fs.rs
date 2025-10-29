@@ -75,6 +75,11 @@ pub fn read_file_preview(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn read_image_as_base64(path: String) -> Result<String, String> {
+    read_image_as_base64_impl(path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn save_clipboard_file(
     data_base64: String,
     extension: Option<String>,
@@ -194,6 +199,27 @@ fn read_file_preview_impl(path: String) -> Result<String> {
 
     if metadata.len() > MAX_PREVIEW_SIZE {
         return Err(anyhow!("Il file è troppo grande per l'anteprima (limite 3MB)"));
+    }
+
+    let bytes = fs::read(&resolved)
+        .with_context(|| format!("Impossibile leggere il file {:?}", resolved))?;
+
+    Ok(BASE64_ENGINE.encode(bytes))
+}
+
+fn read_image_as_base64_impl(path: String) -> Result<String> {
+    let resolved = PathBuf::from(&path);
+    if resolved.is_dir() {
+        return Err(anyhow!("Il percorso selezionato è una cartella"));
+    }
+
+    const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024; // 10MB limit for images
+    let metadata = fs::metadata(&resolved).with_context(|| {
+        format!("Impossibile ottenere le informazioni del file {:?}", resolved)
+    })?;
+
+    if metadata.len() > MAX_IMAGE_SIZE {
+        return Err(anyhow!("L'immagine è troppo grande per l'anteprima (limite 10MB)"));
     }
 
     let bytes = fs::read(&resolved)

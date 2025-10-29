@@ -334,6 +334,7 @@ function App() {
     path: string;
   } | null>(null);
   const [previewContent, setPreviewContent] = useState("");
+  const [previewImageData, setPreviewImageData] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [formattingPreview, setFormattingPreview] = useState(false);
@@ -3428,16 +3429,46 @@ function App() {
       }
       setPreviewFile({ name: entry.name, path: entry.path });
       setPreviewContent("");
+      setPreviewImageData(null);
       setPreviewError(null);
       setPreviewDiffInfo(null);
       setLoadingPreview(true);
 
       try {
-        // Load file content
-        const content = await invoke<string>("read_file_content", {
-          path: entry.path,
-        });
-        setPreviewContent(content);
+        // Check if file is an image
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'];
+        const isImage = imageExtensions.some(ext => entry.name.toLowerCase().endsWith(ext));
+
+        if (isImage) {
+          // Load image as base64
+          const base64Data = await invoke<string>("read_image_as_base64", {
+            path: entry.path,
+          });
+
+          // Detect MIME type from extension
+          const ext = entry.name.toLowerCase().split('.').pop() || 'png';
+          const mimeTypes: Record<string, string> = {
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'webp': 'image/webp',
+            'svg': 'image/svg+xml',
+            'ico': 'image/x-icon',
+            'tiff': 'image/tiff',
+            'tif': 'image/tiff',
+          };
+          const mimeType = mimeTypes[ext] || 'image/png';
+
+          setPreviewImageData(`data:${mimeType};base64,${base64Data}`);
+        } else {
+          // Load file content only for non-image files
+          const content = await invoke<string>("read_file_content", {
+            path: entry.path,
+          });
+          setPreviewContent(content);
+        }
 
         // If file is modified, also load the diff
         const isModified = gitSummary?.entries?.some((gitEntry) => {
@@ -3502,10 +3533,39 @@ function App() {
     setPreviewError(null);
     setLoadingPreview(true);
     try {
-      const content = await invoke<string>("read_file_content", {
-        path: previewFile.path,
-      });
-      setPreviewContent(content);
+      // Check if file is an image
+      const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'];
+      const isImage = imageExtensions.some(ext => previewFile.name.toLowerCase().endsWith(ext));
+
+      if (isImage) {
+        // Reload image as base64
+        const base64Data = await invoke<string>("read_image_as_base64", {
+          path: previewFile.path,
+        });
+
+        // Detect MIME type from extension
+        const ext = previewFile.name.toLowerCase().split('.').pop() || 'png';
+        const mimeTypes: Record<string, string> = {
+          'png': 'image/png',
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'gif': 'image/gif',
+          'bmp': 'image/bmp',
+          'webp': 'image/webp',
+          'svg': 'image/svg+xml',
+          'ico': 'image/x-icon',
+          'tiff': 'image/tiff',
+          'tif': 'image/tiff',
+        };
+        const mimeType = mimeTypes[ext] || 'image/png';
+
+        setPreviewImageData(`data:${mimeType};base64,${base64Data}`);
+      } else {
+        const content = await invoke<string>("read_file_content", {
+          path: previewFile.path,
+        });
+        setPreviewContent(content);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setPreviewError(message);
@@ -4447,6 +4507,7 @@ You have access to all Bash tools to execute git commands like:
           error={previewError}
           formatting={formattingPreview}
           diffInfo={previewDiffInfo}
+          imageData={previewImageData}
           onClose={handleClosePreview}
           onRefresh={handleRefreshPreview}
           onFormat={handleFormatPreview}
@@ -4645,9 +4706,10 @@ You have access to all Bash tools to execute git commands like:
           onClose={() => setShowBackgroundsModal(false)}
         />
 
-        {showTelegramSetup && (
-          <TelegramSetup onClose={() => setShowTelegramSetup(false)} />
-        )}
+        <TelegramSetup
+          open={showTelegramSetup}
+          onClose={() => setShowTelegramSetup(false)}
+        />
       </div>
       {introReplayActive && (
         <div

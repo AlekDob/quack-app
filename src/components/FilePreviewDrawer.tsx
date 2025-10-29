@@ -19,6 +19,7 @@ interface FilePreviewDrawerProps {
   onRefresh: () => void;
   onFormat: () => void;
   onSave?: (content: string) => void;
+  imageData?: string | null;
 }
 
 function FilePreviewDrawer({
@@ -34,6 +35,7 @@ function FilePreviewDrawer({
   onRefresh,
   onFormat,
   onSave,
+  imageData,
 }: FilePreviewDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
@@ -93,6 +95,10 @@ function FilePreviewDrawer({
   const isMarkdownFile = filename?.toLowerCase().endsWith('.md') ?? false;
   const isMermaidFile = filename?.toLowerCase().endsWith('.mmd') ?? false;
 
+  // Check if file is an image
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'];
+  const isImageFile = filename ? imageExtensions.some(ext => filename.toLowerCase().endsWith(ext)) : false;
+
   if (!open) {
     return null;
   }
@@ -115,43 +121,47 @@ function FilePreviewDrawer({
             )}
           </div>
           <div className="preview-actions">
-            <button
-              type="button"
-              className="preview-action"
-              onClick={onRefresh}
-              disabled={loading || formatting}
-              title="Reload file from disk"
-            >
-              Reload
-            </button>
-            <button
-              type="button"
-              className="preview-action"
-              onClick={onFormat}
-              disabled={loading || formatting || isEditing}
-              title="Format code"
-            >
-              {formatting ? "Formatting…" : "Format"}
-            </button>
-            <button
-              type="button"
-              className={`preview-action ${isEditing ? "active" : ""}`}
-              onClick={handleToggleEdit}
-              disabled={loading}
-              title={isEditing ? "Switch to preview mode" : "Switch to edit mode"}
-            >
-              {isEditing ? "Preview" : "Edit"}
-            </button>
-            {isEditing && onSave && (
-              <button
-                type="button"
-                className="preview-action save"
-                onClick={() => handleSave()}
-                disabled={!hasUnsavedChanges}
-                title={hasUnsavedChanges ? "Save changes" : "No changes to save"}
-              >
-                {hasUnsavedChanges ? "Save *" : "Saved"}
-              </button>
+            {!isImageFile && (
+              <>
+                <button
+                  type="button"
+                  className="preview-action"
+                  onClick={onRefresh}
+                  disabled={loading || formatting}
+                  title="Reload file from disk"
+                >
+                  Reload
+                </button>
+                <button
+                  type="button"
+                  className="preview-action"
+                  onClick={onFormat}
+                  disabled={loading || formatting || isEditing}
+                  title="Format code"
+                >
+                  {formatting ? "Formatting…" : "Format"}
+                </button>
+                <button
+                  type="button"
+                  className={`preview-action ${isEditing ? "active" : ""}`}
+                  onClick={handleToggleEdit}
+                  disabled={loading}
+                  title={isEditing ? "Switch to preview mode" : "Switch to edit mode"}
+                >
+                  {isEditing ? "Preview" : "Edit"}
+                </button>
+                {isEditing && onSave && (
+                  <button
+                    type="button"
+                    className="preview-action save"
+                    onClick={() => handleSave()}
+                    disabled={!hasUnsavedChanges}
+                    title={hasUnsavedChanges ? "Save changes" : "No changes to save"}
+                  >
+                    {hasUnsavedChanges ? "Save *" : "Saved"}
+                  </button>
+                )}
+              </>
             )}
             {path && (
               <>
@@ -172,7 +182,7 @@ function FilePreviewDrawer({
             </button>
           </div>
         </header>
-        <div className={`preview-content ${(isMarkdownFile || isMermaidFile) && !isEditing ? 'markdown-preview' : ''}`} data-loading={loading}>
+        <div className={`preview-content ${(isMarkdownFile || isMermaidFile || isImageFile) && !isEditing ? 'markdown-preview' : ''}`} data-loading={loading}>
           {loading ? (
             <div className="preview-placeholder">Loading file…</div>
           ) : error ? (
@@ -186,6 +196,20 @@ function FilePreviewDrawer({
                 onChange={handleContentChange}
                 onSave={handleSave}
                 diffInfo={diffInfo}
+              />
+            </div>
+          ) : isImageFile && imageData ? (
+            <div className="image-viewer">
+              <img
+                src={imageData}
+                alt={filename || 'Image preview'}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  margin: 'auto',
+                }}
               />
             </div>
           ) : isMarkdownFile ? (

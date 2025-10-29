@@ -699,11 +699,16 @@ pub async fn send_message_via_sdk_streaming(
         return Err(format!("Node.js SDK script not found at: {:?}", script_path));
     }
 
+    // Get the node-sdk directory (parent of the script) for node_modules resolution
+    let node_sdk_dir = script_path.parent()
+        .ok_or("Failed to get node-sdk directory".to_string())?;
+
     // Spawn Node.js process
     let mut command = Command::new("node");
     command
         .arg(&script_path)
         .arg(&config_str)
+        .current_dir(node_sdk_dir)  // Set working directory for node_modules resolution
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
