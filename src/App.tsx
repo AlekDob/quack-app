@@ -3550,8 +3550,9 @@ function App() {
       const currentAgent = terminals.find(t => t.id === activeId);
       const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || "~";
 
-      // Generate unique terminal name
-      const terminalNumber = agentTerminals.length + 1;
+      // Generate unique terminal name PER-AGENT
+      const agentTerminalCount = agentTerminals.filter(t => t.agentId === activeId).length;
+      const terminalNumber = agentTerminalCount + 1;
       const terminalName = `Terminal ${terminalNumber}`;
 
       // Create backend terminal (PTY)
