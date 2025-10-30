@@ -34,8 +34,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
   };
 
   const handleDragStart = (e: React.DragEvent, tab: Tab) => {
-    // Don't allow dragging the chat tab or agent-terminal tabs
-    if (tab.type === 'chat' || tab.type === 'agent-terminal') {
+    // Don't allow dragging the chat tab (terminals are draggable now!)
+    if (tab.type === 'chat') {
       e.preventDefault();
       return;
     }
@@ -111,14 +111,14 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           } ${dragOverTabId === tab.id ? 'drag-over' : ''}`}
           onClick={() => handleTabClick(tab)}
           title={tab.filePath || tab.label}
-          draggable={tab.type !== 'chat' && tab.type !== 'agent-terminal'}
+          draggable={tab.type !== 'chat'}
           onDragStart={(e) => handleDragStart(e, tab)}
           onDragOver={(e) => handleDragOver(e, tab)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, tab)}
           onDragEnd={handleDragEnd}
         >
-          {tab.color && (
+          {tab.color && tab.type !== 'agent-terminal' && (
             <span
               className="tab-color-indicator"
               style={{ backgroundColor: tab.color }}
