@@ -115,3 +115,58 @@
 .tab-item.active .tab-close {
   opacity: 1;
 }
+
+/* ===================================
+   DRAG AND DROP STYLES
+   =================================== */
+
+/* Tab being dragged */
+.tab-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing !important;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Tab being dragged over (drop target) - VS Code style drop indicator */
+.tab-item.drag-over {
+  position: relative;
+}
+
+/* White bar indicator on the left side (like VS Code) */
+.tab-item.drag-over::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  z-index: 10;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dropIndicatorPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Cursor feedback for draggable tabs */
+.tab-item[draggable="true"] {
+  cursor: grab;
+}
+
+.tab-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Chat tab is not draggable */
+.tab-item[draggable="false"] {
+  cursor: default;
+}

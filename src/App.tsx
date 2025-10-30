@@ -3715,6 +3715,29 @@ function App() {
     }
   }, [activeTabId, activeId]);
 
+  // Handle tab reorder via drag and drop
+  const handleTabReorder = useCallback((reorderedTabs: Tab[]) => {
+    console.log('[handleTabReorder] Reordering tabs');
+
+    // Update global tabs state
+    setTabs(reorderedTabs);
+
+    // Update tabsByTerminal for the active terminal
+    if (activeId) {
+      setTabsByTerminal((prev) => {
+        const updated = new Map(prev);
+        const fileTabs = reorderedTabs.filter(t => t.type === 'file');
+
+        if (fileTabs.length > 0) {
+          updated.set(activeId, fileTabs);
+          console.log('[handleTabReorder] Updated tab order for terminal:', activeId);
+        }
+
+        return updated;
+      });
+    }
+  }, [activeId]);
+
   // Keyboard navigation for tabs (TAB key)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -4598,6 +4621,7 @@ You have access to all Bash tools to execute git commands like:
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}
+              onTabReorder={handleTabReorder}
             />
 
             {/* Content Area - fills remaining space */}
