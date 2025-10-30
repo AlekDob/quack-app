@@ -4,10 +4,12 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file';
+  type: 'chat' | 'file' | 'agent-terminal';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
+  terminalId?: string; // Reference to terminal instance for agent-terminal tabs
+  icon?: React.ReactNode; // Icon to display before label (e.g., terminal icon)
 }
 
 interface TabBarProps {
@@ -32,8 +34,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
   };
 
   const handleDragStart = (e: React.DragEvent, tab: Tab) => {
-    // Don't allow dragging the chat tab
-    if (tab.type === 'chat') {
+    // Don't allow dragging the chat tab or agent-terminal tabs
+    if (tab.type === 'chat' || tab.type === 'agent-terminal') {
       e.preventDefault();
       return;
     }
@@ -109,7 +111,7 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           } ${dragOverTabId === tab.id ? 'drag-over' : ''}`}
           onClick={() => handleTabClick(tab)}
           title={tab.filePath || tab.label}
-          draggable={tab.type !== 'chat'}
+          draggable={tab.type !== 'chat' && tab.type !== 'agent-terminal'}
           onDragStart={(e) => handleDragStart(e, tab)}
           onDragOver={(e) => handleDragOver(e, tab)}
           onDragLeave={handleDragLeave}
@@ -122,6 +124,11 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
               style={{ backgroundColor: tab.color }}
               aria-hidden="true"
             />
+          )}
+          {tab.icon && (
+            <span className="tab-icon" aria-hidden="true">
+              {tab.icon}
+            </span>
           )}
           <span className="tab-label">{tab.label}</span>
           {tab.closable && (

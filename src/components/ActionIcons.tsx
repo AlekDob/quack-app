@@ -7,6 +7,7 @@ interface ActionIconsProps {
   onPreviewClick: () => void;
   onUsageClick: () => void;
   onTelegramClick: () => void;
+  onTerminalClick: () => void;
 }
 
 function ActionIcons({
@@ -15,6 +16,7 @@ function ActionIcons({
   onPreviewClick,
   onUsageClick,
   onTelegramClick,
+  onTerminalClick,
 }: ActionIconsProps) {
   return (
     <div className="action-icons">
@@ -99,6 +101,41 @@ function ActionIcons({
           />
         </svg>
         <span className="action-icon-tooltip">Telegram</span>
+      </button>
+
+      {/* Terminal Icon */}
+      <button
+        type="button"
+        className="action-icon"
+        onClick={onTerminalClick}
+        aria-label="New Terminal"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect
+            x="1"
+            y="2"
+            width="14"
+            height="12"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <path
+            d="M3.5 6L6 8L3.5 10"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M7.5 10H10.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="action-icon-tooltip">New Terminal</span>
       </button>
     </div>
   );

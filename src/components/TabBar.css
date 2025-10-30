@@ -166,7 +166,30 @@
   cursor: grabbing;
 }
 
-/* Chat tab is not draggable */
+/* Chat tab and agent-terminal tabs are not draggable */
 .tab-item[draggable="false"] {
   cursor: default;
+}
+
+/* ===================================
+   TAB ICON STYLES
+   =================================== */
+
+.tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tab-item.active .tab-icon {
+  opacity: 1;
+}
+
+.tab-icon svg {
+  width: 100%;
+  height: 100%;
 }

@@ -44,6 +44,19 @@ export interface TerminalInfo {
   waitingForResponse?: boolean;      // Chat is idle and waiting for user input
 }
 
+// AgentTerminal: NEW - Terminale integrato XTerm associato ad un agente
+// Separato da TerminalInfo (vecchio sistema) per evitare confusione
+export interface AgentTerminal {
+  id: string;
+  name: string;
+  agentId: string;  // ID dell'agente a cui appartiene questo terminale
+  color: string;
+  cwd: string;
+  alive: boolean;
+  status?: "idle" | "busy";
+  createdAt: number;
+}
+
 export type SavedCommandCategory = "dev" | "build" | "test" | "custom";
 
 export interface SavedCommand {

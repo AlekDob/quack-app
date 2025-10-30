@@ -36,6 +36,8 @@ import TelegramSetup from "./components/TelegramSetup";
 import ChatView from "./components/ChatView";
 import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
+import { AgentTerminalTab } from "./components/AgentTerminalTab";
+import { TerminalIcon } from "./components/TerminalIcon";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
@@ -53,6 +55,7 @@ import type {
   NativeTerminal,
   TerminalExitEvent,
   TerminalInfo,
+  AgentTerminal,
   SavedCommand,
   PipAgentState,
   PipAgentStatus,
@@ -346,6 +349,9 @@ function App() {
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // NEW: Agent Terminals - Terminali integrati XTerm associati agli agenti (separati da terminals)
+  const [agentTerminals, setAgentTerminals] = useState<AgentTerminal[]>([]);
+
   // Native Terminals state (Mac Terminal.app integration)
   const [nativeTerminals, setNativeTerminals] = useState<NativeTerminal[]>([]);
   const [showAddNativeTerminalModal, setShowAddNativeTerminalModal] = useState(false);
@@ -358,10 +364,6 @@ function App() {
     [activeId, terminals]
   );
 
-  const activeAgentChat = useMemo(
-    () => agentChats.find((chat) => chat.id === activeAgentChatId) ?? null,
-    [activeAgentChatId, agentChats]
-  );
 
   const [explorerPath, setExplorerPath] = useState("");
   const [explorerTree, setExplorerTree] = useState<
@@ -637,6 +639,45 @@ function App() {
       });
     });
   }, [chatLoadingMap, chatSessions]);
+
+  // Effect to save/restore tabs when switching between agents
+  useEffect(() => {
+    const previousId = previousActiveIdRef.current;
+
+    // Save current tabs for previous agent (if any)
+    if (previousId && previousId !== activeId) {
+      console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs);
+      setTabsByTerminal((prev) => {
+        const updated = new Map(prev);
+        // Filter out chat tab (always present) - save only file/terminal tabs
+        const agentTabs = tabs.filter(t => t.type !== 'chat');
+        updated.set(previousId, agentTabs);
+        return updated;
+      });
+    }
+
+    // Restore tabs for new active agent
+    if (activeId) {
+      const restoredTabs = tabsByTerminal.get(activeId) || [];
+      console.log(`🦆 [Tab Management] Restoring tabs for agent: ${activeId}`, restoredTabs);
+
+      // Always include chat tab + restored agent tabs
+      setTabs([
+        { id: 'chat', label: 'Chat', type: 'chat', closable: false },
+        ...restoredTabs
+      ]);
+
+      // If there are restored tabs, activate the first one; otherwise activate chat
+      if (restoredTabs.length > 0) {
+        setActiveTabId(restoredTabs[0].id);
+      } else {
+        setActiveTabId('chat');
+      }
+    }
+
+    // Update previous activeId ref
+    previousActiveIdRef.current = activeId;
+  }, [activeId]); // Only depend on activeId change
 
   // 🦆 Ref to sendMessageForAgent function (to avoid circular dependency)
   const sendMessageForAgentRef = useRef<((content: string, options?: ChatSendOptions) => Promise<void>) | null>(null);
@@ -3497,6 +3538,72 @@ function App() {
   const handleOpenPreviewDrawer = useCallback(() => {
     setShowPreviewDrawer(true);
   }, []);
+
+  // Handler to create a new agent terminal tab
+  const handleCreateAgentTerminal = useCallback(async () => {
+    if (!tauriAvailable || !activeId) {
+      return;
+    }
+
+    try {
+      // Get current agent info from terminals (legacy)
+      const currentAgent = terminals.find(t => t.id === activeId);
+      const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || "~";
+
+      // Generate unique terminal name
+      const terminalNumber = agentTerminals.length + 1;
+      const terminalName = `Terminal ${terminalNumber}`;
+
+      // Create backend terminal (PTY)
+      const created = await invoke<TerminalInfo>("create_terminal", {
+        label: terminalName,
+        color: currentAgent?.color || COLORS[0],
+        cwd: terminalCwd,
+      });
+
+      // Create AgentTerminal entry (NEW STATE - not in terminals!)
+      const newAgentTerminal: AgentTerminal = {
+        id: created.id,
+        name: terminalName,
+        agentId: activeId, // Associate with active agent
+        color: currentAgent?.color || COLORS[0],
+        cwd: terminalCwd,
+        alive: true,
+        status: "idle",
+        createdAt: Date.now(),
+      };
+
+      setAgentTerminals((prev) => [...prev, newAgentTerminal]);
+
+      // Create agent terminal tab
+      const agentTerminalTab: Tab = {
+        id: `agent-terminal-${created.id}`,
+        label: terminalName,
+        type: 'agent-terminal',
+        closable: true,
+        color: currentAgent?.color || COLORS[0],
+        terminalId: created.id,
+        icon: <TerminalIcon />,
+      };
+
+      setTabs((prevTabs) => [...prevTabs, agentTerminalTab]);
+      setActiveTabId(agentTerminalTab.id);
+
+      // Add to tabsByTerminal for the active agent
+      setTabsByTerminal((prev) => {
+        const updated = new Map(prev);
+        const currentTabs = updated.get(activeId) || [];
+        updated.set(activeId, [...currentTabs, agentTerminalTab]);
+        return updated;
+      });
+
+      console.log(`✅ Created agent terminal tab: ${terminalName}`);
+    } catch (error) {
+      console.error("Failed to create agent terminal:", error);
+      toast.error("Failed to create terminal");
+    }
+  }, [tauriAvailable, activeId, terminals, explorerPath, agentTerminals]);
+
   const handleColorChange = useCallback(
     async (id: string, color: string) => {
       if (!tauriAvailable) {
@@ -3681,9 +3788,32 @@ function App() {
     }
   }, [tabs, handleOpenFilePreview]);
 
-  const handleTabClose = useCallback((tabId: string) => {
+  const handleTabClose = useCallback(async (tabId: string) => {
     // Don't close the chat tab
     if (tabId === 'chat') return;
+
+    // Check if this is an agent-terminal tab
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab?.type === 'agent-terminal' && tab.terminalId) {
+      // Ask for confirmation before closing terminal
+      const confirmed = await confirm(
+        `Close terminal "${tab.label}"? This will terminate the running process.`,
+        { title: 'Close Terminal', kind: 'warning' }
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      // Dispose terminal instance and close backend PTY
+      const { disposeAgentTerminalTab } = await import('./components/AgentTerminalTab');
+      disposeAgentTerminalTab(tab.terminalId);
+
+      // Remove terminal from agentTerminals list (NEW STATE!)
+      setAgentTerminals((prev) => prev.filter(t => t.id !== tab.terminalId));
+
+      console.log(`✅ Closed agent terminal: ${tab.label} (${tab.terminalId})`);
+    }
 
     setTabs((prevTabs) => {
       const filtered = prevTabs.filter(t => t.id !== tabId);
@@ -3713,7 +3843,7 @@ function App() {
         return updated;
       });
     }
-  }, [activeTabId, activeId]);
+  }, [activeTabId, activeId, tabs]);
 
   // Handle tab reorder via drag and drop
   const handleTabReorder = useCallback((reorderedTabs: Tab[]) => {
@@ -4613,6 +4743,7 @@ You have access to all Bash tools to execute git commands like:
                 }
               }}
               onTelegramClick={() => setShowTelegramSetup(true)}
+              onTerminalClick={handleCreateAgentTerminal}
             />
 
             {/* Tab Bar - VSCode style */}
@@ -4715,6 +4846,35 @@ You have access to all Bash tools to execute git commands like:
                     hasUnsavedChanges={previewHasUnsavedChanges}
                     isImageFile={previewFile?.name ? ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'].some(ext => previewFile.name!.toLowerCase().endsWith(ext)) : false}
                   />
+                </div>
+              )}
+
+              {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
+              {tabs.some(t => t.type === 'agent-terminal') && (
+                <div style={{
+                  flex: 1,
+                  minHeight: 0,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: tabs.some(t => t.type === 'agent-terminal' && activeTabId === t.id) ? 'flex' : 'none',
+                  flexDirection: 'column'
+                }}>
+                  {tabs
+                    .filter(t => t.type === 'agent-terminal' && t.terminalId)
+                    .map(tab => {
+                      const agentTerminal = agentTerminals.find(t => t.id === tab.terminalId);
+                      if (!agentTerminal) return null;
+
+                      return (
+                        <AgentTerminalTab
+                          key={agentTerminal.id}
+                          terminalId={agentTerminal.id}
+                          color={agentTerminal.color}
+                          isActive={activeTabId === tab.id}
+                        />
+                      );
+                    })
+                  }
                 </div>
               )}
             </div>
