@@ -237,7 +237,9 @@ export default function AIAssistant({
       <div className={`ai-assistant-modal ${isImprovementView ? 'ai-modal-large' : 'ai-modal-compact'}`} onClick={(e) => e.stopPropagation()}>
         <div className="ai-assistant-header">
           <div className="ai-assistant-title">
-            <span className="ai-icon">🤖</span>
+            <div className="ai-icon-minimal">
+              <div className="ai-icon-pulse"></div>
+            </div>
             {mode === 'selection' && 'AI Assistant'}
             {mode === 'terminal-helper' && 'Terminal Command Helper'}
             {mode === 'prompt-engineer' && 'Prompt Engineer'}
@@ -257,7 +259,9 @@ export default function AIAssistant({
                   className="ai-mode-card"
                   onClick={() => handleModeSelect('terminal-helper')}
                 >
-                  <span className="ai-mode-icon">⚡</span>
+                  <div className="ai-mode-icon ai-mode-icon-terminal">
+                    <div className="ai-mode-icon-graphic"></div>
+                  </div>
                   <div className="ai-mode-card-content">
                     <h3 className="ai-mode-card-title">Terminal Helper</h3>
                     <p className="ai-mode-card-description">
@@ -270,7 +274,9 @@ export default function AIAssistant({
                   className="ai-mode-card"
                   onClick={() => handleModeSelect('prompt-engineer')}
                 >
-                  <span className="ai-mode-icon">✨</span>
+                  <div className="ai-mode-icon ai-mode-icon-prompt">
+                    <div className="ai-mode-icon-graphic"></div>
+                  </div>
                   <div className="ai-mode-card-content">
                     <h3 className="ai-mode-card-title">Prompt Engineer</h3>
                     <p className="ai-mode-card-description">
@@ -351,7 +357,9 @@ export default function AIAssistant({
                   </div>
 
                   <div className="ai-explanation">
-                    <span className="ai-explanation-icon">💡</span>
+                    <div className="ai-explanation-icon">
+                      <div className="ai-explanation-icon-graphic"></div>
+                    </div>
                     {suggestion.explanation}
                   </div>
 
@@ -470,7 +478,7 @@ export default function AIAssistant({
                           onClick={() => copyToClipboard(improvement.originalPrompt)}
                           title="Copy original prompt"
                         >
-                          📋
+                          <div className="ai-copy-icon"></div>
                         </button>
                       </div>
                       <div className="ai-prompt-box-content">{improvement.originalPrompt}</div>
@@ -486,7 +494,7 @@ export default function AIAssistant({
                           onClick={() => copyToClipboard(improvement.improvedPrompt)}
                           title="Copy improved prompt"
                         >
-                          📋
+                          <div className="ai-copy-icon"></div>
                         </button>
                       </div>
                       <div className="ai-prompt-box-content">{improvement.improvedPrompt}</div>
@@ -498,7 +506,7 @@ export default function AIAssistant({
                     <ul className="ai-improvements-items">
                       {improvement.improvements.map((item, index) => (
                         <li key={index} className="ai-improvement-item">
-                          <span className="ai-improvement-bullet">✓</span>
+                          <div className="ai-improvement-bullet"></div>
                           {item}
                         </li>
                       ))}
@@ -543,7 +551,9 @@ export default function AIAssistant({
           {/* Error State */}
           {error && (
             <div className="ai-error">
-              <span className="ai-error-icon">⚠️</span>
+              <div className="ai-error-icon">
+                <div className="ai-error-icon-graphic"></div>
+              </div>
               <div className="ai-error-content">
                 <p className="ai-error-title">Error</p>
                 <p className="ai-error-message">{error}</p>
