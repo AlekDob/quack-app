@@ -381,6 +381,8 @@ function App() {
   const [newTerminalName, setNewTerminalName] = useState("");
   const [newTerminalPath, setNewTerminalPath] = useState("");
   const [newTerminalColor, setNewTerminalColor] = useState(COLORS[0]);
+  const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
+  const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
   const [newTerminalError, setNewTerminalError] = useState<string | null>(null);
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
@@ -2641,7 +2643,8 @@ function App() {
     model: string,
     color: string,
     content: string,
-    scope: 'global' | 'project'
+    scope: 'global' | 'project',
+    workingOn?: string
   ) => {
     if (!tauriAvailable) {
       return;
@@ -2656,6 +2659,7 @@ function App() {
         content,
         scope,
         workingDir,
+        workingOn,
       });
       toast.success(`Agent created successfully: ${name}`, {
         description: `New agent "${name}" has been added`,
@@ -3175,6 +3179,8 @@ function App() {
     setNewTerminalName(terminal.label);
     setNewTerminalColor(terminal.color);
     setNewTerminalPath(terminal.cwd);
+    setNewTerminalWorkingOn(terminal.workingOn || "");
+    setNewTerminalAvatar(terminal.avatar || "68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
     setNewTerminalError(null);
     setShowNewTerminalModal(true);
   }, []);
@@ -3250,6 +3256,8 @@ function App() {
     const defaultColor = COLORS[index % COLORS.length];
     setNewTerminalName(getRandomAgentName()); // Random agent name instead of "Terminal X"
     setNewTerminalColor(defaultColor);
+    setNewTerminalWorkingOn(""); // Reset working on field
+    setNewTerminalAvatar("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg"); // Reset to first avatar
     const fallbackPath = activeTerminal?.cwd ?? explorerPath ?? "";
     setNewTerminalPath(fallbackPath);
     setShowNewTerminalModal(true);
@@ -3304,6 +3312,7 @@ function App() {
 
     const trimmedName = newTerminalName.trim();
     const trimmedPath = newTerminalPath.trim();
+    const trimmedWorkingOn = newTerminalWorkingOn.trim();
 
     if (!trimmedName) {
       setNewTerminalError("Enter a terminal name.");
@@ -3313,6 +3322,15 @@ function App() {
     if (!trimmedPath) {
       setNewTerminalError("Select working directory.");
       return;
+    }
+
+    // Validate word count for "Working on" (max 5 words)
+    if (trimmedWorkingOn) {
+      const wordCount = trimmedWorkingOn.split(/\s+/).length;
+      if (wordCount > 5) {
+        setNewTerminalError('Working on must be 5 words or less');
+        return;
+      }
     }
 
     setCreatingTerminal(true);
@@ -3326,6 +3344,8 @@ function App() {
           label: trimmedName,
           color: newTerminalColor,
           cwd: trimmedPath,
+          workingOn: trimmedWorkingOn || null,
+          avatar: newTerminalAvatar,
         });
 
         setTerminals((prev) =>
@@ -3336,6 +3356,8 @@ function App() {
                   label: trimmedName,
                   color: newTerminalColor,
                   cwd: trimmedPath,
+                  workingOn: trimmedWorkingOn || undefined,
+                  avatar: newTerminalAvatar,
                 }
               : t
           )
@@ -3353,10 +3375,13 @@ function App() {
         setEditingTerminal(null);
       } else {
         // Create new terminal - SIMPLE! No AgentChat logic
+        console.log('Creating terminal with avatar:', newTerminalAvatar);
         const created = await invoke<TerminalInfo>("create_terminal", {
           label: trimmedName,
           color: newTerminalColor,
           cwd: trimmedPath,
+          workingOn: trimmedWorkingOn || null,
+          avatar: newTerminalAvatar,
         });
 
         const createdWithState: TerminalInfo = {
@@ -3365,6 +3390,8 @@ function App() {
           needsAttention: false,
           hasResponded: false,
           responseStartTime: null,
+          workingOn: trimmedWorkingOn || undefined,
+          avatar: newTerminalAvatar,
         };
 
         // Save metadata for Telegram notifications immediately
@@ -3397,6 +3424,8 @@ function App() {
     newTerminalColor,
     newTerminalName,
     newTerminalPath,
+    newTerminalWorkingOn,
+    newTerminalAvatar,
     tauriAvailable,
   ]);
 
@@ -5026,12 +5055,16 @@ You have access to all Bash tools to execute git commands like:
           name={newTerminalName}
           path={newTerminalPath}
           color={newTerminalColor}
+          workingOn={newTerminalWorkingOn}
+          avatar={newTerminalAvatar}
           availableColors={COLORS}
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
           error={newTerminalError}
           onNameChange={setNewTerminalName}
           onColorChange={setNewTerminalColor}
+          onWorkingOnChange={setNewTerminalWorkingOn}
+          onAvatarChange={setNewTerminalAvatar}
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}

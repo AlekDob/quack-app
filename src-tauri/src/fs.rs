@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
 use serde::Serialize;
+use tauri::Manager;
 use uuid::Uuid;
 use walkdir::WalkDir;
 use fuzzy_matcher::FuzzyMatcher;
@@ -535,4 +536,48 @@ fn open_file_in_editor_impl(path: String) -> Result<()> {
     }
 
     Ok(())
+}
+
+
+#[tauri::command]
+pub fn list_avatar_images(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    list_avatar_images_impl(app).map_err(|err| err.to_string())
+}
+
+fn list_avatar_images_impl(app: tauri::AppHandle) -> Result<Vec<String>> {
+    // Get resource directory path
+    let resource_dir = app.path().resource_dir()
+        .map_err(|e| anyhow!("Cannot get resource directory: {}", e))?;
+
+    let avatars_path = resource_dir.join("images").join("ducks").join("avatars");
+
+    if !avatars_path.exists() {
+        return Err(anyhow!("Avatars directory does not exist: {:?}", avatars_path));
+    }
+
+    let mut avatar_files = Vec::new();
+
+    for entry in fs::read_dir(&avatars_path)
+        .with_context(|| format!("Cannot read avatars directory: {:?}", avatars_path))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Only include image files (jpeg, jpg, png)
+        if path.is_file() {
+            if let Some(extension) = path.extension() {
+                let ext = extension.to_string_lossy().to_lowercase();
+                if ext == "jpeg" || ext == "jpg" || ext == "png" {
+                    if let Some(filename) = path.file_name() {
+                        avatar_files.push(filename.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort alphabetically
+    avatar_files.sort();
+
+    Ok(avatar_files)
 }

@@ -406,6 +406,7 @@ pub fn run() {
             fs::save_clipboard_file,
             fs::search_files_recursive,
             fs::open_file_in_editor,
+            fs::list_avatar_images,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { AgentInfo } from '../types';
 
 interface NewAgentModalProps {
   isOpen: boolean;
@@ -9,8 +10,10 @@ interface NewAgentModalProps {
     model: string,
     color: string,
     content: string,
-    scope: 'global' | 'project'
+    scope: 'global' | 'project',
+    workingOn?: string
   ) => Promise<void>;
+  existingAgents?: AgentInfo[]; // For duplicate name validation
 }
 
 // Agent color mapping
@@ -48,33 +51,59 @@ const AGENT_NAMES = [
   'Agent Skylar',
 ];
 
-// Get random agent name
-const getRandomAgentName = () => {
-  return AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
+// Get random agent name that doesn't exist in the project
+const getRandomAgentName = (existingAgents?: AgentInfo[], scope?: 'global' | 'project') => {
+  // Filter existing agents by scope (only check project agents for duplicates)
+  const projectAgents = existingAgents?.filter(a => a.scope === scope) || [];
+  const existingNames = new Set(projectAgents.map(a => a.name.toLowerCase()));
+
+  // Try to find a unique name
+  const availableNames = AGENT_NAMES.filter(name => !existingNames.has(name.toLowerCase()));
+
+  if (availableNames.length > 0) {
+    return availableNames[Math.floor(Math.random() * availableNames.length)];
+  }
+
+  // If all names are taken, append a number
+  let counter = 2;
+  let baseName = AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
+  while (existingNames.has(`${baseName} ${counter}`.toLowerCase())) {
+    counter++;
+  }
+  return `${baseName} ${counter}`;
 };
 
-export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
+export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAgentModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [model, setModel] = useState('claude-sonnet-4-20250514');
   const [color, setColor] = useState('blue');
   const [content, setContent] = useState('');
   const [scope, setScope] = useState<'global' | 'project'>('project');
+  const [workingOn, setWorkingOn] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setName(getRandomAgentName()); // Set random agent name
+      setName(getRandomAgentName(existingAgents, 'project')); // Set random unique agent name
       setDescription('');
       setModel('claude-sonnet-4-20250514');
       setColor('blue');
       setContent('');
       setScope('project');
+      setWorkingOn('');
       setError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, existingAgents]);
+
+  // Update suggested name when scope changes
+  useEffect(() => {
+    if (isOpen) {
+      setName(getRandomAgentName(existingAgents, scope));
+    }
+  }, [scope, isOpen, existingAgents]);
 
   const handleSave = async () => {
     // Validation
@@ -91,6 +120,15 @@ export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
       return;
     }
 
+    // Validate word count for "Working on" (max 5 words)
+    if (workingOn.trim()) {
+      const wordCount = workingOn.trim().split(/\s+/).length;
+      if (wordCount > 5) {
+        setError('Working on must be 5 words or less');
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -100,7 +138,8 @@ export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
         model,
         color,
         content.trim(),
-        scope
+        scope,
+        workingOn.trim() || undefined
       );
       onClose();
     } catch (err) {
@@ -155,6 +194,24 @@ export function NewAgentModal({ isOpen, onClose, onSave }: NewAgentModalProps) {
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 resize-vertical"
               style={{ minHeight: '80px' }}
             />
+          </div>
+
+          {/* Working On */}
+          <div>
+            <label className="block text-xs font-medium text-white/70 mb-2">
+              What are you working on?
+            </label>
+            <input
+              type="text"
+              value={workingOn}
+              onChange={(e) => setWorkingOn(e.target.value)}
+              placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
+              maxLength={50}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+            />
+            <p className="text-xs text-white/30 mt-1">
+              Brief context about what this agent is working on (max 5 words, optional)
+            </p>
           </div>
 
           {/* Model */}

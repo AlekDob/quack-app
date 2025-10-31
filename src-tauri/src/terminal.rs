@@ -29,6 +29,8 @@ struct TerminalSession {
   process: Option<TerminalProcess>,
   detected_port: Option<u16>,
   output_buffer: String,
+  working_on: Option<String>,
+  avatar: Option<String>,
 }
 
 struct TerminalProcess {
@@ -46,6 +48,10 @@ pub struct TerminalInfo {
   pub cwd: String,
   pub alive: bool,
   pub detected_port: Option<u16>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub working_on: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub avatar: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -126,8 +132,10 @@ pub fn create_terminal(
   label: Option<String>,
   color: Option<String>,
   cwd: Option<String>,
+  working_on: Option<String>,
+  avatar: Option<String>,
 ) -> Result<TerminalInfo, String> {
-  create_terminal_impl(&app, label, color, cwd).map_err(|err| err.to_string())
+  create_terminal_impl(&app, label, color, cwd, working_on, avatar).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -206,8 +214,10 @@ pub fn update_terminal(
   label: Option<String>,
   color: Option<String>,
   cwd: Option<String>,
+  working_on: Option<String>,
+  avatar: Option<String>,
 ) -> Result<TerminalInfo, String> {
-  update_terminal_impl(&id, label, color, cwd).map_err(|err| err.to_string())
+  update_terminal_impl(&id, label, color, cwd, working_on, avatar).map_err(|err| err.to_string())
 }
 
 fn create_terminal_impl(
@@ -215,6 +225,8 @@ fn create_terminal_impl(
   label: Option<String>,
   color: Option<String>,
   cwd_input: Option<String>,
+  working_on: Option<String>,
+  avatar: Option<String>,
 ) -> Result<TerminalInfo> {
   let default_color = color.unwrap_or_else(|| "#4ecdc4".to_string());
 
@@ -239,6 +251,8 @@ fn create_terminal_impl(
     process: Some(process),
     detected_port: None,
     output_buffer: String::new(),
+    working_on: working_on.clone(),
+    avatar: avatar.clone(),
   };
 
   registry.order.push(id.clone());
@@ -251,6 +265,8 @@ fn create_terminal_impl(
     cwd: cwd_to_string(&cwd),
     alive: true,
     detected_port: None,
+    working_on,
+    avatar,
   })
 }
 
@@ -353,6 +369,8 @@ fn update_terminal_impl(
   label: Option<String>,
   color: Option<String>,
   cwd: Option<String>,
+  working_on: Option<String>,
+  avatar: Option<String>,
 ) -> Result<TerminalInfo> {
   let mut registry = REGISTRY
     .lock()
@@ -378,6 +396,12 @@ fn update_terminal_impl(
     let new_cwd = resolve_cwd(Some(cwd_input))?;
     session.cwd = new_cwd;
   }
+
+  // Update working_on if provided
+  session.working_on = working_on;
+
+  // Update avatar if provided
+  session.avatar = avatar;
 
   Ok(compile_info(id, session))
 }
@@ -580,6 +604,8 @@ fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
     cwd: cwd_to_string(&session.cwd),
     alive: session.alive,
     detected_port: session.detected_port,
+    working_on: session.working_on.clone(),
+    avatar: session.avatar.clone(),
   }
 }
 

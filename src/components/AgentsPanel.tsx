@@ -23,7 +23,8 @@ interface AgentsPanelProps {
     model: string,
     color: string,
     content: string,
-    scope: 'global' | 'project'
+    scope: 'global' | 'project',
+    workingOn?: string
   ) => Promise<void>;
 }
 
@@ -54,9 +55,10 @@ export default function AgentsPanel({
     model: string,
     color: string,
     content: string,
-    scope: 'global' | 'project'
+    scope: 'global' | 'project',
+    workingOn?: string
   ) => {
-    await onCreateAgent(name, description, model, color, content, scope);
+    await onCreateAgent(name, description, model, color, content, scope, workingOn);
     setModalOpen(false);
     onRefresh();
   };
@@ -301,7 +303,7 @@ export default function AgentsPanel({
                             />
                           </div>
 
-                          {/* Agent Info - 3 lines */}
+                          {/* Agent Info - 4 lines */}
                           <div className="flex-1 min-w-0 flex flex-col gap-1">
                             {/* Line 1: Model tag */}
                             <div
@@ -321,6 +323,16 @@ export default function AgentsPanel({
                             >
                               {agent.name.replace(/-/g, " ")}
                             </div>
+
+                            {/* Line 2.5: Working On (if exists) */}
+                            {agent.workingOn && (
+                              <div
+                                className="text-[10px] italic truncate"
+                                style={{ color: "rgba(255, 255, 255, 0.4)" }}
+                              >
+                                {agent.workingOn}
+                              </div>
+                            )}
 
                             {/* Line 3: Description */}
                             <div
@@ -432,7 +444,7 @@ export default function AgentsPanel({
                             />
                           </div>
 
-                          {/* Agent Info - 3 lines */}
+                          {/* Agent Info - 4 lines */}
                           <div className="flex-1 min-w-0 flex flex-col gap-1">
                             {/* Line 1: Model tag */}
                             <div
@@ -452,6 +464,16 @@ export default function AgentsPanel({
                             >
                               {agent.name.replace(/-/g, " ")}
                             </div>
+
+                            {/* Line 2.5: Working On (if exists) */}
+                            {agent.workingOn && (
+                              <div
+                                className="text-[10px] italic truncate"
+                                style={{ color: "rgba(255, 255, 255, 0.4)" }}
+                              >
+                                {agent.workingOn}
+                              </div>
+                            )}
 
                             {/* Line 3: Description */}
                             <div
@@ -524,6 +546,7 @@ export default function AgentsPanel({
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={handleCreateAgent}
+        existingAgents={agents}
       />
     </div>
   );

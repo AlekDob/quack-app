@@ -60,10 +60,28 @@ export default function TerminalActivityBar({ terminal }: TerminalActivityBarPro
 
   return (
     <>
-      <div
-        className={dotClassName}
-        style={{ backgroundColor: terminal.color }}
-      />
+      {terminal.avatar ? (
+        <div
+          className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : ''}`}
+          style={{
+            '--avatar-border-color': terminal.color,
+          } as React.CSSProperties}
+        >
+          <img
+            src={`/images/ducks/avatars/${terminal.avatar}`}
+            alt={terminal.label}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = `/images/ducks/${terminal.avatar}`;
+            }}
+          />
+        </div>
+      ) : (
+        <div
+          className={dotClassName}
+          style={{ backgroundColor: terminal.color }}
+        />
+      )}
       <div className="terminal-details">
         <span className="terminal-name">
           {terminal.label}
@@ -71,6 +89,11 @@ export default function TerminalActivityBar({ terminal }: TerminalActivityBarPro
             {getBadge()}
           </span>
         </span>
+        {terminal.workingOn && (
+          <span className="terminal-working-on">
+            {terminal.workingOn}
+          </span>
+        )}
         {isBusy && (
           <div className="terminal-progress-bar">
             <div className="terminal-progress-indicator" />

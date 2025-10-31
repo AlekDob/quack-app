@@ -42,6 +42,8 @@ export interface TerminalInfo {
   hasResponded?: boolean;           // Ha già risposto alla richiesta corrente?
   responseStartTime?: number | null; // Timestamp inizio risposta
   waitingForResponse?: boolean;      // Chat is idle and waiting for user input
+  workingOn?: string;                // What the agent is working on (max 5 words)
+  avatar?: string;                   // Avatar filename (e.g., "mike.png")
 }
 
 // AgentTerminal: NEW - Terminale integrato XTerm associato ad un agente
@@ -207,6 +209,7 @@ export interface AgentInfo {
   color: string;
   file_path: string;
   scope: string; // "global" or "project"
+  workingOn?: string; // What the agent is working on (max 5 words)
 }
 
 export interface AgentDetails extends AgentInfo {
