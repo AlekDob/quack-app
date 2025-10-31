@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run prepare-node-sdk && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "cargo tauri",
     "tauri:dev": "cargo tauri dev",
-    "tauri:build": "cargo tauri build"
+    "tauri:build": "cargo tauri build",
+    "prepare-node-sdk": "cd src-tauri/node-sdk && npm install --production"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.14",

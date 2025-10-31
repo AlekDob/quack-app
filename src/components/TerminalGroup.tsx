@@ -1,7 +1,7 @@
 import { type MouseEvent } from 'react'
 import GroupHeader from './GroupHeader'
 import TerminalActivityBar from './TerminalActivityBar'
-import type { TerminalInfo } from '../types'
+import type { TerminalInfo, ChatMessage } from '../types'
 
 interface TerminalGroupProps {
   cwd: string
@@ -13,6 +13,7 @@ interface TerminalGroupProps {
   // Phase 4: AgentChat display data (optional for backward compatibility)
   agentChatName?: string
   agentChatColor?: string
+  chatSessions?: Map<string, ChatMessage[]>
   onToggle: () => void
   onSelect: (terminal: TerminalInfo) => void // Phase 4: Changed signature to pass full terminal
   onClose: (id: string) => void
@@ -32,6 +33,7 @@ export default function TerminalGroup({
   canGroupMoveDown,
   agentChatName,
   agentChatColor,
+  chatSessions,
   onToggle,
   onSelect,
   onClose,
@@ -89,7 +91,7 @@ export default function TerminalGroup({
                   }
                 }}
               >
-                <TerminalActivityBar terminal={terminal} />
+                <TerminalActivityBar terminal={terminal} chatSessions={chatSessions} />
                 <div className="terminal-reorder-controls">
                   <button
                     type="button"

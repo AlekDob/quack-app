@@ -316,7 +316,7 @@ const getRandomAgentName = () => {
 
 function App() {
   // Load assets INSIDE the component, not at module level
-  const splashImage = new URL("../images/quack-agency.jpeg", import.meta.url).href;
+  const splashImage = new URL("../images/quack-visual-ide.jpeg", import.meta.url).href;
   const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
   const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
   const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
@@ -2644,7 +2644,8 @@ function App() {
     color: string,
     content: string,
     scope: 'global' | 'project',
-    workingOn?: string
+    workingOn?: string,
+    avatar?: string
   ) => {
     if (!tauriAvailable) {
       return;
@@ -2660,6 +2661,7 @@ function App() {
         scope,
         workingDir,
         workingOn,
+        avatar,
       });
       toast.success(`Agent created successfully: ${name}`, {
         description: `New agent "${name}" has been added`,
@@ -4777,6 +4779,8 @@ You have access to all Bash tools to execute git commands like:
           // PiP props
           onTogglePip={togglePipWindow}
           isPipOpen={isPipOpen}
+          // Chat sessions
+          chatSessions={chatSessions}
           // Terminal props
           onAdd={handleOpenNewTerminalModal}
           onSelect={handleSelectTerminal}

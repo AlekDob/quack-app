@@ -13,6 +13,8 @@ pub struct AgentInfo {
     pub scope: String, // "global" or "project"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_on: Option<String>, // What the agent is working on (max 5 words)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>, // Avatar filename (e.g., "24d6c816fe40a284f2451b1469c5e6d63d236e53.png")
 }
 
 #[derive(Serialize, Clone)]
@@ -104,8 +106,9 @@ pub fn create_agent(
     scope: String,
     working_dir: Option<String>,
     working_on: Option<String>,
+    avatar: Option<String>,
 ) -> Result<String, String> {
-    create_agent_impl(name, description, model, color, content, scope, working_dir, working_on)
+    create_agent_impl(name, description, model, color, content, scope, working_dir, working_on, avatar)
         .map_err(|err| err.to_string())
 }
 
@@ -254,6 +257,7 @@ fn parse_agent_file_with_scope(path: &PathBuf, scope: &str) -> Result<AgentInfo>
         file_path: path.to_string_lossy().to_string(),
         scope: scope.to_string(),
         working_on: frontmatter.working_on,
+        avatar: frontmatter.avatar,
     })
 }
 
@@ -281,6 +285,7 @@ struct AgentFrontmatter {
     model: String,
     color: String,
     working_on: Option<String>,
+    avatar: Option<String>,
 }
 
 /// Extract YAML frontmatter and content from markdown file
@@ -307,6 +312,7 @@ fn extract_frontmatter(content: &str) -> Result<(AgentFrontmatter, String)> {
     let mut model = String::new();
     let mut color = String::new();
     let mut working_on: Option<String> = None;
+    let mut avatar: Option<String> = None;
 
     for line in yaml_lines {
         let line = line.trim();
@@ -323,6 +329,11 @@ fn extract_frontmatter(content: &str) -> Result<(AgentFrontmatter, String)> {
             if !value.is_empty() {
                 working_on = Some(value);
             }
+        } else if line.starts_with("avatar:") {
+            let value = line.trim_start_matches("avatar:").trim().to_string();
+            if !value.is_empty() {
+                avatar = Some(value);
+            }
         }
     }
 
@@ -336,6 +347,7 @@ fn extract_frontmatter(content: &str) -> Result<(AgentFrontmatter, String)> {
         model,
         color,
         working_on,
+        avatar,
     };
 
     // Extract markdown content (after closing ---)
@@ -569,6 +581,7 @@ fn create_agent_impl(
     scope: String,
     working_dir: Option<String>,
     working_on: Option<String>,
+    avatar: Option<String>,
 ) -> Result<String> {
     // Determine which directory to use based on scope
     let agents_dir = match scope.as_str() {
@@ -619,6 +632,11 @@ fn create_agent_impl(
     if let Some(working_on_val) = working_on {
         if !working_on_val.is_empty() {
             file_content.push_str(&format!("working_on: {}\n", working_on_val));
+        }
+    }
+    if let Some(avatar_val) = avatar {
+        if !avatar_val.is_empty() {
+            file_content.push_str(&format!("avatar: {}\n", avatar_val));
         }
     }
     file_content.push_str("---\n");

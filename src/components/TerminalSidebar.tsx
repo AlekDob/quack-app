@@ -1,7 +1,7 @@
 import { useState, useMemo, type MouseEvent } from "react";
 import TerminalGroup from "./TerminalGroup";
 import ContextMenu from "./ContextMenu";
-import type { TerminalInfo, AgentChat } from "../types";
+import type { TerminalInfo, AgentChat, ChatMessage } from "../types";
 
 const normalize = (value: string) => value.toLowerCase();
 const fuzzyMatch = (query: string, target: string) => {
@@ -39,6 +39,8 @@ interface TerminalSidebarProps {
   // PiP props
   onTogglePip?: () => void;
   isPipOpen?: boolean;
+  // Chat sessions
+  chatSessions?: Map<string, ChatMessage[]>;
   // Terminal props
   onAdd: () => void; // Will be used by "+" button for terminal creation
   onSelect: (id: string) => void;
@@ -66,6 +68,8 @@ export default function TerminalSidebar({
   // PiP props
   onTogglePip,
   isPipOpen,
+  // Chat sessions
+  chatSessions,
   // Terminal props
   onAdd,
   onSelect,
@@ -262,6 +266,7 @@ export default function TerminalSidebar({
               activeId={activeId}
               canGroupMoveUp={canGroupMoveUp}
               canGroupMoveDown={canGroupMoveDown}
+              chatSessions={chatSessions}
               onToggle={() => onToggleGroup(cwd)}
               onSelect={handleSelectTerminal}
               onClose={onClose}

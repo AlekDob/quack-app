@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
 import { NewAgentModal } from "./NewAgentModal";
+import { getAgentAvatar } from "../utils/agentAvatars";
 
 /**
  * Agents Panel - Inline list view of agents
@@ -24,7 +25,8 @@ interface AgentsPanelProps {
     color: string,
     content: string,
     scope: 'global' | 'project',
-    workingOn?: string
+    workingOn?: string,
+    avatar?: string
   ) => Promise<void>;
 }
 
@@ -56,9 +58,10 @@ export default function AgentsPanel({
     color: string,
     content: string,
     scope: 'global' | 'project',
-    workingOn?: string
+    workingOn?: string,
+    avatar?: string
   ) => {
-    await onCreateAgent(name, description, model, color, content, scope, workingOn);
+    await onCreateAgent(name, description, model, color, content, scope, workingOn, avatar);
     setModalOpen(false);
     onRefresh();
   };
@@ -292,7 +295,7 @@ export default function AgentsPanel({
                             }}
                           >
                             <img
-                              src="/agent-setting.jpeg"
+                              src={getAgentAvatar(agent.name, agent.avatar)}
                               alt={agent.name}
                               style={{
                                 width: "100%",
@@ -433,7 +436,7 @@ export default function AgentsPanel({
                             }}
                           >
                             <img
-                              src="/agent-setting.jpeg"
+                              src={getAgentAvatar(agent.name, agent.avatar)}
                               alt={agent.name}
                               style={{
                                 width: "100%",

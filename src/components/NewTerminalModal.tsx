@@ -1,20 +1,33 @@
-import React from 'react'
-
 // Available duck avatars from /images/ducks/avatars/
 const AVAILABLE_AVATARS = [
   '24d6c816fe40a284f2451b1469c5e6d63d236e53.png',
   '5a1b030fb3b46f153f9b4f786a56570d828d2d2f.png',
+  '5c275f841f212073cbddbe734d1979a6c2f17ab8.png',
   '5ef21f43a917b3bbe86dad58669fdad1c9f3e7c1.png',
   '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg',
   '94ab4eb6a469bf7f9de538e5c2f3dc3f2637fddf.jpeg',
+  '99d6b811344a0bd98d18246ca8208314e8b490f3.png',
   '9e56d5e5edfcef59ce2aba2b96130dad44ce1135.png',
+  'ab7cadc881ab08dcc27d8a8a1f3cb3e8af002216.png',
   'bafc4d0ca4264fb26f014f27c641d860ff356f7a.png',
   'c036fd117629d44e78464dd12d95760f0f0b3d9b.png',
+  'd305287d5c861601e285b34ec5a8c7835ae9f8ea.png',
   'de8b5bfa62130bde399a6cb5255323ac949756ec.png',
   'e34736e96c3537509d80e78454d6e88ebe18cc2a.png',
   'e98b4d01e977b8572b85c44cad2e32bbfde68902.jpeg',
   'fa574b2f56d31adfc5900e4bfd116f9cddff17a0.png',
 ]
+
+// Helper function to get avatar image URL (works in both dev and production)
+function getAvatarUrl(avatarName: string): string {
+  // Check if we're in Tauri context
+  if (window.__TAURI__) {
+    // In Tauri v2, use asset:// protocol for bundled resources
+    return `asset://localhost/images/ducks/avatars/${avatarName}`;
+  }
+  // In dev mode, use standard public path
+  return `/images/ducks/avatars/${avatarName}`;
+}
 
 interface NewTerminalModalProps {
   open: boolean
@@ -99,13 +112,14 @@ function NewTerminalModal({
                 aria-label={`Select ${avatarName} avatar`}
               >
                 <img
-                  src={`/images/ducks/avatars/${avatarName}`}
+                  src={getAvatarUrl(avatarName)}
                   alt={avatarName}
                   className="avatar-image"
                   onError={(e) => {
-                    // Fallback to /images/ducks/ if not found in avatars folder
+                    // If image fails to load, show a placeholder
                     const target = e.target as HTMLImageElement;
-                    target.src = `/images/ducks/${avatarName}`;
+                    target.style.display = 'none';
+                    console.error(`Failed to load avatar: ${avatarName}`);
                   }}
                 />
               </button>

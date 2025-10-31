@@ -1239,6 +1239,88 @@ button.directory-chooser:hover {
   }
 }
 
+/* Avatar tooltip - fumetto style */
+.terminal-avatar-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.terminal-avatar-container:hover .terminal-avatar {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.avatar-tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 180px;
+  max-width: 280px;
+  background: rgba(20, 24, 36, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 12px;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  animation: tooltipFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+.avatar-tooltip-arrow {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid rgba(20, 24, 36, 0.96);
+}
+
+.avatar-tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.avatar-tooltip-working,
+.avatar-tooltip-message {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.avatar-tooltip-working strong,
+.avatar-tooltip-message strong {
+  color: rgba(255, 255, 255, 1);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.avatar-tooltip-message {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.75);
+}
+
 .terminal-dot {
   width: 11px;
   height: 11px;

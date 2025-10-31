@@ -1,8 +1,22 @@
 import { useEffect, useState } from 'react'
-import type { TerminalInfo } from '../types'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import type { TerminalInfo, ChatMessage } from '../types'
+
+// Helper function to get avatar image URL (works in both dev and production)
+function getAvatarUrl(avatarName: string): string {
+  // Check if we're in Tauri context
+  if (window.__TAURI__) {
+    // In production, use convertFileSrc with the expected resource path
+    // Tauri will handle the path resolution automatically
+    return convertFileSrc(`/images/ducks/avatars/${avatarName}`, 'asset')
+  }
+  // In dev mode, use standard public path
+  return `/images/ducks/avatars/${avatarName}`
+}
 
 interface TerminalActivityBarProps {
   terminal: TerminalInfo
+  chatSessions?: Map<string, ChatMessage[]>
 }
 
 /**
@@ -20,9 +34,10 @@ interface TerminalActivityBarProps {
  * <TerminalActivityBar terminal={terminal} />
  * ```
  */
-export default function TerminalActivityBar({ terminal }: TerminalActivityBarProps) {
+export default function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProps) {
   const status = terminal.status ?? 'idle'
   const [confirmedStatus, setConfirmedStatus] = useState<'busy' | 'idle'>(status)
+  const [isHovering, setIsHovering] = useState(false)
 
   useEffect(() => {
     if (status === 'busy') {
@@ -40,6 +55,23 @@ export default function TerminalActivityBar({ terminal }: TerminalActivityBarPro
 
   const isBusy = confirmedStatus === 'busy'
   const isWaitingForResponse = terminal.waitingForResponse ?? false
+
+  // Get last message from chat session
+  const getLastMessage = (): string | null => {
+    if (!chatSessions) return null
+    const messages = chatSessions.get(terminal.id)
+    if (!messages || messages.length === 0) return null
+
+    const lastMsg = messages[messages.length - 1]
+    if (!lastMsg || !lastMsg.content) return null
+
+    // Truncate to 6-7 words
+    const words = lastMsg.content.trim().split(/\s+/)
+    if (words.length <= 7) return lastMsg.content
+    return words.slice(0, 7).join(' ') + '...'
+  }
+
+  const lastMessage = getLastMessage()
 
   // Determine badge and styling based on state
   const getBadge = () => {
@@ -62,19 +94,44 @@ export default function TerminalActivityBar({ terminal }: TerminalActivityBarPro
     <>
       {terminal.avatar ? (
         <div
-          className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : ''}`}
-          style={{
-            '--avatar-border-color': terminal.color,
-          } as React.CSSProperties}
+          className="terminal-avatar-container"
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
         >
-          <img
-            src={`/images/ducks/avatars/${terminal.avatar}`}
-            alt={terminal.label}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = `/images/ducks/${terminal.avatar}`;
-            }}
-          />
+          <div
+            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : ''}`}
+            style={{
+              '--avatar-border-color': terminal.color,
+            } as React.CSSProperties}
+          >
+            <img
+              src={getAvatarUrl(terminal.avatar)}
+              alt={terminal.label}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = `/images/ducks/${terminal.avatar}`;
+              }}
+            />
+          </div>
+
+          {/* Tooltip fumetto */}
+          {isHovering && (terminal.workingOn || lastMessage) && (
+            <div className="avatar-tooltip">
+              <div className="avatar-tooltip-arrow" />
+              <div className="avatar-tooltip-content">
+                {terminal.workingOn && (
+                  <div className="avatar-tooltip-working">
+                    <strong>Working on:</strong> {terminal.workingOn}
+                  </div>
+                )}
+                {lastMessage && (
+                  <div className="avatar-tooltip-message">
+                    <strong>Last message:</strong> {lastMessage}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div

@@ -790,22 +790,31 @@ pub async fn send_message_via_sdk_streaming(
         .resolve("node-sdk/stream-claude.js", tauri::path::BaseDirectory::Resource)
         .map_err(|e| format!("Failed to resolve node-sdk path: {}", e))?;
 
+    log::info!("[SDK DEBUG] Resolved script path: {:?}", script_path);
+
     if !script_path.exists() {
+        log::error!("[SDK DEBUG] Script not found at path: {:?}", script_path);
         return Err(format!("Node.js SDK script not found at: {:?}", script_path));
     }
+
+    log::info!("[SDK DEBUG] Script found successfully");
 
     // Get the node-sdk directory (parent of the script) for node_modules resolution
     let node_sdk_dir = script_path.parent()
         .ok_or("Failed to get node-sdk directory".to_string())?;
 
     // Find Node.js executable (cached, searches common locations)
+    log::info!("[SDK DEBUG] Searching for Node.js executable...");
     let node_path = get_node_executable()
-        .ok_or("Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string())?;
+        .ok_or_else(|| {
+            log::error!("[SDK DEBUG] Node.js executable not found!");
+            "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
+        })?;
 
     log::info!("[SDK] Using Node.js at: {:?}", node_path);
 
     // Spawn Node.js process
-    let mut command = Command::new(node_path);
+    let mut command = Command::new(&node_path);
     command
         .arg(&script_path)
         .arg(&config_str)
@@ -813,24 +822,55 @@ pub async fn send_message_via_sdk_streaming(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // CRITICAL: Add node directory to PATH so the SDK can spawn child node processes
+    // The Claude Agent SDK internally spawns node processes and needs node in PATH
+    if let Some(node_dir) = node_path.parent() {
+        // Get current PATH or create empty one
+        let current_path = std::env::var("PATH").unwrap_or_default();
+        let node_dir_str = node_dir.to_string_lossy();
+
+        // Prepend node directory to PATH
+        let new_path = if current_path.is_empty() {
+            node_dir_str.to_string()
+        } else {
+            format!("{}:{}", node_dir_str, current_path)
+        };
+
+        log::info!("[SDK DEBUG] Setting PATH with node directory: {}", new_path);
+        command.env("PATH", new_path);
+    }
+
+    log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);
+    log::info!("[SDK DEBUG] Working directory: {:?}", node_sdk_dir);
+
     let mut child = command
         .spawn()
-        .map_err(|e| format!("Failed to spawn Node.js SDK script: {}", e))?;
+        .map_err(|e| {
+            log::error!("[SDK DEBUG] Failed to spawn Node.js process: {}", e);
+            format!("Failed to spawn Node.js SDK script: {}", e)
+        })?;
+
+    log::info!("[SDK DEBUG] Node.js process spawned successfully");
 
     // Read stdout for events (in foreground to stream in real-time)
     let stdout = child.stdout.take()
         .ok_or("Failed to capture stdout".to_string())?;
     let mut stdout_reader = BufReader::new(stdout).lines();
 
-    // Move stderr logging to background
-    if let Some(stderr) = child.stderr.take() {
-        tokio::spawn(async move {
+    // Capture stderr for error reporting
+    let stderr_handle = if let Some(stderr) = child.stderr.take() {
+        Some(tokio::spawn(async move {
             let mut stderr_reader = BufReader::new(stderr).lines();
+            let mut stderr_lines = Vec::new();
             while let Ok(Some(line)) = stderr_reader.next_line().await {
                 log::error!("[Node.js SDK stderr] {}", line);
+                stderr_lines.push(line);
             }
-        });
-    }
+            stderr_lines
+        }))
+    } else {
+        None
+    };
 
     // Track final response
     let mut final_result: Option<ClaudeCliResponse> = None;
@@ -865,8 +905,25 @@ pub async fn send_message_via_sdk_streaming(
     let status = child.wait().await
         .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?;
 
+    // Collect stderr if available
+    let stderr_output = if let Some(handle) = stderr_handle {
+        handle.await.unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     if !status.success() {
-        return Err(format!("Node.js SDK script failed with status: {}", status));
+        let stderr_text = if !stderr_output.is_empty() {
+            format!("\n\nStderr output:\n{}", stderr_output.join("\n"))
+        } else {
+            String::new()
+        };
+
+        return Err(format!(
+            "Node.js SDK script failed with status: {}{}",
+            status,
+            stderr_text
+        ));
     }
 
     // Return final response
