@@ -474,6 +474,7 @@ function App() {
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiIntent, setAiIntent] = useState('');
+  const [aiInitialMode, setAiInitialMode] = useState<'terminal-helper' | 'prompt-engineer' | undefined>(undefined);
   const [aiContext, setAiContext] = useState<TerminalContext>({
     os: 'macos',
     shell: 'zsh',
@@ -2455,6 +2456,19 @@ function App() {
 
   const handleOpenAIAssistant = useCallback((intent = '') => {
     setAiIntent(intent);
+    setAiInitialMode(undefined);
+    setAiContext({
+      os: 'macos',
+      shell: 'zsh',
+      cwd: activeTerminal?.cwd || '',
+      recentCommands: recentCommandsRef.current.slice(-5),
+    });
+    setShowAIAssistant(true);
+  }, [activeTerminal]);
+
+  const handleOpenPromptEngineer = useCallback(() => {
+    setAiIntent('');
+    setAiInitialMode('prompt-engineer');
     setAiContext({
       os: 'macos',
       shell: 'zsh',
@@ -4813,6 +4827,8 @@ You have access to all Bash tools to execute git commands like:
               sessionTokens={currentAgentTokens}
               // OpenAI API key for Whisper
               openaiApiKey={openaiApiKey ?? undefined}
+              // Open Prompt Engineer
+              onOpenPromptEngineer={handleOpenPromptEngineer}
             />
               )}
 
@@ -5191,6 +5207,7 @@ You have access to all Bash tools to execute git commands like:
           <AIAssistant
             intent={aiIntent}
             context={aiContext}
+            initialMode={aiInitialMode}
             onClose={() => setShowAIAssistant(false)}
             onSelectCommand={handleAICommandSelect}
           />

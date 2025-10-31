@@ -64,6 +64,8 @@ interface ChatInputProps {
   lastPrompt?: string;
   // OpenAI API key for Whisper
   openaiApiKey?: string;
+  // Open Prompt Engineer
+  onOpenPromptEngineer?: () => void;
 }
 
 export default function ChatInput({
@@ -84,6 +86,7 @@ export default function ChatInput({
   onAbort,
   lastPrompt,
   openaiApiKey,
+  onOpenPromptEngineer,
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
@@ -1203,9 +1206,10 @@ export default function ChatInput({
           <button
             type="button"
             className="chat-input-action-btn"
+            onClick={onOpenPromptEngineer}
             disabled={disabled}
-            data-tooltip="AI Assistant"
-            aria-label="AI Assistant"
+            data-tooltip="Prompt Engineer"
+            aria-label="Prompt Engineer"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5L8 1Z" opacity="0.8"/>

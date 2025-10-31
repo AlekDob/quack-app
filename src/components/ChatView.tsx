@@ -50,6 +50,8 @@ interface ChatViewProps {
   };
   // OpenAI API key for Whisper
   openaiApiKey?: string;
+  // Open Prompt Engineer
+  onOpenPromptEngineer?: () => void;
 }
 
 export default function ChatView({
@@ -86,6 +88,8 @@ export default function ChatView({
   sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 },
   // OpenAI API key for Whisper
   openaiApiKey,
+  // Open Prompt Engineer
+  onOpenPromptEngineer,
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -208,6 +212,8 @@ export default function ChatView({
           lastPrompt={lastPrompt}
           // OpenAI API key for Whisper
           openaiApiKey={openaiApiKey}
+          // Open Prompt Engineer
+          onOpenPromptEngineer={onOpenPromptEngineer}
         />
       </div>
     </div>

@@ -14,6 +14,7 @@ interface AIAssistantProps {
   context: TerminalContext
   onClose: () => void
   onSelectCommand: (command: string) => void
+  initialMode?: 'terminal-helper' | 'prompt-engineer'
 }
 
 type Mode = 'selection' | 'terminal-helper' | 'prompt-engineer'
@@ -24,9 +25,10 @@ export default function AIAssistant({
   context,
   onClose,
   onSelectCommand,
+  initialMode,
 }: AIAssistantProps) {
   // Mode and navigation
-  const [mode, setMode] = useState<Mode>('selection')
+  const [mode, setMode] = useState<Mode>(initialMode || 'selection')
   const [promptEngineerStep, setPromptEngineerStep] = useState<PromptEngineerStep>('input')
 
   // Terminal Helper states
