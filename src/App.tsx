@@ -374,6 +374,9 @@ function App() {
   const [explorerError, setExplorerError] = useState<string | null>(null);
   const [refreshExplorerTrigger, setRefreshExplorerTrigger] = useState(0);
   const [creatingTerminal, setCreatingTerminal] = useState(false);
+
+  // OpenAI API Key for Whisper
+  const [openaiApiKey, setOpenaiApiKey] = useState<string | null>(null);
   const [showNewTerminalModal, setShowNewTerminalModal] = useState(false);
   const [newTerminalName, setNewTerminalName] = useState("");
   const [newTerminalPath, setNewTerminalPath] = useState("");
@@ -585,6 +588,21 @@ function App() {
       // we can assume chat is always configured. Errors will be handled
       // at runtime if Node.js SDK is not available.
       setIsChatConfigured(true);
+
+      // Load OpenAI API key for Whisper
+      invoke<string | null>('get_ai_api_key')
+        .then((savedKey) => {
+          if (savedKey) {
+            const decoded = atob(savedKey);
+            setOpenaiApiKey(decoded);
+            console.log('[OpenAI] API key loaded successfully');
+          } else {
+            console.log('[OpenAI] No API key found');
+          }
+        })
+        .catch((err) => {
+          console.error('[OpenAI] Failed to load API key:', err);
+        });
     }
   }, [tauriAvailable]);
 
@@ -4793,6 +4811,8 @@ You have access to all Bash tools to execute git commands like:
               onClearConversation={clearCurrentAgentConversation}
               // Token usage tracking
               sessionTokens={currentAgentTokens}
+              // OpenAI API key for Whisper
+              openaiApiKey={openaiApiKey ?? undefined}
             />
               )}
 

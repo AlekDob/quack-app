@@ -18,6 +18,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",
+    "@tauri-apps/plugin-fs": "^2.4.4",
     "@tauri-apps/plugin-notification": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.3",
     "@tauri-apps/plugin-store": "^2.4.0",
@@ -28,10 +29,12 @@
     "ai": "^5.0.68",
     "mermaid": "^11.12.0",
     "monaco-editor": "^0.53.0",
+    "openai": "^6.7.0",
     "prettier": "^3.3.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "sonner": "^2.0.7",
+    "tauri-plugin-mic-recorder-api": "^2.0.0",
     "vscode-icons-js": "^11.6.1"
   },
   "devDependencies": {

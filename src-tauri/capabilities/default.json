@@ -26,6 +26,11 @@
     "dialog:default",
     "notification:default",
     "store:default",
-    "shell:default"
+    "shell:default",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-app-read",
+    "fs:allow-app-read-recursive",
+    "mic-recorder:default"
   ]
 }

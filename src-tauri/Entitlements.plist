@@ -14,6 +14,12 @@
     <key>com.apple.security.files.downloads.read-write</key>
     <true/>
 
+    <!-- Access to common user directories (Desktop, Documents, Downloads) -->
+    <key>com.apple.security.files.bookmarks.app-scope</key>
+    <true/>
+    <key>com.apple.security.files.bookmarks.document-scope</key>
+    <true/>
+
     <!-- Allow shell execution for terminal/PTY operations -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>

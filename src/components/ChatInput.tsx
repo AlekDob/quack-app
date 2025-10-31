@@ -15,6 +15,8 @@ import duckAvatar from '../../images/duck.png';
 import type { ChatAttachment, AgentInfo, SearchResult } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
+import { useMicRecorder } from '../hooks/useMicRecorder';
+import VoiceRecordingModal from './VoiceRecordingModal';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
@@ -60,6 +62,8 @@ interface ChatInputProps {
   isStreaming?: boolean;
   onAbort?: () => void;
   lastPrompt?: string;
+  // OpenAI API key for Whisper
+  openaiApiKey?: string;
 }
 
 export default function ChatInput({
@@ -79,6 +83,7 @@ export default function ChatInput({
   isStreaming = false,
   onAbort,
   lastPrompt,
+  openaiApiKey,
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
@@ -118,6 +123,45 @@ export default function ChatInput({
   const [commandFilter, setCommandFilter] = useState('');
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [slashCommandStart, setSlashCommandStart] = useState(-1);
+
+  // Voice recording state
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+
+  // Microphone recorder hook (uses tauri-plugin-mic-recorder + Whisper API)
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    error: speechError,
+    isSupported: isSpeechSupported,
+    startListening,
+    stopListening,
+    cancelListening,
+    audioLevel,
+  } = useMicRecorder({
+    lang: 'it', // Italian by default
+    apiKey: openaiApiKey,
+    onResult: (text, isFinal) => {
+      if (isFinal) {
+        // Append final transcript to input
+        // Handle both controlled and uncontrolled modes
+        const currentValue = input || '';
+        const needsSpace = currentValue.length > 0 && !currentValue.endsWith(' ') && !currentValue.endsWith('\n');
+        const newValue = currentValue + (needsSpace ? ' ' : '') + text;
+        setInput(newValue);
+
+        // Close modal automatically after transcription is complete
+        setShowVoiceModal(false);
+
+        // Focus back to textarea
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          }
+        }, 100);
+      }
+    },
+  });
 
   const generateId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -696,7 +740,7 @@ export default function ChatInput({
   }, []);
 
   const handleSend = async () => {
-    const trimmed = input.trim();
+    const trimmed = (input || '').trim();
     if ((!trimmed && attachments.length === 0) || disabled) return;
 
     await onSend(trimmed, { attachments });
@@ -724,6 +768,48 @@ export default function ChatInput({
       }
     }
   };
+
+  // Voice recording handlers
+  const handleVoiceClick = useCallback(() => {
+    console.log('[Voice] Microphone clicked. Speech supported:', isSpeechSupported, 'API Key:', openaiApiKey ? 'present' : 'missing');
+
+    if (!isSpeechSupported) {
+      const errorMsg = 'Audio recording is not supported in this browser.';
+      console.error('[Voice]', errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
+    if (!openaiApiKey) {
+      const errorMsg = 'OpenAI API key is required for voice input. Please configure it in Settings > AI Assistant.';
+      console.error('[Voice]', errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
+    console.log('[Voice] Opening modal and starting listening...');
+    setShowVoiceModal(true);
+    startListening();
+  }, [isSpeechSupported, openaiApiKey, startListening]);
+
+  const handleVoiceClose = useCallback(() => {
+    // Cancel recording without transcription when closing via X button
+    if (isListening) {
+      cancelListening();
+    }
+    setShowVoiceModal(false);
+
+    // Focus back to textarea
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }, 100);
+  }, [isListening, cancelListening]);
+
+  const handleVoiceStop = useCallback(() => {
+    stopListening();
+  }, [stopListening]);
 
   // Drag & drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -1129,8 +1215,9 @@ export default function ChatInput({
           <button
             type="button"
             className="chat-input-action-btn"
-            disabled={disabled}
-            data-tooltip="Voice input"
+            onClick={handleVoiceClick}
+            disabled={disabled || !isSpeechSupported}
+            data-tooltip={isSpeechSupported ? "Voice input" : "Voice input not supported"}
             aria-label="Voice input"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1227,6 +1314,18 @@ export default function ChatInput({
         </div>
       )}
       {error && <div className="chat-input-error">{error}</div>}
+
+      {/* Voice Recording Modal */}
+      <VoiceRecordingModal
+        isOpen={showVoiceModal}
+        isListening={isListening}
+        transcript={transcript}
+        interimTranscript={interimTranscript}
+        audioLevel={audioLevel}
+        error={speechError ? speechError.message : null}
+        onClose={handleVoiceClose}
+        onStop={handleVoiceStop}
+      />
     </div>
   );
 }

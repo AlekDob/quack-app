@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path, process::Stdio};
+use std::{fs, path::{Path, PathBuf}, process::Stdio, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
+use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeCliResponse {
@@ -103,6 +104,100 @@ pub struct ClaudeCliRequest {
 const DEFAULT_MODEL: &str = "sonnet";
 const MAX_ATTACHMENTS: usize = 6;
 const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
+
+// Cache for Node.js executable path (computed once at first use)
+static NODE_EXECUTABLE_CACHE: Lazy<Option<PathBuf>> = Lazy::new(|| {
+    find_node_executable_internal()
+});
+
+/// Get cached Node.js executable path
+fn get_node_executable() -> Option<PathBuf> {
+    NODE_EXECUTABLE_CACHE.clone()
+}
+
+/// Find Node.js executable with robust search including NVM and common installation paths
+/// This is called only once and the result is cached
+fn find_node_executable_internal() -> Option<PathBuf> {
+    // Strategy: Search in order of preference
+    // 1. Check if 'node' is in PATH (works in dev mode and when Node.js is properly installed)
+    // 2. Common system paths (Homebrew, MacPorts, system-wide)
+    // 3. NVM paths (~/.nvm/versions/node/*/bin/node)
+    // 4. User-specific paths (~/.local/bin, ~/bin)
+
+    // Try standard PATH first (fastest, works for most cases)
+    if let Ok(output) = std::process::Command::new("which").arg("node").output() {
+        if output.status.success() {
+            if let Ok(path_str) = String::from_utf8(output.stdout) {
+                let path = PathBuf::from(path_str.trim());
+                if path.exists() {
+                    log::info!("[Node.js] Found via PATH: {:?}", path);
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    // Common installation paths (macOS/Linux)
+    let common_paths = vec![
+        "/usr/local/bin/node",           // Homebrew default
+        "/opt/homebrew/bin/node",        // Homebrew ARM Mac
+        "/usr/bin/node",                 // System package managers
+        "/opt/local/bin/node",           // MacPorts
+    ];
+
+    for path_str in common_paths {
+        let path = PathBuf::from(path_str);
+        if path.exists() {
+            log::info!("[Node.js] Found at common path: {:?}", path);
+            return Some(path);
+        }
+    }
+
+    // Check NVM installations (~/.nvm/versions/node/*/bin/node)
+    if let Some(home) = std::env::var("HOME").ok() {
+        let nvm_dir = PathBuf::from(&home).join(".nvm/versions/node");
+
+        if nvm_dir.exists() {
+            if let Ok(entries) = fs::read_dir(&nvm_dir) {
+                // Get all version directories and sort to get latest first
+                let mut versions: Vec<_> = entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_dir())
+                    .collect();
+
+                // Sort by modification time (latest first)
+                versions.sort_by_key(|e| std::cmp::Reverse(
+                    e.metadata().ok().and_then(|m| m.modified().ok())
+                ));
+
+                // Try each version, latest first
+                for entry in versions {
+                    let node_path = entry.path().join("bin/node");
+                    if node_path.exists() {
+                        log::info!("[Node.js] Found NVM version: {:?}", node_path);
+                        return Some(node_path);
+                    }
+                }
+            }
+        }
+
+        // Check user-specific paths
+        let user_paths = vec![
+            PathBuf::from(&home).join(".local/bin/node"),
+            PathBuf::from(&home).join("bin/node"),
+        ];
+
+        for path in user_paths {
+            if path.exists() {
+                log::info!("[Node.js] Found in user directory: {:?}", path);
+                return Some(path);
+            }
+        }
+    }
+
+    log::error!("[Node.js] Node.js executable not found in any common location");
+    None
+}
 
 // Event payloads for tool tracking
 #[derive(Debug, Clone, Serialize)]
@@ -703,8 +798,14 @@ pub async fn send_message_via_sdk_streaming(
     let node_sdk_dir = script_path.parent()
         .ok_or("Failed to get node-sdk directory".to_string())?;
 
+    // Find Node.js executable (cached, searches common locations)
+    let node_path = get_node_executable()
+        .ok_or("Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string())?;
+
+    log::info!("[SDK] Using Node.js at: {:?}", node_path);
+
     // Spawn Node.js process
-    let mut command = Command::new("node");
+    let mut command = Command::new(node_path);
     command
         .arg(&script_path)
         .arg(&config_str)

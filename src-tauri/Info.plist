@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Microphone access for voice transcription -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Quack needs access to your microphone to transcribe voice input for the chat.</string>
+</dict>
+</plist>

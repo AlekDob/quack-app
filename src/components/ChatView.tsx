@@ -48,6 +48,8 @@ interface ChatViewProps {
     cacheCreationTokens: number;
     cacheReadTokens: number;
   };
+  // OpenAI API key for Whisper
+  openaiApiKey?: string;
 }
 
 export default function ChatView({
@@ -82,6 +84,8 @@ export default function ChatView({
   onClearConversation,
   // Token usage tracking
   sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 },
+  // OpenAI API key for Whisper
+  openaiApiKey,
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -202,6 +206,8 @@ export default function ChatView({
           isStreaming={isLoading}
           onAbort={onAbortStream}
           lastPrompt={lastPrompt}
+          // OpenAI API key for Whisper
+          openaiApiKey={openaiApiKey}
         />
       </div>
     </div>
