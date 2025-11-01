@@ -8,26 +8,27 @@ interface PersonalityBuilderProps {
   availableSkills: string[];
 }
 
-const SPECIALTY_OPTIONS = [
-  { id: 'frontend', label: 'Frontend Development', icon: '🎨' },
-  { id: 'backend', label: 'Backend Development', icon: '⚙️' },
-  { id: 'database', label: 'Database Design', icon: '🗄️' },
-  { id: 'devops', label: 'DevOps & Infrastructure', icon: '🚀' },
-  { id: 'testing', label: 'Testing & QA', icon: '🧪' },
-  { id: 'security', label: 'Security', icon: '🔒' },
-  { id: 'mobile', label: 'Mobile Development', icon: '📱' },
-  { id: 'ai-ml', label: 'AI & Machine Learning', icon: '🤖' },
+const FOCUS_AREAS = [
+  { id: 'feature-planning', label: 'Feature Planning', icon: '🗺️' },
+  { id: 'sprint-management', label: 'Sprint Management', icon: '🏃' },
+  { id: 'branch-coordination', label: 'Branch Coordination', icon: '🌿' },
+  { id: 'team-alignment', label: 'Team Alignment', icon: '🤝' },
+  { id: 'technical-oversight', label: 'Technical Oversight', icon: '👁️' },
+  { id: 'quality-assurance', label: 'Quality Assurance', icon: '✅' },
+  { id: 'delivery-tracking', label: 'Delivery Tracking', icon: '📦' },
+  { id: 'stakeholder-comms', label: 'Stakeholder Communication', icon: '💬' },
 ];
 
 const PERSONALITY_TRAITS = [
-  { id: 'meticulous', label: 'Meticulous', icon: '🔍' },
-  { id: 'creative', label: 'Creative', icon: '💡' },
-  { id: 'pragmatic', label: 'Pragmatic', icon: '⚡' },
-  { id: 'detail-oriented', label: 'Detail-oriented', icon: '🎯' },
-  { id: 'innovative', label: 'Innovative', icon: '✨' },
-  { id: 'analytical', label: 'Analytical', icon: '📊' },
+  { id: 'organized', label: 'Organized', icon: '📋' },
+  { id: 'proactive', label: 'Proactive', icon: '⚡' },
+  { id: 'pragmatic', label: 'Pragmatic', icon: '🎯' },
+  { id: 'strategic', label: 'Strategic', icon: '♟️' },
   { id: 'collaborative', label: 'Collaborative', icon: '🤝' },
-  { id: 'efficient', label: 'Efficient', icon: '⚡' },
+  { id: 'detail-oriented', label: 'Detail-oriented', icon: '🔍' },
+  { id: 'communicative', label: 'Communicative', icon: '💬' },
+  { id: 'results-driven', label: 'Results-driven', icon: '🎯' },
+  { id: 'mad-genius', label: 'Mad Genius', icon: '🧪' },
 ];
 
 const COMMUNICATION_STYLES = [
@@ -35,6 +36,7 @@ const COMMUNICATION_STYLES = [
   { id: 'friendly', label: 'Friendly', description: 'Warm and approachable' },
   { id: 'casual', label: 'Casual', description: 'Relaxed and informal' },
   { id: 'technical', label: 'Technical', description: 'Highly detailed and technical' },
+  { id: 'sarcastic', label: 'Sarcastic', description: 'Witty and ironic' },
 ];
 
 function PersonalityBuilder({
@@ -44,11 +46,11 @@ function PersonalityBuilder({
 }: PersonalityBuilderProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const toggleSpecialty = (specialtyId: string) => {
+  const toggleFocusArea = (focusId: string) => {
     const specialties = personality.specialties || [];
-    const newSpecialties = specialties.includes(specialtyId)
-      ? specialties.filter((s) => s !== specialtyId)
-      : [...specialties, specialtyId];
+    const newSpecialties = specialties.includes(focusId)
+      ? specialties.filter((s) => s !== focusId)
+      : [...specialties, focusId];
     onPersonalityChange({ ...personality, specialties: newSpecialties });
   };
 
@@ -107,28 +109,32 @@ function PersonalityBuilder({
                 type="text"
                 value={personality.role || ''}
                 onChange={(e) => handleRoleChange(e.target.value)}
-                placeholder="e.g., Senior Developer, Code Reviewer, UI Designer"
+                placeholder="e.g., Feature Coordinator, Sprint Manager, Release Lead"
                 className="personality-input"
               />
             </label>
+            <p className="field-hint">
+              Duck Agents are PMs/coordinators who manage features and invoke Protocol Droids for technical work
+            </p>
           </div>
 
           <div className="personality-section">
-            <span className="field-sublabel">Specialties</span>
+            <span className="field-sublabel">Focus Areas</span>
+            <p className="field-hint-small">What this agent coordinates (not technical specialties)</p>
             <div className="tag-grid">
-              {SPECIALTY_OPTIONS.map((specialty) => (
+              {FOCUS_AREAS.map((focus) => (
                 <button
-                  key={specialty.id}
+                  key={focus.id}
                   type="button"
                   className={`tag-button ${
-                    (personality.specialties || []).includes(specialty.id)
+                    (personality.specialties || []).includes(focus.id)
                       ? 'selected'
                       : ''
                   }`}
-                  onClick={() => toggleSpecialty(specialty.id)}
+                  onClick={() => toggleFocusArea(focus.id)}
                 >
-                  <span className="tag-icon">{specialty.icon}</span>
-                  <span className="tag-label">{specialty.label}</span>
+                  <span className="tag-icon">{focus.icon}</span>
+                  <span className="tag-label">{focus.label}</span>
                 </button>
               ))}
             </div>
@@ -228,11 +234,11 @@ function PersonalityBuilder({
               )}
               {personality.specialties && personality.specialties.length > 0 && (
                 <p>
-                  <strong>Specialties:</strong>{' '}
+                  <strong>Focus Areas:</strong>{' '}
                   {personality.specialties
                     .map(
                       (s) =>
-                        SPECIALTY_OPTIONS.find((opt) => opt.id === s)?.label ||
+                        FOCUS_AREAS.find((opt) => opt.id === s)?.label ||
                         s
                     )
                     .join(', ')}

@@ -348,7 +348,7 @@ export default function SidePanel({
     },
     {
       id: "agents" as TabId,
-      label: "Agents",
+      label: "Sub Agents",
       icon: icons.agents,
       badge: agents.length,
       hasContent: agents.length > 0,
