@@ -22,6 +22,7 @@ mod git;
 mod mcp;
 mod notifications;
 mod native_terminal;
+mod personality;
 mod plugins;
 mod preferences;
 mod preview;
@@ -486,7 +487,10 @@ pub fn run() {
             telegram_central::stop_telegram_polling,
             preferences::save_telegram_link,
             preferences::get_telegram_link,
-            preferences::initialize_central_bot_token
+            preferences::initialize_central_bot_token,
+            personality::save_agent_personality,
+            personality::load_agent_personality,
+            personality::inject_personality_to_claude_md
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

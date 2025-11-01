@@ -1,3 +1,7 @@
+import { useState, useEffect } from 'react';
+import type { AgentPersonality } from '../types';
+import PersonalityBuilder from './PersonalityBuilder';
+
 // Available duck avatars from /images/ducks/avatars/
 const AVAILABLE_AVATARS = [
   '24d6c816fe40a284f2451b1469c5e6d63d236e53.png',
@@ -37,6 +41,7 @@ interface NewTerminalModalProps {
   color: string
   workingOn?: string
   avatar?: string
+  personality?: Partial<AgentPersonality>
   availableColors: string[]
   selectingDirectory: boolean
   creating: boolean
@@ -45,6 +50,7 @@ interface NewTerminalModalProps {
   onColorChange: (color: string) => void
   onWorkingOnChange?: (value: string) => void
   onAvatarChange?: (avatar: string) => void
+  onPersonalityChange?: (personality: Partial<AgentPersonality>) => void
   onBrowse: () => void
   onCancel: () => void
   onConfirm: () => void
@@ -58,6 +64,7 @@ function NewTerminalModal({
   color,
   workingOn = '',
   avatar,
+  personality,
   availableColors,
   selectingDirectory,
   creating,
@@ -66,10 +73,22 @@ function NewTerminalModal({
   onColorChange,
   onWorkingOnChange,
   onAvatarChange,
+  onPersonalityChange,
   onBrowse,
   onCancel,
   onConfirm,
 }: NewTerminalModalProps) {
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+
+  // Load available skills from .claude/skills directory
+  useEffect(() => {
+    if (open) {
+      // TODO: Load skills from backend
+      // For now, use the skills we know exist
+      setAvailableSkills(['quack-agents-architecture', 'tauri-drag-and-drop-guide']);
+    }
+  }, [open]);
+
   if (!open) {
     return null
   }
@@ -141,6 +160,12 @@ function NewTerminalModal({
             Brief context about what this agent is working on (max 5 words, optional)
           </small>
         </label>
+
+        <PersonalityBuilder
+          personality={personality || { communicationStyle: 'friendly', specialties: [], skills: [], expressions: [] }}
+          onPersonalityChange={onPersonalityChange || (() => {})}
+          availableSkills={availableSkills}
+        />
 
         <div className="modal-field">
           <span className="field-label">Working directory</span>

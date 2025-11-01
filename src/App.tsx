@@ -69,6 +69,7 @@ import type {
   AgentChatSettings,
   SessionUsage,
   UsageStats,
+  AgentPersonality,
 } from "./types";
 import { getAgentAvatar } from "./utils/agentAvatars";
 
@@ -388,6 +389,12 @@ function App() {
   const [newTerminalColor, setNewTerminalColor] = useState(COLORS[0]);
   const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
   const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
+  const [newTerminalPersonality, setNewTerminalPersonality] = useState<Partial<AgentPersonality>>({
+    communicationStyle: 'friendly',
+    specialties: [],
+    skills: [],
+    expressions: [],
+  });
   const [newTerminalError, setNewTerminalError] = useState<string | null>(null);
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
@@ -3222,7 +3229,7 @@ function App() {
     });
   }, []);
 
-  const handleEditTerminal = useCallback((terminal: TerminalInfo) => {
+  const handleEditTerminal = useCallback(async (terminal: TerminalInfo) => {
     setEditingTerminal(terminal);
     setNewTerminalName(terminal.label);
     setNewTerminalColor(terminal.color);
@@ -3230,6 +3237,26 @@ function App() {
     setNewTerminalWorkingOn(terminal.workingOn || "");
     setNewTerminalAvatar(terminal.avatar || "68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
     setNewTerminalError(null);
+
+    // Try to load existing personality
+    try {
+      const personality = await invoke<AgentPersonality>('load_agent_personality', {
+        projectPath: terminal.cwd,
+        personalityId: terminal.id,
+      });
+      setNewTerminalPersonality(personality);
+      console.log('✅ Loaded existing personality for:', terminal.label);
+    } catch (error) {
+      // No personality found - reset to default
+      console.log('No existing personality found, using default');
+      setNewTerminalPersonality({
+        communicationStyle: 'friendly',
+        specialties: [],
+        skills: [],
+        expressions: [],
+      });
+    }
+
     setShowNewTerminalModal(true);
   }, []);
 
@@ -3317,6 +3344,12 @@ function App() {
     setNewTerminalColor(defaultColor);
     setNewTerminalWorkingOn(""); // Reset working on field
     setNewTerminalAvatar("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg"); // Reset to first avatar
+    setNewTerminalPersonality({ // Reset personality to default
+      communicationStyle: 'friendly',
+      specialties: [],
+      skills: [],
+      expressions: [],
+    });
     const fallbackPath = activeTerminal?.cwd ?? explorerPath ?? "";
     setNewTerminalPath(fallbackPath);
     setShowNewTerminalModal(true);
@@ -3422,6 +3455,39 @@ function App() {
           )
         );
 
+        // Save agent personality if configured
+        if (newTerminalPersonality && Object.keys(newTerminalPersonality).length > 0) {
+          try {
+            const fullPersonality: AgentPersonality = {
+              id: editingTerminal.id,
+              name: trimmedName,
+              role: newTerminalPersonality.role || '',
+              personality: newTerminalPersonality.personality || '',
+              quirks: newTerminalPersonality.quirks || '',
+              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
+              specialties: newTerminalPersonality.specialties || [],
+              skills: newTerminalPersonality.skills || [],
+              expressions: newTerminalPersonality.expressions || [],
+            };
+
+            await invoke('save_agent_personality', {
+              projectPath: trimmedPath,
+              personality: fullPersonality,
+            });
+
+            // Inject personality into CLAUDE.md
+            await invoke('inject_personality_to_claude_md', {
+              projectPath: trimmedPath,
+              personality: fullPersonality,
+            });
+
+            console.log(`✅ Updated personality for agent "${trimmedName}"`);
+          } catch (error) {
+            console.error('Failed to save personality:', error);
+            // Don't block terminal update if personality save fails
+          }
+        }
+
         // If cwd changed and this is active terminal, reload directory
         if (
           trimmedPath !== editingTerminal.cwd &&
@@ -3462,6 +3528,40 @@ function App() {
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
         clearTerminalAttention(createdWithState.id);
+
+        // Save agent personality if configured
+        if (newTerminalPersonality && Object.keys(newTerminalPersonality).length > 0) {
+          try {
+            const fullPersonality: AgentPersonality = {
+              id: createdWithState.id,
+              name: trimmedName,
+              role: newTerminalPersonality.role || '',
+              personality: newTerminalPersonality.personality || '',
+              quirks: newTerminalPersonality.quirks || '',
+              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
+              specialties: newTerminalPersonality.specialties || [],
+              skills: newTerminalPersonality.skills || [],
+              expressions: newTerminalPersonality.expressions || [],
+            };
+
+            await invoke('save_agent_personality', {
+              projectPath: trimmedPath,
+              personality: fullPersonality,
+            });
+
+            // Inject personality into CLAUDE.md
+            await invoke('inject_personality_to_claude_md', {
+              projectPath: trimmedPath,
+              personality: fullPersonality,
+            });
+
+            console.log(`✅ Saved personality for agent "${trimmedName}"`);
+          } catch (error) {
+            console.error('Failed to save personality:', error);
+            // Don't block terminal creation if personality save fails
+          }
+        }
+
         setShowNewTerminalModal(false);
         await loadDirectory(createdWithState.cwd);
 
@@ -3485,6 +3585,7 @@ function App() {
     newTerminalPath,
     newTerminalWorkingOn,
     newTerminalAvatar,
+    newTerminalPersonality,
     tauriAvailable,
   ]);
 
@@ -3569,7 +3670,7 @@ function App() {
   ]);
 
   const handleSelectTerminal = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (!tauriAvailable) {
         return;
       }
@@ -3578,7 +3679,26 @@ function App() {
       clearIdleTimer(id);
       const terminal = terminals.find((candidate) => candidate.id === id);
       if (terminal) {
-        void loadDirectory(terminal.cwd);
+        await loadDirectory(terminal.cwd);
+
+        // Load and inject personality into CLAUDE.md
+        try {
+          const personality = await invoke<AgentPersonality>('load_agent_personality', {
+            projectPath: terminal.cwd,
+            personalityId: terminal.id,
+          });
+
+          // Inject into CLAUDE.md
+          await invoke('inject_personality_to_claude_md', {
+            projectPath: terminal.cwd,
+            personality,
+          });
+
+          console.log(`✅ Injected personality for "${terminal.label}" into CLAUDE.md`);
+        } catch (error) {
+          // No personality found or injection failed - not critical
+          console.log(`No personality to inject for "${terminal.label}"`);
+        }
       }
     },
     [
@@ -5141,6 +5261,7 @@ You have access to all Bash tools to execute git commands like:
           color={newTerminalColor}
           workingOn={newTerminalWorkingOn}
           avatar={newTerminalAvatar}
+          personality={newTerminalPersonality}
           availableColors={COLORS}
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
@@ -5149,6 +5270,7 @@ You have access to all Bash tools to execute git commands like:
           onColorChange={setNewTerminalColor}
           onWorkingOnChange={setNewTerminalWorkingOn}
           onAvatarChange={setNewTerminalAvatar}
+          onPersonalityChange={setNewTerminalPersonality}
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}

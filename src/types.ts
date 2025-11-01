@@ -217,6 +217,19 @@ export interface AgentDetails extends AgentInfo {
   content: string;
 }
 
+// Agent Personality types (for dynamic CLAUDE.md generation)
+export interface AgentPersonality {
+  id: string;
+  name: string;
+  role: string;
+  personality: string;
+  quirks: string;
+  communicationStyle: string;
+  specialties: string[];
+  skills: string[];
+  expressions: string[];
+}
+
 // Skills types (similar to Agents)
 export interface SkillInfo {
   name: string;
