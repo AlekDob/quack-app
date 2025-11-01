@@ -9,6 +9,7 @@ interface ContextMenuProps {
   onCopyPath?: () => void
   onCloseTerminal?: () => void
   onDuplicate?: () => void
+  onReset?: () => void
 }
 
 export default function ContextMenu({
@@ -19,6 +20,7 @@ export default function ContextMenu({
   onCopyPath,
   onCloseTerminal,
   onDuplicate,
+  onReset,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -121,6 +123,19 @@ export default function ContextMenu({
           }}
         >
           <span>Duplicate Agent</span>
+        </button>
+      )}
+
+      {onReset && (
+        <button
+          type="button"
+          className="context-menu-item"
+          onClick={() => {
+            onReset()
+            onClose()
+          }}
+        >
+          <span>Reset Agent</span>
         </button>
       )}
 

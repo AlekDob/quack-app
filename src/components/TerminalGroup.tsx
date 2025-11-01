@@ -8,20 +8,32 @@ interface TerminalGroupProps {
   terminals: TerminalInfo[]
   isCollapsed: boolean
   activeId: string | null
-  canGroupMoveUp: boolean
-  canGroupMoveDown: boolean
   // Phase 4: AgentChat display data (optional for backward compatibility)
   agentChatName?: string
   agentChatColor?: string
   chatSessions?: Map<string, ChatMessage[]>
   onToggle: () => void
-  onSelect: (terminal: TerminalInfo) => void // Phase 4: Changed signature to pass full terminal
+  onSelect: (terminal: TerminalInfo) => void
   onClose: (id: string) => void
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void
-  onMoveUp: (id: string) => void
-  onMoveDown: (id: string) => void
-  onMoveGroupUp: (cwd: string) => void
-  onMoveGroupDown: (cwd: string) => void
+  // Drag & drop support for terminals
+  draggedTerminalId: string | null
+  dragOverTerminalId: string | null
+  dropPosition: 'before' | 'after'
+  onTerminalDragStart: (terminal: TerminalInfo) => void
+  onTerminalDragOver: (terminal: TerminalInfo, event: React.DragEvent) => void
+  onTerminalDragLeave: () => void
+  onTerminalDrop: (targetTerminal: TerminalInfo) => void
+  onTerminalDragEnd: () => void
+  // Drag & drop support for groups
+  draggedGroupCwd: string | null
+  dragOverGroupCwd: string | null
+  groupDropPosition: 'before' | 'after'
+  onGroupDragStart: (cwd: string) => void
+  onGroupDragOver: (cwd: string, event: React.DragEvent) => void
+  onGroupDragLeave: () => void
+  onGroupDrop: (targetCwd: string) => void
+  onGroupDragEnd: () => void
 }
 
 export default function TerminalGroup({
@@ -29,8 +41,6 @@ export default function TerminalGroup({
   terminals,
   isCollapsed,
   activeId,
-  canGroupMoveUp,
-  canGroupMoveDown,
   agentChatName,
   agentChatColor,
   chatSessions,
@@ -38,10 +48,22 @@ export default function TerminalGroup({
   onSelect,
   onClose,
   onContextMenu,
-  onMoveUp,
-  onMoveDown,
-  onMoveGroupUp,
-  onMoveGroupDown,
+  draggedTerminalId,
+  dragOverTerminalId,
+  dropPosition,
+  onTerminalDragStart,
+  onTerminalDragOver,
+  onTerminalDragLeave,
+  onTerminalDrop,
+  onTerminalDragEnd,
+  draggedGroupCwd,
+  dragOverGroupCwd,
+  groupDropPosition,
+  onGroupDragStart,
+  onGroupDragOver,
+  onGroupDragLeave,
+  onGroupDrop,
+  onGroupDragEnd,
 }: TerminalGroupProps) {
   return (
     <div className="terminal-group">
@@ -49,75 +71,66 @@ export default function TerminalGroup({
         cwd={cwd}
         count={terminals.length}
         isCollapsed={isCollapsed}
-        canMoveUp={canGroupMoveUp}
-        canMoveDown={canGroupMoveDown}
-        // Phase 4: Pass AgentChat display data
         agentChatName={agentChatName}
         agentChatColor={agentChatColor}
         onToggle={onToggle}
-        onMoveUp={() => onMoveGroupUp(cwd)}
-        onMoveDown={() => onMoveGroupDown(cwd)}
+        // Drag & drop for group reordering
+        draggedTerminalId={draggedTerminalId}
+        draggedGroupCwd={draggedGroupCwd}
+        dragOverGroupCwd={dragOverGroupCwd}
+        groupDropPosition={groupDropPosition}
+        onGroupDragStart={onGroupDragStart}
+        onGroupDragOver={onGroupDragOver}
+        onGroupDragLeave={onGroupDragLeave}
+        onGroupDrop={onGroupDrop}
+        onGroupDragEnd={onGroupDragEnd}
       />
 
       {!isCollapsed && (
         <div className="terminal-group-items">
-          {terminals.map((terminal, index) => {
+          {terminals.map((terminal) => {
             const active = terminal.id === activeId
+            const isDragging = draggedTerminalId === terminal.id
+            const isDragOver = dragOverTerminalId === terminal.id
+
             const itemClasses = [
               'terminal-item',
               'terminal-item-grouped',
               active ? 'active' : '',
               terminal.alive ? '' : 'inactive',
+              isDragging ? 'dragging' : '',
+              isDragOver && dropPosition === 'before' ? 'drag-over-before' : '',
+              isDragOver && dropPosition === 'after' ? 'drag-over-after' : '',
             ].filter(Boolean).join(' ')
-
-            // Verifica se può muoversi su/giù nell'array globale dei terminali
-            // (Nota: questo richiede accesso all'array completo, per ora usa index locale nel gruppo)
-            const canMoveUp = index > 0
-            const canMoveDown = index < terminals.length - 1
 
             return (
               <div
                 key={terminal.id}
                 className={itemClasses}
-                style={{ '--item-index': index } as React.CSSProperties}
-                onClick={() => onSelect(terminal)} // Phase 4: Pass terminal object
+                draggable={true}
+                onDragStart={() => onTerminalDragStart(terminal)}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  onTerminalDragOver(terminal, e)
+                }}
+                onDragLeave={onTerminalDragLeave}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  onTerminalDrop(terminal)
+                }}
+                onDragEnd={onTerminalDragEnd}
+                onClick={() => onSelect(terminal)}
                 onContextMenu={(event) => onContextMenu(event, terminal)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
-                    onSelect(terminal) // Phase 4: Pass terminal object
+                    onSelect(terminal)
                   }
                 }}
               >
                 <TerminalActivityBar terminal={terminal} chatSessions={chatSessions} />
-                <div className="terminal-reorder-controls">
-                  <button
-                    type="button"
-                    className="terminal-reorder-btn"
-                    disabled={!canMoveUp}
-                    aria-label="Move up"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onMoveUp(terminal.id)
-                    }}
-                  >
-                    ▲
-                  </button>
-                  <button
-                    type="button"
-                    className="terminal-reorder-btn"
-                    disabled={!canMoveDown}
-                    aria-label="Move down"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onMoveDown(terminal.id)
-                    }}
-                  >
-                    ▼
-                  </button>
-                </div>
                 <button
                   type="button"
                   className="terminal-close"

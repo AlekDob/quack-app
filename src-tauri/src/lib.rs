@@ -414,6 +414,7 @@ pub fn run() {
             git::git_commit,
             git::git_commit_history,
             git::git_repository_root,
+            git::git_current_branch,
             preview::create_preview_webview,
             preview::update_preview_webview_position,
             preview::destroy_preview_webview,

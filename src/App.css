@@ -8833,3 +8833,120 @@ button.directory-chooser:hover {
   object-fit: cover;
   display: block;
 }
+
+/* Drag & Drop States for Terminal Items */
+.terminal-item[draggable="true"] {
+  cursor: grab;
+}
+
+.terminal-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.terminal-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing !important;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Drop indicator - horizontal bar above */
+.terminal-item.drag-over-before {
+  position: relative;
+}
+
+.terminal-item.drag-over-before::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(242, 140, 82, 1);
+  box-shadow: 0 0 12px rgba(242, 140, 82, 0.8);
+  z-index: 100;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Drop indicator - horizontal bar below */
+.terminal-item.drag-over-after {
+  position: relative;
+}
+
+.terminal-item.drag-over-after::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(242, 140, 82, 1);
+  box-shadow: 0 0 12px rgba(242, 140, 82, 0.8);
+  z-index: 100;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dropIndicatorPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(242, 140, 82, 0.6);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 12px rgba(242, 140, 82, 0.8);
+  }
+}
+
+/* Drag & Drop States for Group Headers */
+.group-header-wrapper[draggable="true"] {
+  cursor: grab;
+}
+
+.group-header-wrapper[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.group-header.dragging {
+  opacity: 0.4;
+  cursor: grabbing !important;
+}
+
+/* Drop indicator - horizontal bar above group */
+.group-header.drag-over-before {
+  position: relative;
+}
+
+.group-header-wrapper .group-header.drag-over-before::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(242, 140, 82, 1);
+  box-shadow: 0 0 12px rgba(242, 140, 82, 0.8);
+  z-index: 100;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Drop indicator - horizontal bar below group */
+.group-header.drag-over-after {
+  position: relative;
+}
+
+.group-header-wrapper .group-header.drag-over-after::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(242, 140, 82, 1);
+  box-shadow: 0 0 12px rgba(242, 140, 82, 0.8);
+  z-index: 100;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+

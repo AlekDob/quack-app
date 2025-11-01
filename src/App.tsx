@@ -38,6 +38,7 @@ import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
+import AgentViewer from "./components/AgentViewer";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
@@ -69,6 +70,7 @@ import type {
   SessionUsage,
   UsageStats,
 } from "./types";
+import { getAgentAvatar } from "./utils/agentAvatars";
 
 interface TerminalMetadata {
   label: string;
@@ -364,6 +366,9 @@ function App() {
     [activeId, terminals]
   );
 
+  // Project context for chat header
+  const [projectName, setProjectName] = useState<string>('');
+  const [gitBranch, setGitBranch] = useState<string>('');
 
   const [explorerPath, setExplorerPath] = useState("");
   const [explorerTree, setExplorerTree] = useState<
@@ -608,6 +613,30 @@ function App() {
         });
     }
   }, [tauriAvailable]);
+
+  // Update project context when active terminal changes
+  useEffect(() => {
+    if (!activeTerminal || !tauriAvailable) {
+      setProjectName('');
+      setGitBranch('');
+      return;
+    }
+
+    // Extract project name from cwd (last folder in path)
+    const cwd = activeTerminal.cwd || '';
+    const pathParts = cwd.split('/').filter(Boolean);
+    const project = pathParts[pathParts.length - 1] || '';
+    setProjectName(project);
+
+    // Get git branch
+    invoke<string>('git_current_branch', { rootPath: cwd })
+      .then((branch) => {
+        setGitBranch(branch.trim());
+      })
+      .catch(() => {
+        setGitBranch(''); // Not a git repository or error
+      });
+  }, [activeTerminal, tauriAvailable]);
 
   // Handle deep link file opening from Quack Inspector
   useDeepLinkHandler(
@@ -1375,7 +1404,7 @@ function App() {
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<AgentDetails | null>(null);
+  const [selectedAgent, _setSelectedAgent] = useState<AgentDetails | null>(null);
   // activeAgent moved to top of component for TypeScript hoisting
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
   const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string } | null>(null); // File to insert as @file mention
@@ -2535,20 +2564,37 @@ function App() {
       return;
     }
 
-    try {
-      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
-      const details = await invoke<AgentDetails>("get_agent_details", {
-        name: agentInfo.name,
-        workingDir,
-        scope: agentInfo.scope, // ← AGGIUNTO: passa lo scope (global/project)
-      });
-      setSelectedAgent(details);
-      setShowQuackAgencyDrawer(true); // Apre il drawer quando si seleziona un agent
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setAgentsError(message);
+    // Create or select agent tab instead of opening drawer
+    const agentTabId = `agent-${agentInfo.name}-${agentInfo.scope}`;
+
+    // Check if tab already exists
+    const existingTab = tabs.find(t => t.id === agentTabId);
+
+    if (existingTab) {
+      // Tab already exists, just activate it
+      setActiveTabId(agentTabId);
+    } else {
+      // Create new agent tab with duckdroid icon
+      const newTab: Tab = {
+        id: agentTabId,
+        label: agentInfo.name.replace(/-/g, ' '),
+        type: 'agent',
+        closable: true,
+        agentName: agentInfo.name,
+        agentScope: agentInfo.scope as 'global' | 'project',
+        icon: (
+          <img
+            src={agentInfo.avatar ? `/images/ducks/avatars/${agentInfo.avatar}` : '/duckdroid.png'}
+            alt="Agent"
+            style={{ width: '16px', height: '16px', borderRadius: '3px' }}
+          />
+        ),
+      };
+
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId(agentTabId);
     }
-  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+  }, [tauriAvailable, tabs]);
 
   const handleUseAgent = useCallback((agentInfo: AgentInfo) => {
     // Set the agent as active for the chat tab
@@ -3237,6 +3283,17 @@ function App() {
       toast.error("Failed to duplicate agent");
     }
   }, [tauriAvailable]);
+
+  const handleResetTerminal = useCallback((terminal: TerminalInfo) => {
+    // Clear chat session for this terminal
+    setChatSessions((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(terminal.id);
+      return newMap;
+    });
+
+    toast.success(`Agent reset: ${terminal.label}`);
+  }, []);
 
   const handleReorderTerminals = useCallback((reorderedIds: string[]) => {
     setTerminals((prev) => {
@@ -4788,6 +4845,7 @@ You have access to all Bash tools to execute git commands like:
           onColorChange={handleColorChange}
           onEdit={handleEditTerminal}
           onDuplicate={handleDuplicateTerminal}
+          onReset={handleResetTerminal}
           onToggleGroup={handleToggleGroup}
           onReorder={handleReorderTerminals}
           onOpenSettings={() => setShowSettings(true)}
@@ -4862,6 +4920,12 @@ You have access to all Bash tools to execute git commands like:
               openaiApiKey={openaiApiKey ?? undefined}
               // Open Prompt Engineer
               onOpenPromptEngineer={handleOpenPromptEngineer}
+              // Agent display info
+              agentName={activeTerminal?.label || 'Jack'}
+              agentAvatar={activeTerminal?.avatar ? getAgentAvatar(activeTerminal.label, activeTerminal.avatar) : undefined}
+              // Project context
+              projectName={projectName}
+              gitBranch={gitBranch}
             />
               )}
 
@@ -4918,6 +4982,22 @@ You have access to all Bash tools to execute git commands like:
                   />
                 </div>
               )}
+
+              {/* Agent Viewer - shown when agent tab is active */}
+              {activeTabId.startsWith('agent-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'agent' && activeTab.agentName && activeTab.agentScope) {
+                  return (
+                    <AgentViewer
+                      agentName={activeTab.agentName}
+                      agentScope={activeTab.agentScope}
+                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      onRefresh={loadAgents}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (

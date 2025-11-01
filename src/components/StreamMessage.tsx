@@ -21,9 +21,11 @@ interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
   onFilePathClick?: (path: string) => void;
+  agentName?: string;
+  agentAvatar?: string;
 }
 
-const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick }) => {
+const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick, agentName = 'Jack', agentAvatar }) => {
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
     const results = new Map<string, any>();
@@ -71,10 +73,14 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             return (
               <div key={idx} className="assistant-text">
                 <div className="assistant-avatar">
-                  <img src={duckAvatar} alt="Jack" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                  {agentAvatar ? (
+                    <img src={agentAvatar} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                  )}
                 </div>
                 <div className="assistant-content">
-                  <div className="assistant-name">Jack</div>
+                  <div className="assistant-name">{agentName}</div>
                   <div className="assistant-message-text">
                     <MarkdownText>{content.text}</MarkdownText>
                   </div>
@@ -296,10 +302,14 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
     return (
       <div className="assistant-text result-message-consolidated">
         <div className="assistant-avatar">
-          <img src={duckAvatar} alt="Jack" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+          {agentAvatar ? (
+            <img src={agentAvatar} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+          )}
         </div>
         <div className="assistant-content">
-          <div className="assistant-name">Jack</div>
+          <div className="assistant-name">{agentName}</div>
           {message.result && (
             <div className="assistant-message-text">
               <MarkdownText>{message.result}</MarkdownText>

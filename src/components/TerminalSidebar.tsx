@@ -48,6 +48,7 @@ interface TerminalSidebarProps {
   onColorChange: (id: string, color: string) => void;
   onEdit: (terminal: TerminalInfo) => void;
   onDuplicate: (terminal: TerminalInfo) => void;
+  onReset: (terminal: TerminalInfo) => void;
   onToggleGroup: (cwd: string) => void;
   onReorder: (reorderedIds: string[]) => void;
   onOpenSettings?: () => void; // NEW: Open settings panel
@@ -77,6 +78,7 @@ export default function TerminalSidebar({
   onColorChange: _onColorChange,
   onEdit,
   onDuplicate,
+  onReset,
   onToggleGroup,
   onReorder,
   onOpenSettings,
@@ -90,6 +92,14 @@ export default function TerminalSidebar({
     position: { x: number; y: number };
     terminal: TerminalInfo;
   } | null>(null);
+
+  // Drag & drop state
+  const [draggedTerminalId, setDraggedTerminalId] = useState<string | null>(null);
+  const [dragOverTerminalId, setDragOverTerminalId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after'>('after');
+  const [draggedGroupCwd, setDraggedGroupCwd] = useState<string | null>(null);
+  const [dragOverGroupCwd, setDragOverGroupCwd] = useState<string | null>(null);
+  const [groupDropPosition, setGroupDropPosition] = useState<'before' | 'after'>('after');
 
   // Filter terminals by query only
   const filteredTerminals = useMemo(() => {
@@ -131,66 +141,123 @@ export default function TerminalSidebar({
     setContextMenu(null);
   };
 
-  const handleMoveUp = (id: string) => {
+  // Drag & drop handlers for terminals
+  const handleTerminalDragStart = (terminal: TerminalInfo) => {
+    setDraggedTerminalId(terminal.id);
+  };
+
+  const handleTerminalDragOver = (terminal: TerminalInfo, event: React.DragEvent) => {
+    if (terminal.id === draggedTerminalId) return;
+
+    // Block drag between different projects (different cwd)
+    const draggedTerminal = terminals.find(t => t.id === draggedTerminalId);
+    if (draggedTerminal && draggedTerminal.cwd !== terminal.cwd) {
+      return; // Don't allow drop if different project
+    }
+
+    // Calculate drop position based on mouse Y position
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const position = event.clientY < midpoint ? 'before' : 'after';
+
+    setDragOverTerminalId(terminal.id);
+    setDropPosition(position);
+  };
+
+  const handleTerminalDragLeave = () => {
+    setDragOverTerminalId(null);
+  };
+
+  const handleTerminalDrop = (targetTerminal: TerminalInfo) => {
+    if (!draggedTerminalId || targetTerminal.id === draggedTerminalId) return;
+
     const currentIds = terminals.map((t) => t.id);
-    const index = currentIds.indexOf(id);
-    if (index <= 0) return; // Già in cima
+    const draggedIndex = currentIds.indexOf(draggedTerminalId);
+    let targetIndex = currentIds.indexOf(targetTerminal.id);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Adjust target index based on drop position
+    if (dropPosition === 'after') {
+      targetIndex += 1;
+    }
 
     const reordered = [...currentIds];
-    reordered.splice(index, 1);
-    reordered.splice(index - 1, 0, id);
+    reordered.splice(draggedIndex, 1);
+
+    // Recalculate insertion index if needed
+    const newTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    reordered.splice(newTargetIndex, 0, draggedTerminalId);
+
     onReorder(reordered);
+    setDragOverTerminalId(null);
   };
 
-  const handleMoveDown = (id: string) => {
+  const handleTerminalDragEnd = () => {
+    setDraggedTerminalId(null);
+    setDragOverTerminalId(null);
+  };
+
+  // Drag & drop handlers for groups
+  const handleGroupDragStart = (cwd: string) => {
+    setDraggedGroupCwd(cwd);
+  };
+
+  const handleGroupDragOver = (cwd: string, event: React.DragEvent) => {
+    if (cwd === draggedGroupCwd) return;
+
+    // Calculate drop position based on mouse Y position
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const position = event.clientY < midpoint ? 'before' : 'after';
+
+    setDragOverGroupCwd(cwd);
+    setGroupDropPosition(position);
+  };
+
+  const handleGroupDragLeave = () => {
+    setDragOverGroupCwd(null);
+  };
+
+  const handleGroupDrop = (targetCwd: string) => {
+    if (!draggedGroupCwd || targetCwd === draggedGroupCwd) return;
+
+    // Find all terminals in both groups
+    const draggedGroup = cwdGroups.groups.find(([cwd]) => cwd === draggedGroupCwd)?.[1] || [];
+    const targetGroup = cwdGroups.groups.find(([cwd]) => cwd === targetCwd)?.[1] || [];
+
+    if (draggedGroup.length === 0 || targetGroup.length === 0) return;
+
     const currentIds = terminals.map((t) => t.id);
-    const index = currentIds.indexOf(id);
-    if (index === -1 || index >= currentIds.length - 1) return; // Già in fondo
+    const draggedGroupIds = draggedGroup.map((t) => t.id);
 
-    const reordered = [...currentIds];
-    reordered.splice(index, 1);
-    reordered.splice(index + 1, 0, id);
+    // Remove dragged group terminals from current order
+    const withoutDragged = currentIds.filter((id) => !draggedGroupIds.includes(id));
+
+    // Determine insertion point based on drop position
+    let insertId: string;
+    if (groupDropPosition === 'before') {
+      insertId = targetGroup[0].id;
+    } else {
+      insertId = targetGroup[targetGroup.length - 1].id;
+    }
+
+    const insertIndex = withoutDragged.indexOf(insertId);
+    const finalIndex = groupDropPosition === 'before' ? insertIndex : insertIndex + 1;
+
+    // Insert dragged group at the correct position
+    const reordered = [...withoutDragged];
+    reordered.splice(finalIndex, 0, ...draggedGroupIds);
+
     onReorder(reordered);
+    setDragOverGroupCwd(null);
   };
 
-  // SIMPLE: Move groups by cwd
-  const handleMoveGroupUp = (cwd: string) => {
-    // Find all terminals in this cwd group
-    const groupTerminals = cwdGroups.groups.find(([groupCwd]) => groupCwd === cwd)?.[1] || [];
-    if (groupTerminals.length === 0) return;
-
-    const firstTerminalId = groupTerminals[0].id;
-    const currentIds = terminals.map((t) => t.id);
-    const firstIndex = currentIds.indexOf(firstTerminalId);
-
-    if (firstIndex <= 0) return; // Already at top
-
-    const groupIds = groupTerminals.map((t) => t.id);
-    const withoutGroup = currentIds.filter((id) => !groupIds.includes(id));
-
-    const reordered = [...withoutGroup];
-    reordered.splice(firstIndex - 1, 0, ...groupIds);
-    onReorder(reordered);
+  const handleGroupDragEnd = () => {
+    setDraggedGroupCwd(null);
+    setDragOverGroupCwd(null);
   };
 
-  const handleMoveGroupDown = (cwd: string) => {
-    // Find all terminals in this cwd group
-    const groupTerminals = cwdGroups.groups.find(([groupCwd]) => groupCwd === cwd)?.[1] || [];
-    if (groupTerminals.length === 0) return;
-
-    const lastTerminalId = groupTerminals[groupTerminals.length - 1].id;
-    const currentIds = terminals.map((t) => t.id);
-    const lastIndex = currentIds.indexOf(lastTerminalId);
-
-    if (lastIndex === -1 || lastIndex >= currentIds.length - 1) return; // Already at bottom
-
-    const groupIds = groupTerminals.map((t) => t.id);
-    const withoutGroup = currentIds.filter((id) => !groupIds.includes(id));
-
-    const reordered = [...withoutGroup];
-    reordered.splice(lastIndex, 0, ...groupIds);
-    onReorder(reordered);
-  };
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -247,14 +314,6 @@ export default function TerminalSidebar({
       <div className="sidebar-list">
         {/* SIMPLE: Render cwd-based groups */}
         {cwdGroups.groups.map(([cwd, groupTerminals]) => {
-          const firstTerminalId = groupTerminals[0]?.id;
-          const lastTerminalId = groupTerminals[groupTerminals.length - 1]?.id;
-          const firstIndex = firstTerminalId ? terminals.findIndex(t => t.id === firstTerminalId) : -1;
-          const lastIndex = lastTerminalId ? terminals.findIndex(t => t.id === lastTerminalId) : -1;
-
-          const canGroupMoveUp = firstIndex > 0;
-          const canGroupMoveDown = lastIndex >= 0 && lastIndex < terminals.length - 1;
-
           const isCollapsed = collapsedGroups.has(cwd);
 
           return (
@@ -264,17 +323,29 @@ export default function TerminalSidebar({
               terminals={groupTerminals}
               isCollapsed={isCollapsed}
               activeId={activeId}
-              canGroupMoveUp={canGroupMoveUp}
-              canGroupMoveDown={canGroupMoveDown}
               chatSessions={chatSessions}
               onToggle={() => onToggleGroup(cwd)}
               onSelect={handleSelectTerminal}
               onClose={onClose}
               onContextMenu={handleContextMenu}
-              onMoveUp={handleMoveUp}
-              onMoveDown={handleMoveDown}
-              onMoveGroupUp={() => handleMoveGroupUp(cwd)}
-              onMoveGroupDown={() => handleMoveGroupDown(cwd)}
+              // Drag & drop for terminals
+              draggedTerminalId={draggedTerminalId}
+              dragOverTerminalId={dragOverTerminalId}
+              dropPosition={dropPosition}
+              onTerminalDragStart={handleTerminalDragStart}
+              onTerminalDragOver={handleTerminalDragOver}
+              onTerminalDragLeave={handleTerminalDragLeave}
+              onTerminalDrop={handleTerminalDrop}
+              onTerminalDragEnd={handleTerminalDragEnd}
+              // Drag & drop for groups
+              draggedGroupCwd={draggedGroupCwd}
+              dragOverGroupCwd={dragOverGroupCwd}
+              groupDropPosition={groupDropPosition}
+              onGroupDragStart={handleGroupDragStart}
+              onGroupDragOver={handleGroupDragOver}
+              onGroupDragLeave={handleGroupDragLeave}
+              onGroupDrop={handleGroupDrop}
+              onGroupDragEnd={handleGroupDragEnd}
             />
           );
         })}
@@ -303,6 +374,7 @@ export default function TerminalSidebar({
             // Copy handled inside ContextMenu
           }}
           onDuplicate={() => onDuplicate(contextMenu.terminal)}
+          onReset={() => onReset(contextMenu.terminal)}
           onCloseTerminal={() => onClose(contextMenu.terminal.id)}
         />
       )}

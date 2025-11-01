@@ -5,6 +5,7 @@ import StreamMessage from './StreamMessage';
 import { getAgentAvatar } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
 import duckAvatar from '../../images/duck.png';
+import cyberducksAvatar from '../../images/cyberducks.png';
 import './ChatMessage.css';
 import './StreamMessage.css';
 
@@ -12,9 +13,13 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onOpenFile?: (path: string) => void;
   onFilePathClick?: (path: string) => void;
+  agentName?: string;
+  agentAvatar?: string;
+  projectName?: string;
+  gitBranch?: string;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack', agentAvatar, projectName, gitBranch }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -107,6 +112,20 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
               <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
             </svg>
           </div>
+        ) : (projectName && gitBranch) ? (
+          <img
+            src={cyberducksAvatar}
+            alt="Project Context"
+            className="avatar-icon assistant-avatar-img"
+            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+          />
+        ) : agentAvatar ? (
+          <img
+            src={agentAvatar}
+            alt={agentName}
+            className="avatar-icon assistant-avatar-img"
+            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+          />
         ) : (
           <div className="avatar-icon assistant-avatar">🦆</div>
         )}
@@ -114,7 +133,12 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
       <div className="chat-message-content">
         <div className="chat-message-header">
           <span className="chat-message-role">
-            {isUser ? 'You' : 'Quack Agency'}
+            {isUser
+              ? 'You'
+              : (projectName && gitBranch)
+                ? `${projectName} • ${gitBranch}`
+                : agentName
+            }
           </span>
           <span className="chat-message-timestamp">
             {new Date(message.timestamp).toLocaleTimeString('it-IT', {
@@ -132,6 +156,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick }: ChatMessageProps)
                 message={event}
                 streamMessages={message.events || []}
                 onFilePathClick={onFilePathClick}
+                agentName={agentName}
+                agentAvatar={agentAvatar}
               />
             ))}
           </div>

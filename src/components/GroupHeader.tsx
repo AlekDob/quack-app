@@ -4,14 +4,20 @@ interface GroupHeaderProps {
   cwd: string
   count: number
   isCollapsed: boolean
-  canMoveUp: boolean
-  canMoveDown: boolean
   // Phase 4: AgentChat display data (optional for backward compatibility)
   agentChatName?: string
   agentChatColor?: string
   onToggle: () => void
-  onMoveUp: () => void
-  onMoveDown: () => void
+  // Drag & drop support
+  draggedTerminalId: string | null
+  draggedGroupCwd: string | null
+  dragOverGroupCwd: string | null
+  groupDropPosition: 'before' | 'after'
+  onGroupDragStart: (cwd: string) => void
+  onGroupDragOver: (cwd: string, event: React.DragEvent) => void
+  onGroupDragLeave: () => void
+  onGroupDrop: (targetCwd: string) => void
+  onGroupDragEnd: () => void
 }
 
 const getSmartPath = (fullPath: string): string => {
@@ -46,24 +52,58 @@ export default function GroupHeader({
   cwd,
   count,
   isCollapsed,
-  canMoveUp,
-  canMoveDown,
   agentChatName,
   agentChatColor,
   onToggle,
-  onMoveUp,
-  onMoveDown
+  draggedTerminalId,
+  draggedGroupCwd,
+  dragOverGroupCwd,
+  groupDropPosition,
+  onGroupDragStart,
+  onGroupDragOver,
+  onGroupDragLeave,
+  onGroupDrop,
+  onGroupDragEnd,
 }: GroupHeaderProps) {
   const smartPath = useMemo(() => getSmartPath(cwd), [cwd])
 
   // Phase 4: Use AgentChat name if available, otherwise fall back to smart path
   const displayName = agentChatName || smartPath
 
+  const isDragging = draggedGroupCwd === cwd
+  const isDragOver = dragOverGroupCwd === cwd
+
+  // Don't show drop indicator on group header if dragging a terminal (only when dragging groups)
+  const isTerminalDrag = draggedTerminalId !== null
+  const shouldShowDropIndicator = isDragOver && !isTerminalDrag
+
+  const headerClasses = [
+    'group-header',
+    isCollapsed ? 'collapsed' : 'expanded',
+    isDragging ? 'dragging' : '',
+    shouldShowDropIndicator && groupDropPosition === 'before' ? 'drag-over-before' : '',
+    shouldShowDropIndicator && groupDropPosition === 'after' ? 'drag-over-after' : '',
+  ].filter(Boolean).join(' ')
+
   return (
-    <div className="group-header-wrapper">
+    <div
+      className="group-header-wrapper"
+      draggable={true}
+      onDragStart={() => onGroupDragStart(cwd)}
+      onDragOver={(e) => {
+        e.preventDefault()
+        onGroupDragOver(cwd, e)
+      }}
+      onDragLeave={onGroupDragLeave}
+      onDrop={(e) => {
+        e.preventDefault()
+        onGroupDrop(cwd)
+      }}
+      onDragEnd={onGroupDragEnd}
+    >
       <button
         type="button"
-        className={`group-header ${isCollapsed ? 'collapsed' : 'expanded'}`}
+        className={headerClasses}
         onClick={onToggle}
         title={cwd}
         style={agentChatColor ? { '--agent-color': agentChatColor } as React.CSSProperties : undefined}
@@ -84,32 +124,6 @@ export default function GroupHeader({
         <span className="group-path">{displayName}</span>
         <span className="group-count">[{count}]</span>
       </button>
-      <div className="group-reorder-controls">
-        <button
-          type="button"
-          className="terminal-reorder-btn"
-          disabled={!canMoveUp}
-          aria-label="Move group up"
-          onClick={(e) => {
-            e.stopPropagation()
-            onMoveUp()
-          }}
-        >
-          ▲
-        </button>
-        <button
-          type="button"
-          className="terminal-reorder-btn"
-          disabled={!canMoveDown}
-          aria-label="Move group down"
-          onClick={(e) => {
-            e.stopPropagation()
-            onMoveDown()
-          }}
-        >
-          ▼
-        </button>
-      </div>
     </div>
   )
 }

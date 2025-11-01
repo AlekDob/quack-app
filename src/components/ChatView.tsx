@@ -52,6 +52,12 @@ interface ChatViewProps {
   openaiApiKey?: string;
   // Open Prompt Engineer
   onOpenPromptEngineer?: () => void;
+  // Agent display info
+  agentName?: string;
+  agentAvatar?: string;
+  // Project context
+  projectName?: string;
+  gitBranch?: string;
 }
 
 export default function ChatView({
@@ -90,6 +96,12 @@ export default function ChatView({
   openaiApiKey,
   // Open Prompt Engineer
   onOpenPromptEngineer,
+  // Agent display info
+  agentName,
+  agentAvatar,
+  // Project context
+  projectName,
+  gitBranch,
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -151,6 +163,10 @@ export default function ChatView({
         messages={messages}
         loading={isLoading}
         onFilePathClick={onFilePathClick}
+        agentName={agentName}
+        agentAvatar={agentAvatar}
+        projectName={projectName}
+        gitBranch={gitBranch}
       />
       <div className="chat-view-footer">
         <div className="chat-view-footer-controls">

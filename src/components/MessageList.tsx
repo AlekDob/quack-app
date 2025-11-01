@@ -9,9 +9,13 @@ interface MessageListProps {
   messages: ChatMessageType[];
   loading?: boolean;
   onFilePathClick?: (path: string) => void;
+  agentName?: string;
+  agentAvatar?: string;
+  projectName?: string;
+  gitBranch?: string;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, agentName, agentAvatar, projectName, gitBranch }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -153,6 +157,10 @@ export default function MessageList({ messages, loading, onFilePathClick }: Mess
             key={message.id}
             message={message}
             onFilePathClick={onFilePathClick}
+            agentName={agentName}
+            agentAvatar={agentAvatar}
+            projectName={projectName}
+            gitBranch={gitBranch}
           />
         ))}
         {loading && <SkeletonMessage />}

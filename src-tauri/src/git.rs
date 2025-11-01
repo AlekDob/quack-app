@@ -455,3 +455,15 @@ fn status_label(code: char) -> Option<&'static str> {
         _ => None,
     }
 }
+
+#[tauri::command]
+pub fn git_current_branch(root_path: Option<String>) -> Result<String, String> {
+    git_current_branch_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_current_branch_impl(root_path: Option<String>) -> Result<String> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+    let output = run_git(&root, &["branch", "--show-current"], false)?;
+    Ok(output.trim().to_string())
+}

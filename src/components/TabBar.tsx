@@ -4,12 +4,14 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
   terminalId?: string; // Reference to terminal instance for agent-terminal tabs
   icon?: React.ReactNode; // Icon to display before label (e.g., terminal icon)
+  agentName?: string; // Agent name for agent tabs
+  agentScope?: 'global' | 'project'; // Agent scope for agent tabs
 }
 
 interface TabBarProps {
@@ -118,7 +120,7 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           onDrop={(e) => handleDrop(e, tab)}
           onDragEnd={handleDragEnd}
         >
-          {tab.color && tab.type !== 'agent-terminal' && (
+          {tab.color && tab.type !== 'agent-terminal' && tab.type !== 'agent' && (
             <span
               className="tab-color-indicator"
               style={{ backgroundColor: tab.color }}
