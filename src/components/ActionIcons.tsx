@@ -8,6 +8,7 @@ interface ActionIconsProps {
   onUsageClick: () => void;
   onTelegramClick: () => void;
   onTerminalClick: () => void;
+  onBrowserClick: () => void;
 }
 
 function ActionIcons({
@@ -17,6 +18,7 @@ function ActionIcons({
   onUsageClick,
   onTelegramClick,
   onTerminalClick,
+  onBrowserClick,
 }: ActionIconsProps) {
   return (
     <div className="action-icons">
@@ -136,6 +138,46 @@ function ActionIcons({
           />
         </svg>
         <span className="action-icon-tooltip">New Terminal</span>
+      </button>
+
+      {/* Browser Icon */}
+      <button
+        type="button"
+        className="action-icon"
+        onClick={onBrowserClick}
+        aria-label="Open Browser"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle
+            cx="8"
+            cy="8"
+            r="6"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <path
+            d="M8 2C6 2 4 4 4 8C4 12 6 14 8 14"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d="M8 2C10 2 12 4 12 8C12 12 10 14 8 14"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d="M2 8H14"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="action-icon-tooltip">Browser</span>
       </button>
     </div>
   );

@@ -395,6 +395,7 @@ pub fn run() {
             commands::update_command,
             commands::delete_command,
             context::list_claude_md_files,
+            context::list_context_md_files,
             context::get_claude_md_details,
             context::save_claude_md_content,
             fs::list_directory,

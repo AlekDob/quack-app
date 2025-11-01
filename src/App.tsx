@@ -39,6 +39,7 @@ import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
+import BrowserTab from "./components/BrowserTab";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
@@ -4008,6 +4009,47 @@ function App() {
     handleOpenFilePreview(fakeEntry);
   }, [handleOpenFilePreview]);
 
+  // Handler to open a browser tab
+  const handleOpenBrowserTab = useCallback(() => {
+    // Create unique browser tab ID
+    const browserTabId = `browser-${Date.now()}`;
+
+    const newBrowserTab: Tab = {
+      id: browserTabId,
+      label: 'Browser',
+      type: 'browser',
+      closable: true,
+      url: 'https://google.com',
+      icon: '🌐',
+    };
+
+    setTabs((prevTabs) => {
+      // Check if browser tab already exists
+      const existingBrowserTab = prevTabs.find(t => t.type === 'browser');
+      if (existingBrowserTab) {
+        // Activate existing browser tab
+        setActiveTabId(existingBrowserTab.id);
+        return prevTabs;
+      }
+
+      // Add new browser tab
+      return [...prevTabs, newBrowserTab];
+    });
+
+    // Also save to tabsByTerminal for the active terminal
+    if (activeId) {
+      setTabsByTerminal((prev) => {
+        const updated = new Map(prev);
+        const terminalTabs = updated.get(activeId) || [];
+        updated.set(activeId, [...terminalTabs, newBrowserTab]);
+        return updated;
+      });
+    }
+
+    // Set new browser tab as active
+    setActiveTabId(browserTabId);
+  }, [activeId]);
+
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
     setActiveTabId(tabId);
@@ -4988,6 +5030,7 @@ You have access to all Bash tools to execute git commands like:
               }}
               onTelegramClick={() => setShowTelegramSetup(true)}
               onTerminalClick={handleCreateAgentTerminal}
+              onBrowserClick={handleOpenBrowserTab}
             />
 
             {/* Tab Bar - VSCode style */}
@@ -5119,6 +5162,32 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+              {/* Browser Tab - shown when browser tab is active */}
+              {activeTabId.startsWith('browser-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'browser') {
+                  return (
+                    <BrowserTab
+                      tabId={activeTab.id}
+                      initialUrl={activeTab.url || 'https://google.com'}
+                      onUrlChange={(url) => {
+                        // Update tab URL
+                        setTabs((prevTabs) =>
+                          prevTabs.map((t) =>
+                            t.id === activeTab.id ? { ...t, url } : t
+                          )
+                        );
+                      }}
+                      onFileOpen={(filePath) => {
+                        // Open file in new tab when inspector detects component
+                        handleFilePathClick(filePath);
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (
                 <div style={{
@@ -5189,6 +5258,20 @@ You have access to all Bash tools to execute git commands like:
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={handleOpenContextDrawer}
+          // Agent Context props
+          activeAgentId={activeId || null}
+          activeAgentName={(() => {
+            const activeTerminal = terminals.find((t) => t.id === activeId);
+            return activeTerminal?.label || null;
+          })()}
+          activeAgentAvatar={(() => {
+            const activeTerminal = terminals.find((t) => t.id === activeId);
+            return activeTerminal?.avatar || null;
+          })()}
+          activeAgentWorkingOn={(() => {
+            const activeTerminal = terminals.find((t) => t.id === activeId);
+            return activeTerminal?.workingOn || null;
+          })()}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}
@@ -5205,49 +5288,6 @@ You have access to all Bash tools to execute git commands like:
           }
           savedCommandsOpen={savedCommandsDrawerOpen}
           onCreateTerminal={handleQuickCreateTerminal}
-          // Native Terminals props
-          nativeTerminals={nativeTerminals}
-          onAddNativeTerminal={() => setShowAddNativeTerminalModal(true)}
-          onRemoveNativeTerminal={async (id) => {
-            const terminal = nativeTerminals.find((t) => t.id === id);
-            if (!terminal) return;
-            try {
-              await invoke("close_native_terminal", {
-                name: terminal.name,
-                app: terminal.app,
-              });
-              setNativeTerminals((prev) => prev.filter((t) => t.id !== id));
-            } catch (error) {
-              console.error("Failed to close native terminal:", error);
-            }
-          }}
-          onUpdateNativeTerminal={(id, updates) => {
-            setNativeTerminals((prev) =>
-              prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-            );
-          }}
-          onOpenNativeTerminal={(terminal) => {
-            // Aggiorna solo lo stato - l'invoke è già fatto in NativeTerminalPanel
-            setNativeTerminals((prev) =>
-              prev.map((t) =>
-                t.id === terminal.id ? { ...t, isOpen: true } : t
-              )
-            );
-          }}
-          onFocusNativeTerminal={(terminal) => {
-            // Aggiorna solo lo stato - l'invoke è già fatto in NativeTerminalPanel
-            setNativeTerminals((prev) =>
-              prev.map((t) =>
-                t.id === terminal.id ? { ...t, isOpen: true } : t
-              )
-            );
-          }}
-          onMarkClosedNativeTerminal={(id) => {
-            // Mark terminal as closed when focus fails (window was closed externally)
-            setNativeTerminals((prev) =>
-              prev.map((t) => (t.id === id ? { ...t, isOpen: false } : t))
-            );
-          }}
           // Usage props
           usageSessions={usageSessions}
           onClearUsage={handleClearUsage}

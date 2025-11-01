@@ -5,22 +5,47 @@ import SkillsPanel from "./SkillsPanel";
 import MCPPanel from "./MCPPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import ContextPanel from "./ContextPanel";
+import AgentContextPanel from "./AgentContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
-import { TerminalWindowsPanel } from "./TerminalWindowsPanel";
 import UsagePanel from "./UsagePanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, NativeTerminal, SessionUsage } from "../types";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: File Explorer, Agents, Skills, MCP, Commands, Context, Terminal, Terminal Windows, Usage
+ * Tabs: Agent Context, File Explorer, Agents, Skills, MCP, Commands, Context, Terminal, Usage
  */
 
-type TabId = "explorer" | "agents" | "skills" | "mcp" | "commands" | "context" | "terminal" | "terminal-windows" | "usage";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "context" | "terminal" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
+  agentContext: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <circle
+        cx="10"
+        cy="7"
+        r="3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M5 17a5 5 0 0 1 10 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 5l2-2M6 5L4 3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
   folder: (
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
       <path
@@ -239,6 +264,12 @@ interface SidePanelProps {
   tauriAvailable: boolean;
   onOpenContextDrawer: (scope: string) => void;
 
+  // Agent Context props
+  activeAgentId?: string | null;
+  activeAgentName?: string | null;
+  activeAgentAvatar?: string | null;
+  activeAgentWorkingOn?: string | null;
+
   // Terminal props
   activeTerminalId: string | null;
   terminals: TerminalInfo[];
@@ -252,15 +283,6 @@ interface SidePanelProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onCreateTerminal: () => void;
-
-  // Native Terminals props
-  nativeTerminals: NativeTerminal[];
-  onAddNativeTerminal: () => void;
-  onRemoveNativeTerminal: (id: string) => void;
-  onUpdateNativeTerminal: (id: string, updates: Partial<NativeTerminal>) => void;
-  onOpenNativeTerminal: (terminal: NativeTerminal) => void;
-  onFocusNativeTerminal: (terminal: NativeTerminal) => void;
-  onMarkClosedNativeTerminal: (id: string) => void;
 
   // Usage props
   usageSessions: SessionUsage[];
@@ -310,6 +332,12 @@ export default function SidePanel({
   tauriAvailable,
   onOpenContextDrawer,
 
+  // Agent Context
+  activeAgentId,
+  activeAgentName,
+  activeAgentAvatar,
+  activeAgentWorkingOn,
+
   // Terminal
   activeTerminalId,
   terminals,
@@ -324,23 +352,19 @@ export default function SidePanel({
   savedCommandsOpen,
   onCreateTerminal,
 
-  // Native Terminals
-  nativeTerminals,
-  onAddNativeTerminal,
-  onRemoveNativeTerminal,
-  onUpdateNativeTerminal,
-  onOpenNativeTerminal: _onOpenNativeTerminal,
-  onFocusNativeTerminal: _onFocusNativeTerminal,
-  onMarkClosedNativeTerminal: _onMarkClosedNativeTerminal,
-
   // Usage
   usageSessions,
   onClearUsage,
 }: SidePanelProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("explorer");
+  const [activeTab, setActiveTab] = useState<TabId>("agent-context");
 
   // Tab configuration
   const tabs = [
+    {
+      id: "agent-context" as TabId,
+      label: "Agent Context",
+      icon: icons.agentContext,
+    },
     {
       id: "explorer" as TabId,
       label: "File Explorer",
@@ -381,13 +405,14 @@ export default function SidePanel({
     //   label: "Terminal",
     //   icon: icons.terminal,
     // },
-    {
-      id: "terminal-windows" as TabId,
-      label: "Terminal Windows",
-      icon: icons.terminalWindows,
-      badge: nativeTerminals.length,
-      hasContent: nativeTerminals.length > 0,
-    },
+    // Terminal Windows tab removed - merged into Agent Context
+    // {
+    //   id: "terminal-windows" as TabId,
+    //   label: "Terminal Windows",
+    //   icon: icons.terminalWindows,
+    //   badge: nativeTerminals.length,
+    //   hasContent: nativeTerminals.length > 0,
+    // },
     // Usage tab removed - button moved to ToolBar
     // {
     //   id: "usage" as TabId,
@@ -430,6 +455,20 @@ export default function SidePanel({
       </div>
 
       <div className="side-panel-content">
+        {activeTab === "agent-context" && (
+          <div className="side-panel-pane">
+            <AgentContextPanel
+              tauriAvailable={tauriAvailable}
+              activeAgentId={activeAgentId}
+              activeAgentName={activeAgentName}
+              activeAgentAvatar={activeAgentAvatar}
+              activeAgentWorkingOn={activeAgentWorkingOn}
+              onOpenFile={onOpenFile}
+              onOpenContextDrawer={onOpenContextDrawer}
+            />
+          </div>
+        )}
+
         {activeTab === "explorer" && (
           <div className="side-panel-pane">
           <FileExplorer
@@ -567,22 +606,6 @@ export default function SidePanel({
                 <p>Click + to create a new terminal</p>
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === "terminal-windows" && (
-          <div className="side-panel-pane terminal-panel-pane">
-            <div className="terminal-container-with-iconbar">
-              <TerminalWindowsPanel
-                terminals={nativeTerminals}
-                onAdd={onAddNativeTerminal}
-                onRemove={onRemoveNativeTerminal}
-                onUpdateTerminal={onUpdateNativeTerminal}
-                onToggleSavedCommands={onToggleSavedCommands}
-                savedCommandsOpen={savedCommandsOpen}
-              />
-              {/* TerminalToolBar now integrated in drawer footer */}
-            </div>
           </div>
         )}
 

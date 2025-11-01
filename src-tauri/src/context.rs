@@ -7,6 +7,8 @@ pub struct ContextFile {
     pub name: String,
     pub scope: String, // "global" or "project"
     pub exists: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>, // Full file path (for .md files in .claude/)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,6 +54,7 @@ pub fn list_claude_md_files(working_dir: Option<String>) -> Result<Vec<ContextFi
         name: "Global Context".to_string(),
         scope: "global".to_string(),
         exists: global_file.exists(),
+        path: None,
     });
 
     // Project CLAUDE.md
@@ -64,7 +67,73 @@ pub fn list_claude_md_files(working_dir: Option<String>) -> Result<Vec<ContextFi
         name: "Project Context".to_string(),
         scope: "project".to_string(),
         exists: project_exists,
+        path: None,
     });
+
+    Ok(files)
+}
+
+/// List all .md files in .claude/ directories (both global and project)
+/// This includes files in subdirectories like .claude/agents/, .claude/commands/, etc.
+#[tauri::command]
+pub fn list_context_md_files(working_dir: Option<String>) -> Result<Vec<ContextFile>, String> {
+    let mut files = Vec::new();
+
+    // Helper function to recursively find .md files
+    fn find_md_files(dir: &PathBuf, scope: &str, files: &mut Vec<ContextFile>) -> Result<(), String> {
+        if !dir.exists() || !dir.is_dir() {
+            return Ok(());
+        }
+
+        let entries = fs::read_dir(dir)
+            .map_err(|e| format!("Failed to read directory {:?}: {}", dir, e))?;
+
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let path = entry.path();
+
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    if extension == "md" {
+                        let file_name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        let full_path = path
+                            .to_str()
+                            .ok_or_else(|| "Invalid file path".to_string())?
+                            .to_string();
+
+                        files.push(ContextFile {
+                            name: file_name,
+                            scope: scope.to_string(),
+                            exists: true,
+                            path: Some(full_path),
+                        });
+                    }
+                }
+            } else if path.is_dir() {
+                // Recurse into subdirectories
+                find_md_files(&path, scope, files)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    // Search global .claude/ directory
+    let global_dir = get_global_claude_directory()?;
+    if let Err(e) = find_md_files(&global_dir, "global", &mut files) {
+        eprintln!("Warning: Failed to search global .claude/ directory: {}", e);
+    }
+
+    // Search project .claude/ directory
+    let project_dir = get_project_claude_directory(working_dir)?;
+    if let Err(e) = find_md_files(&project_dir, "project", &mut files) {
+        eprintln!("Warning: Failed to search project .claude/ directory: {}", e);
+    }
 
     Ok(files)
 }

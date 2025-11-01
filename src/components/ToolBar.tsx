@@ -3,6 +3,7 @@ interface ToolBarProps {
   onToggleSavedCommands: () => void;
   savedCommandsOpen: boolean;
   onOpenAIAssistant: () => void;
+  onOpenBrowser: () => void;
 }
 
 export default function ToolBar({
@@ -10,6 +11,7 @@ export default function ToolBar({
   onToggleSavedCommands,
   savedCommandsOpen,
   onOpenAIAssistant,
+  onOpenBrowser,
 }: ToolBarProps) {
   const aiTools = [
     {
@@ -27,6 +29,14 @@ export default function ToolBar({
       command: "",
       disabled: false,
       type: "ai-modal",
+    },
+    {
+      id: "browser",
+      label: "Browser",
+      icon: "🌐",
+      command: "",
+      disabled: false,
+      type: "browser",
     },
     {
       id: "microphone",
@@ -72,6 +82,8 @@ export default function ToolBar({
                 onToggleSavedCommands();
               } else if (tool.type === "ai-modal") {
                 onOpenAIAssistant();
+              } else if (tool.type === "browser") {
+                onOpenBrowser();
               } else if (!tool.disabled) {
                 onExecuteCommand(tool.command, tool.label);
               }

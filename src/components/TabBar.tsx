@@ -4,7 +4,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -12,6 +12,7 @@ export interface Tab {
   icon?: React.ReactNode; // Icon to display before label (e.g., terminal icon)
   agentName?: string; // Agent name for agent tabs
   agentScope?: 'global' | 'project'; // Agent scope for agent tabs
+  url?: string; // Current URL for browser tabs
 }
 
 interface TabBarProps {

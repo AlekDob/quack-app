@@ -8589,7 +8589,7 @@ button.directory-chooser:hover {
 /* ========================================= */
 
 .agent-modal {
-  max-width: 520px;
+  max-width: 720px;
   animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

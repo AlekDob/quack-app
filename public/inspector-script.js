@@ -219,24 +219,47 @@
             </div>
           ` : ''}
         </div>
-        <button
-          onclick="window.__quackInspectorCopyForAI()"
-          style="
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid rgba(16, 185, 129, 0.4);
-            background: rgba(16, 185, 129, 0.2);
-            color: rgb(110, 231, 183);
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
-          "
-          onmouseover="this.style.background='rgba(16, 185, 129, 0.3)'"
-          onmouseout="this.style.background='rgba(16, 185, 129, 0.2)'"
-        >
-          Copy for AI
-        </button>
+        <div style="display: flex; gap: 6px;">
+          ${fileName ? `
+            <button
+              onclick="window.__quackInspectorOpenInQuack()"
+              style="
+                padding: 4px 8px;
+                border-radius: 4px;
+                border: 1px solid rgba(96, 165, 250, 0.4);
+                background: rgba(59, 130, 246, 0.2);
+                color: rgb(147, 197, 253);
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.2s;
+              "
+              onmouseover="this.style.background='rgba(59, 130, 246, 0.3)'"
+              onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'"
+              title="Open in Quack"
+            >
+              📂 Open
+            </button>
+          ` : ''}
+          <button
+            onclick="window.__quackInspectorCopyForAI()"
+            style="
+              padding: 4px 8px;
+              border-radius: 4px;
+              border: 1px solid rgba(16, 185, 129, 0.4);
+              background: rgba(16, 185, 129, 0.2);
+              color: rgb(110, 231, 183);
+              font-size: 12px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: background 0.2s;
+            "
+            onmouseover="this.style.background='rgba(16, 185, 129, 0.3)'"
+            onmouseout="this.style.background='rgba(16, 185, 129, 0.2)'"
+          >
+            Copy for AI
+          </button>
+        </div>
       </div>
 
       ${data.component?.componentStack && data.component.componentStack.length > 0 ? `
@@ -356,6 +379,28 @@
     }).catch(err => {
       console.error('Failed to copy:', err);
     });
+  };
+
+  // Open in Quack
+  window.__quackInspectorOpenInQuack = function() {
+    if (!currentInspectorData || !currentInspectorData.component) return;
+
+    const { component } = currentInspectorData;
+
+    if (!component.fileName) {
+      console.warn('🦆 No file name available to open in Quack');
+      return;
+    }
+
+    // Send message to parent window (Quack) to open file
+    window.parent.postMessage({
+      type: 'quack-open-file',
+      fileName: component.fileName,
+      lineNumber: component.lineNumber,
+      columnNumber: component.columnNumber
+    }, '*');
+
+    console.log('🦆 Opening file in Quack:', component.fileName);
   };
 
   // Select from history
