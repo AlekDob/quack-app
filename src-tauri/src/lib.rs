@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Mutex;
 
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
 use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Manager, image::Image};
 
@@ -26,6 +26,7 @@ mod personality;
 mod plugins;
 mod preferences;
 mod preview;
+mod proxy;
 mod reveal;
 mod skills;
 mod slash_commands;
@@ -339,10 +340,11 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let state = HookState { app: app_handle.clone() };
 
-                // Create combined router with both terminal hooks and Telegram webhook
+                // Create combined router with terminal hooks, Telegram webhook, and proxy
                 let telegram_router = telegram_bot::create_telegram_router(app_handle.clone());
                 let router = Router::new()
                     .route("/terminal/status", post(handle_status_update))
+                    .route("/proxy", get(proxy::proxy_handler))
                     .with_state(state)
                     .merge(telegram_router);
 
@@ -352,6 +354,7 @@ pub fn run() {
                     Ok(listener) => {
                         log::info!("🦆 HTTP server started on http://127.0.0.1:6768");
                         log::info!("🦆 Telegram webhook available at: http://127.0.0.1:6768/telegram/webhook");
+                        log::info!("🦆 Proxy server available at: http://127.0.0.1:6768/proxy?url=...");
                         if let Err(error) = axum::serve(listener, router.into_make_service()).await
                         {
                             log::error!("HTTP hook server error: {error}");

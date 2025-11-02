@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
-import { inspectorBridge } from '../services/inspectorBridge';
 import './BrowserTab.css';
 
 interface BrowserTabProps {
@@ -11,7 +10,8 @@ interface BrowserTabProps {
 }
 
 export default function BrowserTab({
-  initialUrl = 'https://google.com',
+  tabId,
+  initialUrl = 'https://quack.build',
   onUrlChange,
   onFileOpen,
 }: BrowserTabProps) {
@@ -21,34 +21,32 @@ export default function BrowserTab({
   const [inspectorActive, setInspectorActive] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Initialize inspector bridge
+  // Sync URL from parent when tab becomes active
   useEffect(() => {
-    inspectorBridge.init();
+    if (initialUrl && initialUrl !== url) {
+      setUrl(initialUrl);
+      setInputUrl(initialUrl);
+    }
+  }, [initialUrl, url]);
 
-    return () => {
-      inspectorBridge.destroy();
-    };
-  }, []);
-
-  // Listen for inspector events
+  // Listen for messages from inspector script
   useEffect(() => {
-    const handleInspectorClick = (data: any) => {
-      console.log('🦆 Inspector click:', data);
+    const handleMessage = (event: MessageEvent) => {
+      // Only handle messages from our iframe
+      if (event.source !== iframeRef.current?.contentWindow) {
+        return;
+      }
 
-      if (data.component?.fileName && onFileOpen) {
-        onFileOpen(
-          data.component.fileName,
-          data.component.lineNumber,
-          data.component.columnNumber
-        );
+      const { type, fileName, lineNumber, columnNumber } = event.data;
+
+      if (type === 'quack-open-file' && fileName && onFileOpen) {
+        console.log('🦆 Opening file from inspector:', fileName);
+        onFileOpen(fileName, lineNumber, columnNumber);
       }
     };
 
-    inspectorBridge.on('click', handleInspectorClick);
-
-    return () => {
-      inspectorBridge.off('click', handleInspectorClick);
-    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, [onFileOpen]);
 
   // Inject inspector script when iframe loads
@@ -59,14 +57,35 @@ export default function BrowserTab({
     const handleLoad = async () => {
       setIsLoading(false);
 
-      // Wait a bit for iframe to be ready
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Only inject for localhost URLs (CORS restriction)
+      if (!url.includes('localhost') && !url.includes('127.0.0.1')) {
+        console.warn('🦆 Inspector only works for localhost URLs');
+        return;
+      }
+
+      // Wait for iframe to be ready
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       try {
-        await inspectorBridge.injectScript(iframe);
-        console.log('🦆 Inspector script injected!');
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) {
+          console.error('🦆 Cannot access iframe document (CORS)');
+          return;
+        }
+
+        // Load inspector script
+        const response = await fetch('/inspector-script.js');
+        const scriptContent = await response.text();
+
+        // Inject script
+        const script = iframeDoc.createElement('script');
+        script.textContent = scriptContent;
+        script.type = 'text/javascript';
+        (iframeDoc.head || iframeDoc.body).appendChild(script);
+
+        console.log('🦆 Inspector script injected successfully!');
       } catch (error) {
-        console.error('Failed to inject inspector:', error);
+        console.error('🦆 Failed to inject inspector:', error);
       }
     };
 
@@ -119,25 +138,35 @@ export default function BrowserTab({
 
   const handleOpenInBrowser = useCallback(async () => {
     try {
-      await open(url);
-      console.log('🦆 Opened in external browser:', url);
+      // Open the original URL (inputUrl), not the proxied URL
+      await open(inputUrl);
+      console.log('🦆 Opened in external browser:', inputUrl);
     } catch (error) {
       console.error('Failed to open in browser:', error);
     }
-  }, [url]);
+  }, [inputUrl]);
+
+  const toggleInspector = useCallback(() => {
+    const newState = !inspectorActive;
+    setInspectorActive(newState);
+
+    // Send toggle message to iframe
+    const iframe = iframeRef.current;
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({
+        type: 'quack-inspector-toggle',
+        enabled: newState
+      }, '*');
+    }
+
+    console.log('🦆 Inspector toggled:', newState);
+  }, [inspectorActive]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleNavigate(inputUrl);
     }
   }, [inputUrl, handleNavigate]);
-
-  const toggleInspector = useCallback(() => {
-    const newState = !inspectorActive;
-    setInspectorActive(newState);
-    inspectorBridge.toggle(newState);
-    console.log('🦆 Inspector toggled:', newState);
-  }, [inspectorActive]);
 
   return (
     <div className="browser-tab">

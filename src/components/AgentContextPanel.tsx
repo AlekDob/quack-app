@@ -17,6 +17,7 @@ interface AgentContextPanelProps {
   activeAgentName?: string | null;
   activeAgentAvatar?: string | null;
   activeAgentWorkingOn?: string | null;
+  activeAgentCwd?: string | null;
   onOpenFile?: (entry: DirectoryEntry) => void;
   onOpenContextDrawer?: (scope: string) => void;
 }
@@ -27,6 +28,7 @@ export default function AgentContextPanel({
   activeAgentName,
   activeAgentAvatar,
   activeAgentWorkingOn,
+  activeAgentCwd,
   onOpenFile,
   onOpenContextDrawer,
 }: AgentContextPanelProps) {
@@ -51,16 +53,17 @@ export default function AgentContextPanel({
       setLoading(true);
 
       // Load personality if we have an active agent
-      if (activeAgentId) {
+      if (activeAgentId && activeAgentCwd) {
         try {
-          // Use the agent ID directly (it's the terminal ID)
+          // Use the agent ID directly (it's the terminal ID) and the working directory
           const loadedPersonality = await invoke<AgentPersonality>(
             'load_agent_personality',
             {
-              projectPath: '', // Will be filled by backend
+              projectPath: activeAgentCwd,
               personalityId: activeAgentId,
             }
           );
+          console.log('Loaded personality:', loadedPersonality);
           setPersonality(loadedPersonality);
         } catch (error) {
           console.error('Failed to load personality:', error);
@@ -70,28 +73,15 @@ export default function AgentContextPanel({
         setPersonality(null);
       }
 
-      // Load context files (.claude/**/*.md)
+      // Load CLAUDE.md files (global and project)
       try {
-        const files = await invoke<ContextFile[]>('list_context_md_files', {
-          workingDir: null,
+        const files = await invoke<ContextFile[]>('list_claude_md_files', {
+          workingDir: activeAgentCwd || null,
         });
-        // Filter to show only root-level CLAUDE.md files (not in subdirectories)
-        const claudeFiles = files.filter((f) => {
-          // Check if it's CLAUDE.md
-          if (f.name !== 'CLAUDE.md') return false;
-
-          // Check if it's at root level of .claude/ directory
-          // Split by .claude/ and check if the remaining path is just "CLAUDE.md" (no subdirs)
-          const pathParts = f.path.split('/.claude/');
-          if (pathParts.length < 2) return false;
-
-          const pathAfterClaude = pathParts[1];
-          // Only include if it's exactly "CLAUDE.md" (no slashes = root level)
-          return pathAfterClaude === 'CLAUDE.md' || !pathAfterClaude.includes('/');
-        });
-        setContextFiles(claudeFiles);
+        console.log('Loaded CLAUDE.md files:', files);
+        setContextFiles(files);
       } catch (error) {
-        console.error('Failed to load context files:', error);
+        console.error('Failed to load CLAUDE.md files:', error);
         setContextFiles([]);
       }
     } finally {
@@ -99,23 +89,35 @@ export default function AgentContextPanel({
     }
   };
 
-  const handleFileClick = (file: ContextFile) => {
+  const handleFileClick = async (file: ContextFile) => {
     if (!file.exists) return;
 
-    // If we have onOpenFile, open as tab
-    if (onOpenFile && file.path) {
-      // Convert file path to DirectoryEntry format
-      const entry: DirectoryEntry = {
-        name: file.name,
-        path: file.path,
-        is_dir: false,
-        is_symlink: false,
-      };
-      onOpenFile(entry);
-    }
-    // Otherwise, open context drawer as fallback
-    else if (onOpenContextDrawer) {
-      onOpenContextDrawer(file.scope);
+    // For CLAUDE.md files, we need to get the actual path from the backend
+    try {
+      const details = await invoke<{ content: string; scope: string; file_path: string }>(
+        'get_claude_md_details',
+        {
+          scope: file.scope,
+          workingDir: activeAgentCwd || null,
+        }
+      );
+
+      // Open the file as a tab
+      if (onOpenFile && details.file_path) {
+        const entry: DirectoryEntry = {
+          name: 'CLAUDE.md',
+          path: details.file_path,
+          is_dir: false,
+          is_symlink: false,
+        };
+        onOpenFile(entry);
+      }
+    } catch (error) {
+      console.error('Failed to get CLAUDE.md details:', error);
+      // Fallback to context drawer
+      if (onOpenContextDrawer) {
+        onOpenContextDrawer(file.scope);
+      }
     }
   };
 

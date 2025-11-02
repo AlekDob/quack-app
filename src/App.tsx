@@ -4019,20 +4019,12 @@ function App() {
       label: 'Browser',
       type: 'browser',
       closable: true,
-      url: 'https://google.com',
+      url: 'https://quack.build',
       icon: '🌐',
     };
 
     setTabs((prevTabs) => {
-      // Check if browser tab already exists
-      const existingBrowserTab = prevTabs.find(t => t.type === 'browser');
-      if (existingBrowserTab) {
-        // Activate existing browser tab
-        setActiveTabId(existingBrowserTab.id);
-        return prevTabs;
-      }
-
-      // Add new browser tab
+      // Always add new browser tab (allow multiple)
       return [...prevTabs, newBrowserTab];
     });
 
@@ -5162,31 +5154,49 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Browser Tab - shown when browser tab is active */}
-              {activeTabId.startsWith('browser-') && (() => {
-                const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'browser') {
-                  return (
-                    <BrowserTab
-                      tabId={activeTab.id}
-                      initialUrl={activeTab.url || 'https://google.com'}
-                      onUrlChange={(url) => {
-                        // Update tab URL
-                        setTabs((prevTabs) =>
-                          prevTabs.map((t) =>
-                            t.id === activeTab.id ? { ...t, url } : t
-                          )
-                        );
-                      }}
-                      onFileOpen={(filePath) => {
-                        // Open file in new tab when inspector detects component
-                        handleFilePathClick(filePath);
-                      }}
-                    />
-                  );
-                }
-                return null;
-              })()}
+              {/* Browser Tabs - render ALL browser tabs, show/hide with visibility */}
+              {tabs.some(t => t.type === 'browser') && (
+                <div style={{
+                  flex: 1,
+                  minHeight: 0,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: tabs.some(t => t.type === 'browser' && activeTabId === t.id) ? 'flex' : 'none',
+                  flexDirection: 'column'
+                }}>
+                  {tabs
+                    .filter(t => t.type === 'browser')
+                    .map(tab => (
+                      <div
+                        key={tab.id}
+                        style={{
+                          display: activeTabId === tab.id ? 'flex' : 'none',
+                          flex: 1,
+                          minHeight: 0,
+                          flexDirection: 'column'
+                        }}
+                      >
+                        <BrowserTab
+                          tabId={tab.id}
+                          initialUrl={tab.url || 'https://google.com'}
+                          onUrlChange={(url) => {
+                            // Update tab URL
+                            setTabs((prevTabs) =>
+                              prevTabs.map((t) =>
+                                t.id === tab.id ? { ...t, url } : t
+                              )
+                            );
+                          }}
+                          onFileOpen={(filePath) => {
+                            // Open file in new tab when inspector detects component
+                            handleFilePathClick(filePath);
+                          }}
+                        />
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (
@@ -5271,6 +5281,10 @@ You have access to all Bash tools to execute git commands like:
           activeAgentWorkingOn={(() => {
             const activeTerminal = terminals.find((t) => t.id === activeId);
             return activeTerminal?.workingOn || null;
+          })()}
+          activeAgentCwd={(() => {
+            const activeTerminal = terminals.find((t) => t.id === activeId);
+            return activeTerminal?.cwd || null;
           })()}
           // Terminal props
           activeTerminalId={activeId}

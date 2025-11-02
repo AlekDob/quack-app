@@ -578,6 +578,19 @@
     updateInspectorPanel(data);
   }
 
+  // Listen for toggle messages from parent window
+  window.addEventListener('message', function(event) {
+    if (event.data.type === 'quack-inspector-toggle') {
+      const enabled = event.data.enabled;
+      console.log('🦆 Inspector toggle received from parent:', enabled);
+
+      // Toggle inspector state to match
+      if (enabled !== isActive) {
+        toggleInspector();
+      }
+    }
+  });
+
   // Add pulse animation
   const style = document.createElement('style');
   style.textContent = `

@@ -269,6 +269,7 @@ interface SidePanelProps {
   activeAgentName?: string | null;
   activeAgentAvatar?: string | null;
   activeAgentWorkingOn?: string | null;
+  activeAgentCwd?: string | null;
 
   // Terminal props
   activeTerminalId: string | null;
@@ -337,6 +338,7 @@ export default function SidePanel({
   activeAgentName,
   activeAgentAvatar,
   activeAgentWorkingOn,
+  activeAgentCwd,
 
   // Terminal
   activeTerminalId,
@@ -463,6 +465,7 @@ export default function SidePanel({
               activeAgentName={activeAgentName}
               activeAgentAvatar={activeAgentAvatar}
               activeAgentWorkingOn={activeAgentWorkingOn}
+              activeAgentCwd={activeAgentCwd}
               onOpenFile={onOpenFile}
               onOpenContextDrawer={onOpenContextDrawer}
             />
