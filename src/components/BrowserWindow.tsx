@@ -34,7 +34,7 @@ export default function BrowserWindow({
   // Listen for messages from inspector script
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const { type, fileName, lineNumber, columnNumber } = event.data;
+      const { type, fileName } = event.data;
 
       if (type === 'quack-open-file' && fileName && onFileOpen) {
         console.log('🦆 Opening file from inspector:', fileName);

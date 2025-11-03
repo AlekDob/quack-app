@@ -78,6 +78,9 @@ interface TerminalMetadata {
   label: string;
   color: string;
   cwd: string;
+  workingOn?: string;
+  avatar?: string;
+  branch?: string;
 }
 
 import "./App.css";
@@ -151,6 +154,9 @@ const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
       label: t.label,
       color: t.color,
       cwd: t.cwd,
+      workingOn: t.workingOn,
+      avatar: t.avatar,
+      branch: t.branch,
     }));
     await store.set(STORAGE_KEY, metadata);
     await store.save();
@@ -3108,10 +3114,17 @@ function App() {
                 needsAttention: false,
                 hasResponded: false,
                 responseStartTime: null,
+                workingOn: metadata.workingOn,
+                avatar: metadata.avatar,
+                branch: metadata.branch,
               };
 
               recreated.push(terminalWithState);
-              console.log(`Recreated terminal: ${terminal.label}`);
+              console.log(`Recreated terminal: ${terminal.label}`, {
+                workingOn: metadata.workingOn,
+                avatar: metadata.avatar,
+                branch: metadata.branch,
+              });
             } catch (error) {
               console.warn(
                 `Unable to recreate terminal ${metadata.label}`,

@@ -7,7 +7,6 @@ import { invoke } from '@tauri-apps/api/core';
 
 function BrowserApp() {
   const [initialUrl] = useState<string>('https://quack.build');
-  const browserWindowRef = React.useRef<any>(null);
 
   useEffect(() => {
     // Listen for initial URL from Rust
@@ -39,7 +38,6 @@ function BrowserApp() {
 
   return (
     <BrowserWindow
-      ref={browserWindowRef}
       initialUrl={initialUrl}
       onFileOpen={handleFileOpen}
     />

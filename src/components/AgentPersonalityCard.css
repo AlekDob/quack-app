@@ -88,10 +88,10 @@
 
 .personality-working-on {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.375rem;
   margin-top: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   background: rgba(77, 212, 179, 0.1);
   border: 1px solid rgba(77, 212, 179, 0.25);
   border-radius: 6px;

@@ -68,7 +68,7 @@ function NewTerminalModal({
   workingOn = '',
   avatar,
   personality,
-  branch = '',
+  branch = 'main',
   availableColors,
   selectingDirectory,
   creating,
@@ -202,6 +202,8 @@ function NewTerminalModal({
           </div>
         </div>
 
+        <div className="modal-section-divider" />
+
         <label className="modal-field">
           <span className="field-label">What are you working on?</span>
           <input
@@ -216,11 +218,15 @@ function NewTerminalModal({
           </small>
         </label>
 
+        <div className="modal-section-divider" />
+
         <PersonalityBuilder
           personality={personality || { communicationStyle: 'friendly', specialties: [], skills: [], expressions: [] }}
           onPersonalityChange={onPersonalityChange || (() => {})}
           availableSkills={availableSkills}
         />
+
+        <div className="modal-section-divider" />
 
         <div className="modal-field">
           <span className="field-label">Working directory</span>
@@ -324,6 +330,8 @@ function NewTerminalModal({
             )}
           </div>
         )}
+
+        <div className="modal-section-divider" />
 
         <div className="modal-field">
           <span className="field-label">Agent color</span>
