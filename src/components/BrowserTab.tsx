@@ -21,13 +21,22 @@ export default function BrowserTab({
   const [inspectorActive, setInspectorActive] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Check if current URL is localhost
+  const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🦆 BrowserTab Debug:', { url, inputUrl, isLocalhost, tabId });
+  }, [url, inputUrl, isLocalhost, tabId]);
+
   // Sync URL from parent when tab becomes active
   useEffect(() => {
     if (initialUrl && initialUrl !== url) {
+      console.log('🦆 Syncing URL from parent:', initialUrl);
       setUrl(initialUrl);
       setInputUrl(initialUrl);
     }
-  }, [initialUrl, url]);
+  }, [initialUrl]);
 
   // Listen for messages from inspector script
   useEffect(() => {
@@ -223,17 +232,20 @@ export default function BrowserTab({
         />
 
         <div className="browser-actions">
-          <button
-            type="button"
-            className={`browser-action-button ${inspectorActive ? 'active' : ''}`}
-            onClick={toggleInspector}
-            title="Toggle Inspector (Alt+Shift+Q)"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2L14 6V10L8 14L2 10V6L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M8 8L14 6M8 8L2 6M8 8V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          {/* Inspector toggle - only show for localhost URLs */}
+          {isLocalhost && (
+            <button
+              type="button"
+              className={`browser-action-button ${inspectorActive ? 'active' : ''}`}
+              onClick={toggleInspector}
+              title="Toggle Inspector (Alt+Shift+Q)"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2L14 6V10L8 14L2 10V6L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 8L14 6M8 8L2 6M8 8V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             className="browser-action-button"

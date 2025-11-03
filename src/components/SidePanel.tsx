@@ -4,7 +4,6 @@ import AgentsPanel from "./AgentsPanel";
 import SkillsPanel from "./SkillsPanel";
 import MCPPanel from "./MCPPanel";
 import { CommandsPanel } from "./CommandsPanel";
-import ContextPanel from "./ContextPanel";
 import AgentContextPanel from "./AgentContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
@@ -17,7 +16,7 @@ import type { SlashCommand } from "../hooks/useSlashCommands";
  * Tabs: Agent Context, File Explorer, Agents, Skills, MCP, Commands, Context, Terminal, Usage
  */
 
-type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "context" | "terminal" | "usage";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "terminal" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -396,11 +395,6 @@ export default function SidePanel({
       label: "Commands",
       icon: icons.commands,
     },
-    {
-      id: "context" as TabId,
-      label: "Context",
-      icon: icons.context,
-    },
     // Terminal tab hidden - integrated into terminal-windows
     // {
     //   id: "terminal" as TabId,
@@ -531,15 +525,6 @@ export default function SidePanel({
             <CommandsPanel
               basePath={rootPath || ''}
               onUseCommand={onUseCommand}
-            />
-          </div>
-        )}
-
-        {activeTab === "context" && (
-          <div className="side-panel-pane">
-            <ContextPanel
-              tauriAvailable={tauriAvailable}
-              onOpenContextDrawer={onOpenContextDrawer}
             />
           </div>
         )}

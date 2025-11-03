@@ -39,7 +39,7 @@ import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
-import BrowserTab from "./components/BrowserTab";
+import BrowserManager from "./components/BrowserManager";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
@@ -423,6 +423,16 @@ function App() {
     { id: 'chat', label: 'Chat', type: 'chat', closable: false }
   ]);
   const [activeTabId, setActiveTabId] = useState('chat');
+  // Track last active tab per terminal/agent
+  const lastActiveTabPerTerminal = useRef<Map<string, string>>(new Map());
+
+  // Wrapper to update activeTabId and save it for current terminal
+  const updateActiveTab = useCallback((tabId: string) => {
+    setActiveTabId(tabId);
+    if (activeId) {
+      lastActiveTabPerTerminal.current.set(activeId, tabId);
+    }
+  }, [activeId]);
 
   // Tabs per terminal/agent - each agent has its own set of file tabs
   const [tabsByTerminal, setTabsByTerminal] = useState<Map<string, Tab[]>>(new Map());
@@ -3009,6 +3019,53 @@ function App() {
     tauriAvailable,
   ]);
 
+  // Listen for file open requests from browser window
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const unlistenPromise = listen<{ filePath: string }>('open-file-from-browser', async (event) => {
+      const { filePath } = event.payload;
+      console.log('🦆 Opening file from browser window:', filePath);
+
+      try {
+        // Open file in main window - create file tab directly
+        const fileName = filePath.split('/').pop() || 'Unknown';
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+
+        const newFileTab: Tab = {
+          id: `file-${Date.now()}`,
+          label: fileName,
+          type: 'file',
+          filePath: filePath,
+          closable: true,
+          icon: fileExtension === 'ts' || fileExtension === 'tsx' ? '📘' :
+                fileExtension === 'js' || fileExtension === 'jsx' ? '📙' :
+                fileExtension === 'json' ? '📋' :
+                fileExtension === 'css' || fileExtension === 'scss' ? '🎨' :
+                fileExtension === 'md' ? '📝' : '📄',
+        };
+
+        setTabs((prevTabs) => [...prevTabs, newFileTab]);
+        setActiveTabId(newFileTab.id);
+
+        toast.success('File opened from browser! 📂', {
+          description: filePath,
+          duration: 2000,
+        });
+      } catch (error) {
+        console.error('Failed to open file from browser:', error);
+        toast.error('Failed to open file', {
+          description: String(error),
+          duration: 3000,
+        });
+      }
+    });
+
+    return () => {
+      void unlistenPromise.then((fn) => fn());
+    };
+  }, [tauriAvailable]);
+
   useEffect(() => {
     if (!tauriAvailable) {
       setBooting(false);
@@ -3678,6 +3735,15 @@ function App() {
       setActiveId(id);
       clearTerminalAttention(id);
       clearIdleTimer(id);
+
+      // Restore last active tab for this terminal
+      const lastTab = lastActiveTabPerTerminal.current.get(id);
+      if (lastTab) {
+        setActiveTabId(lastTab);
+      } else {
+        // Default to chat if no history
+        setActiveTabId('chat');
+      }
       const terminal = terminals.find((candidate) => candidate.id === id);
       if (terminal) {
         await loadDirectory(terminal.cwd);
@@ -4009,42 +4075,31 @@ function App() {
     handleOpenFilePreview(fakeEntry);
   }, [handleOpenFilePreview]);
 
-  // Handler to open a browser tab
+  // Handler to open Browser Manager tab
   const handleOpenBrowserTab = useCallback(() => {
-    // Create unique browser tab ID
-    const browserTabId = `browser-${Date.now()}`;
-
-    const newBrowserTab: Tab = {
-      id: browserTabId,
-      label: 'Browser',
+    // Create Browser Manager tab in main Quack tab system
+    const newTab: Tab = {
+      id: `browser-manager-${Date.now()}`,
+      label: 'Browser Manager',
       type: 'browser',
       closable: true,
-      url: 'https://quack.build',
       icon: '🌐',
     };
 
-    setTabs((prevTabs) => {
-      // Always add new browser tab (allow multiple)
-      return [...prevTabs, newBrowserTab];
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
+
+    console.log('🦆 Browser Manager tab opened:', newTab.id);
+
+    toast.success('Browser Manager opened! 🌐', {
+      description: 'Enter a URL to open in native browser window',
+      duration: 2000,
     });
-
-    // Also save to tabsByTerminal for the active terminal
-    if (activeId) {
-      setTabsByTerminal((prev) => {
-        const updated = new Map(prev);
-        const terminalTabs = updated.get(activeId) || [];
-        updated.set(activeId, [...terminalTabs, newBrowserTab]);
-        return updated;
-      });
-    }
-
-    // Set new browser tab as active
-    setActiveTabId(browserTabId);
-  }, [activeId]);
+  }, []);
 
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
-    setActiveTabId(tabId);
+    updateActiveTab(tabId);
 
     // If clicking a file tab, restore its preview
     if (tabId.startsWith('file-')) {
@@ -4061,7 +4116,7 @@ function App() {
         handleOpenFilePreview(fakeEntry);
       }
     }
-  }, [tabs, handleOpenFilePreview]);
+  }, [tabs, handleOpenFilePreview, updateActiveTab]);
 
   const handleTabClose = useCallback(async (tabId: string) => {
     // Don't close the chat tab
@@ -5154,49 +5209,14 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Browser Tabs - render ALL browser tabs, show/hide with visibility */}
-              {tabs.some(t => t.type === 'browser') && (
-                <div style={{
-                  flex: 1,
-                  minHeight: 0,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  display: tabs.some(t => t.type === 'browser' && activeTabId === t.id) ? 'flex' : 'none',
-                  flexDirection: 'column'
-                }}>
-                  {tabs
-                    .filter(t => t.type === 'browser')
-                    .map(tab => (
-                      <div
-                        key={tab.id}
-                        style={{
-                          display: activeTabId === tab.id ? 'flex' : 'none',
-                          flex: 1,
-                          minHeight: 0,
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <BrowserTab
-                          tabId={tab.id}
-                          initialUrl={tab.url || 'https://google.com'}
-                          onUrlChange={(url) => {
-                            // Update tab URL
-                            setTabs((prevTabs) =>
-                              prevTabs.map((t) =>
-                                t.id === tab.id ? { ...t, url } : t
-                              )
-                            );
-                          }}
-                          onFileOpen={(filePath) => {
-                            // Open file in new tab when inspector detects component
-                            handleFilePathClick(filePath);
-                          }}
-                        />
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
+              {/* Browser Manager - shown when browser tab is active */}
+              {activeTabId.startsWith('browser-manager-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'browser') {
+                  return <BrowserManager />;
+                }
+                return null;
+              })()}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (

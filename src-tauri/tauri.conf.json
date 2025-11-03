@@ -51,6 +51,7 @@
     ],
     "resources": [
       "../images",
+      "../public",
       "node-sdk"
     ],
     "macOS": {

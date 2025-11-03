@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - Page Not Found | Quack Browser</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      color: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 600px;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .duck-image {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      border-radius: 16px;
+      margin-bottom: 30px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #f3f4f6;
+      margin-bottom: 12px;
+    }
+
+    p {
+      font-size: 1rem;
+      color: #9ca3af;
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #1a1a1a;
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e0e0e0;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .error-code {
+      display: inline-block;
+      background: rgba(251, 191, 36, 0.1);
+      color: #fbbf24;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      border: 1px solid rgba(251, 191, 36, 0.2);
+    }
+
+    .quack-emoji {
+      font-size: 2rem;
+      animation: bounce 1s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="images/404.jpeg" alt="404 Duck" class="duck-image">
+
+    <div class="error-code">ERROR 404</div>
+
+    <h1>Quack! <span class="quack-emoji">🦆</span></h1>
+    <h2>Page Not Found</h2>
+    <p>
+      Oops! This duck couldn't find the page you're looking for.
+      The site might be down, the URL might be incorrect, or the page may have flown away.
+    </p>
+
+    <div class="buttons">
+      <button class="btn-primary" onclick="tryAgain()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12a9 9 0 11-6.219-8.56"/>
+          <path d="M13 4L21 4 21 12"/>
+        </svg>
+        Try Again
+      </button>
+      <button class="btn-secondary" onclick="goBack()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Go Back
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function tryAgain() {
+      window.location.reload();
+    }
+
+    function goBack() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        // If no history, close the window (Tauri command)
+        if (window.__TAURI__) {
+          window.__TAURI__.window.getCurrent().close();
+        }
+      }
+    }
+
+    // Auto-detect if loaded in an error state and add helpful info
+    window.addEventListener('load', () => {
+      console.log('🦆 Quack! 404 page loaded');
+    });
+  </script>
+</body>
+</html>

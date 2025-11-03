@@ -125,7 +125,11 @@ export default function AgentContextPanel({
     return (
       <div className="agent-context-panel">
         <div className="context-fallback">
-          <div className="text-6xl mb-6">🦆</div>
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth="1.5" style={{ margin: '0 auto 1.5rem' }}>
+            <circle cx="12" cy="7" r="3"/>
+            <path d="M5 17a5 5 0 0 1 10 0"/>
+            <path d="M14 5l2-2M6 5L4 3"/>
+          </svg>
           <h3 className="text-xl font-bold mb-3" style={{ color: '#f28c52' }}>
             Agent Context
           </h3>
@@ -144,7 +148,11 @@ export default function AgentContextPanel({
     return (
       <div className="agent-context-panel">
         <div className="context-loading">
-          <div className="loading-spinner">⏳</div>
+          <div className="loading-spinner">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+          </div>
           <p>Loading agent context...</p>
         </div>
       </div>
@@ -284,7 +292,15 @@ export default function AgentContextPanel({
                     cursor: file.exists ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  <div className="context-item-icon">📝</div>
+                  <div className="context-item-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                  </div>
                   <div className="context-item-content">
                     <div className="context-item-name">{file.name}</div>
                     {!file.exists && (
@@ -363,7 +379,15 @@ export default function AgentContextPanel({
                     cursor: file.exists ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  <div className="context-item-icon">📝</div>
+                  <div className="context-item-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                  </div>
                   <div className="context-item-content">
                     <div className="context-item-name">{file.name}</div>
                     {!file.exists && (
@@ -384,7 +408,11 @@ export default function AgentContextPanel({
 
       {contextFiles.length === 0 && (
         <div className="context-empty">
-          <div className="empty-icon">📂</div>
+          <div className="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
           <p>No context files found</p>
           <p className="empty-hint">
             Create .md files in .claude/ directory

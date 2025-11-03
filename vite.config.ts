@@ -24,6 +24,7 @@ export default defineConfig(() => ({
         preview: resolve(rootDir, 'preview.html'),
         terminal: resolve(rootDir, 'terminal.html'),
         pip: resolve(rootDir, 'pip.html'),
+        browser: resolve(rootDir, 'browser.html'),
       },
     },
   },

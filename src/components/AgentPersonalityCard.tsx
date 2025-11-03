@@ -60,7 +60,13 @@ export default function AgentPersonalityCard({
     return (
       <div className="agent-personality-card empty">
         <div className="personality-empty-state">
-          <div className="empty-icon">🦆</div>
+          <div className="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="12" cy="7" r="3"/>
+              <path d="M5 17a5 5 0 0 1 10 0"/>
+              <path d="M14 5l2-2M6 5L4 3"/>
+            </svg>
+          </div>
           <h3>No Agent Selected</h3>
           <p>Select an agent to view their personality configuration</p>
         </div>
@@ -92,17 +98,20 @@ export default function AgentPersonalityCard({
               alt={agentName || personality.name}
               className="avatar-image"
               onError={(e) => {
-                // Fallback to duck emoji if image fails to load
+                // Fallback to SVG icon if image fails to load
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
                 const parent = target.parentElement;
                 if (parent) {
-                  parent.innerHTML = '<span class="avatar-icon">🦆</span>';
+                  parent.innerHTML = '<svg class="avatar-icon-svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="3"/><path d="M5 17a5 5 0 0 1 10 0"/></svg>';
                 }
               }}
             />
           ) : (
-            <span className="avatar-icon">🦆</span>
+            <svg className="avatar-icon-svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="7" r="3"/>
+              <path d="M5 17a5 5 0 0 1 10 0"/>
+            </svg>
           )}
         </div>
         <div className="personality-identity">
@@ -135,9 +144,6 @@ export default function AgentPersonalityCard({
               const focusArea = FOCUS_AREAS_MAP[specialty];
               return (
                 <div key={specialty} className="focus-area-badge">
-                  <span className="focus-icon">
-                    {focusArea?.icon || '📌'}
-                  </span>
                   <span className="focus-label">
                     {focusArea?.label || specialty}
                   </span>
@@ -154,7 +160,6 @@ export default function AgentPersonalityCard({
           <div className="personality-traits-grid">
             {personalityTraits.map((trait) => (
               <div key={trait.id} className="personality-trait-badge">
-                <span className="trait-icon">{trait.icon}</span>
                 <span className="trait-label">{trait.label}</span>
               </div>
             ))}
