@@ -75,7 +75,6 @@ function PersonalityBuilder({
       <div className="personality-header">
         <span className="field-label">
           Agent Personality
-          <span className="field-badge">Optional</span>
         </span>
         <button
           type="button"
@@ -115,6 +114,27 @@ function PersonalityBuilder({
             </label>
             <p className="field-hint">
               Duck Agents are PMs/coordinators who manage features and invoke Protocol Droids for technical work
+            </p>
+          </div>
+
+          <div className="personality-section">
+            <label className="personality-field">
+              <span className="field-sublabel">
+                Intro
+              </span>
+              <textarea
+                value={personality.intro || ''}
+                onChange={(e) =>
+                  onPersonalityChange({ ...personality, intro: e.target.value })
+                }
+                placeholder="e.g., 'Experienced PM specializing in feature delivery and team coordination...'"
+                className="personality-textarea"
+                rows={3}
+                maxLength={300}
+              />
+            </label>
+            <p className="field-hint">
+              Additional context or characteristics about this agent (optional)
             </p>
           </div>
 
@@ -230,6 +250,11 @@ function PersonalityBuilder({
               {personality.role && (
                 <p>
                   <strong>Role:</strong> {personality.role}
+                </p>
+              )}
+              {personality.intro && (
+                <p>
+                  <strong>Intro:</strong> {personality.intro}
                 </p>
               )}
               {personality.specialties && personality.specialties.length > 0 && (

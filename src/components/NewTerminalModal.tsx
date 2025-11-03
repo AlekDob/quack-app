@@ -211,10 +211,10 @@ function NewTerminalModal({
             value={workingOn}
             onChange={(event) => onWorkingOnChange?.(event.target.value)}
             placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
-            maxLength={50}
+            maxLength={150}
           />
           <small className="field-hint">
-            Brief context about what this agent is working on (max 5 words, optional)
+            Brief context about what this agent is working on (max 20 words, optional)
           </small>
         </label>
 
@@ -245,88 +245,97 @@ function NewTerminalModal({
         </div>
 
         {availableBranches.length > 0 && (
-          <div className="modal-field">
-            <span className="field-label">
-              Git Branch
-              <span style={{ marginLeft: '8px', fontSize: '0.85em', color: '#888' }}>
-                (optional - agent workspace)
-              </span>
-            </span>
+          <div className="git-branch-section">
+            <div className="git-branch-header">
+              <svg className="git-branch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="6" y1="3" x2="6" y2="15"></line>
+                <circle cx="18" cy="6" r="3"></circle>
+                <circle cx="6" cy="18" r="3"></circle>
+                <path d="M18 9a9 9 0 0 1-9 9"></path>
+              </svg>
+              <div className="git-branch-header-text">
+                <span className="git-branch-title">Git Branch</span>
+                <span className="git-branch-subtitle">Agent workspace</span>
+              </div>
+              <span className="git-badge">GIT</span>
+            </div>
 
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <div className="git-branch-mode-selector">
+              <label className={`git-mode-option ${branchMode === 'existing' ? 'active' : ''}`}>
                 <input
                   type="radio"
                   checked={branchMode === 'existing'}
                   onChange={() => setBranchMode('existing')}
-                  style={{ cursor: 'pointer' }}
                 />
-                <span>Use existing branch</span>
+                <svg className="git-mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="6" y1="3" x2="6" y2="15"></line>
+                  <circle cx="18" cy="6" r="3"></circle>
+                  <circle cx="6" cy="18" r="3"></circle>
+                  <path d="M18 9a9 9 0 0 1-9 9"></path>
+                </svg>
+                <span>Use existing</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <label className={`git-mode-option ${branchMode === 'new' ? 'active' : ''}`}>
                 <input
                   type="radio"
                   checked={branchMode === 'new'}
                   onChange={() => setBranchMode('new')}
-                  style={{ cursor: 'pointer' }}
                 />
-                <span>Create new branch</span>
+                <svg className="git-mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="16"></line>
+                  <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                <span>Create new</span>
               </label>
             </div>
 
             {branchMode === 'existing' ? (
-              <select
-                value={branch}
-                onChange={(e) => onBranchChange?.(e.target.value)}
-                disabled={loadingBranches}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #333',
-                  background: '#1a1a1a',
-                  color: '#fff',
-                  fontSize: '14px',
-                  cursor: loadingBranches ? 'wait' : 'pointer'
-                }}
-              >
-                {loadingBranches ? (
-                  <option>Loading branches...</option>
-                ) : (
-                  availableBranches.map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name} {b.isCurrent ? '(current)' : ''} {b.hasRemote ? '↑' : ''}
-                    </option>
-                  ))
-                )}
-              </select>
+              <div className="git-branch-input-wrapper">
+                <select
+                  value={branch}
+                  onChange={(e) => onBranchChange?.(e.target.value)}
+                  disabled={loadingBranches}
+                  className="git-branch-select"
+                >
+                  {loadingBranches ? (
+                    <option>Loading branches...</option>
+                  ) : (
+                    availableBranches.map((b) => (
+                      <option key={b.name} value={b.name}>
+                        {b.name} {b.isCurrent ? '⭐' : ''} {b.hasRemote ? '☁️' : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <svg className="git-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
             ) : (
-              <>
+              <div className="git-branch-create-mode">
                 <input
                   type="text"
                   value={newBranchName}
                   onChange={(e) => setNewBranchName(e.target.value)}
                   placeholder="e.g., feature/agent-name"
-                  style={{
-                    width: '100%',
-                    marginBottom: '8px'
-                  }}
+                  className="git-branch-input"
                 />
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9em', color: '#aaa' }}>
+                <label className="git-branch-checkbox">
                   <input
                     type="checkbox"
                     checked={fromCurrentBranch}
                     onChange={(e) => setFromCurrentBranch(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
                   />
-                  <span>
+                  <span className="git-checkbox-checkmark"></span>
+                  <span className="git-checkbox-label">
                     Branch from current ({availableBranches.find(b => b.isCurrent)?.name || 'main'})
                   </span>
                 </label>
-                <small className="field-hint" style={{ marginTop: '6px' }}>
-                  Agent will work on this branch independently
+                <small className="git-branch-hint">
+                  🌿 Agent will work on this branch independently
                 </small>
-              </>
+              </div>
             )}
           </div>
         )}
