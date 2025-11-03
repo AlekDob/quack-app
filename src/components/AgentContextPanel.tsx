@@ -20,6 +20,8 @@ interface AgentContextPanelProps {
   activeAgentCwd?: string | null;
   onOpenFile?: (entry: DirectoryEntry) => void;
   onOpenContextDrawer?: (scope: string) => void;
+  projectName?: string;
+  gitBranch?: string;
 }
 
 export default function AgentContextPanel({
@@ -31,6 +33,8 @@ export default function AgentContextPanel({
   activeAgentCwd,
   onOpenFile,
   onOpenContextDrawer,
+  projectName,
+  gitBranch,
 }: AgentContextPanelProps) {
   const [personality, setPersonality] = useState<AgentPersonality | null>(null);
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
@@ -164,6 +168,78 @@ export default function AgentContextPanel({
 
   return (
     <div className="agent-context-panel">
+      {/* Current Workspace Info */}
+      {(projectName || gitBranch) && (
+        <div className="context-section" style={{ marginBottom: '12px' }}>
+          <div className="context-section-header" style={{ cursor: 'default', paddingBottom: '8px' }}>
+            <div className="context-section-title">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                style={{ opacity: 0.6 }}
+              >
+                <path
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Current Workspace</span>
+            </div>
+          </div>
+          <div className="context-list" style={{ gap: '4px' }}>
+            {projectName && (
+              <div
+                className="context-item"
+                style={{ cursor: 'default', padding: '6px 12px', background: 'rgba(242, 140, 82, 0.05)' }}
+              >
+                <div className="context-item-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                  </svg>
+                </div>
+                <div className="context-item-content">
+                  <div className="context-item-name" style={{ fontSize: '0.9em' }}>
+                    {projectName}
+                  </div>
+                </div>
+              </div>
+            )}
+            {gitBranch && (
+              <div
+                className="context-item"
+                style={{ cursor: 'default', padding: '6px 12px', background: 'rgba(78, 205, 196, 0.05)' }}
+              >
+                <div className="context-item-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" strokeWidth="2">
+                    <line x1="6" y1="3" x2="6" y2="15"/>
+                    <circle cx="18" cy="6" r="3"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <path d="M18 9a9 9 0 0 1-9 9"/>
+                  </svg>
+                </div>
+                <div className="context-item-content">
+                  <div
+                    className="context-item-name"
+                    style={{
+                      fontSize: '0.85em',
+                      fontFamily: 'monospace',
+                      color: '#4ecdc4',
+                    }}
+                  >
+                    {gitBranch}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Agent Personality Section */}
       <div className="context-section personality-section">
         <div

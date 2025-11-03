@@ -390,6 +390,7 @@ function App() {
   const [newTerminalColor, setNewTerminalColor] = useState(COLORS[0]);
   const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
   const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
+  const [newTerminalBranch, setNewTerminalBranch] = useState("");
   const [newTerminalPersonality, setNewTerminalPersonality] = useState<Partial<AgentPersonality>>({
     communicationStyle: 'friendly',
     specialties: [],
@@ -646,14 +647,20 @@ function App() {
     const project = pathParts[pathParts.length - 1] || '';
     setProjectName(project);
 
-    // Get git branch
-    invoke<string>('git_current_branch', { rootPath: cwd })
-      .then((branch) => {
-        setGitBranch(branch.trim());
-      })
-      .catch(() => {
-        setGitBranch(''); // Not a git repository or error
-      });
+    // Use the branch associated with this terminal (agent workspace)
+    // instead of the current repository branch on disk
+    if (activeTerminal.branch) {
+      setGitBranch(activeTerminal.branch);
+    } else {
+      // Fallback: Get current git branch from disk if no branch is assigned to terminal
+      invoke<string>('git_current_branch', { rootPath: cwd })
+        .then((branch) => {
+          setGitBranch(branch.trim());
+        })
+        .catch(() => {
+          setGitBranch(''); // Not a git repository or error
+        });
+    }
   }, [activeTerminal, tauriAvailable]);
 
   // Handle deep link file opening from Quack Inspector
@@ -3496,6 +3503,7 @@ function App() {
           cwd: trimmedPath,
           workingOn: trimmedWorkingOn || null,
           avatar: newTerminalAvatar,
+          branch: newTerminalBranch || null,
         });
 
         setTerminals((prev) =>
@@ -3508,6 +3516,7 @@ function App() {
                   cwd: trimmedPath,
                   workingOn: trimmedWorkingOn || undefined,
                   avatar: newTerminalAvatar,
+                  branch: newTerminalBranch || undefined,
                 }
               : t
           )
@@ -3558,13 +3567,48 @@ function App() {
         setEditingTerminal(null);
       } else {
         // Create new terminal - SIMPLE! No AgentChat logic
-        console.log('Creating terminal with avatar:', newTerminalAvatar);
+        console.log('Creating terminal with avatar:', newTerminalAvatar, 'branch:', newTerminalBranch);
+
+        // Handle Git branch creation and switching if specified
+        if (newTerminalBranch) {
+          try {
+            // Check if branch exists
+            const branches = await invoke<Array<{name: string, isCurrent: boolean, hasRemote: boolean}>>('git_list_branches', {
+              rootPath: trimmedPath
+            });
+
+            const branchExists = branches.some(b => b.name === newTerminalBranch);
+
+            if (!branchExists) {
+              // Create new branch from current
+              console.log(`Creating new branch: ${newTerminalBranch}`);
+              await invoke('git_create_branch', {
+                branchName: newTerminalBranch,
+                fromBranch: null, // Will branch from current
+                switch: true, // Automatically switch to new branch
+                rootPath: trimmedPath
+              });
+            } else {
+              // Branch exists, just switch to it
+              console.log(`Switching to existing branch: ${newTerminalBranch}`);
+              await invoke('git_switch_branch', {
+                branchName: newTerminalBranch,
+                rootPath: trimmedPath
+              });
+            }
+          } catch (err) {
+            console.warn('Git branch operation failed:', err);
+            // Continue with terminal creation even if branch operation fails
+          }
+        }
+
         const created = await invoke<TerminalInfo>("create_terminal", {
           label: trimmedName,
           color: newTerminalColor,
           cwd: trimmedPath,
           workingOn: trimmedWorkingOn || null,
           avatar: newTerminalAvatar,
+          branch: newTerminalBranch || null,
         });
 
         const createdWithState: TerminalInfo = {
@@ -3575,6 +3619,7 @@ function App() {
           responseStartTime: null,
           workingOn: trimmedWorkingOn || undefined,
           avatar: newTerminalAvatar,
+          branch: newTerminalBranch || undefined,
         };
 
         // Save metadata for Telegram notifications immediately
@@ -3747,6 +3792,20 @@ function App() {
       const terminal = terminals.find((candidate) => candidate.id === id);
       if (terminal) {
         await loadDirectory(terminal.cwd);
+
+        // Switch to terminal's branch if specified
+        if (terminal.branch) {
+          try {
+            console.log(`Switching to branch: ${terminal.branch} for terminal ${terminal.label}`);
+            await invoke('git_switch_branch', {
+              branchName: terminal.branch,
+              rootPath: terminal.cwd
+            });
+          } catch (err) {
+            console.warn(`Failed to switch to branch ${terminal.branch}:`, err);
+            // Don't block terminal selection if branch switch fails
+          }
+        }
 
         // Load and inject personality into CLAUDE.md
         try {
@@ -5306,6 +5365,8 @@ You have access to all Bash tools to execute git commands like:
             const activeTerminal = terminals.find((t) => t.id === activeId);
             return activeTerminal?.cwd || null;
           })()}
+          projectName={projectName}
+          gitBranch={gitBranch}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}
@@ -5336,6 +5397,7 @@ You have access to all Bash tools to execute git commands like:
           workingOn={newTerminalWorkingOn}
           avatar={newTerminalAvatar}
           personality={newTerminalPersonality}
+          branch={newTerminalBranch}
           availableColors={COLORS}
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
@@ -5345,6 +5407,7 @@ You have access to all Bash tools to execute git commands like:
           onWorkingOnChange={setNewTerminalWorkingOn}
           onAvatarChange={setNewTerminalAvatar}
           onPersonalityChange={setNewTerminalPersonality}
+          onBranchChange={setNewTerminalBranch}
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}

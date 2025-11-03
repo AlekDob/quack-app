@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use std::time::Duration;
 use reqwest;
@@ -61,21 +61,26 @@ pub async fn open_browser_window(
         Ok(window) => {
             log::info!("🦆 Native browser window opened: {} with URL: {}", window_label, final_url);
 
-            // If localhost (original URL), inject inspector after page loads
-            if is_localhost {
-                let app_handle = app.clone();
-                let label = window_label.clone();
+            let app_handle = app.clone();
+            let label = window_label.clone();
 
-                // Spawn async task to inject inspector
-                tauri::async_runtime::spawn(async move {
-                    // Wait for page to load (1.5 seconds like in the iframe version)
-                    tokio::time::sleep(Duration::from_millis(1500)).await;
+            // Spawn async task to inject scripts after page loads
+            tauri::async_runtime::spawn(async move {
+                // Wait for page to load
+                tokio::time::sleep(Duration::from_millis(1500)).await;
 
+                // If localhost (original URL), inject inspector
+                if is_localhost {
                     if let Err(e) = inject_inspector(&app_handle, &label).await {
                         log::error!("Failed to inject inspector: {}", e);
                     }
-                });
-            }
+                }
+
+                // Always inject OAuth navigation interceptor
+                if let Err(e) = inject_oauth_interceptor(&app_handle, &label).await {
+                    log::error!("Failed to inject OAuth interceptor: {}", e);
+                }
+            });
 
             Ok(window_label)
         }
@@ -255,6 +260,284 @@ async fn check_url_reachable(url: &str) -> Result<bool, String> {
                 }
             }
         }
+    }
+}
+
+/// Inject OAuth navigation interceptor script
+async fn inject_oauth_interceptor(app: &AppHandle, window_label: &str) -> Result<(), String> {
+    let window = app.get_webview_window(window_label)
+        .ok_or_else(|| format!("Browser window not found: {}", window_label))?;
+
+    let oauth_script = r#"
+        (function() {
+            console.log('🦆 OAuth interceptor initialized');
+
+            // Store original window.open
+            const originalOpen = window.open;
+
+            // Override window.open to intercept OAuth popups
+            window.open = function(url, target, features) {
+                console.log('🦆 Intercepted window.open:', url);
+
+                // Check if this is an OAuth URL
+                const oauthPatterns = [
+                    'accounts.google.com',
+                    'github.com/login/oauth',
+                    'login.microsoftonline.com',
+                    'facebook.com/dialog/oauth',
+                    'appleid.apple.com/auth',
+                    'oauth',
+                    'auth/authorize',
+                    'login/oauth'
+                ];
+
+                const isOAuth = oauthPatterns.some(pattern =>
+                    url && url.includes(pattern)
+                );
+
+                if (isOAuth) {
+                    console.log('🦆 OAuth URL detected, opening in Quack window');
+
+                    // Send to Tauri backend to open OAuth window
+                    window.__TAURI__.invoke('open_oauth_window', {
+                        url: url,
+                        parentLabel: window.__TAURI_INTERNALS__.metadata.currentWindow.label
+                    }).then(oauthLabel => {
+                        console.log('🦆 OAuth window opened:', oauthLabel);
+                    }).catch(err => {
+                        console.error('Failed to open OAuth window:', err);
+                        // Fallback to original window.open
+                        return originalOpen.call(window, url, target, features);
+                    });
+
+                    // Return a proxy window object to prevent errors
+                    return {
+                        focus: () => {},
+                        close: () => {},
+                        closed: false
+                    };
+                } else {
+                    // Not OAuth, use original window.open
+                    return originalOpen.call(window, url, target, features);
+                }
+            };
+
+            // Intercept link clicks that might open OAuth popups
+            document.addEventListener('click', function(e) {
+                const target = e.target.closest('a');
+                if (!target) return;
+
+                const href = target.getAttribute('href');
+                if (!href) return;
+
+                // Check if target is _blank (new window)
+                if (target.getAttribute('target') === '_blank') {
+                    const oauthPatterns = [
+                        'accounts.google.com',
+                        'github.com/login/oauth',
+                        'login.microsoftonline.com',
+                        'facebook.com/dialog/oauth',
+                        'appleid.apple.com/auth',
+                        'oauth',
+                        'auth/authorize'
+                    ];
+
+                    const isOAuth = oauthPatterns.some(pattern => href.includes(pattern));
+
+                    if (isOAuth) {
+                        e.preventDefault();
+                        console.log('🦆 OAuth link intercepted:', href);
+
+                        window.__TAURI__.invoke('open_oauth_window', {
+                            url: href,
+                            parentLabel: window.__TAURI_INTERNALS__.metadata.currentWindow.label
+                        }).catch(err => {
+                            console.error('Failed to open OAuth window:', err);
+                        });
+                    }
+                }
+            }, true);
+
+            console.log('🦆 OAuth interceptor ready');
+        })();
+    "#;
+
+    window.eval(oauth_script)
+        .map_err(|e| format!("Failed to inject OAuth interceptor: {}", e))?;
+
+    log::info!("🦆 OAuth interceptor injected into {}", window_label);
+    Ok(())
+}
+
+/// Open OAuth authentication window
+#[tauri::command]
+pub async fn open_oauth_window(
+    app: AppHandle,
+    url: String,
+    parent_label: String,
+) -> Result<String, String> {
+    let window_label = format!("oauth-{}", chrono::Utc::now().timestamp_millis());
+
+    log::info!("🦆 Opening OAuth window: {} for parent: {}", url, parent_label);
+
+    let webview_url = WebviewUrl::External(url.parse().map_err(|e| format!("Invalid URL: {}", e))?);
+
+    let builder = WebviewWindowBuilder::new(&app, &window_label, webview_url)
+        .title("Sign In - Quack Browser")
+        .inner_size(600.0, 700.0)
+        .resizable(true)
+        .center()
+        .decorations(true);
+
+    match builder.build() {
+        Ok(window) => {
+            log::info!("🦆 OAuth window opened: {}", window_label);
+
+            let app_handle = app.clone();
+            let label = window_label.clone();
+            let parent = parent_label.clone();
+
+            // Monitor OAuth window for callback
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+
+                if let Err(e) = inject_oauth_callback_monitor(&app_handle, &label, &parent).await {
+                    log::error!("Failed to inject OAuth callback monitor: {}", e);
+                }
+            });
+
+            Ok(window_label)
+        }
+        Err(e) => {
+            log::error!("Failed to create OAuth window: {}", e);
+            Err(format!("Failed to create OAuth window: {}", e))
+        }
+    }
+}
+
+/// Inject OAuth callback monitoring script
+async fn inject_oauth_callback_monitor(
+    app: &AppHandle,
+    window_label: &str,
+    parent_label: &str,
+) -> Result<(), String> {
+    let window = app.get_webview_window(window_label)
+        .ok_or_else(|| format!("OAuth window not found: {}", window_label))?;
+
+    let parent_label_owned = parent_label.to_string();
+    let callback_script = format!(r#"
+        (function() {{
+            console.log('🦆 OAuth callback monitor initialized');
+
+            // Monitor URL changes
+            let lastUrl = window.location.href;
+
+            setInterval(() => {{
+                const currentUrl = window.location.href;
+
+                if (currentUrl !== lastUrl) {{
+                    console.log('🦆 OAuth URL changed:', currentUrl);
+                    lastUrl = currentUrl;
+
+                    // Check if this is a callback URL
+                    const isCallback =
+                        currentUrl.includes('callback') ||
+                        currentUrl.includes('redirect_uri') ||
+                        currentUrl.includes('code=') ||
+                        currentUrl.includes('access_token=') ||
+                        currentUrl.includes('id_token=');
+
+                    if (isCallback) {{
+                        console.log('🦆 OAuth callback detected!');
+
+                        // Extract OAuth data from URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+
+                        const oauthData = {{
+                            code: urlParams.get('code') || hashParams.get('code'),
+                            access_token: urlParams.get('access_token') || hashParams.get('access_token'),
+                            id_token: urlParams.get('id_token') || hashParams.get('id_token'),
+                            state: urlParams.get('state') || hashParams.get('state'),
+                            callback_url: currentUrl
+                        }};
+
+                        console.log('🦆 OAuth data extracted:', oauthData);
+
+                        // Send callback data to parent window
+                        window.__TAURI__.invoke('handle_oauth_callback', {{
+                            parentLabel: '{}',
+                            oauthData: oauthData
+                        }}).then(() => {{
+                            console.log('🦆 OAuth callback sent to parent');
+                            // Close OAuth window after successful callback
+                            setTimeout(() => {{
+                                window.__TAURI__.window.getCurrent().close();
+                            }}, 500);
+                        }}).catch(err => {{
+                            console.error('Failed to send OAuth callback:', err);
+                        }});
+                    }}
+                }}
+            }}, 500);
+
+            console.log('🦆 OAuth callback monitor ready');
+        }})();
+    "#, parent_label_owned);
+
+    window.eval(&callback_script)
+        .map_err(|e| format!("Failed to inject OAuth callback monitor: {}", e))?;
+
+    log::info!("🦆 OAuth callback monitor injected into {}", window_label);
+    Ok(())
+}
+
+/// Handle OAuth callback from OAuth window
+#[tauri::command]
+pub async fn handle_oauth_callback(
+    app: AppHandle,
+    parent_label: String,
+    oauth_data: serde_json::Value,
+) -> Result<(), String> {
+    log::info!("🦆 OAuth callback received for parent: {}", parent_label);
+    log::info!("🦆 OAuth data: {:?}", oauth_data);
+
+    // Get parent browser window
+    if let Some(parent_window) = app.get_webview_window(&parent_label) {
+        // Inject OAuth data into parent window
+        let oauth_json = serde_json::to_string(&oauth_data)
+            .map_err(|e| format!("Failed to serialize OAuth data: {}", e))?;
+
+        let inject_script = format!(r#"
+            (function() {{
+                console.log('🦆 Received OAuth callback data');
+
+                // Store OAuth data
+                window.__QUACK_OAUTH_DATA__ = {};
+
+                // Dispatch custom event
+                const event = new CustomEvent('quack-oauth-complete', {{
+                    detail: window.__QUACK_OAUTH_DATA__
+                }});
+                window.dispatchEvent(event);
+
+                // Also try postMessage for compatibility
+                window.postMessage({{
+                    type: 'quack-oauth-complete',
+                    data: window.__QUACK_OAUTH_DATA__
+                }}, '*');
+
+                console.log('🦆 OAuth data injected into parent window');
+            }})();
+        "#, oauth_json);
+
+        parent_window.eval(&inject_script)
+            .map_err(|e| format!("Failed to inject OAuth data into parent: {}", e))?;
+
+        log::info!("🦆 OAuth data sent to parent window: {}", parent_label);
+        Ok(())
+    } else {
+        Err(format!("Parent window not found: {}", parent_label))
     }
 }
 

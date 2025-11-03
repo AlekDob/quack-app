@@ -142,6 +142,24 @@ export default function TerminalActivityBar({ terminal, chatSessions }: Terminal
       <div className="terminal-details">
         <span className="terminal-name">
           {terminal.label}
+          {terminal.branch && (
+            <span
+              className="terminal-branch-badge"
+              style={{
+                marginLeft: '6px',
+                padding: '2px 6px',
+                fontSize: '0.75em',
+                fontFamily: 'monospace',
+                borderRadius: '3px',
+                background: 'rgba(78, 205, 196, 0.15)',
+                border: '1px solid rgba(78, 205, 196, 0.3)',
+                color: '#4ecdc4',
+              }}
+              title={`Working on branch: ${terminal.branch}`}
+            >
+              {terminal.branch}
+            </span>
+          )}
           <span className={badgeClassName}>
             {getBadge()}
           </span>

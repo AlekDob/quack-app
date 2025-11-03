@@ -10,11 +10,15 @@ interface ContextFile {
 interface ContextPanelProps {
   tauriAvailable: boolean;
   onOpenContextDrawer: (scope: string) => void;
+  projectName?: string;
+  gitBranch?: string;
 }
 
 export default function ContextPanel({
   tauriAvailable,
   onOpenContextDrawer,
+  projectName,
+  gitBranch,
 }: ContextPanelProps) {
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +85,67 @@ export default function ContextPanel({
 
   return (
     <div className="context-panel">
+      {/* Current Project Info */}
+      {(projectName || gitBranch) && (
+        <div className="context-section" style={{ marginBottom: '16px' }}>
+          <div className="context-section-header" style={{ cursor: 'default' }}>
+            <div className="context-section-title">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                style={{ opacity: 0.6 }}
+              >
+                <path
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Current Workspace</span>
+            </div>
+          </div>
+          <div className="context-list">
+            {projectName && (
+              <div
+                className="context-item"
+                style={{ cursor: 'default', padding: '8px 12px' }}
+              >
+                <div className="context-item-icon">📁</div>
+                <div className="context-item-content">
+                  <div className="context-item-name" style={{ fontSize: '0.9em' }}>
+                    {projectName}
+                  </div>
+                </div>
+              </div>
+            )}
+            {gitBranch && (
+              <div
+                className="context-item"
+                style={{ cursor: 'default', padding: '8px 12px' }}
+              >
+                <div className="context-item-icon">🌿</div>
+                <div className="context-item-content">
+                  <div
+                    className="context-item-name"
+                    style={{
+                      fontSize: '0.85em',
+                      fontFamily: 'monospace',
+                      color: '#4ecdc4',
+                    }}
+                  >
+                    {gitBranch}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Global Context Section */}
       {globalFiles.length > 0 && (
         <div className="context-section">

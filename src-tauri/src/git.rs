@@ -467,3 +467,141 @@ fn git_current_branch_impl(root_path: Option<String>) -> Result<String> {
     let output = run_git(&root, &["branch", "--show-current"], false)?;
     Ok(output.trim().to_string())
 }
+
+#[derive(Serialize, Clone)]
+pub struct GitBranch {
+    pub name: String,
+    pub is_current: bool,
+    pub has_remote: bool,
+    pub upstream: Option<String>,
+}
+
+#[tauri::command]
+pub fn git_list_branches(root_path: Option<String>) -> Result<Vec<GitBranch>, String> {
+    git_list_branches_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_list_branches_impl(root_path: Option<String>) -> Result<Vec<GitBranch>> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Get all local branches with tracking info
+    let output = run_git(&root, &["branch", "-vv"], false)?;
+    let mut branches = Vec::new();
+
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let is_current = line.starts_with('*');
+        let line = if is_current { &line[2..] } else { &line[2..] };
+
+        // Parse branch name (first word)
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.is_empty() {
+            continue;
+        }
+
+        let name = parts[0].to_string();
+
+        // Check if branch has remote tracking (contains [origin/...])
+        let has_remote = line.contains('[') && line.contains("origin/");
+        let upstream = if has_remote {
+            // Extract upstream branch name from [origin/branch-name...]
+            if let Some(start) = line.find('[') {
+                if let Some(end) = line[start..].find(']') {
+                    let tracking = &line[start+1..start+end];
+                    // Remove : ahead/behind info if present
+                    let upstream_name = tracking.split(':').next().unwrap_or(tracking);
+                    Some(upstream_name.trim().to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        branches.push(GitBranch {
+            name,
+            is_current,
+            has_remote,
+            upstream,
+        });
+    }
+
+    Ok(branches)
+}
+
+#[tauri::command]
+pub fn git_create_branch(
+    branch_name: String,
+    from_branch: Option<String>,
+    switch: Option<bool>,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_create_branch_impl(branch_name, from_branch, switch, root_path)
+        .map_err(|err| err.to_string())
+}
+
+fn git_create_branch_impl(
+    branch_name: String,
+    from_branch: Option<String>,
+    switch: Option<bool>,
+    root_path: Option<String>,
+) -> Result<()> {
+    // Validate branch name
+    if branch_name.trim().is_empty() {
+        return Err(anyhow!("Branch name cannot be empty"));
+    }
+
+    // Check for invalid characters
+    let invalid_chars = ['~', '^', ':', '?', '*', '[', '\\', ' ', '\t'];
+    if branch_name.chars().any(|c| invalid_chars.contains(&c)) {
+        return Err(anyhow!("Branch name contains invalid characters"));
+    }
+
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Create branch (optionally from specific branch)
+    let mut args = vec!["branch", &branch_name];
+    if let Some(from) = from_branch.as_ref() {
+        args.push(from);
+    }
+
+    run_git(&root, &args, false)?;
+
+    // Switch to new branch if requested
+    if switch.unwrap_or(false) {
+        run_git(&root, &["checkout", &branch_name], false)?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn git_switch_branch(
+    branch_name: String,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_switch_branch_impl(branch_name, root_path).map_err(|err| err.to_string())
+}
+
+fn git_switch_branch_impl(branch_name: String, root_path: Option<String>) -> Result<()> {
+    if branch_name.trim().is_empty() {
+        return Err(anyhow!("Branch name cannot be empty"));
+    }
+
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Switch branch using checkout
+    run_git(&root, &["checkout", &branch_name], false)?;
+
+    Ok(())
+}

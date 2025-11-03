@@ -44,6 +44,7 @@ export interface TerminalInfo {
   waitingForResponse?: boolean;      // Chat is idle and waiting for user input
   workingOn?: string;                // What the agent is working on (max 5 words)
   avatar?: string;                   // Avatar filename (e.g., "mike.png")
+  branch?: string;                   // Git branch this agent is working on
 }
 
 // AgentTerminal: NEW - Terminale integrato XTerm associato ad un agente
@@ -127,6 +128,13 @@ export interface GitCommitEntry {
   author: string;
   relativeTime: string;
   timestamp?: number;
+}
+
+export interface GitBranch {
+  name: string;
+  isCurrent: boolean;
+  hasRemote: boolean;
+  upstream?: string;
 }
 
 export interface TerminalDataEvent {

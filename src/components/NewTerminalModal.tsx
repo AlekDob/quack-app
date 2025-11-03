@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { AgentPersonality } from '../types';
+import type { AgentPersonality, GitBranch } from '../types';
 import PersonalityBuilder from './PersonalityBuilder';
+import { invoke } from '@tauri-apps/api/core';
 
 // Available duck avatars from /images/ducks/avatars/
 const AVAILABLE_AVATARS = [
@@ -42,6 +43,7 @@ interface NewTerminalModalProps {
   workingOn?: string
   avatar?: string
   personality?: Partial<AgentPersonality>
+  branch?: string
   availableColors: string[]
   selectingDirectory: boolean
   creating: boolean
@@ -51,6 +53,7 @@ interface NewTerminalModalProps {
   onWorkingOnChange?: (value: string) => void
   onAvatarChange?: (avatar: string) => void
   onPersonalityChange?: (personality: Partial<AgentPersonality>) => void
+  onBranchChange?: (branch: string) => void
   onBrowse: () => void
   onCancel: () => void
   onConfirm: () => void
@@ -65,6 +68,7 @@ function NewTerminalModal({
   workingOn = '',
   avatar,
   personality,
+  branch = '',
   availableColors,
   selectingDirectory,
   creating,
@@ -74,20 +78,71 @@ function NewTerminalModal({
   onWorkingOnChange,
   onAvatarChange,
   onPersonalityChange,
+  onBranchChange,
   onBrowse,
   onCancel,
   onConfirm,
 }: NewTerminalModalProps) {
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [availableBranches, setAvailableBranches] = useState<GitBranch[]>([]);
+  const [branchMode, setBranchMode] = useState<'existing' | 'new'>('existing');
+  const [newBranchName, setNewBranchName] = useState('');
+  const [fromCurrentBranch, setFromCurrentBranch] = useState(true);
+  const [loadingBranches, setLoadingBranches] = useState(false);
 
-  // Load available skills from .claude/skills directory
+  // Load available skills and branches from backend
   useEffect(() => {
-    if (open) {
-      // TODO: Load skills from backend
-      // For now, use the skills we know exist
+    if (open && path) {
+      // Load skills
       setAvailableSkills(['quack-agents-architecture', 'tauri-drag-and-drop-guide']);
+
+      // Load Git branches
+      loadBranches();
     }
-  }, [open]);
+  }, [open, path]);
+
+  async function loadBranches() {
+    if (!path) return;
+
+    setLoadingBranches(true);
+    try {
+      const branches = await invoke<GitBranch[]>('git_list_branches', {
+        rootPath: path
+      });
+      setAvailableBranches(branches);
+
+      // Auto-select current branch if not already set
+      if (!branch) {
+        const currentBranch = branches.find(b => b.isCurrent);
+        if (currentBranch && onBranchChange) {
+          onBranchChange(currentBranch.name);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load branches (not a git repository?):', err);
+      setAvailableBranches([]);
+    } finally {
+      setLoadingBranches(false);
+    }
+  }
+
+  // Generate suggested branch name based on agent name
+  useEffect(() => {
+    if (branchMode === 'new' && name && !newBranchName) {
+      const sanitized = name
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+      setNewBranchName(`feature/${sanitized}`);
+    }
+  }, [branchMode, name, newBranchName]);
+
+  // Sync newBranchName to parent when in "new" mode
+  useEffect(() => {
+    if (branchMode === 'new' && newBranchName && onBranchChange) {
+      onBranchChange(newBranchName);
+    }
+  }, [branchMode, newBranchName, onBranchChange]);
 
   if (!open) {
     return null
@@ -182,6 +237,93 @@ function NewTerminalModal({
             {selectingDirectory ? 'Opening Finder…' : 'Choose directory'}
           </button>
         </div>
+
+        {availableBranches.length > 0 && (
+          <div className="modal-field">
+            <span className="field-label">
+              Git Branch
+              <span style={{ marginLeft: '8px', fontSize: '0.85em', color: '#888' }}>
+                (optional - agent workspace)
+              </span>
+            </span>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  checked={branchMode === 'existing'}
+                  onChange={() => setBranchMode('existing')}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>Use existing branch</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  checked={branchMode === 'new'}
+                  onChange={() => setBranchMode('new')}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>Create new branch</span>
+              </label>
+            </div>
+
+            {branchMode === 'existing' ? (
+              <select
+                value={branch}
+                onChange={(e) => onBranchChange?.(e.target.value)}
+                disabled={loadingBranches}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #333',
+                  background: '#1a1a1a',
+                  color: '#fff',
+                  fontSize: '14px',
+                  cursor: loadingBranches ? 'wait' : 'pointer'
+                }}
+              >
+                {loadingBranches ? (
+                  <option>Loading branches...</option>
+                ) : (
+                  availableBranches.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name} {b.isCurrent ? '(current)' : ''} {b.hasRemote ? '↑' : ''}
+                    </option>
+                  ))
+                )}
+              </select>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  placeholder="e.g., feature/agent-name"
+                  style={{
+                    width: '100%',
+                    marginBottom: '8px'
+                  }}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9em', color: '#aaa' }}>
+                  <input
+                    type="checkbox"
+                    checked={fromCurrentBranch}
+                    onChange={(e) => setFromCurrentBranch(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>
+                    Branch from current ({availableBranches.find(b => b.isCurrent)?.name || 'main'})
+                  </span>
+                </label>
+                <small className="field-hint" style={{ marginTop: '6px' }}>
+                  Agent will work on this branch independently
+                </small>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="modal-field">
           <span className="field-label">Agent color</span>

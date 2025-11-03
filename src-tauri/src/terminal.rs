@@ -31,6 +31,7 @@ struct TerminalSession {
   output_buffer: String,
   working_on: Option<String>,
   avatar: Option<String>,
+  branch: Option<String>,
 }
 
 struct TerminalProcess {
@@ -52,6 +53,8 @@ pub struct TerminalInfo {
   pub working_on: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub avatar: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub branch: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -134,8 +137,9 @@ pub fn create_terminal(
   cwd: Option<String>,
   working_on: Option<String>,
   avatar: Option<String>,
+  branch: Option<String>,
 ) -> Result<TerminalInfo, String> {
-  create_terminal_impl(&app, label, color, cwd, working_on, avatar).map_err(|err| err.to_string())
+  create_terminal_impl(&app, label, color, cwd, working_on, avatar, branch).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -216,8 +220,9 @@ pub fn update_terminal(
   cwd: Option<String>,
   working_on: Option<String>,
   avatar: Option<String>,
+  branch: Option<String>,
 ) -> Result<TerminalInfo, String> {
-  update_terminal_impl(&id, label, color, cwd, working_on, avatar).map_err(|err| err.to_string())
+  update_terminal_impl(&id, label, color, cwd, working_on, avatar, branch).map_err(|err| err.to_string())
 }
 
 fn create_terminal_impl(
@@ -227,6 +232,7 @@ fn create_terminal_impl(
   cwd_input: Option<String>,
   working_on: Option<String>,
   avatar: Option<String>,
+  branch: Option<String>,
 ) -> Result<TerminalInfo> {
   let default_color = color.unwrap_or_else(|| "#4ecdc4".to_string());
 
@@ -253,6 +259,7 @@ fn create_terminal_impl(
     output_buffer: String::new(),
     working_on: working_on.clone(),
     avatar: avatar.clone(),
+    branch: branch.clone(),
   };
 
   registry.order.push(id.clone());
@@ -267,6 +274,7 @@ fn create_terminal_impl(
     detected_port: None,
     working_on,
     avatar,
+    branch,
   })
 }
 
@@ -371,6 +379,7 @@ fn update_terminal_impl(
   cwd: Option<String>,
   working_on: Option<String>,
   avatar: Option<String>,
+  branch: Option<String>,
 ) -> Result<TerminalInfo> {
   let mut registry = REGISTRY
     .lock()
@@ -402,6 +411,9 @@ fn update_terminal_impl(
 
   // Update avatar if provided
   session.avatar = avatar;
+
+  // Update branch if provided
+  session.branch = branch;
 
   Ok(compile_info(id, session))
 }
@@ -606,6 +618,7 @@ fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
     detected_port: session.detected_port,
     working_on: session.working_on.clone(),
     avatar: session.avatar.clone(),
+    branch: session.branch.clone(),
   }
 }
 
