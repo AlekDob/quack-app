@@ -111,12 +111,9 @@ function NewTerminalModal({
       });
       setAvailableBranches(branches);
 
-      // Auto-select current branch if not already set
-      if (!branch) {
-        const currentBranch = branches.find(b => b.isCurrent);
-        if (currentBranch && onBranchChange) {
-          onBranchChange(currentBranch.name);
-        }
+      // Ensure 'main' is selected if branch is empty/undefined
+      if (!branch && onBranchChange) {
+        onBranchChange('main');
       }
     } catch (err) {
       console.warn('Could not load branches (not a git repository?):', err);
@@ -143,6 +140,13 @@ function NewTerminalModal({
       onBranchChange(newBranchName);
     }
   }, [branchMode, newBranchName, onBranchChange]);
+
+  // Reset to 'main' when switching back to "existing" mode
+  useEffect(() => {
+    if (branchMode === 'existing' && onBranchChange) {
+      onBranchChange('main');
+    }
+  }, [branchMode, onBranchChange]);
 
   if (!open) {
     return null
