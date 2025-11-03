@@ -5525,6 +5525,15 @@ You have access to all Bash tools to execute git commands like:
               onCommit={handleCommit}
               committing={committing}
               onGenerateCommitMessage={handleGenerateCommitMessage}
+              rootPath={explorerPath}
+              terminals={terminals}
+              onBranchSwitch={(_branchName) => {
+                // Switch to the branch in the current terminal or create a new terminal
+                if (activeTerminal) {
+                  // For now, just refresh the git status after branch switch
+                  refreshGitSummary();
+                }
+              }}
             />
           </div>
         </div>

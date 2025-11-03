@@ -209,27 +209,27 @@ export function usePipWindow() {
     checkExisting();
   }, []);
 
-  // Auto-open PiP window on mount (default active)
-  useEffect(() => {
-    if (!store) return; // Wait for store to be ready
+  // Auto-open PiP window on mount (DISABLED - user must manually activate)
+  // useEffect(() => {
+  //   if (!store) return; // Wait for store to be ready
 
-    const autoOpenPip = async () => {
-      try {
-        // Check if a PiP window already exists
-        const allWindows = await WebviewWindow.getAll();
-        const existing = allWindows.find((w) => w.label === PIP_WINDOW_LABEL);
+  //   const autoOpenPip = async () => {
+  //     try {
+  //       // Check if a PiP window already exists
+  //       const allWindows = await WebviewWindow.getAll();
+  //       const existing = allWindows.find((w) => w.label === PIP_WINDOW_LABEL);
 
-        if (!existing) {
-          // Open PiP window on startup (will start hidden)
-          await openPipWindow();
-        }
-      } catch (error) {
-        console.error('🦆 Failed to auto-open PiP window:', error);
-      }
-    };
+  //       if (!existing) {
+  //         // Open PiP window on startup (will start hidden)
+  //         await openPipWindow();
+  //       }
+  //     } catch (error) {
+  //       console.error('🦆 Failed to auto-open PiP window:', error);
+  //     }
+  //   };
 
-    autoOpenPip();
-  }, [store, openPipWindow]);
+  //   autoOpenPip();
+  // }, [store, openPipWindow]);
 
   return {
     isPipOpen,

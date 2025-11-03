@@ -118,7 +118,7 @@ fn get_installed_terminal_apps_impl() -> Result<Vec<TerminalApp>> {
         .filter(|p| p.exists());
 
     if let Some(home_apps) = home_apps_dir {
-        for (name, display_name, default_path) in vec![
+        for (name, display_name, _default_path) in vec![
             ("iTerm", "iTerm.app", ""),
             ("iTerm2", "iTerm2.app", ""),
             ("Warp", "Warp.app", ""),
@@ -219,7 +219,7 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
         "Warp" => {
             // Warp doesn't support AppleScript well, so we use 'open' command with URL scheme
             // First, just open Warp and let it handle the directory
-            let warp_command = format!(
+            let _warp_command = format!(
                 r#"
                 tell application "Warp"
                     activate

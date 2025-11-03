@@ -469,6 +469,7 @@ fn git_current_branch_impl(root_path: Option<String>) -> Result<String> {
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GitBranch {
     pub name: String,
     pub is_current: bool,
@@ -604,4 +605,200 @@ fn git_switch_branch_impl(branch_name: String, root_path: Option<String>) -> Res
     run_git(&root, &["checkout", &branch_name], false)?;
 
     Ok(())
+}
+
+#[derive(Serialize, Clone)]
+pub struct GitMergeResult {
+    pub success: bool,
+    pub has_conflicts: bool,
+    pub conflicted_files: Vec<String>,
+    pub message: String,
+}
+
+#[tauri::command]
+pub fn git_merge_branch(
+    branch_name: String,
+    root_path: Option<String>,
+) -> Result<GitMergeResult, String> {
+    git_merge_branch_impl(branch_name, root_path).map_err(|err| err.to_string())
+}
+
+fn git_merge_branch_impl(branch_name: String, root_path: Option<String>) -> Result<GitMergeResult> {
+    if branch_name.trim().is_empty() {
+        return Err(anyhow!("Branch name cannot be empty"));
+    }
+
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Attempt merge
+    let output = run_git(&root, &["merge", &branch_name, "--no-edit"], true)?;
+
+    // Check if there are conflicts
+    let status_output = run_git(&root, &["status", "--porcelain"], false)?;
+    let has_conflicts = status_output.lines().any(|line| {
+        line.starts_with("UU ") || line.starts_with("AA ") ||
+        line.starts_with("DD ") || line.starts_with("AU ") ||
+        line.starts_with("UA ") || line.starts_with("DU ") ||
+        line.starts_with("UD ")
+    });
+
+    let conflicted_files: Vec<String> = if has_conflicts {
+        status_output
+            .lines()
+            .filter(|line| {
+                line.starts_with("UU ") || line.starts_with("AA ") ||
+                line.starts_with("DD ") || line.starts_with("AU ") ||
+                line.starts_with("UA ") || line.starts_with("DU ") ||
+                line.starts_with("UD ")
+            })
+            .map(|line| line[3..].to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let conflicted_count = conflicted_files.len();
+
+    Ok(GitMergeResult {
+        success: !has_conflicts,
+        has_conflicts,
+        conflicted_files,
+        message: if has_conflicts {
+            format!("Merge has conflicts in {} files", conflicted_count)
+        } else {
+            output.trim().to_string()
+        },
+    })
+}
+
+#[tauri::command]
+pub fn git_abort_merge(root_path: Option<String>) -> Result<(), String> {
+    git_abort_merge_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_abort_merge_impl(root_path: Option<String>) -> Result<()> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    run_git(&root, &["merge", "--abort"], false)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn git_resolve_conflict(
+    file_path: String,
+    strategy: String,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_resolve_conflict_impl(file_path, strategy, root_path).map_err(|err| err.to_string())
+}
+
+fn git_resolve_conflict_impl(
+    file_path: String,
+    strategy: String,
+    root_path: Option<String>,
+) -> Result<()> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    let strategy_arg = match strategy.as_str() {
+        "ours" => "--ours",
+        "theirs" => "--theirs",
+        _ => return Err(anyhow!("Invalid strategy. Use 'ours' or 'theirs'")),
+    };
+
+    // Checkout the file with the specified strategy
+    run_git(&root, &["checkout", strategy_arg, "--", &file_path], false)?;
+
+    // Add the resolved file to staging
+    run_git(&root, &["add", "--", &file_path], false)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn git_delete_branch(
+    branch_name: String,
+    force: Option<bool>,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_delete_branch_impl(branch_name, force, root_path).map_err(|err| err.to_string())
+}
+
+fn git_delete_branch_impl(
+    branch_name: String,
+    force: Option<bool>,
+    root_path: Option<String>,
+) -> Result<()> {
+    if branch_name.trim().is_empty() {
+        return Err(anyhow!("Branch name cannot be empty"));
+    }
+
+    // Safety check: prevent deleting main/master branches
+    if branch_name == "main" || branch_name == "master" {
+        return Err(anyhow!("Cannot delete main or master branch"));
+    }
+
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Check if it's the current branch
+    let current_branch = run_git(&root, &["branch", "--show-current"], false)?;
+    if current_branch.trim() == branch_name {
+        return Err(anyhow!("Cannot delete the current branch. Switch to another branch first."));
+    }
+
+    // Delete branch (force or regular)
+    let flag = if force.unwrap_or(false) { "-D" } else { "-d" };
+    run_git(&root, &["branch", flag, &branch_name], false)?;
+
+    Ok(())
+}
+
+#[derive(Serialize, Clone)]
+pub struct GitConflictFile {
+    pub path: String,
+    pub status: String,
+}
+
+#[tauri::command]
+pub fn git_get_conflicts(root_path: Option<String>) -> Result<Vec<GitConflictFile>, String> {
+    git_get_conflicts_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_get_conflicts_impl(root_path: Option<String>) -> Result<Vec<GitConflictFile>> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    let status_output = run_git(&root, &["status", "--porcelain"], false)?;
+
+    let conflicts: Vec<GitConflictFile> = status_output
+        .lines()
+        .filter_map(|line| {
+            let status_code = &line[0..2];
+            if status_code.contains('U') || status_code == "AA" || status_code == "DD" {
+                Some(GitConflictFile {
+                    path: line[3..].to_string(),
+                    status: conflict_status_label(status_code).to_string(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(conflicts)
+}
+
+fn conflict_status_label(code: &str) -> &'static str {
+    match code {
+        "UU" => "Both modified",
+        "AA" => "Both added",
+        "DD" => "Both deleted",
+        "AU" | "UA" => "Added by one, modified by other",
+        "DU" | "UD" => "Deleted by one, modified by other",
+        _ => "Conflict",
+    }
 }

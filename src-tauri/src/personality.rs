@@ -204,7 +204,7 @@ fn inject_personality_to_claude_md_impl(
 
         // Add first few lines (header)
         let header_end = lines.iter().position(|&line| line.is_empty()).unwrap_or(2);
-        for (i, line) in lines.iter().enumerate().take(header_end + 1) {
+        for (_i, line) in lines.iter().enumerate().take(header_end + 1) {
             result.push_str(line);
             result.push('\n');
         }

@@ -200,7 +200,7 @@ pub fn save_claude_md_content(
         global_dir.join("CLAUDE.md")
     } else {
         // Project scope: prefer .claude/CLAUDE.md if .claude/ exists, otherwise root
-        let project_dir = get_project_claude_directory(working_dir.clone())?;
+        let _project_dir = get_project_claude_directory(working_dir.clone())?;
         let dotclaude_dir = if let Some(ref dir) = working_dir {
             PathBuf::from(dir).join(".claude")
         } else {

@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
-import type { GitCommitEntry, GitStatusEntry, GitStatusSummary } from '../types'
+import BranchManager from './BranchManager'
+import type { GitCommitEntry, GitStatusEntry, GitStatusSummary, TerminalInfo } from '../types'
 
 type DiffView = 'worktree' | 'staged'
+type GitTab = 'changes' | 'branches'
 
 interface GitPanelProps {
   summary: GitStatusSummary | null
@@ -28,6 +30,9 @@ interface GitPanelProps {
   onCommit: () => void
   committing: boolean
   onGenerateCommitMessage: () => Promise<void>
+  rootPath: string | null
+  terminals: TerminalInfo[]
+  onBranchSwitch?: (branchName: string) => void
 }
 
 const statusBadgeClass = (kind: 'staged' | 'working') =>
@@ -157,7 +162,12 @@ function GitPanel({
   onCommit,
   committing,
   onGenerateCommitMessage,
+  rootPath,
+  terminals,
+  onBranchSwitch,
 }: GitPanelProps) {
+  const [activeTab, setActiveTab] = useState<GitTab>('changes')
+
   const groupedEntries = useMemo(() => {
     const entries = summary?.entries ?? []
     const staged: GitStatusEntry[] = []
@@ -187,14 +197,32 @@ function GitPanel({
           )}
         </div>
         <div className="git-panel-actions">
-          <button
-            type="button"
-            className="git-stage-all-button"
-            onClick={onStageAll}
-            disabled={loading || groupedEntries.unstaged.length === 0}
-          >
-            Stage All
-          </button>
+          <div className="git-tabs">
+            <button
+              type="button"
+              className={`git-tab ${activeTab === 'changes' ? 'active' : ''}`}
+              onClick={() => setActiveTab('changes')}
+            >
+              Changes
+            </button>
+            <button
+              type="button"
+              className={`git-tab ${activeTab === 'branches' ? 'active' : ''}`}
+              onClick={() => setActiveTab('branches')}
+            >
+              Branches
+            </button>
+          </div>
+          {activeTab === 'changes' && (
+            <button
+              type="button"
+              className="git-stage-all-button"
+              onClick={onStageAll}
+              disabled={loading || groupedEntries.unstaged.length === 0}
+            >
+              Stage All
+            </button>
+          )}
           <button type="button" className="git-refresh" onClick={onRefresh} disabled={loading}>
             Refresh
           </button>
@@ -203,8 +231,18 @@ function GitPanel({
 
       {error ? (
         <div className="git-panel-error">{error}</div>
-      ) : (
+      ) : activeTab === 'branches' ? (
         <div className="git-panel-body">
+          <BranchManager
+            rootPath={rootPath}
+            currentBranch={summary?.branch ?? ''}
+            terminals={terminals}
+            onBranchSwitch={onBranchSwitch}
+            onRefresh={onRefresh}
+          />
+        </div>
+      ) : (
+        <div className="git-panel-body changes-view">
           <aside className="git-status-column">
             <section className="git-status-section">
               <h3>Staging</h3>

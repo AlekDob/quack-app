@@ -137,6 +137,18 @@ export interface GitBranch {
   upstream?: string;
 }
 
+export interface GitMergeResult {
+  success: boolean;
+  hasConflicts: boolean;
+  conflictedFiles: string[];
+  message: string;
+}
+
+export interface GitConflictFile {
+  path: string;
+  status: string;
+}
+
 export interface TerminalDataEvent {
   id: string;
   data: string;
@@ -236,6 +248,7 @@ export interface AgentPersonality {
   specialties: string[];
   skills: string[];
   expressions: string[];
+  intro?: string;
 }
 
 // Skills types (similar to Agents)
