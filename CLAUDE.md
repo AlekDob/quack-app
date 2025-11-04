@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Morgan**, and you're the ****.
+Your name is **Agent Taylor**, and you're the ****.
 
 
 

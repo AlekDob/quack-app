@@ -155,81 +155,16 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "🦆 Quack [DEV MOD
         left: '12px',
         zIndex: 2
       }}>
-        <button
-          onClick={handleMinimize}
-          style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: 'none',
-            backgroundColor: '#FFB84D',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '10px',
-            color: '#8B4513',
-            opacity: 1,
-            boxShadow: '0 2px 4px rgba(255, 184, 77, 0.3)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#FFA500';
-            e.currentTarget.style.opacity = '0.8';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#FFB84D';
-            e.currentTarget.style.opacity = '1';
-          }}
-          title="Minimizza"
-        >
-          ―
-        </button>
-
-        <button
-          onClick={handleMaximize}
-          style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: 'none',
-            backgroundColor: '#66CC99',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '10px',
-            color: '#2F4F2F',
-            opacity: 1,
-            boxShadow: '0 2px 4px rgba(102, 204, 153, 0.3)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#4CAF50';
-            e.currentTarget.style.opacity = '0.8';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#66CC99';
-            e.currentTarget.style.opacity = '1';
-          }}
-          title="Massimizza"
-        >
-        </button>
-
+        {/* Rosso - Close (primo a sinistra) */}
         <button
           onClick={handleClose}
           style={{
-            width: '16px',
-            height: '16px',
+            width: '12px',
+            height: '12px',
             borderRadius: '50%',
             border: 'none',
             backgroundColor: '#FF6B6B',
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '10px',
-            color: '#8B0000',
             opacity: 1,
             boxShadow: '0 2px 4px rgba(255, 107, 107, 0.3)',
             transition: 'all 0.2s ease'
@@ -243,9 +178,57 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "🦆 Quack [DEV MOD
             e.currentTarget.style.opacity = '1';
           }}
           title="Chiudi"
-        >
-          ✕
-        </button>
+        />
+
+        {/* Giallo - Minimize (secondo) */}
+        <button
+          onClick={handleMinimize}
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            border: 'none',
+            backgroundColor: '#FFB84D',
+            cursor: 'pointer',
+            opacity: 1,
+            boxShadow: '0 2px 4px rgba(255, 184, 77, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#FFA500';
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#FFB84D';
+            e.currentTarget.style.opacity = '1';
+          }}
+          title="Minimizza"
+        />
+
+        {/* Verde - Maximize (terzo a destra) */}
+        <button
+          onClick={handleMaximize}
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            border: 'none',
+            backgroundColor: '#66CC99',
+            cursor: 'pointer',
+            opacity: 1,
+            boxShadow: '0 2px 4px rgba(102, 204, 153, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#4CAF50';
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#66CC99';
+            e.currentTarget.style.opacity = '1';
+          }}
+          title="Massimizza"
+        />
       </div>
     </div>
   );
