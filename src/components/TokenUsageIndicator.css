@@ -5,14 +5,19 @@
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 140px;
-  height: 32px;
+  height: 36px;
   position: relative;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   justify-content: center;
+}
+
+/* Duck Stamina Meter specific styles */
+.duck-stamina-meter {
+  gap: 3px;
 }
 
 .token-usage-indicator:hover {
@@ -46,11 +51,50 @@
   opacity: 0.6;
 }
 
+/* Duck emoji styling */
+.duck-emoji {
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Duck stamina icon (image replacement for emoji) */
+.duck-stamina-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+  opacity: 0.85;
+}
+
+.stamina-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+}
+
+.stamina-percentage {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.stamina-label {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .token-usage-progress-bar {
   width: 100%;
-  height: 2px;
+  height: 3px;
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 1px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -58,6 +102,28 @@
   height: 100%;
   transition: width 0.3s ease, background-color 0.3s ease;
   border-radius: 2px;
+}
+
+/* Stamina bar enhanced styling - MORE VISIBLE */
+.stamina-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+}
+
+.stamina-fill {
+  box-shadow: 0 0 12px currentColor, inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  opacity: 1;
+  border-radius: 2px;
+  background: linear-gradient(to bottom,
+    rgba(255, 255, 255, 0.2) 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  background-color: currentColor;
+  background-blend-mode: overlay;
 }
 
 .token-usage-badge {
@@ -73,7 +139,41 @@
   letter-spacing: 0.5px;
 }
 
-/* Status-specific styles */
+/* Duck Stamina status-specific styles */
+.duck-stamina-meter.exhausted {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+  animation: pulse-exhausted 1.5s ease-in-out infinite;
+}
+
+.duck-stamina-meter.tired {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.duck-stamina-meter.working {
+  border-color: rgba(234, 179, 8, 0.3);
+  background: rgba(234, 179, 8, 0.05);
+}
+
+.duck-stamina-meter.fresh {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+@keyframes pulse-exhausted {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+}
+
+/* Legacy status styles (for backwards compatibility) */
 .token-usage-indicator.critical {
   border-color: rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.05);

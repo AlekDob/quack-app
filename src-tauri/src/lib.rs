@@ -435,6 +435,8 @@ pub fn run() {
             git::git_abort_merge,
             git::git_resolve_conflict,
             git::git_get_conflicts,
+            git::git_push,
+            git::git_pull,
             preview::create_preview_webview,
             preview::update_preview_webview_position,
             preview::destroy_preview_webview,

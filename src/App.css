@@ -577,7 +577,7 @@ button.directory-chooser:hover {
 .git-drawer-panel {
   position: relative;
   height: 100%;
-  width: clamp(900px, 85vw, 1600px);
+  width: clamp(1000px, 90vw, 1800px);
   background: #181a21;
   border-left: 1px solid var(--panel-border-strong);
   box-shadow: -18px 0 48px rgba(6, 8, 18, 0.45);
@@ -2534,6 +2534,60 @@ button.directory-chooser:hover {
   cursor: not-allowed;
 }
 
+.git-pull-button {
+  padding: 0.3rem 0.7rem;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.git-pull-button:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.git-pull-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.git-push-button {
+  padding: 0.3rem 0.7rem;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.git-push-button:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: rgba(34, 197, 94, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+}
+
+.git-push-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .git-branch-meta {
   display: flex;
   align-items: center;
@@ -2695,7 +2749,7 @@ button.directory-chooser:hover {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   border-left: 1px solid var(--panel-border);
   padding-left: 1.2rem;
 }

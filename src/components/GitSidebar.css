@@ -1,0 +1,420 @@
+/* ====================================
+   Git Sidebar - Fork Style
+   ==================================== */
+
+.git-sidebar {
+  background: #12141a;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Filter Input */
+.git-sidebar-filter {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.git-sidebar-filter svg {
+  color: rgba(168, 182, 221, 0.4);
+  flex-shrink: 0;
+}
+
+.git-sidebar-filter-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  color: #e5ecff;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.git-sidebar-filter-input::placeholder {
+  color: rgba(168, 182, 221, 0.4);
+}
+
+.git-sidebar-filter-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
+}
+
+/* Sections */
+.git-sidebar-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.git-sidebar-section:last-child {
+  border-bottom: none;
+}
+
+.git-sidebar-section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  background: transparent;
+  border: none;
+  color: rgba(168, 182, 221, 0.8);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.git-sidebar-section-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: #a8b6dd;
+}
+
+.git-sidebar-section-header svg {
+  flex-shrink: 0;
+  color: rgba(168, 182, 221, 0.5);
+}
+
+.git-sidebar-section-header span {
+  flex: 1;
+  text-align: left;
+}
+
+.git-sidebar-section-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.git-sidebar-section-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.git-sidebar-section-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.git-sidebar-section-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.git-sidebar-section-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Branch Items */
+.git-sidebar-branch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: relative;
+}
+
+.git-sidebar-branch-wrapper:hover .git-sidebar-branch-merge {
+  opacity: 1;
+}
+
+.git-sidebar-branch-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  border: none;
+  color: #d6dae4;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.git-sidebar-branch-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.git-sidebar-branch-item.current {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.git-sidebar-branch-item.current:hover {
+  background: rgba(var(--accent-rgb), 0.18);
+}
+
+.git-sidebar-branch-item svg {
+  flex-shrink: 0;
+  color: rgba(168, 182, 221, 0.6);
+}
+
+.git-sidebar-branch-item.current svg {
+  color: var(--accent-text);
+}
+
+.git-sidebar-branch-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-sidebar-branch-behind {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(139, 92, 246, 0.8);
+  margin-left: 0.25rem;
+}
+
+.git-sidebar-branch-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Merge Button */
+.git-sidebar-branch-merge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-right: 0.5rem;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 4px;
+  color: #86efac;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.git-sidebar-branch-merge:hover {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+  transform: scale(1.05);
+}
+
+.git-sidebar-branch-merge:active {
+  transform: scale(0.95);
+}
+
+.git-sidebar-branch-merge svg {
+  width: 12px;
+  height: 12px;
+  color: currentColor;
+}
+
+/* Nested Branch Items */
+.git-sidebar-branch-item.nested {
+  padding-left: 2.5rem;
+}
+
+/* Folders */
+.git-sidebar-folder {
+  display: flex;
+  flex-direction: column;
+}
+
+.git-sidebar-folder-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  border: none;
+  color: rgba(168, 182, 221, 0.75);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  min-width: auto;
+  overflow: visible;
+}
+
+.git-sidebar-folder-header.static {
+  cursor: default;
+}
+
+.git-sidebar-folder-header:not(.static):hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #a8b6dd;
+}
+
+.git-sidebar-folder-header svg {
+  flex-shrink: 0;
+  color: rgba(168, 182, 221, 0.5);
+}
+
+.git-sidebar-folder-header span {
+  flex: 1;
+  min-width: auto;
+  overflow: visible;
+  word-wrap: break-word;
+  text-indent: 0 !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  white-space: normal;
+  display: block;
+}
+
+.git-sidebar-folder-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* File Items */
+.git-sidebar-file-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  border: none;
+  color: #d6dae4;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.git-sidebar-file-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.git-sidebar-file-item.selected {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-text);
+}
+
+.git-sidebar-file-item.selected:hover {
+  background: rgba(var(--accent-rgb), 0.18);
+}
+
+.git-sidebar-file-item svg {
+  flex-shrink: 0;
+  color: rgba(168, 182, 221, 0.6);
+}
+
+.git-sidebar-file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-sidebar-file-status {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+}
+
+.git-sidebar-file-status.unstaged {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.git-sidebar-file-status.staged {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+/* Empty State */
+.git-sidebar .git-empty {
+  padding: 0.75rem 0.85rem;
+  font-size: 0.7rem;
+  color: rgba(168, 182, 221, 0.4);
+  text-align: center;
+}
+
+/* Readonly Items (Remotes) */
+.git-sidebar-branch-item.readonly {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.git-sidebar-branch-item.readonly:hover {
+  background: transparent;
+  color: #d6dae4;
+}
+
+/* Fork Layout - 3 Columns (Diff moved to drawer) */
+.git-panel.fork-style .git-panel-body.fork-layout.three-column {
+  display: grid;
+  grid-template-columns: 30% 40% 30%;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Legacy 4 Columns (if needed) */
+.git-panel.fork-style .git-panel-body.fork-layout:not(.three-column) {
+  display: grid;
+  grid-template-columns: 180px 200px 1fr auto;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.git-center-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.git-right-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Remove tabs in fork-style */
+.git-panel.fork-style .git-tabs {
+  display: none;
+}
+
+/* Drag & Drop States */
+.git-sidebar-branch-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing !important;
+}
+
+.git-sidebar-branch-wrapper.drag-over {
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+.git-sidebar-branch-wrapper.drag-over .git-sidebar-branch-item {
+  background: rgba(34, 197, 94, 0.05);
+}

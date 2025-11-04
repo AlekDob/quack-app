@@ -135,6 +135,7 @@ export interface GitBranch {
   isCurrent: boolean;
   hasRemote: boolean;
   upstream?: string;
+  behind?: number;
 }
 
 export interface GitMergeResult {
@@ -142,6 +143,14 @@ export interface GitMergeResult {
   hasConflicts: boolean;
   conflictedFiles: string[];
   message: string;
+}
+
+export interface GitPullResult {
+  success: boolean;
+  hasConflicts: boolean;
+  conflictedFiles: string[];
+  message: string;
+  isFastForward: boolean;
 }
 
 export interface GitConflictFile {

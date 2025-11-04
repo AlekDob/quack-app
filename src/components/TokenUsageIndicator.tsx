@@ -12,6 +12,14 @@ interface TokenUsageIndicatorProps {
   onClear?: () => void;
 }
 
+interface DuckStatus {
+  level: string;
+  color: string;
+  label: string;
+  emoji: string;
+  message: string;
+}
+
 export default function TokenUsageIndicator({
   inputTokens,
   outputTokens,
@@ -25,17 +33,44 @@ export default function TokenUsageIndicator({
 
   // Calculate totals
   const totalTokens = inputTokens + outputTokens;
-  const percentage = (totalTokens / maxTokens) * 100;
+  const usagePercentage = (totalTokens / maxTokens) * 100;
 
-  // Determine status and color
-  const getStatus = () => {
-    if (percentage >= 90) return { level: 'critical', color: '#EF4444', label: 'Critical' };
-    if (percentage >= 75) return { level: 'warning', color: '#F59E0B', label: 'Warning' };
-    if (percentage >= 50) return { level: 'caution', color: '#EAB308', label: 'Caution' };
-    return { level: 'normal', color: '#10B981', label: 'Normal' };
+  // INVERTED: Stamina starts at 100% and decreases as tokens are used
+  const staminaPercentage = Math.max(0, 100 - usagePercentage);
+
+  // Determine duck stamina status (INVERTED LOGIC)
+  const getDuckStatus = () => {
+    if (staminaPercentage <= 10) return {
+      level: 'exhausted',
+      color: '#EF4444',
+      label: 'Exhausted',
+      emoji: '🥵',
+      message: 'Duck needs rest!'
+    };
+    if (staminaPercentage <= 25) return {
+      level: 'tired',
+      color: '#F59E0B',
+      label: 'Tired',
+      emoji: '😮‍💨',
+      message: 'Getting tired...'
+    };
+    if (staminaPercentage <= 50) return {
+      level: 'working',
+      color: '#EAB308',
+      label: 'Working',
+      emoji: '😅',
+      message: 'Still going!'
+    };
+    return {
+      level: 'fresh',
+      color: '#10B981',
+      label: 'Fresh',
+      emoji: '🦆',
+      message: 'Full energy!'
+    };
   };
 
-  const status = getStatus();
+  const status = getDuckStatus();
 
   // Format token count (45.2k, 120k, etc.)
   const formatTokens = (tokens: number) => {
@@ -47,28 +82,28 @@ export default function TokenUsageIndicator({
   return (
     <>
       <div
-        className={`token-usage-indicator ${status.level}`}
+        className={`token-usage-indicator duck-stamina-meter ${status.level}`}
         onClick={() => setShowModal(true)}
-        title="Click for details"
+        title={status.message}
       >
         <div className="token-usage-label">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 6v6l4 2" />
-          </svg>
-          <span>{formatTokens(totalTokens)} / {formatTokens(maxTokens)}</span>
+          <img src="/images/stamina-icon.png" alt="Duck" className="duck-stamina-icon" />
+          <span className="stamina-text">
+            <span className="stamina-percentage">{Math.round(staminaPercentage)}%</span>
+            <span className="stamina-label">Stamina</span>
+          </span>
         </div>
-        <div className="token-usage-progress-bar">
+        <div className="token-usage-progress-bar stamina-bar">
           <div
-            className="token-usage-progress-fill"
+            className="token-usage-progress-fill stamina-fill"
             style={{
-              width: `${Math.min(percentage, 100)}%`,
+              width: `${Math.min(staminaPercentage, 100)}%`,
               backgroundColor: status.color,
             }}
           />
         </div>
-        {status.level !== 'normal' && (
-          <div className="token-usage-badge" style={{ backgroundColor: status.color }}>
+        {status.level !== 'fresh' && (
+          <div className="token-usage-badge stamina-badge" style={{ backgroundColor: status.color }}>
             {status.label}
           </div>
         )}
@@ -81,7 +116,7 @@ export default function TokenUsageIndicator({
           cacheCreationTokens={cacheCreationTokens}
           cacheReadTokens={cacheReadTokens}
           maxTokens={maxTokens}
-          percentage={percentage}
+          percentage={usagePercentage}
           status={status}
           onClose={() => setShowModal(false)}
           onCompact={onCompact}

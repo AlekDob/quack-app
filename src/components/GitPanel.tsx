@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
-import BranchManager from './BranchManager'
-import type { GitCommitEntry, GitStatusEntry, GitStatusSummary, TerminalInfo } from '../types'
-
-type DiffView = 'worktree' | 'staged'
-type GitTab = 'changes' | 'branches'
+import GitSidebar from './GitSidebar'
+import GitFilesColumn from './GitFilesColumn'
+import type { GitBranch, GitCommitEntry, GitStatusEntry, GitStatusSummary, GitPullResult, TerminalInfo } from '../types'
 
 interface GitPanelProps {
   summary: GitStatusSummary | null
@@ -14,15 +13,8 @@ interface GitPanelProps {
   historyLoading: boolean
   historyError: string | null
   selected: GitStatusEntry | null
-  diffContent: string
-  diffLoading: boolean
-  diffError: string | null
-  diffView: DiffView
-  onDiffViewChange: (view: DiffView) => void
   onRefresh: () => void
   onSelect: (entry: GitStatusEntry) => void
-  onStage: (entry: GitStatusEntry) => void
-  onUnstage: (entry: GitStatusEntry) => void
   onStageAll: () => void
   onOpenFile: (path: string) => void
   commitMessage: string
@@ -34,9 +26,6 @@ interface GitPanelProps {
   terminals: TerminalInfo[]
   onBranchSwitch?: (branchName: string) => void
 }
-
-const statusBadgeClass = (kind: 'staged' | 'working') =>
-  kind === 'staged' ? 'git-status-badge staged' : 'git-status-badge working'
 
 const TIMELINE_LINE_LEFT = 20
 const TIMELINE_LINE_COLOR = 'rgba(232, 125, 62, 0.32)'
@@ -61,6 +50,38 @@ const GitTimelineItem = ({
       })
     : null
 
+  // Generate initials from author name
+  const getAuthorInitials = (author: string): string => {
+    const parts = author.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return author.slice(0, 2).toUpperCase()
+  }
+
+  // Generate color from author name (deterministic)
+  const getAuthorColor = (author: string): string => {
+    const colors = [
+      '#f87171', // red
+      '#fb923c', // orange
+      '#fbbf24', // yellow
+      '#a3e635', // lime
+      '#34d399', // emerald
+      '#22d3ee', // cyan
+      '#60a5fa', // blue
+      '#a78bfa', // violet
+      '#f472b6', // pink
+    ]
+    let hash = 0
+    for (let i = 0; i < author.length; i++) {
+      hash = author.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return colors[Math.abs(hash) % colors.length]
+  }
+
+  const initials = getAuthorInitials(entry.author)
+  const avatarColor = getAuthorColor(entry.author)
+
   return (
     <div
       style={{
@@ -82,22 +103,31 @@ const GitTimelineItem = ({
             zIndex: 0,
           }}
         />
+      {/* Avatar con iniziali invece del pallino */}
       <div
         aria-hidden
         style={{
           position: 'absolute',
           left: `${lineLeft}px`,
-          top: '0.25rem',
-          width: '14px',
-          height: '14px',
+          top: '0.1rem',
+          width: '24px',
+          height: '24px',
           borderRadius: '999px',
-          background: TIMELINE_DOT_COLOR,
-          border: '3px solid ' + TIMELINE_DOT_COLOR,
-          boxShadow: '0 0 0 3px rgba(15, 17, 26, 1)',
+          background: avatarColor,
+          border: '2px solid rgba(15, 17, 26, 1)',
+          boxShadow: `0 0 0 2px ${avatarColor}30`,
           transform: 'translate(-50%, 0)',
           zIndex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '0.6rem',
+          fontWeight: 600,
+          color: '#000',
         }}
-      />
+      >
+        {initials}
+      </div>
       <div
         style={{
           display: 'flex',
@@ -146,15 +176,8 @@ function GitPanel({
   historyLoading,
   historyError,
   selected,
-  diffContent,
-  diffLoading,
-  diffError,
-  diffView,
-  onDiffViewChange,
   onRefresh,
   onSelect,
-  onStage,
-  onUnstage,
   onStageAll,
   onOpenFile,
   commitMessage,
@@ -166,7 +189,109 @@ function GitPanel({
   terminals,
   onBranchSwitch,
 }: GitPanelProps) {
-  const [activeTab, setActiveTab] = useState<GitTab>('changes')
+  const [pushing, setPushing] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const [branches, setBranches] = useState<GitBranch[]>([])
+
+  // Load branches
+  useEffect(() => {
+    const loadBranches = async () => {
+      if (!rootPath) return
+      try {
+        const result = await invoke<GitBranch[]>('git_list_branches', {
+          rootPath: rootPath,
+        })
+        setBranches(result)
+      } catch (error) {
+        console.error('Failed to load branches:', error)
+        setBranches([])
+      }
+    }
+
+    loadBranches()
+  }, [rootPath, summary]) // Reload when summary changes (e.g., after branch switch)
+
+  const handlePush = async () => {
+    if (!rootPath || !summary?.branch) return
+
+    setPushing(true)
+    try {
+      const result = await invoke<string>('git_push', {
+        branchName: summary.branch,
+        force: false,
+        rootPath: rootPath,
+      })
+      console.log('Push result:', result)
+      onRefresh()
+    } catch (error) {
+      console.error('Push failed:', error)
+      alert(`Push failed: ${error}`)
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  const handlePull = async () => {
+    if (!rootPath || !summary?.branch) return
+
+    setPulling(true)
+    try {
+      const result = await invoke<GitPullResult>('git_pull', {
+        branchName: summary.branch,
+        rootPath: rootPath,
+      })
+
+      if (result.hasConflicts) {
+        // TODO Phase 4: Show ConflictResolver with result.conflictedFiles
+        alert(`Pull has conflicts in ${result.conflictedFiles.length} file(s):\n${result.conflictedFiles.join('\n')}`)
+      } else {
+        console.log('Pull result:', result.message)
+      }
+
+      onRefresh()
+    } catch (error) {
+      console.error('Pull failed:', error)
+      alert(`Pull failed: ${error}`)
+    } finally {
+      setPulling(false)
+    }
+  }
+
+  const handleMerge = async (sourceBranch: string, targetBranch: string) => {
+    if (!rootPath) return
+
+    try {
+      // First switch to target branch
+      await invoke('git_switch_branch', {
+        branchName: targetBranch,
+        rootPath: rootPath,
+      })
+
+      // Then merge source into target
+      const result = await invoke<{
+        success: boolean
+        hasConflicts: boolean
+        conflictedFiles: string[]
+        message: string
+      }>('git_merge_branch', {
+        branchName: sourceBranch,
+        rootPath: rootPath,
+      })
+
+      if (result.hasConflicts) {
+        alert(
+          `Merge has conflicts in ${result.conflictedFiles.length} file(s):\n${result.conflictedFiles.join('\n')}`
+        )
+      } else {
+        alert(`Successfully merged '${sourceBranch}' into '${targetBranch}'`)
+      }
+
+      onRefresh()
+    } catch (error) {
+      console.error('Merge failed:', error)
+      alert(`Merge failed: ${error}`)
+    }
+  }
 
   const groupedEntries = useMemo(() => {
     const entries = summary?.entries ?? []
@@ -184,7 +309,7 @@ function GitPanel({
   }, [summary])
 
   return (
-    <div className="git-panel">
+    <div className="git-panel fork-style">
       <header className="git-panel-header">
         <div className="git-branch-meta">
           <span className="git-branch-label">{summary?.branch ?? '—'}</span>
@@ -197,32 +322,34 @@ function GitPanel({
           )}
         </div>
         <div className="git-panel-actions">
-          <div className="git-tabs">
+          {(summary?.behind ?? 0) > 0 && (
             <button
               type="button"
-              className={`git-tab ${activeTab === 'changes' ? 'active' : ''}`}
-              onClick={() => setActiveTab('changes')}
+              className="git-pull-button"
+              onClick={handlePull}
+              disabled={pulling}
             >
-              Changes
-            </button>
-            <button
-              type="button"
-              className={`git-tab ${activeTab === 'branches' ? 'active' : ''}`}
-              onClick={() => setActiveTab('branches')}
-            >
-              Branches
-            </button>
-          </div>
-          {activeTab === 'changes' && (
-            <button
-              type="button"
-              className="git-stage-all-button"
-              onClick={onStageAll}
-              disabled={loading || groupedEntries.unstaged.length === 0}
-            >
-              Stage All
+              {pulling ? 'Pulling…' : `Pull ↓ ${summary?.behind}`}
             </button>
           )}
+          {(summary?.ahead ?? 0) > 0 && (
+            <button
+              type="button"
+              className="git-push-button"
+              onClick={handlePush}
+              disabled={pushing}
+            >
+              {pushing ? 'Pushing…' : `Push ↑ ${summary?.ahead}`}
+            </button>
+          )}
+          <button
+            type="button"
+            className="git-stage-all-button"
+            onClick={onStageAll}
+            disabled={loading || groupedEntries.unstaged.length === 0}
+          >
+            Stage All
+          </button>
           <button type="button" className="git-refresh" onClick={onRefresh} disabled={loading}>
             Refresh
           </button>
@@ -231,201 +358,29 @@ function GitPanel({
 
       {error ? (
         <div className="git-panel-error">{error}</div>
-      ) : activeTab === 'branches' ? (
-        <div className="git-panel-body">
-          <BranchManager
-            rootPath={rootPath}
+      ) : (
+        <div className="git-panel-body fork-layout three-column">
+          {/* LEFT SIDEBAR - Branches */}
+          <GitSidebar
+            branches={branches}
             currentBranch={summary?.branch ?? ''}
             terminals={terminals}
             onBranchSwitch={onBranchSwitch}
-            onRefresh={onRefresh}
+            unstagedCount={groupedEntries.unstaged.length}
+            onMerge={handleMerge}
           />
-        </div>
-      ) : (
-        <div className="git-panel-body changes-view">
-          <aside className="git-status-column">
-            <section className="git-status-section">
-              <h3>Staging</h3>
-              <div className="git-status-list">
-                {loading ? (
-                  <div className="git-empty">Loading…</div>
-                ) : groupedEntries.staged.length === 0 ? (
-                  <div className="git-empty">No files in staging</div>
-                ) : (
-                  groupedEntries.staged.map((entry) => (
-                    <button
-                      key={`staged-${entry.path}`}
-                      type="button"
-                      className={`git-status-item ${
-                        selected?.path === entry.path ? 'selected' : ''
-                      }`}
-                      onClick={() => onSelect(entry)}
-                      onDoubleClick={() => onOpenFile(entry.path)}
-                    >
-                      <span className="git-status-path">{entry.path}</span>
-                      <span className={statusBadgeClass('staged')}>
-                        {entry.staged_status ?? 'Staged'}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </section>
-            <section className="git-status-section">
-              <h3>Changes</h3>
-              <div className="git-status-list">
-                {loading ? (
-                  <div className="git-empty">Loading…</div>
-                ) : groupedEntries.unstaged.length === 0 ? (
-                  <div className="git-empty">Working tree clean</div>
-                ) : (
-                  groupedEntries.unstaged.map((entry) => (
-                    <button
-                      key={`unstaged-${entry.path}`}
-                      type="button"
-                      className={`git-status-item ${
-                        selected?.path === entry.path ? 'selected' : ''
-                      }`}
-                      onClick={() => onSelect(entry)}
-                      onDoubleClick={() => onOpenFile(entry.path)}
-                    >
-                      <span className="git-status-path">{entry.path}</span>
-                      <span className={statusBadgeClass('working')}>
-                        {entry.unstaged_status ?? 'Modified'}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </section>
-          </aside>
 
-          <section className="git-main-column">
-            <div className="git-diff-column">
-            {selected ? (
-              <div className="git-diff-wrapper">
-                <div className="git-diff-toolbar">
-                  <div className="git-diff-meta">
-                    <span className="git-diff-filename">{selected.path}</span>
-                    {selected.original_path && (
-                      <span className="git-diff-rename">from {selected.original_path}</span>
-                    )}
-                  </div>
-                  <div className="git-diff-actions">
-                    {selected.staged_status && selected.unstaged_status && (
-                      <div className="git-diff-toggle">
-                        <button
-                          type="button"
-                          className={diffView === 'worktree' ? 'active' : ''}
-                          onClick={() => onDiffViewChange('worktree')}
-                        >
-                          Working tree
-                        </button>
-                        <button
-                          type="button"
-                          className={diffView === 'staged' ? 'active' : ''}
-                          onClick={() => onDiffViewChange('staged')}
-                        >
-                          Staging
-                        </button>
-                      </div>
-                    )}
-                    <div className="git-diff-buttons">
-                      {(selected.unstaged_status || selected.is_untracked) && (
-                        <button type="button" onClick={() => onStage(selected)}>
-                          Stage
-                        </button>
-                      )}
-                      {selected.staged_status && (
-                        <button type="button" onClick={() => onUnstage(selected)}>
-                          Unstage
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="git-diff-content">
-                  {diffLoading ? (
-                    <div className="git-empty">Computing diff…</div>
-                  ) : diffError ? (
-                    <div className="git-panel-error">{diffError}</div>
-                  ) : (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.15rem',
-                        fontFamily:
-                          '"IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace',
-                        fontSize: '0.74rem',
-                        lineHeight: 1.5,
-                        color: '#e5ecff',
-                      }}
-                    >
-                      {diffContent.split('\n').map((line, index) => {
-                        const isAddition = line.startsWith('+') && !line.startsWith('+++')
-                        const isDeletion = line.startsWith('-') && !line.startsWith('---')
-                        const isMeta =
-                          line.startsWith('@@') ||
-                          line.startsWith('diff ') ||
-                          line.startsWith('index ') ||
-                          line.startsWith('---') ||
-                          line.startsWith('+++')
+          {/* FILES COLUMN - Unstaged/Staged */}
+          <GitFilesColumn
+            unstaged={groupedEntries.unstaged}
+            staged={groupedEntries.staged}
+            selected={selected}
+            onSelect={onSelect}
+            onOpenFile={onOpenFile}
+          />
 
-                        const content =
-                          isAddition || isDeletion ? line.slice(1) : line
-
-                        const displayText = content.length > 0 ? content : '\u00a0'
-
-                        let background = 'transparent'
-                        let borderLeft = '3px solid transparent'
-                        let textColor = '#e5ecff'
-                        let fontWeight: number | undefined
-
-                        if (isAddition) {
-                          background = 'rgba(34, 197, 94, 0.18)'
-                          borderLeft = '3px solid rgba(34, 197, 94, 0.55)'
-                          textColor = '#bbf7d0'
-                        } else if (isDeletion) {
-                          background = 'rgba(239, 68, 68, 0.22)'
-                          borderLeft = '3px solid rgba(239, 68, 68, 0.55)'
-                          textColor = '#fecaca'
-                        } else if (isMeta) {
-                          background = 'rgba(59, 130, 246, 0.15)'
-                          borderLeft = '3px solid rgba(59, 130, 246, 0.6)'
-                          textColor = '#cbd5f5'
-                          fontWeight = 600
-                        }
-
-                        return (
-                          <div
-                            key={`${index}-${line}`}
-                            style={{
-                              background,
-                              borderLeft,
-                              borderRadius: '6px',
-                              padding: '0.18rem 0.65rem',
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                              color: textColor,
-                              fontWeight,
-                            }}
-                          >
-                            {displayText}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="git-empty git-diff-placeholder">
-                Select a file to see the diff
-              </div>
-            )}
-            </div>
-
+          {/* RIGHT - Timeline & Commit */}
+          <section className="git-right-column">
             <div className="git-history-timeline">
               <header className="git-history-header">
                 <h3>Timeline</h3>

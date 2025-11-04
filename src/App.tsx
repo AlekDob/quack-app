@@ -19,6 +19,7 @@ import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
+import DiffDrawer from "./components/DiffDrawer";
 import PluginsPanel from "./components/PluginsPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
@@ -421,6 +422,7 @@ function App() {
   const [previewHasUnsavedChanges, setPreviewHasUnsavedChanges] = useState(false);
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
+  const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -4678,6 +4680,8 @@ function App() {
     } else if (entry.staged_status) {
       setDiffView("staged");
     }
+    // Open diff drawer when file is selected
+    setShowDiffDrawer(true);
   }, []);
 
   const handleOpenFileFromGit = useCallback(
@@ -5509,15 +5513,8 @@ You have access to all Bash tools to execute git commands like:
               historyLoading={loadingGit}
               historyError={historyError}
               selected={selectedGitEntry}
-              diffContent={diffContent}
-              diffLoading={diffLoading}
-              diffError={diffError}
-              diffView={diffView}
-              onDiffViewChange={handleDiffViewChange}
               onRefresh={refreshGitSummary}
               onSelect={handleSelectGitEntry}
-              onStage={handleStageEntry}
-              onUnstage={handleUnstageEntry}
               onStageAll={handleStageAll}
               onOpenFile={handleOpenFileFromGit}
               commitMessage={commitMessage}
@@ -5527,16 +5524,43 @@ You have access to all Bash tools to execute git commands like:
               onGenerateCommitMessage={handleGenerateCommitMessage}
               rootPath={explorerPath}
               terminals={terminals}
-              onBranchSwitch={(_branchName) => {
-                // Switch to the branch in the current terminal or create a new terminal
-                if (activeTerminal) {
-                  // For now, just refresh the git status after branch switch
-                  refreshGitSummary();
+              onBranchSwitch={async (branchName) => {
+                // Switch to the branch
+                try {
+                  await invoke('git_switch_branch', {
+                    branchName: branchName,
+                    rootPath: explorerPath,
+                  });
+
+                  // Close diff drawer if open
+                  setShowDiffDrawer(false);
+                  setSelectedGitEntry(null);
+
+                  // Refresh git status and reload branches
+                  await refreshGitSummary();
+                } catch (error) {
+                  console.error('Failed to switch branch:', error);
+                  alert(`Failed to switch branch: ${error}`);
                 }
               }}
             />
           </div>
         </div>
+
+        {/* Diff Drawer - Opened when clicking a file */}
+        {showDiffDrawer && selectedGitEntry && (
+          <DiffDrawer
+            selected={selectedGitEntry}
+            diffContent={diffContent}
+            diffLoading={diffLoading}
+            diffError={diffError}
+            diffView={diffView}
+            onDiffViewChange={handleDiffViewChange}
+            onStage={handleStageEntry}
+            onUnstage={handleUnstageEntry}
+            onClose={() => setShowDiffDrawer(false)}
+          />
+        )}
 
         <div className={`git-drawer ${showPluginsDrawer ? "open" : ""}`}>
           <div

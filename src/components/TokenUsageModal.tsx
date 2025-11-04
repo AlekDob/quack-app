@@ -11,6 +11,8 @@ interface TokenUsageModalProps {
     level: string;
     color: string;
     label: string;
+    emoji?: string;
+    message?: string;
   };
   onClose: () => void;
   onCompact?: () => void;
@@ -31,6 +33,9 @@ export default function TokenUsageModal({
 }: TokenUsageModalProps) {
   const totalTokens = inputTokens + outputTokens;
   const remainingTokens = maxTokens - totalTokens;
+
+  // INVERTED: Stamina percentage (100% = fresh, 0% = exhausted)
+  const staminaPercentage = Math.max(0, 100 - percentage);
 
   const formatTokens = (tokens: number) => {
     return tokens.toLocaleString();
@@ -69,55 +74,50 @@ export default function TokenUsageModal({
 
   return (
     <div className="token-modal-overlay" onClick={onClose}>
-      <div className="token-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="token-modal-header">
-          <h3>Token Usage Details</h3>
+      <div className="token-modal fallout-style" onClick={(e) => e.stopPropagation()}>
+        <div className="token-modal-header fallout-header">
+          <h3>🦆 DUCK STAMINA STATUS</h3>
           <button className="token-modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <div className="token-modal-content">
-          {/* Progress Circle */}
-          <div className="token-usage-circle">
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              <circle
-                cx="60"
-                cy="60"
-                r="54"
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.1)"
-                strokeWidth="8"
+        <div className="token-modal-content fallout-content">
+          {/* Fallout-style Duck Stamina Display */}
+          <div className="fallout-stamina-display">
+            {/* Duck Image */}
+            <div className="fallout-duck-container">
+              <img
+                src="/images/stamina.png"
+                alt="Duck Stamina"
+                className="fallout-duck-image"
               />
-              <circle
-                cx="60"
-                cy="60"
-                r="54"
-                fill="none"
-                stroke={status.color}
-                strokeWidth="8"
-                strokeDasharray={`${(percentage / 100) * 339.292} 339.292`}
-                strokeLinecap="round"
-                transform="rotate(-90 60 60)"
-              />
-              <text
-                x="60"
-                y="55"
-                textAnchor="middle"
-                fontSize="24"
-                fontWeight="600"
-                fill="rgba(255, 255, 255, 0.9)"
-              >
-                {percentage.toFixed(1)}%
-              </text>
-              <text
-                x="60"
-                y="75"
-                textAnchor="middle"
-                fontSize="12"
-                fill="rgba(255, 255, 255, 0.6)"
-              >
-                {status.label}
-              </text>
-            </svg>
+              <div className="fallout-duck-status-badge" style={{ backgroundColor: status.color }}>
+                {status.emoji} {status.label}
+              </div>
+            </div>
+
+            {/* Stamina Bar (Fallout-style) */}
+            <div className="fallout-stamina-section">
+              <div className="fallout-stat-label">
+                <span className="fallout-stat-name">STAMINA</span>
+                <span className="fallout-stat-value">{Math.round(staminaPercentage)}%</span>
+              </div>
+              <div className="fallout-progress-bar-container">
+                <div className="fallout-progress-bar">
+                  <div
+                    className="fallout-progress-fill"
+                    style={{
+                      width: `${staminaPercentage}%`,
+                      backgroundColor: status.color,
+                    }}
+                  />
+                </div>
+                <div className="fallout-progress-segments">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} className="fallout-segment" />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Token Breakdown */}

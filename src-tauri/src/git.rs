@@ -135,7 +135,7 @@ fn git_status_summary_impl(root_path: Option<String>) -> Result<GitStatusSummary
                 path,
                 original_path: None,
                 staged_status: None,
-                unstaged_status: Some(String::from("Untracked")),
+                unstaged_status: Some(String::from("U")),
                 is_untracked: true,
                 additions: None,
                 deletions: None,
@@ -444,14 +444,14 @@ fn run_git(root: &PathBuf, args: &[&str], allow_non_zero: bool) -> Result<String
 
 fn status_label(code: char) -> Option<&'static str> {
     match code {
-        'M' => Some("Modified"),
-        'A' => Some("Added"),
-        'D' => Some("Deleted"),
-        'R' => Some("Renamed"),
-        'C' => Some("Copied"),
-        'U' => Some("Updated"),
-        'T' => Some("Type changed"),
-        '!' => Some("Ignored"),
+        'M' => Some("M"),
+        'A' => Some("A"),
+        'D' => Some("D"),
+        'R' => Some("R"),
+        'C' => Some("C"),
+        'U' => Some("U"),
+        'T' => Some("T"),
+        '!' => Some("!"),
         _ => None,
     }
 }
@@ -475,6 +475,7 @@ pub struct GitBranch {
     pub is_current: bool,
     pub has_remote: bool,
     pub upstream: Option<String>,
+    pub behind: Option<i32>,
 }
 
 #[tauri::command]
@@ -527,11 +528,25 @@ fn git_list_branches_impl(root_path: Option<String>) -> Result<Vec<GitBranch>> {
             None
         };
 
+        // Calculate behind count if there's an upstream
+        let behind = if let Some(ref upstream_ref) = upstream {
+            // Use git rev-list to count commits: local..remote
+            let count_args = ["rev-list", "--count", &format!("{}..{}", name, upstream_ref)];
+            if let Ok(count_output) = run_git(&root, &count_args, true) {
+                count_output.trim().parse::<i32>().ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         branches.push(GitBranch {
             name,
             is_current,
             has_remote,
             upstream,
+            behind,
         });
     }
 
@@ -801,4 +816,132 @@ fn conflict_status_label(code: &str) -> &'static str {
         "DU" | "UD" => "Deleted by one, modified by other",
         _ => "Conflict",
     }
+}
+
+#[tauri::command]
+pub fn git_push(
+    branch_name: Option<String>,
+    force: Option<bool>,
+    root_path: Option<String>,
+) -> Result<String, String> {
+    git_push_impl(branch_name, force, root_path).map_err(|err| err.to_string())
+}
+
+fn git_push_impl(
+    branch_name: Option<String>,
+    force: Option<bool>,
+    root_path: Option<String>,
+) -> Result<String> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Get current branch if not specified
+    let branch = if let Some(name) = branch_name {
+        name
+    } else {
+        let output = run_git(&root, &["branch", "--show-current"], false)?;
+        output.trim().to_string()
+    };
+
+    if branch.is_empty() {
+        return Err(anyhow!("No branch specified and cannot determine current branch"));
+    }
+
+    // Build push command
+    let mut args = vec!["push", "origin", &branch];
+    if force.unwrap_or(false) {
+        args.insert(1, "--force");
+    }
+
+    // Execute push
+    let output = run_git(&root, &args, false)?;
+
+    Ok(format!("Successfully pushed {} to origin", branch))
+}
+
+#[derive(Serialize, Clone)]
+pub struct GitPullResult {
+    pub success: bool,
+    pub has_conflicts: bool,
+    pub conflicted_files: Vec<String>,
+    pub message: String,
+    pub is_fast_forward: bool,
+}
+
+#[tauri::command]
+pub fn git_pull(
+    branch_name: Option<String>,
+    root_path: Option<String>,
+) -> Result<GitPullResult, String> {
+    git_pull_impl(branch_name, root_path).map_err(|err| err.to_string())
+}
+
+fn git_pull_impl(
+    branch_name: Option<String>,
+    root_path: Option<String>,
+) -> Result<GitPullResult> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Get current branch if not specified
+    let branch = if let Some(name) = branch_name {
+        name
+    } else {
+        let output = run_git(&root, &["branch", "--show-current"], false)?;
+        output.trim().to_string()
+    };
+
+    if branch.is_empty() {
+        return Err(anyhow!("No branch specified and cannot determine current branch"));
+    }
+
+    // First, fetch from origin to get latest changes
+    let _fetch_output = run_git(&root, &["fetch", "origin"], false)?;
+
+    // Execute pull with merge strategy (not rebase)
+    let output = run_git(&root, &["pull", "origin", &branch, "--no-rebase"], true)?;
+    let output_lower = output.to_lowercase();
+
+    // Check if it's a fast-forward merge
+    let is_fast_forward = output_lower.contains("fast-forward");
+
+    // Check for conflicts
+    let status_output = run_git(&root, &["status", "--porcelain"], false)?;
+    let has_conflicts = status_output.lines().any(|line| {
+        line.starts_with("UU ") || line.starts_with("AA ") ||
+        line.starts_with("DD ") || line.starts_with("AU ") ||
+        line.starts_with("UA ") || line.starts_with("DU ") ||
+        line.starts_with("UD ")
+    });
+
+    let conflicted_files = if has_conflicts {
+        status_output
+            .lines()
+            .filter(|line| {
+                line.starts_with("UU ") || line.starts_with("AA ") ||
+                line.starts_with("DD ") || line.starts_with("AU ") ||
+                line.starts_with("UA ") || line.starts_with("DU ") ||
+                line.starts_with("UD ")
+            })
+            .map(|line| line[3..].to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let conflicted_count = conflicted_files.len();
+
+    Ok(GitPullResult {
+        success: !has_conflicts,
+        has_conflicts,
+        conflicted_files,
+        is_fast_forward,
+        message: if has_conflicts {
+            format!("Pull has conflicts in {} files", conflicted_count)
+        } else if is_fast_forward {
+            "Pull completed (fast-forward)".to_string()
+        } else {
+            "Pull completed successfully".to_string()
+        },
+    })
 }
