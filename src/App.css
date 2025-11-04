@@ -2,7 +2,8 @@
   display: grid;
   grid-template-columns: 850px minmax(0, 1fr) 340px;
   grid-template-rows: auto 1fr;
-  height: 100vh;
+  height: calc(100vh - 40px);
+  margin-top: 40px;
   overflow: hidden;
   background: transparent;
   color: #eef0f5;

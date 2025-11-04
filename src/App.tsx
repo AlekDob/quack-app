@@ -26,6 +26,7 @@ import SavedCommandModal from "./components/SavedCommandModal";
 import { SessionDetailsDrawer } from "./components/SessionDetailsDrawer";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
 import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
+import { TitleBar } from "./components/TitleBar";
 import PreviewDrawer from "./components/PreviewDrawer";
 import UnifiedSettings from "./components/settings/UnifiedSettings";
 import PerformanceMonitor from "./components/PerformanceMonitor";
@@ -3275,37 +3276,13 @@ function App() {
             await loadDirectory(recreated[0].cwd);
           }
         } else {
-          console.log('No saved terminals found');
+          console.log('No saved terminals found - empty state will be shown');
 
           // Load any existing AgentChats even if no terminals (optional UI grouping)
           const existingChats = await loadAgentChatsFromStorage();
           if (existingChats.length > 0) {
             setAgentChats(existingChats);
           }
-
-          // Create a default terminal
-          const initial = await invoke<TerminalInfo>("create_terminal", {
-            label: "Terminal 1",
-            color: COLORS[0],
-            cwd: null,
-          });
-          const initialWithState = {
-            ...initial,
-            status: "idle" as const,
-            needsAttention: false,
-            hasResponded: false,
-            responseStartTime: null,
-          };
-
-          // Save metadata for Telegram notifications immediately
-          agentMetadataRef.current.set(initialWithState.id, {
-            name: "Terminal 1",
-            cwd: initialWithState.cwd,
-          });
-
-          setTerminals([initialWithState]);
-          setActiveId(initialWithState.id);
-          await loadDirectory(initialWithState.cwd);
         }
       } catch (error) {
         console.error("Error during initialization", error);
@@ -5349,6 +5326,7 @@ You have access to all Bash tools to execute git commands like:
 
   return (
     <>
+      <TitleBar />
       <div
         ref={appShellRef}
         className="app-shell"

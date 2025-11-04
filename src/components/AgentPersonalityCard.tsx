@@ -60,13 +60,6 @@ export default function AgentPersonalityCard({
     return (
       <div className="agent-personality-card empty">
         <div className="personality-empty-state">
-          <div className="empty-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="7" r="3"/>
-              <path d="M5 17a5 5 0 0 1 10 0"/>
-              <path d="M14 5l2-2M6 5L4 3"/>
-            </svg>
-          </div>
           <h3>No Agent Selected</h3>
           <p>Select an agent to view their personality configuration</p>
         </div>
