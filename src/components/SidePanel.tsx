@@ -8,15 +8,16 @@ import AgentContextPanel from "./AgentContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
 import UsagePanel from "./UsagePanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage } from "../types";
+import { SessionsPanel } from "./SessionsPanel";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
- * Tabs: Agent Context, File Explorer, Agents, Skills, MCP, Commands, Context, Terminal, Usage
+ * Tabs: Agent Context, File Explorer, Agents, Skills, MCP, Commands, Sessions, Terminal, Usage
  */
 
-type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "terminal" | "usage";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "sessions" | "terminal" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -211,6 +212,25 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  sessions: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <circle
+        cx="10"
+        cy="10"
+        r="7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M10 6v4l3 2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -289,6 +309,10 @@ interface SidePanelProps {
   // Usage props
   usageSessions: SessionUsage[];
   onClearUsage?: () => void;
+  onCreateTerminalWithCommand?: (label: string, command: string, cwd?: string) => void;
+
+  // Sessions props
+  onSelectSession?: (session: SessionInfo) => void;
 }
 
 export default function SidePanel({
@@ -360,6 +384,10 @@ export default function SidePanel({
   // Usage
   usageSessions,
   onClearUsage,
+  onCreateTerminalWithCommand,
+
+  // Sessions
+  onSelectSession,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("agent-context");
 
@@ -398,6 +426,11 @@ export default function SidePanel({
       id: "commands" as TabId,
       label: "Commands",
       icon: icons.commands,
+    },
+    {
+      id: "sessions" as TabId,
+      label: "Sessions",
+      icon: icons.sessions,
     },
     // Terminal tab hidden - integrated into terminal-windows
     // {
@@ -535,6 +568,14 @@ export default function SidePanel({
           </div>
         )}
 
+        {activeTab === "sessions" && (
+          <div className="side-panel-pane">
+            <SessionsPanel
+              onSelectSession={(session) => onSelectSession?.(session)}
+            />
+          </div>
+        )}
+
         {activeTab === "terminal" && (
           <div className="side-panel-pane terminal-panel-pane">
             {terminals.length > 0 ? (
@@ -608,6 +649,7 @@ export default function SidePanel({
             <UsagePanel
               sessions={usageSessions}
               onClearUsage={onClearUsage}
+              onCreateTerminalWithCommand={onCreateTerminalWithCommand}
               isActive={activeTab === "usage"}
               currentCwd={workingDir}
             />

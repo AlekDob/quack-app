@@ -638,3 +638,34 @@ export interface PipWindowState {
   position?: { x: number; y: number };
   size?: { width: number; height: number };
 }
+
+// Claude Agent SDK Session types
+export interface SessionHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: number;
+  tool_calls?: Array<{
+    name: string;
+    input: Record<string, unknown>;
+  }>;
+}
+
+export interface SessionInfo {
+  id: string; // Session ID (from file-history folder name)
+  title: string; // First user message or derived title
+  createdAt: number; // Timestamp from history.jsonl first entry
+  updatedAt: number; // Timestamp from history.jsonl last entry
+  messageCount: number; // Total messages in session
+  totalTokens: number; // Sum of input + output tokens
+  totalCost: number; // Total cost in USD
+  status: 'active' | 'completed' | 'error';
+  workingDirectory?: string; // CWD from first system event
+  model?: string; // Model from first system event
+  agentName?: string; // Agent name if available
+}
+
+export interface SessionDetails extends SessionInfo {
+  messages: SessionHistoryMessage[]; // All messages from history.jsonl
+  usage: UsageStats; // Detailed token usage stats
+  events: ClaudeEvent[]; // All Claude events for detailed view
+}

@@ -38,6 +38,15 @@ export default function TokenUsageIndicator({
   // INVERTED: Stamina starts at 100% and decreases as tokens are used
   const staminaPercentage = Math.max(0, 100 - usagePercentage);
 
+  // Debug logging
+  console.log('[TokenUsageIndicator] Debug:', {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    usagePercentage,
+    staminaPercentage,
+  });
+
   // Determine duck stamina status (INVERTED LOGIC)
   const getDuckStatus = () => {
     if (staminaPercentage <= 10) return {
@@ -94,13 +103,24 @@ export default function TokenUsageIndicator({
           </span>
         </div>
         <div className="token-usage-progress-bar stamina-bar">
-          <div
-            className="token-usage-progress-fill stamina-fill"
-            style={{
-              width: `${Math.min(staminaPercentage, 100)}%`,
-              backgroundColor: status.color,
-            }}
-          />
+          {staminaPercentage > 0 && (
+            <div
+              className="token-usage-progress-fill stamina-fill"
+              data-stamina={staminaPercentage}
+              data-color={status.color}
+              style={{
+                width: `${Math.max(1, Math.min(staminaPercentage, 100))}%`,
+                height: '100%',
+                backgroundColor: status.color,
+                boxShadow: `0 0 12px ${status.color}, inset 0 1px 0 rgba(255, 255, 255, 0.3)`,
+                display: 'block',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 10,
+              }}
+            />
+          )}
         </div>
         {status.level !== 'fresh' && (
           <div className="token-usage-badge stamina-badge" style={{ backgroundColor: status.color }}>

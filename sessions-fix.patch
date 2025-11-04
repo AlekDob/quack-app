@@ -1,0 +1,88 @@
+# Sessions Feature - Manual fixes needed
+
+## 1. Fix SessionDetailsDrawer.tsx
+
+Replace all instances of `details.info.` with `details.`:
+- Line 118: `details.info.messageCount` → `details.messageCount`
+- Line 132: `details.info.totalTokens` → `details.totalTokens`
+- Line 146: `details.info.totalCost` → `details.totalCost`
+- Line 196: `details.info.workingDirectory` → `details.workingDirectory`
+- Line 200: `details.info.workingDirectory` → `details.workingDirectory`
+
+Also fix the undefined cache tokens:
+- Line 176: Add null check: `{details.usage.cache_creation_input_tokens ?? 0 > 0 &&`
+- Line 184: Add null check: `{details.usage.cache_read_input_tokens ?? 0 > 0 &&`
+- Line 180: Change to: `formatNumber(details.usage.cache_creation_input_tokens ?? 0)`
+- Line 188: Change to: `formatNumber(details.usage.cache_read_input_tokens ?? 0)`
+
+## 2. Fix App.tsx
+
+Add these state variables after line 509 (after `setEditingCommand` definition):
+
+```typescript
+const [sessionDetailsDrawerOpen, setSessionDetailsDrawerOpen] = useState(false);
+const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
+```
+
+Add handler function around line 3000 (with other handlers):
+
+```typescript
+const handleSelectSession = useCallback((session: SessionInfo) => {
+  setSelectedSession(session);
+  setSessionDetailsDrawerOpen(true);
+}, []);
+
+const handleResumeSession = useCallback((sessionId: string) => {
+  // TODO: Implement resume session logic
+  console.log('Resuming session:', sessionId);
+  // This would need to integrate with useClaudeChat to resume the session
+  toast.info('Resume session feature coming soon!');
+  setSessionDetailsDrawerOpen(false);
+}, []);
+
+const handleDeleteSession = useCallback(async (sessionId: string) => {
+  try {
+    await invoke('delete_session', { sessionId });
+    toast.success('Session deleted successfully');
+    return Promise.resolve();
+  } catch (error) {
+    console.error('Failed to delete session:', error);
+    toast.error('Failed to delete session');
+    return Promise.reject(error);
+  }
+}, []);
+```
+
+Add prop to SidePanel (around line 5461):
+
+```typescript
+onSelectSession={handleSelectSession}
+```
+
+Add SessionDetailsDrawer before closing tag (around line 5650):
+
+```typescript
+<SessionDetailsDrawer
+  session={selectedSession}
+  open={sessionDetailsDrawerOpen}
+  onClose={() => setSessionDetailsDrawerOpen(false)}
+  onResume={handleResumeSession}
+  onDelete={handleDeleteSession}
+/>
+```
+
+## 3. Remove unused SessionInfo import warning
+
+The warning about SessionInfo being imported but never used will go away once you add the state and handlers above.
+
+## 4. Fix onCreateTerminalWithCommand prop
+
+Remove this prop from SidePanel interface if it's causing issues, or implement it if needed.
+
+## To apply these fixes:
+
+1. Open SessionDetailsDrawer.tsx and make the changes listed in section 1
+2. Open App.tsx and add the code from sections 2
+3. Save all files and run `npm run build` to verify
+
+Quack quack! 🦆

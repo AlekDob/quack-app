@@ -29,6 +29,7 @@ mod preferences;
 mod preview;
 mod proxy;
 mod reveal;
+mod sessions;
 mod skills;
 mod slash_commands;
 mod telegram_bot;
@@ -511,7 +512,11 @@ pub fn run() {
             preferences::initialize_central_bot_token,
             personality::save_agent_personality,
             personality::load_agent_personality,
-            personality::inject_personality_to_claude_md
+            personality::inject_personality_to_claude_md,
+            sessions::list_sessions,
+            sessions::get_session_info,
+            sessions::get_session_details,
+            sessions::delete_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

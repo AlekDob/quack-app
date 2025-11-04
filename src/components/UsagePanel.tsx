@@ -5,6 +5,7 @@ import type { SessionUsage, AgentUsageSummary, DailyUsageSummary, PlanUsageData 
 interface UsagePanelProps {
   sessions: SessionUsage[];
   onClearUsage?: () => void;
+  onCreateTerminalWithCommand?: (label: string, command: string, cwd?: string) => void;
   isActive?: boolean;
   currentCwd?: string;
 }
@@ -13,7 +14,7 @@ interface UsagePanelProps {
  * Usage Panel - Cost tracking for Claude Agent SDK
  * Based on https://docs.claude.com/en/api/agent-sdk/cost-tracking
  */
-export default function UsagePanel({ sessions, onClearUsage, isActive, currentCwd }: UsagePanelProps) {
+export default function UsagePanel({ sessions, onClearUsage, onCreateTerminalWithCommand, isActive, currentCwd }: UsagePanelProps) {
   const [planUsage, setPlanUsage] = useState<PlanUsageData | null>(null);
   const [loadingPlanUsage, setLoadingPlanUsage] = useState(false);
   const [planUsageError, setPlanUsageError] = useState<string | null>(null);
@@ -33,9 +34,14 @@ export default function UsagePanel({ sessions, onClearUsage, isActive, currentCw
   };
 
   const openPlanUsageInTerminal = async () => {
+    if (!onCreateTerminalWithCommand) {
+      console.warn("onCreateTerminalWithCommand not provided");
+      return;
+    }
+
     try {
       const cwd = currentCwd || process.env.HOME || "~";
-      await invoke("open_claude_usage_in_terminal", { cwd });
+      await onCreateTerminalWithCommand("Claude Plan Usage", "claude /usage", cwd);
     } catch (error) {
       console.error("Failed to open terminal:", error);
     }

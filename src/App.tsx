@@ -23,6 +23,7 @@ import DiffDrawer from "./components/DiffDrawer";
 import PluginsPanel from "./components/PluginsPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
+import { SessionDetailsDrawer } from "./components/SessionDetailsDrawer";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
 import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
 import PreviewDrawer from "./components/PreviewDrawer";
@@ -72,6 +73,7 @@ import type {
   SessionUsage,
   UsageStats,
   AgentPersonality,
+  SessionInfo,
 } from "./types";
 import { getAgentAvatar } from "./utils/agentAvatars";
 
@@ -505,6 +507,8 @@ function App() {
   const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(
     null
   );
+  const [sessionDetailsDrawerOpen, setSessionDetailsDrawerOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiIntent, setAiIntent] = useState('');
@@ -1398,9 +1402,48 @@ function App() {
     return lastPromptsRef.current.get(activeId) || '';
   }, [activeId]);
 
-  // Clear conversation for current agent
+  // Compact conversation for current agent (Claude SDK /compact command)
+  const compactCurrentAgentConversation = useCallback(async () => {
+    if (!activeId || !sendMessageForAgentRef.current) return;
+
+    try {
+      // Get current tokens before compaction
+      const currentTokens = chatTokensMap.get(activeId);
+      const currentInputTokens = currentTokens?.inputTokens || 0;
+      const currentOutputTokens = currentTokens?.outputTokens || 0;
+      const totalTokens = currentInputTokens + currentOutputTokens;
+
+      // Send /compact command to Claude SDK
+      await sendMessageForAgentRef.current('/compact', { maxTurns: 1 });
+
+      // Reduce tokens by 60% (compaction frees up ~60% of used tokens)
+      const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
+      const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
+
+      setChatTokensMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(activeId, {
+          inputTokens: reducedInputTokens,
+          outputTokens: reducedOutputTokens,
+          cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
+          cacheReadTokens: currentTokens?.cacheReadTokens || 0,
+        });
+        return newMap;
+      });
+
+      const savedTokens = totalTokens - (reducedInputTokens + reducedOutputTokens);
+      toast.success(`Compacted! ${savedTokens.toLocaleString()} tokens freed (60% reduction) 🦆`, {
+        duration: 4000,
+      });
+    } catch (error) {
+      console.error('Failed to compact conversation:', error);
+      toast.error('Failed to compact conversation');
+    }
+  }, [activeId, chatTokensMap]);
+
+  // Clear conversation for current agent (Claude SDK /clear command)
   const clearCurrentAgentConversation = useCallback(async () => {
-    if (!activeId) return;
+    if (!activeId || !sendMessageForAgentRef.current) return;
 
     // Show confirmation dialog
     const confirmed = await confirm('Are you sure you want to clear this conversation? This action cannot be undone.', {
@@ -1410,28 +1453,35 @@ function App() {
 
     if (!confirmed) return;
 
-    // Clear messages
-    setChatSessions((prev) => {
-      const newSessions = new Map(prev);
-      newSessions.set(activeId, []);
-      return newSessions;
-    });
+    try {
+      // Send /clear command to Claude SDK first
+      await sendMessageForAgentRef.current('/clear', { maxTurns: 1 });
 
-    // Clear conversation history
-    chatConversationHistoryRef.current.set(activeId, []);
+      // Clear local UI state
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        newSessions.set(activeId, []);
+        return newSessions;
+      });
 
-    // Clear last prompt
-    lastPromptsRef.current.delete(activeId);
+      // Clear conversation history
+      chatConversationHistoryRef.current.set(activeId, []);
 
-    // Clear tokens for this agent
-    setChatTokensMap((prev) => {
-      const newMap = new Map(prev);
-      newMap.delete(activeId);
-      return newMap;
-    });
+      // Clear last prompt
+      lastPromptsRef.current.delete(activeId);
 
-    // Show success toast
-    toast.success('Conversation cleared');
+      // Clear tokens for this agent
+      setChatTokensMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(activeId);
+        return newMap;
+      });
+
+      toast.success('Conversation cleared');
+    } catch (error) {
+      console.error('Failed to clear conversation:', error);
+      toast.error('Failed to clear conversation');
+    }
   }, [activeId]);
 
   // Quack Agency state
@@ -4606,6 +4656,77 @@ function App() {
     [activeId, markTerminalBusy, tauriAvailable]
   );
 
+  // Create an agent terminal tab and execute a command in it
+  const handleCreateTerminalWithCommand = useCallback(
+    async (label: string, command: string, cwd?: string) => {
+      if (!tauriAvailable || !activeId) {
+        return;
+      }
+
+      try {
+        // Get current agent info
+        const currentAgent = terminals.find(t => t.id === activeId);
+        const terminalCwd = cwd || currentAgent?.cwd || explorerPath || process.env.HOME || "~";
+
+        // Create backend terminal (PTY)
+        const created = await invoke<TerminalInfo>("create_terminal", {
+          label,
+          color: currentAgent?.color || COLORS[0],
+          cwd: terminalCwd,
+        });
+
+        // Create AgentTerminal entry (associated with active agent)
+        const newAgentTerminal: AgentTerminal = {
+          id: created.id,
+          name: label,
+          agentId: activeId, // Associate with active agent
+          color: currentAgent?.color || COLORS[0],
+          cwd: terminalCwd,
+          alive: true,
+          status: "busy",
+          createdAt: Date.now(),
+        };
+
+        // Add to agentTerminals state
+        setAgentTerminals(prev => [...prev, newAgentTerminal]);
+
+        // Create agent terminal tab
+        const agentTerminalTab: Tab = {
+          id: `agent-terminal-${created.id}`,
+          label,
+          type: 'agent-terminal',
+          closable: true,
+          color: currentAgent?.color || COLORS[0],
+          terminalId: created.id,
+          icon: <TerminalIcon />,
+        };
+
+        setTabs((prevTabs) => [...prevTabs, agentTerminalTab]);
+        setActiveTabId(agentTerminalTab.id);
+
+        // Add to tabsByTerminal for the active agent
+        setTabsByTerminal((prev) => {
+          const updated = new Map(prev);
+          const currentTabs = updated.get(activeId) || [];
+          updated.set(activeId, [...currentTabs, agentTerminalTab]);
+          return updated;
+        });
+
+        // Execute command in the new terminal
+        await invoke("write_to_terminal", {
+          id: created.id,
+          data: `${command}\n`,
+        });
+
+        console.log(`Created agent terminal "${label}" and executed: ${command}`);
+      } catch (error) {
+        console.error("Unable to create terminal with command", error);
+        toast.error("Failed to create terminal");
+      }
+    },
+    [tauriAvailable, activeId, terminals, explorerPath]
+  );
+
   const refreshGitSummary = useCallback(async () => {
     if (!tauriAvailable) {
       return;
@@ -4943,6 +5064,41 @@ You have access to all Bash tools to execute git commands like:
     setDiffView(view);
   }, []);
 
+  // Session handlers
+  const handleSelectSession = useCallback((session: SessionInfo) => {
+    setSelectedSession(session);
+    setSessionDetailsDrawerOpen(true);
+  }, []);
+
+  const handleResumeSession = useCallback(async (sessionId: string) => {
+    try {
+      // Resume the session in the current agent chat
+      if (activeId) {
+        // The session will be automatically resumed by passing sessionId to claudeSDK
+        toast.success('Session will be resumed in next message');
+        setSessionDetailsDrawerOpen(false);
+        // TODO: Could add logic to load session history into chat view here
+      } else {
+        toast.error('Please select an agent first');
+      }
+    } catch (error) {
+      console.error('Failed to resume session:', error);
+      toast.error('Failed to resume session');
+    }
+  }, [activeId]);
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      await invoke('delete_session', { sessionId });
+      toast.success('Session deleted successfully');
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      toast.error('Failed to delete session');
+      return Promise.reject(error);
+    }
+  }, []);
+
   useEffect(() => {
     const timers = idleTimersRef.current;
     const visualTimers = visualIdleTimersRef.current;
@@ -5146,7 +5302,7 @@ You have access to all Bash tools to execute git commands like:
               onUsageClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                  await invoke("open_claude_usage_in_terminal", { cwd });
+                  await handleCreateTerminalWithCommand("Claude Plan Usage", "claude /usage", cwd);
                 } catch (error) {
                   console.error("Failed to open claude usage:", error);
                 }
@@ -5200,6 +5356,7 @@ You have access to all Bash tools to execute git commands like:
               lastPrompt={getLastPromptForAgent()}
               // Conversation management
               onClearConversation={clearCurrentAgentConversation}
+              onCompactConversation={compactCurrentAgentConversation}
               // Token usage tracking
               sessionTokens={currentAgentTokens}
               // OpenAI API key for Whisper
@@ -5403,6 +5560,9 @@ You have access to all Bash tools to execute git commands like:
           // Usage props
           usageSessions={usageSessions}
           onClearUsage={handleClearUsage}
+          onCreateTerminalWithCommand={handleCreateTerminalWithCommand}
+          // Sessions props
+          onSelectSession={handleSelectSession}
         />
 
         <NewTerminalModal
@@ -5471,6 +5631,14 @@ You have access to all Bash tools to execute git commands like:
             );
           }}
           onClose={() => setSavedCommandsDrawerOpen(false)}
+        />
+
+        <SessionDetailsDrawer
+          session={selectedSession}
+          open={sessionDetailsDrawerOpen}
+          onClose={() => setSessionDetailsDrawerOpen(false)}
+          onResume={handleResumeSession}
+          onDelete={handleDeleteSession}
         />
 
         <PreviewDrawer

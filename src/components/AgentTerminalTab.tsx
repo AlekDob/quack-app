@@ -65,6 +65,10 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
                     try {
                       instance.fitAddon.fit();
                       const { cols, rows } = instance.xterm;
+
+                      // Sync dimensions with PTY backend
+                      invoke('resize_terminal', { id: terminalId, cols, rows }).catch(console.error);
+
                       console.log(`🦆 [AgentTerminalTab] Re-attached terminal fitted: ${terminalId} - ${cols}x${rows}`);
                     } catch (error) {
                       console.error(`🦆 [AgentTerminalTab] Failed to fit after re-attach:`, error);
@@ -99,17 +103,18 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
         const rect = terminalRef.current.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
           try {
-            // Force a complete resize cycle to redraw canvas
-            const { cols, rows } = instance.xterm;
-            // First, manually trigger resize with current dimensions
-            instance.xterm.resize(cols, rows);
-            // Then fit to container (may change dimensions)
+            // Clear any cached dimensions to force fresh calculation
             instance.fitAddon.fit();
-            // Finally, force refresh the entire viewport
-            instance.xterm.refresh(0, instance.xterm.rows - 1);
 
             const newCols = instance.xterm.cols;
             const newRows = instance.xterm.rows;
+
+            // Sync dimensions with PTY backend
+            invoke('resize_terminal', { id: terminalId, cols: newCols, rows: newRows }).catch(console.error);
+
+            // Force refresh the entire viewport to redraw everything
+            instance.xterm.refresh(0, instance.xterm.rows - 1);
+
             console.log(`🦆 [AgentTerminalTab] Terminal fitted on activation: ${terminalId} - Container: ${Math.floor(rect.width)}x${Math.floor(rect.height)}, Terminal: ${newCols} cols x ${newRows} rows`);
           } catch (error) {
             console.error(`🦆 [AgentTerminalTab] Failed to fit terminal:`, error);
@@ -153,6 +158,7 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
         const instance = terminalInstances.get(terminalId);
         if (instance && terminalRef.current) {
           const rect = terminalRef.current.getBoundingClientRect();
+
           if (rect.width > 0 && rect.height > 0) {
             const now = Date.now();
             const timeSinceLastFit = now - lastFitTimeRef.current;
@@ -162,8 +168,12 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
               requestAnimationFrame(() => {
                 try {
                   instance.fitAddon.fit();
-                  lastFitTimeRef.current = Date.now();
                   const { cols, rows } = instance.xterm;
+
+                  // Sync dimensions with PTY backend
+                  invoke('resize_terminal', { id: terminalId, cols, rows }).catch(console.error);
+
+                  lastFitTimeRef.current = Date.now();
                   console.log(`🦆 [AgentTerminalTab] Terminal refitted on window resize: ${terminalId} - Container: ${Math.floor(rect.width)}x${Math.floor(rect.height)}, Terminal: ${cols} cols x ${rows} rows`);
                 } catch (error) {
                   console.error('Failed to fit terminal on resize:', error);
@@ -174,7 +184,7 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
             }
           }
         }
-      }, 200);
+      }, 200); // Debounce resize events
     };
 
     window.addEventListener('resize', handleWindowResize);
@@ -220,6 +230,10 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
         try {
           fitAddon.fit();
           const { cols, rows } = xterm;
+
+          // Sync dimensions with PTY backend
+          invoke('resize_terminal', { id: termId, cols, rows }).catch(console.error);
+
           console.log(`🦆 [AgentTerminalTab] Initial fit result: ${cols} cols x ${rows} rows`);
         } catch (error) {
           console.error(`🦆 [AgentTerminalTab] Initial fit failed:`, error);
@@ -238,11 +252,21 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
       invoke('write_to_terminal', { id: termId, data }).catch(console.error);
     });
 
-    // Listen for terminal output
+    // Listen for terminal output with zsh % symbol filtering
     const unlisten = await listen<string>('terminal-data', (event) => {
       const payload = event.payload as any;
       if (payload.id === termId) {
-        xterm.write(payload.data);
+        let data = payload.data;
+
+        // Filter out zsh's % prompt mark that appears when there's no previous newline
+        // This symbol is displayed as an inverted % at the beginning of a line
+        // Pattern: ESC[7m%ESC[27m (inverted %) followed by optional whitespace and newline
+        data = data.replace(/\x1b\[7m%\x1b\[27m\s*[\r\n]*/g, '');
+
+        // Also filter standalone % at start of line followed by newline
+        data = data.replace(/^%\s*[\r\n]+/gm, '');
+
+        xterm.write(data);
       }
     });
 

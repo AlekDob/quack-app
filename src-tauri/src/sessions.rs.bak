@@ -1,0 +1,401 @@
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use tauri::command;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SessionInfo {
+    pub id: String,
+    pub title: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub message_count: i32,
+    pub total_tokens: i32,
+    pub total_cost: f64,
+    pub status: String,
+    pub working_directory: Option<String>,
+    pub model: Option<String>,
+    pub agent_name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SessionHistoryMessage {
+    pub role: String,
+    pub content: String,
+    pub timestamp: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UsageStats {
+    pub input_tokens: i32,
+    pub output_tokens: i32,
+    pub cache_creation_input_tokens: i32,
+    pub cache_read_input_tokens: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SessionDetails {
+    #[serde(flatten)]
+    pub info: SessionInfo,
+    pub messages: Vec<SessionHistoryMessage>,
+    pub usage: UsageStats,
+}
+
+/// Get the file-history directory path
+fn get_file_history_dir() -> Result<PathBuf, String> {
+    let home = dirs::home_dir().ok_or("Failed to get home directory")?;
+    Ok(home.join(".claude").join("file-history"))
+}
+
+/// List all session IDs from ~/.claude/file-history/
+#[command]
+pub fn list_sessions() -> Result<Vec<String>, String> {
+    let file_history_dir = get_file_history_dir()?;
+
+    if !file_history_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut session_ids = Vec::new();
+
+    for entry in fs::read_dir(&file_history_dir)
+        .map_err(|e| format!("Failed to read file-history directory: {}", e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+
+        // Only include directories (session folders)
+        if path.is_dir() {
+            if let Some(folder_name) = path.file_name().and_then(|n| n.to_str()) {
+                session_ids.push(folder_name.to_string());
+            }
+        }
+    }
+
+    Ok(session_ids)
+}
+
+/// Get session info from a session folder
+#[command]
+pub fn get_session_info(session_id: String) -> Result<SessionInfo, String> {
+    let file_history_dir = get_file_history_dir()?;
+    let session_dir = file_history_dir.join(&session_id);
+
+    if !session_dir.exists() {
+        return Err(format!("Session {} not found", session_id));
+    }
+
+    // Read history.jsonl to extract session info
+    let history_path = session_dir.join("history.jsonl");
+    if !history_path.exists() {
+        return Err(format!("Session {} has no history.jsonl file", session_id));
+    }
+
+    let history_content = fs::read_to_string(&history_path)
+        .map_err(|e| format!("Failed to read history.jsonl: {}", e))?;
+
+    // Parse history.jsonl to extract metadata
+    let (
+        title,
+        created_at,
+        updated_at,
+        message_count,
+        total_tokens,
+        total_cost,
+        status,
+        working_directory,
+        model,
+    ) = parse_session_metadata(&history_content)?;
+
+    Ok(SessionInfo {
+        id: session_id,
+        title,
+        created_at,
+        updated_at,
+        message_count,
+        total_tokens,
+        total_cost,
+        status,
+        working_directory,
+        model,
+        agent_name: None, // TODO: Extract from session if available
+    })
+}
+
+/// Get full session details including messages
+#[command]
+pub fn get_session_details(session_id: String) -> Result<SessionDetails, String> {
+    let file_history_dir = get_file_history_dir()?;
+    let session_dir = file_history_dir.join(&session_id);
+
+    if !session_dir.exists() {
+        return Err(format!("Session {} not found", session_id));
+    }
+
+    // Read history.jsonl
+    let history_path = session_dir.join("history.jsonl");
+    if !history_path.exists() {
+        return Err(format!("Session {} has no history.jsonl file", session_id));
+    }
+
+    let history_content = fs::read_to_string(&history_path)
+        .map_err(|e| format!("Failed to read history.jsonl: {}", e))?;
+
+    // Parse metadata
+    let (
+        title,
+        created_at,
+        updated_at,
+        message_count,
+        total_tokens,
+        total_cost,
+        status,
+        working_directory,
+        model,
+    ) = parse_session_metadata(&history_content)?;
+
+    // Parse messages
+    let (messages, usage) = parse_session_messages(&history_content)?;
+
+    Ok(SessionDetails {
+        info: SessionInfo {
+            id: session_id,
+            title,
+            created_at,
+            updated_at,
+            message_count,
+            total_tokens,
+            total_cost,
+            status,
+            working_directory,
+            model,
+            agent_name: None,
+        },
+        messages,
+        usage,
+    })
+}
+
+/// Delete a session from file-history
+#[command]
+pub fn delete_session(session_id: String) -> Result<(), String> {
+    let file_history_dir = get_file_history_dir()?;
+    let session_dir = file_history_dir.join(&session_id);
+
+    if !session_dir.exists() {
+        return Err(format!("Session {} not found", session_id));
+    }
+
+    fs::remove_dir_all(&session_dir)
+        .map_err(|e| format!("Failed to delete session directory: {}", e))?;
+
+    Ok(())
+}
+
+/// Parse session metadata from history.jsonl content
+fn parse_session_metadata(
+    history_content: &str,
+) -> Result<
+    (
+        String,
+        i64,
+        i64,
+        i32,
+        i32,
+        f64,
+        String,
+        Option<String>,
+        Option<String>,
+    ),
+    String,
+> {
+    let lines: Vec<&str> = history_content.lines().collect();
+
+    if lines.is_empty() {
+        return Err("Empty history file".to_string());
+    }
+
+    let mut title = String::from("Untitled Session");
+    let mut created_at = chrono::Utc::now().timestamp_millis();
+    let mut updated_at = created_at;
+    let mut message_count = 0;
+    let mut total_tokens = 0;
+    let mut total_cost = 0.0;
+    let mut status = "completed".to_string();
+    let mut working_directory: Option<String> = None;
+    let mut model: Option<String> = None;
+
+    // Parse each line as JSON event
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let event: serde_json::Value = serde_json::from_str(line)
+            .map_err(|e| format!("Failed to parse JSON line: {}", e))?;
+
+        // Extract metadata from system events
+        if event["type"] == "system" {
+            if let Some(m) = event["model"].as_str() {
+                model = Some(m.to_string());
+            }
+            if let Some(cwd) = event["cwd"].as_str() {
+                working_directory = Some(cwd.to_string());
+            }
+        }
+
+        // Extract first user message as title
+        if event["type"] == "user" && title == "Untitled Session" {
+            if let Some(content_array) = event["message"]["content"].as_array() {
+                for block in content_array {
+                    if block["type"] == "text" {
+                        if let Some(text) = block["text"].as_str() {
+                            title = text
+                                .chars()
+                                .take(60)
+                                .collect::<String>()
+                                .trim()
+                                .to_string();
+                            if title.len() > 57 {
+                                title.push_str("...");
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Count messages
+        if event["type"] == "assistant" || event["type"] == "user" {
+            message_count += 1;
+        }
+
+        // Accumulate token usage and cost from result events
+        if event["type"] == "result" {
+            if let Some(usage) = event["usage"].as_object() {
+                if let Some(input) = usage["input_tokens"].as_i64() {
+                    total_tokens += input as i32;
+                }
+                if let Some(output) = usage["output_tokens"].as_i64() {
+                    total_tokens += output as i32;
+                }
+            }
+
+            if let Some(cost) = event["cost_usd"].as_f64() {
+                total_cost += cost;
+            } else if let Some(cost) = event["total_cost_usd"].as_f64() {
+                total_cost = cost; // Use total cost if available (more accurate)
+            }
+
+            // Check for errors
+            if let Some(is_error) = event["is_error"].as_bool() {
+                if is_error {
+                    status = "error".to_string();
+                }
+            }
+        }
+    }
+
+    // Use current time for timestamps (TODO: extract from events if available)
+    updated_at = chrono::Utc::now().timestamp_millis();
+
+    Ok((
+        title,
+        created_at,
+        updated_at,
+        message_count,
+        total_tokens,
+        total_cost,
+        status,
+        working_directory,
+        model,
+    ))
+}
+
+/// Parse messages and usage from history.jsonl content
+fn parse_session_messages(
+    history_content: &str,
+) -> Result<(Vec<SessionHistoryMessage>, UsageStats), String> {
+    let lines: Vec<&str> = history_content.lines().collect();
+    let mut messages = Vec::new();
+
+    let mut total_input = 0;
+    let mut total_output = 0;
+    let mut total_cache_creation = 0;
+    let mut total_cache_read = 0;
+
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let event: serde_json::Value = serde_json::from_str(line)
+            .map_err(|e| format!("Failed to parse JSON line: {}", e))?;
+
+        // Extract user messages
+        if event["type"] == "user" {
+            if let Some(content_array) = event["message"]["content"].as_array() {
+                for block in content_array {
+                    if block["type"] == "text" {
+                        if let Some(text) = block["text"].as_str() {
+                            messages.push(SessionHistoryMessage {
+                                role: "user".to_string(),
+                                content: text.to_string(),
+                                timestamp: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Extract assistant messages
+        if event["type"] == "assistant" {
+            if let Some(content_array) = event["message"]["content"].as_array() {
+                let mut assistant_text = String::new();
+                for block in content_array {
+                    if block["type"] == "text" {
+                        if let Some(text) = block["text"].as_str() {
+                            assistant_text.push_str(text);
+                        }
+                    }
+                }
+                if !assistant_text.is_empty() {
+                    messages.push(SessionHistoryMessage {
+                        role: "assistant".to_string(),
+                        content: assistant_text,
+                        timestamp: None,
+                    });
+                }
+            }
+        }
+
+        // Accumulate usage stats
+        if event["type"] == "result" {
+            if let Some(usage) = event["usage"].as_object() {
+                if let Some(input) = usage["input_tokens"].as_i64() {
+                    total_input += input as i32;
+                }
+                if let Some(output) = usage["output_tokens"].as_i64() {
+                    total_output += output as i32;
+                }
+                if let Some(cache_creation) = usage["cache_creation_input_tokens"].as_i64() {
+                    total_cache_creation += cache_creation as i32;
+                }
+                if let Some(cache_read) = usage["cache_read_input_tokens"].as_i64() {
+                    total_cache_read += cache_read as i32;
+                }
+            }
+        }
+    }
+
+    let usage = UsageStats {
+        input_tokens: total_input,
+        output_tokens: total_output,
+        cache_creation_input_tokens: total_cache_creation,
+        cache_read_input_tokens: total_cache_read,
+    };
+
+    Ok((messages, usage))
+}
