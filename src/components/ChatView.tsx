@@ -42,6 +42,7 @@ interface ChatViewProps {
   // Conversation management
   onClearConversation?: () => void;
   onCompactConversation?: () => void;
+  onOpenSessionInTerminal?: () => void;
   // Token usage tracking
   sessionTokens?: {
     inputTokens: number;
@@ -92,6 +93,7 @@ export default function ChatView({
   // Conversation management
   onClearConversation,
   onCompactConversation,
+  onOpenSessionInTerminal,
   // Token usage tracking
   sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 },
   // OpenAI API key for Whisper
@@ -203,6 +205,19 @@ export default function ChatView({
                 <polyline points="21 12 16.5 14.6 16.5 19.79" />
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
                 <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+            </button>
+          )}
+          {messages.length > 0 && onOpenSessionInTerminal && (
+            <button
+              className="chat-terminal-btn"
+              onClick={onOpenSessionInTerminal}
+              disabled={isLoading}
+              title="Open session in Terminal (claude --resume)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
               </svg>
             </button>
           )}

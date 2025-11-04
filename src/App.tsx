@@ -564,16 +564,25 @@ function App() {
     cacheReadTokens: number;
   }>>(new Map());
 
+  // Session ID tracking per agent - for resuming sessions in terminal
+  const [chatSessionIds, setChatSessionIds] = useState<Map<string, string>>(new Map());
 
   // Track usage from Claude Agent SDK response
   const trackUsage = useCallback((
-    _agentId: string,
+    agentId: string,
     agentName: string,
     sessionId: string,
     totalCostUsd: number,
     usage?: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
   ) => {
     const now = Date.now();
+
+    // Save session ID for this agent (for terminal resume)
+    setChatSessionIds((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(agentId, sessionId);
+      return newMap;
+    });
 
     setUsageSessions((prev) => {
       const existingSession = prev.find((s) => s.session_id === sessionId);
@@ -1483,6 +1492,67 @@ function App() {
       toast.error('Failed to clear conversation');
     }
   }, [activeId]);
+
+  // Open current session in terminal tab with claude --resume command
+  const openSessionInTerminal = useCallback(async () => {
+    if (!activeId || !tauriAvailable) return;
+
+    const sessionId = chatSessionIds.get(activeId);
+    if (!sessionId) {
+      toast.error('No session ID found for this agent');
+      return;
+    }
+
+    try {
+      // Get current agent info
+      const currentAgent = terminals.find((t) => t.id === activeId);
+      const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || '~';
+      const terminalLabel = `Resume ${sessionId.slice(0, 8)}`;
+
+      // Create backend terminal (PTY)
+      const created = await invoke<TerminalInfo>('create_terminal', {
+        label: terminalLabel,
+        color: currentAgent?.color || COLORS[0],
+        cwd: terminalCwd,
+      });
+
+      // Create AgentTerminal entry (associated with active agent)
+      const newAgentTerminal: AgentTerminal = {
+        id: created.id,
+        name: terminalLabel,
+        agentId: activeId, // Associate with active agent
+        color: currentAgent?.color || COLORS[0],
+      };
+
+      setAgentTerminals((prev) => [...prev, newAgentTerminal]);
+
+      // Create Tab for this terminal
+      const agentTerminalTab: Tab = {
+        id: `agent-terminal-${created.id}`,
+        label: terminalLabel,
+        type: 'agent-terminal',
+        closable: true,
+        color: currentAgent?.color || COLORS[0],
+        terminalId: created.id,
+      };
+
+      setTabs((prev) => [...prev, agentTerminalTab]);
+      setActiveTabId(agentTerminalTab.id);
+
+      // Execute claude --resume command in the new terminal
+      await invoke('write_to_terminal', {
+        id: created.id,
+        data: `claude --resume ${sessionId}\n`,
+      });
+
+      toast.success(`Opened session in terminal tab`, {
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Failed to open session in terminal:', error);
+      toast.error('Failed to open session in terminal');
+    }
+  }, [activeId, chatSessionIds, terminals, explorerPath, tauriAvailable]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -5357,6 +5427,7 @@ You have access to all Bash tools to execute git commands like:
               // Conversation management
               onClearConversation={clearCurrentAgentConversation}
               onCompactConversation={compactCurrentAgentConversation}
+              onOpenSessionInTerminal={openSessionInTerminal}
               // Token usage tracking
               sessionTokens={currentAgentTokens}
               // OpenAI API key for Whisper
