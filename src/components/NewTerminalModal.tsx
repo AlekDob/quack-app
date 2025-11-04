@@ -44,6 +44,7 @@ interface NewTerminalModalProps {
   avatar?: string
   personality?: Partial<AgentPersonality>
   branch?: string
+  useWorktree?: boolean
   availableColors: string[]
   selectingDirectory: boolean
   creating: boolean
@@ -54,6 +55,7 @@ interface NewTerminalModalProps {
   onAvatarChange?: (avatar: string) => void
   onPersonalityChange?: (personality: Partial<AgentPersonality>) => void
   onBranchChange?: (branch: string) => void
+  onUseWorktreeChange?: (useWorktree: boolean) => void
   onBrowse: () => void
   onCancel: () => void
   onConfirm: () => void
@@ -69,6 +71,7 @@ function NewTerminalModal({
   avatar,
   personality,
   branch = 'main',
+  useWorktree = false,
   availableColors,
   selectingDirectory,
   creating,
@@ -79,6 +82,7 @@ function NewTerminalModal({
   onAvatarChange,
   onPersonalityChange,
   onBranchChange,
+  onUseWorktreeChange,
   onBrowse,
   onCancel,
   onConfirm,
@@ -141,12 +145,14 @@ function NewTerminalModal({
     }
   }, [branchMode, newBranchName, onBranchChange]);
 
-  // Reset to 'main' when switching back to "existing" mode
+  // Reset to current branch when switching back to "existing" mode
   useEffect(() => {
-    if (branchMode === 'existing' && onBranchChange) {
-      onBranchChange('main');
+    if (branchMode === 'existing' && onBranchChange && availableBranches.length > 0) {
+      // Use the first available branch or current branch, not hardcoded 'main'
+      const currentBranch = availableBranches.find(b => b.isCurrent);
+      onBranchChange(currentBranch?.name || availableBranches[0]?.name || 'main');
     }
-  }, [branchMode, onBranchChange]);
+  }, [branchMode, onBranchChange, availableBranches]);
 
   if (!open) {
     return null
@@ -340,6 +346,26 @@ function NewTerminalModal({
                   🌿 Agent will work on this branch independently
                 </small>
               </div>
+            )}
+
+            {/* Worktree Option - only show for new branches */}
+            {branchMode === 'new' && newBranchName && (
+              <label className="git-branch-checkbox" style={{ marginTop: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={useWorktree}
+                  onChange={(e) => onUseWorktreeChange?.(e.target.checked)}
+                />
+                <span className="git-checkbox-checkmark"></span>
+                <span className="git-checkbox-label">
+                  Use Git Worktree (isolated directory)
+                </span>
+              </label>
+            )}
+            {useWorktree && branchMode === 'new' && (
+              <small className="git-branch-hint" style={{ marginTop: '8px', display: 'block' }}>
+                🌳 Creates a separate directory for this agent - perfect for frequent switching!
+              </small>
             )}
           </div>
         )}

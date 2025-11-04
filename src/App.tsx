@@ -401,6 +401,7 @@ function App() {
   const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
   const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
   const [newTerminalBranch, setNewTerminalBranch] = useState("");
+  const [newTerminalUseWorktree, setNewTerminalUseWorktree] = useState(false);
   const [newTerminalPersonality, setNewTerminalPersonality] = useState<Partial<AgentPersonality>>({
     communicationStyle: 'friendly',
     specialties: [],
@@ -410,7 +411,7 @@ function App() {
   const [newTerminalError, setNewTerminalError] = useState<string | null>(null);
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
-  const [booting, setBooting] = useState(true);
+  const [_booting, setBooting] = useState(true);
   const [videoEnded, setVideoEnded] = useState(false);
   const [splashFadingOut, setSplashFadingOut] = useState(false);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
@@ -1423,7 +1424,7 @@ function App() {
       const totalTokens = currentInputTokens + currentOutputTokens;
 
       // Send /compact command to Claude SDK
-      await sendMessageForAgentRef.current('/compact', { maxTurns: 1 });
+      await sendMessageForAgentRef.current('/compact');
 
       // Reduce tokens by 60% (compaction frees up ~60% of used tokens)
       const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
@@ -1464,7 +1465,7 @@ function App() {
 
     try {
       // Send /clear command to Claude SDK first
-      await sendMessageForAgentRef.current('/clear', { maxTurns: 1 });
+      await sendMessageForAgentRef.current('/clear');
 
       // Clear local UI state
       setChatSessions((prev) => {
@@ -1522,6 +1523,9 @@ function App() {
         name: terminalLabel,
         agentId: activeId, // Associate with active agent
         color: currentAgent?.color || COLORS[0],
+        cwd: terminalCwd,
+        alive: true,
+        createdAt: Date.now(),
       };
 
       setAgentTerminals((prev) => [...prev, newAgentTerminal]);
@@ -3688,7 +3692,8 @@ function App() {
         // Create new terminal - SIMPLE! No AgentChat logic
         console.log('Creating terminal with avatar:', newTerminalAvatar, 'branch:', newTerminalBranch);
 
-        // Handle Git branch creation and switching if specified
+        // Handle Git branch creation and worktree if specified
+        let worktreePath: string | undefined;
         if (newTerminalBranch) {
           try {
             // Check if branch exists
@@ -3698,8 +3703,26 @@ function App() {
 
             const branchExists = branches.some(b => b.name === newTerminalBranch);
 
-            if (!branchExists) {
-              // Create new branch from current
+            if (newTerminalUseWorktree && !branchExists) {
+              // Create worktree for new branch
+              console.log(`Creating worktree for new branch: ${newTerminalBranch}`);
+
+              // Calculate worktree path: /path/to/repo-branchname
+              const repoName = trimmedPath.split('/').pop() || 'repo';
+              const sanitizedBranch = newTerminalBranch.replace(/\//g, '-');
+              const parentDir = trimmedPath.split('/').slice(0, -1).join('/');
+              worktreePath = `${parentDir}/${repoName}-${sanitizedBranch}`;
+
+              await invoke('git_add_worktree', {
+                path: worktreePath,
+                branchName: newTerminalBranch,
+                createBranch: true,
+                rootPath: trimmedPath
+              });
+
+              console.log(`✅ Worktree created at: ${worktreePath}`);
+            } else if (!branchExists) {
+              // Create new branch from current (no worktree)
               console.log(`Creating new branch: ${newTerminalBranch}`);
               await invoke('git_create_branch', {
                 branchName: newTerminalBranch,
@@ -3708,7 +3731,7 @@ function App() {
                 rootPath: trimmedPath
               });
             } else {
-              // Branch exists, just switch to it
+              // Branch exists, just switch to it (no worktree)
               console.log(`Switching to existing branch: ${newTerminalBranch}`);
               await invoke('git_switch_branch', {
                 branchName: newTerminalBranch,
@@ -3716,15 +3739,19 @@ function App() {
               });
             }
           } catch (err) {
-            console.warn('Git branch operation failed:', err);
-            // Continue with terminal creation even if branch operation fails
+            console.warn('Git branch/worktree operation failed:', err);
+            setNewTerminalError(`Failed to create branch/worktree: ${err}`);
+            return;
           }
         }
+
+        // Use worktree path if it was created, otherwise use trimmedPath
+        const effectivePath = worktreePath || trimmedPath;
 
         const created = await invoke<TerminalInfo>("create_terminal", {
           label: trimmedName,
           color: newTerminalColor,
-          cwd: trimmedPath,
+          cwd: effectivePath,
           workingOn: trimmedWorkingOn || null,
           avatar: newTerminalAvatar,
           branch: newTerminalBranch || null,
@@ -3739,12 +3766,14 @@ function App() {
           workingOn: trimmedWorkingOn || undefined,
           avatar: newTerminalAvatar,
           branch: newTerminalBranch || undefined,
+          useWorktree: newTerminalUseWorktree && !!worktreePath,
+          worktreePath: worktreePath,
         };
 
         // Save metadata for Telegram notifications immediately
         agentMetadataRef.current.set(createdWithState.id, {
           name: trimmedName,
-          cwd: trimmedPath,
+          cwd: effectivePath,
         });
 
         setTerminals((prev) => [...prev, createdWithState]);
@@ -3767,13 +3796,13 @@ function App() {
             };
 
             await invoke('save_agent_personality', {
-              projectPath: trimmedPath,
+              projectPath: effectivePath,
               personality: fullPersonality,
             });
 
             // Inject personality into CLAUDE.md
             await invoke('inject_personality_to_claude_md', {
-              projectPath: trimmedPath,
+              projectPath: effectivePath,
               personality: fullPersonality,
             });
 
@@ -5119,7 +5148,7 @@ You have access to all Bash tools to execute git commands like:
     setSessionDetailsDrawerOpen(true);
   }, []);
 
-  const handleResumeSession = useCallback(async (sessionId: string) => {
+  const handleResumeSession = useCallback(async (_sessionId: string) => {
     try {
       // Resume the session in the current agent chat
       if (activeId) {
@@ -5688,6 +5717,7 @@ You have access to all Bash tools to execute git commands like:
           avatar={newTerminalAvatar}
           personality={newTerminalPersonality}
           branch={newTerminalBranch}
+          useWorktree={newTerminalUseWorktree}
           availableColors={COLORS}
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
@@ -5698,6 +5728,7 @@ You have access to all Bash tools to execute git commands like:
           onAvatarChange={setNewTerminalAvatar}
           onPersonalityChange={setNewTerminalPersonality}
           onBranchChange={setNewTerminalBranch}
+          onUseWorktreeChange={setNewTerminalUseWorktree}
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
@@ -5815,7 +5846,7 @@ You have access to all Bash tools to execute git commands like:
 
                   // Close diff drawer if open
                   setShowDiffDrawer(false);
-                  setSelectedGitEntry(null);
+                  setSelectedGitPath(null);
 
                   // Refresh git status and reload branches
                   await refreshGitSummary();

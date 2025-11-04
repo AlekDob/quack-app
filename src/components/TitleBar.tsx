@@ -23,9 +23,13 @@ const QUOTES = [
   "Quack once, code twice, document with CLAUDE.md"
 ];
 
-export const TitleBar: React.FC<TitleBarProps> = ({ title = "🦆 Quack [DEV MODE]" }) => {
-  const [displayText, setDisplayText] = useState(title);
-  const [isMaximized, setIsMaximized] = useState(false);
+export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
+  // Determine default title based on environment
+  const defaultTitle = import.meta.env.DEV ? "🦆🧪 Quack [DEV MODE]" : "🦆 Quack";
+  const finalTitle = title || defaultTitle;
+
+  const [displayText, setDisplayText] = useState(finalTitle);
+  const [_isMaximized, setIsMaximized] = useState(false);
   const animationRef = useRef<NodeJS.Timeout | null>(null);
 
   // Typewriter effect
@@ -34,7 +38,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "🦆 Quack [DEV MOD
     let isDeleting = false;
     let isTypingQuote = false;
     let currentQuoteIndex = 0;
-    let currentText = title;
+    let currentText = finalTitle;
 
     const type = () => {
       if (!isTypingQuote) {
@@ -70,7 +74,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "🦆 Quack [DEV MOD
               isDeleting = true;
               animationRef.current = setTimeout(() => {
                 // After deleting quote, go back to title
-                currentText = title;
+                currentText = finalTitle;
                 currentQuoteIndex = (currentQuoteIndex + 1) % QUOTES.length;
                 isTypingQuote = false;
                 type();
@@ -88,7 +92,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "🦆 Quack [DEV MOD
         clearTimeout(animationRef.current);
       }
     };
-  }, [title]);
+  }, [finalTitle]);
 
   const handleMinimize = async () => {
     const window = getCurrentWindow();

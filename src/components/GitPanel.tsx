@@ -29,7 +29,7 @@ interface GitPanelProps {
 
 const TIMELINE_LINE_LEFT = 20
 const TIMELINE_LINE_COLOR = 'rgba(232, 125, 62, 0.32)'
-const TIMELINE_DOT_COLOR = '#e87d3e'
+// const TIMELINE_DOT_COLOR = '#e87d3e' // Kept for potential future use
 
 const GitTimelineItem = ({
   entry,

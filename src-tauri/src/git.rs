@@ -945,3 +945,179 @@ fn git_pull_impl(
         },
     })
 }
+
+// ============================================================================
+// Git Worktree Support
+// ============================================================================
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GitWorktree {
+    pub path: String,
+    pub branch: String,
+    pub commit_hash: String,
+    pub is_bare: bool,
+    pub is_detached: bool,
+}
+
+#[tauri::command]
+pub fn git_list_worktrees(root_path: Option<String>) -> Result<Vec<GitWorktree>, String> {
+    git_list_worktrees_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_list_worktrees_impl(root_path: Option<String>) -> Result<Vec<GitWorktree>> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // List all worktrees with porcelain format for easier parsing
+    let output = run_git(&root, &["worktree", "list", "--porcelain"], false)?;
+
+    let mut worktrees = Vec::new();
+    let mut current_worktree: Option<GitWorktree> = None;
+
+    for line in output.lines() {
+        if line.starts_with("worktree ") {
+            // Save previous worktree if exists
+            if let Some(wt) = current_worktree.take() {
+                worktrees.push(wt);
+            }
+
+            // Start new worktree
+            let path = line.strip_prefix("worktree ").unwrap_or_default().to_string();
+            current_worktree = Some(GitWorktree {
+                path,
+                branch: String::new(),
+                commit_hash: String::new(),
+                is_bare: false,
+                is_detached: false,
+            });
+        } else if line.starts_with("HEAD ") {
+            if let Some(ref mut wt) = current_worktree {
+                wt.commit_hash = line.strip_prefix("HEAD ").unwrap_or_default().to_string();
+            }
+        } else if line.starts_with("branch ") {
+            if let Some(ref mut wt) = current_worktree {
+                wt.branch = line.strip_prefix("branch ").unwrap_or_default()
+                    .trim_start_matches("refs/heads/")
+                    .to_string();
+            }
+        } else if line == "bare" {
+            if let Some(ref mut wt) = current_worktree {
+                wt.is_bare = true;
+            }
+        } else if line == "detached" {
+            if let Some(ref mut wt) = current_worktree {
+                wt.is_detached = true;
+            }
+        }
+    }
+
+    // Don't forget the last worktree
+    if let Some(wt) = current_worktree {
+        worktrees.push(wt);
+    }
+
+    Ok(worktrees)
+}
+
+#[tauri::command]
+pub fn git_add_worktree(
+    path: String,
+    branch_name: String,
+    create_branch: Option<bool>,
+    root_path: Option<String>,
+) -> Result<String, String> {
+    git_add_worktree_impl(path, branch_name, create_branch, root_path)
+        .map_err(|err| err.to_string())
+}
+
+fn git_add_worktree_impl(
+    path: String,
+    branch_name: String,
+    create_branch: Option<bool>,
+    root_path: Option<String>,
+) -> Result<String> {
+    if path.trim().is_empty() {
+        return Err(anyhow!("Worktree path cannot be empty"));
+    }
+
+    if branch_name.trim().is_empty() {
+        return Err(anyhow!("Branch name cannot be empty"));
+    }
+
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Build worktree add command
+    let mut args = vec!["worktree", "add"];
+
+    // Add -b flag if creating new branch
+    if create_branch.unwrap_or(false) {
+        args.push("-b");
+        args.push(&branch_name);
+    }
+
+    args.push(&path);
+
+    // If not creating new branch, add branch name to checkout
+    if !create_branch.unwrap_or(false) {
+        args.push(&branch_name);
+    }
+
+    // Execute worktree add
+    let output = run_git(&root, &args, false)?;
+
+    Ok(format!("Worktree created at: {}", path))
+}
+
+#[tauri::command]
+pub fn git_remove_worktree(
+    path: String,
+    force: Option<bool>,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_remove_worktree_impl(path, force, root_path).map_err(|err| err.to_string())
+}
+
+fn git_remove_worktree_impl(
+    path: String,
+    force: Option<bool>,
+    root_path: Option<String>,
+) -> Result<()> {
+    if path.trim().is_empty() {
+        return Err(anyhow!("Worktree path cannot be empty"));
+    }
+
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Build worktree remove command
+    let mut args = vec!["worktree", "remove"];
+
+    if force.unwrap_or(false) {
+        args.push("--force");
+    }
+
+    args.push(&path);
+
+    // Execute worktree remove
+    run_git(&root, &args, false)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn git_has_uncommitted_changes(root_path: Option<String>) -> Result<bool, String> {
+    git_has_uncommitted_changes_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_has_uncommitted_changes_impl(root_path: Option<String>) -> Result<bool> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Check git status
+    let output = run_git(&root, &["status", "--porcelain"], false)?;
+
+    // If output is not empty, there are uncommitted changes
+    Ok(!output.trim().is_empty())
+}

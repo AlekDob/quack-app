@@ -160,6 +160,23 @@ export default function TerminalActivityBar({ terminal, chatSessions }: Terminal
               {terminal.branch}
             </span>
           )}
+          {terminal.useWorktree && (
+            <span
+              className="terminal-worktree-badge"
+              style={{
+                marginLeft: '4px',
+                padding: '2px 6px',
+                fontSize: '0.75em',
+                borderRadius: '3px',
+                background: 'rgba(156, 39, 176, 0.15)',
+                border: '1px solid rgba(156, 39, 176, 0.3)',
+                color: '#9c27b0',
+              }}
+              title={`Uses Git Worktree: ${terminal.worktreePath || 'isolated directory'}`}
+            >
+              🌳
+            </span>
+          )}
           <span className={badgeClassName}>
             {getBadge()}
           </span>

@@ -12,6 +12,7 @@ interface TokenUsageIndicatorProps {
   onClear?: () => void;
 }
 
+// Duck status interface for stamina levels
 interface DuckStatus {
   level: string;
   color: string;
@@ -48,7 +49,7 @@ export default function TokenUsageIndicator({
   });
 
   // Determine duck stamina status (INVERTED LOGIC)
-  const getDuckStatus = () => {
+  const getDuckStatus = (): DuckStatus => {
     if (staminaPercentage <= 10) return {
       level: 'exhausted',
       color: '#EF4444',
@@ -81,12 +82,12 @@ export default function TokenUsageIndicator({
 
   const status = getDuckStatus();
 
-  // Format token count (45.2k, 120k, etc.)
-  const formatTokens = (tokens: number) => {
-    if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-    if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-    return tokens.toString();
-  };
+  // Format token count (45.2k, 120k, etc.) - unused but kept for potential future use
+  // const formatTokens = (tokens: number) => {
+  //   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  //   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  //   return tokens.toString();
+  // };
 
   return (
     <>

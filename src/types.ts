@@ -45,6 +45,8 @@ export interface TerminalInfo {
   workingOn?: string;                // What the agent is working on (max 5 words)
   avatar?: string;                   // Avatar filename (e.g., "mike.png")
   branch?: string;                   // Git branch this agent is working on
+  useWorktree?: boolean;             // Whether this agent uses Git worktree
+  worktreePath?: string;             // Path to worktree if different from cwd
 }
 
 // AgentTerminal: NEW - Terminale integrato XTerm associato ad un agente
@@ -156,6 +158,14 @@ export interface GitPullResult {
 export interface GitConflictFile {
   path: string;
   status: string;
+}
+
+export interface GitWorktree {
+  path: string;
+  branch: string;
+  commitHash: string;
+  isBare: boolean;
+  isDetached: boolean;
 }
 
 export interface TerminalDataEvent {
