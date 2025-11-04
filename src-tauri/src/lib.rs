@@ -484,6 +484,7 @@ pub fn run() {
             slash_commands::create_slash_command,
             slash_commands::update_slash_command,
             slash_commands::delete_slash_command,
+            slash_commands::expand_slash_command,
             mcp::list_mcp_servers,
             mcp::get_mcp_server,
             mcp::save_mcp_server,

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
@@ -109,6 +110,40 @@ export default function ChatView({
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
+
+    // Check if message starts with a slash command
+    const trimmedContent = content.trim();
+    const slashCommandMatch = trimmedContent.match(/^\/(\w+)(?:\s+(.*))?$/s);
+
+    if (slashCommandMatch) {
+      const [, commandName, commandArgs] = slashCommandMatch;
+      console.log('[ChatView] Detected slash command:', commandName, 'with args:', commandArgs);
+
+      try {
+        // Try to expand the command via backend
+        const expandedContent = await invoke<string>('expand_slash_command', {
+          basePath: basePath || '',
+          commandName,
+          args: commandArgs || '',
+        });
+
+        console.log('[ChatView] Expanded slash command to:', expandedContent);
+
+        // Send the expanded content instead of the raw command
+        await onSendMessage(expandedContent, {
+          ...options,
+          model,
+          thinkingMode,
+          permissionMode,
+        });
+        return;
+      } catch (error) {
+        console.error('[ChatView] Failed to expand slash command:', error);
+        // Fall through to send raw content if expansion fails
+      }
+    }
+
+    // Send raw content if no slash command or expansion failed
     await onSendMessage(content, {
       ...options,
       model,

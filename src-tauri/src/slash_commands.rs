@@ -21,51 +21,11 @@ pub struct SlashCommandsResponse {
     pub custom: Vec<SlashCommand>,
 }
 
-/// Built-in Claude Code commands
-/// Source: https://docs.claude.com/en/api/agent-sdk/slash-commands
+/// Built-in commands (empty - all functionality moved to chat UI buttons)
+/// Previously included: /help, /clear, /reset, /model, /session
+/// Now handled by: Compact, Clear, Terminal Resume buttons in chat footer
 fn get_builtin_commands() -> Vec<SlashCommand> {
-    vec![
-        SlashCommand {
-            name: "help".to_string(),
-            description: "Show available commands and keyboard shortcuts".to_string(),
-            content: "Display help information for Claude Code".to_string(),
-            is_builtin: true,
-            parameters: None,
-            scope: "builtin".to_string(),
-        },
-        SlashCommand {
-            name: "clear".to_string(),
-            description: "Clear the current conversation history".to_string(),
-            content: "Clear all messages from the current session".to_string(),
-            is_builtin: true,
-            parameters: None,
-            scope: "builtin".to_string(),
-        },
-        SlashCommand {
-            name: "reset".to_string(),
-            description: "Reset the conversation to a fresh state".to_string(),
-            content: "Start a new conversation from scratch".to_string(),
-            is_builtin: true,
-            parameters: None,
-            scope: "builtin".to_string(),
-        },
-        SlashCommand {
-            name: "model".to_string(),
-            description: "Switch between Claude models".to_string(),
-            content: "Change the active Claude model (sonnet, opus, etc.)".to_string(),
-            is_builtin: true,
-            parameters: Some(vec!["model_name".to_string()]),
-            scope: "builtin".to_string(),
-        },
-        SlashCommand {
-            name: "session".to_string(),
-            description: "Manage conversation sessions".to_string(),
-            content: "Create, save, or load conversation sessions".to_string(),
-            is_builtin: true,
-            parameters: Some(vec!["action".to_string(), "session_id".to_string()]),
-            scope: "builtin".to_string(),
-        },
-    ]
+    vec![]
 }
 
 /// Parse frontmatter from markdown file
@@ -266,4 +226,64 @@ pub fn delete_slash_command(_app: AppHandle, base_path: String, name: String) ->
         .map_err(|e| format!("Failed to delete command file: {}", e))?;
 
     Ok(())
+}
+
+/// Expand a slash command by reading its content and replacing placeholders
+#[tauri::command]
+pub fn expand_slash_command(
+    _app: AppHandle,
+    base_path: String,
+    command_name: String,
+    args: String,
+) -> Result<String, String> {
+    log::info!("🦆 Expanding slash command: {} with args: {}", command_name, args);
+
+    // Try to find command in project commands first
+    let project_commands_dir = PathBuf::from(&base_path).join(".claude/commands");
+    let project_file = project_commands_dir.join(format!("{}.md", command_name));
+
+    // Then try global commands
+    let global_file = if let Ok(home_dir) = std::env::var("HOME") {
+        Some(PathBuf::from(home_dir).join(format!(".claude/commands/{}.md", command_name)))
+    } else {
+        None
+    };
+
+    // Determine which file to use
+    let command_file = if project_file.exists() {
+        log::info!("🦆 Found project command: {:?}", project_file);
+        project_file
+    } else if let Some(gf) = global_file {
+        if gf.exists() {
+            log::info!("🦆 Found global command: {:?}", gf);
+            gf
+        } else {
+            return Err(format!("Command '{}' not found", command_name));
+        }
+    } else {
+        return Err(format!("Command '{}' not found", command_name));
+    };
+
+    // Read command content
+    let content = fs::read_to_string(&command_file)
+        .map_err(|e| format!("Failed to read command file: {}", e))?;
+
+    // Parse frontmatter to get the body
+    let (_, _, _, body) = parse_frontmatter(&content);
+
+    // Replace $ARGUMENTS placeholder with actual arguments
+    let expanded = body.replace("$ARGUMENTS", &args);
+
+    // Replace numbered placeholders $1, $2, etc. with space-separated arguments
+    let args_vec: Vec<&str> = args.split_whitespace().collect();
+    let mut final_content = expanded.clone();
+
+    for (i, arg) in args_vec.iter().enumerate() {
+        let placeholder = format!("${}", i + 1);
+        final_content = final_content.replace(&placeholder, arg);
+    }
+
+    log::info!("🦆 Expanded command content ({} chars)", final_content.len());
+
+    Ok(final_content)
 }

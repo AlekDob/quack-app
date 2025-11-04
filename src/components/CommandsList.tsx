@@ -3,7 +3,6 @@ import type { SlashCommand } from '../hooks/useSlashCommands';
 import { CommandItem } from './CommandItem';
 
 interface CommandsListProps {
-  builtinCommands: SlashCommand[];
   customCommands: SlashCommand[];
   onUseCommand: (command: SlashCommand) => void;
   onEditCommand: (command: SlashCommand) => void;
@@ -11,13 +10,11 @@ interface CommandsListProps {
 }
 
 export function CommandsList({
-  builtinCommands,
   customCommands,
   onUseCommand,
   onEditCommand,
   onDeleteCommand
 }: CommandsListProps) {
-  const [builtinExpanded, setBuiltinExpanded] = useState(true);
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
 
@@ -27,40 +24,6 @@ export function CommandsList({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Built-in Commands Section */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setBuiltinExpanded(!builtinExpanded)}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-        >
-          <span className={`transition-transform ${builtinExpanded ? 'rotate-90' : ''}`}>▶</span>
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <circle cx="12" cy="12" r="10" strokeWidth={2} />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
-          </svg>
-          <span>Claude Code Commands</span>
-          <span className="ml-auto text-xs text-white/40">{builtinCommands.length}</span>
-        </button>
-        {builtinExpanded && (
-          <div className="mt-2 space-y-1">
-            {builtinCommands.length === 0 ? (
-              <div className="px-3 py-6 text-center">
-                <p className="text-xs text-white/30">No built-in commands available</p>
-              </div>
-            ) : (
-              builtinCommands.map((command) => (
-                <CommandItem
-                  key={command.name}
-                  command={command}
-                  onUse={onUseCommand}
-                />
-              ))
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Global Commands Section */}
       {globalCommands.length > 0 && (

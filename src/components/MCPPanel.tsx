@@ -120,7 +120,7 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
             type="button"
             onClick={handleRefresh}
             disabled={loading}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
+            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50 flex items-center gap-1.5"
             style={{
               background: "rgba(255, 255, 255, 0.05)",
               border: "1px solid rgba(255, 255, 255, 0.12)",
@@ -135,12 +135,27 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
               e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
             }}
           >
-            {loading ? "..." : "↻ Refresh"}
+            {loading ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </>
+            )}
           </button>
           <button
             type="button"
             onClick={handleAddServer}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
+            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
             style={{
               background: "rgba(242, 140, 82, 0.1)",
               border: "1px solid rgba(242, 140, 82, 0.3)",
@@ -155,7 +170,10 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
               e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
             }}
           >
-            + Add Server
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Server
           </button>
         </div>
       </div>

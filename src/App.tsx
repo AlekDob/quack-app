@@ -763,12 +763,9 @@ function App() {
         ...restoredTabs
       ]);
 
-      // If there are restored tabs, activate the first one; otherwise activate chat
-      if (restoredTabs.length > 0) {
-        setActiveTabId(restoredTabs[0].id);
-      } else {
-        setActiveTabId('chat');
-      }
+      // Always activate chat tab when switching agents for consistent UX
+      // Users expect to see the agent chat first, not the last visited tab
+      setActiveTabId('chat');
     }
 
     // Update previous activeId ref
@@ -3916,14 +3913,9 @@ function App() {
       clearTerminalAttention(id);
       clearIdleTimer(id);
 
-      // Restore last active tab for this terminal
-      const lastTab = lastActiveTabPerTerminal.current.get(id);
-      if (lastTab) {
-        setActiveTabId(lastTab);
-      } else {
-        // Default to chat if no history
-        setActiveTabId('chat');
-      }
+      // Always open the chat tab when selecting a terminal from sidebar
+      // This ensures consistent behavior - first tab is always the agent chat
+      setActiveTabId('chat');
       const terminal = terminals.find((candidate) => candidate.id === id);
       if (terminal) {
         await loadDirectory(terminal.cwd);

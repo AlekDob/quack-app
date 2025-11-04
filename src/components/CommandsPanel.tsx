@@ -25,11 +25,6 @@ export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter commands based on search
-  const filteredBuiltin = commands.builtin.filter(cmd =>
-    cmd.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    cmd.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const filteredCustom = commands.custom.filter(cmd =>
     cmd.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     cmd.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -130,7 +125,6 @@ export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
           </div>
         ) : (
           <CommandsList
-            builtinCommands={filteredBuiltin}
             customCommands={filteredCustom}
             onUseCommand={onUseCommand}
             onEditCommand={handleEditCommand}
