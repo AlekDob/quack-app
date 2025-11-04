@@ -353,8 +353,39 @@ export default function TerminalSidebar({
         {/* Empty state */}
         {terminals.length === 0 && (
           <div className="empty-state">
-            <div>🦆 Quack quack!</div>
-            <div>No terminals</div>
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+              <div className="text-6xl mb-4">🦆</div>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                No agents yet
+              </h3>
+              <p className="text-sm text-white/60 mb-12 max-w-xs">
+                Quack quack! Create your first agent to start coding with AI assistance.
+              </p>
+              <button
+                type="button"
+                onClick={onCreateAgent}
+                className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2"
+                style={{
+                  background: 'rgba(242, 140, 82, 0.1)',
+                  border: '1px solid rgba(242, 140, 82, 0.3)',
+                  color: '#f28c52',
+                  marginTop: '32px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Create your first agent
+              </button>
+            </div>
           </div>
         )}
 

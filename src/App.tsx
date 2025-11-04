@@ -410,6 +410,8 @@ function App() {
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
   const [booting, setBooting] = useState(true);
+  const [videoEnded, setVideoEnded] = useState(false);
+  const [splashFadingOut, setSplashFadingOut] = useState(false);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [previewFile, setPreviewFile] = useState<{
     name: string;
@@ -3348,21 +3350,29 @@ function App() {
     };
   }, []);
 
-  // Play intro audio on splash screen
-  useEffect(() => {
-    if (booting && tauriAvailable) {
-      const audio = new Audio(introAudio);
-      audio.volume = 0.5;
-      audio.play().catch((error) => {
-        console.warn("Unable to play intro audio:", error);
-      });
+  // Intro audio disabled - can be re-enabled later when you decide what to use
+  // useEffect(() => {
+  //   if (!videoEnded && tauriAvailable) {
+  //     const audio = new Audio(introAudio);
+  //     audio.volume = 0.5;
+  //     audio.play().catch((error) => {
+  //       console.warn("Unable to play intro audio:", error);
+  //     });
 
-      return () => {
-        audio.pause();
-        audio.currentTime = 0;
-      };
+  //     return () => {
+  //       audio.pause();
+  //       audio.currentTime = 0;
+  //     };
+  //   }
+  // }, [videoEnded, tauriAvailable, introAudio]);
+
+  // Clean background during video splash to avoid flash
+  useEffect(() => {
+    if (!videoEnded) {
+      // Remove background image during splash for clean black screen
+      document.body.style.backgroundImage = 'none';
     }
-  }, [booting, tauriAvailable, introAudio]);
+  }, [videoEnded]);
 
   // Global keyboard shortcut: Cmd+J to open AI Assistant
   useEffect(() => {
@@ -5290,16 +5300,49 @@ You have access to all Bash tools to execute git commands like:
     return null;
   }
 
-  if (booting) {
+  if (!videoEnded || splashFadingOut) {
     return (
-      <div className="app-loader">
-        <div className="app-loader-card">
-          <img
-            src={splashImage}
-            alt="Logo Quack"
-            className="app-loader-image"
-          />
-        </div>
+      <div className="app-loader" style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#000',
+        zIndex: 9999,
+        opacity: splashFadingOut ? 0 : 1,
+        transition: 'opacity 0.8s ease-out',
+        pointerEvents: splashFadingOut ? 'none' : 'auto',
+      }}>
+        <video
+          autoPlay
+          muted
+          playsInline
+          onEnded={() => {
+            // When video ends, mark it as ended and start fade out
+            setVideoEnded(true);
+            setSplashFadingOut(true);
+            // After fade animation completes, hide splash completely
+            setTimeout(() => {
+              setBooting(false);
+              setSplashFadingOut(false);
+              if (!hasBootstrapped) {
+                setHasBootstrapped(true);
+              }
+            }, 800); // Match transition duration
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center',
+          }}
+        >
+          <source src="/video/introquack.mp4" type="video/mp4" />
+        </video>
       </div>
     );
   }
@@ -5354,10 +5397,38 @@ You have access to all Bash tools to execute git commands like:
           onOpenSettings={() => setShowSettings(true)}
         />
 
+        {/* Terminal pane - show video background when no terminals, otherwise show chat */}
         <section className="terminal-pane">
-          <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Action Icons - aligned right above tabs */}
-            <ActionIcons
+          {terminals.length === 0 ? (
+            /* Video background when no agents */
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                }}
+              >
+                <source src="/video/introquack.mp4" type="video/mp4" />
+              </video>
+            </div>
+          ) : (
+            /* Chat area when agents are active */
+            <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Action Icons - aligned right above tabs */}
+              <ActionIcons
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
               onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
               onPreviewClick={handleOpenPreviewDrawer}
@@ -5544,6 +5615,7 @@ You have access to all Bash tools to execute git commands like:
               )}
             </div>
           </div>
+          )}
         </section>
 
         <SidePanel
