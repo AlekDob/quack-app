@@ -3554,6 +3554,27 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setShowNewTerminalModal(true);
   }, []);
 
+  const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
+    // Update terminal workingOn field
+    setTerminals((prevTerminals) =>
+      prevTerminals.map((t) =>
+        t.id === terminalId ? { ...t, workingOn } : t
+      )
+    );
+
+    // Persist to backend if Tauri is available
+    if (tauriAvailable) {
+      try {
+        await invoke('update_terminal_working_on', {
+          terminalId,
+          workingOn,
+        });
+      } catch (error) {
+        console.error('Failed to persist workingOn:', error);
+      }
+    }
+  }, [tauriAvailable]);
+
   const handleDuplicateTerminal = useCallback(async (terminal: TerminalInfo) => {
     if (!tauriAvailable) {
       return;
@@ -5623,6 +5644,9 @@ You have access to all Bash tools to execute git commands like:
               // Project context
               projectName={projectName}
               gitBranch={gitBranch}
+              // Working on field
+              workingOn={activeTerminal?.workingOn}
+              onWorkingOnChange={(value) => activeTerminal && handleUpdateWorkingOn(activeTerminal.id, value)}
             />
               )}
 

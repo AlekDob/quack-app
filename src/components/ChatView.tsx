@@ -61,6 +61,9 @@ interface ChatViewProps {
   // Project context
   projectName?: string;
   gitBranch?: string;
+  // Working on field
+  workingOn?: string;
+  onWorkingOnChange?: (value: string) => void;
 }
 
 export default function ChatView({
@@ -107,6 +110,9 @@ export default function ChatView({
   // Project context
   projectName,
   gitBranch,
+  // Working on field
+  workingOn,
+  onWorkingOnChange,
 }: ChatViewProps) {
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -296,6 +302,9 @@ export default function ChatView({
           openaiApiKey={openaiApiKey}
           // Open Prompt Engineer
           onOpenPromptEngineer={onOpenPromptEngineer}
+          // Working on field
+          workingOn={workingOn}
+          onWorkingOnChange={onWorkingOnChange}
         />
       </div>
     </div>

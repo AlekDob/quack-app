@@ -397,6 +397,7 @@ pub fn run() {
             terminal::close_terminal,
             terminal::set_terminal_color,
             terminal::update_terminal,
+            terminal::update_terminal_working_on,
             native_terminal::open_native_terminal,
             native_terminal::focus_native_terminal,
             native_terminal::close_native_terminal,

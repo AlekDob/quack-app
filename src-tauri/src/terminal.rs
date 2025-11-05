@@ -225,6 +225,14 @@ pub fn update_terminal(
   update_terminal_impl(&id, label, color, cwd, working_on, avatar, branch).map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+pub fn update_terminal_working_on(
+  terminal_id: String,
+  working_on: String,
+) -> Result<TerminalInfo, String> {
+  update_terminal(terminal_id, None, None, None, Some(working_on), None, None)
+}
+
 fn create_terminal_impl(
   app: &AppHandle,
   label: Option<String>,
