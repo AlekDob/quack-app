@@ -1146,3 +1146,25 @@ fn git_get_remote_url_impl(root_path: Option<String>) -> Result<String> {
 
     Ok(output.trim().to_string())
 }
+
+#[tauri::command]
+pub fn git_uncommitted_files_count(root_path: Option<String>) -> Result<usize, String> {
+    git_uncommitted_files_count_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_uncommitted_files_count_impl(root_path: Option<String>) -> Result<usize> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Use git status --short to get a clean list of modified files
+    // This counts each file once, even if it has multiple statuses (staged + modified)
+    let output = run_git(&root, &["status", "--short"], false)?;
+
+    // Count non-empty lines (each line = one modified file)
+    let count = output
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
+
+    Ok(count)
+}

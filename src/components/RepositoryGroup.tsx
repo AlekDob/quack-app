@@ -239,10 +239,11 @@ export default function RepositoryGroup({
   // Fetch git status for a specific branch
   const fetchBranchGitStatus = async (branchName: string, rootPath: string) => {
     try {
-      const status = await invoke<GitStatusSummary>('git_status_summary', { rootPath });
+      // Use the new precise file counting command
+      const count = await invoke<number>('git_uncommitted_files_count', { rootPath });
       setBranchModifiedFiles(prev => {
         const newMap = new Map(prev);
-        newMap.set(branchName, status.entries.length);
+        newMap.set(branchName, count);
         return newMap;
       });
     } catch (error) {
@@ -288,6 +289,13 @@ export default function RepositoryGroup({
   // Fetch git status on mount and when operations complete
   useEffect(() => {
     fetchAllBranchesGitStatus();
+
+    // Auto-refresh every 10 seconds to catch commits from Git Panel or external terminal
+    const interval = setInterval(() => {
+      fetchAllBranchesGitStatus();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
   }, [mainAgents, worktreeAgents]);
 
   // Group agents by branch
@@ -409,9 +417,9 @@ export default function RepositoryGroup({
                     style={{
                       background: '#f59e0b',
                       color: '#fff',
-                      borderRadius: '12px',
-                      padding: '2px 8px',
-                      fontSize: '11px',
+                      borderRadius: '8px',
+                      padding: '1px 6px',
+                      fontSize: '9px',
                       fontWeight: 600,
                       cursor: 'default',
                       userSelect: 'none',
@@ -844,9 +852,9 @@ export default function RepositoryGroup({
                           style={{
                             background: '#f59e0b',
                             color: '#fff',
-                            borderRadius: '12px',
-                            padding: '2px 8px',
-                            fontSize: '11px',
+                            borderRadius: '8px',
+                            padding: '1px 6px',
+                            fontSize: '9px',
                             fontWeight: 600,
                             cursor: 'default',
                             userSelect: 'none',
