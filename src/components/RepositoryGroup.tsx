@@ -202,8 +202,8 @@ export default function RepositoryGroup({
           console.warn(`Unknown git operation: ${operation}`);
       }
 
-      // Refresh git status after operation completes
-      fetchAllBranchesGitStatus();
+      // Refresh git status after operation completes (only for active terminal)
+      fetchActiveTerminalGitStatus();
     } catch (error) {
       console.error(`Git operation failed:`, error);
       alert(`Git operation failed: ${error}`);
@@ -236,67 +236,39 @@ export default function RepositoryGroup({
     }
   };
 
-  // Fetch git status for a specific branch
-  const fetchBranchGitStatus = async (branchName: string, rootPath: string) => {
+  // Fetch git status for the ACTIVE terminal's branch ONLY (performance optimization)
+  const fetchActiveTerminalGitStatus = async () => {
+    if (!activeId) {
+      // No active terminal, clear badge
+      setBranchModifiedFiles(new Map());
+      return;
+    }
+
+    // Find the active terminal from main agents or worktrees
+    const activeTerminal = [...mainAgents, ...worktreeAgents].find(a => a.id === activeId);
+    if (!activeTerminal) {
+      setBranchModifiedFiles(new Map());
+      return;
+    }
+
+    const branchName = activeTerminal.branch || getBranchName(activeTerminal);
+    const rootPath = activeTerminal.worktreePath || activeTerminal.cwd;
+
     try {
-      // Use the new precise file counting command
+      // Fetch ONLY for the active terminal's branch
       const count = await invoke<number>('git_uncommitted_files_count', { rootPath });
-      setBranchModifiedFiles(prev => {
-        const newMap = new Map(prev);
-        newMap.set(branchName, count);
-        return newMap;
-      });
+      // Store ONLY this branch in the map - badge will show only here!
+      setBranchModifiedFiles(new Map([[branchName, count]]));
     } catch (error) {
-      console.error(`Failed to fetch git status for branch ${branchName}:`, error);
-      setBranchModifiedFiles(prev => {
-        const newMap = new Map(prev);
-        newMap.set(branchName, 0);
-        return newMap;
-      });
+      console.error(`Failed to fetch git status for active terminal:`, error);
+      setBranchModifiedFiles(new Map([[branchName, 0]]));
     }
   };
 
-  // Fetch git status for all branches
-  const fetchAllBranchesGitStatus = async () => {
-    // Fetch for main branches
-    const branchPromises: Promise<void>[] = [];
-
-    agentsByBranch.forEach((agents, branchName) => {
-      const firstAgent = agents[0];
-      const rootPath = firstAgent.worktreePath || firstAgent.cwd;
-      branchPromises.push(fetchBranchGitStatus(branchName, rootPath));
-    });
-
-    // Fetch for worktrees
-    const worktreeByBranch = new Map<string, TerminalInfo[]>();
-    worktreeAgents.forEach(agent => {
-      const branchName = getBranchName(agent);
-      if (!worktreeByBranch.has(branchName)) {
-        worktreeByBranch.set(branchName, []);
-      }
-      worktreeByBranch.get(branchName)!.push(agent);
-    });
-
-    worktreeByBranch.forEach((agents, branchName) => {
-      const firstAgent = agents[0];
-      const rootPath = firstAgent.worktreePath || firstAgent.cwd;
-      branchPromises.push(fetchBranchGitStatus(branchName, rootPath));
-    });
-
-    await Promise.all(branchPromises);
-  };
-
-  // Fetch git status on mount and when operations complete
+  // Fetch git status when active terminal changes (no more polling!)
   useEffect(() => {
-    fetchAllBranchesGitStatus();
-
-    // Auto-refresh every 10 seconds to catch commits from Git Panel or external terminal
-    const interval = setInterval(() => {
-      fetchAllBranchesGitStatus();
-    }, 10000); // 10 seconds
-
-    return () => clearInterval(interval);
-  }, [mainAgents, worktreeAgents]);
+    fetchActiveTerminalGitStatus();
+  }, [activeId, mainAgents, worktreeAgents]);
 
   // Group agents by branch
   const agentsByBranch = new Map<string, TerminalInfo[]>();
@@ -409,11 +381,21 @@ export default function RepositoryGroup({
                 >
                   {branchName} ({agents.length} agent{agents.length !== 1 ? 's' : ''})
                 </span>
-                {/* Modified Files Badge */}
-                {branchModifiedFiles.get(branchName) && branchModifiedFiles.get(branchName)! > 0 && (
+                {/* Modified Files Badge - Clickable to open Git Panel */}
+                {(branchModifiedFiles.get(branchName) || 0) > 0 && (
                   <div
                     className="modified-files-badge"
-                    title={`${branchModifiedFiles.get(branchName)} files to commit`}
+                    title={`${branchModifiedFiles.get(branchName)} files to commit - Click to open Git Panel`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenGitPanel) onOpenGitPanel();
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#d97706';  // Darker orange on hover
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f59e0b';  // Back to amber
+                    }}
                     style={{
                       background: '#f59e0b',
                       color: '#fff',
@@ -421,8 +403,9 @@ export default function RepositoryGroup({
                       padding: '1px 6px',
                       fontSize: '9px',
                       fontWeight: 600,
-                      cursor: 'default',
+                      cursor: 'pointer',  // Changed from 'default' to 'pointer'
                       userSelect: 'none',
+                      transition: 'background 0.2s ease',
                     }}
                   >
                     {branchModifiedFiles.get(branchName)}
@@ -844,11 +827,21 @@ export default function RepositoryGroup({
                       >
                         {branchName} ({agents.length} agent{agents.length !== 1 ? 's' : ''})
                       </span>
-                      {/* Modified Files Badge */}
-                      {branchModifiedFiles.get(branchName) && branchModifiedFiles.get(branchName)! > 0 && (
+                      {/* Modified Files Badge - Clickable to open Git Panel */}
+                      {(branchModifiedFiles.get(branchName) || 0) > 0 && (
                         <div
                           className="modified-files-badge"
-                          title={`${branchModifiedFiles.get(branchName)} files to commit`}
+                          title={`${branchModifiedFiles.get(branchName)} files to commit - Click to open Git Panel`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenGitPanel) onOpenGitPanel();
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#d97706';  // Darker orange on hover
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f59e0b';  // Back to amber
+                          }}
                           style={{
                             background: '#f59e0b',
                             color: '#fff',
@@ -856,8 +849,9 @@ export default function RepositoryGroup({
                             padding: '1px 6px',
                             fontSize: '9px',
                             fontWeight: 600,
-                            cursor: 'default',
+                            cursor: 'pointer',  // Changed from 'default' to 'pointer'
                             userSelect: 'none',
+                            transition: 'background 0.2s ease',
                           }}
                         >
                           {branchModifiedFiles.get(branchName)}
