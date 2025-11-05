@@ -88,6 +88,7 @@ interface TerminalMetadata {
 }
 
 import "./App.css";
+import "./components/MetroStyle.css";
 
 const INTRO_REPLAY_DURATION_MS = 5000;
 

@@ -1,5 +1,6 @@
 import { useState, useMemo, type MouseEvent } from "react";
 import TerminalGroup from "./TerminalGroup";
+import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import type { TerminalInfo, AgentChat, ChatMessage } from "../types";
 
@@ -88,6 +89,7 @@ export default function TerminalSidebar({
   void _onUpdateAgentChat; // Will be used in rename functionality (Phase 4)
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
+  const [useMetroStyle, setUseMetroStyle] = useState(true); // Enable metro style by default
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     terminal: TerminalInfo;
@@ -106,7 +108,80 @@ export default function TerminalSidebar({
     return terminals.filter((terminal) => fuzzyMatch(query, terminal.label));
   }, [terminals, query]);
 
-  // SIMPLE: Group terminals by cwd only!
+  // Group terminals by repository (main repo vs worktrees)
+  const repositoryGroups = useMemo(() => {
+    const repoMap = new Map<string, {
+      mainAgents: TerminalInfo[];
+      worktreeAgents: TerminalInfo[];
+      repoPath: string;
+    }>();
+
+    filteredTerminals.forEach((terminal) => {
+      const cwd = terminal.cwd || 'unknown';
+
+      // Determine if this is a worktree
+      const isWorktree = terminal.useWorktree === true ||
+                        cwd.includes('-worktree-') ||
+                        cwd.includes('-feature-');
+
+      // Extract base repository name more intelligently
+      let repoName: string;
+      const parts = cwd.split('/');
+      const lastPart = parts[parts.length - 1];
+
+      if (isWorktree) {
+        // For worktrees, extract the base repo name
+        // Handle patterns like:
+        // - quack-app-worktree-feature-xyz
+        // - quack-app-feature-agent-avery-tree-feature-agent-giusppe
+
+        if (lastPart.includes('-worktree-')) {
+          repoName = lastPart.split('-worktree-')[0];
+        } else if (lastPart.includes('-feature-')) {
+          // Extract base name before -feature- suffix
+          // quack-app-feature-agent-giusppe → quack-app
+          const featureIndex = lastPart.indexOf('-feature-');
+          if (featureIndex > 0) {
+            repoName = lastPart.substring(0, featureIndex);
+          } else {
+            repoName = lastPart.split('-feature-')[0];
+          }
+        } else {
+          // Default fallback
+          repoName = lastPart;
+        }
+      } else {
+        // For main repos, use the directory name directly
+        repoName = lastPart;
+      }
+
+      // Get or create repository group
+      if (!repoMap.has(repoName)) {
+        repoMap.set(repoName, {
+          mainAgents: [],
+          worktreeAgents: [],
+          repoPath: cwd,
+        });
+      }
+
+      const group = repoMap.get(repoName)!;
+
+      // Add terminal to appropriate list
+      if (isWorktree) {
+        group.worktreeAgents.push(terminal);
+      } else {
+        group.mainAgents.push(terminal);
+        // Update repo path to main repo path if we have one
+        if (!cwd.includes('-worktree-') && !cwd.includes('-feature-')) {
+          group.repoPath = cwd;
+        }
+      }
+    });
+
+    return Array.from(repoMap.entries());
+  }, [filteredTerminals]);
+
+  // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
     const groupMap: Record<string, TerminalInfo[]> = {};
 
@@ -118,9 +193,7 @@ export default function TerminalSidebar({
       groupMap[cwd].push(terminal);
     });
 
-    // Just return cwd groups - no AgentChat mapping!
     const groups: Array<[string, TerminalInfo[]]> = Object.entries(groupMap);
-
     return { groups };
   }, [filteredTerminals]);
 
@@ -139,6 +212,13 @@ export default function TerminalSidebar({
 
   const closeContextMenu = () => {
     setContextMenu(null);
+  };
+
+  // Handle Git operations from dropdown menu
+  const handleGitOperation = (operation: string, terminal: TerminalInfo) => {
+    console.log(`Git operation: ${operation} for terminal: ${terminal.label}`);
+    // TODO: Implement actual Git operations via Tauri commands
+    // This would typically call backend functions to perform Git operations
   };
 
   // Drag & drop handlers for terminals
@@ -312,43 +392,83 @@ export default function TerminalSidebar({
       </div>
 
       <div className="sidebar-list">
-        {/* SIMPLE: Render cwd-based groups */}
-        {cwdGroups.groups.map(([cwd, groupTerminals]) => {
-          const isCollapsed = collapsedGroups.has(cwd);
-
-          return (
-            <TerminalGroup
-              key={cwd}
-              cwd={cwd}
-              terminals={groupTerminals}
-              isCollapsed={isCollapsed}
-              activeId={activeId}
-              chatSessions={chatSessions}
-              onToggle={() => onToggleGroup(cwd)}
-              onSelect={handleSelectTerminal}
-              onClose={onClose}
-              onContextMenu={handleContextMenu}
-              // Drag & drop for terminals
-              draggedTerminalId={draggedTerminalId}
-              dragOverTerminalId={dragOverTerminalId}
-              dropPosition={dropPosition}
-              onTerminalDragStart={handleTerminalDragStart}
-              onTerminalDragOver={handleTerminalDragOver}
-              onTerminalDragLeave={handleTerminalDragLeave}
-              onTerminalDrop={handleTerminalDrop}
-              onTerminalDragEnd={handleTerminalDragEnd}
-              // Drag & drop for groups
-              draggedGroupCwd={draggedGroupCwd}
-              dragOverGroupCwd={dragOverGroupCwd}
-              groupDropPosition={groupDropPosition}
-              onGroupDragStart={handleGroupDragStart}
-              onGroupDragOver={handleGroupDragOver}
-              onGroupDragLeave={handleGroupDragLeave}
-              onGroupDrop={handleGroupDrop}
-              onGroupDragEnd={handleGroupDragEnd}
+        {/* Toggle for metro style */}
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <label className="flex items-center gap-2 text-xs text-white/60 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useMetroStyle}
+              onChange={(e) => setUseMetroStyle(e.target.checked)}
+              className="rounded"
             />
-          );
-        })}
+            <span>Metro Style View</span>
+          </label>
+        </div>
+
+        {/* Render based on selected style */}
+        {useMetroStyle ? (
+          // Metro-style repository groups
+          repositoryGroups.map(([repoName, group]) => {
+            const repoKey = `repo-${repoName}`;
+            const isCollapsed = collapsedGroups.has(repoKey);
+
+            return (
+              <RepositoryGroup
+                key={repoKey}
+                repoPath={group.repoPath}
+                repoName={repoName}
+                mainAgents={group.mainAgents}
+                worktreeAgents={group.worktreeAgents}
+                isCollapsed={isCollapsed}
+                activeId={activeId}
+                chatSessions={chatSessions}
+                onToggle={() => onToggleGroup(repoKey)}
+                onSelect={handleSelectTerminal}
+                onClose={onClose}
+                onContextMenu={handleContextMenu}
+                onGitOperation={handleGitOperation}
+              />
+            );
+          })
+        ) : (
+          // Legacy cwd-based groups
+          cwdGroups.groups.map(([cwd, groupTerminals]) => {
+            const isCollapsed = collapsedGroups.has(cwd);
+
+            return (
+              <TerminalGroup
+                key={cwd}
+                cwd={cwd}
+                terminals={groupTerminals}
+                isCollapsed={isCollapsed}
+                activeId={activeId}
+                chatSessions={chatSessions}
+                onToggle={() => onToggleGroup(cwd)}
+                onSelect={handleSelectTerminal}
+                onClose={onClose}
+                onContextMenu={handleContextMenu}
+                // Drag & drop for terminals
+                draggedTerminalId={draggedTerminalId}
+                dragOverTerminalId={dragOverTerminalId}
+                dropPosition={dropPosition}
+                onTerminalDragStart={handleTerminalDragStart}
+                onTerminalDragOver={handleTerminalDragOver}
+                onTerminalDragLeave={handleTerminalDragLeave}
+                onTerminalDrop={handleTerminalDrop}
+                onTerminalDragEnd={handleTerminalDragEnd}
+                // Drag & drop for groups
+                draggedGroupCwd={draggedGroupCwd}
+                dragOverGroupCwd={dragOverGroupCwd}
+                groupDropPosition={groupDropPosition}
+                onGroupDragStart={handleGroupDragStart}
+                onGroupDragOver={handleGroupDragOver}
+                onGroupDragLeave={handleGroupDragLeave}
+                onGroupDrop={handleGroupDrop}
+                onGroupDragEnd={handleGroupDragEnd}
+              />
+            );
+          })
+        )}
 
         {/* Empty state */}
         {terminals.length === 0 && (

@@ -1,0 +1,110 @@
+/* Metro-Style Visual System - Ultra Minimal Design */
+/* Inspired by Moscow Metro Map - Clean, Simple, Effective */
+
+/* Repository Group Base Styling */
+.repository-group {
+  margin-bottom: 16px;
+  position: relative;
+}
+
+/* Repository Header - Clean and Minimal */
+.repository-header {
+  user-select: none;
+  position: relative;
+}
+
+/* Agent Card - Minimal Styling */
+.agent-card {
+  position: relative;
+  user-select: none;
+}
+
+/* Metro Lines - Keep them super thin! */
+.metro-line-container {
+  pointer-events: none;
+}
+
+.metro-line {
+  /* Line is styled inline for maximum control */
+  pointer-events: none;
+}
+
+/* Metro Station Dots */
+.metro-station-dot {
+  /* Styled inline for precise control */
+  pointer-events: none;
+}
+
+/* Fork Point - The branch indicator */
+.fork-point {
+  /* Styled inline with gradient */
+  pointer-events: none;
+}
+
+/* Section Labels - Ultra Minimal */
+.section-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  opacity: 0.4;
+}
+
+/* Terminal Close Button - Simple and Clean */
+.terminal-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.terminal-close:hover {
+  color: rgba(239, 68, 68, 0.6);
+}
+
+/* Git Operations Dropdown - Clean */
+.git-operations-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.branch-badge-with-menu {
+  position: relative;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.dropdown-menu {
+  /* Simple slide-in animation */
+  animation: slideIn 0.15s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth transitions for interactive elements */
+.repository-group *,
+.agent-card * {
+  transition-property: background, opacity, color, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+/* Sidebar scrollbar - Minimal */
+.sidebar-list {
+  scroll-behavior: smooth;
+}
+
+/* Remove all complex animations and effects */
+/* No pulsing, no glowing, no complex gradients */
+/* Just clean, minimal, metro-style design */

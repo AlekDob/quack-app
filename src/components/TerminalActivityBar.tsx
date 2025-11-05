@@ -17,6 +17,7 @@ function getAvatarUrl(avatarName: string): string {
 interface TerminalActivityBarProps {
   terminal: TerminalInfo
   chatSessions?: Map<string, ChatMessage[]>
+  hideBranch?: boolean  // New prop to hide branch badge
 }
 
 /**
@@ -34,7 +35,7 @@ interface TerminalActivityBarProps {
  * <TerminalActivityBar terminal={terminal} />
  * ```
  */
-export default function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProps) {
+export default function TerminalActivityBar({ terminal, chatSessions, hideBranch = false }: TerminalActivityBarProps) {
   const status = terminal.status ?? 'idle'
   const [confirmedStatus, setConfirmedStatus] = useState<'busy' | 'idle'>(status)
   const [isHovering, setIsHovering] = useState(false)
@@ -77,7 +78,7 @@ export default function TerminalActivityBar({ terminal, chatSessions }: Terminal
   const getBadge = () => {
     if (isBusy) return '⚡'
     if (isWaitingForResponse) return '💬'
-    return '✓'
+    return '' // No badge when idle
   }
 
   const dotClassName = isBusy
@@ -92,7 +93,8 @@ export default function TerminalActivityBar({ terminal, chatSessions }: Terminal
 
   return (
     <>
-      {terminal.avatar ? (
+      {/* Only show avatar if it exists - no fallback dot */}
+      {terminal.avatar && (
         <div
           className="terminal-avatar-container"
           onMouseEnter={() => setIsHovering(true)}
@@ -133,53 +135,18 @@ export default function TerminalActivityBar({ terminal, chatSessions }: Terminal
             </div>
           )}
         </div>
-      ) : (
-        <div
-          className={dotClassName}
-          style={{ backgroundColor: terminal.color }}
-        />
       )}
-      <div className="terminal-details">
-        <span className="terminal-name">
-          {terminal.label}
-          {terminal.branch && (
-            <span
-              className="terminal-branch-badge"
-              style={{
-                marginLeft: '6px',
-                padding: '2px 6px',
-                fontSize: '0.75em',
-                fontFamily: 'monospace',
-                borderRadius: '3px',
-                background: 'rgba(78, 205, 196, 0.15)',
-                border: '1px solid rgba(78, 205, 196, 0.3)',
-                color: '#4ecdc4',
-              }}
-              title={`Working on branch: ${terminal.branch}`}
-            >
-              {terminal.branch}
+
+      {/* Terminal details - name takes all available space with flex: 1 */}
+      <div className="terminal-details" style={{ flex: 1 }}>
+        <span className="terminal-name" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ flex: 1 }}>{terminal.label}</span>
+          {/* Only show badge if busy or waiting for response */}
+          {(isBusy || isWaitingForResponse) && (
+            <span className={badgeClassName}>
+              {getBadge()}
             </span>
           )}
-          {terminal.useWorktree && (
-            <span
-              className="terminal-worktree-badge"
-              style={{
-                marginLeft: '4px',
-                padding: '2px 6px',
-                fontSize: '0.75em',
-                borderRadius: '3px',
-                background: 'rgba(156, 39, 176, 0.15)',
-                border: '1px solid rgba(156, 39, 176, 0.3)',
-                color: '#9c27b0',
-              }}
-              title={`Uses Git Worktree: ${terminal.worktreePath || 'isolated directory'}`}
-            >
-              🌳
-            </span>
-          )}
-          <span className={badgeClassName}>
-            {getBadge()}
-          </span>
         </span>
         {terminal.workingOn && (
           <span className="terminal-working-on">
