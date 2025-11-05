@@ -404,8 +404,11 @@ function App() {
   const [newTerminalBranch, setNewTerminalBranch] = useState("");
   const [newTerminalUseWorktree, setNewTerminalUseWorktree] = useState(false);
   const [newTerminalPersonality, setNewTerminalPersonality] = useState<Partial<AgentPersonality>>({
+    role: 'Feature Coordinator',
+    intro: 'Experienced PM specializing in feature delivery and team coordination',
     communicationStyle: 'friendly',
-    specialties: [],
+    specialties: ['feature-planning', 'team-alignment'],
+    personality: 'Organized. Proactive',
     skills: [],
     expressions: [],
   });
@@ -3538,8 +3541,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // No personality found - reset to default
       console.log('No existing personality found, using default');
       setNewTerminalPersonality({
+        role: 'Feature Coordinator',
+        intro: 'Experienced PM specializing in feature delivery and team coordination',
         communicationStyle: 'friendly',
-        specialties: [],
+        specialties: ['feature-planning', 'team-alignment'],
+        personality: 'Organized. Proactive',
         skills: [],
         expressions: [],
       });
@@ -3633,8 +3639,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalWorkingOn(""); // Reset working on field
     setNewTerminalAvatar("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg"); // Reset to first avatar
     setNewTerminalPersonality({ // Reset personality to default
+      role: 'Feature Coordinator',
+      intro: 'Experienced PM specializing in feature delivery and team coordination',
       communicationStyle: 'friendly',
-      specialties: [],
+      specialties: ['feature-planning', 'team-alignment'],
+      personality: 'Organized. Proactive',
       skills: [],
       expressions: [],
     });

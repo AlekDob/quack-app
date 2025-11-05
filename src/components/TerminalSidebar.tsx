@@ -73,9 +73,9 @@ function SortableRepositoryGroup({
       style={style}
       className="sortable-repository-group group relative"
     >
-      {/* Drag Handle - positioned absolutely on the left */}
+      {/* Drag Handle - positioned absolutely and aligned with project name */}
       <div
-        className="absolute left-0 top-2 z-10"
+        className="absolute left-0 top-[10px] z-10"
         style={{
           opacity: isHovered ? 0.6 : 0,
           transition: 'opacity 0.2s ease',
@@ -755,7 +755,7 @@ export default function TerminalSidebar({
         ACTIVE AGENTS
       </div>
 
-      <div className="sidebar-list">
+      <div className="sidebar-list" style={{ marginTop: '5px' }}>
         {/* Toggle for metro style */}
         <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
           <label className="flex items-center gap-2 text-xs text-white/60 cursor-pointer">

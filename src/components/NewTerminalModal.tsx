@@ -162,8 +162,21 @@ function NewTerminalModal({
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel agent-modal">
         <div className="modal-header">
-          <h2>{isEditing ? '✏️ Edit agent' : '✨ Create new agent'}</h2>
-          <p className="modal-subtitle">Configure your agent settings</p>
+          <div>
+            <h2>{isEditing ? '✏️ Edit agent' : '✨ Create new agent'}</h2>
+            <p className="modal-subtitle">Configure your agent settings</p>
+          </div>
+          <button
+            type="button"
+            className="modal-close-button"
+            onClick={onCancel}
+            aria-label="Close"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
         <label className="modal-field">
@@ -214,10 +227,11 @@ function NewTerminalModal({
 
         <div className="modal-section-divider" />
 
-        <label className="modal-field">
+        <label className="modal-field working-on-field">
           <span className="field-label">What are you working on?</span>
           <input
             type="text"
+            className="working-on-input"
             value={workingOn}
             onChange={(event) => onWorkingOnChange?.(event.target.value)}
             placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
@@ -231,7 +245,15 @@ function NewTerminalModal({
         <div className="modal-section-divider" />
 
         <PersonalityBuilder
-          personality={personality || { communicationStyle: 'friendly', specialties: [], skills: [], expressions: [] }}
+          personality={{
+            role: personality?.role || 'Feature Coordinator',
+            intro: personality?.intro || 'Experienced PM specializing in feature delivery and team coordination',
+            communicationStyle: personality?.communicationStyle || 'friendly',
+            specialties: personality?.specialties || ['feature-planning', 'team-alignment'],
+            personality: personality?.personality || 'Organized. Proactive',
+            skills: personality?.skills || [],
+            expressions: personality?.expressions || []
+          }}
           onPersonalityChange={onPersonalityChange || (() => {})}
           availableSkills={availableSkills}
         />

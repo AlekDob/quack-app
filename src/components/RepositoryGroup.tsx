@@ -938,9 +938,6 @@ export default function RepositoryGroup({
             <span className="font-semibold text-sm text-white/90">
               {displayName}
             </span>
-            <span className="text-xs text-white/40 font-mono">
-              ({mainAgents.length + worktreeAgents.length} agents)
-            </span>
           </div>
 
           {/* Reveal in Finder button */}

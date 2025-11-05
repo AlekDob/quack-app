@@ -44,7 +44,7 @@ function PersonalityBuilder({
   onPersonalityChange,
   availableSkills,
 }: PersonalityBuilderProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const toggleFocusArea = (focusId: string) => {
     const specialties = personality.specialties || [];
