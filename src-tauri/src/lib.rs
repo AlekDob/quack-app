@@ -442,6 +442,7 @@ pub fn run() {
             git::git_add_worktree,
             git::git_remove_worktree,
             git::git_has_uncommitted_changes,
+            git::git_get_remote_url,
             preview::create_preview_webview,
             preview::update_preview_webview_position,
             preview::destroy_preview_webview,

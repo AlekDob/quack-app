@@ -72,9 +72,10 @@ pub fn git_commit(message: String, root_path: Option<String>) -> Result<(), Stri
 #[tauri::command]
 pub fn git_commit_history(
     limit: Option<usize>,
+    branch_name: Option<String>,
     root_path: Option<String>,
 ) -> Result<Vec<GitCommitEntry>, String> {
-    git_commit_history_impl(limit, root_path).map_err(|err| err.to_string())
+    git_commit_history_impl(limit, branch_name, root_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -250,6 +251,7 @@ fn git_commit_impl(message: String, root_path: Option<String>) -> Result<()> {
 
 fn git_commit_history_impl(
     limit: Option<usize>,
+    branch_name: Option<String>,
     root_path: Option<String>,
 ) -> Result<Vec<GitCommitEntry>> {
     let starting_path = root_path.map(PathBuf::from);
@@ -257,7 +259,15 @@ fn git_commit_history_impl(
     let limit = limit.unwrap_or(50).min(200);
     let pretty = "--pretty=format:%H%x1f%an%x1f%ad%x1f%at%x1f%s";
     let limit_arg = format!("-n{limit}");
-    let args = ["log", "--date=relative", pretty, limit_arg.as_str()];
+
+    // Build args with optional branch name
+    let mut args = vec!["log", "--date=relative", pretty, limit_arg.as_str()];
+    let branch_str: String;
+    if let Some(ref branch) = branch_name {
+        branch_str = branch.clone();
+        args.push(&branch_str);
+    }
+
     let output = run_git(&root, &args, false)?;
 
     let mut entries = Vec::new();
@@ -1120,4 +1130,19 @@ fn git_has_uncommitted_changes_impl(root_path: Option<String>) -> Result<bool> {
 
     // If output is not empty, there are uncommitted changes
     Ok(!output.trim().is_empty())
+}
+
+#[tauri::command]
+pub fn git_get_remote_url(root_path: Option<String>) -> Result<String, String> {
+    git_get_remote_url_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_get_remote_url_impl(root_path: Option<String>) -> Result<String> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    // Get remote URL for origin
+    let output = run_git(&root, &["config", "--get", "remote.origin.url"], false)?;
+
+    Ok(output.trim().to_string())
 }

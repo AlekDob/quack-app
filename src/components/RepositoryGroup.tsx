@@ -1,7 +1,10 @@
-import { type MouseEvent, useState } from 'react';
+import { type MouseEvent, useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import TerminalActivityBar from './TerminalActivityBar';
 import MetroLine from './MetroLine';
-import type { TerminalInfo, ChatMessage } from '../types';
+import CommitHistoryModal from './CommitHistoryModal';
+import RevealInFinderButton from './RevealInFinderButton';
+import type { TerminalInfo, ChatMessage, GitPullResult, GitStatusSummary } from '../types';
 
 interface RepositoryGroupProps {
   repoPath: string;
@@ -16,6 +19,7 @@ interface RepositoryGroupProps {
   onClose: (id: string) => void;
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
   onGitOperation?: (operation: string, terminal: TerminalInfo) => void;
+  onOpenGitPanel?: () => void; // NEW: Function to open Git Panel drawer
 }
 
 // Helper to extract repository name from path
@@ -53,11 +57,238 @@ export default function RepositoryGroup({
   onClose,
   onContextMenu,
   onGitOperation,
+  onOpenGitPanel,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
+  const [commitHistoryModal, setCommitHistoryModal] = useState<{
+    branchName: string;
+    rootPath: string;
+  } | null>(null);
+  const [branchModifiedFiles, setBranchModifiedFiles] = useState<Map<string, number>>(new Map());
   const displayName = getRepoDisplayName(repoName);
   const hasWorktrees = worktreeAgents.length > 0;
+
+  // Intelligent Git Operations Handler
+  const handleGitOperation = async (operation: string, terminal: TerminalInfo) => {
+    const rootPath = terminal.worktreePath || terminal.cwd;
+    const branchName = terminal.branch || 'main';
+
+    try {
+      // Operations that need uncommitted changes check
+      const needsCheck = ['pull', 'push', 'merge-to-main'];
+
+      if (needsCheck.includes(operation)) {
+        // Check for uncommitted changes
+        const hasUncommitted = await invoke<boolean>('git_has_uncommitted_changes', { rootPath });
+
+        if (hasUncommitted) {
+          // Show alert and ask to open Git Panel
+          const userConfirmed = window.confirm(
+            `⚠️ Modifiche Non Committate\n\n` +
+            `Hai modifiche non committate nel branch "${branchName}".\n\n` +
+            `Vuoi aprire il Git Panel per committare le modifiche prima di procedere?`
+          );
+
+          if (userConfirmed && onOpenGitPanel) {
+            onOpenGitPanel();
+            return;
+          } else {
+            // User cancelled
+            return;
+          }
+        }
+      }
+
+      // Handle different operations
+      switch (operation) {
+        case 'pull': {
+          const result = await invoke<GitPullResult>('git_pull', {
+            branchName,
+            rootPath,
+          });
+
+          if (result.hasConflicts) {
+            alert(`Pull has conflicts in ${result.conflictedFiles.length} file(s):\n${result.conflictedFiles.join('\n')}`);
+          } else {
+            console.log(`✅ Pull successful: ${result.message}`);
+          }
+          break;
+        }
+
+        case 'push': {
+          const result = await invoke<string>('git_push', {
+            branchName,
+            force: false,
+            rootPath,
+          });
+          console.log(`✅ Push successful: ${result}`);
+          break;
+        }
+
+        case 'merge-to-main': {
+          const confirmed = window.confirm(
+            `Vuoi mergeare il branch "${branchName}" in main?\n\n` +
+            `Questa operazione:\n` +
+            `1. Switcha a main\n` +
+            `2. Mergia ${branchName} in main\n\n` +
+            `Continua?`
+          );
+
+          if (!confirmed) return;
+
+          await invoke('git_switch_branch', {
+            branchName: 'main',
+            rootPath,
+          });
+
+          const result = await invoke<{
+            success: boolean;
+            hasConflicts: boolean;
+            conflictedFiles: string[];
+            message: string;
+          }>('git_merge_branch', {
+            branchName,
+            rootPath,
+          });
+
+          if (result.hasConflicts) {
+            alert(`Merge has conflicts in ${result.conflictedFiles.length} file(s):\n${result.conflictedFiles.join('\n')}`);
+          } else {
+            console.log(`✅ Merge successful: ${result.message}`);
+          }
+          break;
+        }
+
+        case 'create-pr': {
+          const prUrl = await generatePRUrl(rootPath, branchName);
+          if (prUrl) {
+            window.open(prUrl, '_blank');
+          } else {
+            alert('Could not generate PR URL. Make sure the repository has a remote configured.');
+          }
+          break;
+        }
+
+        case 'view-commits': {
+          setCommitHistoryModal({
+            branchName,
+            rootPath,
+          });
+          break;
+        }
+
+        case 'delete-worktree': {
+          const confirmed = window.confirm(
+            `Sei sicuro di voler eliminare il worktree per "${branchName}"?\n\n` +
+            `Questo rimuoverà:\n` +
+            `- ${rootPath}\n\n` +
+            `Il branch continuerà ad esistere nel repository.`
+          );
+
+          if (confirmed) {
+            await invoke('git_remove_worktree', {
+              path: rootPath,
+              force: false,
+              rootPath: terminal.cwd,
+            });
+            console.log(`✅ Worktree deleted: ${rootPath}`);
+            onClose(terminal.id);
+          }
+          break;
+        }
+
+        default:
+          console.warn(`Unknown git operation: ${operation}`);
+      }
+
+      // Refresh git status after operation completes
+      fetchAllBranchesGitStatus();
+    } catch (error) {
+      console.error(`Git operation failed:`, error);
+      alert(`Git operation failed: ${error}`);
+    }
+  };
+
+  // Helper to generate PR URL
+  const generatePRUrl = async (rootPath: string, branchName: string): Promise<string | null> => {
+    try {
+      const remoteUrl = await invoke<string>('git_get_remote_url', { rootPath });
+
+      if (remoteUrl.includes('github.com')) {
+        const match = remoteUrl.match(/github\.com[:/]([^/]+)\/(.+?)(\.git)?$/);
+        if (match) {
+          const [, owner, repo] = match;
+          return `https://github.com/${owner}/${repo}/compare/${branchName}?expand=1`;
+        }
+      } else if (remoteUrl.includes('gitlab.com')) {
+        const match = remoteUrl.match(/gitlab\.com[:/]([^/]+)\/(.+?)(\.git)?$/);
+        if (match) {
+          const [, owner, repo] = match;
+          return `https://gitlab.com/${owner}/${repo}/-/merge_requests/new?merge_request[source_branch]=${branchName}`;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to generate PR URL:', error);
+      return null;
+    }
+  };
+
+  // Fetch git status for a specific branch
+  const fetchBranchGitStatus = async (branchName: string, rootPath: string) => {
+    try {
+      const status = await invoke<GitStatusSummary>('git_status_summary', { rootPath });
+      setBranchModifiedFiles(prev => {
+        const newMap = new Map(prev);
+        newMap.set(branchName, status.entries.length);
+        return newMap;
+      });
+    } catch (error) {
+      console.error(`Failed to fetch git status for branch ${branchName}:`, error);
+      setBranchModifiedFiles(prev => {
+        const newMap = new Map(prev);
+        newMap.set(branchName, 0);
+        return newMap;
+      });
+    }
+  };
+
+  // Fetch git status for all branches
+  const fetchAllBranchesGitStatus = async () => {
+    // Fetch for main branches
+    const branchPromises: Promise<void>[] = [];
+
+    agentsByBranch.forEach((agents, branchName) => {
+      const firstAgent = agents[0];
+      const rootPath = firstAgent.worktreePath || firstAgent.cwd;
+      branchPromises.push(fetchBranchGitStatus(branchName, rootPath));
+    });
+
+    // Fetch for worktrees
+    const worktreeByBranch = new Map<string, TerminalInfo[]>();
+    worktreeAgents.forEach(agent => {
+      const branchName = getBranchName(agent);
+      if (!worktreeByBranch.has(branchName)) {
+        worktreeByBranch.set(branchName, []);
+      }
+      worktreeByBranch.get(branchName)!.push(agent);
+    });
+
+    worktreeByBranch.forEach((agents, branchName) => {
+      const firstAgent = agents[0];
+      const rootPath = firstAgent.worktreePath || firstAgent.cwd;
+      branchPromises.push(fetchBranchGitStatus(branchName, rootPath));
+    });
+
+    await Promise.all(branchPromises);
+  };
+
+  // Fetch git status on mount and when operations complete
+  useEffect(() => {
+    fetchAllBranchesGitStatus();
+  }, [mainAgents, worktreeAgents]);
 
   // Group agents by branch
   const agentsByBranch = new Map<string, TerminalInfo[]>();
@@ -116,6 +347,15 @@ export default function RepositoryGroup({
               ({mainAgents.length + worktreeAgents.length} agents)
             </span>
           </div>
+
+          {/* Reveal in Finder button */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <RevealInFinderButton
+              path={repoPath}
+              iconOnly={true}
+              className="opacity-60 hover:opacity-100 transition-opacity"
+            />
+          </div>
         </div>
       </div>
 
@@ -143,15 +383,43 @@ export default function RepositoryGroup({
             <div key={branchName} className="branch-group relative" style={{ marginBottom: '24px' }}>
               {/* Branch Header */}
               <div
-                className="branch-header text-white/60 font-mono mb-3"
+                className="branch-header mb-3"
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   marginLeft: '32px',
-                  fontFamily: "'SF Mono', 'Monaco', 'Consolas', monospace",
                 }}
               >
-                {branchName} ({agents.length} agent{agents.length !== 1 ? 's' : ''})
+                <span
+                  className="text-white/60 font-mono"
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    fontFamily: "'SF Mono', 'Monaco', 'Consolas', monospace",
+                  }}
+                >
+                  {branchName} ({agents.length} agent{agents.length !== 1 ? 's' : ''})
+                </span>
+                {/* Modified Files Badge */}
+                {branchModifiedFiles.get(branchName) && branchModifiedFiles.get(branchName)! > 0 && (
+                  <div
+                    className="modified-files-badge"
+                    title={`${branchModifiedFiles.get(branchName)} files to commit`}
+                    style={{
+                      background: '#f59e0b',
+                      color: '#fff',
+                      borderRadius: '12px',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'default',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {branchModifiedFiles.get(branchName)}
+                  </div>
+                )}
               </div>
 
               {/* Agents in this branch */}
@@ -322,7 +590,7 @@ export default function RepositoryGroup({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onGitOperation?.('pull', agent);
+                              handleGitOperation('pull', agent);
                               setShowGitMenu(null);
                             }}
                             className="menu-item"
@@ -357,7 +625,7 @@ export default function RepositoryGroup({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onGitOperation?.('push', agent);
+                              handleGitOperation('push', agent);
                               setShowGitMenu(null);
                             }}
                             className="menu-item"
@@ -392,7 +660,7 @@ export default function RepositoryGroup({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onGitOperation?.('create-pr', agent);
+                              handleGitOperation('create-pr', agent);
                               setShowGitMenu(null);
                             }}
                             className="menu-item"
@@ -434,7 +702,7 @@ export default function RepositoryGroup({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onGitOperation?.('view-commits', agent);
+                              handleGitOperation('view-commits', agent);
                               setShowGitMenu(null);
                             }}
                             className="menu-item"
@@ -476,7 +744,7 @@ export default function RepositoryGroup({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onGitOperation?.('delete-worktree', agent);
+                                  handleGitOperation('delete-worktree', agent);
                                   setShowGitMenu(null);
                                 }}
                                 className="menu-item"
@@ -550,15 +818,43 @@ export default function RepositoryGroup({
                   <div key={`worktree-${branchName}`} className="branch-group relative" style={{ marginBottom: '24px' }}>
                     {/* Branch Header */}
                     <div
-                      className="branch-header text-white/60 font-mono mb-3"
+                      className="branch-header mb-3"
                       style={{
-                        fontSize: '11px',
-                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
                         marginLeft: '32px',
-                        fontFamily: "'SF Mono', 'Monaco', 'Consolas', monospace",
                       }}
                     >
-                      {branchName} ({agents.length} agent{agents.length !== 1 ? 's' : ''})
+                      <span
+                        className="text-white/60 font-mono"
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          fontFamily: "'SF Mono', 'Monaco', 'Consolas', monospace",
+                        }}
+                      >
+                        {branchName} ({agents.length} agent{agents.length !== 1 ? 's' : ''})
+                      </span>
+                      {/* Modified Files Badge */}
+                      {branchModifiedFiles.get(branchName) && branchModifiedFiles.get(branchName)! > 0 && (
+                        <div
+                          className="modified-files-badge"
+                          title={`${branchModifiedFiles.get(branchName)} files to commit`}
+                          style={{
+                            background: '#f59e0b',
+                            color: '#fff',
+                            borderRadius: '12px',
+                            padding: '2px 8px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'default',
+                            userSelect: 'none',
+                          }}
+                        >
+                          {branchModifiedFiles.get(branchName)}
+                        </div>
+                      )}
                     </div>
 
                     {/* Worktree Agents */}
@@ -726,7 +1022,7 @@ export default function RepositoryGroup({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onGitOperation?.('pull', agent);
+                                    handleGitOperation('pull', agent);
                                     setShowGitMenu(null);
                                   }}
                                   className="menu-item"
@@ -761,7 +1057,7 @@ export default function RepositoryGroup({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onGitOperation?.('push', agent);
+                                    handleGitOperation('push', agent);
                                     setShowGitMenu(null);
                                   }}
                                   className="menu-item"
@@ -796,7 +1092,7 @@ export default function RepositoryGroup({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onGitOperation?.('create-pr', agent);
+                                    handleGitOperation('create-pr', agent);
                                     setShowGitMenu(null);
                                   }}
                                   className="menu-item"
@@ -838,7 +1134,7 @@ export default function RepositoryGroup({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onGitOperation?.('view-commits', agent);
+                                    handleGitOperation('view-commits', agent);
                                     setShowGitMenu(null);
                                   }}
                                   className="menu-item"
@@ -878,7 +1174,7 @@ export default function RepositoryGroup({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onGitOperation?.('delete-worktree', agent);
+                                    handleGitOperation('delete-worktree', agent);
                                     setShowGitMenu(null);
                                   }}
                                   className="menu-item"
@@ -920,6 +1216,15 @@ export default function RepositoryGroup({
             </div>
           )}
         </div>
+      )}
+
+      {/* Commit History Modal */}
+      {commitHistoryModal && (
+        <CommitHistoryModal
+          branchName={commitHistoryModal.branchName}
+          rootPath={commitHistoryModal.rootPath}
+          onClose={() => setCommitHistoryModal(null)}
+        />
       )}
     </div>
   );

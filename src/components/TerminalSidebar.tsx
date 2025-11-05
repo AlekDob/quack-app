@@ -1,8 +1,10 @@
 import { useState, useMemo, type MouseEvent } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import TerminalGroup from "./TerminalGroup";
 import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
-import type { TerminalInfo, AgentChat, ChatMessage } from "../types";
+import CommitHistoryModal from "./CommitHistoryModal";
+import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult } from "../types";
 
 const normalize = (value: string) => value.toLowerCase();
 const fuzzyMatch = (query: string, target: string) => {
@@ -53,6 +55,7 @@ interface TerminalSidebarProps {
   onToggleGroup: (cwd: string) => void;
   onReorder: (reorderedIds: string[]) => void;
   onOpenSettings?: () => void; // NEW: Open settings panel
+  onOpenGitPanel?: () => void; // NEW: Open Git Panel drawer
 }
 
 export default function TerminalSidebar({
@@ -83,6 +86,7 @@ export default function TerminalSidebar({
   onToggleGroup,
   onReorder,
   onOpenSettings,
+  onOpenGitPanel,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -93,6 +97,10 @@ export default function TerminalSidebar({
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     terminal: TerminalInfo;
+  } | null>(null);
+  const [commitHistoryModal, setCommitHistoryModal] = useState<{
+    branchName: string;
+    rootPath: string;
   } | null>(null);
 
   // Drag & drop state
@@ -215,10 +223,146 @@ export default function TerminalSidebar({
   };
 
   // Handle Git operations from dropdown menu
-  const handleGitOperation = (operation: string, terminal: TerminalInfo) => {
-    console.log(`Git operation: ${operation} for terminal: ${terminal.label}`);
-    // TODO: Implement actual Git operations via Tauri commands
-    // This would typically call backend functions to perform Git operations
+  const handleGitOperation = async (operation: string, terminal: TerminalInfo) => {
+    const rootPath = terminal.worktreePath || terminal.cwd;
+    const branchName = terminal.branch || 'main';
+
+    try {
+      switch (operation) {
+        case 'pull': {
+          const result = await invoke<GitPullResult>('git_pull', {
+            branchName,
+            rootPath,
+          });
+
+          if (result.hasConflicts) {
+            alert(`Pull has conflicts in ${result.conflictedFiles.length} file(s):\n${result.conflictedFiles.join('\n')}`);
+          } else {
+            console.log(`✅ Pull successful: ${result.message}`);
+            // TODO: Show toast notification instead of console
+          }
+          break;
+        }
+
+        case 'push': {
+          const result = await invoke<string>('git_push', {
+            branchName,
+            force: false,
+            rootPath,
+          });
+          console.log(`✅ Push successful: ${result}`);
+          // TODO: Show toast notification instead of console
+          break;
+        }
+
+        case 'merge-to-main': {
+          // First switch to main
+          await invoke('git_switch_branch', {
+            branchName: 'main',
+            rootPath,
+          });
+
+          // Then merge the feature branch
+          const result = await invoke<{
+            success: boolean;
+            hasConflicts: boolean;
+            conflictedFiles: string[];
+            message: string;
+          }>('git_merge_branch', {
+            branchName,
+            rootPath,
+          });
+
+          if (result.hasConflicts) {
+            alert(`Merge has conflicts in ${result.conflictedFiles.length} file(s):\n${result.conflictedFiles.join('\n')}`);
+          } else {
+            console.log(`✅ Merge successful: ${result.message}`);
+            // TODO: Show toast notification
+          }
+          break;
+        }
+
+        case 'create-pr': {
+          // Generate GitHub/GitLab PR URL
+          const prUrl = await generatePRUrl(rootPath, branchName);
+          if (prUrl) {
+            window.open(prUrl, '_blank');
+          } else {
+            alert('Could not generate PR URL. Make sure the repository has a remote configured.');
+          }
+          break;
+        }
+
+        case 'view-commits': {
+          // Open commit history modal
+          setCommitHistoryModal({
+            branchName,
+            rootPath,
+          });
+          break;
+        }
+
+        case 'view-diff': {
+          // TODO: Open modal with diff viewer
+          alert(`View diff feature for ${branchName} coming soon!`);
+          break;
+        }
+
+        case 'delete-worktree': {
+          const confirmed = window.confirm(
+            `Are you sure you want to delete the worktree for ${branchName}?\n\nThis will remove:\n- ${rootPath}\n\nThe branch will still exist in the repository.`
+          );
+
+          if (confirmed) {
+            await invoke('git_remove_worktree', {
+              path: rootPath,
+              force: false,
+              rootPath: terminal.cwd, // Use main repo path
+            });
+            console.log(`✅ Worktree deleted: ${rootPath}`);
+            // TODO: Close terminal and refresh UI
+            onClose(terminal.id);
+          }
+          break;
+        }
+
+        default:
+          console.warn(`Unknown git operation: ${operation}`);
+      }
+    } catch (error) {
+      console.error(`Git operation failed:`, error);
+      alert(`Git operation failed: ${error}`);
+    }
+  };
+
+  // Helper to generate PR URL
+  const generatePRUrl = async (rootPath: string, branchName: string): Promise<string | null> => {
+    try {
+      // Get remote URL using git config
+      const remoteUrl = await invoke<string>('git_get_remote_url', { rootPath });
+
+      // Parse GitHub/GitLab URL
+      if (remoteUrl.includes('github.com')) {
+        // GitHub: https://github.com/owner/repo or git@github.com:owner/repo.git
+        const match = remoteUrl.match(/github\.com[:/]([^/]+)\/(.+?)(\.git)?$/);
+        if (match) {
+          const [, owner, repo] = match;
+          return `https://github.com/${owner}/${repo}/compare/${branchName}?expand=1`;
+        }
+      } else if (remoteUrl.includes('gitlab.com')) {
+        // GitLab: https://gitlab.com/owner/repo or git@gitlab.com:owner/repo.git
+        const match = remoteUrl.match(/gitlab\.com[:/]([^/]+)\/(.+?)(\.git)?$/);
+        if (match) {
+          const [, owner, repo] = match;
+          return `https://gitlab.com/${owner}/${repo}/-/merge_requests/new?merge_request[source_branch]=${branchName}`;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to generate PR URL:', error);
+      return null;
+    }
   };
 
   // Drag & drop handlers for terminals
@@ -427,6 +571,7 @@ export default function TerminalSidebar({
                 onClose={onClose}
                 onContextMenu={handleContextMenu}
                 onGitOperation={handleGitOperation}
+                onOpenGitPanel={onOpenGitPanel}
               />
             );
           })
@@ -548,6 +693,15 @@ export default function TerminalSidebar({
             <span className="sidebar-settings-version">v1.0.0</span>
           </div>
         </button>
+      )}
+
+      {/* Commit History Modal */}
+      {commitHistoryModal && (
+        <CommitHistoryModal
+          branchName={commitHistoryModal.branchName}
+          rootPath={commitHistoryModal.rootPath}
+          onClose={() => setCommitHistoryModal(null)}
+        />
       )}
     </aside>
   );

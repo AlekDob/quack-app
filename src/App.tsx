@@ -4817,7 +4817,7 @@ function App() {
       const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
       const [statusResult, historyResult] = await Promise.allSettled([
         invoke<GitStatusSummary>("git_status_summary", { rootPath }),
-        invoke<GitCommitEntry[]>("git_commit_history", { limit: 50, rootPath }),
+        invoke<GitCommitEntry[]>("git_commit_history", { limit: 50, branchName: null, rootPath }),
       ]);
 
       if (statusResult.status === "fulfilled") {
@@ -5403,6 +5403,7 @@ You have access to all Bash tools to execute git commands like:
           onToggleGroup={handleToggleGroup}
           onReorder={handleReorderTerminals}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenGitPanel={() => setShowGitDrawer(true)}
         />
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
