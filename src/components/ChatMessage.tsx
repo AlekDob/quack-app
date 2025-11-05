@@ -17,9 +17,10 @@ interface ChatMessageProps {
   agentAvatar?: string;
   projectName?: string;
   gitBranch?: string;
+  isLastUserMessage?: boolean;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack', agentAvatar, projectName, gitBranch }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -103,7 +104,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
   }
 
   return (
-    <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''}`}>
+    <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''}`}>
       <div className="chat-message-avatar">
         {isUser ? (
           <div className="avatar-icon user-avatar">

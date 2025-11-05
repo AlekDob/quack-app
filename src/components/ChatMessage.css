@@ -25,6 +25,30 @@
   background: transparent;
 }
 
+/* Sticky last user message */
+.chat-message.sticky-user-message {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(242, 140, 82, 0.15) !important;
+  box-shadow: 
+    0 2px 12px rgba(242, 140, 82, 0.2),
+    0 0 0 1px rgba(242, 140, 82, 0.25),
+    0 4px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(16px);
+  border-bottom: 2px solid rgba(242, 140, 82, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chat-message.sticky-user-message:hover {
+  background: rgba(242, 140, 82, 0.2) !important;
+  box-shadow: 
+    0 2px 16px rgba(242, 140, 82, 0.3),
+    0 0 0 1px rgba(242, 140, 82, 0.4),
+    0 4px 32px rgba(0, 0, 0, 0.5);
+  border-bottom-color: rgba(242, 140, 82, 0.6);
+}
+
 .chat-message.error {
   background: rgba(255, 59, 48, 0.05);
 }

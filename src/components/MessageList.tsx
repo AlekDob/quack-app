@@ -149,10 +149,15 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
     );
   }
 
+  // Find the last user message
+  const lastUserMessageIndex = messages.reduce((lastIndex, msg, index) => {
+    return msg.role === 'user' ? index : lastIndex;
+  }, -1);
+
   return (
     <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
       <div className="message-list-content">
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <ChatMessage
             key={message.id}
             message={message}
@@ -161,6 +166,7 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
             agentAvatar={agentAvatar}
             projectName={projectName}
             gitBranch={gitBranch}
+            isLastUserMessage={index === lastUserMessageIndex}
           />
         ))}
         {loading && <SkeletonMessage />}
