@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo, useMemo } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { TerminalInfo, ChatMessage } from '../types'
 
@@ -35,7 +35,7 @@ interface TerminalActivityBarProps {
  * <TerminalActivityBar terminal={terminal} />
  * ```
  */
-export default function TerminalActivityBar({ terminal, chatSessions, hideBranch = false }: TerminalActivityBarProps) {
+function TerminalActivityBar({ terminal, chatSessions, hideBranch = false }: TerminalActivityBarProps) {
   const status = terminal.status ?? 'idle'
   const [confirmedStatus, setConfirmedStatus] = useState<'busy' | 'idle'>(status)
   const [isHovering, setIsHovering] = useState(false)
@@ -57,8 +57,8 @@ export default function TerminalActivityBar({ terminal, chatSessions, hideBranch
   const isBusy = confirmedStatus === 'busy'
   const isWaitingForResponse = terminal.waitingForResponse ?? false
 
-  // Get last message from chat session
-  const getLastMessage = (): string | null => {
+  // Memoize last message calculation
+  const lastMessage = useMemo((): string | null => {
     if (!chatSessions) return null
     const messages = chatSessions.get(terminal.id)
     if (!messages || messages.length === 0) return null
@@ -70,16 +70,14 @@ export default function TerminalActivityBar({ terminal, chatSessions, hideBranch
     const words = lastMsg.content.trim().split(/\s+/)
     if (words.length <= 7) return lastMsg.content
     return words.slice(0, 7).join(' ') + '...'
-  }
+  }, [chatSessions, terminal.id])
 
-  const lastMessage = getLastMessage()
-
-  // Determine badge and styling based on state
-  const getBadge = () => {
+  // Memoize badge calculation
+  const badge = useMemo(() => {
     if (isBusy) return '⚡'
     if (isWaitingForResponse) return '💬'
     return '' // No badge when idle
-  }
+  }, [isBusy, isWaitingForResponse])
 
   const dotClassName = isBusy
     ? 'terminal-dot pulsing'
@@ -144,7 +142,7 @@ export default function TerminalActivityBar({ terminal, chatSessions, hideBranch
           {/* Only show badge if busy or waiting for response */}
           {(isBusy || isWaitingForResponse) && (
             <span className={badgeClassName}>
-              {getBadge()}
+              {badge}
             </span>
           )}
         </span>
@@ -162,3 +160,19 @@ export default function TerminalActivityBar({ terminal, chatSessions, hideBranch
     </>
   )
 }
+
+// Export memoized version with custom comparison
+export default memo(TerminalActivityBar, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.terminal.id === nextProps.terminal.id &&
+    prevProps.terminal.label === nextProps.terminal.label &&
+    prevProps.terminal.status === nextProps.terminal.status &&
+    prevProps.terminal.avatar === nextProps.terminal.avatar &&
+    prevProps.terminal.color === nextProps.terminal.color &&
+    prevProps.terminal.workingOn === nextProps.terminal.workingOn &&
+    prevProps.terminal.waitingForResponse === nextProps.terminal.waitingForResponse &&
+    prevProps.hideBranch === nextProps.hideBranch &&
+    prevProps.chatSessions === nextProps.chatSessions
+  )
+})

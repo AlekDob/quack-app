@@ -1214,6 +1214,31 @@ button.directory-chooser:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
+/* Performance optimization: Disable animations during drag operations */
+.dragging-active *,
+.dragging-active *::before,
+.dragging-active *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* Exception: Keep drag-related transforms working */
+.dragging-active [style*="transform"] {
+  transition: none !important;
+}
+
+/* Drop indicator animation - exception to dragging-active rule */
+@keyframes dropIndicatorPulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scaleX(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(0.98);
+  }
+}
+
 /* Pulsing animation for busy avatar */
 .terminal-avatar.pulsing {
   animation: avatarPulse 1.5s ease-in-out infinite;

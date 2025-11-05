@@ -1,10 +1,106 @@
-import { useState, useMemo, type MouseEvent } from "react";
+import { useState, useMemo, useEffect, useCallback, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Store } from '@tauri-apps/plugin-store';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import TerminalGroup from "./TerminalGroup";
 import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
+import DragHandle from "./DragHandle";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult } from "../types";
+
+// Sortable Repository Group wrapper
+interface SortableRepositoryGroupProps {
+  repoKey: string;
+  repoPath: string;
+  repoName: string;
+  mainAgents: TerminalInfo[];
+  worktreeAgents: TerminalInfo[];
+  isCollapsed: boolean;
+  activeId: string | null;
+  chatSessions?: Map<string, ChatMessage[]>;
+  onToggle: () => void;
+  onSelect: (terminal: TerminalInfo) => void;
+  onClose: (id: string) => void;
+  onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
+  onGitOperation: (operation: string, terminal: TerminalInfo) => void;
+  onOpenGitPanel?: () => void;
+  gitRefreshTrigger?: number;
+}
+
+function SortableRepositoryGroup({
+  repoKey,
+  ...props
+}: SortableRepositoryGroupProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: repoKey });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.5 : 1,
+    willChange: isDragging ? 'transform' : 'auto',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="sortable-repository-group group relative"
+    >
+      {/* Drag Handle - positioned absolutely on the left */}
+      <div
+        className="absolute left-0 top-2 z-10"
+        style={{
+          opacity: isHovered ? 0.6 : 0,
+          transition: 'opacity 0.2s ease',
+        }}
+        onMouseEnter={() => !isDragging && setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <DragHandle
+          isDragging={isDragging}
+          {...attributes}
+          {...listeners}
+        />
+      </div>
+
+      {/* Repository Group with extra padding for drag handle */}
+      <div 
+        style={{ paddingLeft: '16px' }}
+        onMouseEnter={() => !isDragging && setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <RepositoryGroup {...props} />
+      </div>
+    </div>
+  );
+}
 
 const normalize = (value: string) => value.toLowerCase();
 const fuzzyMatch = (query: string, target: string) => {
@@ -96,6 +192,9 @@ export default function TerminalSidebar({
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
   const [useMetroStyle, setUseMetroStyle] = useState(true); // Enable metro style by default
+  const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
+  const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
+  const store = new Store('.quack-repo-order.dat');
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     terminal: TerminalInfo;
@@ -112,6 +211,92 @@ export default function TerminalSidebar({
   const [draggedGroupCwd, setDraggedGroupCwd] = useState<string | null>(null);
   const [dragOverGroupCwd, setDragOverGroupCwd] = useState<string | null>(null);
   const [groupDropPosition, setGroupDropPosition] = useState<'before' | 'after'>('after');
+
+  // Cleanup: Ensure dragging class is removed on unmount
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('dragging-active');
+    };
+  }, []);
+
+  // Configure drag sensors for repository groups with optimized constraints
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+        tolerance: 5,
+        delay: 100,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  // Load saved repository order on mount
+  useEffect(() => {
+    const loadOrder = async () => {
+      try {
+        const savedOrder = await store.get<string[]>('repository-order');
+        if (savedOrder) {
+          setRepositoryOrder(savedOrder);
+        }
+      } catch (error) {
+        console.error('Failed to load repository order:', error);
+      }
+    };
+    loadOrder();
+  }, []);
+
+  // Save repository order
+  const saveRepositoryOrder = useCallback(async (order: string[]) => {
+    try {
+      await store.set('repository-order', order);
+      await store.save();
+    } catch (error) {
+      console.error('Failed to save repository order:', error);
+    }
+  }, []);
+
+  // Handle repository drag start
+  const handleRepoDragStart = (event: DragStartEvent) => {
+    setActiveRepoId(String(event.active.id));
+    // Add class to disable animations for performance
+    document.body.classList.add('dragging-active');
+  };
+
+  // Handle repository drag end
+  const handleRepoDragEnd = (event: DragEndEvent) => {
+    // Remove dragging class to re-enable animations
+    document.body.classList.remove('dragging-active');
+    
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      setActiveRepoId(null);
+      return;
+    }
+
+    const activeIndex = repositoryOrder.indexOf(String(active.id));
+    const overIndex = repositoryOrder.indexOf(String(over.id));
+
+    if (activeIndex !== -1 && overIndex !== -1) {
+      const newOrder = arrayMove(repositoryOrder, activeIndex, overIndex);
+      setRepositoryOrder(newOrder);
+      saveRepositoryOrder(newOrder);
+    } else {
+      // If not in saved order, create new order from current groups
+      const currentOrder = repositoryGroups.map(([name]) => `repo-${name}`);
+      const activeIdx = currentOrder.indexOf(String(active.id));
+      const overIdx = currentOrder.indexOf(String(over.id));
+
+      if (activeIdx !== -1 && overIdx !== -1) {
+        const newOrder = arrayMove(currentOrder, activeIdx, overIdx);
+        setRepositoryOrder(newOrder);
+        saveRepositoryOrder(newOrder);
+      }
+    }
+
+    setActiveRepoId(null);
+  };
 
   // Filter terminals by query only
   const filteredTerminals = useMemo(() => {
@@ -190,6 +375,39 @@ export default function TerminalSidebar({
 
     return Array.from(repoMap.entries());
   }, [filteredTerminals]);
+
+  // Apply custom ordering to repository groups
+  const orderedRepositoryGroups = useMemo(() => {
+    if (repositoryOrder.length === 0) {
+      return repositoryGroups;
+    }
+
+    // Create a map for quick lookup
+    const groupMap = new Map(repositoryGroups.map(([name, group]) => [`repo-${name}`, [name, group] as [string, typeof group]]));
+
+    // Sort based on saved order
+    const ordered: typeof repositoryGroups = [];
+    const added = new Set<string>();
+
+    // First add repositories in the saved order
+    for (const repoKey of repositoryOrder) {
+      const group = groupMap.get(repoKey);
+      if (group && !added.has(repoKey)) {
+        ordered.push(group);
+        added.add(repoKey);
+      }
+    }
+
+    // Then add any new repositories not in the saved order
+    for (const [name, group] of repositoryGroups) {
+      const repoKey = `repo-${name}`;
+      if (!added.has(repoKey)) {
+        ordered.push([name, group]);
+      }
+    }
+
+    return ordered;
+  }, [repositoryGroups, repositoryOrder]);
 
   // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
@@ -553,31 +771,69 @@ export default function TerminalSidebar({
 
         {/* Render based on selected style */}
         {useMetroStyle ? (
-          // Metro-style repository groups
-          repositoryGroups.map(([repoName, group]) => {
-            const repoKey = `repo-${repoName}`;
-            const isCollapsed = collapsedGroups.has(repoKey);
+          // Metro-style repository groups with drag-and-drop
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleRepoDragStart}
+            onDragEnd={handleRepoDragEnd}
+          >
+            <SortableContext
+              items={orderedRepositoryGroups.map(([name]) => `repo-${name}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              {orderedRepositoryGroups.map(([repoName, group]) => {
+                const repoKey = `repo-${repoName}`;
+                const isCollapsed = collapsedGroups.has(repoKey);
 
-            return (
-              <RepositoryGroup
-                key={repoKey}
-                repoPath={group.repoPath}
-                repoName={repoName}
-                mainAgents={group.mainAgents}
-                worktreeAgents={group.worktreeAgents}
-                isCollapsed={isCollapsed}
-                activeId={activeId}
-                chatSessions={chatSessions}
-                onToggle={() => onToggleGroup(repoKey)}
-                onSelect={handleSelectTerminal}
-                onClose={onClose}
-                onContextMenu={handleContextMenu}
-                onGitOperation={handleGitOperation}
-                onOpenGitPanel={onOpenGitPanel}
-                gitRefreshTrigger={gitRefreshTrigger}
-              />
-            );
-          })
+                return (
+                  <SortableRepositoryGroup
+                    key={repoKey}
+                    repoKey={repoKey}
+                    repoPath={group.repoPath}
+                    repoName={repoName}
+                    mainAgents={group.mainAgents}
+                    worktreeAgents={group.worktreeAgents}
+                    isCollapsed={isCollapsed}
+                    activeId={activeId}
+                    chatSessions={chatSessions}
+                    onToggle={() => onToggleGroup(repoKey)}
+                    onSelect={handleSelectTerminal}
+                    onClose={onClose}
+                    onContextMenu={handleContextMenu}
+                    onGitOperation={handleGitOperation}
+                    onOpenGitPanel={onOpenGitPanel}
+                    gitRefreshTrigger={gitRefreshTrigger}
+                  />
+                );
+              })}
+            </SortableContext>
+
+            {/* Drag Overlay - Ghost Preview for repositories */}
+            <DragOverlay dropAnimation={null}>
+              {activeRepoId ? (() => {
+                const activeRepo = orderedRepositoryGroups.find(([name]) => `repo-${name}` === activeRepoId);
+                if (!activeRepo) return null;
+                
+                const [repoName] = activeRepo;
+                return (
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      background: 'rgba(242, 140, 82, 0.15)',
+                      border: '2px dashed #f28c52',
+                      borderRadius: '6px',
+                      boxShadow: '0 8px 24px rgba(242, 140, 82, 0.25), 0 0 40px rgba(242, 140, 82, 0.2)',
+                      pointerEvents: 'none',
+                      opacity: 0.8,
+                    }}
+                  >
+                    <span className="font-semibold text-sm text-white/90">{repoName}</span>
+                  </div>
+                );
+              })() : null}
+            </DragOverlay>
+          </DndContext>
         ) : (
           // Legacy cwd-based groups
           cwdGroups.groups.map(([cwd, groupTerminals]) => {
