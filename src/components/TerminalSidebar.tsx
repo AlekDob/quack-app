@@ -56,6 +56,7 @@ interface TerminalSidebarProps {
   onReorder: (reorderedIds: string[]) => void;
   onOpenSettings?: () => void; // NEW: Open settings panel
   onOpenGitPanel?: () => void; // NEW: Open Git Panel drawer
+  gitRefreshTrigger?: number; // NEW: Trigger to refresh git status after commit
 }
 
 export default function TerminalSidebar({
@@ -87,6 +88,7 @@ export default function TerminalSidebar({
   onReorder,
   onOpenSettings,
   onOpenGitPanel,
+  gitRefreshTrigger,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -572,6 +574,7 @@ export default function TerminalSidebar({
                 onContextMenu={handleContextMenu}
                 onGitOperation={handleGitOperation}
                 onOpenGitPanel={onOpenGitPanel}
+                gitRefreshTrigger={gitRefreshTrigger}
               />
             );
           })

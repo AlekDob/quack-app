@@ -479,6 +479,7 @@ function App() {
   const [committing, setCommitting] = useState(false);
   const [commitHistory, setCommitHistory] = useState<GitCommitEntry[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [gitRefreshTrigger, setGitRefreshTrigger] = useState<number>(0);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem("sidebar.collapsed.groups");
@@ -5085,6 +5086,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       await invoke("git_commit", { message: commitMessage, rootPath });
       setCommitMessage("");
       await refreshGitSummary();
+      // Trigger badge refresh in RepositoryGroup
+      setGitRefreshTrigger(prev => prev + 1);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setGitError(message);
@@ -5502,6 +5505,7 @@ You have access to all Bash tools to execute git commands like:
           onReorder={handleReorderTerminals}
           onOpenSettings={() => setShowSettings(true)}
           onOpenGitPanel={() => setShowGitDrawer(true)}
+          gitRefreshTrigger={gitRefreshTrigger}
         />
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}

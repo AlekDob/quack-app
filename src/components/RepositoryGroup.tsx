@@ -20,6 +20,7 @@ interface RepositoryGroupProps {
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
   onGitOperation?: (operation: string, terminal: TerminalInfo) => void;
   onOpenGitPanel?: () => void; // NEW: Function to open Git Panel drawer
+  gitRefreshTrigger?: number; // NEW: Trigger to refresh git status after commit
 }
 
 // Helper to extract repository name from path
@@ -58,6 +59,7 @@ export default function RepositoryGroup({
   onContextMenu,
   onGitOperation,
   onOpenGitPanel,
+  gitRefreshTrigger,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -265,10 +267,17 @@ export default function RepositoryGroup({
     }
   };
 
-  // Fetch git status when active terminal changes (no more polling!)
+  // Fetch git status when active terminal changes, or when triggered from Git Panel
   useEffect(() => {
     fetchActiveTerminalGitStatus();
-  }, [activeId, mainAgents, worktreeAgents]);
+
+    // Auto-refresh every 60 seconds to catch commits from external sources
+    const interval = setInterval(() => {
+      fetchActiveTerminalGitStatus();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [activeId, mainAgents, worktreeAgents, gitRefreshTrigger]);
 
   // Group agents by branch
   const agentsByBranch = new Map<string, TerminalInfo[]>();
