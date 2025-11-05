@@ -1413,24 +1413,113 @@ function App() {
     return lastPromptsRef.current.get(activeId) || '';
   }, [activeId]);
 
-  // Compact conversation for current agent (Claude SDK /compact command)
+  // Compact conversation for current agent (custom implementation since SDK /compact is buggy)
   const compactCurrentAgentConversation = useCallback(async () => {
-    if (!activeId || !sendMessageForAgentRef.current) return;
+    if (!activeId) return;
+
+    const currentMessages = chatSessions.get(activeId) ?? [];
+    const totalMessages = currentMessages.length;
+
+    // Need at least 6 messages to compact (keep last 5, summarize the rest)
+    if (totalMessages < 6) {
+      toast.info('Not enough messages to compact (need at least 6)', {
+        duration: 3000,
+      });
+      return;
+    }
+
+    console.log('[compactConversation] Starting compaction for agent:', activeId);
 
     try {
-      // Get current tokens before compaction
+      // Keep last 5 messages, summarize everything before
+      const messagesToKeep = 5;
+      const messagesToSummarize = currentMessages.slice(0, totalMessages - messagesToKeep);
+      const messagesToPreserve = currentMessages.slice(totalMessages - messagesToKeep);
+
+      // Create a text representation of messages to summarize
+      const conversationText = messagesToSummarize
+        .map((msg) => {
+          const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
+          return `${role}: ${msg.content}`;
+        })
+        .join('\n\n');
+
+      // Create the compaction prompt (similar to Claude Code's /compact)
+      const compactPrompt = `Please create a concise summary of the following conversation history. Focus on:
+- Key decisions and conclusions reached
+- Important code changes or implementations discussed
+- Critical context needed for future interactions
+- Technical details that should not be lost
+
+Keep the summary brief but informative (aim for 200-300 words maximum).
+
+Conversation to summarize:
+${conversationText}
+
+Please respond ONLY with the summary, no preamble or explanations.`;
+
+      // Show loading indicator
+      toast.loading('Compacting conversation...', {
+        duration: 1000,
+        id: 'compacting',
+      });
+
+      // Set loading state
+      setChatLoadingMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(activeId, true);
+        return newMap;
+      });
+
+      // Generate unique message ID
+      const messageId = `msg-${Date.now()}-compact`;
+
+      // Call Claude to generate summary using Haiku (faster + cheaper for summaries)
+      const response = await invoke<{
+        result: string;
+        session_id: string;
+        total_cost_usd: number;
+        usage: UsageStats;
+      }>('send_message_via_sdk_streaming', {
+        agentId: activeId,
+        request: {
+          prompt: compactPrompt,
+          model: 'haiku', // Use faster model for summaries
+          permissionMode: 'bypass',
+          cwd: activeTerminal?.cwd ?? explorerPath,
+        },
+      });
+
+      // Create a system message with the summary
+      const summaryMessage: ChatMessage = {
+        id: messageId,
+        role: 'assistant',
+        content: `📦 **Conversation Summary** (${messagesToSummarize.length} messages compacted)\n\n${response.result}`,
+        timestamp: Date.now(),
+        status: 'complete',
+        events: [],
+      };
+
+      // Replace old messages with summary + keep recent messages
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        newSessions.set(activeId, [summaryMessage, ...messagesToPreserve]);
+        return newSessions;
+      });
+
+      console.log(`[compactConversation] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
+
+      // Get current tokens and estimate reduction
       const currentTokens = chatTokensMap.get(activeId);
       const currentInputTokens = currentTokens?.inputTokens || 0;
       const currentOutputTokens = currentTokens?.outputTokens || 0;
-      const totalTokens = currentInputTokens + currentOutputTokens;
 
-      // Send /compact command to Claude SDK
-      await sendMessageForAgentRef.current('/compact');
-
-      // Reduce tokens by 60% (compaction frees up ~60% of used tokens)
+      // Estimate 60% reduction (based on removed messages)
       const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
       const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
+      const savedTokens = (currentInputTokens + currentOutputTokens) - (reducedInputTokens + reducedOutputTokens);
 
+      // Update token counts
       setChatTokensMap((prev) => {
         const newMap = new Map(prev);
         newMap.set(activeId, {
@@ -1442,15 +1531,24 @@ function App() {
         return newMap;
       });
 
-      const savedTokens = totalTokens - (reducedInputTokens + reducedOutputTokens);
-      toast.success(`Compacted! ${savedTokens.toLocaleString()} tokens freed (60% reduction) 🦆`, {
-        duration: 4000,
+      toast.dismiss('compacting');
+      toast.success(`Compacted! ${messagesToSummarize.length} messages → 1 summary. ~${savedTokens.toLocaleString()} tokens freed 🦆`, {
+        duration: 5000,
       });
+
     } catch (error) {
-      console.error('Failed to compact conversation:', error);
+      console.error('[compactConversation] Failed to compact:', error);
+      toast.dismiss('compacting');
       toast.error('Failed to compact conversation');
+    } finally {
+      // Clear loading state
+      setChatLoadingMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(activeId, false);
+        return newMap;
+      });
     }
-  }, [activeId, chatTokensMap]);
+  }, [activeId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
 
   // Clear conversation for current agent (Claude SDK /clear command)
   const clearCurrentAgentConversation = useCallback(async () => {
