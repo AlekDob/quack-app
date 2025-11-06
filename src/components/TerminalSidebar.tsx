@@ -197,7 +197,7 @@ export default function TerminalSidebar({
   void _onUpdateAgentChat; // Will be used in rename functionality (Phase 4)
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
-  const [useMetroStyle, setUseMetroStyle] = useState(true); // Enable metro style by default
+  // Metro style is now the only option (removed useMetroStyle state)
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -798,23 +798,10 @@ export default function TerminalSidebar({
       </div>
 
       <div className="sidebar-list" style={{ marginTop: '5px' }}>
-        {/* Toggle for metro style */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <label className="flex items-center gap-2 text-xs text-white/60 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useMetroStyle}
-              onChange={(e) => setUseMetroStyle(e.target.checked)}
-              className="rounded"
-            />
-            <span>Metro Style View</span>
-          </label>
-        </div>
+        {/* Metro Style View is now the only option */}
 
-        {/* Render based on selected style */}
-        {useMetroStyle ? (
-          // Metro-style repository groups with drag-and-drop
-          <DndContext
+        {/* Metro-style repository groups with drag-and-drop */}
+        <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleRepoDragStart}
@@ -876,45 +863,6 @@ export default function TerminalSidebar({
               })() : null}
             </DragOverlay>
           </DndContext>
-        ) : (
-          // Legacy cwd-based groups
-          cwdGroups.groups.map(([cwd, groupTerminals]) => {
-            const isCollapsed = collapsedGroups.has(cwd);
-
-            return (
-              <TerminalGroup
-                key={cwd}
-                cwd={cwd}
-                terminals={groupTerminals}
-                isCollapsed={isCollapsed}
-                activeId={activeId}
-                chatSessions={chatSessions}
-                onToggle={() => onToggleGroup(cwd)}
-                onSelect={handleSelectTerminal}
-                onClose={onClose}
-                onContextMenu={handleContextMenu}
-                // Drag & drop for terminals
-                draggedTerminalId={draggedTerminalId}
-                dragOverTerminalId={dragOverTerminalId}
-                dropPosition={dropPosition}
-                onTerminalDragStart={handleTerminalDragStart}
-                onTerminalDragOver={handleTerminalDragOver}
-                onTerminalDragLeave={handleTerminalDragLeave}
-                onTerminalDrop={handleTerminalDrop}
-                onTerminalDragEnd={handleTerminalDragEnd}
-                // Drag & drop for groups
-                draggedGroupCwd={draggedGroupCwd}
-                dragOverGroupCwd={dragOverGroupCwd}
-                groupDropPosition={groupDropPosition}
-                onGroupDragStart={handleGroupDragStart}
-                onGroupDragOver={handleGroupDragOver}
-                onGroupDragLeave={handleGroupDragLeave}
-                onGroupDrop={handleGroupDrop}
-                onGroupDragEnd={handleGroupDragEnd}
-              />
-            );
-          })
-        )}
 
         {/* Empty state */}
         {terminals.length === 0 && (
