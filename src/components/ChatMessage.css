@@ -112,6 +112,46 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
+  position: relative;
+}
+
+.sticky-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.chat-message.sticky-user-message:hover .sticky-message-actions {
+  opacity: 1;
+}
+
+.sticky-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+
+.sticky-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.05);
+}
+
+.sticky-action-btn:active {
+  transform: scale(0.95);
 }
 
 .chat-message-role {
@@ -133,11 +173,52 @@
   white-space: pre-wrap;
 }
 
+/* Sticky message body - force text wrapping for long URLs/commands */
+.chat-message.sticky-user-message .chat-message-body {
+  overflow-wrap: anywhere; /* Break even within long words/URLs */
+  word-break: break-word;
+  max-height: 4.5rem; /* ~3 lines at 1.5 line-height */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: max-height 0.7s cubic-bezier(0.25, 0.1, 0.25, 1); /* Morbido e graduale */
+}
+
+/* Remove height constraint when expanded */
+.chat-message.sticky-user-message .chat-message-body.expanded {
+  max-height: none;
+  overflow: visible;
+}
+
 .chat-message-attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+/* Compact attachments for sticky messages */
+.chat-message-attachments.compact {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chat-message-attachments.compact .chat-message-attachment {
+  padding: 4px 8px;
+  max-width: 200px;
+}
+
+.chat-message-attachments.compact .chat-message-attachment-preview {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.chat-message-attachments.compact .chat-message-attachment-name {
+  font-size: 10px;
+}
+
+.chat-message-attachments.compact .chat-message-attachment-size {
+  font-size: 9px;
 }
 
 .chat-message-attachment {

@@ -164,7 +164,7 @@ function SortableAgent({
         style={{
           marginLeft: '36px',
           padding: '8px 12px',
-          paddingLeft: '36px',
+          paddingLeft: '24px',
           background: agentCardBg,
           borderRadius: '6px',
           cursor: 'pointer',
@@ -203,7 +203,6 @@ function SortableAgent({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
               marginLeft: 'auto',
             }}
           >
@@ -947,7 +946,7 @@ export default function RepositoryGroup({
 
       {/* Expanded Content with Metro Map Design */}
       {!isCollapsed && (
-        <div className="repository-content relative" style={{ marginLeft: '8px', position: 'relative' }}>
+        <div className="repository-content relative" style={{ position: 'relative' }}>
 
           {/* SINGLE CONTINUOUS LINE for entire repository */}
           <div
@@ -1237,7 +1236,6 @@ export default function RepositoryGroup({
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '4px',  // Small custom gap between icons, NOT inheriting parent gap
                                   marginLeft: 'auto',
                                 }}
                               >

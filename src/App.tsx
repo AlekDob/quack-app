@@ -3604,11 +3604,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         newName = `${baseName} Copy`;
       }
 
-      // Create new terminal with same color and cwd
+      // Create new terminal with ALL characteristics from original (except workingOn)
       const created = await invoke<TerminalInfo>("create_terminal", {
         label: newName,
         color: terminal.color,
         cwd: terminal.cwd,
+        avatar: terminal.avatar, // ✅ Copy avatar!
+        branch: terminal.branch, // ✅ Copy branch!
+        // Note: working_on is NOT copied - starts empty
       });
 
       const createdWithState: TerminalInfo = {
@@ -3621,7 +3624,39 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       setTerminals((prev) => [...prev, createdWithState]);
       setActiveId(created.id);
-      toast.success(`Agent duplicated: ${newName}`);
+
+      // Try to copy personality from original agent
+      try {
+        const originalPersonality = await invoke<AgentPersonality>('load_agent_personality', {
+          projectPath: terminal.cwd,
+          personalityId: terminal.id,
+        });
+
+        // Save personality with new agent ID
+        const newPersonality: AgentPersonality = {
+          ...originalPersonality,
+          id: created.id, // ← New agent ID
+          name: newName, // ← New agent name
+        };
+
+        await invoke('save_agent_personality', {
+          projectPath: terminal.cwd,
+          personality: newPersonality,
+        });
+
+        // Inject personality into CLAUDE.md
+        await invoke('inject_personality_to_claude_md', {
+          projectPath: terminal.cwd,
+          personality: newPersonality,
+        });
+
+        console.log(`✅ Copied personality for agent "${newName}"`);
+      } catch (error) {
+        // No personality found or copy failed - not critical
+        console.log('No personality to copy or personality copy failed');
+      }
+
+      toast.success(`Agent duplicated: ${newName} 🦆`);
     } catch (error) {
       console.error("Failed to duplicate agent:", error);
       toast.error("Failed to duplicate agent");
@@ -3636,7 +3671,31 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return newMap;
     });
 
-    toast.success(`Agent reset: ${terminal.label}`);
+    // Get session ID for this terminal to remove usage data
+    setChatSessionIds((prev) => {
+      const sessionId = prev.get(terminal.id);
+
+      // Remove usage sessions for this session ID
+      if (sessionId) {
+        setUsageSessions((prevSessions) =>
+          prevSessions.filter(s => s.session_id !== sessionId)
+        );
+      }
+
+      // Remove session ID mapping
+      const newMap = new Map(prev);
+      newMap.delete(terminal.id);
+      return newMap;
+    });
+
+    // Reset token tracking for this agent (stamina back to 100%)
+    setChatTokensMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(terminal.id);
+      return newMap;
+    });
+
+    toast.success(`Agent reset: ${terminal.label} - Stamina restored to 100%! 🦆`);
   }, []);
 
   const handleReorderTerminals = useCallback((reorderedIds: string[]) => {

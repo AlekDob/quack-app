@@ -1261,7 +1261,6 @@ export default function ChatInput({
               <button
                 type="button"
                 className={`chat-input-action-btn ${workingOn ? 'has-value' : ''}`}
-                disabled={disabled}
                 data-tooltip="What are you working on?"
                 aria-label="Working on"
                 onClick={() => setShowWorkingOnPopover(!showWorkingOnPopover)}

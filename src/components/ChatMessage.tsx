@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
@@ -30,6 +30,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
 
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // State for sticky message actions
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load avatar URL (custom or default)
   useEffect(() => {
@@ -69,12 +74,72 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
     };
   }, [agentAvatar]);
 
+  // Auto-collapse with delay after hover is removed
+  useEffect(() => {
+    // Clear any existing timeout
+    if (collapseTimeoutRef.current) {
+      clearTimeout(collapseTimeoutRef.current);
+      collapseTimeoutRef.current = null;
+    }
+
+    // If expanded and not hovering, start collapse timer
+    if (isExpanded && !isHovering) {
+      collapseTimeoutRef.current = setTimeout(() => {
+        setIsExpanded(false);
+      }, 300); // 300ms delay after hover out
+    }
+
+    return () => {
+      if (collapseTimeoutRef.current) {
+        clearTimeout(collapseTimeoutRef.current);
+      }
+    };
+  }, [isExpanded, isHovering]);
+
+  // Copy message content to clipboard
+  const handleCopyMessage = () => {
+    navigator.clipboard.writeText(message.content).catch(err => {
+      console.error('Failed to copy message:', err);
+    });
+  };
+
+  // Toggle expanded state
+  const handleToggleExpand = () => {
+    setIsExpanded(prev => !prev);
+  };
+
   const formatSize = (size: number | undefined) => {
     if (!size) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB'];
     const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
     const value = size / Math.pow(1024, exponent);
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[exponent]}`;
+  };
+
+  // Truncate text to max words AND max characters (for sticky messages)
+  const truncateText = (text: string, maxWords: number, maxChars: number = 250): string => {
+    const trimmed = text.trim();
+
+    // First check character limit
+    if (trimmed.length <= maxChars) {
+      // Text is short enough, check word limit
+      const words = trimmed.split(/\s+/);
+      if (words.length <= maxWords) {
+        return trimmed;
+      }
+      return words.slice(0, maxWords).join(' ') + '...';
+    }
+
+    // Text exceeds character limit - truncate to maxChars
+    let truncated = trimmed.substring(0, maxChars);
+
+    // Try to break at last space to avoid cutting words
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > maxChars * 0.8) { // Only break at space if it's near the end
+      truncated = truncated.substring(0, lastSpace);
+    }
+
+    return truncated + '...';
   };
 
   // Render text with @mentions as inline chips
@@ -173,7 +238,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
           <div className="avatar-icon assistant-avatar">🦆</div>
         )}
       </div>
-      <div className="chat-message-content">
+      <div
+        className="chat-message-content"
+        onMouseEnter={() => isLastUserMessage && isUser && setIsHovering(true)}
+        onMouseLeave={() => isLastUserMessage && isUser && setIsHovering(false)}
+      >
         <div className="chat-message-header">
           <span className="chat-message-role">
             {isUser
@@ -189,6 +258,35 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
               minute: '2-digit'
             })}
           </span>
+          {isLastUserMessage && isUser && (
+            <div className="sticky-message-actions">
+              <button
+                className="sticky-action-btn"
+                onClick={handleCopyMessage}
+                title="Copy full message"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+              <button
+                className="sticky-action-btn"
+                onClick={handleToggleExpand}
+                title={isExpanded ? "Collapse" : "Expand full message"}
+              >
+                {isExpanded ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                )}
+              </button>
+            </div>
+          )}
         </div>
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
@@ -205,13 +303,16 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
             ))}
           </div>
         ) : (
-          <div className="chat-message-body">
-            {renderTextWithMentions(message.content)}
+          <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
+            {isLastUserMessage && isUser && !isExpanded
+              ? renderTextWithMentions(truncateText(message.content, 30))
+              : renderTextWithMentions(message.content)
+            }
             {isStreaming && <span className="streaming-cursor">▊</span>}
           </div>
         )}
         {attachments.length > 0 && (
-          <div className="chat-message-attachments">
+          <div className={`chat-message-attachments ${isLastUserMessage && isUser ? 'compact' : ''}`}>
             {attachments.map((attachment) => {
               const isImage = attachment.previewUrl !== undefined;
               return (
