@@ -18,13 +18,11 @@ import {
   useSortable,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import TerminalActivityBar from './TerminalActivityBar';
-import MetroLine from './MetroLine';
 import CommitHistoryModal from './CommitHistoryModal';
 import RevealInFinderButton from './RevealInFinderButton';
 import DragHandle from './DragHandle';
-import type { TerminalInfo, ChatMessage, GitPullResult, GitStatusSummary } from '../types';
+import type { TerminalInfo, ChatMessage, GitPullResult } from '../types';
 
 interface RepositoryGroupProps {
   repoPath: string;
@@ -38,7 +36,6 @@ interface RepositoryGroupProps {
   onSelect: (terminal: TerminalInfo) => void;
   onClose: (id: string) => void;
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
-  onGitOperation?: (operation: string, terminal: TerminalInfo) => void;
   onOpenGitPanel?: () => void; // NEW: Function to open Git Panel drawer
   gitRefreshTrigger?: number; // NEW: Trigger to refresh git status after commit
 }
@@ -75,7 +72,6 @@ interface SortableAgentProps {
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
   onGitMenuToggle: (agentId: string | null) => void;
   showGitMenu: boolean;
-  onOpenGitPanel?: () => void;
   handleGitOperation: (operation: string, terminal: TerminalInfo) => void;
   isWorktree?: boolean;
   isDraggingAny?: boolean;
@@ -90,7 +86,6 @@ function SortableAgent({
   onContextMenu,
   onGitMenuToggle,
   showGitMenu,
-  onOpenGitPanel,
   handleGitOperation,
   isWorktree = false,
   isDraggingAny = false,
@@ -522,7 +517,6 @@ export default function RepositoryGroup({
   onSelect,
   onClose,
   onContextMenu,
-  onGitOperation,
   onOpenGitPanel,
   gitRefreshTrigger,
 }: RepositoryGroupProps) {
@@ -535,9 +529,7 @@ export default function RepositoryGroup({
   const [branchModifiedFiles, setBranchModifiedFiles] = useState<Map<string, number>>(new Map());
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [agentOrder, setAgentOrder] = useState<Record<string, string[]>>({});
-  const store = new Store('.quack-agent-order.dat');
   const displayName = getRepoDisplayName(repoName);
-  const hasWorktrees = worktreeAgents.length > 0;
   const isDraggingAny = activeAgentId !== null;
 
   // Cleanup: Ensure dragging class is removed on unmount
@@ -563,6 +555,7 @@ export default function RepositoryGroup({
   useEffect(() => {
     const loadOrder = async () => {
       try {
+        const store = await Store.load('.quack-agent-order.dat');
         const savedOrder = await store.get<Record<string, string[]>>(`agent-order-${repoPath}`);
         if (savedOrder) {
           setAgentOrder(savedOrder);
@@ -577,6 +570,7 @@ export default function RepositoryGroup({
   // Save agent order when it changes
   const saveOrder = useCallback(async (order: Record<string, string[]>) => {
     try {
+      const store = await Store.load('.quack-agent-order.dat');
       await store.set(`agent-order-${repoPath}`, order);
       await store.save();
     } catch (error) {
@@ -977,7 +971,7 @@ export default function RepositoryGroup({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            {sortedBranches.map(([branchName, agents], branchIndex) => {
+            {sortedBranches.map(([branchName, agents]) => {
               const orderedAgents = applyCustomOrder(agents, branchName);
 
               return (
@@ -1047,7 +1041,6 @@ export default function RepositoryGroup({
                         onContextMenu={onContextMenu}
                         onGitMenuToggle={setShowGitMenu}
                         showGitMenu={showGitMenu === agent.id}
-                        onOpenGitPanel={onOpenGitPanel}
                         handleGitOperation={handleGitOperation}
                         isWorktree={false}
                         isDraggingAny={isDraggingAny}

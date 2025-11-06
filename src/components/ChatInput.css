@@ -526,7 +526,7 @@
     0 0 20px rgba(139, 92, 246, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   padding: 16px;
-  z-index: 10001;
+  z-index: 999999;
   animation: popover-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   backdrop-filter: blur(12px);
 }

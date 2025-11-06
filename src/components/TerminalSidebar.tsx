@@ -194,7 +194,6 @@ export default function TerminalSidebar({
   const [useMetroStyle, setUseMetroStyle] = useState(true); // Enable metro style by default
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
-  const store = new Store('.quack-repo-order.dat');
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     terminal: TerminalInfo;
@@ -235,6 +234,7 @@ export default function TerminalSidebar({
   useEffect(() => {
     const loadOrder = async () => {
       try {
+        const store = await Store.load('.quack-repo-order.dat');
         const savedOrder = await store.get<string[]>('repository-order');
         if (savedOrder) {
           setRepositoryOrder(savedOrder);
@@ -249,6 +249,7 @@ export default function TerminalSidebar({
   // Save repository order
   const saveRepositoryOrder = useCallback(async (order: string[]) => {
     try {
+      const store = await Store.load('.quack-repo-order.dat');
       await store.set('repository-order', order);
       await store.save();
     } catch (error) {

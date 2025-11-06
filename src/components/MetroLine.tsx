@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface MetroLineProps {
   color: string;
   height?: number;

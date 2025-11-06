@@ -35,7 +35,7 @@ interface TerminalActivityBarProps {
  * <TerminalActivityBar terminal={terminal} />
  * ```
  */
-function TerminalActivityBar({ terminal, chatSessions, hideBranch = false }: TerminalActivityBarProps) {
+function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProps) {
   const status = terminal.status ?? 'idle'
   const [confirmedStatus, setConfirmedStatus] = useState<'busy' | 'idle'>(status)
   const [isHovering, setIsHovering] = useState(false)
@@ -78,12 +78,6 @@ function TerminalActivityBar({ terminal, chatSessions, hideBranch = false }: Ter
     if (isWaitingForResponse) return '💬'
     return '' // No badge when idle
   }, [isBusy, isWaitingForResponse])
-
-  const dotClassName = isBusy
-    ? 'terminal-dot pulsing'
-    : isWaitingForResponse
-      ? 'terminal-dot waiting'
-      : 'terminal-dot'
 
   const badgeClassName = isWaitingForResponse
     ? 'terminal-status-badge waiting'
