@@ -30,8 +30,8 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(242, 140, 82, 0.15) !important;
-  box-shadow: 
+  background: rgba(242, 140, 82, 0.4) !important;
+  box-shadow:
     0 2px 12px rgba(242, 140, 82, 0.2),
     0 0 0 1px rgba(242, 140, 82, 0.25),
     0 4px 24px rgba(0, 0, 0, 0.4);
@@ -41,8 +41,8 @@
 }
 
 .chat-message.sticky-user-message:hover {
-  background: rgba(242, 140, 82, 0.2) !important;
-  box-shadow: 
+  background: rgba(242, 140, 82, 0.3) !important;
+  box-shadow:
     0 2px 16px rgba(242, 140, 82, 0.3),
     0 0 0 1px rgba(242, 140, 82, 0.4),
     0 4px 32px rgba(0, 0, 0, 0.5);
@@ -85,8 +85,16 @@
 }
 
 .user-avatar {
-  background: rgba(242, 140, 82, 0.2);
+  background-image: url('/images/humanoid.jpeg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border-color: rgba(242, 140, 82, 0.3);
+}
+
+/* Nascondi l'iconcina SVG per l'utente */
+.user-avatar svg {
+  display: none;
 }
 
 .assistant-avatar {
@@ -108,17 +116,17 @@
 
 .chat-message-role {
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10px; /* ← Ridotto da 11px */
   color: rgba(255, 255, 255, 0.7);
 }
 
 .chat-message-timestamp {
-  font-size: 10px;
+  font-size: 9px; /* ← Ridotto da 10px */
   color: rgba(255, 255, 255, 0.35);
 }
 
 .chat-message-body {
-  font-size: 13px;
+  font-size: 12px; /* ← Ridotto da 13px */
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.85);
   word-wrap: break-word;
@@ -175,7 +183,7 @@
 }
 
 .chat-message-attachment-name {
-  font-size: 13px;
+  font-size: 12px; /* ← Ridotto da 13px */
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
@@ -184,7 +192,7 @@
 }
 
 .chat-message-attachment-size {
-  font-size: 11px;
+  font-size: 10px; /* ← Ridotto da 11px */
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -210,7 +218,7 @@
   background: rgba(255, 59, 48, 0.1);
   border: 1px solid rgba(255, 59, 48, 0.2);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10px; /* ← Ridotto da 11px */
   color: #ff3b30;
 }
 
@@ -238,7 +246,7 @@
   background: rgba(77, 212, 179, 0.1);
   border: 1px solid rgba(77, 212, 179, 0.2);
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 10px; /* ← Ridotto da 11px */
   font-weight: 500;
   color: rgba(77, 212, 179, 0.9);
   white-space: nowrap;
@@ -265,7 +273,7 @@
   background: rgba(242, 140, 82, 0.15);
   border: 1px solid rgba(242, 140, 82, 0.3);
   border-radius: 10px;
-  font-size: 11px;
+  font-size: 10px; /* ← Ridotto da 11px */
   font-weight: 500;
   vertical-align: middle;
 }

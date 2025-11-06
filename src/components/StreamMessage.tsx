@@ -11,7 +11,7 @@ import {
   ExitPlanModeWidget,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
-import { getAgentAvatar } from '../utils/agentAvatars';
+import { getAgentAvatar, getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent } from '../types';
 
@@ -54,9 +54,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
           }
         }
       } else {
-        // Default avatar - use as-is (already a proper path/URL)
+        // Default avatar - need to get full path with prefix
         if (isMounted) {
-          setAvatarUrl(agentAvatar);
+          setAvatarUrl(getAvatarUrl(agentAvatar));
         }
       }
     }

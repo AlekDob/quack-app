@@ -2,7 +2,7 @@ import { memo, useState, useEffect } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
-import { getAgentAvatar } from '../utils/agentAvatars';
+import { getAgentAvatar, getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import duckAvatar from '../../images/duck.png';
@@ -55,9 +55,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
           }
         }
       } else {
-        // Default avatar - use as-is (already a proper path/URL)
+        // Default avatar - need to get full path with prefix
         if (isMounted) {
-          setAvatarUrl(agentAvatar);
+          setAvatarUrl(getAvatarUrl(agentAvatar));
         }
       }
     }

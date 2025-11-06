@@ -36,7 +36,7 @@
 
 .system-init-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px; /* ← Ridotto da 14px */
   color: rgba(59, 130, 246, 1);
 }
 
@@ -50,7 +50,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 11px; /* ← Ridotto da 13px */
   color: rgba(255, 255, 255, 0.7);
 }
 
@@ -66,7 +66,7 @@
 
 .system-init-value {
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   background: rgba(0, 0, 0, 0.2);
   padding: 2px 6px;
   border-radius: 4px;
@@ -89,7 +89,7 @@
   border: 1px solid rgba(59, 130, 246, 0.3);
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 9px; /* ← Ridotto da 11px */
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
   color: rgba(59, 130, 246, 0.9);
 }
@@ -128,7 +128,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 12px; /* ← Ridotto da 14px */
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -138,14 +138,14 @@
 }
 
 .tool-widget-meta {
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(255, 255, 255, 0.5);
   font-weight: 400;
 }
 
 .tool-widget-command {
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   background: rgba(0, 0, 0, 0.3);
   padding: 4px 8px;
   border-radius: 4px;
@@ -154,7 +154,7 @@
 
 .tool-widget-pattern {
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   background: rgba(147, 197, 253, 0.15);
   padding: 4px 8px;
   border-radius: 4px;
@@ -162,7 +162,7 @@
 }
 
 .tool-widget-path {
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(255, 255, 255, 0.5);
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
 }
@@ -175,7 +175,7 @@
   border: 1px solid rgba(147, 197, 253, 0.2);
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
   color: rgba(147, 197, 253, 0.9);
   cursor: pointer;
@@ -240,7 +240,7 @@
 .tool-widget-code,
 .tool-widget-output {
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.9);
   background: rgba(0, 0, 0, 0.3);
@@ -259,7 +259,7 @@
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(239, 68, 68, 1);
   line-height: 1.5;
 }
@@ -309,7 +309,7 @@
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -329,7 +329,7 @@
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(239, 68, 68, 1);
 }
 
@@ -353,7 +353,7 @@
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(255, 255, 255, 0.6);
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
 }
