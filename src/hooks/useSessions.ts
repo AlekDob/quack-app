@@ -72,16 +72,18 @@ export function useSessions() {
 
   /**
    * Delete a session from file-history
+   * Returns { success: boolean, error?: string }
    */
-  const deleteSession = useCallback(async (sessionId: string): Promise<boolean> => {
+  const deleteSession = useCallback(async (sessionId: string): Promise<{ success: boolean; error?: string }> => {
     try {
       await invoke('delete_session', { sessionId });
       // Reload sessions after deletion
       await loadSessions();
-      return true;
+      return { success: true };
     } catch (err) {
-      console.error(`Failed to delete session ${sessionId}:`, err);
-      return false;
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`Failed to delete session ${sessionId}:`, errorMessage);
+      return { success: false, error: errorMessage };
     }
   }, [loadSessions]);
 

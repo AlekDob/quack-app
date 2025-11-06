@@ -11,7 +11,6 @@ import {
   revokeAvatarUrl,
   type CustomAvatarInfo
 } from '../utils/customAvatarStorage';
-import { isCustomAvatar } from '../utils/customAvatarStorage';
 
 // Available duck avatars from /images/ducks/avatars/
 const AVAILABLE_AVATARS = [

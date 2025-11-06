@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { SessionInfo } from '../types';
 import { useSessions } from '../hooks/useSessions';
 
@@ -6,20 +6,52 @@ interface SessionsPanelProps {
   onSelectSession: (session: SessionInfo) => void;
 }
 
+const SESSIONS_PER_PAGE = 50;
+
 export function SessionsPanel({ onSelectSession }: SessionsPanelProps) {
   const { sessions, loading, error, loadSessions } = useSessions();
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(SESSIONS_PER_PAGE);
 
   // Filter sessions based on search
-  const filteredSessions = sessions.filter(
-    (session) =>
-      session.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.model?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((session) => {
+      // Check if session has at least ONE valid piece of data
+      const hasValidTitle = session.title && session.title !== 'Untitled Session';
+      const hasValidProject = session.workingDirectory && session.workingDirectory !== 'unknown';
+      const hasValidDate = (session.updatedAt && session.updatedAt !== 0 && !isNaN(session.updatedAt)) ||
+                          (session.createdAt && session.createdAt !== 0 && !isNaN(session.createdAt));
 
-  // Group sessions by time period
-  const groupedSessions = groupSessionsByTime(filteredSessions);
+      // Only show sessions with at least 1 out of 3 valid criteria
+      // This allows sessions with valid dates to show even if title/project are unknown
+      const validCount = [hasValidTitle, hasValidProject, hasValidDate].filter(Boolean).length;
+      if (validCount < 1) {
+        return false;
+      }
+
+      // Apply search filter
+      const query = searchQuery.toLowerCase();
+      if (!query) return true;
+
+      return (
+        session.title.toLowerCase().includes(query) ||
+        session.id.toLowerCase().includes(query) ||
+        session.model?.toLowerCase().includes(query) ||
+        session.workingDirectory?.toLowerCase().includes(query)
+      );
+    });
+  }, [sessions, searchQuery]);
+
+  // Group sessions by project (working directory) first, then by time
+  const groupedSessions = useMemo(() => {
+    return groupSessionsByProject(filteredSessions.slice(0, visibleCount));
+  }, [filteredSessions, visibleCount]);
+
+  const hasMore = visibleCount < filteredSessions.length;
+
+  const loadMore = () => {
+    setVisibleCount(prev => Math.min(prev + SESSIONS_PER_PAGE, filteredSessions.length));
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -110,34 +142,66 @@ export function SessionsPanel({ onSelectSession }: SessionsPanelProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedSessions).map(([period, periodSessions]) => (
-              <div key={period}>
-                {/* Period Header */}
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                    <span className="text-[11px] font-medium text-white/40 uppercase tracking-wider">
-                      {period}
-                    </span>
-                  </div>
-                  <div className="flex-1 h-px bg-white/5" />
-                  <span className="text-[10px] text-white/30">{periodSessions.length}</span>
-                </div>
+          <>
+            <div className="space-y-6">
+              {Object.entries(groupedSessions).map(([projectKey, projectData]) => (
+                <div key={projectKey}>
+                  {/* Project Header - hide if Unknown Project */}
+                  {projectData.name !== 'Unknown Project' && (
+                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
+                      <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <span className="text-xs font-semibold text-white/70 truncate">
+                        {projectData.name}
+                      </span>
+                      <span className="text-[10px] text-white/30 ml-auto">
+                        {projectData.sessions.length} sessions
+                      </span>
+                    </div>
+                  )}
 
-                {/* Sessions List */}
-                <div className="space-y-2">
-                  {periodSessions.map((session) => (
-                    <SessionCard
-                      key={session.id}
-                      session={session}
-                      onClick={() => onSelectSession(session)}
-                    />
+                  {/* Time periods within project */}
+                  {Object.entries(projectData.byTime).map(([period, periodSessions]) => (
+                    <div key={period} className="mb-4">
+                      {/* Hide period header if it's "Unknown" or other invalid values */}
+                      {period !== 'Unknown' && period.toLowerCase() !== 'unknown' && (
+                        <div className="flex items-center gap-2 mb-2 ml-4">
+                          <div className="w-1 h-1 rounded-full bg-white/20" />
+                          <span className="text-[10px] font-medium text-white/30 uppercase tracking-wider">
+                            {period}
+                          </span>
+                          <div className="flex-1 h-px bg-white/5" />
+                          <span className="text-[9px] text-white/25">{periodSessions.length}</span>
+                        </div>
+                      )}
+                      <div className="space-y-2 ml-4">
+                        {periodSessions.map((session) => (
+                          <SessionCard
+                            key={session.id}
+                            session={session}
+                            onClick={() => onSelectSession(session)}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="mt-4 pb-4 px-4">
+                <button
+                  onClick={loadMore}
+                  className="w-full py-2 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-sm text-white/70 hover:text-white transition-all duration-200"
+                >
+                  Load More ({filteredSessions.length - visibleCount} remaining)
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -216,9 +280,15 @@ function SessionCard({ session, onClick }: SessionCardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-        <span className="text-[10px] text-white/30">
-          {formatTimeAgo(session.updatedAt)}
-        </span>
+        {/* Date - hide if Unknown date */}
+        {(() => {
+          const dateStr = formatTimeAgo(session.updatedAt);
+          return dateStr !== 'Unknown date' && (
+            <span className="text-[10px] text-white/30">
+              {dateStr}
+            </span>
+          );
+        })()}
         {(session.totalCost ?? 0) > 0 && (
           <span className="text-[10px] font-medium text-white/50">
             ${session.totalCost.toFixed(4)}
@@ -229,39 +299,94 @@ function SessionCard({ session, onClick }: SessionCardProps) {
   );
 }
 
-// Helper: Group sessions by time period
-function groupSessionsByTime(sessions: SessionInfo[]): Record<string, SessionInfo[]> {
+// Helper: Extract project name from working directory
+function getProjectName(workingDir: string | undefined | null): string {
+  if (!workingDir) return 'Unknown Project';
+
+  // Extract last part of path as project name
+  const parts = workingDir.split('/').filter(Boolean);
+  return parts[parts.length - 1] || 'Unknown Project';
+}
+
+// Helper: Group sessions by project, then by time
+function groupSessionsByProject(sessions: SessionInfo[]): Record<string, {
+  name: string;
+  path: string;
+  sessions: SessionInfo[];
+  byTime: Record<string, SessionInfo[]>;
+}> {
+  const projectGroups: Record<string, {
+    name: string;
+    path: string;
+    sessions: SessionInfo[];
+    byTime: Record<string, SessionInfo[]>;
+  }> = {};
+
+  // Group by project first
+  for (const session of sessions) {
+    const projectPath = session.workingDirectory || 'unknown';
+    const projectName = getProjectName(session.workingDirectory);
+
+    if (!projectGroups[projectPath]) {
+      projectGroups[projectPath] = {
+        name: projectName,
+        path: projectPath,
+        sessions: [],
+        byTime: {},
+      };
+    }
+
+    projectGroups[projectPath].sessions.push(session);
+  }
+
+  // Now group each project's sessions by time
   const now = Date.now();
   const oneDay = 24 * 60 * 60 * 1000;
   const oneWeek = 7 * oneDay;
   const oneMonth = 30 * oneDay;
 
-  const groups: Record<string, SessionInfo[]> = {
-    Today: [],
-    Yesterday: [],
-    'This Week': [],
-    'This Month': [],
-    Older: [],
-  };
+  for (const project of Object.values(projectGroups)) {
+    const timeGroups: Record<string, SessionInfo[]> = {
+      Today: [],
+      Yesterday: [],
+      'This Week': [],
+      'This Month': [],
+      Older: [],
+    };
 
-  for (const session of sessions) {
-    const diff = now - session.updatedAt;
+    for (const session of project.sessions) {
+      // Fix: Ensure timestamp is valid
+      const timestamp = session.updatedAt || session.createdAt || 0;
+      if (timestamp === 0) {
+        timeGroups.Older.push(session);
+        continue;
+      }
 
-    if (diff < oneDay) {
-      groups.Today.push(session);
-    } else if (diff < 2 * oneDay) {
-      groups.Yesterday.push(session);
-    } else if (diff < oneWeek) {
-      groups['This Week'].push(session);
-    } else if (diff < oneMonth) {
-      groups['This Month'].push(session);
-    } else {
-      groups.Older.push(session);
+      const diff = now - timestamp;
+
+      if (diff < 0) {
+        // Future timestamp, treat as today
+        timeGroups.Today.push(session);
+      } else if (diff < oneDay) {
+        timeGroups.Today.push(session);
+      } else if (diff < 2 * oneDay) {
+        timeGroups.Yesterday.push(session);
+      } else if (diff < oneWeek) {
+        timeGroups['This Week'].push(session);
+      } else if (diff < oneMonth) {
+        timeGroups['This Month'].push(session);
+      } else {
+        timeGroups.Older.push(session);
+      }
     }
+
+    // Remove empty time groups
+    project.byTime = Object.fromEntries(
+      Object.entries(timeGroups).filter(([, sessions]) => sessions.length > 0)
+    );
   }
 
-  // Remove empty groups
-  return Object.fromEntries(Object.entries(groups).filter(([, sessions]) => sessions.length > 0));
+  return projectGroups;
 }
 
 // Helper: Format token count
@@ -276,9 +401,20 @@ function formatTokens(tokens: number): string {
 }
 
 // Helper: Format time ago
-function formatTimeAgo(timestamp: number): string {
+function formatTimeAgo(timestamp: number | undefined | null): string {
+  // Fix: Handle invalid timestamps
+  if (!timestamp || timestamp === 0 || isNaN(timestamp)) {
+    return 'Unknown date';
+  }
+
   const now = Date.now();
   const diff = now - timestamp;
+
+  // Future timestamp
+  if (diff < 0) {
+    return 'just now';
+  }
+
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -301,5 +437,9 @@ function formatTimeAgo(timestamp: number): string {
     return `${weeks}w ago`;
   }
   const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  if (months < 12) {
+    return `${months}mo ago`;
+  }
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
 }

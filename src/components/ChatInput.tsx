@@ -9,9 +9,8 @@ import {
 } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { getAgentAvatar } from '../utils/agentAvatars';
 import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
-import duckAvatar from '../../images/duck.png';
+import { AgentMentionChip } from './AgentMentionChip';
 import type { ChatAttachment, AgentInfo, SearchResult } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
@@ -1199,19 +1198,11 @@ export default function ChatInput({
 
           return (
             <div className="chat-input-mentions">
-              {matchedAgents.map((agent, idx) => {
-                const avatarPath = getAgentAvatar(agent.name) || duckAvatar;
-                return (
-                  <div key={idx} className="chat-input-mention-chip">
-                    <img
-                      src={avatarPath}
-                      alt={agent.name}
-                      className="chat-input-mention-avatar"
-                    />
-                    <span className="chat-input-mention-name">@{agent.name}</span>
-                  </div>
-                );
-              })}
+              {matchedAgents.map((agent, idx) => (
+                <div key={idx} className="chat-input-mention-chip-wrapper">
+                  <AgentMentionChip agentName={agent.name} />
+                </div>
+              ))}
             </div>
           );
         })()}

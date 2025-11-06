@@ -527,6 +527,7 @@ pub fn run() {
             personality::inject_personality_to_claude_md,
             sessions::list_sessions,
             sessions::get_session_info,
+            sessions::get_all_sessions_info,
             sessions::get_session_details,
             sessions::delete_session
         ])

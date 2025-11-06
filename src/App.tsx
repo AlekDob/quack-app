@@ -23,7 +23,7 @@ import DiffDrawer from "./components/DiffDrawer";
 import PluginsPanel from "./components/PluginsPanel";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
-import { SessionDetailsDrawer } from "./components/SessionDetailsDrawer";
+import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
 import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
 import { TitleBar } from "./components/TitleBar";
@@ -76,6 +76,7 @@ import type {
   AgentPersonality,
   SessionInfo,
 } from "./types";
+import { getRandomName } from "./utils/agentNames";
 
 interface TerminalMetadata {
   label: string;
@@ -296,32 +297,8 @@ const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
 // ============================================
 // Random Agent Names
 // ============================================
-const AGENT_NAMES = [
-  'Agent Jack',
-  'Agent Mike',
-  'Agent Julie',
-  'Agent John',
-  'Agent Scott',
-  'Agent Carmelo',
-  'Agent Giuseppe',
-  'Agent Roberta',
-  'Agent Charlie',
-  'Agent Alex',
-  'Agent Sam',
-  'Agent Jordan',
-  'Agent Taylor',
-  'Agent Morgan',
-  'Agent Casey',
-  'Agent Riley',
-  'Agent Quinn',
-  'Agent Avery',
-  'Agent Parker',
-  'Agent Skylar',
-];
-
-const getRandomAgentName = () => {
-  return AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
-};
+// Agent names now managed in src/utils/agentNames.ts
+// This module provides 140+ international names from various countries
 
 // ============================================
 // Migration System (Phase 2)
@@ -523,6 +500,7 @@ function App() {
   );
   const [sessionDetailsDrawerOpen, setSessionDetailsDrawerOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
+  const [sessionsRefreshKey, setSessionsRefreshKey] = useState(0);
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiIntent, setAiIntent] = useState('');
@@ -3729,7 +3707,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalError(null);
     const index = terminals.length;
     const defaultColor = COLORS[index % COLORS.length];
-    setNewTerminalName(getRandomAgentName()); // Random agent name instead of "Terminal X"
+    setNewTerminalName(getRandomName()); // Random international agent name (140+ names)
     setNewTerminalColor(defaultColor);
     setNewTerminalWorkingOn(""); // Reset working on field
     setNewTerminalAvatar("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg"); // Reset to first avatar
@@ -5372,15 +5350,11 @@ You have access to all Bash tools to execute git commands like:
   }, [activeId]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
-    try {
-      await invoke('delete_session', { sessionId });
-      toast.success('Session deleted successfully');
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Failed to delete session:', error);
-      toast.error('Failed to delete session');
-      return Promise.reject(error);
-    }
+    // Toast messages are handled by SessionDetailsDrawer
+    // Just update UI state here
+    setSessionDetailsDrawerOpen(false);
+    setSelectedSession(null);
+    setSessionsRefreshKey(prev => prev + 1);
   }, []);
 
   useEffect(() => {
@@ -5921,6 +5895,7 @@ You have access to all Bash tools to execute git commands like:
           onCreateTerminalWithCommand={handleCreateTerminalWithCommand}
           // Sessions props
           onSelectSession={handleSelectSession}
+          sessionsRefreshKey={sessionsRefreshKey}
           // Collapse props
           isCollapsed={sidePanelCollapsed}
           onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
@@ -5997,11 +5972,11 @@ You have access to all Bash tools to execute git commands like:
         />
 
         <SessionDetailsDrawer
-          session={selectedSession}
-          open={sessionDetailsDrawerOpen}
+          isOpen={sessionDetailsDrawerOpen}
+          sessionId={selectedSession?.id || null}
           onClose={() => setSessionDetailsDrawerOpen(false)}
-          onResume={handleResumeSession}
-          onDelete={handleDeleteSession}
+          onResumeSession={handleResumeSession}
+          onDeleteSession={handleDeleteSession}
         />
 
         <PreviewDrawer

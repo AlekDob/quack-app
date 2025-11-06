@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { AgentInfo } from '../types';
 import { AVAILABLE_AVATARS, getAvatarUrl, getRandomAvatar } from '../utils/agentAvatars';
+import { getRandomAgentName } from '../utils/agentNames';
 
 interface NewAgentModalProps {
   isOpen: boolean;
@@ -27,52 +28,6 @@ const AGENT_COLORS: Record<string, string> = {
   yellow: "#EAB308",
   red: "#EF4444",
   pink: "#EC4899",
-};
-
-// Random agent names for default naming
-const AGENT_NAMES = [
-  'Agent Jack',
-  'Agent Mike',
-  'Agent Julie',
-  'Agent John',
-  'Agent Scott',
-  'Agent Carmelo',
-  'Agent Giuseppe',
-  'Agent Roberta',
-  'Agent Charlie',
-  'Agent Alex',
-  'Agent Sam',
-  'Agent Jordan',
-  'Agent Taylor',
-  'Agent Morgan',
-  'Agent Casey',
-  'Agent Riley',
-  'Agent Quinn',
-  'Agent Avery',
-  'Agent Parker',
-  'Agent Skylar',
-];
-
-// Get random agent name that doesn't exist in the project
-const getRandomAgentName = (existingAgents?: AgentInfo[], scope?: 'global' | 'project') => {
-  // Filter existing agents by scope (only check project agents for duplicates)
-  const projectAgents = existingAgents?.filter(a => a.scope === scope) || [];
-  const existingNames = new Set(projectAgents.map(a => a.name.toLowerCase()));
-
-  // Try to find a unique name
-  const availableNames = AGENT_NAMES.filter(name => !existingNames.has(name.toLowerCase()));
-
-  if (availableNames.length > 0) {
-    return availableNames[Math.floor(Math.random() * availableNames.length)];
-  }
-
-  // If all names are taken, append a number
-  let counter = 2;
-  let baseName = AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
-  while (existingNames.has(`${baseName} ${counter}`.toLowerCase())) {
-    counter++;
-  }
-  return `${baseName} ${counter}`;
 };
 
 export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAgentModalProps) {

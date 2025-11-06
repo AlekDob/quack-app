@@ -11,9 +11,10 @@ import {
   ExitPlanModeWidget,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
-import { getAgentAvatar, getAvatarUrl } from '../utils/agentAvatars';
+import { TaskAgentAvatar } from './TaskAgentAvatar';
+import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
-import type { ClaudeEvent } from '../types';
+import type { ClaudeEvent} from '../types';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
@@ -227,25 +228,13 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             // Special handling for Task tool (subagent invocation)
             if (toolName === 'task' && input?.subagent_type) {
               const subagentType = input.subagent_type;
-              const avatarPath = getAgentAvatar(subagentType) || duckAvatar;
               const description = input.description || 'Running task';
 
               return (
                 <div key={idx} className="tool-widget task-widget">
                   <div className="tool-widget-header">
                     <div className="tool-widget-title">
-                      <img
-                        src={avatarPath}
-                        alt={subagentType}
-                        className="tool-widget-agent-avatar"
-                        style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          objectFit: 'contain',
-                          marginRight: '6px'
-                        }}
-                      />
+                      <TaskAgentAvatar subagentType={subagentType} />
                       <span>Agent: <strong>{subagentType.replace(/-/g, ' ')}</strong></span>
                     </div>
                     <span className="tool-widget-meta">{description}</span>

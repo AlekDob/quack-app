@@ -6,21 +6,21 @@ interface TitleBarProps {
 }
 
 const QUOTES = [
-  "A project without CLAUDE.md is like a duck without water: possible but not recommended",
-  "Debugging: when the duck in your code starts quacking in production",
-  "Real programmers comment their code. Wise programmers use CLAUDE.md and let the duck explain",
-  "Rubber duck debugging is out. CLAUDE.md duck explaining is in",
-  "Git commit -m 'fixed the thing' said the duck, lying",
-  "Why do ducks make great developers? They're experts at debugging in a row",
-  "Programming is 10% writing code, 90% explaining to the duck why it doesn't work",
-  "A duck typed language: where errors quack at compile time",
-  "CLAUDE.md: because your future self deserves better than 'TODO: fix this later'",
-  "The best code is self-documenting. The wisest code has CLAUDE.md explaining why",
-  "Ducks don't get imposter syndrome. They just keep swimming and coding",
-  "Stack Overflow is temporary. CLAUDE.md is forever",
-  "In Soviet Russia, duck debugs you",
-  "Error 404: Duck not found. Please add CLAUDE.md",
-  "Quack once, code twice, document with CLAUDE.md"
+  "🦆 A project without CLAUDE.md is like a duck without water: possible but not recommended",
+  "🦆 Debugging: when the duck in your code starts quacking in production",
+  "🦆 Real programmers comment their code. Wise programmers use CLAUDE.md and let the duck explain",
+  "🦆 Rubber duck debugging is out. CLAUDE.md duck explaining is in",
+  "🦆 Git commit -m 'fixed the thing' said the duck, lying",
+  "🦆 Why do ducks make great developers? They're experts at debugging in a row",
+  "🦆 Programming is 10% writing code, 90% explaining to the duck why it doesn't work",
+  "🦆 A duck typed language: where errors quack at compile time",
+  "🦆 CLAUDE.md: because your future self deserves better than 'TODO: fix this later'",
+  "🦆 The best code is self-documenting. The wisest code has CLAUDE.md explaining why",
+  "🦆 Ducks don't get imposter syndrome. They just keep swimming and coding",
+  "🦆 Stack Overflow is temporary. CLAUDE.md is forever",
+  "🦆 In Soviet Russia, duck debugs you",
+  "🦆 Error 404: Duck not found. Please add CLAUDE.md",
+  "🦆 Quack once, code twice, document with CLAUDE.md"
 ];
 
 export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {

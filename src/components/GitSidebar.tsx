@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { GitBranch, TerminalInfo } from '../types'
-import { getAgentAvatar } from '../utils/agentAvatars'
+import { AgentAvatar } from './AgentAvatar'
 import './GitSidebar.css'
 
 interface GitSidebarProps {
@@ -280,8 +280,9 @@ function GitSidebar({
                       <span className="git-sidebar-branch-behind">{branch.behind}↓</span>
                     )}
                     {agent && (
-                      <img
-                        src={getAgentAvatar(agent.label, agent.avatar)}
+                      <AgentAvatar
+                        agentName={agent.label}
+                        avatarFilename={agent.avatar}
                         alt={agent.label}
                         className="git-sidebar-branch-avatar"
                       />
@@ -382,8 +383,9 @@ function GitSidebar({
                                 <span className="git-sidebar-branch-behind">{branch.behind}↓</span>
                               )}
                               {agent && (
-                                <img
-                                  src={getAgentAvatar(agent.label, agent.avatar)}
+                                <AgentAvatar
+                                  agentName={agent.label}
+                                  avatarFilename={agent.avatar}
                                   alt={agent.label}
                                   className="git-sidebar-branch-avatar"
                                 />

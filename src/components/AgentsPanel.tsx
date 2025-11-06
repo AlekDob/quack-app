@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
 import { NewAgentModal } from "./NewAgentModal";
-import { getAgentAvatar } from "../utils/agentAvatars";
+import { AgentAvatar } from "./AgentAvatar";
 
 /**
  * Agents Panel - Inline list view of agents
@@ -300,8 +300,9 @@ export default function AgentsPanel({
                               borderRadius: "6px",
                             }}
                           >
-                            <img
-                              src={getAgentAvatar(agent.name, agent.avatar)}
+                            <AgentAvatar
+                              agentName={agent.name}
+                              avatarFilename={agent.avatar}
                               alt={agent.name}
                               style={{
                                 width: "100%",
@@ -442,8 +443,9 @@ export default function AgentsPanel({
                               borderRadius: "6px",
                             }}
                           >
-                            <img
-                              src={getAgentAvatar(agent.name, agent.avatar)}
+                            <AgentAvatar
+                              agentName={agent.name}
+                              avatarFilename={agent.avatar}
                               alt={agent.name}
                               style={{
                                 width: "100%",

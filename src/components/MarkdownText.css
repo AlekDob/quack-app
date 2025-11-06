@@ -12,18 +12,18 @@
 }
 
 .md-h1 {
-  font-size: 24px;
+  font-size: 20px;
   border-bottom: 2px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 8px;
 }
 
 .md-h2 {
-  font-size: 20px;
+  font-size: 17px;
   color: #f28c52;
 }
 
 .md-h3 {
-  font-size: 17px;
+  font-size: 15px;
   color: #f28c52;
 }
 

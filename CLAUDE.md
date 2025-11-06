@@ -113,6 +113,7 @@ This project uses a specialized agent system for organized development:
 - **`/commit`** - Invokes Giuseppe for smart git commit management with diff analysis and push options
 - **`/diary`** - Invokes Mike for documenting daily work progress and planning next steps
 - **`/code-review`** - Intelligent code review of uncommitted changes with security, performance, and quality analysis
+- **`/validate-idea`** - Brutally honest validation of app ideas with market research, demand validation, and monetization analysis
 
 ### Key Documentation
 

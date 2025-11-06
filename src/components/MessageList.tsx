@@ -21,6 +21,7 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showScrollToTopButton, setShowScrollToTopButton] = useState(false);
+  const [currentUserMessageIndex, setCurrentUserMessageIndex] = useState<number>(-1);
 
   // Check if user is at bottom of scroll
   const checkIfAtBottom = useCallback(() => {
@@ -38,9 +39,11 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
     const isAtBottom = checkIfAtBottom();
     setShowScrollButton(!isAtBottom);
 
-    // Show "scroll to top" button only when at bottom AND there are user messages
+    // Show "scroll to top" (previous user message) button when:
+    // 1. Not at bottom (scrolled up in conversation)
+    // 2. There are user messages to navigate to
     const hasUserMessages = messages.some(m => m.role === 'user');
-    setShowScrollToTopButton(isAtBottom && hasUserMessages);
+    setShowScrollToTopButton(!isAtBottom && hasUserMessages);
   }, [checkIfAtBottom, messages]);
 
   // Scroll to bottom function
@@ -53,30 +56,58 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
     });
   }, []);
 
-  // Scroll to last user message function
-  const scrollToLastUserMessage = useCallback(() => {
+  // Navigate to previous user message (ignoring sticky header)
+  const scrollToPreviousUserMessage = useCallback(() => {
     if (!scrollRef.current) return;
 
-    // Find the last user message
-    const lastUserMessageIndex = messages.map((m, i) => ({ msg: m, index: i }))
-      .reverse()
-      .find(({ msg }) => msg.role === 'user')?.index;
+    // Get all user message indices
+    const userMessageIndices = messages
+      .map((m, i) => ({ msg: m, index: i }))
+      .filter(({ msg }) => msg.role === 'user')
+      .map(({ index }) => index);
 
-    if (lastUserMessageIndex === undefined) return;
+    if (userMessageIndices.length === 0) return;
 
-    // Find the DOM element for that message
+    // Get current scroll position
+    const currentScrollTop = scrollRef.current.scrollTop;
     const messageElements = scrollRef.current.querySelectorAll('.chat-message');
-    const targetElement = messageElements[lastUserMessageIndex] as HTMLElement;
 
+    // Find which user message we're currently viewing or past
+    let targetIndex = -1;
+
+    for (let i = userMessageIndices.length - 1; i >= 0; i--) {
+      const messageIndex = userMessageIndices[i];
+      const element = messageElements[messageIndex] as HTMLElement;
+
+      if (element) {
+        const elementTop = element.offsetTop;
+
+        // If this message is above current scroll position (with some buffer)
+        // This is our target - the previous user message
+        if (elementTop < currentScrollTop - 50) {
+          targetIndex = messageIndex;
+          break;
+        }
+      }
+    }
+
+    // If no message found above current position, wrap to last user message
+    if (targetIndex === -1) {
+      targetIndex = userMessageIndices[userMessageIndices.length - 1];
+    }
+
+    // Scroll to the target user message
+    const targetElement = messageElements[targetIndex] as HTMLElement;
     if (targetElement) {
-      // Scroll to the top of the user message
       const elementTop = targetElement.offsetTop;
-      const targetScroll = elementTop - 20; // 20px padding from top
+      const targetScroll = elementTop - 80; // 80px padding from top (to avoid sticky header)
 
       scrollRef.current.scrollTo({
         top: targetScroll,
         behavior: 'smooth'
       });
+
+      setCurrentUserMessageIndex(targetIndex);
     }
   }, [messages]);
 
@@ -194,8 +225,9 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
       {showScrollToTopButton && (
         <button
           className="scroll-to-top-button"
-          onClick={scrollToLastUserMessage}
-          aria-label="Scroll to last message"
+          onClick={scrollToPreviousUserMessage}
+          aria-label="Previous user message"
+          title="Jump to previous 'You' message"
         >
           <svg
             width="20"

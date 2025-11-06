@@ -4,7 +4,7 @@ import type { AgentDetails } from "../types";
 import MarkdownText from "./MarkdownText";
 import CodeEditor from "./CodeEditor";
 import RevealInFinderButton from "./RevealInFinderButton";
-import { getAgentAvatar } from "../utils/agentAvatars";
+import { AgentAvatar } from "./AgentAvatar";
 import "./AgentViewer.css";
 
 interface AgentViewerProps {
@@ -259,8 +259,9 @@ export default function AgentViewer({
           {/* Header with avatar and metadata */}
           <div className="agent-viewer-header">
             <div className="agent-viewer-avatar-section">
-              <img
-                src={getAgentAvatar(agent.name, agent.avatar)}
+              <AgentAvatar
+                agentName={agent.name}
+                avatarFilename={agent.avatar}
                 alt={agent.name}
                 className="agent-viewer-avatar"
               />

@@ -313,6 +313,7 @@ interface SidePanelProps {
 
   // Sessions props
   onSelectSession?: (session: SessionInfo) => void;
+  sessionsRefreshKey?: number;
 
   // Collapse props
   isCollapsed?: boolean;
@@ -392,6 +393,7 @@ export default function SidePanel({
 
   // Sessions
   onSelectSession,
+  sessionsRefreshKey,
 
   // Collapse
   isCollapsed = false,
@@ -608,6 +610,7 @@ export default function SidePanel({
         {activeTab === "sessions" && (
           <div className="side-panel-pane">
             <SessionsPanel
+              key={sessionsRefreshKey}
               onSelectSession={(session) => onSelectSession?.(session)}
             />
           </div>

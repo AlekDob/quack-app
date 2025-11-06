@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { GitBranch, GitMergeResult, TerminalInfo } from '../types';
 import ConflictResolver from './ConflictResolver';
-import { getAgentAvatar } from '../utils/agentAvatars';
+import { AgentAvatar } from './AgentAvatar';
 
 interface BranchManagerProps {
   rootPath: string | null;
@@ -241,8 +241,9 @@ const BranchManager: React.FC<BranchManagerProps> = ({
                   </div>
                   {agent && (
                     <div className="branch-agent">
-                      <img
-                        src={getAgentAvatar(agent.label, agent.avatar)}
+                      <AgentAvatar
+                        agentName={agent.label}
+                        avatarFilename={agent.avatar}
                         alt={agent.label}
                         className="branch-agent-avatar"
                       />

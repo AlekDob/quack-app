@@ -2089,7 +2089,7 @@ button.directory-chooser:hover {
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   align-items: center;
   gap: 6px;

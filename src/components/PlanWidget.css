@@ -124,19 +124,19 @@
 }
 
 .plan-widget-markdown h1 {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   border-bottom: 2px solid rgba(99, 102, 241, 0.2);
   padding-bottom: 6px;
 }
 
 .plan-widget-markdown h2 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .plan-widget-markdown h3 {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 

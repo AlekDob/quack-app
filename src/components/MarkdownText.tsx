@@ -11,6 +11,9 @@ interface MarkdownTextProps {
  */
 export default function MarkdownText({ children }: MarkdownTextProps) {
   const renderMarkdown = (text: string): React.ReactNode[] => {
+    // Safety check for undefined/null
+    if (!text) return [];
+
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
     let currentList: string[] | null = null;

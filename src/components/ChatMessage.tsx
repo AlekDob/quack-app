@@ -2,13 +2,38 @@ import { memo, useState, useEffect, useRef } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
-import { getAgentAvatar, getAvatarUrl } from '../utils/agentAvatars';
+import { AgentMentionChip } from './AgentMentionChip';
+import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
-import duckAvatar from '../../images/duck.png';
+import { useAgentAvatar } from '../hooks/useAgentAvatar';
 import cyberducksAvatar from '../../images/cyberducks.png';
 import './ChatMessage.css';
 import './StreamMessage.css';
+
+// System Message Component
+function SystemMessage({ agentName, content }: { agentName: string | null; content: string }) {
+  const avatarUrl = useAgentAvatar(agentName || '', undefined);
+
+  return (
+    <div className="chat-message system">
+      <div className="chat-message-system-content">
+        {agentName && avatarUrl ? (
+          <>
+            <img
+              src={avatarUrl}
+              alt={agentName}
+              className="agent-system-avatar"
+            />
+            <span>Invocando agente: <strong>{agentName}</strong></span>
+          </>
+        ) : (
+          content
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -199,16 +224,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
       }
 
       // Add mention chip
-      const avatarPath = getAgentAvatar(mention.agentName) || duckAvatar;
       parts.push(
-        <span key={`mention-${idx}`} className="agent-mention-chip">
-          <img
-            src={avatarPath}
-            alt={mention.agentName}
-            className="agent-mention-avatar"
-          />
-          <span className="agent-mention-name">@{mention.agentName}</span>
-        </span>
+        <AgentMentionChip
+          key={`mention-${idx}`}
+          agentName={mention.agentName}
+        />
       );
 
       lastIndex = mention.endIndex;
@@ -226,26 +246,13 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
   if (isSystem) {
     // Extract agent name from content (format: "🦆 Invocando agente: **agent name**")
     const agentNameMatch = message.content.match(/\*\*(.*?)\*\*/);
-    const agentName = agentNameMatch ? agentNameMatch[1] : null;
-    const avatarPath = agentName ? getAgentAvatar(agentName) : null;
+    const extractedAgentName = agentNameMatch ? agentNameMatch[1] : null;
 
     return (
-      <div className="chat-message system">
-        <div className="chat-message-system-content">
-          {avatarPath ? (
-            <>
-              <img
-                src={avatarPath}
-                alt={agentName || 'agent'}
-                className="agent-system-avatar"
-              />
-              <span>Invocando agente: <strong>{agentName}</strong></span>
-            </>
-          ) : (
-            message.content
-          )}
-        </div>
-      </div>
+      <SystemMessage
+        agentName={extractedAgentName}
+        content={message.content}
+      />
     );
   }
 

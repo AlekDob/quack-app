@@ -34,7 +34,12 @@ export default function TokenUsageIndicator({
 
   // Calculate totals
   const totalTokens = inputTokens + outputTokens;
-  const usagePercentage = (totalTokens / maxTokens) * 100;
+
+  // Progressive multiplier: starts at 1x, gradually increases to 2x as tokens are consumed
+  // This makes stamina drain faster as you use more tokens (more realistic)
+  const multiplier = 1 + (totalTokens / maxTokens); // 1x → 2x progression
+  const effectiveTokens = totalTokens * multiplier;
+  const usagePercentage = (effectiveTokens / maxTokens) * 100;
 
   // INVERTED: Stamina starts at 100% and decreases as tokens are used
   const staminaPercentage = Math.max(0, 100 - usagePercentage);
@@ -44,6 +49,8 @@ export default function TokenUsageIndicator({
     inputTokens,
     outputTokens,
     totalTokens,
+    multiplier: multiplier.toFixed(2),
+    effectiveTokens,
     usagePercentage,
     staminaPercentage,
   });

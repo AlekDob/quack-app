@@ -144,7 +144,7 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 // Fallback for default avatars only
-                if (!isCustomAvatar(terminal.avatar)) {
+                if (terminal.avatar && !isCustomAvatar(terminal.avatar)) {
                   target.src = `/images/ducks/${terminal.avatar}`;
                 }
               }}
