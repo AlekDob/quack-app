@@ -1,6 +1,7 @@
 import { useEffect, useState, memo, useMemo } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { TerminalInfo, ChatMessage } from '../types'
+import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage'
 
 // Helper function to get avatar image URL (works in both dev and production)
 function getAvatarUrl(avatarName: string): string {
@@ -39,6 +40,7 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
   const status = terminal.status ?? 'idle'
   const [confirmedStatus, setConfirmedStatus] = useState<'busy' | 'idle'>(status)
   const [isHovering, setIsHovering] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'busy') {
@@ -53,6 +55,44 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
       return () => clearTimeout(timer)
     }
   }, [status])
+
+  // Load custom avatar URL if needed
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadAvatarUrl() {
+      if (!terminal.avatar) {
+        setAvatarUrl(null)
+        return
+      }
+
+      // Check if it's a custom avatar (UUID format)
+      if (isCustomAvatar(terminal.avatar)) {
+        try {
+          const url = await getCustomAvatarUrl(terminal.avatar)
+          if (isMounted) {
+            setAvatarUrl(url)
+          }
+        } catch (error) {
+          console.error('Failed to load custom avatar:', error)
+          if (isMounted) {
+            setAvatarUrl(null)
+          }
+        }
+      } else {
+        // Default avatar - use getAvatarUrl helper
+        if (isMounted) {
+          setAvatarUrl(getAvatarUrl(terminal.avatar))
+        }
+      }
+    }
+
+    loadAvatarUrl()
+
+    return () => {
+      isMounted = false
+    }
+  }, [terminal.avatar])
 
   const isBusy = confirmedStatus === 'busy'
   const isWaitingForResponse = terminal.waitingForResponse ?? false
@@ -86,7 +126,7 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
   return (
     <>
       {/* Only show avatar if it exists - no fallback dot */}
-      {terminal.avatar && (
+      {terminal.avatar && avatarUrl && (
         <div
           className="terminal-avatar-container"
           onMouseEnter={() => setIsHovering(true)}
@@ -99,11 +139,14 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
             } as React.CSSProperties}
           >
             <img
-              src={getAvatarUrl(terminal.avatar)}
+              src={avatarUrl}
               alt={terminal.label}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = `/images/ducks/${terminal.avatar}`;
+                // Fallback for default avatars only
+                if (!isCustomAvatar(terminal.avatar)) {
+                  target.src = `/images/ducks/${terminal.avatar}`;
+                }
               }}
             />
           </div>

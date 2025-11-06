@@ -75,10 +75,6 @@ pub fn read_file_preview(path: String) -> Result<String, String> {
     read_file_preview_impl(path).map_err(|err| err.to_string())
 }
 
-#[tauri::command]
-pub fn read_image_as_base64(path: String) -> Result<String, String> {
-    read_image_as_base64_impl(path).map_err(|err| err.to_string())
-}
 
 #[tauri::command]
 pub fn save_clipboard_file(
@@ -208,26 +204,6 @@ fn read_file_preview_impl(path: String) -> Result<String> {
     Ok(BASE64_ENGINE.encode(bytes))
 }
 
-fn read_image_as_base64_impl(path: String) -> Result<String> {
-    let resolved = PathBuf::from(&path);
-    if resolved.is_dir() {
-        return Err(anyhow!("Il percorso selezionato è una cartella"));
-    }
-
-    const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024; // 10MB limit for images
-    let metadata = fs::metadata(&resolved).with_context(|| {
-        format!("Impossibile ottenere le informazioni del file {:?}", resolved)
-    })?;
-
-    if metadata.len() > MAX_IMAGE_SIZE {
-        return Err(anyhow!("L'immagine è troppo grande per l'anteprima (limite 10MB)"));
-    }
-
-    let bytes = fs::read(&resolved)
-        .with_context(|| format!("Impossibile leggere il file {:?}", resolved))?;
-
-    Ok(BASE64_ENGINE.encode(bytes))
-}
 
 fn get_home() -> Result<String> {
     dirs::home_dir()
@@ -580,4 +556,234 @@ fn list_avatar_images_impl(app: tauri::AppHandle) -> Result<Vec<String>> {
     avatar_files.sort();
 
     Ok(avatar_files)
+}
+
+// Custom avatar management
+#[derive(Serialize)]
+pub struct CustomAvatarInfo {
+    pub id: String,
+    pub filename: String,
+    pub original_name: String,
+    pub created_at: u64,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub fn save_custom_avatar(
+    app: tauri::AppHandle,
+    data_base64: String,
+    original_name: String,
+) -> Result<CustomAvatarInfo, String> {
+    save_custom_avatar_impl(app, data_base64, original_name).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn list_custom_avatars(app: tauri::AppHandle) -> Result<Vec<CustomAvatarInfo>, String> {
+    list_custom_avatars_impl(app).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn delete_custom_avatar(app: tauri::AppHandle, avatar_id: String) -> Result<(), String> {
+    delete_custom_avatar_impl(app, avatar_id).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn get_custom_avatar_path(app: tauri::AppHandle, avatar_id: String) -> Result<String, String> {
+    get_custom_avatar_path_impl(app, avatar_id).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn read_custom_avatar_bytes(app: tauri::AppHandle, avatar_id: String) -> Result<Vec<u8>, String> {
+    read_custom_avatar_bytes_impl(app, avatar_id).map_err(|err| err.to_string())
+}
+
+fn save_custom_avatar_impl(
+    app: tauri::AppHandle,
+    data_base64: String,
+    original_name: String,
+) -> Result<CustomAvatarInfo> {
+    // Decode base64 image data
+    let bytes = BASE64_ENGINE
+        .decode(data_base64)
+        .map_err(|err| anyhow!("Failed to decode avatar image: {err}"))?;
+
+    // Validate image size (max 5MB)
+    const MAX_AVATAR_SIZE: usize = 5 * 1024 * 1024;
+    if bytes.len() > MAX_AVATAR_SIZE {
+        return Err(anyhow!("Avatar image is too large (max 5MB)"));
+    }
+
+    // Get app data directory
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| anyhow!("Cannot get app data directory: {}", e))?;
+
+    // Create custom avatars directory
+    let custom_avatars_dir = app_data_dir.join("avatars").join("custom");
+    fs::create_dir_all(&custom_avatars_dir)
+        .with_context(|| format!("Cannot create custom avatars directory: {:?}", custom_avatars_dir))?;
+
+    // Generate unique ID for avatar
+    let avatar_id = Uuid::new_v4().to_string();
+
+    // Extract extension from original filename
+    let extension = PathBuf::from(&original_name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase())
+        .unwrap_or_else(|| "png".to_string());
+
+    // Validate extension
+    let valid_extensions = ["png", "jpg", "jpeg", "gif", "webp"];
+    if !valid_extensions.contains(&extension.as_str()) {
+        return Err(anyhow!("Invalid image format. Supported: PNG, JPG, JPEG, GIF, WEBP"));
+    }
+
+    // Create filename: {uuid}.{extension}
+    let filename = format!("{}.{}", avatar_id, extension);
+    let avatar_path = custom_avatars_dir.join(&filename);
+
+    // Save image file
+    fs::write(&avatar_path, &bytes)
+        .with_context(|| format!("Cannot save custom avatar: {:?}", avatar_path))?;
+
+    // Get current timestamp
+    let created_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| anyhow!("Failed to get timestamp: {}", e))?
+        .as_secs();
+
+    Ok(CustomAvatarInfo {
+        id: avatar_id,
+        filename,
+        original_name,
+        created_at,
+        size: bytes.len() as u64,
+    })
+}
+
+fn list_custom_avatars_impl(app: tauri::AppHandle) -> Result<Vec<CustomAvatarInfo>> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| anyhow!("Cannot get app data directory: {}", e))?;
+
+    let custom_avatars_dir = app_data_dir.join("avatars").join("custom");
+
+    // If directory doesn't exist, return empty list
+    if !custom_avatars_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut avatars = Vec::new();
+
+    for entry in fs::read_dir(&custom_avatars_dir)
+        .with_context(|| format!("Cannot read custom avatars directory: {:?}", custom_avatars_dir))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file() {
+            if let Some(filename) = path.file_name() {
+                let filename_str = filename.to_string_lossy().to_string();
+
+                // Extract ID from filename (before extension)
+                if let Some(stem) = path.file_stem() {
+                    let avatar_id = stem.to_string_lossy().to_string();
+
+                    // Get file metadata
+                    let metadata = fs::metadata(&path)?;
+                    let created_at = metadata
+                        .created()
+                        .or_else(|_| metadata.modified())
+                        .map(|time| {
+                            time.duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs()
+                        })
+                        .unwrap_or(0);
+
+                    avatars.push(CustomAvatarInfo {
+                        id: avatar_id.clone(),
+                        filename: filename_str.clone(),
+                        original_name: filename_str,
+                        created_at,
+                        size: metadata.len(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort by creation date (newest first)
+    avatars.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    Ok(avatars)
+}
+
+fn delete_custom_avatar_impl(app: tauri::AppHandle, avatar_id: String) -> Result<()> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| anyhow!("Cannot get app data directory: {}", e))?;
+
+    let custom_avatars_dir = app_data_dir.join("avatars").join("custom");
+
+    if !custom_avatars_dir.exists() {
+        return Err(anyhow!("Custom avatars directory does not exist"));
+    }
+
+    // Find file with matching ID (any extension)
+    let mut deleted = false;
+    for entry in fs::read_dir(&custom_avatars_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if let Some(stem) = path.file_stem() {
+            if stem.to_string_lossy() == avatar_id {
+                fs::remove_file(&path)
+                    .with_context(|| format!("Cannot delete custom avatar: {:?}", path))?;
+                deleted = true;
+                break;
+            }
+        }
+    }
+
+    if !deleted {
+        return Err(anyhow!("Custom avatar not found: {}", avatar_id));
+    }
+
+    Ok(())
+}
+
+fn get_custom_avatar_path_impl(app: tauri::AppHandle, avatar_id: String) -> Result<String> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| anyhow!("Cannot get app data directory: {}", e))?;
+
+    let custom_avatars_dir = app_data_dir.join("avatars").join("custom");
+
+    if !custom_avatars_dir.exists() {
+        return Err(anyhow!("Custom avatars directory does not exist"));
+    }
+
+    // Find file with matching ID
+    for entry in fs::read_dir(&custom_avatars_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if let Some(stem) = path.file_stem() {
+            if stem.to_string_lossy() == avatar_id {
+                return Ok(path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    Err(anyhow!("Custom avatar not found: {}", avatar_id))
+}
+
+fn read_custom_avatar_bytes_impl(app: tauri::AppHandle, avatar_id: String) -> Result<Vec<u8>> {
+    // Get the path to the custom avatar file
+    let path = get_custom_avatar_path_impl(app, avatar_id)?;
+    let file_path = PathBuf::from(&path);
+
+    // Read the file as bytes
+    let bytes = fs::read(&file_path)
+        .with_context(|| format!("Cannot read custom avatar file: {:?}", file_path))?;
+
+    Ok(bytes)
 }

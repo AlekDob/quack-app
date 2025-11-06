@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AgentPersonality, GitBranch } from '../types';
 import PersonalityBuilder from './PersonalityBuilder';
 import { invoke } from '@tauri-apps/api/core';
+import {
+  uploadCustomAvatar,
+  listCustomAvatars,
+  deleteCustomAvatar,
+  getCustomAvatarUrl,
+  validateAvatarFile,
+  revokeAvatarUrl,
+  type CustomAvatarInfo
+} from '../utils/customAvatarStorage';
+import { isCustomAvatar } from '../utils/customAvatarStorage';
 
 // Available duck avatars from /images/ducks/avatars/
 const AVAILABLE_AVATARS = [
@@ -94,6 +104,14 @@ function NewTerminalModal({
   const [fromCurrentBranch, setFromCurrentBranch] = useState(true);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
+  // Custom avatar management
+  const [customAvatars, setCustomAvatars] = useState<CustomAvatarInfo[]>([]);
+  const [customAvatarUrls, setCustomAvatarUrls] = useState<Record<string, string>>({});
+  const [loadingAvatars, setLoadingAvatars] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Load available skills and branches from backend
   useEffect(() => {
     if (open && path) {
@@ -102,8 +120,59 @@ function NewTerminalModal({
 
       // Load Git branches
       loadBranches();
+
+      // Load custom avatars
+      loadCustomAvatars();
     }
   }, [open, path]);
+
+  // Cleanup blob URLs when modal closes (separate effect to avoid infinite loop)
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount or when modal closes
+      if (!open && Object.keys(customAvatarUrls).length > 0) {
+        Object.values(customAvatarUrls).forEach(url => {
+          revokeAvatarUrl(url);
+        });
+      }
+    };
+  }, [open]);
+
+  async function loadCustomAvatars() {
+    setLoadingAvatars(true);
+    try {
+      const avatars = await listCustomAvatars();
+      setCustomAvatars(avatars);
+
+      // Load URLs for all custom avatars IN PARALLEL (much faster!)
+      const urlPromises = avatars.map(async (avatar) => {
+        try {
+          const url = await getCustomAvatarUrl(avatar.id);
+          return { id: avatar.id, url };
+        } catch (err) {
+          console.error(`Failed to load URL for custom avatar ${avatar.id}:`, err);
+          return { id: avatar.id, url: null };
+        }
+      });
+
+      // Wait for all promises to resolve in parallel
+      const results = await Promise.all(urlPromises);
+
+      // Build URLs object from results
+      const urls: Record<string, string> = {};
+      results.forEach(result => {
+        if (result.url) {
+          urls[result.id] = result.url;
+        }
+      });
+
+      setCustomAvatarUrls(urls);
+    } catch (err) {
+      console.error('Failed to load custom avatars:', err);
+    } finally {
+      setLoadingAvatars(false);
+    }
+  }
 
   async function loadBranches() {
     if (!path) return;
@@ -154,6 +223,78 @@ function NewTerminalModal({
     }
   }, [branchMode, onBranchChange, availableBranches]);
 
+  // Handle custom avatar upload
+  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    const validationError = validateAvatarFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setUploadError(null);
+
+    try {
+      // Upload avatar
+      const avatarInfo = await uploadCustomAvatar(file);
+
+      // Get avatar URL
+      const avatarUrl = await getCustomAvatarUrl(avatarInfo.id);
+
+      // Update custom avatars list
+      setCustomAvatars(prev => [avatarInfo, ...prev]);
+      setCustomAvatarUrls(prev => ({ ...prev, [avatarInfo.id]: avatarUrl }));
+
+      // Select the newly uploaded avatar
+      onAvatarChange?.(avatarInfo.id);
+    } catch (err) {
+      console.error('Failed to upload avatar:', err);
+      setUploadError('Failed to upload avatar. Please try again.');
+    } finally{
+      setUploadingAvatar(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }
+
+  // Handle custom avatar deletion
+  async function handleDeleteCustomAvatar(avatarId: string, event: React.MouseEvent) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    if (!confirm('Are you sure you want to delete this custom avatar?')) {
+      return;
+    }
+
+    try {
+      await deleteCustomAvatar(avatarId);
+
+      // Remove from state
+      setCustomAvatars(prev => prev.filter(a => a.id !== avatarId));
+      setCustomAvatarUrls(prev => {
+        const newUrls = { ...prev };
+        delete newUrls[avatarId];
+        return newUrls;
+      });
+
+      // If this was the selected avatar, clear selection
+      if (avatar === avatarId) {
+        onAvatarChange?.('');
+      }
+
+      console.log('Custom avatar deleted:', avatarId);
+    } catch (err) {
+      console.error('Failed to delete custom avatar:', err);
+      alert('Failed to delete avatar. Please try again.');
+    }
+  }
+
   if (!open) {
     return null
   }
@@ -192,35 +333,130 @@ function NewTerminalModal({
 
         <div className="modal-field">
           <span className="field-label">Avatar</span>
-          <span className="field-hint">Scroll for more avatars →</span>
+          <span className="field-hint">
+            {customAvatars.length > 0 ? 'Custom and default avatars →' : 'Scroll for more avatars →'}
+          </span>
+          {uploadError && (
+            <div className="avatar-upload-error">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              {uploadError}
+            </div>
+          )}
           <div className="avatar-grid-container">
             <div className="avatar-grid">
-              {AVAILABLE_AVATARS.map((avatarName) => (
+              {/* Upload Button - First Item */}
               <button
-                key={avatarName}
                 type="button"
-                className={`avatar-option ${avatar === avatarName ? 'selected' : ''}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('Avatar clicked:', avatarName);
-                  onAvatarChange?.(avatarName);
-                }}
-                aria-label={`Select ${avatarName} avatar`}
+                className="avatar-upload-button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                aria-label="Upload custom avatar"
               >
-                <img
-                  src={getAvatarUrl(avatarName)}
-                  alt={avatarName}
-                  className="avatar-image"
-                  onError={(e) => {
-                    // If image fails to load, show a placeholder
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    console.error(`Failed to load avatar: ${avatarName}`);
-                  }}
-                />
+                {uploadingAvatar ? (
+                  <div className="avatar-upload-spinner">
+                    <svg className="spinner-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                    </svg>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="plus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span className="upload-label">Upload</span>
+                  </>
+                )}
               </button>
-            ))}
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                style={{ display: 'none' }}
+              />
+
+              {/* Custom Avatars */}
+              {customAvatars.map((customAvatar) => (
+                <button
+                  key={customAvatar.id}
+                  type="button"
+                  className={`avatar-option custom-avatar ${avatar === customAvatar.id ? 'selected' : ''} ${!customAvatarUrls[customAvatar.id] && loadingAvatars ? 'loading' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Only allow selection if avatar is loaded
+                    if (customAvatarUrls[customAvatar.id]) {
+                      onAvatarChange?.(customAvatar.id);
+                    }
+                  }}
+                  aria-label={`Select custom avatar ${customAvatar.originalName}`}
+                  disabled={!customAvatarUrls[customAvatar.id] && loadingAvatars}
+                >
+                  {customAvatarUrls[customAvatar.id] ? (
+                    <img
+                      src={customAvatarUrls[customAvatar.id]}
+                      alt={customAvatar.originalName}
+                      className="avatar-image"
+                    />
+                  ) : loadingAvatars ? (
+                    // Show spinner while loading
+                    <div className="avatar-loading-spinner">
+                      <svg className="spinner-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                      </svg>
+                    </div>
+                  ) : null}
+                  {/* Delete button for custom avatars - only show when loaded */}
+                  {customAvatarUrls[customAvatar.id] && (
+                    <button
+                      type="button"
+                      className="avatar-delete-button"
+                      onClick={(e) => handleDeleteCustomAvatar(customAvatar.id, e)}
+                      aria-label="Delete custom avatar"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  )}
+                </button>
+              ))}
+
+              {/* Default Avatars */}
+              {AVAILABLE_AVATARS.map((avatarName) => (
+                <button
+                  key={avatarName}
+                  type="button"
+                  className={`avatar-option ${avatar === avatarName ? 'selected' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Avatar clicked:', avatarName);
+                    onAvatarChange?.(avatarName);
+                  }}
+                  aria-label={`Select ${avatarName} avatar`}
+                >
+                  <img
+                    src={getAvatarUrl(avatarName)}
+                    alt={avatarName}
+                    className="avatar-image"
+                    onError={(e) => {
+                      // If image fails to load, show a placeholder
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      console.error(`Failed to load avatar: ${avatarName}`);
+                    }}
+                  />
+                </button>
+              ))}
             </div>
           </div>
         </div>

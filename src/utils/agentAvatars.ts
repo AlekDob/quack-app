@@ -2,7 +2,10 @@
  * Agent Avatar Utilities
  *
  * Manages duck avatars for agents with proper dev/production path resolution.
+ * Supports both default avatars and custom uploaded avatars.
  */
+
+import { getCustomAvatarUrl, isCustomAvatar } from './customAvatarStorage';
 
 // Type augmentation for Tauri
 declare global {
@@ -70,27 +73,44 @@ export function getRandomAvatar(): string {
 /**
  * Get the avatar image path for an agent
  * @param _agentName - The full agent name (unused, kept for API compatibility)
- * @param avatarFilename - Optional specific avatar filename
- * @returns Avatar image URL
+ * @param avatarFilename - Optional specific avatar filename (default or custom)
+ * @returns Avatar image URL or Promise for custom avatars
  */
-export function getAgentAvatar(_agentName: string, avatarFilename?: string): string {
-  // For agents (subagents), always use duckdroid.png as default
-  // If specific avatar is provided and it's in the available avatars list, use it
-  if (avatarFilename && AVAILABLE_AVATARS.includes(avatarFilename)) {
+export function getAgentAvatar(_agentName: string, avatarFilename?: string): string | Promise<string> {
+  // If no avatar specified, use default duckdroid
+  if (!avatarFilename) {
+    return getDuckdroidUrl();
+  }
+
+  // Check if it's a custom avatar (UUID format)
+  if (isCustomAvatar(avatarFilename)) {
+    // Return promise for custom avatar URL
+    return getCustomAvatarUrl(avatarFilename);
+  }
+
+  // Check if it's a default avatar
+  if (AVAILABLE_AVATARS.includes(avatarFilename)) {
     return getAvatarUrl(avatarFilename);
   }
 
-  // Otherwise, use duckdroid.png as default for all agents
+  // Fallback to duckdroid if avatar not found
   return getDuckdroidUrl();
 }
 
 /**
  * Check if an agent has a valid avatar
  * @param avatarFilename - Avatar filename to check
- * @returns true if avatar is valid
+ * @returns true if avatar is valid (default or custom)
  */
 export function hasAgentAvatar(avatarFilename?: string): boolean {
   if (!avatarFilename) return false;
+
+  // Check if it's a custom avatar (UUID format)
+  if (isCustomAvatar(avatarFilename)) {
+    return true;
+  }
+
+  // Check if it's a default avatar
   return AVAILABLE_AVATARS.includes(avatarFilename);
 }
 

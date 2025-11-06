@@ -9293,7 +9293,7 @@ button.directory-chooser:hover {
   overflow-y: auto;
   overflow-x: hidden;
   margin-top: 0.5rem;
-  padding-right: 8px;
+  padding: 8px 8px 8px 0;
   /* Custom scrollbar */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
@@ -9374,6 +9374,188 @@ button.directory-chooser:hover {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Custom Avatar Upload Button */
+.avatar-upload-button {
+  position: relative;
+  aspect-ratio: 1;
+  max-width: 120px;
+  width: 100%;
+  border-radius: 12px;
+  border: 2px dashed rgba(78, 205, 196, 0.4);
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.05) 0%, rgba(78, 205, 196, 0.1) 100%);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: visible;
+}
+
+.avatar-upload-button:hover {
+  border-color: rgba(78, 205, 196, 0.8);
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.1) 0%, rgba(78, 205, 196, 0.2) 100%);
+  box-shadow: 0 0 20px rgba(78, 205, 196, 0.3);
+}
+
+.avatar-upload-button:active {
+  transform: scale(0.98);
+}
+
+.avatar-upload-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.avatar-upload-button .plus-icon {
+  width: 32px;
+  height: 32px;
+  color: rgba(78, 205, 196, 0.9);
+  transition: all 0.3s ease;
+}
+
+.avatar-upload-button:hover .plus-icon {
+  color: rgb(78, 205, 196);
+  transform: rotate(90deg) scale(1.1);
+}
+
+.avatar-upload-button .upload-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(78, 205, 196, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.avatar-upload-button:hover .upload-label {
+  color: rgb(78, 205, 196);
+  transform: translateY(-1px);
+}
+
+/* Upload Spinner */
+.avatar-upload-spinner {
+  width: 36px;
+  height: 36px;
+}
+
+.avatar-upload-spinner .spinner-icon {
+  width: 100%;
+  height: 100%;
+  animation: rotate 1s linear infinite;
+}
+
+.avatar-upload-spinner .spinner-icon circle {
+  fill: none;
+  stroke: rgba(78, 205, 196, 0.9);
+  stroke-linecap: round;
+  stroke-dasharray: 50 50;
+  stroke-dashoffset: 0;
+  transform-origin: center;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Custom Avatar Styling */
+.avatar-option.custom-avatar {
+  position: relative;
+}
+
+.avatar-option.custom-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(242, 140, 82, 0.4), rgba(78, 205, 196, 0.4));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.avatar-option.custom-avatar:hover::before {
+  opacity: 1;
+}
+
+/* Delete Button for Custom Avatars */
+.avatar-delete-button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(242, 140, 82, 0.95), rgba(220, 85, 65, 0.95));
+  border: 2px solid rgba(40, 44, 52, 0.95);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+}
+
+.avatar-option.custom-avatar:hover .avatar-delete-button {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.avatar-delete-button:hover {
+  transform: scale(1.15);
+  background: linear-gradient(135deg, rgba(255, 80, 60, 0.95), rgba(242, 140, 82, 0.95));
+  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.5);
+}
+
+.avatar-delete-button:active {
+  transform: scale(0.95);
+}
+
+.avatar-delete-button svg {
+  color: white;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Upload Error Message */
+.avatar-upload-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: rgba(242, 140, 82, 0.1);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 8px;
+  color: rgba(242, 140, 82, 0.95);
+  font-size: 13px;
+  animation: slideInDown 0.3s ease;
+}
+
+.avatar-upload-error svg {
+  flex-shrink: 0;
+  color: rgba(242, 140, 82, 1);
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Drag & Drop States for Terminal Items */

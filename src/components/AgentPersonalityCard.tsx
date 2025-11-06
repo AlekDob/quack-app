@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import type { AgentPersonality } from '../types';
 import './AgentPersonalityCard.css';
+import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 
 interface AgentPersonalityCardProps {
   personality: AgentPersonality | null;
@@ -56,6 +58,46 @@ export default function AgentPersonalityCard({
   agentAvatar,
   agentWorkingOn,
 }: AgentPersonalityCardProps) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Load avatar URL (custom or default)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvatarUrl() {
+      if (!agentAvatar) {
+        setAvatarUrl(null);
+        return;
+      }
+
+      // Check if it's a custom avatar (UUID format)
+      if (isCustomAvatar(agentAvatar)) {
+        try {
+          const url = await getCustomAvatarUrl(agentAvatar);
+          if (isMounted) {
+            setAvatarUrl(url);
+          }
+        } catch (error) {
+          console.error('Failed to load custom avatar:', error);
+          if (isMounted) {
+            setAvatarUrl(null);
+          }
+        }
+      } else {
+        // Default avatar - use getAvatarUrl helper
+        if (isMounted) {
+          setAvatarUrl(getAvatarUrl(agentAvatar));
+        }
+      }
+    }
+
+    loadAvatarUrl();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [agentAvatar]);
+
   if (!personality) {
     return (
       <div className="agent-personality-card empty">
@@ -85,9 +127,9 @@ export default function AgentPersonalityCard({
     <div className="agent-personality-card">
       <div className="personality-header">
         <div className="personality-avatar">
-          {agentAvatar ? (
+          {agentAvatar && avatarUrl ? (
             <img
-              src={getAvatarUrl(agentAvatar)}
+              src={avatarUrl}
               alt={agentName || personality.name}
               className="avatar-image"
               onError={(e) => {
