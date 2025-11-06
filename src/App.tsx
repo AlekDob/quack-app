@@ -76,7 +76,6 @@ import type {
   AgentPersonality,
   SessionInfo,
 } from "./types";
-import { getAgentAvatar } from "./utils/agentAvatars";
 
 interface TerminalMetadata {
   label: string;
@@ -436,6 +435,7 @@ function App() {
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
 
   // Tab system state
   const [tabs, setTabs] = useState<Tab[]>([
@@ -1735,7 +1735,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     gitSummary?.entries?.[gitSummary.entries.length - 1]?.path
   ]);
 
-  const gridTemplateColumns = "360px minmax(0, 1fr) 420px";
+  const gridTemplateColumns = sidePanelCollapsed
+    ? "360px minmax(0, 1fr) 0px"
+    : "360px minmax(0, 1fr) 420px";
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -5490,7 +5492,7 @@ You have access to all Bash tools to execute git commands like:
       <TitleBar />
       <div
         ref={appShellRef}
-        className="app-shell"
+        className={`app-shell ${sidePanelCollapsed ? 'side-panel-collapsed' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -5584,6 +5586,8 @@ You have access to all Bash tools to execute git commands like:
               onTelegramClick={() => setShowTelegramSetup(true)}
               onTerminalClick={handleCreateAgentTerminal}
               onBrowserClick={handleOpenBrowserTab}
+              onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
+              sidePanelCollapsed={sidePanelCollapsed}
             />
 
             {/* Tab Bar - VSCode style */}
@@ -5640,7 +5644,7 @@ You have access to all Bash tools to execute git commands like:
               onOpenPromptEngineer={handleOpenPromptEngineer}
               // Agent display info
               agentName={activeTerminal?.label || 'Jack'}
-              agentAvatar={activeTerminal?.avatar ? getAgentAvatar(activeTerminal.label, activeTerminal.avatar) : undefined}
+              agentAvatar={activeTerminal?.avatar}
               // Project context
               projectName={projectName}
               gitBranch={gitBranch}
@@ -5842,6 +5846,9 @@ You have access to all Bash tools to execute git commands like:
           onCreateTerminalWithCommand={handleCreateTerminalWithCommand}
           // Sessions props
           onSelectSession={handleSelectSession}
+          // Collapse props
+          isCollapsed={sidePanelCollapsed}
+          onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
         />
 
         <NewTerminalModal

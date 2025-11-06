@@ -38,6 +38,17 @@
   transform: scale(0.95);
 }
 
+/* Active state - icon is "on" (e.g., sidebar open) */
+.action-icon.active {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+.action-icon.active:hover {
+  background: rgba(242, 140, 82, 0.25);
+  color: #f28c52;
+}
+
 .action-icon svg {
   width: 16px;
   height: 16px;

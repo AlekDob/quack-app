@@ -1,9 +1,10 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
 import { getAgentAvatar } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
+import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import duckAvatar from '../../images/duck.png';
 import cyberducksAvatar from '../../images/cyberducks.png';
 import './ChatMessage.css';
@@ -26,6 +27,47 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
   const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
   const attachments = message.attachments ?? [];
+
+  // State for avatar URL (handles both default and custom avatars)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Load avatar URL (custom or default)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvatarUrl() {
+      if (!agentAvatar) {
+        setAvatarUrl(null);
+        return;
+      }
+
+      // Check if it's a custom avatar (UUID format)
+      if (isCustomAvatar(agentAvatar)) {
+        try {
+          const url = await getCustomAvatarUrl(agentAvatar);
+          if (isMounted) {
+            setAvatarUrl(url);
+          }
+        } catch (error) {
+          console.error('Failed to load custom avatar in chat:', error);
+          if (isMounted) {
+            setAvatarUrl(null);
+          }
+        }
+      } else {
+        // Default avatar - use as-is (already a proper path/URL)
+        if (isMounted) {
+          setAvatarUrl(agentAvatar);
+        }
+      }
+    }
+
+    loadAvatarUrl();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [agentAvatar]);
 
   const formatSize = (size: number | undefined) => {
     if (!size) return '0 B';
@@ -120,9 +162,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
             className="avatar-icon assistant-avatar-img"
             style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
           />
-        ) : agentAvatar ? (
+        ) : avatarUrl ? (
           <img
-            src={agentAvatar}
+            src={avatarUrl}
             alt={agentName}
             className="avatar-icon assistant-avatar-img"
             style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}

@@ -29,7 +29,7 @@
 .chat-message.sticky-user-message {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 10;
   background: rgba(242, 140, 82, 0.15) !important;
   box-shadow: 
     0 2px 12px rgba(242, 140, 82, 0.2),

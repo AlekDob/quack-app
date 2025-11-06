@@ -9,6 +9,8 @@ interface ActionIconsProps {
   onTelegramClick: () => void;
   onTerminalClick: () => void;
   onBrowserClick: () => void;
+  onToggleSidePanel: () => void;
+  sidePanelCollapsed: boolean;
 }
 
 function ActionIcons({
@@ -19,6 +21,8 @@ function ActionIcons({
   onTelegramClick,
   onTerminalClick,
   onBrowserClick,
+  onToggleSidePanel,
+  sidePanelCollapsed,
 }: ActionIconsProps) {
   return (
     <div className="action-icons">
@@ -178,6 +182,34 @@ function ActionIcons({
           />
         </svg>
         <span className="action-icon-tooltip">Browser</span>
+      </button>
+
+      {/* Side Panel Toggle Icon */}
+      <button
+        type="button"
+        className={`action-icon ${!sidePanelCollapsed ? 'active' : ''}`}
+        onClick={onToggleSidePanel}
+        aria-label={sidePanelCollapsed ? "Open side panel" : "Close side panel"}
+        data-tooltip={sidePanelCollapsed ? "Open Side Panel" : "Close Side Panel"}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect
+            x="2"
+            y="2"
+            width="12"
+            height="12"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <path
+            d="M10 2V14"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
       </button>
     </div>
   );

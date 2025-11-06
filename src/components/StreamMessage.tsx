@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './ToolWidgets.css';
 import {
   SystemInitializedWidget,
@@ -12,6 +12,7 @@ import {
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import { getAgentAvatar } from '../utils/agentAvatars';
+import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent } from '../types';
 
 // Import duck avatar
@@ -26,6 +27,47 @@ interface StreamMessageProps {
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick, agentName = 'Jack', agentAvatar }) => {
+  // State for avatar URL (handles both default and custom avatars)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Load avatar URL (custom or default)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvatarUrl() {
+      if (!agentAvatar) {
+        setAvatarUrl(null);
+        return;
+      }
+
+      // Check if it's a custom avatar (UUID format)
+      if (isCustomAvatar(agentAvatar)) {
+        try {
+          const url = await getCustomAvatarUrl(agentAvatar);
+          if (isMounted) {
+            setAvatarUrl(url);
+          }
+        } catch (error) {
+          console.error('Failed to load custom avatar in stream:', error);
+          if (isMounted) {
+            setAvatarUrl(null);
+          }
+        }
+      } else {
+        // Default avatar - use as-is (already a proper path/URL)
+        if (isMounted) {
+          setAvatarUrl(agentAvatar);
+        }
+      }
+    }
+
+    loadAvatarUrl();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [agentAvatar]);
+
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
     const results = new Map<string, any>();
@@ -73,8 +115,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             return (
               <div key={idx} className="assistant-text">
                 <div className="assistant-avatar">
-                  {agentAvatar ? (
-                    <img src={agentAvatar} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                   ) : (
                     <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
                   )}
@@ -302,8 +344,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
     return (
       <div className="assistant-text result-message-consolidated">
         <div className="assistant-avatar">
-          {agentAvatar ? (
-            <img src={agentAvatar} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
           ) : (
             <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
           )}

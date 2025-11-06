@@ -313,6 +313,10 @@ interface SidePanelProps {
 
   // Sessions props
   onSelectSession?: (session: SessionInfo) => void;
+
+  // Collapse props
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function SidePanel({
@@ -388,6 +392,10 @@ export default function SidePanel({
 
   // Sessions
   onSelectSession,
+
+  // Collapse
+  isCollapsed = false,
+  onToggleCollapse,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("agent-context");
 
@@ -457,7 +465,36 @@ export default function SidePanel({
   ];
 
   return (
-    <aside className="side-panel">
+    <aside className={`side-panel ${isCollapsed ? 'collapsed' : ''}`}>
+      {/* Toggle button */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          className="side-panel-toggle"
+          onClick={onToggleCollapse}
+          aria-label={isCollapsed ? "Expand side panel" : "Collapse side panel"}
+        >
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            style={{
+              transform: isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+              transition: 'transform 0.3s ease'
+            }}
+          >
+            <path
+              d="M12 5l-5 5 5 5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      )}
       <div className="side-panel-tabs">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
