@@ -25,7 +25,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }
       case 'completed':
         return (
           <div className="todo-status-icon-wrapper completed">
-            <svg className="todo-status-icon completed" width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <svg className="todo-status-icon completed" width="20" height="20" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="11" fill="#10b981" opacity="0.15"/>
               <circle cx="12" cy="12" r="10" fill="#10b981" stroke="#10b981" strokeWidth="2"/>
               <path d="M7 12l3.5 3.5 6.5-7" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
@@ -35,7 +35,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }
       case 'in_progress':
         return (
           <div className="todo-status-icon-wrapper in-progress">
-            <svg className="todo-status-icon in-progress" width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <svg className="todo-status-icon in-progress" width="20" height="20" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="11" fill="#3b82f6" opacity="0.1"/>
               <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2.5" fill="none" strokeDasharray="63" strokeDashoffset="16" className="rotating-circle"/>
               <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2.5" fill="none" opacity="0.15"/>
@@ -46,7 +46,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }
       case 'pending':
         return (
           <div className="todo-status-icon-wrapper pending">
-            <svg className="todo-status-icon pending" width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <svg className="todo-status-icon pending" width="20" height="20" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="11" fill="#6b7280" opacity="0.08"/>
               <circle cx="12" cy="12" r="10" stroke="#6b7280" strokeWidth="2" fill="none" strokeDasharray="4 4"/>
               <circle cx="12" cy="12" r="2" fill="#6b7280" opacity="0.5"/>
@@ -58,7 +58,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }
 
   const getToolIcon = () => {
     return (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="todo-tool-icon">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="todo-tool-icon">
         <path d="M1.5 2.75a.25.25 0 01.25-.25h8.5a.25.25 0 01.25.25v5.5a.25.25 0 01-.25.25h-8.5a.25.25 0 01-.25-.25v-5.5zM1.75 1A1.75 1.75 0 000 2.75v5.5C0 9.216.784 10 1.75 10h8.5A1.75 1.75 0 0012 8.25v-5.5A1.75 1.75 0 0010.25 1h-8.5zM2.75 3.5a.75.75 0 000 1.5h5.5a.75.75 0 000-1.5h-5.5zM3 7.25a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4A.75.75 0 013 7.25z"/>
       </svg>
     );

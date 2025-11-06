@@ -22,6 +22,7 @@ interface AgentContextPanelProps {
   onOpenContextDrawer?: (scope: string) => void;
   projectName?: string;
   gitBranch?: string;
+  refreshKey?: number; // Added: forces refresh when agent is edited
 }
 
 export default function AgentContextPanel({
@@ -35,6 +36,7 @@ export default function AgentContextPanel({
   onOpenContextDrawer,
   projectName,
   gitBranch,
+  refreshKey, // Added: forces refresh when agent is edited
 }: AgentContextPanelProps) {
   const [personality, setPersonality] = useState<AgentPersonality | null>(null);
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
@@ -45,7 +47,7 @@ export default function AgentContextPanel({
 
   useEffect(() => {
     void loadAgentContext();
-  }, [tauriAvailable, activeAgentId]);
+  }, [tauriAvailable, activeAgentId, refreshKey]); // Added refreshKey to trigger reload when agent is edited
 
   const loadAgentContext = async () => {
     if (!tauriAvailable) {

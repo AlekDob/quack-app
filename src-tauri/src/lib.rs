@@ -529,7 +529,8 @@ pub fn run() {
             sessions::get_session_info,
             sessions::get_all_sessions_info,
             sessions::get_session_details,
-            sessions::delete_session
+            sessions::delete_session,
+            sessions::resume_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

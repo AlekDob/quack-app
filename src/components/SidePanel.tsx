@@ -291,6 +291,7 @@ interface SidePanelProps {
   activeAgentCwd?: string | null;
   projectName?: string;
   gitBranch?: string;
+  agentRefreshKey?: number; // Added: forces context panel refresh when agent is edited
 
   // Terminal props
   activeTerminalId: string | null;
@@ -371,6 +372,7 @@ export default function SidePanel({
   activeAgentCwd,
   projectName,
   gitBranch,
+  agentRefreshKey, // Added: forces context panel refresh when agent is edited
 
   // Terminal
   activeTerminalId,
@@ -540,6 +542,7 @@ export default function SidePanel({
               onOpenContextDrawer={onOpenContextDrawer}
               projectName={projectName}
               gitBranch={gitBranch}
+              refreshKey={agentRefreshKey}
             />
           </div>
         )}

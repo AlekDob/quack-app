@@ -804,3 +804,10 @@ fn parse_session_messages(
 
     Ok((messages, usage))
 }
+
+/// Resume a session - get complete session data for resuming conversation
+#[command]
+pub fn resume_session(session_id: String) -> Result<SessionDetails, String> {
+    // Reuse get_session_details which already loads full conversation
+    get_session_details(session_id)
+}

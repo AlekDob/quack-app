@@ -280,6 +280,39 @@ export function useClaudeChat() {
     return claudeSessionId.current;
   }, []);
 
+  // Load historical messages from a resumed session
+  const loadHistoricalMessages = useCallback((historicalMessages: Array<{ role: string; content: string; timestamp?: number }>, sessionId?: string) => {
+    console.log('[useClaudeChat] Loading historical messages:', historicalMessages.length);
+
+    // Convert historical messages to ChatMessage format
+    const chatMessages: ChatMessage[] = historicalMessages.map((msg, index) => ({
+      id: `msg-historical-${index}`,
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content,
+      timestamp: msg.timestamp || Date.now() - (historicalMessages.length - index) * 1000,
+      status: 'complete' as const,
+    }));
+
+    // Set messages
+    setMessages(chatMessages);
+
+    // Set session ID if provided
+    if (sessionId) {
+      claudeSessionId.current = sessionId;
+      console.log('[useClaudeChat] Set session ID for resume:', sessionId);
+    }
+
+    // Clear session tokens (they'll be recalculated if needed)
+    setSessionTokens({
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+    });
+
+    console.log('[useClaudeChat] Historical messages loaded successfully');
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -292,5 +325,6 @@ export function useClaudeChat() {
     initialize,
     getCurrentSessionId,
     sessionTokens,
+    loadHistoricalMessages, // Add new function to return
   };
 }

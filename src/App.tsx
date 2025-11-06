@@ -501,6 +501,7 @@ function App() {
   const [sessionDetailsDrawerOpen, setSessionDetailsDrawerOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [sessionsRefreshKey, setSessionsRefreshKey] = useState(0);
+  const [agentRefreshKey, setAgentRefreshKey] = useState(0); // Forces context panel refresh when agent is edited
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiIntent, setAiIntent] = useState('');
@@ -3860,6 +3861,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           }
         }
 
+        // Force context panel refresh when agent is edited
+        setAgentRefreshKey((prev) => prev + 1);
+
         // If cwd changed and this is active terminal, reload directory
         if (
           trimmedPath !== editingTerminal.cwd &&
@@ -5332,22 +5336,126 @@ You have access to all Bash tools to execute git commands like:
     setSessionDetailsDrawerOpen(true);
   }, []);
 
-  const handleResumeSession = useCallback(async (_sessionId: string) => {
-    try {
-      // Resume the session in the current agent chat
-      if (activeId) {
-        // The session will be automatically resumed by passing sessionId to claudeSDK
-        toast.success('Session will be resumed in next message');
-        setSessionDetailsDrawerOpen(false);
-        // TODO: Could add logic to load session history into chat view here
-      } else {
-        toast.error('Please select an agent first');
-      }
-    } catch (error) {
-      console.error('Failed to resume session:', error);
-      toast.error('Failed to resume session');
+  const handleResumeSession = useCallback(async (sessionId: string) => {
+    if (!tauriAvailable || creatingTerminal) {
+      return;
     }
-  }, [activeId]);
+
+    setCreatingTerminal(true);
+
+    try {
+      // 1. Load complete session data from backend
+      console.log('[Resume] Loading session:', sessionId);
+      const sessionDetails = await invoke<{
+        id: string;
+        title: string;
+        created_at: number;
+        updated_at: number;
+        message_count: number;
+        total_tokens: number;
+        total_cost: number;
+        status: string;
+        working_directory: string | null;
+        model: string | null;
+        agent_name: string | null;
+        messages: Array<{ role: string; content: string; timestamp: number | null }>;
+        usage: {
+          input_tokens: number;
+          output_tokens: number;
+          cache_creation_input_tokens: number;
+          cache_read_input_tokens: number;
+        };
+      }>('resume_session', { sessionId });
+
+      console.log('[Resume] Session details loaded:', sessionDetails);
+
+      // 2. Determine working directory
+      const workingDirectory = sessionDetails.working_directory || explorerPath || await invoke<string>('get_home_directory');
+      const terminalName = `Resumed: ${sessionDetails.title.substring(0, 40)}${sessionDetails.title.length > 40 ? '...' : ''}`;
+
+      // 3. Create new terminal for the resumed session
+      console.log('[Resume] Creating terminal:', terminalName, 'cwd:', workingDirectory);
+      const created = await invoke<TerminalInfo>('create_terminal', {
+        label: terminalName,
+        color: COLORS[terminals.length % COLORS.length],
+        cwd: workingDirectory,
+        workingOn: null,
+        avatar: '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg', // Default duck avatar
+        branch: null,
+      });
+
+      const createdWithState: TerminalInfo = {
+        ...created,
+        status: 'idle',
+        needsAttention: false,
+        hasResponded: false,
+        responseStartTime: null,
+        workingOn: undefined,
+        avatar: '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg',
+        branch: undefined,
+      };
+
+      console.log('[Resume] Terminal created:', createdWithState.id);
+
+      // 4. Convert SessionHistoryMessage[] to ChatMessage[]
+      const chatMessages: ChatMessage[] = sessionDetails.messages.map((msg, index) => ({
+        id: `msg-resumed-${index}`,
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content,
+        timestamp: msg.timestamp || sessionDetails.created_at + (index * 1000),
+        status: 'complete' as const,
+      }));
+
+      console.log('[Resume] Converted', chatMessages.length, 'messages');
+
+      // 5. Add terminal to state
+      setTerminals((prev) => [...prev, createdWithState]);
+      setActiveId(createdWithState.id);
+      clearTerminalAttention(createdWithState.id);
+
+      // 6. Load conversation history into chat
+      setChatSessions((prev) => {
+        const updated = new Map(prev);
+        updated.set(createdWithState.id, chatMessages);
+        return updated;
+      });
+
+      // 7. Set token usage if available
+      setChatTokensMap((prev) => {
+        const updated = new Map(prev);
+        updated.set(createdWithState.id, {
+          inputTokens: sessionDetails.usage.input_tokens,
+          outputTokens: sessionDetails.usage.output_tokens,
+          cacheCreationTokens: sessionDetails.usage.cache_creation_input_tokens,
+          cacheReadTokens: sessionDetails.usage.cache_read_input_tokens,
+        });
+        return updated;
+      });
+
+      // 8. Close drawer and load directory
+      setSessionDetailsDrawerOpen(false);
+      await loadDirectory(createdWithState.cwd);
+
+      // 9. Switch to chat tab
+      setActiveTabId('chat');
+
+      toast.success(`Resumed session: ${sessionDetails.title}`, {
+        description: `Loaded ${chatMessages.length} messages`,
+        duration: 3000,
+      });
+
+      console.log('[Resume] Session resumed successfully');
+    } catch (error) {
+      console.error('[Resume] Failed to resume session:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to resume session', {
+        description: message,
+        duration: 4000,
+      });
+    } finally {
+      setCreatingTerminal(false);
+    }
+  }, [tauriAvailable, creatingTerminal, terminals.length, explorerPath, clearTerminalAttention, loadDirectory]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     // Toast messages are handled by SessionDetailsDrawer
@@ -5873,6 +5981,7 @@ You have access to all Bash tools to execute git commands like:
           })()}
           projectName={projectName}
           gitBranch={gitBranch}
+          agentRefreshKey={agentRefreshKey}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}
