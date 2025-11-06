@@ -28,6 +28,9 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
   const defaultTitle = import.meta.env.DEV ? "🦆🧪 Quack [DEV MODE]" : "🦆 Quack";
   const finalTitle = title || defaultTitle;
 
+  // Dev mode styling
+  const isDevMode = import.meta.env.DEV;
+
   const [displayText, setDisplayText] = useState(finalTitle);
   const [_isMaximized, setIsMaximized] = useState(false);
   const animationRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,7 +124,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
       data-tauri-drag-region
       style={{
         height: '40px',
-        backgroundColor: '#0B0F15',
+        backgroundColor: isDevMode
+          ? 'rgba(236, 127, 69, 0.85)' // #EC7F45 with transparency for glassmorphism
+          : 'rgba(11, 15, 21, 0.85)', // #0B0F15 with transparency for glassmorphism
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)', // Safari support
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -132,8 +139,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
         left: 0,
         right: 0,
         zIndex: 1000,
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        borderBottom: isDevMode
+          ? '1px solid rgba(255, 255, 255, 0.3)'
+          : '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: isDevMode
+          ? '0 4px 16px rgba(236, 127, 69, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+          : '0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
       }}
     >
       {/* Typewriter text - centered */}

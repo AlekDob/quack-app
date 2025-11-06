@@ -154,6 +154,30 @@
   transform: scale(0.95);
 }
 
+.sticky-action-btn.copied {
+  background: rgba(52, 199, 89, 0.2);
+  color: rgba(52, 199, 89, 1);
+  border: 1px solid rgba(52, 199, 89, 0.4);
+  animation: copySuccess 0.3s ease;
+}
+
+.sticky-action-btn.copied:hover {
+  background: rgba(52, 199, 89, 0.25);
+  color: rgba(52, 199, 89, 1);
+}
+
+@keyframes copySuccess {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .chat-message-role {
   font-weight: 600;
   font-size: 10px; /* ← Ridotto da 11px */

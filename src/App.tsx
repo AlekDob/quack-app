@@ -414,6 +414,11 @@ function App() {
   const [newTerminalError, setNewTerminalError] = useState<string | null>(null);
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
+  const [quackSoundEnabled, setQuackSoundEnabled] = useState(() => {
+    // Load from localStorage, default to true
+    const stored = localStorage.getItem('quackSoundEnabled');
+    return stored === null ? true : stored === 'true';
+  });
   const [_booting, setBooting] = useState(true);
   const [videoEnded, setVideoEnded] = useState(false);
   const [splashFadingOut, setSplashFadingOut] = useState(false);
@@ -1926,7 +1931,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const currentSettings = getCurrentAgentSettings();
 
   const playQuackSound = useCallback(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !quackSoundEnabled) {
       return;
     }
     try {
@@ -1938,7 +1943,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } catch (error) {
       console.warn("Unable to play notification sound", error);
     }
-  }, [notificationAudio]);
+  }, [notificationAudio, quackSoundEnabled]);
+
+  const toggleQuackSound = useCallback(() => {
+    setQuackSoundEnabled(prev => {
+      const newValue = !prev;
+      localStorage.setItem('quackSoundEnabled', String(newValue));
+      return newValue;
+    });
+  }, []);
 
   const loadSavedCommands = useCallback(async () => {
     try {
@@ -5582,6 +5595,9 @@ You have access to all Bash tools to execute git commands like:
           // PiP props
           onTogglePip={togglePipWindow}
           isPipOpen={isPipOpen}
+          // Quack sound props
+          onToggleQuackSound={toggleQuackSound}
+          quackSoundEnabled={quackSoundEnabled}
           // Chat sessions
           chatSessions={chatSessions}
           // Terminal props

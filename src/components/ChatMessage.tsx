@@ -34,7 +34,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
   // State for sticky message actions
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load avatar URL (custom or default)
   useEffect(() => {
@@ -71,6 +73,10 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
 
     return () => {
       isMounted = false;
+      // Clean up timeout on unmount
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
     };
   }, [agentAvatar]);
 
@@ -98,9 +104,23 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
 
   // Copy message content to clipboard
   const handleCopyMessage = () => {
-    navigator.clipboard.writeText(message.content).catch(err => {
-      console.error('Failed to copy message:', err);
-    });
+    navigator.clipboard.writeText(message.content)
+      .then(() => {
+        setIsCopied(true);
+
+        // Clear any existing timeout
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+
+        // Reset after 2 seconds
+        copyTimeoutRef.current = setTimeout(() => {
+          setIsCopied(false);
+        }, 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy message:', err);
+      });
   };
 
   // Toggle expanded state
@@ -261,14 +281,20 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
           {isLastUserMessage && isUser && (
             <div className="sticky-message-actions">
               <button
-                className="sticky-action-btn"
+                className={`sticky-action-btn ${isCopied ? 'copied' : ''}`}
                 onClick={handleCopyMessage}
-                title="Copy full message"
+                title={isCopied ? "Copied!" : "Copy full message"}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
+                {isCopied ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                )}
               </button>
               <button
                 className="sticky-action-btn"

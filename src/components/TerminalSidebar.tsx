@@ -138,6 +138,9 @@ interface TerminalSidebarProps {
   // PiP props
   onTogglePip?: () => void;
   isPipOpen?: boolean;
+  // Quack sound props
+  onToggleQuackSound?: () => void;
+  quackSoundEnabled?: boolean;
   // Chat sessions
   chatSessions?: Map<string, ChatMessage[]>;
   // Terminal props
@@ -170,6 +173,9 @@ export default function TerminalSidebar({
   // PiP props
   onTogglePip,
   isPipOpen,
+  // Quack sound props
+  onToggleQuackSound,
+  quackSoundEnabled,
   // Chat sessions
   chatSessions,
   // Terminal props
@@ -730,6 +736,41 @@ export default function TerminalSidebar({
                   <rect x="8" y="8" width="8" height="8" rx="1" />
                 </svg>
                 PiP
+              </button>
+            )}
+            {/* Quack Sound Button */}
+            {onToggleQuackSound && (
+              <button
+                type="button"
+                className="sidebar-button"
+                onClick={onToggleQuackSound}
+                style={{
+                  background: quackSoundEnabled ? 'rgba(77, 212, 179, 0.2)' : 'rgba(255, 59, 48, 0.15)',
+                  borderColor: quackSoundEnabled ? 'rgba(77, 212, 179, 0.4)' : 'rgba(255, 59, 48, 0.3)',
+                  color: quackSoundEnabled ? '#4dd4b3' : '#ff3b30',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title={quackSoundEnabled ? 'Sound ON (Click to disable)' : 'Sound OFF (Click to enable)'}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {quackSoundEnabled ? (
+                    // Volume ON icon
+                    <>
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </>
+                  ) : (
+                    // Volume OFF icon
+                    <>
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                      <line x1="23" y1="9" x2="17" y2="15" />
+                      <line x1="17" y1="9" x2="23" y2="15" />
+                    </>
+                  )}
+                </svg>
+                Quack
               </button>
             )}
             {/* New Agent Button */}
