@@ -233,6 +233,7 @@
   border: 2px solid #4dd4b3;
   box-shadow: 0 0 30px rgba(77, 212, 179, 0.3), 0 20px 60px rgba(0, 0, 0, 0.5);
   animation: modalSlideUpFallout 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), borderGlowPulse 2s ease-in-out infinite;
+  max-height: 450px;
 }
 
 @keyframes modalSlideUpFallout {

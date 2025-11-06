@@ -136,6 +136,20 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[exponent]}`;
   };
 
+  // Check if text needs truncation
+  const isTruncated = (text: string, maxWords: number, maxChars: number = 250): boolean => {
+    const trimmed = text.trim();
+
+    // Check character limit
+    if (trimmed.length > maxChars) {
+      return true;
+    }
+
+    // Check word limit
+    const words = trimmed.split(/\s+/);
+    return words.length > maxWords;
+  };
+
   // Truncate text to max words AND max characters (for sticky messages)
   const truncateText = (text: string, maxWords: number, maxChars: number = 250): string => {
     const trimmed = text.trim();
@@ -161,6 +175,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
 
     return truncated + '...';
   };
+
+  // Check if current message is truncated (only for sticky user messages)
+  const isMessageTruncated = isLastUserMessage && isUser
+    ? isTruncated(message.content, 30, 250)
+    : false;
 
   // Render text with @mentions as inline chips
   const renderTextWithMentions = (text: string) => {
@@ -296,21 +315,24 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
                   </svg>
                 )}
               </button>
-              <button
-                className="sticky-action-btn"
-                onClick={handleToggleExpand}
-                title={isExpanded ? "Collapse" : "Expand full message"}
-              >
-                {isExpanded ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="18 15 12 9 6 15"></polyline>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                )}
-              </button>
+              {/* Only show expand button if message is actually truncated */}
+              {isMessageTruncated && (
+                <button
+                  className="sticky-action-btn"
+                  onClick={handleToggleExpand}
+                  title={isExpanded ? "Collapse" : "Expand full message"}
+                >
+                  {isExpanded ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>
