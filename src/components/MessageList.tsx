@@ -21,7 +21,6 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showScrollToTopButton, setShowScrollToTopButton] = useState(false);
-  const [currentUserMessageIndex, setCurrentUserMessageIndex] = useState<number>(-1);
 
   // Check if user is at bottom of scroll
   const checkIfAtBottom = useCallback(() => {
@@ -106,8 +105,6 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
         top: targetScroll,
         behavior: 'smooth'
       });
-
-      setCurrentUserMessageIndex(targetIndex);
     }
   }, [messages]);
 

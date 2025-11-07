@@ -311,7 +311,6 @@ const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
 
 function App() {
   // Load assets INSIDE the component, not at module level
-  const splashImage = new URL("../images/quack-visual-ide.jpeg", import.meta.url).href;
   const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
   const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
   const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
@@ -4155,18 +4154,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
-  // Override handleQuickCreateTerminal to check Pro limits
-  const handleQuickCreateTerminalWithLimit = useCallback(async () => {
-    // Check if user can create another terminal
-    if (!canCreateTerminal(terminals.length)) {
-      handleShowUpgrade('terminals');
-      return;
-    }
-
-    // Call original function
-    await handleQuickCreateTerminal();
-  }, [terminals.length, handleShowUpgrade, handleQuickCreateTerminal]);
-
   const handleSelectTerminal = useCallback(
     async (id: string) => {
       if (!tauriAvailable) {
@@ -5518,7 +5505,7 @@ You have access to all Bash tools to execute git commands like:
     }
   }, [tauriAvailable, creatingTerminal, terminals.length, explorerPath, clearTerminalAttention, loadDirectory]);
 
-  const handleDeleteSession = useCallback(async (sessionId: string) => {
+  const handleDeleteSession = useCallback(async (_sessionId: string) => {
     // Toast messages are handled by SessionDetailsDrawer
     // Just update UI state here
     setSessionDetailsDrawerOpen(false);

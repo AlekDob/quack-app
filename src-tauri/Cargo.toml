@@ -56,6 +56,7 @@ image = "0.25"
 tauri-plugin-mic-recorder = "2.0"
 rayon = "1.10"
 lazy_static = "1.5"
+dotenvy = "0.15"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"

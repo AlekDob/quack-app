@@ -150,6 +150,18 @@ pub fn run() {
         .plugin(tauri_plugin_mic_recorder::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // 💰 Load Lemon Squeezy credentials from .env file
+            if dotenvy::dotenv().is_ok() {
+                if let Ok(api_key) = std::env::var("LEMON_SQUEEZY_API_KEY") {
+                    if let Ok(store_id) = std::env::var("LEMON_SQUEEZY_STORE_ID") {
+                        let license_state: tauri::State<license::LicenseState> = app.state();
+                        *license_state.api_key.lock().unwrap() = Some(api_key);
+                        *license_state.store_id.lock().unwrap() = Some(store_id);
+                        log::info!("🦆 Lemon Squeezy API credentials loaded from .env");
+                    }
+                }
+            }
+
             // Initialize Telegram Central Polling State
             let telegram_state = telegram_central::TelegramPollingState::new(app.handle().clone());
             app.manage(telegram_state);

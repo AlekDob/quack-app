@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import type { SessionDetails, SessionHistoryMessage, ClaudeContentBlock } from '../types';
+import type { SessionDetails, SessionHistoryMessage } from '../types';
 import { useSessions } from '../hooks/useSessions';
 import MarkdownText from './MarkdownText';
 
@@ -19,7 +18,7 @@ export default function SessionDetailsDrawer({
   sessionId,
   onClose,
   onResumeSession,
-  onExportSession,
+  onExportSession: _onExportSession,
   onDeleteSession,
 }: SessionDetailsDrawerProps) {
   const [details, setDetails] = useState<SessionDetails | null>(null);
@@ -164,22 +163,6 @@ export default function SessionDetailsDrawer({
     if (days < 7) return `${days}d ago`;
     if (days < 30) return `${Math.floor(days / 7)}w ago`;
     return `${Math.floor(days / 30)}mo ago`;
-  };
-
-  const formatTimestamp = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    if (isToday) {
-      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   if (!isOpen) return null;
@@ -512,7 +495,7 @@ interface MessageCardProps {
   index: number;
 }
 
-const MessageCard = memo(({ message, showTimestamp, events, index }: MessageCardProps) => {
+const MessageCard = memo(({ message, showTimestamp, events: _events, index }: MessageCardProps) => {
   const isUser = message.role === 'user';
   const timestamp = message.timestamp || Date.now();
 

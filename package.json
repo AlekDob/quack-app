@@ -11,8 +11,8 @@
     "preview": "vite preview",
     "tauri": "cargo tauri",
     "tauri:dev": "cargo tauri dev",
-    "tauri:build": "npm run build:secure && cargo tauri build --release",
-    "tauri:build:debug": "cargo tauri build",
+    "tauri:build": "npm run build:secure && cargo tauri build",
+    "tauri:build:debug": "cargo tauri build --debug",
     "prepare-node-sdk": "cd src-tauri/node-sdk && npm install --production"
   },
   "dependencies": {

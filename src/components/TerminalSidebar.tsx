@@ -19,7 +19,6 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import TerminalGroup from "./TerminalGroup";
 import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
@@ -187,7 +186,7 @@ export default function TerminalSidebar({
   onDuplicate,
   onReset,
   onToggleGroup,
-  onReorder,
+  onReorder: _onReorder,
   onOpenSettings,
   onOpenGitPanel,
   gitRefreshTrigger,
@@ -195,6 +194,7 @@ export default function TerminalSidebar({
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
   void _onUpdateAgentChat; // Will be used in rename functionality (Phase 4)
+  void _onReorder; // Drag & drop reordering functionality (currently disabled)
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
   // Metro style is now the only option (removed useMetroStyle state)
@@ -208,14 +208,6 @@ export default function TerminalSidebar({
     branchName: string;
     rootPath: string;
   } | null>(null);
-
-  // Drag & drop state
-  const [draggedTerminalId, setDraggedTerminalId] = useState<string | null>(null);
-  const [dragOverTerminalId, setDragOverTerminalId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<'before' | 'after'>('after');
-  const [draggedGroupCwd, setDraggedGroupCwd] = useState<string | null>(null);
-  const [dragOverGroupCwd, setDragOverGroupCwd] = useState<string | null>(null);
-  const [groupDropPosition, setGroupDropPosition] = useState<'before' | 'after'>('after');
 
   // Cleanup: Ensure dragging class is removed on unmount
   useEffect(() => {
@@ -590,123 +582,6 @@ export default function TerminalSidebar({
       console.error('Failed to generate PR URL:', error);
       return null;
     }
-  };
-
-  // Drag & drop handlers for terminals
-  const handleTerminalDragStart = (terminal: TerminalInfo) => {
-    setDraggedTerminalId(terminal.id);
-  };
-
-  const handleTerminalDragOver = (terminal: TerminalInfo, event: React.DragEvent) => {
-    if (terminal.id === draggedTerminalId) return;
-
-    // Block drag between different projects (different cwd)
-    const draggedTerminal = terminals.find(t => t.id === draggedTerminalId);
-    if (draggedTerminal && draggedTerminal.cwd !== terminal.cwd) {
-      return; // Don't allow drop if different project
-    }
-
-    // Calculate drop position based on mouse Y position
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    const position = event.clientY < midpoint ? 'before' : 'after';
-
-    setDragOverTerminalId(terminal.id);
-    setDropPosition(position);
-  };
-
-  const handleTerminalDragLeave = () => {
-    setDragOverTerminalId(null);
-  };
-
-  const handleTerminalDrop = (targetTerminal: TerminalInfo) => {
-    if (!draggedTerminalId || targetTerminal.id === draggedTerminalId) return;
-
-    const currentIds = terminals.map((t) => t.id);
-    const draggedIndex = currentIds.indexOf(draggedTerminalId);
-    let targetIndex = currentIds.indexOf(targetTerminal.id);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // Adjust target index based on drop position
-    if (dropPosition === 'after') {
-      targetIndex += 1;
-    }
-
-    const reordered = [...currentIds];
-    reordered.splice(draggedIndex, 1);
-
-    // Recalculate insertion index if needed
-    const newTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    reordered.splice(newTargetIndex, 0, draggedTerminalId);
-
-    onReorder(reordered);
-    setDragOverTerminalId(null);
-  };
-
-  const handleTerminalDragEnd = () => {
-    setDraggedTerminalId(null);
-    setDragOverTerminalId(null);
-  };
-
-  // Drag & drop handlers for groups
-  const handleGroupDragStart = (cwd: string) => {
-    setDraggedGroupCwd(cwd);
-  };
-
-  const handleGroupDragOver = (cwd: string, event: React.DragEvent) => {
-    if (cwd === draggedGroupCwd) return;
-
-    // Calculate drop position based on mouse Y position
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    const position = event.clientY < midpoint ? 'before' : 'after';
-
-    setDragOverGroupCwd(cwd);
-    setGroupDropPosition(position);
-  };
-
-  const handleGroupDragLeave = () => {
-    setDragOverGroupCwd(null);
-  };
-
-  const handleGroupDrop = (targetCwd: string) => {
-    if (!draggedGroupCwd || targetCwd === draggedGroupCwd) return;
-
-    // Find all terminals in both groups
-    const draggedGroup = cwdGroups.groups.find(([cwd]) => cwd === draggedGroupCwd)?.[1] || [];
-    const targetGroup = cwdGroups.groups.find(([cwd]) => cwd === targetCwd)?.[1] || [];
-
-    if (draggedGroup.length === 0 || targetGroup.length === 0) return;
-
-    const currentIds = terminals.map((t) => t.id);
-    const draggedGroupIds = draggedGroup.map((t) => t.id);
-
-    // Remove dragged group terminals from current order
-    const withoutDragged = currentIds.filter((id) => !draggedGroupIds.includes(id));
-
-    // Determine insertion point based on drop position
-    let insertId: string;
-    if (groupDropPosition === 'before') {
-      insertId = targetGroup[0].id;
-    } else {
-      insertId = targetGroup[targetGroup.length - 1].id;
-    }
-
-    const insertIndex = withoutDragged.indexOf(insertId);
-    const finalIndex = groupDropPosition === 'before' ? insertIndex : insertIndex + 1;
-
-    // Insert dragged group at the correct position
-    const reordered = [...withoutDragged];
-    reordered.splice(finalIndex, 0, ...draggedGroupIds);
-
-    onReorder(reordered);
-    setDragOverGroupCwd(null);
-  };
-
-  const handleGroupDragEnd = () => {
-    setDraggedGroupCwd(null);
-    setDragOverGroupCwd(null);
   };
 
   return (
