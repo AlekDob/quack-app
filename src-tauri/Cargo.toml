@@ -29,6 +29,7 @@ tauri-plugin-store = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-updater = "2"
 axum = { version = "0.7", features = ["macros"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "process", "io-util"] }
 anyhow = "1.0"

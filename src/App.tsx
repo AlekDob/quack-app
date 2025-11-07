@@ -43,6 +43,10 @@ import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
 import BrowserManager from "./components/BrowserManager";
+import { LicenseModal } from "./components/LicenseModal";
+import { UpgradeModal } from "./components/UpgradeModal";
+import { ProBanner } from "./components/ProBanner";
+import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
@@ -519,7 +523,25 @@ function App() {
 
   // Background state
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
+
+  // 💰 License and upgrade modals state
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeLimitType, setUpgradeLimitType] = useState<'terminals' | 'groups' | 'backgrounds' | 'agency' | 'sync'>('terminals');
+  const [isProUser, setIsProUser] = useState(isPro());
+  const [proBannerExpanded, setProBannerExpanded] = useState(true);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
+
+  // Auto-collapse ProBanner after 10 seconds
+  useEffect(() => {
+    if (!isProUser && proBannerExpanded) {
+      const timer = setTimeout(() => {
+        setProBannerExpanded(false);
+      }, 10000); // 10 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [isProUser, proBannerExpanded]);
 
   // Telegram Central Bot state
   const [showTelegramSetup, setShowTelegramSetup] = useState(false);
@@ -3704,6 +3726,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setExplorerError("Terminals available only via desktop app.");
       return;
     }
+
+    // 💰 Check Pro limit before opening modal
+    if (!canCreateTerminal(terminals.length)) {
+      setUpgradeLimitType('terminals');
+      setShowUpgradeModal(true);
+      return;
+    }
     setEditingTerminal(null);
     setNewTerminalError(null);
     const index = terminals.length;
@@ -4107,6 +4136,36 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     clearTerminalAttention,
     loadDirectory,
   ]);
+
+  // 💰 License and upgrade handlers
+  const handleShowUpgrade = useCallback((limitType: typeof upgradeLimitType = 'terminals') => {
+    setUpgradeLimitType(limitType);
+    setShowUpgradeModal(true);
+  }, []);
+
+  const handleActivateLicense = useCallback(() => {
+    setShowUpgradeModal(false);
+    setShowLicenseModal(true);
+  }, []);
+
+  const handleLicenseSuccess = useCallback(() => {
+    setIsProUser(true);
+    toast.success('🎉 Quack Pro activated! Enjoy unlimited features!', {
+      duration: 5000,
+    });
+  }, []);
+
+  // Override handleQuickCreateTerminal to check Pro limits
+  const handleQuickCreateTerminalWithLimit = useCallback(async () => {
+    // Check if user can create another terminal
+    if (!canCreateTerminal(terminals.length)) {
+      handleShowUpgrade('terminals');
+      return;
+    }
+
+    // Call original function
+    await handleQuickCreateTerminal();
+  }, [terminals.length, handleShowUpgrade, handleQuickCreateTerminal]);
 
   const handleSelectTerminal = useCallback(
     async (id: string) => {
@@ -5697,6 +5756,16 @@ You have access to all Bash tools to execute git commands like:
   return (
     <>
       <TitleBar />
+
+      {/* 💰 Pro Banner - Fixed at bottom with collapse to badge */}
+      {!isProUser && (
+        <ProBanner
+          onUpgrade={() => handleShowUpgrade('terminals')}
+          isExpanded={proBannerExpanded}
+          onToggle={() => setProBannerExpanded(!proBannerExpanded)}
+        />
+      )}
+
       <div
         ref={appShellRef}
         className={`app-shell ${sidePanelCollapsed ? 'side-panel-collapsed' : ''}`}
@@ -6342,6 +6411,7 @@ You have access to all Bash tools to execute git commands like:
           onClose={() => setShowTelegramSetup(false)}
         />
       </div>
+
       {introReplayActive && (
         <div
           className="intro-replay-overlay"
@@ -6425,6 +6495,20 @@ You have access to all Bash tools to execute git commands like:
           `}</style>
         </div>
       )}
+
+      {/* 💰 License and Upgrade Modals */}
+      <LicenseModal
+        isOpen={showLicenseModal}
+        onClose={() => setShowLicenseModal(false)}
+        onSuccess={handleLicenseSuccess}
+      />
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onActivateLicense={handleActivateLicense}
+        limitType={upgradeLimitType}
+      />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>

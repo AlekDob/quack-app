@@ -37,6 +37,14 @@
       "desktop": {
         "schemes": ["quack"]
       }
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://quack-app.com/api/update/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "dialog": false,
+      "pubkey": ""
     }
   },
   "bundle": {

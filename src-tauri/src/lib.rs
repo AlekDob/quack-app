@@ -21,6 +21,7 @@ mod deep_link_commands;
 mod fs;
 mod git;
 mod keychain; // 🔐 Secure keychain management for API keys
+mod license; // 💰 License management for Pro features
 mod mcp;
 mod notifications;
 mod native_terminal;
@@ -138,6 +139,7 @@ async fn handle_status_update(
 pub fn run() {
     tauri::Builder::default()
         .manage(SessionState::new()) // Register global session state
+        .manage(license::LicenseState::default()) // Register license state
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -145,6 +147,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_mic_recorder::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Initialize Telegram Central Polling State
             let telegram_state = telegram_central::TelegramPollingState::new(app.handle().clone());
@@ -548,7 +551,12 @@ pub fn run() {
             sessions::get_all_sessions_info,
             sessions::get_session_details,
             sessions::delete_session,
-            sessions::resume_session
+            sessions::resume_session,
+            // 💰 License management commands
+            license::configure_license_api,
+            license::validate_license,
+            license::deactivate_license,
+            license::get_license_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -246,6 +246,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
           title="Massimizza"
         />
       </div>
+
     </div>
   );
 };
