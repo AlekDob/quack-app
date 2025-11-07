@@ -179,6 +179,17 @@ fn write_file_impl(path: String, content: String) -> Result<()> {
 fn create_directory_impl(path: String) -> Result<()> {
     let resolved = PathBuf::from(path);
 
+    // Check if the path already exists
+    if resolved.exists() {
+        // If it exists and is a directory, return success (idempotent)
+        if resolved.is_dir() {
+            return Ok(());
+        }
+        // If it exists but is not a directory, return an error
+        return Err(anyhow!("Il percorso {:?} esiste ma non è una cartella", resolved));
+    }
+
+    // Create the directory and all parent directories
     fs::create_dir_all(&resolved)
         .with_context(|| format!("Impossibile creare la cartella {:?}", resolved))?;
 

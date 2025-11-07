@@ -9,12 +9,13 @@ import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
 import UsagePanel from "./UsagePanel";
 import { SessionsPanel } from "./SessionsPanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo } from "../types";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
  * Side Panel with tab navigation
  * Tabs: Agent Context, File Explorer, Agents, Skills, MCP, Commands, Sessions, Terminal, Usage
+ * Note: Marketplace is now a drawer (not a tab)
  */
 
 type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "sessions" | "terminal" | "usage";
@@ -289,6 +290,7 @@ interface SidePanelProps {
   activeAgentAvatar?: string | null;
   activeAgentWorkingOn?: string | null;
   activeAgentCwd?: string | null;
+  activeAgentPersonality?: Partial<AgentPersonality> | null; // Added: personality from terminal state
   projectName?: string;
   gitBranch?: string;
   agentRefreshKey?: number; // Added: forces context panel refresh when agent is edited
@@ -370,6 +372,7 @@ export default function SidePanel({
   activeAgentAvatar,
   activeAgentWorkingOn,
   activeAgentCwd,
+  activeAgentPersonality, // Added: personality from terminal state
   projectName,
   gitBranch,
   agentRefreshKey, // Added: forces context panel refresh when agent is edited
@@ -538,6 +541,7 @@ export default function SidePanel({
               activeAgentAvatar={activeAgentAvatar}
               activeAgentWorkingOn={activeAgentWorkingOn}
               activeAgentCwd={activeAgentCwd}
+              activeAgentPersonality={activeAgentPersonality}
               onOpenFile={onOpenFile}
               onOpenContextDrawer={onOpenContextDrawer}
               projectName={projectName}

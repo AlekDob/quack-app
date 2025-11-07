@@ -2,6 +2,7 @@ import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import CodeEditor, { type DiffInfo } from "./CodeEditor";
+import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 
 interface FilePreviewDrawerProps {
@@ -24,6 +25,8 @@ interface FilePreviewDrawerProps {
 
 export interface FilePreviewDrawerRef {
   triggerSave: () => void;
+  isEditMode: boolean;
+  toggleEditMode: () => void;
 }
 
 const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProps>(({
@@ -45,6 +48,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
 }, ref) => {
   const [editedContent, setEditedContent] = useState(content);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Notify parent when hasUnsavedChanges state changes
   useEffect(() => {
@@ -82,20 +86,26 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
     [editedContent, onSave]
   );
 
-  // Expose triggerSave method via ref
+  // Expose methods via ref
   useImperativeHandle(ref, () => ({
     triggerSave: () => handleSave(),
-  }), [handleSave]);
+    isEditMode,
+    toggleEditMode: () => setIsEditMode(!isEditMode),
+  }), [handleSave, isEditMode]);
 
-  // Reset content when file changes
+  // Reset content and edit mode when file changes
   useEffect(() => {
     setEditedContent(content);
     setHasUnsavedChanges(false);
+    setIsEditMode(false); // Always start in preview mode
   }, [path, content]);
 
   // Check if file is an image
   const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'];
   const isImageFile = filename ? imageExtensions.some(ext => filename.toLowerCase().endsWith(ext)) : false;
+
+  // Check if file is markdown
+  const isMarkdownFile = filename ? filename.toLowerCase().endsWith('.md') : false;
 
   if (!open) {
     return null;
@@ -105,7 +115,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
   const renderContent = () => {
     return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {!embedded && <header className="preview-toolbar">
+      <header className={`preview-toolbar ${embedded ? 'embedded' : ''}`}>
         <div className="preview-meta">
           <span className="preview-filename">{filename ?? "File"}</span>
           {path && <span className="preview-path">{path}</span>}
@@ -115,58 +125,65 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
           )}
         </div>
         <div className="preview-actions">
-          {!isImageFile && (
+          {/* Hide toolbar buttons in embedded mode - use bottom file-action-buttons instead */}
+          {!embedded && (
             <>
-              <button
-                type="button"
-                className="preview-action"
-                onClick={onRefresh}
-                disabled={loading || formatting}
-                title="Reload file from disk"
-              >
-                Reload
-              </button>
-              <button
-                type="button"
-                className="preview-action"
-                onClick={onFormat}
-                disabled={loading || formatting}
-                title="Format code"
-              >
-                {formatting ? "Formatting…" : "Format"}
-              </button>
-              {onSave && (
-                <button
-                  type="button"
-                  className={`preview-action save ${hasUnsavedChanges ? "active" : ""}`}
-                  onClick={() => handleSave()}
-                  disabled={!hasUnsavedChanges}
-                  title={hasUnsavedChanges ? "Save changes (⌘S)" : "No changes to save"}
-                >
-                  {hasUnsavedChanges ? "Save *" : "Saved"}
-                </button>
+              {!isImageFile && (
+                <>
+                  <button
+                    type="button"
+                    className="preview-action"
+                    onClick={onRefresh}
+                    disabled={loading || formatting}
+                    title="Reload file from disk"
+                  >
+                    Reload
+                  </button>
+                  {!isMarkdownFile && (
+                    <button
+                      type="button"
+                      className="preview-action"
+                      onClick={onFormat}
+                      disabled={loading || formatting}
+                      title="Format code"
+                    >
+                      {formatting ? "Formatting…" : "Format"}
+                    </button>
+                  )}
+                  {onSave && (
+                    <button
+                      type="button"
+                      className={`preview-action save ${hasUnsavedChanges ? "active" : ""}`}
+                      onClick={() => handleSave()}
+                      disabled={!hasUnsavedChanges}
+                      title={hasUnsavedChanges ? "Save changes (⌘S)" : "No changes to save"}
+                    >
+                      {hasUnsavedChanges ? "Save *" : "Saved"}
+                    </button>
+                  )}
+                </>
               )}
-            </>
-          )}
-          {path && (
-            <>
-              <button
-                type="button"
-                className="preview-action"
-                onClick={handleOpenInEditor}
-                disabled={loading}
-                title="Open in default IDE"
-              >
-                Open with IDE
+              {path && (
+                <>
+                  <button
+                    type="button"
+                    className="preview-action"
+                    onClick={handleOpenInEditor}
+                    disabled={loading}
+                    title="Open in default IDE"
+                  >
+                    Open with IDE
+                  </button>
+                  <RevealInFinderButton path={path} className="preview-action" />
+                </>
+              )}
+              <button type="button" className="preview-close" onClick={onClose} title="Close preview">
+                Close
               </button>
-              <RevealInFinderButton path={path} className="preview-action" />
             </>
           )}
-          <button type="button" className="preview-close" onClick={onClose} title="Close preview">
-            Close
-          </button>
         </div>
-      </header>}
+      </header>
       <div
         className="preview-content"
         data-loading={loading}
@@ -188,6 +205,23 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                 margin: 'auto',
               }}
             />
+          </div>
+        ) : isMarkdownFile ? (
+          <div className="editor-container">
+            {isEditMode ? (
+              <CodeEditor
+                content={editedContent}
+                filename={filename}
+                readOnly={false}
+                onChange={handleContentChange}
+                onSave={handleSave}
+                diffInfo={diffInfo}
+              />
+            ) : (
+              <div style={{ padding: '20px', overflow: 'auto', height: '100%' }}>
+                <MarkdownText>{editedContent}</MarkdownText>
+              </div>
+            )}
           </div>
         ) : (
           <div className="editor-container">

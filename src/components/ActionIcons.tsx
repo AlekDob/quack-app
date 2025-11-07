@@ -42,12 +42,12 @@ function ActionIcons({
         <span className="action-icon-tooltip">Git Panel</span>
       </button>
 
-      {/* Plugins Icon */}
+      {/* Marketplace Icon */}
       <button
         type="button"
         className="action-icon"
         onClick={onPluginsClick}
-        aria-label="Open Agents & Plugins panel"
+        aria-label="Open Marketplace"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path
@@ -55,7 +55,7 @@ function ActionIcons({
             fill="currentColor"
           />
         </svg>
-        <span className="action-icon-tooltip">Agents & Plugins</span>
+        <span className="action-icon-tooltip">Marketplace</span>
       </button>
 
       {/* Preview Icon */}

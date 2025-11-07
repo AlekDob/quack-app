@@ -47,6 +47,7 @@ export interface TerminalInfo {
   branch?: string;                   // Git branch this agent is working on
   useWorktree?: boolean;             // Whether this agent uses Git worktree
   worktreePath?: string;             // Path to worktree if different from cwd
+  personality?: Partial<AgentPersonality>; // Agent personality traits
 }
 
 // AgentTerminal: NEW - Terminale integrato XTerm associato ad un agente
@@ -678,4 +679,56 @@ export interface SessionDetails extends SessionInfo {
   messages: SessionHistoryMessage[]; // All messages from history.jsonl
   usage: UsageStats; // Detailed token usage stats
   events: ClaudeEvent[]; // All Claude events for detailed view
+}
+
+// Marketplace types
+export type MarketplaceCategory = 'agents' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills';
+
+export interface MarketplaceResource {
+  id: string;
+  name: string;
+  description: string;
+  category: MarketplaceCategory;
+  author: string;
+  authorAvatar?: string;
+  installCount: number;
+  rating?: number;
+  tags: string[];
+  version: string;
+  installCommand: string; // Full npx command (e.g., "npx claude-code-templates@latest --agent=...")
+  repository?: string; // GitHub repo URL
+  icon?: string;
+  featured?: boolean;
+  verified?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  dependencies?: string[];
+  screenshots?: string[];
+}
+
+export interface MarketplaceStack {
+  id: string;
+  name: string;
+  description: string;
+  resources: MarketplaceResource[];
+  author: string;
+  public: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketplaceLibrary {
+  installedResources: MarketplaceResource[];
+  customStacks: MarketplaceStack[];
+  favorites: string[]; // Resource IDs
+  lastSync: number;
+}
+
+export interface MarketplaceFilters {
+  category?: MarketplaceCategory;
+  searchQuery?: string;
+  tags?: string[];
+  verified?: boolean;
+  featured?: boolean;
+  sortBy?: 'popular' | 'recent' | 'name' | 'rating';
 }

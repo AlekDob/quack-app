@@ -817,6 +817,12 @@ button.directory-chooser:hover {
   flex-shrink: 0;
 }
 
+.preview-toolbar.embedded {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
 .preview-embedded .preview-content {
   flex: 1;
   min-height: 0;
@@ -8736,7 +8742,22 @@ button.directory-chooser:hover {
   transform: translateX(0);
 }
 
-/* File Action Buttons - Fixed bottom right */
+/* File Action Buttons - Fixed bottom right with animated glow */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(77, 212, 179, 0.3),
+      0 0 40px rgba(77, 212, 179, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.3),
+      0 0 30px rgba(77, 212, 179, 0.5),
+      0 0 60px rgba(77, 212, 179, 0.2);
+  }
+}
+
 .file-action-buttons {
   position: fixed;
   bottom: 24px;
@@ -8746,11 +8767,11 @@ button.directory-chooser:hover {
   gap: 8px;
   padding: 8px 12px;
   background: rgba(18, 20, 27, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(77, 212, 179, 0.3);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(12px);
   z-index: 1000;
+  animation: glowPulse 3s ease-in-out infinite;
 }
 
 .file-action-btn {

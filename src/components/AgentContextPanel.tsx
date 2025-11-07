@@ -18,6 +18,7 @@ interface AgentContextPanelProps {
   activeAgentAvatar?: string | null;
   activeAgentWorkingOn?: string | null;
   activeAgentCwd?: string | null;
+  activeAgentPersonality?: Partial<AgentPersonality> | null; // Added: personality from terminal state
   onOpenFile?: (entry: DirectoryEntry) => void;
   onOpenContextDrawer?: (scope: string) => void;
   projectName?: string;
@@ -32,6 +33,7 @@ export default function AgentContextPanel({
   activeAgentAvatar,
   activeAgentWorkingOn,
   activeAgentCwd,
+  activeAgentPersonality, // Added: personality from terminal state
   onOpenFile,
   onOpenContextDrawer,
   projectName,
@@ -58,10 +60,26 @@ export default function AgentContextPanel({
     try {
       setLoading(true);
 
-      // Load personality if we have an active agent
-      if (activeAgentId && activeAgentCwd) {
+      // Use personality from props (state) instead of loading from Rust
+      if (activeAgentPersonality && Object.keys(activeAgentPersonality).length > 0) {
+        // Personality available from terminal state - use it!
+        const fullPersonality: AgentPersonality = {
+          id: activeAgentId || '',
+          name: activeAgentName || '',
+          role: activeAgentPersonality.role || '',
+          intro: activeAgentPersonality.intro || '',
+          personality: activeAgentPersonality.personality || '',
+          quirks: activeAgentPersonality.quirks || '',
+          communicationStyle: activeAgentPersonality.communicationStyle || 'friendly',
+          specialties: activeAgentPersonality.specialties || [],
+          skills: activeAgentPersonality.skills || [],
+          expressions: activeAgentPersonality.expressions || [],
+        };
+        setPersonality(fullPersonality);
+        console.log('✅ Loaded personality from state:', fullPersonality);
+      } else if (activeAgentId && activeAgentCwd) {
+        // Fallback: try loading from Rust (for backward compatibility)
         try {
-          // Use the agent ID directly (it's the terminal ID) and the working directory
           const loadedPersonality = await invoke<AgentPersonality>(
             'load_agent_personality',
             {
@@ -69,7 +87,7 @@ export default function AgentContextPanel({
               personalityId: activeAgentId,
             }
           );
-          console.log('Loaded personality:', loadedPersonality);
+          console.log('✅ Loaded personality from Rust:', loadedPersonality);
           setPersonality(loadedPersonality);
         } catch (error) {
           console.error('Failed to load personality:', error);

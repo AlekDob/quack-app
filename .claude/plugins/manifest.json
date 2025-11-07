@@ -71,5 +71,25 @@
       ]
     },
     "scope": "project"
+  },
+  {
+    "id": "supabase-toolkit",
+    "name": "Supabase Toolkit",
+    "description": "Complete Supabase workflow with specialized commands, data engineering agents, and MCP integrations",
+    "category": "agent",
+    "version": "1.0.0",
+    "author": "Daniel Avila",
+    "repository": "https://github.com/davila7/claude-code-templates",
+    "installed": true,
+    "source": "davila7",
+    "metadata": {
+      "tags": [
+        "supabase",
+        "database",
+        "postgresql",
+        "data"
+      ]
+    },
+    "scope": "project"
   }
 ]

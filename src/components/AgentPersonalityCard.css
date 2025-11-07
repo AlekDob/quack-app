@@ -139,6 +139,17 @@
   margin: 0;
 }
 
+.personality-intro {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border-left: 3px solid rgba(77, 212, 179, 0.5);
+}
+
 .communication-badge {
   display: inline-flex;
   align-items: center;

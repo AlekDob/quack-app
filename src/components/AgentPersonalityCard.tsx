@@ -161,6 +161,13 @@ export default function AgentPersonalityCard({
         </div>
       </div>
 
+      {personality.intro && (
+        <div className="personality-section">
+          <h4 className="section-title">About</h4>
+          <p className="personality-intro">{personality.intro}</p>
+        </div>
+      )}
+
       {personality.communicationStyle && (
         <div className="personality-section">
           <h4 className="section-title">Communication Style</h4>
@@ -214,6 +221,20 @@ export default function AgentPersonalityCard({
           </div>
         </div>
       )}
+
+      {/* HIDDEN: Favorite Expressions section - not editable in UI yet */}
+      {/* {personality.expressions && personality.expressions.length > 0 && (
+        <div className="personality-section">
+          <h4 className="section-title">Favorite Expressions</h4>
+          <div className="expressions-list">
+            {personality.expressions.map((expression, index) => (
+              <div key={index} className="expression-item">
+                💬 {expression}
+              </div>
+            ))}
+          </div>
+        </div>
+      )} */}
     </div>
   );
 }

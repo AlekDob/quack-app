@@ -20,7 +20,7 @@ import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FileP
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
-import PluginsPanel from "./components/PluginsPanel";
+import MarketplaceDrawer from "./components/MarketplaceDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
@@ -89,6 +89,7 @@ interface TerminalMetadata {
   workingOn?: string;
   avatar?: string;
   branch?: string;
+  personality?: Partial<AgentPersonality>;
 }
 
 import "./App.css";
@@ -158,7 +159,7 @@ const STORAGE_KEY = "terminals";
 const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
   try {
     const store = await Store.load("quack-terminals.json");
-    // SIMPLE: Save terminal metadata only
+    // Save terminal metadata including personality
     const metadata = terminals.map((t) => ({
       label: t.label,
       color: t.color,
@@ -166,10 +167,11 @@ const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
       workingOn: t.workingOn,
       avatar: t.avatar,
       branch: t.branch,
+      personality: t.personality, // Include personality traits
     }));
     await store.set(STORAGE_KEY, metadata);
     await store.save();
-    console.log(`Saved ${metadata.length} terminals`);
+    console.log(`Saved ${metadata.length} terminals with personality data`);
   } catch (error) {
     console.warn("Unable to save terminals", error);
   }
@@ -3385,6 +3387,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
                 workingOn: metadata.workingOn,
                 avatar: metadata.avatar,
                 branch: metadata.branch,
+                personality: metadata.personality, // Restore personality traits
               };
 
               recreated.push(terminalWithState);
@@ -3392,6 +3395,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
                 workingOn: metadata.workingOn,
                 avatar: metadata.avatar,
                 branch: metadata.branch,
+                personality: metadata.personality ? 'loaded' : 'none',
               });
             } catch (error) {
               console.warn(
@@ -3568,26 +3572,32 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalAvatar(terminal.avatar || "68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
     setNewTerminalError(null);
 
-    // Try to load existing personality
-    try {
-      const personality = await invoke<AgentPersonality>('load_agent_personality', {
-        projectPath: terminal.cwd,
-        personalityId: terminal.id,
-      });
-      setNewTerminalPersonality(personality);
-      console.log('✅ Loaded existing personality for:', terminal.label);
-    } catch (error) {
-      // No personality found - reset to default
-      console.log('No existing personality found, using default');
-      setNewTerminalPersonality({
-        role: 'Feature Coordinator',
-        intro: 'Experienced PM specializing in feature delivery and team coordination',
-        communicationStyle: 'friendly',
-        specialties: ['feature-planning', 'team-alignment'],
-        personality: 'Organized. Proactive',
-        skills: [],
-        expressions: [],
-      });
+    // Load personality from terminal state (already persisted)
+    if (terminal.personality && Object.keys(terminal.personality).length > 0) {
+      setNewTerminalPersonality(terminal.personality);
+      console.log('✅ Loaded personality from state for:', terminal.label);
+    } else {
+      // Try to load from Rust as fallback
+      try {
+        const personality = await invoke<AgentPersonality>('load_agent_personality', {
+          projectPath: terminal.cwd,
+          personalityId: terminal.id,
+        });
+        setNewTerminalPersonality(personality);
+        console.log('✅ Loaded personality from Rust for:', terminal.label);
+      } catch (error) {
+        // No personality found - reset to default
+        console.log('No existing personality found, using default');
+        setNewTerminalPersonality({
+          role: 'Feature Coordinator',
+          intro: 'Experienced PM specializing in feature delivery and team coordination',
+          communicationStyle: 'friendly',
+          specialties: ['feature-planning', 'team-alignment'],
+          personality: 'Organized. Proactive',
+          skills: [],
+          expressions: [],
+        });
+      }
     }
 
     setShowNewTerminalModal(true);
@@ -3875,6 +3885,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
                   workingOn: trimmedWorkingOn || undefined,
                   avatar: newTerminalAvatar,
                   branch: newTerminalBranch || undefined,
+                  personality: newTerminalPersonality, // Update personality in state
                 }
               : t
           )
@@ -4007,6 +4018,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           branch: newTerminalBranch || undefined,
           useWorktree: newTerminalUseWorktree && !!worktreePath,
           worktreePath: worktreePath,
+          personality: newTerminalPersonality, // Store personality in state
         };
 
         // Save metadata for Telegram notifications immediately
@@ -5994,6 +6006,11 @@ You have access to all Bash tools to execute git commands like:
                     formatting={formattingPreview}
                     hasUnsavedChanges={previewHasUnsavedChanges}
                     isImageFile={previewFile?.name ? ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'].some(ext => previewFile.name!.toLowerCase().endsWith(ext)) : false}
+                    isMarkdownFile={previewFile?.name ? previewFile.name.toLowerCase().endsWith('.md') : false}
+                    isEditMode={previewDrawerRef.current?.isEditMode ?? false}
+                    onToggleEditMode={() => {
+                      previewDrawerRef.current?.toggleEditMode();
+                    }}
                   />
                 </div>
               )}
@@ -6111,6 +6128,10 @@ You have access to all Bash tools to execute git commands like:
           activeAgentCwd={(() => {
             const activeTerminal = terminals.find((t) => t.id === activeId);
             return activeTerminal?.cwd || null;
+          })()}
+          activeAgentPersonality={(() => {
+            const activeTerminal = terminals.find((t) => t.id === activeId);
+            return activeTerminal?.personality || null;
           })()}
           projectName={projectName}
           gitBranch={gitBranch}
@@ -6326,7 +6347,7 @@ You have access to all Bash tools to execute git commands like:
                 ✕
               </button>
             </header>
-            <PluginsPanel workingDir={explorerPath || undefined} />
+            <MarketplaceDrawer workingDir={explorerPath || undefined} />
           </div>
         </div>
 
