@@ -59,3 +59,11 @@ lazy_static = "1.5"
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"
 objc = "0.2"
+
+# 🔐 Security-optimized production build profile
+[profile.release]
+opt-level = "z"        # Optimize for size and performance
+lto = true             # Link Time Optimization (slower build, smaller/faster binary)
+codegen-units = 1      # Single codegen unit for better optimization
+strip = true           # Strip debug symbols from binary
+panic = "abort"        # Smaller panic handler

@@ -20,6 +20,7 @@ mod deep_link;
 mod deep_link_commands;
 mod fs;
 mod git;
+mod keychain; // 🔐 Secure keychain management for API keys
 mod mcp;
 mod notifications;
 mod native_terminal;
@@ -148,6 +149,14 @@ pub fn run() {
             // Initialize Telegram Central Polling State
             let telegram_state = telegram_central::TelegramPollingState::new(app.handle().clone());
             app.manage(telegram_state);
+
+            // 🔐 Migrate API keys from preferences to keychain on first run
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = keychain::migrate_keys_to_keychain(&app_handle).await {
+                    log::warn!("⚠️ Failed to migrate API keys to keychain: {}", e);
+                }
+            });
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {
@@ -475,6 +484,14 @@ pub fn run() {
             preferences::get_claude_api_key,
             preferences::set_ai_model,
             preferences::get_ai_model,
+            // 🔐 Secure keychain commands for API keys
+            keychain::set_claude_api_key_secure,
+            keychain::get_claude_api_key_secure,
+            keychain::delete_claude_api_key_secure,
+            keychain::set_openai_api_key_secure,
+            keychain::get_openai_api_key_secure,
+            keychain::delete_openai_api_key_secure,
+            keychain::check_api_keys_in_keychain,
             preferences::get_background_image,
             preferences::set_background_image,
             preferences::list_available_backgrounds,

@@ -199,12 +199,29 @@ export function useClaudeChat() {
           )
         );
       } else {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : typeof err === 'string'
-              ? err
-              : 'Unknown error';
+        let errorMessage = 'Unknown error';
+        let errorDetails = '';
+
+        if (err instanceof Error) {
+          errorMessage = err.message;
+
+          // Extract specific error types for better user feedback
+          if (errorMessage.includes('API key')) {
+            errorDetails = 'Please check your Anthropic API key in settings.';
+          } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+            errorDetails = 'Rate limit reached. Please wait a few minutes and try again.';
+          } else if (errorMessage.includes('401') || errorMessage.includes('authentication')) {
+            errorDetails = 'Authentication failed. Please verify your API key.';
+          } else if (errorMessage.includes('timeout')) {
+            errorDetails = 'Request took too long. Try a shorter prompt or simpler task.';
+          } else if (errorMessage.includes('working directory') || errorMessage.includes('cwd')) {
+            errorDetails = 'Working directory is not accessible. Check file permissions.';
+          } else if (errorMessage.includes('exit status: 1')) {
+            errorDetails = 'Claude SDK process crashed. Check console for more details. Common causes: invalid API key, rate limiting, or corrupted CLAUDE.md file.';
+          }
+        } else if (typeof err === 'string') {
+          errorMessage = err;
+        }
 
         // Update message with error
         setMessages((prev) =>
@@ -212,7 +229,7 @@ export function useClaudeChat() {
             msg.id === assistantMessageId
               ? {
                   ...msg,
-                  content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
+                  content: `Quack! 🦆 I encountered an error:\n\n**${errorMessage}**\n\n${errorDetails}`,
                   status: 'error' as const,
                   error: errorMessage,
                 }

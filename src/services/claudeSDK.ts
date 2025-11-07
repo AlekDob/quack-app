@@ -284,7 +284,29 @@ export async function* streamClaudeMessage(
     const isTimeout = error instanceof Error && error.message.includes('timeout');
     const isAborted = combinedSignal.aborted;
 
-    console.error(`[claudeSDK:${streamId}] Error after ${duration}ms (aborted: ${isAborted}):`, error);
+    // Enhanced error logging with more details
+    console.error(`[claudeSDK:${streamId}] ❌ Error after ${duration}ms (aborted: ${isAborted}):`, error);
+
+    // Log additional error details if available
+    if (error instanceof Error) {
+      console.error(`[claudeSDK:${streamId}] Error name: ${error.name}`);
+      console.error(`[claudeSDK:${streamId}] Error message: ${error.message}`);
+      if (error.stack) {
+        console.error(`[claudeSDK:${streamId}] Error stack:`, error.stack);
+      }
+
+      // Log specific error causes
+      if (error.message.includes('exit status: 1')) {
+        console.error(`[claudeSDK:${streamId}] 🦆 SDK process crashed - possible causes:`);
+        console.error(`  - Invalid or expired Anthropic API key`);
+        console.error(`  - Rate limit exceeded (429)`);
+        console.error(`  - Authentication failure (401)`);
+        console.error(`  - Corrupted CLAUDE.md or .mcp.json file`);
+        console.error(`  - Working directory permissions issue`);
+        console.error(`  - Insufficient memory or CPU resources`);
+        console.error(`  - MCP server initialization failure`);
+      }
+    }
 
     yield {
       type: 'error',

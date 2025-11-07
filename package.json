@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run prepare-node-sdk && tsc -b && vite build",
+    "build": "NODE_ENV=production npm run prepare-node-sdk && tsc -b && vite build",
+    "build:secure": "NODE_ENV=production npm run prepare-node-sdk && tsc -b && vite build --minify esbuild",
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "cargo tauri",
     "tauri:dev": "cargo tauri dev",
-    "tauri:build": "cargo tauri build",
+    "tauri:build": "npm run build:secure && cargo tauri build --release",
+    "tauri:build:debug": "cargo tauri build",
     "prepare-node-sdk": "cd src-tauri/node-sdk && npm install --production"
   },
   "dependencies": {

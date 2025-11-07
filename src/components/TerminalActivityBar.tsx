@@ -97,6 +97,16 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
   const isBusy = confirmedStatus === 'busy'
   const isWaitingForResponse = terminal.waitingForResponse ?? false
 
+  // Check if agent is sleeping (30+ minutes since last response)
+  const SLEEP_THRESHOLD_MS = 30 * 60 * 1000 // 30 minutes
+  const isSleeping = useMemo(() => {
+    if (!terminal.hasResponded || !terminal.responseStartTime) return false
+    if (isBusy || isWaitingForResponse) return false // Not sleeping if active
+
+    const timeSinceLastResponse = Date.now() - terminal.responseStartTime
+    return timeSinceLastResponse > SLEEP_THRESHOLD_MS
+  }, [terminal.hasResponded, terminal.responseStartTime, isBusy, isWaitingForResponse])
+
   // Memoize last message calculation
   const lastMessage = useMemo((): string | null => {
     if (!chatSessions) return null
@@ -116,12 +126,15 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
   const badge = useMemo(() => {
     if (isBusy) return '⚡'
     if (isWaitingForResponse) return '💬'
+    if (isSleeping) return '💤' // Sleeping emoji for dormant agents
     return '' // No badge when idle
-  }, [isBusy, isWaitingForResponse])
+  }, [isBusy, isWaitingForResponse, isSleeping])
 
-  const badgeClassName = isWaitingForResponse
-    ? 'terminal-status-badge waiting'
-    : 'terminal-status-badge'
+  const badgeClassName = useMemo(() => {
+    if (isWaitingForResponse) return 'terminal-status-badge waiting'
+    if (isSleeping) return 'terminal-status-badge sleeping'
+    return 'terminal-status-badge'
+  }, [isWaitingForResponse, isSleeping])
 
   return (
     <>
@@ -133,7 +146,7 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
           onMouseLeave={() => setIsHovering(false)}
         >
           <div
-            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : ''}`}
+            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : isSleeping ? 'sleeping' : ''}`}
             style={{
               '--avatar-border-color': terminal.color,
             } as React.CSSProperties}
@@ -176,8 +189,8 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
       <div className="terminal-details" style={{ flex: 1 }}>
         <span className="terminal-name" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span style={{ flex: 1 }}>{terminal.label}</span>
-          {/* Only show badge if busy or waiting for response */}
-          {(isBusy || isWaitingForResponse) && (
+          {/* Show badge if busy, waiting for response, or sleeping */}
+          {(isBusy || isWaitingForResponse || isSleeping) && (
             <span className={badgeClassName}>
               {badge}
             </span>

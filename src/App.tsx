@@ -3835,6 +3835,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               id: editingTerminal.id,
               name: trimmedName,
               role: newTerminalPersonality.role || '',
+              intro: newTerminalPersonality.intro || '', // ✅ FIXED: Now saving intro field
               personality: newTerminalPersonality.personality || '',
               quirks: newTerminalPersonality.quirks || '',
               communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
@@ -3973,6 +3974,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               id: createdWithState.id,
               name: trimmedName,
               role: newTerminalPersonality.role || '',
+              intro: newTerminalPersonality.intro || '', // ✅ FIXED: Now saving intro field
               personality: newTerminalPersonality.personality || '',
               quirks: newTerminalPersonality.quirks || '',
               communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
