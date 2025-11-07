@@ -65,39 +65,60 @@ pub async fn validate_license(
         });
     }
 
-    // For now, implement a simple validation
-    // In production, this would call Lemon Squeezy API
-    // https://docs.lemonsqueezy.com/api/license-keys#validate-a-license-key
+    // Lemon Squeezy License Key Activation API
+    // https://docs.lemonsqueezy.com/api/license-keys#activate-a-license-key
 
     let client = reqwest::Client::new();
     let api_key = api_key.unwrap();
 
+    // First, validate the license key format
+    if license_key.is_empty() {
+        return Ok(LicenseValidationResponse {
+            valid: false,
+            license_data: None,
+            error: Some("License key cannot be empty".to_string()),
+        });
+    }
+
     match client
-        .post(format!("{}/licenses/validate", LEMON_SQUEEZY_API_URL))
+        .post(format!("{}/licenses/activate", LEMON_SQUEEZY_API_URL))
         .header("Authorization", format!("Bearer {}", api_key))
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
         .json(&serde_json::json!({
-            "license_key": license_key
+            "license_key": license_key,
+            "instance_name": format!("Quack-{}", uuid::Uuid::new_v4())
         }))
         .send()
         .await
     {
         Ok(response) => {
-            if response.status().is_success() {
+            let status = response.status();
+
+            if status.is_success() {
                 match response.json::<serde_json::Value>().await {
                     Ok(data) => {
-                        // Parse Lemon Squeezy response
-                        let valid = data["valid"].as_bool().unwrap_or(false);
+                        // Parse Lemon Squeezy activate response
+                        // Response structure: { "activated": true, "license_key": {...}, "instance": {...}, "meta": {...} }
+                        let activated = data["activated"].as_bool().unwrap_or(false);
 
-                        if valid {
+                        if activated {
+                            let license_key_data = &data["license_key"];
+                            let meta_data = &data["meta"];
+
                             let license_data = LicenseData {
                                 key: license_key.clone(),
-                                email: data["meta"]["customer_email"].as_str().map(|s| s.to_string()),
+                                email: meta_data["customer_email"].as_str().map(|s| s.to_string())
+                                    .or_else(|| license_key_data["customer_email"].as_str().map(|s| s.to_string())),
                                 activated_at: chrono::Utc::now().timestamp(),
-                                expires_at: data["license_key"]["expires_at"]
+                                expires_at: license_key_data["expires_at"]
                                     .as_str()
+                                    .filter(|s| !s.is_empty() && *s != "null")
                                     .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                                     .map(|dt| dt.timestamp()),
-                                license_type: if data["license_key"]["expires_at"].is_null() {
+                                license_type: if license_key_data["expires_at"].is_null()
+                                    || license_key_data["expires_at"].as_str() == Some("null")
+                                    || license_key_data["expires_at"].as_str() == Some("") {
                                     "lifetime".to_string()
                                 } else {
                                     "subscription".to_string()
@@ -114,21 +135,36 @@ pub async fn validate_license(
                             Ok(LicenseValidationResponse {
                                 valid: false,
                                 license_data: None,
-                                error: Some(data["error"].as_str().unwrap_or("Invalid license key").to_string()),
+                                error: Some(data["error"].as_str().unwrap_or("License activation failed").to_string()),
                             })
                         }
                     }
                     Err(e) => Ok(LicenseValidationResponse {
                         valid: false,
                         license_data: None,
-                        error: Some(format!("Failed to parse response: {}", e)),
+                        error: Some(format!("Failed to parse API response: {}", e)),
                     }),
                 }
             } else {
+                // Try to parse error message from response body
+                let error_msg = match response.text().await {
+                    Ok(body) => {
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                            json["error"].as_str()
+                                .or_else(|| json["message"].as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| format!("API request failed: {} - {}", status, body))
+                        } else {
+                            format!("API request failed: {} - {}", status, body)
+                        }
+                    }
+                    Err(_) => format!("API request failed: {}", status)
+                };
+
                 Ok(LicenseValidationResponse {
                     valid: false,
                     license_data: None,
-                    error: Some(format!("API request failed: {}", response.status())),
+                    error: Some(error_msg),
                 })
             }
         }
