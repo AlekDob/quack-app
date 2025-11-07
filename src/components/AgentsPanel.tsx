@@ -264,7 +264,7 @@ export default function AgentsPanel({
                     .filter((a) => a.scope === "global")
                     .map((agent) => (
                       <div
-                        key={agent.name}
+                        key={`global-${agent.name}`}
                         className="rounded-lg border transition-all duration-200"
                         style={{
                           background: "rgba(12, 16, 24, 0.6)",
@@ -407,7 +407,7 @@ export default function AgentsPanel({
                     .filter((a) => a.scope === "project")
                     .map((agent) => (
                       <div
-                        key={agent.name}
+                        key={`project-${agent.name}`}
                         className="rounded-lg border transition-all duration-200"
                         style={{
                           background: "rgba(12, 16, 24, 0.6)",

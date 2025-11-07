@@ -414,6 +414,7 @@ pub fn run() {
             fs::get_home_directory,
             fs::read_file_content,
             fs::write_file_content,
+            fs::create_directory,
             fs::stat_file,
             fs::read_file_preview,
             fs::save_clipboard_file,

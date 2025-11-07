@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import MarkdownText from './MarkdownText';
 import './PlanWidget.css';
 
 interface PlanWidgetProps {
   plan: string;
   defaultExpanded?: boolean;
+  workingDirectory?: string; // Current working directory of the agent
 }
 
-const PlanWidget: React.FC<PlanWidgetProps> = ({ plan, defaultExpanded = true }) => {
+const PlanWidget: React.FC<PlanWidgetProps> = ({ plan, defaultExpanded = true, workingDirectory }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isCopied, setIsCopied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [savedFilePath, setSavedFilePath] = useState<string | null>(null);
 
   const handleCopy = async () => {
     try {
@@ -18,6 +22,65 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({ plan, defaultExpanded = true })
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy plan:', err);
+    }
+  };
+
+  const handleSaveToFile = async () => {
+    try {
+      console.log('[PlanWidget] Saving plan to file...');
+      console.log('[PlanWidget] Working directory:', workingDirectory);
+
+      // Normalize title for filename (remove special chars, replace spaces with dashes)
+      const normalizedTitle = planTitle
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+
+      console.log('[PlanWidget] Normalized title:', normalizedTitle);
+
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      const filename = `${normalizedTitle}-${today}.md`;
+
+      console.log('[PlanWidget] Filename:', filename);
+
+      // Use working directory if available, otherwise current working directory from agent
+      // If no workingDirectory is provided, the planning folder will be created relative to CWD
+      const planningDir = workingDirectory ? `${workingDirectory}/planning` : 'planning';
+
+      console.log('[PlanWidget] Planning directory:', planningDir);
+
+      // Create planning directory if it doesn't exist
+      await invoke('create_directory', { path: planningDir });
+
+      console.log('[PlanWidget] Directory created successfully');
+
+      // Write plan to file
+      const filepath = `${planningDir}/${filename}`;
+      await invoke('write_file_content', { path: filepath, content: plan });
+
+      console.log('[PlanWidget] File written successfully:', filepath);
+
+      setSavedFilePath(filepath);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2000);
+    } catch (err) {
+      console.error('[PlanWidget] Failed to save plan to file:', err);
+      alert(`Failed to save plan: ${err}`);
+    }
+  };
+
+  const handleOpenFile = async () => {
+    if (!savedFilePath) return;
+
+    try {
+      console.log('[PlanWidget] Opening file:', savedFilePath);
+      await invoke('open_file_in_editor', { path: savedFilePath });
+    } catch (err) {
+      console.error('[PlanWidget] Failed to open file:', err);
+      alert(`Failed to open file: ${err}`);
     }
   };
 
@@ -41,6 +104,45 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({ plan, defaultExpanded = true })
           <span className="plan-widget-badge">Plan Mode</span>
         </div>
         <div className="plan-widget-actions">
+          {/* Open file button (only shown after saving) */}
+          {savedFilePath && (
+            <button
+              className="plan-widget-copy-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenFile();
+              }}
+              title="Open saved plan file"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1.75 2.5a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 00.25-.25V5.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H1.75zM0 2.75C0 1.784.784 1 1.75 1h8.836c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0113.5 16h-11A1.75 1.75 0 010 14.25V2.75z"/>
+                <path d="M5.5 5.75a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4a.75.75 0 01-.75-.75zm0 2.5a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4a.75.75 0 01-.75-.75zm0 2.5a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4a.75.75 0 01-.75-.75z"/>
+              </svg>
+            </button>
+          )}
+
+          {/* Save to file button */}
+          <button
+            className="plan-widget-copy-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSaveToFile();
+            }}
+            title="Save plan to file (planning/*.md)"
+          >
+            {isSaved ? (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75z"/>
+                <path d="M4.75 7.5a.75.75 0 01.75-.75h5a.75.75 0 010 1.5h-5a.75.75 0 01-.75-.75zm0 2a.75.75 0 01.75-.75h5a.75.75 0 010 1.5h-5a.75.75 0 01-.75-.75zm0 2a.75.75 0 01.75-.75h2a.75.75 0 010 1.5h-2a.75.75 0 01-.75-.75z"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Copy to clipboard button */}
           <button
             className="plan-widget-copy-btn"
             onClick={(e) => {
@@ -60,6 +162,8 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({ plan, defaultExpanded = true })
               </svg>
             )}
           </button>
+
+          {/* Expand/collapse chevron */}
           <svg
             className={`plan-widget-chevron ${isExpanded ? 'expanded' : ''}`}
             width="16"

@@ -495,6 +495,7 @@ export const TodoWriteWidget: React.FC<{
 export const ExitPlanModeWidget: React.FC<{
   plan: string;
   defaultExpanded?: boolean;
-}> = ({ plan, defaultExpanded = true }) => {
-  return <PlanWidget plan={plan} defaultExpanded={defaultExpanded} />;
+  workingDirectory?: string;
+}> = ({ plan, defaultExpanded = true, workingDirectory }) => {
+  return <PlanWidget plan={plan} defaultExpanded={defaultExpanded} workingDirectory={workingDirectory} />;
 };

@@ -33,7 +33,11 @@ export function useSessions() {
               const info = await invoke<SessionInfo>('get_session_info', { sessionId });
               return info;
             } catch (err) {
-              console.error(`Failed to load session ${sessionId}:`, err);
+              // Silently skip empty or corrupted sessions (don't spam console)
+              const errMsg = err instanceof Error ? err.message : String(err);
+              if (!errMsg.includes('Empty session file')) {
+                console.warn(`Failed to load session ${sessionId}:`, err);
+              }
               return null;
             }
           })

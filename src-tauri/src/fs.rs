@@ -66,6 +66,11 @@ pub fn write_file_content(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn create_directory(path: String) -> Result<(), String> {
+    create_directory_impl(path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn stat_file(path: String) -> Result<FileMetadata, String> {
     stat_file_impl(path).map_err(|err| err.to_string())
 }
@@ -167,6 +172,15 @@ fn write_file_impl(path: String, content: String) -> Result<()> {
 
     fs::write(&resolved, content)
         .with_context(|| format!("Impossibile scrivere il file {:?}", resolved))?;
+
+    Ok(())
+}
+
+fn create_directory_impl(path: String) -> Result<()> {
+    let resolved = PathBuf::from(path);
+
+    fs::create_dir_all(&resolved)
+        .with_context(|| format!("Impossibile creare la cartella {:?}", resolved))?;
 
     Ok(())
 }

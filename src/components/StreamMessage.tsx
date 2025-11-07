@@ -25,9 +25,10 @@ interface StreamMessageProps {
   onFilePathClick?: (path: string) => void;
   agentName?: string;
   agentAvatar?: string;
+  workingDirectory?: string; // Current working directory for file operations
 }
 
-const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick, agentName = 'Jack', agentAvatar }) => {
+const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick, agentName = 'Jack', agentAvatar, workingDirectory }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -219,6 +220,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                 <ExitPlanModeWidget
                   key={idx}
                   plan={input.plan}
+                  workingDirectory={workingDirectory}
                   defaultExpanded={true}
                 />
               );

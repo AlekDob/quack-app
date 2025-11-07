@@ -6343,8 +6343,85 @@ You have access to all Bash tools to execute git commands like:
       {introReplayActive && (
         <div
           className="intro-replay-overlay"
-          style={{ backgroundImage: `url(${splashImage})` }}
-        />
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#000',
+            zIndex: 9999,
+          }}
+        >
+          {/* Video background */}
+          <video
+            autoPlay
+            muted
+            playsInline
+            loop
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center',
+            }}
+          >
+            <source src="/video/introquack.mp4" type="video/mp4" />
+          </video>
+
+          {/* Dark overlay (30% opacity) */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            zIndex: 1,
+          }} />
+
+          {/* "QUACK" text with colorful glow and fade-in animation */}
+          <h1 style={{
+            position: 'relative',
+            zIndex: 2,
+            fontSize: '120px',
+            fontWeight: '900',
+            fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+            color: '#fff',
+            margin: 0,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            textShadow: `
+              0 0 20px rgba(242, 140, 82, 0.8),
+              0 0 40px rgba(242, 140, 82, 0.6),
+              0 0 60px rgba(77, 212, 179, 0.5),
+              0 0 80px rgba(77, 212, 179, 0.3)
+            `,
+            animation: 'quackFadeIn 1s ease-out forwards',
+          }}>
+            QUACK
+          </h1>
+
+          {/* Fade-in animation keyframes */}
+          <style>{`
+            @keyframes quackFadeIn {
+              from {
+                opacity: 0;
+                transform: scale(0.9);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+          `}</style>
+        </div>
       )}
 
       <Toaster position="bottom-right" richColors closeButton />

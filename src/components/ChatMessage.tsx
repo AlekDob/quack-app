@@ -346,16 +346,35 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {message.events.map((event, idx) => (
-              <StreamMessage
-                key={idx}
-                message={event}
-                streamMessages={message.events || []}
-                onFilePathClick={onFilePathClick}
-                agentName={agentName}
-                agentAvatar={agentAvatar}
-              />
-            ))}
+            {message.events.map((event, idx) => {
+              // Generate unique key based on event properties to avoid React key warnings and duplicate rendering
+              const eventKey = (() => {
+                // Try to use session_id if available
+                if ('session_id' in event && event.session_id) {
+                  return `${event.type}-${event.session_id}-${idx}`;
+                }
+                // For assistant events with content blocks, use first content block ID if available
+                if (event.type === 'assistant' && 'content' in event && Array.isArray(event.content) && event.content.length > 0) {
+                  const firstBlock = event.content[0];
+                  if ('id' in firstBlock && firstBlock.id) {
+                    return `${event.type}-${firstBlock.id}-${idx}`;
+                  }
+                }
+                // Fallback to timestamp + index
+                return `${event.type}-${message.timestamp}-${idx}`;
+              })();
+
+              return (
+                <StreamMessage
+                  key={eventKey}
+                  message={event}
+                  streamMessages={message.events || []}
+                  onFilePathClick={onFilePathClick}
+                  agentName={agentName}
+                  agentAvatar={agentAvatar}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
