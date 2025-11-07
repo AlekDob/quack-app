@@ -47,11 +47,12 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, onS
 
       if (response.valid && response.license_data) {
         // Convert snake_case to camelCase for frontend
+        // Backend timestamps are in seconds, convert to milliseconds for JavaScript Date
         const licenseData: LicenseData = {
           key: response.license_data.key,
           email: response.license_data.email,
-          activatedAt: response.license_data.activated_at,
-          expiresAt: response.license_data.expires_at,
+          activatedAt: response.license_data.activated_at * 1000, // Convert seconds to milliseconds
+          expiresAt: response.license_data.expires_at ? response.license_data.expires_at * 1000 : undefined,
           type: response.license_data.license_type as 'lifetime' | 'subscription',
           valid: response.license_data.valid,
         };

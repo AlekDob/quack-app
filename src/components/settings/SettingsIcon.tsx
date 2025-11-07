@@ -36,6 +36,15 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'license':
+      return (
+        <svg {...iconProps}>
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <line x1="2" y1="10" x2="22" y2="10"/>
+          <path d="M6 15h.01M10 15h4"/>
+        </svg>
+      );
+
     case 'notifications':
       return (
         <svg {...iconProps}>

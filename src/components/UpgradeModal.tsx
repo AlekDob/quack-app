@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Crown, Check, Sparkles, Zap, Shield } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-shell';
 import { FREE_LIMITS } from '../config/features';
 
 interface UpgradeModalProps {
@@ -121,7 +122,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           <div className="space-y-3">
             <button
               onClick={() => {
-                window.open('https://quack-app.com/buy', '_blank'); // Replace with actual Lemon Squeezy URL
+                // Open Lemon Squeezy checkout in browser using Tauri shell
+                open('https://quackbuild.lemonsqueezy.com/checkout/buy/69111d6b-9f87-4eeb-a1d6-202980eaa47f');
               }}
               className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold transition-all shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 flex items-center justify-center gap-2"
             >

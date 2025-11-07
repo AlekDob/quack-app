@@ -4,6 +4,7 @@ import type { SettingsCategory } from './SettingsSidebar';
 import SettingsContent from './SettingsContent';
 import GeneralSettings from './categories/GeneralSettings';
 import AIAssistantSettings from './categories/AIAssistantSettings';
+import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
 import TerminalSettings from './categories/TerminalSettings';
@@ -39,6 +40,8 @@ export default function UnifiedSettings({
         return <GeneralSettings />;
       case 'ai-assistant':
         return <AIAssistantSettings />;
+      case 'license':
+        return <LicenseSettings />;
       case 'notifications':
         return <NotificationSettings />;
       case 'appearance':
