@@ -230,6 +230,107 @@ pub async fn get_license_info(
     Ok(None)
 }
 
+/// Revalidate an existing license (check if still valid on Lemon Squeezy)
+/// Used for periodic checks to detect refunds, chargebacks, or expiration
+#[tauri::command]
+pub async fn revalidate_license(
+    license_key: String,
+    state: State<'_, LicenseState>,
+) -> Result<serde_json::Value, String> {
+    let api_key = state.api_key.lock().unwrap().clone();
+
+    if api_key.is_none() {
+        return Ok(serde_json::json!({
+            "valid": false,
+            "error": "License API not configured"
+        }));
+    }
+
+    let client = reqwest::Client::new();
+    let api_key = api_key.unwrap();
+
+    // Use the /licenses/validate endpoint (not activate)
+    // https://docs.lemonsqueezy.com/api/license-keys#validate-a-license-key
+    match client
+        .post(format!("{}/licenses/validate", LEMON_SQUEEZY_API_URL))
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "license_key": license_key
+        }))
+        .send()
+        .await
+    {
+        Ok(response) => {
+            let status = response.status();
+
+            if status.is_success() {
+                match response.json::<serde_json::Value>().await {
+                    Ok(data) => {
+                        // Check if license is valid
+                        let valid = data["valid"].as_bool().unwrap_or(false);
+
+                        if valid {
+                            // Check license status field
+                            let license_status = data["license_key"]["status"]
+                                .as_str()
+                                .unwrap_or("inactive");
+
+                            // Lemon Squeezy status values: active, inactive, expired, refunded, etc.
+                            let is_active = license_status == "active";
+
+                            if is_active {
+                                Ok(serde_json::json!({
+                                    "valid": true,
+                                    "status": license_status
+                                }))
+                            } else {
+                                Ok(serde_json::json!({
+                                    "valid": false,
+                                    "error": format!("License status: {}", license_status)
+                                }))
+                            }
+                        } else {
+                            Ok(serde_json::json!({
+                                "valid": false,
+                                "error": data["error"].as_str().unwrap_or("License is not valid")
+                            }))
+                        }
+                    }
+                    Err(e) => Ok(serde_json::json!({
+                        "valid": false,
+                        "error": format!("Failed to parse API response: {}", e)
+                    })),
+                }
+            } else {
+                let error_msg = match response.text().await {
+                    Ok(body) => {
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                            json["error"].as_str()
+                                .or_else(|| json["message"].as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| format!("API request failed: {}", status))
+                        } else {
+                            format!("API request failed: {}", status)
+                        }
+                    }
+                    Err(_) => format!("API request failed: {}", status)
+                };
+
+                Ok(serde_json::json!({
+                    "valid": false,
+                    "error": error_msg
+                }))
+            }
+        }
+        Err(e) => Ok(serde_json::json!({
+            "valid": false,
+            "error": format!("Network error: {}", e)
+        })),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

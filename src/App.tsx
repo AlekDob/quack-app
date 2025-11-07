@@ -3335,6 +3335,30 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const bootstrap = async () => {
       try {
+        // 💰 License revalidation check (every 7 days)
+        try {
+          const { getLicenseData, needsRevalidation, revalidateLicense } = await import('./config/features');
+          const licenseData = getLicenseData();
+
+          if (licenseData && needsRevalidation(licenseData.lastValidatedAt)) {
+            console.log('🦆 License needs revalidation - checking with Lemon Squeezy...');
+            const isStillValid = await revalidateLicense();
+
+            if (!isStillValid) {
+              console.warn('⚠️ License is no longer valid (refunded or expired)');
+              // Toast notification to inform user
+              toast.error('License Deactivated', {
+                description: 'Your license is no longer valid. Switching to Free tier.',
+                duration: 10000,
+              });
+            } else {
+              console.log('✅ License revalidated successfully');
+            }
+          }
+        } catch (licenseError) {
+          console.warn('License revalidation check failed (non-critical):', licenseError);
+        }
+
         // Try to load saved terminals
         const savedMetadata = await loadTerminalsFromStorage();
 

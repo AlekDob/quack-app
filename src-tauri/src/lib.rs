@@ -569,7 +569,8 @@ pub fn run() {
             license::configure_license_api,
             license::validate_license,
             license::deactivate_license,
-            license::get_license_info
+            license::get_license_info,
+            license::revalidate_license
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

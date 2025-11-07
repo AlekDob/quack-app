@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
-import { getLicenseData, clearLicenseData, type LicenseData as ConfigLicenseData } from '../../../config/features';
+import { getLicenseData, clearLicenseData } from '../../../config/features';
 import './LicenseSettings.css';
 
 interface LicenseData {

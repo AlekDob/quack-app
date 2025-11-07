@@ -38,6 +38,7 @@ export interface LicenseData {
   expiresAt?: number; // For subscription model
   type: 'lifetime' | 'subscription';
   valid: boolean;
+  lastValidatedAt?: number; // Timestamp of last revalidation check
 }
 
 /**
@@ -182,4 +183,54 @@ export const getDaysUntilExpiry = (expiresAt?: number): number | null => {
 export const isExpiringSoon = (expiresAt?: number): boolean => {
   const days = getDaysUntilExpiry(expiresAt);
   return days !== null && days <= 7 && days > 0;
+};
+
+/**
+ * Check if license needs revalidation (7 days since last check)
+ */
+export const needsRevalidation = (lastValidatedAt?: number): boolean => {
+  if (!lastValidatedAt) return true; // Never validated, need to validate
+
+  const now = Date.now();
+  const daysSinceValidation = (now - lastValidatedAt) / (1000 * 60 * 60 * 24);
+
+  return daysSinceValidation >= 7;
+};
+
+/**
+ * Revalidate license with Lemon Squeezy API
+ * Returns true if license is still valid, false if it should be deactivated
+ */
+export const revalidateLicense = async (): Promise<boolean> => {
+  try {
+    const licenseData = getLicenseData();
+    if (!licenseData) return false;
+
+    // Import invoke dynamically to avoid issues in non-Tauri environments
+    const { invoke } = await import('@tauri-apps/api/core');
+
+    // Call backend revalidation
+    const response = await invoke<{ valid: boolean; error?: string }>('revalidate_license', {
+      licenseKey: licenseData.key,
+    });
+
+    if (response.valid) {
+      // Update lastValidatedAt timestamp
+      const updatedLicense: LicenseData = {
+        ...licenseData,
+        lastValidatedAt: Date.now(),
+      };
+      saveLicenseData(updatedLicense);
+      return true;
+    } else {
+      // License is no longer valid (refunded, expired, etc.)
+      console.warn('License revalidation failed:', response.error);
+      clearLicenseData();
+      return false;
+    }
+  } catch (error) {
+    console.error('Error during license revalidation:', error);
+    // Don't clear license on network errors - only clear if API explicitly says invalid
+    return true; // Assume valid if we can't reach API
+  }
 };

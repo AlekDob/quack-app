@@ -55,6 +55,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, onS
           expiresAt: response.license_data.expires_at ? response.license_data.expires_at * 1000 : undefined,
           type: response.license_data.license_type as 'lifetime' | 'subscription',
           valid: response.license_data.valid,
+          lastValidatedAt: Date.now(), // Set initial validation timestamp
         };
 
         // Save license data
