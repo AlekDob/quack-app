@@ -36,6 +36,7 @@ mod skills;
 mod slash_commands;
 mod telegram_bot;
 mod telegram_central;
+mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security)
 mod terminal;
 
 // Global state for tracking Claude SDK session IDs per agent

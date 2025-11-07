@@ -466,8 +466,11 @@ pub async fn initialize_central_bot_token(app: AppHandle) -> Result<(), String> 
         .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
         .unwrap_or_default();
 
-    // Always set the Quack Central Bot token (hardcoded for SaaS model)
-    prefs.telegram_bot_token = Some("8025889203:AAGo90Tu41u5irM1Sig3gGYc97syx6zmd20".to_string());
+    // 🔐 Set the Quack Central Bot token (obfuscated for security)
+    // Uses telegram_obfuscation module to reconstruct token at runtime
+    let token = crate::telegram_obfuscation::get_telegram_token()
+        .map_err(|e| format!("Failed to get Telegram token: {}", e))?;
+    prefs.telegram_bot_token = Some(token);
 
     store.set(
         PREFERENCES_KEY.to_string(),

@@ -16,7 +16,23 @@ export const ProBanner: React.FC<ProBannerProps> = ({
   isExpanded = true,
   onToggle,
 }) => {
-  // When collapsed, show compact badge in bottom-right
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const handleToggle = () => {
+    if (isExpanded) {
+      // Start collapsing animation
+      setIsAnimating(true);
+      setTimeout(() => {
+        onToggle?.();
+        setIsAnimating(false);
+      }, 400); // Match animation duration
+    } else {
+      // Expand immediately (animation is on the banner itself)
+      onToggle?.();
+    }
+  };
+
+  // When collapsed, show compact badge with pop-in animation
   if (!isExpanded) {
     return (
       <div
@@ -25,10 +41,23 @@ export const ProBanner: React.FC<ProBannerProps> = ({
           bottom: '12px',
           right: '12px',
           zIndex: 100,
+          animation: 'popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         }}
       >
+        <style>{`
+          @keyframes popIn {
+            0% {
+              transform: scale(0) rotate(-180deg);
+              opacity: 0;
+            }
+            100% {
+              transform: scale(1) rotate(0deg);
+              opacity: 1;
+            }
+          }
+        `}</style>
         <button
-          onClick={onToggle}
+          onClick={handleToggle}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-xs font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105 border border-yellow-400/20"
           title="Expand Pro banner"
         >
@@ -40,7 +69,7 @@ export const ProBanner: React.FC<ProBannerProps> = ({
     );
   }
 
-  // When expanded, show full banner at bottom
+  // When expanded, show full banner at bottom with animation
   return (
     <div
       style={{
@@ -49,9 +78,35 @@ export const ProBanner: React.FC<ProBannerProps> = ({
         left: 0,
         right: 0,
         zIndex: 100,
+        animation: isAnimating
+          ? 'slideDownFadeOut 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards'
+          : 'slideUpFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
       }}
       className="bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-yellow-500/20 border-t border-yellow-500/50 px-6 py-3 flex items-center justify-between overflow-hidden backdrop-blur-sm"
     >
+      <style>{`
+        @keyframes slideUpFadeIn {
+          0% {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        @keyframes slideDownFadeOut {
+          0% {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100%) scale(0.8);
+            opacity: 0;
+          }
+        }
+      `}</style>
       {/* Animated sparkles background */}
       <div className="absolute inset-0 opacity-10 pointer-events-none">
         <Sparkles className="absolute top-1 left-4 w-3 h-3 text-yellow-400 animate-pulse" />
@@ -79,7 +134,7 @@ export const ProBanner: React.FC<ProBannerProps> = ({
         {/* Collapse button */}
         {onToggle && (
           <button
-            onClick={onToggle}
+            onClick={handleToggle}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
             title="Collapse banner"
           >
