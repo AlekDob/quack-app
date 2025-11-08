@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦆 Quack - Multi-Agentic Desktop App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        .downloads {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 60px;
+        }
+
+        .download-btn {
+            background: white;
+            color: #667eea;
+            padding: 20px 40px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .download-btn .icon {
+            font-size: 1.5rem;
+        }
+
+        .features {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 40px;
+        }
+
+        .features h2 {
+            font-size: 2rem;
+            margin-bottom: 30px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            text-align: left;
+        }
+
+        .feature {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .feature h3 {
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .feature p {
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .version {
+            margin-top: 40px;
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+
+        footer {
+            margin-top: 60px;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🦆</div>
+        <h1>Quack</h1>
+        <p class="tagline">Multi-Agentic Desktop Application powered by Claude Agent SDK</p>
+
+        <div class="downloads">
+            <a href="/downloads/Quack_0.0.1_aarch64.dmg" class="download-btn" id="download-mac-arm">
+                <span class="icon"></span>
+                <span>Download for Mac (Apple Silicon)</span>
+            </a>
+            <a href="/downloads/Quack_0.0.1_x64.dmg" class="download-btn" id="download-mac-intel">
+                <span class="icon"></span>
+                <span>Download for Mac (Intel)</span>
+            </a>
+            <a href="/downloads/Quack_0.0.1_x64.msi" class="download-btn" id="download-windows">
+                <span class="icon">🪟</span>
+                <span>Download for Windows</span>
+            </a>
+            <a href="/downloads/Quack_0.0.1_amd64.AppImage" class="download-btn" id="download-linux">
+                <span class="icon">🐧</span>
+                <span>Download for Linux</span>
+            </a>
+        </div>
+
+        <div class="features">
+            <h2>Features</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <h3>🖥️ Multi-Terminal</h3>
+                    <p>Manage multiple terminal sessions with intelligent state detection and custom themes.</p>
+                </div>
+                <div class="feature">
+                    <h3>🤖 AI Assistant</h3>
+                    <p>Powered by Claude Agent SDK with real-time streaming and autonomous capabilities.</p>
+                </div>
+                <div class="feature">
+                    <h3>📁 File Explorer</h3>
+                    <p>Integrated file navigation with preview support and context menu operations.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔀 Git Integration</h3>
+                    <p>Visual Git status, diff viewer, and interactive staging directly in the app.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔄 Auto-Update</h3>
+                    <p>Automatic updates notification and seamless installation on restart.</p>
+                </div>
+                <div class="feature">
+                    <h3>🎨 Customizable</h3>
+                    <p>Terminal colors, backgrounds, and themes to match your workflow.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="version">
+            Version 0.0.1 | Built with Tauri + React + TypeScript
+        </div>
+
+        <footer>
+            <p>🦆 Generated with Claude Code</p>
+        </footer>
+    </div>
+
+    <script>
+        // Auto-detect platform and highlight appropriate download button
+        const platform = navigator.platform.toLowerCase();
+        const isAppleSilicon = navigator.userAgent.includes('Mac') &&
+                              (navigator.userAgent.includes('ARM') || window.screen.width > 1920);
+
+        if (platform.includes('mac')) {
+            if (isAppleSilicon) {
+                document.getElementById('download-mac-arm').style.background = '#FFD700';
+                document.getElementById('download-mac-arm').style.color = '#000';
+            } else {
+                document.getElementById('download-mac-intel').style.background = '#FFD700';
+                document.getElementById('download-mac-intel').style.color = '#000';
+            }
+        } else if (platform.includes('win')) {
+            document.getElementById('download-windows').style.background = '#FFD700';
+            document.getElementById('download-windows').style.color = '#000';
+        } else if (platform.includes('linux')) {
+            document.getElementById('download-linux').style.background = '#FFD700';
+            document.getElementById('download-linux').style.color = '#000';
+        }
+    </script>
+</body>
+</html>

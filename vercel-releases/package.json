@@ -1,0 +1,11 @@
+{
+  "name": "quack-releases",
+  "version": "1.0.0",
+  "description": "Quack app releases hosting on Vercel",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
+  }
+}
