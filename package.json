@@ -16,7 +16,9 @@
     "prepare-node-sdk": "cd src-tauri/node-sdk && npm install --production",
     "release:prepare": "git checkout production && git merge main && echo '✅ Ready to release! Run: npm run release:publish'",
     "release:publish": "git push origin production && echo '🚀 Release triggered! Check GitHub Actions for progress.'",
-    "release:create-branch": "git checkout -b production && git push -u origin production && git checkout main && echo '✅ Production branch created!'"
+    "release:create-branch": "git checkout -b production && git push -u origin production && git checkout main && echo '✅ Production branch created!'",
+    "release:sync": "./scripts/sync-release.sh",
+    "release:deploy": "npm run release:sync && cd ../quackagency-website && vercel --prod"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.14",
