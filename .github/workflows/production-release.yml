@@ -79,7 +79,6 @@ jobs:
             🤖 Generated with Claude Code
           releaseDraft: false
           prerelease: false
-          releaseId: ${{ steps.create_release.outputs.id }}
           owner: AlekDob
           repo: quack-releases
 
