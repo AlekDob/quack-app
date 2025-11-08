@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        platform: [macos-latest]
 
     runs-on: ${{ matrix.platform }}
 
@@ -71,8 +71,6 @@ jobs:
 
             ### Installation
             - **macOS**: Download the `.dmg` file
-            - **Windows**: Download the `.msi` file
-            - **Linux**: Download the `.AppImage` file
 
             ### Auto-Update
             Existing users will receive a notification to update automatically!
