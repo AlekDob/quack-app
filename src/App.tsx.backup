@@ -745,7 +745,7 @@ function App() {
 
     // Save current tabs for previous agent (if any)
     if (previousId && previousId !== activeId) {
-      // console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs); // Performance: Disabled logging
+      console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs);
       setTabsByTerminal((prev) => {
         const updated = new Map(prev);
         // Filter out chat tab (always present) - save only file/terminal tabs
@@ -758,7 +758,7 @@ function App() {
     // Restore tabs for new active agent
     if (activeId) {
       const restoredTabs = tabsByTerminal.get(activeId) || [];
-      // console.log(`🦆 [Tab Management] Restoring tabs for agent: ${activeId}`, restoredTabs); // Performance: Disabled logging
+      console.log(`🦆 [Tab Management] Restoring tabs for agent: ${activeId}`, restoredTabs);
 
       // Always include chat tab + restored agent tabs
       setTabs([
@@ -871,7 +871,7 @@ function App() {
     // Get all agent IDs that have chat sessions
     const activeAgentIds = Array.from(chatSessions.keys());
 
-    // console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds); // Performance: Disabled logging
+    console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds);
 
     // Setup listener for each active agent
     const setupPromises = activeAgentIds.map(async (agentId) => {
@@ -881,7 +881,7 @@ function App() {
         const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
           const claudeEvent = event.payload;
 
-          // console.log(`[Multi-Listener] Event received for agent ${agentId}:`, claudeEvent.type); // Performance: Disabled logging
+          console.log(`[Multi-Listener] Event received for agent ${agentId}:`, claudeEvent.type);
 
           // Update chat session with incoming events
           setChatSessions((prev) => {
@@ -2191,58 +2191,47 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, terminals]);
 
-  // Auto-save terminals to storage (debounced to avoid excessive writes)
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
 
-    // Debounce storage save - wait 2 seconds after last change before saving
-    const saveTimer = setTimeout(() => {
-      if (terminals.length > 0) {
-        void saveTerminalsToStorage(terminals);
-      } else {
-        // If no terminals, clean up storage
-        void (async () => {
-          try {
-            const store = await Store.load("quack-terminals.json");
-            await store.delete(STORAGE_KEY);
-            await store.save();
-          } catch {
-            // Ignore errors
-          }
-        })();
-      }
-    }, 2000); // Wait 2 seconds before saving
-
-    return () => clearTimeout(saveTimer);
+    if (terminals.length > 0) {
+      void saveTerminalsToStorage(terminals);
+    } else {
+      // If no terminals, clean up storage
+      void (async () => {
+        try {
+          const store = await Store.load("quack-terminals.json");
+          await store.delete(STORAGE_KEY);
+          await store.save();
+        } catch {
+          // Ignore errors
+        }
+      })();
+    }
   }, [hasBootstrapped, tauriAvailable, terminals]);
 
-  // Auto-save tabs by terminal to storage (debounced to avoid saving on every switch)
+  // Auto-save tabs by terminal to storage
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
 
-    // Debounce storage save - wait 2 seconds after last change before saving
-    const saveTimer = setTimeout(() => {
-      if (tabsByTerminal.size > 0) {
-        void saveTabsByTerminalToStorage(tabsByTerminal);
-      } else {
-        // If no tabs, clean up storage
-        void (async () => {
-          try {
-            const store = await Store.load("quack-terminals.json");
-            await store.delete(TABS_BY_TERMINAL_KEY);
-            await store.save();
-          } catch {
-            // Ignore errors
-          }
-        })();
-      }
-    }, 2000); // Wait 2 seconds before saving
-
-    return () => clearTimeout(saveTimer);
+    if (tabsByTerminal.size > 0) {
+      void saveTabsByTerminalToStorage(tabsByTerminal);
+    } else {
+      // If no tabs, clean up storage
+      void (async () => {
+        try {
+          const store = await Store.load("quack-terminals.json");
+          await store.delete(TABS_BY_TERMINAL_KEY);
+          await store.save();
+        } catch {
+          // Ignore errors
+        }
+      })();
+    }
   }, [tabsByTerminal, tauriAvailable, hasBootstrapped]);
 
   // Auto-save Native Terminals when they change
@@ -3031,23 +3020,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
 
   // Load Quack Agency agents on startup
-  // Load Agents on startup only (not on every terminal switch!)
   useEffect(() => {
-    if (!tauriAvailable || !hasBootstrapped) {
+    if (!tauriAvailable) {
       return;
     }
     void loadAgents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadAgents to prevent re-load on every switch
+  }, [loadAgents, tauriAvailable]);
 
-  // Load Skills on startup only (not on every terminal switch!)
+  // Load Skills on startup
   useEffect(() => {
-    if (!tauriAvailable || !hasBootstrapped) {
+    if (!tauriAvailable) {
       return;
     }
     void loadSkills();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadSkills to prevent re-load on every switch
+  }, [loadSkills, tauriAvailable]);
 
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
@@ -3401,12 +3387,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               };
 
               recreated.push(terminalWithState);
-              // console.log(`Recreated terminal: ${terminal.label}`, { // Performance: Disabled logging
-              //   workingOn: metadata.workingOn,
-              //   avatar: metadata.avatar,
-              //   branch: metadata.branch,
-              //   personality: metadata.personality ? 'loaded' : 'none',
-              // });
+              console.log(`Recreated terminal: ${terminal.label}`, {
+                workingOn: metadata.workingOn,
+                avatar: metadata.avatar,
+                branch: metadata.branch,
+                personality: metadata.personality ? 'loaded' : 'none',
+              });
             } catch (error) {
               console.warn(
                 `Unable to recreate terminal ${metadata.label}`,
@@ -5141,14 +5127,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [refreshGitSummary, showGitDrawer]);
 
-  // Load git status on startup only (not on every terminal switch!)
   useEffect(() => {
-    if (!tauriAvailable || !hasBootstrapped) {
+    if (!tauriAvailable) {
       return;
     }
     void refreshGitSummary();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including refreshGitSummary to prevent re-load on every switch
+  }, [refreshGitSummary, tauriAvailable]);
 
   const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
     setSelectedGitPath(entry.path);

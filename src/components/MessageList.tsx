@@ -125,7 +125,7 @@ export default function MessageList({ messages, loading, onFilePathClick, agentN
           behavior: 'smooth' // Smooth scroll animation when switching chats
         });
 
-        console.log('[MessageList] Component mounted - scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'scrolling to:', scrollHeight);
+        // console.log('[MessageList] Component mounted - scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'scrolling to:', scrollHeight); // Performance: Disabled
       }
     }, 100);
 

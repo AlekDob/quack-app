@@ -1,0 +1,147 @@
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import type { DirectoryEntry } from '../types';
+
+interface FileSystemState {
+  // Explorer state
+  explorerPath: string;
+  explorerTree: Record<string, DirectoryEntry[]>;
+  explorerRoot: string | null;
+  loadingExplorer: boolean;
+  explorerError: string | null;
+  expandedDirs: Set<string>;
+  selectedFile: string | null;
+
+  // File preview state
+  previewFile: string | null;
+  previewContent: string | null;
+  previewLoading: boolean;
+
+  // Actions - Explorer
+  setExplorerPath: (path: string) => void;
+  setExplorerTree: (tree: Record<string, DirectoryEntry[]>) => void;
+  addToExplorerTree: (path: string, entries: DirectoryEntry[]) => void;
+  setExplorerRoot: (root: string | null) => void;
+  setLoadingExplorer: (loading: boolean) => void;
+  setExplorerError: (error: string | null) => void;
+
+  // Actions - Directory expansion
+  expandDir: (path: string) => void;
+  collapseDir: (path: string) => void;
+  toggleDirExpansion: (path: string) => void;
+  clearExpandedDirs: () => void;
+
+  // Actions - File selection
+  setSelectedFile: (file: string | null) => void;
+
+  // Actions - File preview
+  setPreviewFile: (file: string | null) => void;
+  setPreviewContent: (content: string | null) => void;
+  setPreviewLoading: (loading: boolean) => void;
+  clearPreview: () => void;
+
+  // Selectors
+  getDirectoryEntries: (path: string) => DirectoryEntry[] | undefined;
+  isDirExpanded: (path: string) => boolean;
+  isFileSelected: (path: string) => boolean;
+}
+
+export const useFileSystemStore = create<FileSystemState>()(
+  devtools((set, get) => ({
+    // Initial state
+    explorerPath: '',
+    explorerTree: {},
+    explorerRoot: null,
+    loadingExplorer: false,
+    explorerError: null,
+    expandedDirs: new Set(),
+    selectedFile: null,
+    previewFile: null,
+    previewContent: null,
+    previewLoading: false,
+
+    // Explorer actions
+    setExplorerPath: (path) => set({ explorerPath: path }),
+
+    setExplorerTree: (tree) => set({ explorerTree: tree }),
+
+    addToExplorerTree: (path, entries) => set((state) => ({
+      explorerTree: {
+        ...state.explorerTree,
+        [path]: entries,
+      },
+    })),
+
+    setExplorerRoot: (root) => set({
+      explorerRoot: root,
+      expandedDirs: new Set(),
+      selectedFile: null,
+    }),
+
+    setLoadingExplorer: (loading) => set({ loadingExplorer: loading }),
+
+    setExplorerError: (error) => set({ explorerError: error }),
+
+    // Directory expansion actions
+    expandDir: (path) => set((state) => {
+      const newExpanded = new Set(state.expandedDirs);
+      newExpanded.add(path);
+      return { expandedDirs: newExpanded };
+    }),
+
+    collapseDir: (path) => set((state) => {
+      const newExpanded = new Set(state.expandedDirs);
+      newExpanded.delete(path);
+      // Also collapse all subdirectories
+      newExpanded.forEach((dir) => {
+        if (dir.startsWith(path + '/')) {
+          newExpanded.delete(dir);
+        }
+      });
+      return { expandedDirs: newExpanded };
+    }),
+
+    toggleDirExpansion: (path) => {
+      const state = get();
+      if (state.expandedDirs.has(path)) {
+        state.collapseDir(path);
+      } else {
+        state.expandDir(path);
+      }
+    },
+
+    clearExpandedDirs: () => set({ expandedDirs: new Set() }),
+
+    // File selection actions
+    setSelectedFile: (file) => set({ selectedFile: file }),
+
+    // File preview actions
+    setPreviewFile: (file) => set({ previewFile: file }),
+
+    setPreviewContent: (content) => set({ previewContent: content }),
+
+    setPreviewLoading: (loading) => set({ previewLoading: loading }),
+
+    clearPreview: () => set({
+      previewFile: null,
+      previewContent: null,
+      previewLoading: false,
+    }),
+
+    // Selectors
+    getDirectoryEntries: (path) => {
+      const state = get();
+      return state.explorerTree[path];
+    },
+
+    isDirExpanded: (path) => {
+      const state = get();
+      return state.expandedDirs.has(path);
+    },
+
+    isFileSelected: (path) => {
+      const state = get();
+      return state.selectedFile === path;
+    },
+  }), { name: 'filesystem-store' })
+);

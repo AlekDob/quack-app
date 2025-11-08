@@ -1,9 +1,13 @@
-import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
+import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import CodeEditor, { type DiffInfo } from "./CodeEditor";
+import type { DiffInfo } from "./CodeEditor";
 import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
+import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
+
+// Lazy load the heavy Monaco Editor component
+const CodeEditor = lazy(() => import("./CodeEditor"));
 
 interface FilePreviewDrawerProps {
   open: boolean;
@@ -209,14 +213,16 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
         ) : isMarkdownFile ? (
           <div className="editor-container">
             {isEditMode ? (
-              <CodeEditor
-                content={editedContent}
-                filename={filename}
-                readOnly={false}
-                onChange={handleContentChange}
-                onSave={handleSave}
-                diffInfo={diffInfo}
-              />
+              <Suspense fallback={<CodeEditorSkeleton />}>
+                <CodeEditor
+                  content={editedContent}
+                  filename={filename}
+                  readOnly={false}
+                  onChange={handleContentChange}
+                  onSave={handleSave}
+                  diffInfo={diffInfo}
+                />
+              </Suspense>
             ) : (
               <div style={{ padding: '20px', overflow: 'auto', height: '100%' }}>
                 <MarkdownText>{editedContent}</MarkdownText>
@@ -225,14 +231,16 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
           </div>
         ) : (
           <div className="editor-container">
-            <CodeEditor
-              content={editedContent}
-              filename={filename}
-              readOnly={false}
-              onChange={handleContentChange}
-              onSave={handleSave}
-              diffInfo={diffInfo}
-            />
+            <Suspense fallback={<CodeEditorSkeleton />}>
+              <CodeEditor
+                content={editedContent}
+                filename={filename}
+                readOnly={false}
+                onChange={handleContentChange}
+                onSave={handleSave}
+                diffInfo={diffInfo}
+              />
+            </Suspense>
           </div>
         )}
       </div>

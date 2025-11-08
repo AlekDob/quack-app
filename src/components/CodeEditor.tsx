@@ -8,6 +8,9 @@ export interface DiffInfo {
   modifications: number[]; // Array di numeri di linea modificate
 }
 
+// Export type separately for lazy loading compatibility
+export type { DiffInfo as DiffInfoType };
+
 interface CodeEditorProps {
   content: string;
   filename: string | null;

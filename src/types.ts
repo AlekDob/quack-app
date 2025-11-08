@@ -28,6 +28,8 @@ export interface AgentChat {
   color: string;
   cwd: string;
   createdAt: number;
+  avatar?: string;
+  personality?: any;
 }
 
 export interface TerminalInfo {

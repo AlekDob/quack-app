@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import './TokenUsageIndicator.css';
 import TokenUsageModal from './TokenUsageModal';
 
@@ -21,7 +21,7 @@ interface DuckStatus {
   message: string;
 }
 
-export default function TokenUsageIndicator({
+function TokenUsageIndicator({
   inputTokens,
   outputTokens,
   cacheCreationTokens = 0,
@@ -44,16 +44,16 @@ export default function TokenUsageIndicator({
   // INVERTED: Stamina starts at 100% and decreases as tokens are used
   const staminaPercentage = Math.max(0, 100 - usagePercentage);
 
-  // Debug logging
-  console.log('[TokenUsageIndicator] Debug:', {
-    inputTokens,
-    outputTokens,
-    totalTokens,
-    multiplier: multiplier.toFixed(2),
-    effectiveTokens,
-    usagePercentage,
-    staminaPercentage,
-  });
+  // Debug logging (disabled for performance)
+  // console.log('[TokenUsageIndicator] Debug:', {
+  //   inputTokens,
+  //   outputTokens,
+  //   totalTokens,
+  //   multiplier: multiplier.toFixed(2),
+  //   effectiveTokens,
+  //   usagePercentage,
+  //   staminaPercentage,
+  // });
 
   // Determine duck stamina status (INVERTED LOGIC)
   const getDuckStatus = (): DuckStatus => {
@@ -153,3 +153,14 @@ export default function TokenUsageIndicator({
     </>
   );
 }
+
+// Export with memo to prevent unnecessary re-renders
+export default memo(TokenUsageIndicator, (prevProps, nextProps) => {
+  // Only re-render if token counts actually changed
+  return (
+    prevProps.inputTokens === nextProps.inputTokens &&
+    prevProps.outputTokens === nextProps.outputTokens &&
+    prevProps.cacheCreationTokens === nextProps.cacheCreationTokens &&
+    prevProps.cacheReadTokens === nextProps.cacheReadTokens
+  );
+});

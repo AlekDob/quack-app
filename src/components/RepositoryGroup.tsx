@@ -653,7 +653,7 @@ export default function RepositoryGroup({
 
       if (!lastAssistantMessage?.timestamp) return 0;
 
-      console.log(`[SORT] ${agent.label} - last assistant msg timestamp: ${lastAssistantMessage.timestamp}`);
+      // console.log(`[SORT] ${agent.label} - last assistant msg timestamp: ${lastAssistantMessage.timestamp}`); // Performance: Disabled logging
       return lastAssistantMessage.timestamp;
     };
 
@@ -675,7 +675,7 @@ export default function RepositoryGroup({
       return 0;
     });
 
-    console.log(`[SORT] Branch ${branchName} sorted order:`, sorted.map(a => `${a.label} (${getLastAssistantMessageTimestamp(a)})`));
+    // console.log(`[SORT] Branch ${branchName} sorted order:`, sorted.map(a => `${a.label} (${getLastAssistantMessageTimestamp(a)})`)); // Performance: Disabled logging
     return sorted;
   }, [chatSessions]);
 
