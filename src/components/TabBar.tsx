@@ -4,7 +4,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -13,6 +13,8 @@ export interface Tab {
   agentName?: string; // Agent name for agent tabs
   agentScope?: 'global' | 'project'; // Agent scope for agent tabs
   url?: string; // Current URL for browser tabs
+  skillName?: string; // Skill name for skill tabs
+  skillScope?: 'global' | 'project'; // Skill scope for skill tabs
 }
 
 interface TabBarProps {

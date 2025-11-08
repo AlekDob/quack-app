@@ -41,6 +41,7 @@ import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
+import SkillViewer from "./components/SkillViewer";
 import BrowserManager from "./components/BrowserManager";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -2916,14 +2917,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
-      // Open the skill drawer with selected skill
-      setSelectedSkill(skillInfo);
-      setShowSkillDrawer(true);
+      // Create a new tab for the skill instead of opening drawer
+      const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
+
+      // Check if tab already exists
+      const existingTab = tabs.find(t => t.id === skillTabId);
+
+      if (existingTab) {
+        // Tab already exists, just switch to it
+        setActiveTabId(skillTabId);
+      } else {
+        // Create new skill tab
+        const newTab: Tab = {
+          id: skillTabId,
+          label: skillInfo.name.replace(/-/g, ' '),
+          type: 'skill',
+          closable: true,
+          skillName: skillInfo.name,
+          skillScope: skillInfo.scope,
+          icon: <span style={{ fontSize: '14px' }}>⚡</span>,
+        };
+
+        setTabs(prevTabs => [...prevTabs, newTab]);
+        setActiveTabId(skillTabId);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to load skill: ${message}`);
+      toast.error(`Failed to open skill: ${message}`);
     }
-  }, [tauriAvailable]);
+  }, [tauriAvailable, tabs]);
 
   // Marketplace refresh handler - refreshes all panels when resources are installed
   const handleMarketplaceRefresh = useCallback(async () => {
@@ -6032,6 +6054,22 @@ You have access to all Bash tools to execute git commands like:
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'browser') {
                   return <BrowserManager />;
+                }
+                return null;
+              })()}
+
+              {/* Skill Viewer - shown when skill tab is active */}
+              {activeTabId.startsWith('skill-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'skill' && activeTab.skillName && activeTab.skillScope) {
+                  return (
+                    <SkillViewer
+                      skillName={activeTab.skillName}
+                      skillScope={activeTab.skillScope}
+                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      onRefresh={loadSkills}
+                    />
+                  );
                 }
                 return null;
               })()}

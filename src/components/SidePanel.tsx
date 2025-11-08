@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
 import SkillsPanel from "./SkillsPanel";
@@ -405,6 +405,19 @@ export default function SidePanel({
   onToggleCollapse,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("agent-context");
+
+  // Auto-refresh agents and skills when their tabs are opened
+  useEffect(() => {
+    if (activeTab === "agents" && onRefreshAgents) {
+      onRefreshAgents();
+    }
+  }, [activeTab, onRefreshAgents]);
+
+  useEffect(() => {
+    if (activeTab === "skills" && onRefreshSkills) {
+      onRefreshSkills();
+    }
+  }, [activeTab, onRefreshSkills]);
 
   // Tab configuration
   const tabs = [
