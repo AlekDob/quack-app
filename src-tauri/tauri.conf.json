@@ -41,7 +41,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/alekdob/quack-app/releases/latest/download/latest.json"
+        "https://github.com/AlekDob/quack-releases/releases/latest/download/latest.json"
       ],
       "dialog": true,
       "pubkey": ""

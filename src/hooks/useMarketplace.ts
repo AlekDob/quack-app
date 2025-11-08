@@ -119,10 +119,6 @@ export function useMarketplace(workingDir?: string) {
 
       console.log('Installation successful:', result.stdout);
 
-      // Verify installation by checking if file was created
-      const categoryFolder = resource.category === 'agents' ? 'agents' : resource.category;
-      const expectedPath = `${workingDir}/.claude/${categoryFolder}`;
-
       // Add to installed resources
       setLibrary(prev => ({
         ...prev,

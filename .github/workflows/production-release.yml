@@ -57,7 +57,7 @@ jobs:
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
@@ -67,7 +67,7 @@ jobs:
             ## 🦆 Quack v${{ steps.bump_version.outputs.new_version }}
 
             ### What's New
-            See the [changelog](https://github.com/${{ github.repository }}/compare/v${{ steps.get_version.outputs.version }}...v${{ steps.bump_version.outputs.new_version }}) for details.
+            See the [changelog](https://github.com/AlekDob/quack-app/compare/v${{ steps.get_version.outputs.version }}...v${{ steps.bump_version.outputs.new_version }}) for details.
 
             ### Installation
             - **macOS**: Download the `.dmg` file
@@ -79,6 +79,9 @@ jobs:
             🤖 Generated with Claude Code
           releaseDraft: false
           prerelease: false
+          releaseId: ${{ steps.create_release.outputs.id }}
+          owner: AlekDob
+          repo: quack-releases
 
       - name: Commit version bump
         if: matrix.platform == 'macos-latest'
@@ -103,7 +106,7 @@ jobs:
                 "fields": [
                   {
                     "name": "📦 Downloads",
-                    "value": "[GitHub Releases](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump_version.outputs.new_version }})"
+                    "value": "[GitHub Releases](https://github.com/AlekDob/quack-releases/releases/tag/v${{ steps.bump_version.outputs.new_version }})"
                   },
                   {
                     "name": "🔄 Auto-Update",
@@ -111,7 +114,7 @@ jobs:
                   }
                 ],
                 "thumbnail": {
-                  "url": "https://raw.githubusercontent.com/${{ github.repository }}/main/public/duck.png"
+                  "url": "https://raw.githubusercontent.com/AlekDob/quack-app/main/public/duck.png"
                 },
                 "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
               }]
