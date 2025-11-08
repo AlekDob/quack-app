@@ -953,7 +953,6 @@ export const MARKETPLACE_RESOURCES: MarketplaceResource[] = [
     description: 'Comprehensive skill for creating beautiful, accessible user interfaces combining shadcn/ui components, Tailwind CSS utility styling, and canvas-based visual design systems. Pre-installed in this project.',
     category: 'skills',
     author: 'mrgoonie (ClaudeKit Skills)',
-    installCount: 0, // Pre-installed, no installation needed
     tags: ['ui', 'styling', 'tailwind', 'design-system', 'css', 'shadcn', 'radix-ui', 'accessibility'],
     version: '1.0.0',
     installCommand: '', // Already included in project
@@ -970,7 +969,6 @@ export const MARKETPLACE_RESOURCES: MarketplaceResource[] = [
     description: 'Modern React development guidelines emphasizing Suspense-based data fetching, lazy loading, proper file organization, MUI v7 styling, TanStack Router, performance optimization, and TypeScript best practices. Pre-installed in this project.',
     category: 'skills',
     author: 'diet103 (Infrastructure Showcase)',
-    installCount: 0, // Pre-installed, no installation needed
     tags: ['react', 'typescript', 'suspense', 'tanstack-query', 'mui', 'performance', 'best-practices', 'architecture'],
     version: '1.0.0',
     installCommand: '', // Already included in project
