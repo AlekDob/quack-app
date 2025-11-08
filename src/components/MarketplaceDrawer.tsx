@@ -83,6 +83,8 @@ export default function MarketplaceDrawer({
           duration: 5000,
         });
 
+        // Wait a bit for filesystem to sync before refreshing
+        await new Promise(resolve => setTimeout(resolve, 500));
         onRefresh?.();
         return true;
       }
@@ -116,6 +118,8 @@ export default function MarketplaceDrawer({
           duration: 4000,
         });
 
+        // Wait a bit for filesystem to sync before refreshing
+        await new Promise(resolve => setTimeout(resolve, 500));
         onRefresh?.();
         return true;
       }

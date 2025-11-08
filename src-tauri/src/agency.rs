@@ -179,8 +179,36 @@ fn list_agents_impl(working_dir: Option<String>) -> Result<Vec<AgentInfo>> {
 
     log::info!("Total agents found: {} (global + project)", agents.len());
 
+    // Deduplicate agents by name: prefer PROJECT agents over GLOBAL agents
+    // This ensures that if an agent exists in both locations, only the project version is shown
+    let mut seen_names = std::collections::HashSet::new();
+    let mut deduplicated_agents = Vec::new();
+
+    // First pass: add all PROJECT agents
+    for agent in &agents {
+        if agent.scope == "project" {
+            seen_names.insert(agent.name.to_lowercase());
+            deduplicated_agents.push(agent.clone());
+        }
+    }
+
+    // Second pass: add GLOBAL agents only if not already seen
+    for agent in &agents {
+        if agent.scope == "global" {
+            let lowercase_name = agent.name.to_lowercase();
+            if !seen_names.contains(&lowercase_name) {
+                seen_names.insert(lowercase_name);
+                deduplicated_agents.push(agent.clone());
+            } else {
+                log::info!("Skipping duplicate global agent '{}' (project version exists)", agent.name);
+            }
+        }
+    }
+
+    log::info!("Deduplicated agents: {} unique (from {} total)", deduplicated_agents.len(), agents.len());
+
     // Sort agents: first by scope (global first), then by name
-    agents.sort_by(|a, b| {
+    deduplicated_agents.sort_by(|a, b| {
         match (a.scope.as_str(), b.scope.as_str()) {
             ("global", "project") => std::cmp::Ordering::Less,
             ("project", "global") => std::cmp::Ordering::Greater,
@@ -188,7 +216,7 @@ fn list_agents_impl(working_dir: Option<String>) -> Result<Vec<AgentInfo>> {
         }
     });
 
-    Ok(agents)
+    Ok(deduplicated_agents)
 }
 
 fn get_agent_details_impl(
@@ -337,15 +365,24 @@ fn extract_frontmatter(content: &str) -> Result<(AgentFrontmatter, String)> {
         }
     }
 
-    if name.is_empty() || model.is_empty() || color.is_empty() {
-        return Err(anyhow!("Missing required fields in frontmatter (name, model, color)"));
+    // Validate required fields (name and model are mandatory)
+    if name.is_empty() || model.is_empty() {
+        return Err(anyhow!("Missing required fields in frontmatter (name, model)"));
     }
+
+    // Use default color if not specified (for compatibility with claude-code-templates)
+    let final_color = if color.is_empty() {
+        log::warn!("Agent '{}' missing color field, using default #6366f1", name);
+        "#6366f1".to_string() // Default indigo color
+    } else {
+        color
+    };
 
     let frontmatter = AgentFrontmatter {
         name,
         description,
         model,
-        color,
+        color: final_color,
         working_on,
         avatar,
     };
