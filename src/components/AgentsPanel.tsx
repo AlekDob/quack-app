@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
 import { NewAgentModal } from "./NewAgentModal";
 import { AgentAvatar } from "./AgentAvatar";
+import './AgentsPanel.css';
 
 /**
  * Agents Panel - Inline list view of agents
@@ -50,6 +51,50 @@ export default function AgentsPanel({
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Sort agents within each scope: unread messages first, then by timestamp
+  const sortAgents = (agentsToSort: AgentInfo[]) => {
+    return [...agentsToSort].sort((a, b) => {
+      // First, prioritize agents with unread messages
+      if (a.hasUnreadMessages && !b.hasUnreadMessages) return -1;
+      if (!a.hasUnreadMessages && b.hasUnreadMessages) return 1;
+
+      // Then sort by last message timestamp (newest first)
+      const timeA = a.lastMessageTimestamp ?? 0;
+      const timeB = b.lastMessageTimestamp ?? 0;
+      return timeB - timeA;
+    });
+  };
+
+  // Helper to render unread indicator
+  const renderUnreadIndicator = (agent: AgentInfo) => {
+    if (agent.isEmpty) {
+      // Empty chat - show sleeping indicator
+      return (
+        <span className="text-base" title="No messages yet">
+          💤
+        </span>
+      );
+    }
+
+    if (agent.hasUnreadMessages) {
+      // Unread messages - show pulsing chat indicator
+      return (
+        <span
+          className="text-base animate-pulse-unread"
+          title="Unread messages"
+          style={{
+            animation: 'pulse-unread 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }}
+        >
+          💬
+        </span>
+      );
+    }
+
+    // All messages read - no indicator
+    return null;
+  };
 
   const handleCreateAgent = async (
     name: string,
@@ -260,8 +305,7 @@ export default function AgentsPanel({
                 </button>
                 {globalExpanded && (
                 <div className="space-y-2">
-                  {filteredAgents
-                    .filter((a) => a.scope === "global")
+                  {sortAgents(filteredAgents.filter((a) => a.scope === "global"))
                     .map((agent) => (
                       <div
                         key={`global-${agent.name}`}
@@ -326,12 +370,15 @@ export default function AgentsPanel({
                               {agent.model}
                             </div>
 
-                            {/* Line 2: Agent Name */}
-                            <div
-                              className="text-sm font-medium text-left"
-                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                            >
-                              {agent.name.replace(/-/g, " ")}
+                            {/* Line 2: Agent Name with unread indicator */}
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="text-sm font-medium text-left"
+                                style={{ color: "rgba(255, 255, 255, 0.9)" }}
+                              >
+                                {agent.name.replace(/-/g, " ")}
+                              </div>
+                              {renderUnreadIndicator(agent)}
                             </div>
 
                             {/* Line 2.5: Working On (if exists) */}
@@ -403,8 +450,7 @@ export default function AgentsPanel({
                 </button>
                 {projectExpanded && (
                 <div className="space-y-2">
-                  {filteredAgents
-                    .filter((a) => a.scope === "project")
+                  {sortAgents(filteredAgents.filter((a) => a.scope === "project"))
                     .map((agent) => (
                       <div
                         key={`project-${agent.name}`}
@@ -469,12 +515,15 @@ export default function AgentsPanel({
                               {agent.model}
                             </div>
 
-                            {/* Line 2: Agent Name */}
-                            <div
-                              className="text-sm font-medium text-left"
-                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                            >
-                              {agent.name.replace(/-/g, " ")}
+                            {/* Line 2: Agent Name with unread indicator */}
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="text-sm font-medium text-left"
+                                style={{ color: "rgba(255, 255, 255, 0.9)" }}
+                              >
+                                {agent.name.replace(/-/g, " ")}
+                              </div>
+                              {renderUnreadIndicator(agent)}
                             </div>
 
                             {/* Line 2.5: Working On (if exists) */}

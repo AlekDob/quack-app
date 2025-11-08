@@ -19,6 +19,7 @@ interface TerminalActivityBarProps {
   terminal: TerminalInfo
   chatSessions?: Map<string, ChatMessage[]>
   hideBranch?: boolean  // New prop to hide branch badge
+  isActive?: boolean  // Whether this terminal is currently active (to manage unread state)
 }
 
 /**
@@ -36,7 +37,7 @@ interface TerminalActivityBarProps {
  * <TerminalActivityBar terminal={terminal} />
  * ```
  */
-function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProps) {
+function TerminalActivityBar({ terminal, chatSessions, isActive = false }: TerminalActivityBarProps) {
   const status = terminal.status ?? 'idle'
   const [confirmedStatus, setConfirmedStatus] = useState<'busy' | 'idle'>(status)
   const [isHovering, setIsHovering] = useState(false)
@@ -55,6 +56,11 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
       return () => clearTimeout(timer)
     }
   }, [status])
+
+  // Debug: Log when isActive changes
+  useEffect(() => {
+    console.log(`[${terminal.label}] 🎯 isActive changed to: ${isActive}`)
+  }, [isActive, terminal.label])
 
   // Load custom avatar URL if needed
   useEffect(() => {
@@ -97,15 +103,31 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
   const isBusy = confirmedStatus === 'busy'
   const isWaitingForResponse = terminal.waitingForResponse ?? false
 
-  // Check if agent is sleeping (30+ minutes since last response)
-  const SLEEP_THRESHOLD_MS = 30 * 60 * 1000 // 30 minutes
-  const isSleeping = useMemo(() => {
-    if (!terminal.hasResponded || !terminal.responseStartTime) return false
-    if (isBusy || isWaitingForResponse) return false // Not sleeping if active
+  // Check if chat is empty (no messages)
+  const isChatEmpty = useMemo(() => {
+    if (!chatSessions) return true
+    const messages = chatSessions.get(terminal.id)
+    return !messages || messages.length === 0
+  }, [chatSessions, terminal.id])
 
-    const timeSinceLastResponse = Date.now() - terminal.responseStartTime
-    return timeSinceLastResponse > SLEEP_THRESHOLD_MS
-  }, [terminal.hasResponded, terminal.responseStartTime, isBusy, isWaitingForResponse])
+  // Check if there are unread messages (agent responded but terminal not active)
+  const hasUnreadMessages = useMemo(() => {
+    if (!chatSessions || isActive) {
+      console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (isActive=${isActive}, chatSessions exists=${!!chatSessions})`)
+      return false // If active, no unread messages
+    }
+    const messages = chatSessions.get(terminal.id)
+    if (!messages || messages.length === 0) {
+      console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (no messages)`)
+      return false
+    }
+
+    // Check if there's at least one assistant message
+    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant')
+    const result = lastAssistantMessage !== undefined
+    console.log(`[${terminal.label}] 💬 hasUnreadMessages=${result} (isActive=${isActive}, hasAssistantMsg=${lastAssistantMessage !== undefined})`)
+    return result
+  }, [chatSessions, terminal.id, isActive, terminal.label])
 
   // Memoize last message calculation
   const lastMessage = useMemo((): string | null => {
@@ -126,15 +148,18 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
   const badge = useMemo(() => {
     if (isBusy) return '⚡'
     if (isWaitingForResponse) return '💬'
-    if (isSleeping) return '💤' // Sleeping emoji for dormant agents
-    return '' // No badge when idle
-  }, [isBusy, isWaitingForResponse, isSleeping])
+    // New logic: 💤 for empty chat, 💬 for unread messages, nothing if read
+    if (isChatEmpty) return '💤' // Empty chat - never had messages
+    if (hasUnreadMessages) return '💬' // Has unread messages from assistant
+    return '' // No badge when all messages are read
+  }, [isBusy, isWaitingForResponse, isChatEmpty, hasUnreadMessages])
 
   const badgeClassName = useMemo(() => {
     if (isWaitingForResponse) return 'terminal-status-badge waiting'
-    if (isSleeping) return 'terminal-status-badge sleeping'
+    if (isChatEmpty) return 'terminal-status-badge sleeping' // Reuse sleeping style for empty chat
+    if (hasUnreadMessages) return 'terminal-status-badge waiting' // Use waiting style for unread (pulsing)
     return 'terminal-status-badge'
-  }, [isWaitingForResponse, isSleeping])
+  }, [isWaitingForResponse, isChatEmpty, hasUnreadMessages])
 
   return (
     <>
@@ -146,7 +171,7 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
           onMouseLeave={() => setIsHovering(false)}
         >
           <div
-            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : isSleeping ? 'sleeping' : ''}`}
+            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : isChatEmpty ? 'sleeping' : hasUnreadMessages ? 'waiting' : ''}`}
             style={{
               '--avatar-border-color': terminal.color,
             } as React.CSSProperties}
@@ -189,8 +214,8 @@ function TerminalActivityBar({ terminal, chatSessions }: TerminalActivityBarProp
       <div className="terminal-details" style={{ flex: 1 }}>
         <span className="terminal-name" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span style={{ flex: 1 }}>{terminal.label}</span>
-          {/* Show badge if busy, waiting for response, or sleeping */}
-          {(isBusy || isWaitingForResponse || isSleeping) && (
+          {/* Show badge if busy, waiting, empty chat, or has unread messages */}
+          {(isBusy || isWaitingForResponse || isChatEmpty || hasUnreadMessages) && (
             <span className={badgeClassName}>
               {badge}
             </span>
@@ -223,6 +248,7 @@ export default memo(TerminalActivityBar, (prevProps, nextProps) => {
     prevProps.terminal.workingOn === nextProps.terminal.workingOn &&
     prevProps.terminal.waitingForResponse === nextProps.terminal.waitingForResponse &&
     prevProps.hideBranch === nextProps.hideBranch &&
-    prevProps.chatSessions === nextProps.chatSessions
+    prevProps.chatSessions === nextProps.chatSessions &&
+    prevProps.isActive === nextProps.isActive
   )
 })

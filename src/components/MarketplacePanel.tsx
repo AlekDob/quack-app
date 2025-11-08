@@ -31,8 +31,9 @@ export default function MarketplacePanel() {
   const [contributeModalOpen, setContributeModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const categories: Array<{ value: MarketplaceCategory | 'all'; label: string; icon: string }> = [
+  const categories: Array<{ value: MarketplaceCategory | 'all' | 'favorites'; label: string; icon: string }> = [
     { value: 'all', label: 'All', icon: '🏪' },
+    { value: 'favorites', label: 'Favorites', icon: '❤️' },
     { value: 'agents', label: 'Agents', icon: '🦆' },
     { value: 'commands', label: 'Commands', icon: '⌘' },
     { value: 'hooks', label: 'Hooks', icon: '🪝' },
@@ -42,10 +43,11 @@ export default function MarketplacePanel() {
     { value: 'skills', label: 'Skills', icon: '⭐' },
   ];
 
-  const handleCategoryChange = (category: MarketplaceCategory | 'all') => {
+  const handleCategoryChange = (category: MarketplaceCategory | 'all' | 'favorites') => {
     setFilters({
       ...filters,
-      category: category === 'all' ? undefined : category,
+      category: category === 'all' || category === 'favorites' ? undefined : category,
+      showFavoritesOnly: category === 'favorites',
     });
   };
 
@@ -79,8 +81,10 @@ export default function MarketplacePanel() {
     alert('Thank you for your contribution! Your resource will be reviewed by our team.');
   };
 
-  const activeCategory = filters.category || 'all';
-  const displayedResources = resources;
+  const activeCategory = filters.showFavoritesOnly ? 'favorites' : (filters.category || 'all');
+  const displayedResources = filters.showFavoritesOnly
+    ? resources.filter(r => isFavorite(r.id))
+    : resources;
 
   return (
     <div className="marketplace-panel flex flex-col h-full">

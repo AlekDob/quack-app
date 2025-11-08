@@ -194,6 +194,7 @@ function SortableAgent({
               terminal={agent}
               chatSessions={chatSessions}
               hideBranch={true}
+              isActive={isActive}
             />
           </div>
 
@@ -639,31 +640,44 @@ export default function RepositoryGroup({
     setActiveAgentId(null);
   };
 
-  // Apply custom ordering to agents - Memoized for performance
+  // Sort agents by last ASSISTANT message timestamp - most recent first (NO DRAG-AND-DROP)
   const applyCustomOrder = useCallback((agents: TerminalInfo[], branchName: string, isWorktree: boolean = false) => {
-    const orderKey = `${branchName}-${isWorktree ? 'worktree' : 'main'}`;
-    const customOrder = agentOrder[orderKey];
+    // Get last ASSISTANT message timestamp (only when agent RESPONDS, not when user sends!)
+    const getLastAssistantMessageTimestamp = (agent: TerminalInfo): number => {
+      if (!chatSessions) return 0;
+      const messages = chatSessions.get(agent.id);
+      if (!messages || messages.length === 0) return 0;
 
-    if (!customOrder || customOrder.length === 0) {
-      return agents;
-    }
+      // Find LAST assistant message (when the agent responds, not when user sends)
+      const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
 
-    // Sort agents based on saved order
-    return [...agents].sort((a, b) => {
-      const indexA = customOrder.indexOf(a.id);
-      const indexB = customOrder.indexOf(b.id);
+      if (!lastAssistantMessage?.timestamp) return 0;
 
-      // If both are in the custom order, sort by that
-      if (indexA !== -1 && indexB !== -1) {
-        return indexA - indexB;
+      console.log(`[SORT] ${agent.label} - last assistant msg timestamp: ${lastAssistantMessage.timestamp}`);
+      return lastAssistantMessage.timestamp;
+    };
+
+    // Simple sort: most recent ASSISTANT message first (sorting happens when agent RESPONDS)
+    const sorted = [...agents].sort((a, b) => {
+      const timestampA = getLastAssistantMessageTimestamp(a);
+      const timestampB = getLastAssistantMessageTimestamp(b);
+
+      // If both have assistant messages, sort by timestamp (most recent first)
+      if (timestampA > 0 && timestampB > 0) {
+        return timestampB - timestampA;
       }
-      // If only one is in custom order, it comes first
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-      // Otherwise maintain original order
+
+      // Agents with assistant messages come before agents without
+      if (timestampA > 0) return -1;
+      if (timestampB > 0) return 1;
+
+      // Both empty - maintain original order
       return 0;
     });
-  }, [agentOrder]);
+
+    console.log(`[SORT] Branch ${branchName} sorted order:`, sorted.map(a => `${a.label} (${getLastAssistantMessageTimestamp(a)})`));
+    return sorted;
+  }, [chatSessions]);
 
   // Helper to generate PR URL - Memoized for performance
   const generatePRUrl = useCallback(async (rootPath: string, branchName: string): Promise<string | null> => {
@@ -1227,6 +1241,7 @@ export default function RepositoryGroup({
                                   terminal={agent}
                                   chatSessions={chatSessions}
                                   hideBranch={true}  // Hide branch badge
+                                  isActive={agent.id === activeId}
                                 />
                               </div>
 

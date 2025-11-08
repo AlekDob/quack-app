@@ -945,6 +945,38 @@ export const MARKETPLACE_RESOURCES: MarketplaceResource[] = [
     createdAt: '2024-03-01',
     updatedAt: '2024-11-01',
   },
+
+  // Skills (included directly in project - no installation needed)
+  {
+    id: 'ui-styling-expert',
+    name: 'UI Styling Expert',
+    description: 'Comprehensive skill for creating beautiful, accessible user interfaces combining shadcn/ui components, Tailwind CSS utility styling, and canvas-based visual design systems. Pre-installed in this project.',
+    category: 'skills',
+    author: 'mrgoonie (ClaudeKit Skills)',
+    tags: ['ui', 'styling', 'tailwind', 'design-system', 'css', 'shadcn', 'radix-ui', 'accessibility'],
+    version: '1.0.0',
+    installCommand: '', // Already included in project
+    repository: 'https://github.com/mrgoonie/claudekit-skills',
+    verified: true,
+    featured: true,
+    createdAt: '2024-03-17',
+    updatedAt: '2024-11-20',
+  },
+  {
+    id: 'frontend-dev-guidelines',
+    name: 'Frontend Dev Guidelines',
+    description: 'Modern React development guidelines emphasizing Suspense-based data fetching, lazy loading, proper file organization, MUI v7 styling, TanStack Router, performance optimization, and TypeScript best practices. Pre-installed in this project.',
+    category: 'skills',
+    author: 'diet103 (Infrastructure Showcase)',
+    tags: ['react', 'typescript', 'suspense', 'tanstack-query', 'mui', 'performance', 'best-practices', 'architecture'],
+    version: '1.0.0',
+    installCommand: '', // Already included in project
+    repository: 'https://github.com/diet103/claude-code-infrastructure-showcase',
+    verified: true,
+    featured: true,
+    createdAt: '2024-03-18',
+    updatedAt: '2024-11-20',
+  },
 ];
 
 /**

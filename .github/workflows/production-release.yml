@@ -1,0 +1,121 @@
+name: Production Release
+
+on:
+  push:
+    branches:
+      - production
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Get current version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Bump version (patch)
+        id: bump_version
+        run: |
+          npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Update tauri.conf.json version
+          node -e "const fs = require('fs'); const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')); conf.version = '$NEW_VERSION'; fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2));"
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: v${{ steps.bump_version.outputs.new_version }}
+          releaseName: 'Quack v${{ steps.bump_version.outputs.new_version }}'
+          releaseBody: |
+            ## 🦆 Quack v${{ steps.bump_version.outputs.new_version }}
+
+            ### What's New
+            See the [changelog](https://github.com/${{ github.repository }}/compare/v${{ steps.get_version.outputs.version }}...v${{ steps.bump_version.outputs.new_version }}) for details.
+
+            ### Installation
+            - **macOS**: Download the `.dmg` file
+            - **Windows**: Download the `.msi` file
+            - **Linux**: Download the `.AppImage` file
+
+            ### Auto-Update
+            Existing users will receive a notification to update automatically!
+
+            ---
+            🤖 Generated with Claude Code
+          releaseDraft: false
+          prerelease: false
+
+      - name: Commit version bump
+        if: matrix.platform == 'macos-latest'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json src-tauri/tauri.conf.json
+          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }}"
+          git push
+
+      - name: Send Discord Notification
+        if: matrix.platform == 'macos-latest'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🦆 New Quack Release!",
+                "description": "Version **v${{ steps.bump_version.outputs.new_version }}** is now available!",
+                "color": 5814783,
+                "fields": [
+                  {
+                    "name": "📦 Downloads",
+                    "value": "[GitHub Releases](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump_version.outputs.new_version }})"
+                  },
+                  {
+                    "name": "🔄 Auto-Update",
+                    "value": "Existing users will be notified automatically"
+                  }
+                ],
+                "thumbnail": {
+                  "url": "https://raw.githubusercontent.com/${{ github.repository }}/main/public/duck.png"
+                },
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
+              }]
+            }' \
+            $DISCORD_WEBHOOK

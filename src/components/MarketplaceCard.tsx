@@ -189,56 +189,23 @@ export default function MarketplaceCard({
         {resource.description}
       </p>
 
-      {/* Author and Stats */}
+      {/* Author */}
       <div
-        className="flex items-center gap-4 text-xs mb-3"
+        className="flex items-center gap-2 text-xs mb-3"
         style={{ color: 'rgba(255, 255, 255, 0.5)' }}
       >
-        <div className="flex items-center gap-1">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="8" r="4" />
-            <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
-          </svg>
-          {resource.author}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          {resource.installCount}
-        </div>
-
-        {resource.rating && (
-          <div className="flex items-center gap-1">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              style={{ color: '#fbbf24' }}
-            >
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-            {resource.rating.toFixed(1)}
-          </div>
-        )}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <circle cx="12" cy="8" r="4" />
+          <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+        </svg>
+        {resource.author}
       </div>
 
       {/* Tags */}
@@ -271,42 +238,63 @@ export default function MarketplaceCard({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
-        {installed ? (
+        {/* Only show Install button if there's an installCommand */}
+        {resource.installCommand && (
+          <>
+            {installed ? (
+              <button
+                type="button"
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium"
+                style={{
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  color: '#22c55e',
+                  cursor: 'default',
+                }}
+              >
+                ✓ Installed
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onInstall(resource);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                style={{
+                  background: 'rgba(242, 140, 82, 0.1)',
+                  border: '1px solid rgba(242, 140, 82, 0.3)',
+                  color: '#f28c52',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+                }}
+              >
+                Install
+              </button>
+            )}
+          </>
+        )}
+
+        {/* If no install command, show "Pre-installed" badge */}
+        {!resource.installCommand && (
           <button
             type="button"
             className="flex-1 px-4 py-2 rounded-lg text-sm font-medium"
             style={{
-              background: 'rgba(34, 197, 94, 0.1)',
-              border: '1px solid rgba(34, 197, 94, 0.3)',
-              color: '#22c55e',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              color: '#8b5cf6',
               cursor: 'default',
             }}
           >
-            ✓ Installed
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onInstall(resource);
-            }}
-            className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-            style={{
-              background: 'rgba(242, 140, 82, 0.1)',
-              border: '1px solid rgba(242, 140, 82, 0.3)',
-              color: '#f28c52',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
-              e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-              e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
-            }}
-          >
-            Install
+            ✓ Pre-installed
           </button>
         )}
 

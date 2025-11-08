@@ -1667,6 +1667,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
 
+  // Track which agent tabs have been read (to manage unread indicators)
+  const [readAgentTabs, setReadAgentTabs] = useState<Set<string>>(new Set());
+
   // Skills state
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
@@ -2872,6 +2875,45 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       duration: 2000,
     });
   }, []);
+
+  // Compute agents with unread message status and sorting info (useMemo to avoid re-computation)
+  const agentsWithUnreadStatus = useMemo(() => {
+    return agents.map(agent => {
+      const agentTabId = `agent-${agent.name}-${agent.scope}`;
+      const messages = chatSessions.get(agentTabId) ?? [];
+
+      // Check if chat is empty
+      const isEmpty = messages.length === 0;
+
+      // Get last assistant message timestamp
+      const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+      const lastMessageTimestamp = lastAssistantMessage?.timestamp ?? 0;
+
+      // Check if agent tab has been read
+      const hasBeenRead = readAgentTabs.has(agentTabId);
+
+      // Has unread messages if there's an assistant message and tab hasn't been read
+      const hasUnreadMessages = !isEmpty && lastAssistantMessage !== undefined && !hasBeenRead;
+
+      return {
+        ...agent,
+        isEmpty,
+        lastMessageTimestamp,
+        hasUnreadMessages,
+      };
+    });
+  }, [agents, chatSessions, readAgentTabs]);
+
+  // Mark agent tab as read when selected
+  useEffect(() => {
+    if (!activeTabId || !activeTabId.startsWith('agent-')) return;
+
+    setReadAgentTabs(prev => {
+      const updated = new Set(prev);
+      updated.add(activeTabId);
+      return updated;
+    });
+  }, [activeTabId]);
 
   // Skills handlers
   const loadSkills = useCallback(async () => {
@@ -5903,7 +5945,7 @@ You have access to all Bash tools to execute git commands like:
               onSendMessage={sendMessageForAgent}
               activeAgent={activeAgent}
               onClearAgent={handleClearAgent}
-              agents={agents}
+              agents={agentsWithUnreadStatus}
               onSelectAgent={handleUseAgent}
               onFilePathClick={handleFilePathClick}
               pendingAgentMention={pendingAgentMention}
@@ -6078,7 +6120,7 @@ You have access to all Bash tools to execute git commands like:
           modifiedEntries={stableModifiedEntries}
           gitRootPath={explorerRoot}
           // Agents props
-          agents={agents}
+          agents={agentsWithUnreadStatus}
           selectedAgent={selectedAgent}
           loadingAgents={loadingAgents}
           agentsError={agentsError}
@@ -6384,7 +6426,7 @@ You have access to all Bash tools to execute git commands like:
 
         <QuackAgencyDrawer
           open={showQuackAgencyDrawer}
-          agents={agents}
+          agents={agentsWithUnreadStatus}
           selectedAgent={selectedAgent}
           loading={loadingAgents}
           error={agentsError}
