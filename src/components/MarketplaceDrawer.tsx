@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useMarketplace } from '../hooks/useMarketplace';
 import type { MarketplaceCategory, MarketplaceResource } from '../types';
 import MarketplaceCard from './MarketplaceCard';
@@ -32,7 +33,7 @@ export default function MarketplaceDrawer({
     toggleFavorite,
     isInstalled,
     isFavorite,
-  } = useMarketplace();
+  } = useMarketplace(workingDir);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedResource, setSelectedResource] = useState<MarketplaceResource | null>(null);
@@ -65,21 +66,69 @@ export default function MarketplaceDrawer({
   };
 
   const handleInstall = async (resource: MarketplaceResource) => {
-    const success = await installResource(resource);
-    if (success) {
-      console.log('Resource installed successfully:', resource.name);
-      onRefresh?.();
+    // Show loading toast
+    const toastId = toast.loading(`Installing ${resource.name}...`, {
+      description: 'This may take a few moments',
+    });
+
+    try {
+      const success = await installResource(resource);
+      if (success) {
+        console.log('Resource installed successfully:', resource.name);
+
+        // Show success toast
+        toast.success(`${resource.name} installed successfully!`, {
+          id: toastId,
+          description: `Check your .claude/${resource.category} folder`,
+          duration: 5000,
+        });
+
+        onRefresh?.();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      // Show error toast
+      toast.error(`Failed to install ${resource.name}`, {
+        id: toastId,
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: 6000,
+      });
+      return false;
     }
-    return success;
   };
 
   const handleUninstall = async (resourceId: string) => {
-    const success = await uninstallResource(resourceId);
-    if (success) {
-      console.log('Resource uninstalled successfully');
-      onRefresh?.();
+    const resource = resources.find(r => r.id === resourceId);
+    const resourceName = resource?.name || 'Resource';
+
+    // Show loading toast
+    const toastId = toast.loading(`Uninstalling ${resourceName}...`);
+
+    try {
+      const success = await uninstallResource(resourceId);
+      if (success) {
+        console.log('Resource uninstalled successfully');
+
+        // Show success toast
+        toast.success(`${resourceName} uninstalled successfully!`, {
+          id: toastId,
+          duration: 4000,
+        });
+
+        onRefresh?.();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      // Show error toast
+      toast.error(`Failed to uninstall ${resourceName}`, {
+        id: toastId,
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: 5000,
+      });
+      return false;
     }
-    return success;
   };
 
   const handleContribute = async (resource: Partial<MarketplaceResource>) => {

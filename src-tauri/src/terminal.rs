@@ -652,3 +652,50 @@ fn default_cwd() -> Result<PathBuf> {
 fn cwd_to_string(path: &Path) -> String {
   path.to_string_lossy().to_string()
 }
+
+// Execute a command in a specific working directory and return the result
+#[derive(Serialize)]
+pub struct CommandResult {
+  pub success: bool,
+  pub stdout: String,
+  pub stderr: String,
+}
+
+#[tauri::command]
+pub fn execute_command(command: String, cwd: String) -> Result<CommandResult, String> {
+  execute_command_impl(command, cwd).map_err(|err| err.to_string())
+}
+
+fn execute_command_impl(command: String, cwd: String) -> Result<CommandResult> {
+  use std::process::Command;
+
+  let cwd_path = PathBuf::from(&cwd);
+  if !cwd_path.exists() || !cwd_path.is_dir() {
+    return Err(anyhow!("Invalid working directory: {}", cwd));
+  }
+
+  // Parse the command (split by spaces, respecting quotes)
+  let parts: Vec<&str> = command.split_whitespace().collect();
+  if parts.is_empty() {
+    return Err(anyhow!("Empty command"));
+  }
+
+  let program = parts[0];
+  let args = &parts[1..];
+
+  // Execute the command
+  let output = Command::new(program)
+    .args(args)
+    .current_dir(cwd_path)
+    .output()
+    .context(format!("Failed to execute command: {}", command))?;
+
+  let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+  let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+  Ok(CommandResult {
+    success: output.status.success(),
+    stdout,
+    stderr,
+  })
+}

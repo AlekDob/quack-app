@@ -415,6 +415,7 @@ pub fn run() {
             browser::open_oauth_window,
             browser::handle_oauth_callback,
             terminal::create_terminal,
+            terminal::execute_command,
             terminal::list_terminals,
             terminal::get_active_processes,
             terminal::write_to_terminal,

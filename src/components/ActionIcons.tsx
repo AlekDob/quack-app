@@ -4,7 +4,6 @@ import './ActionIcons.css';
 interface ActionIconsProps {
   onGitClick: () => void;
   onPluginsClick: () => void;
-  onPreviewClick: () => void;
   onUsageClick: () => void;
   onTelegramClick: () => void;
   onTerminalClick: () => void;
@@ -16,7 +15,6 @@ interface ActionIconsProps {
 function ActionIcons({
   onGitClick,
   onPluginsClick,
-  onPreviewClick,
   onUsageClick,
   onTelegramClick,
   onTerminalClick,
@@ -56,22 +54,6 @@ function ActionIcons({
           />
         </svg>
         <span className="action-icon-tooltip">Marketplace</span>
-      </button>
-
-      {/* Preview Icon */}
-      <button
-        type="button"
-        className="action-icon"
-        onClick={onPreviewClick}
-        aria-label="Open Preview panel"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M8 4C4.5 4 1.7 6.3 1 9C1.7 11.7 4.5 14 8 14C11.5 14 14.3 11.7 15 9C14.3 6.3 11.5 4 8 4ZM8 12C6.3 12 5 10.7 5 9C5 7.3 6.3 6 8 6C9.7 6 11 7.3 11 9C11 10.7 9.7 12 8 12ZM8 7.5C7.2 7.5 6.5 8.2 6.5 9C6.5 9.8 7.2 10.5 8 10.5C8.8 10.5 9.5 9.8 9.5 9C9.5 8.2 8.8 7.5 8 7.5Z"
-            fill="currentColor"
-          />
-        </svg>
-        <span className="action-icon-tooltip">Preview Panel</span>
       </button>
 
       {/* Usage Icon */}

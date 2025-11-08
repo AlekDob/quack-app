@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { MarketplaceResource, MarketplaceFilters, MarketplaceLibrary, MarketplaceStack } from '../types';
 import { MARKETPLACE_RESOURCES } from '../data/marketplaceData';
 
@@ -6,7 +7,7 @@ import { MARKETPLACE_RESOURCES } from '../data/marketplaceData';
  * Custom hook for managing Marketplace data
  * Handles fetching resources, managing library, and installations
  */
-export function useMarketplace() {
+export function useMarketplace(workingDir?: string) {
   const [resources, setResources] = useState<MarketplaceResource[]>([]);
   const [library, setLibrary] = useState<MarketplaceLibrary>({
     installedResources: [],
@@ -95,11 +96,32 @@ export function useMarketplace() {
     return result;
   }, [resources, filters]);
 
-  // Install a resource
+  // Install a resource with progress tracking
   const installResource = useCallback(async (resource: MarketplaceResource): Promise<boolean> => {
     try {
-      // In production, this would execute the install command
-      console.log('Installing resource:', resource.installCommand);
+      if (!workingDir) {
+        console.error('No working directory specified');
+        throw new Error('No working directory specified');
+      }
+
+      console.log('Installing resource:', resource.installCommand, 'in', workingDir);
+
+      // Execute the npx command in the working directory
+      const result = await invoke<{ success: boolean; stdout: string; stderr: string }>('execute_command', {
+        command: resource.installCommand,
+        cwd: workingDir,
+      });
+
+      if (!result.success) {
+        console.error('Installation failed:', result.stderr);
+        throw new Error(result.stderr || 'Installation failed');
+      }
+
+      console.log('Installation successful:', result.stdout);
+
+      // Verify installation by checking if file was created
+      const categoryFolder = resource.category === 'agents' ? 'agents' : resource.category;
+      const expectedPath = `${workingDir}/.claude/${categoryFolder}`;
 
       // Add to installed resources
       setLibrary(prev => ({
@@ -110,9 +132,9 @@ export function useMarketplace() {
       return true;
     } catch (err) {
       console.error('Failed to install resource:', err);
-      return false;
+      throw err; // Re-throw to let caller handle error
     }
-  }, []);
+  }, [workingDir]);
 
   // Uninstall a resource
   const uninstallResource = useCallback(async (resourceId: string): Promise<boolean> => {

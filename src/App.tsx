@@ -27,7 +27,6 @@ import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
 import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
 import { TitleBar } from "./components/TitleBar";
-import PreviewDrawer from "./components/PreviewDrawer";
 import UnifiedSettings from "./components/settings/UnifiedSettings";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
@@ -420,7 +419,6 @@ function App() {
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
-  const [showPreviewDrawer, setShowPreviewDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
 
@@ -446,17 +444,6 @@ function App() {
   // Track previous activeId to save tabs correctly when switching terminals
   const previousActiveIdRef = useRef<string | null>(null);
 
-  const [previewDrawerWidth, setPreviewDrawerWidth] = useState(() => {
-    if (typeof window === "undefined") {
-      return 960;
-    }
-    const stored = window.localStorage.getItem("previewDrawer.width");
-    const value = stored ? Number.parseInt(stored, 10) : NaN;
-    if (Number.isFinite(value)) {
-      return Math.min(1200, Math.max(420, value));
-    }
-    return Math.min(window.innerWidth * 0.7, 960);
-  });
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null);
   const [loadingGit, setLoadingGit] = useState(false);
   const [gitError, setGitError] = useState<string | null>(null);
@@ -2938,6 +2925,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable]);
 
+  // Marketplace refresh handler - refreshes all panels when resources are installed
+  const handleMarketplaceRefresh = useCallback(async () => {
+    // Reload agents, skills, and let panels like CommandsPanel/MCPPanel refresh internally
+    await Promise.all([
+      loadAgents(),
+      loadSkills(),
+    ]);
+  }, [loadAgents, loadSkills]);
+
   const handleMentionFile = useCallback((filePath: string, fileName: string) => {
     // Calculate relative path from explorerRoot
     const basePath = explorerRoot ?? explorerPath;
@@ -4313,10 +4309,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // ============================================
 
   // NO AgentChat handlers needed - terminals are independent!
-
-  const handleOpenPreviewDrawer = useCallback(() => {
-    setShowPreviewDrawer(true);
-  }, []);
 
   // Handler to create a new agent terminal tab
   const handleCreateAgentTerminal = useCallback(async () => {
@@ -5876,7 +5868,6 @@ You have access to all Bash tools to execute git commands like:
               <ActionIcons
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
               onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
-              onPreviewClick={handleOpenPreviewDrawer}
               onUsageClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
@@ -6242,22 +6233,6 @@ You have access to all Bash tools to execute git commands like:
           onDeleteSession={handleDeleteSession}
         />
 
-        <PreviewDrawer
-          open={showPreviewDrawer}
-          onClose={() => setShowPreviewDrawer(false)}
-          width={previewDrawerWidth}
-          minWidth={420}
-          maxWidth={1200}
-          onResize={(width) => {
-            setPreviewDrawerWidth(width);
-            if (typeof window !== "undefined") {
-              window.localStorage.setItem("previewDrawer.width", String(Math.round(width)));
-            }
-          }}
-          explorerPath={explorerPath}
-          processes={[]} // TODO: Implement process tracking
-        />
-
         <div className={`git-drawer ${showGitDrawer ? "open" : ""}`}>
           <div
             className="git-drawer-backdrop"
@@ -6347,7 +6322,10 @@ You have access to all Bash tools to execute git commands like:
                 ✕
               </button>
             </header>
-            <MarketplaceDrawer workingDir={explorerPath || undefined} />
+            <MarketplaceDrawer
+              workingDir={explorerPath || undefined}
+              onRefresh={handleMarketplaceRefresh}
+            />
           </div>
         </div>
 
