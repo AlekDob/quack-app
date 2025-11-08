@@ -251,9 +251,6 @@ export interface AgentInfo {
   scope: string; // "global" or "project"
   workingOn?: string; // What the agent is working on (max 5 words)
   avatar?: string; // Avatar filename (e.g., "24d6c816fe40a284f2451b1469c5e6d63d236e53.png")
-  hasUnreadMessages?: boolean; // Indicates if there are unread messages
-  lastMessageTimestamp?: number; // Timestamp of last message for sorting
-  isEmpty?: boolean; // True if chat has no messages yet
 }
 
 export interface AgentDetails extends AgentInfo {

@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        platform: [macos-latest]
 
     runs-on: ${{ matrix.platform }}
 
@@ -67,12 +67,10 @@ jobs:
             ## 🦆 Quack v${{ steps.bump_version.outputs.new_version }}
 
             ### What's New
-            See the [source code changelog](https://github.com/AlekDob/quack-app/compare/v${{ steps.get_version.outputs.version }}...v${{ steps.bump_version.outputs.new_version }}) for details.
+            See the [changelog](https://github.com/AlekDob/quack-app/compare/v${{ steps.get_version.outputs.version }}...v${{ steps.bump_version.outputs.new_version }}) for details.
 
             ### Installation
             - **macOS**: Download the `.dmg` file
-            - **Windows**: Download the `.msi` file
-            - **Linux**: Download the `.AppImage` file
 
             ### Auto-Update
             Existing users will receive a notification to update automatically!
@@ -114,7 +112,7 @@ jobs:
                   }
                 ],
                 "thumbnail": {
-                  "url": "https://raw.githubusercontent.com/${{ github.repository }}/main/public/duck.png"
+                  "url": "https://raw.githubusercontent.com/AlekDob/quack-app/main/public/duck.png"
                 },
                 "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
               }]
