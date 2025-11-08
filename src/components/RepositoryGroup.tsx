@@ -641,7 +641,7 @@ export default function RepositoryGroup({
   };
 
   // Sort agents by last ASSISTANT message timestamp - most recent first (NO DRAG-AND-DROP)
-  const applyCustomOrder = useCallback((agents: TerminalInfo[], branchName: string, isWorktree: boolean = false) => {
+  const applyCustomOrder = useCallback((agents: TerminalInfo[], branchName: string) => {
     // Get last ASSISTANT message timestamp (only when agent RESPONDS, not when user sends!)
     const getLastAssistantMessageTimestamp = (agent: TerminalInfo): number => {
       if (!chatSessions) return 0;
