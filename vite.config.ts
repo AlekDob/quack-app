@@ -4,6 +4,8 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { visualizer } from 'rollup-plugin-visualizer'
 import viteCompression from 'vite-plugin-compression'
+import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
+const monacoEditorPlugin = (monacoEditorPluginModule as any).default || monacoEditorPluginModule
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -15,6 +17,12 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+
+      // Monaco Editor plugin - handles web workers correctly in production
+      monacoEditorPlugin({
+        languageWorkers: ['typescript', 'json', 'css', 'html', 'editorWorkerService'],
+        globalAPI: false, // Use ES modules, not global monaco object
+      }),
 
       // Bundle analyzer - creates stats.html with bundle visualization
       isProduction && visualizer({
@@ -211,7 +219,7 @@ export default defineConfig(({ mode }) => {
       ],
       exclude: [
         '@anthropic-ai/claude-agent-sdk', // Don't pre-bundle SDK
-        'monaco-editor', // Too big, handle separately
+        // monaco-editor now handled by vite-plugin-monaco-editor
       ],
       // Force dependency optimization
       force: isDevelopment,

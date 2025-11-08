@@ -1718,17 +1718,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
   }, [gitSummary, selectedGitPath]);
 
-  // Performance: Stabilizza modifiedEntries reference per evitare re-render FileExplorer
-  const stableModifiedEntries = useMemo(() => {
-    if (!gitSummary?.entries) return null;
-    // Memoizza basandosi su length + primi path per shallow equality check
-    return gitSummary.entries;
-  }, [
-    gitSummary?.entries?.length,
-    gitSummary?.entries?.[0]?.path,
-    gitSummary?.entries?.[gitSummary.entries.length - 1]?.path
-  ]);
-
   const gridTemplateColumns = sidePanelCollapsed
     ? "360px minmax(0, 1fr) 0px"
     : "360px minmax(0, 1fr) 420px";
@@ -6091,8 +6080,6 @@ You have access to all Bash tools to execute git commands like:
           onOpenFile={handleOpenFilePreview}
           onLoadChildren={fetchDirectoryChildren}
           onMentionFile={handleMentionFile}
-          modifiedEntries={stableModifiedEntries}
-          gitRootPath={explorerRoot}
           // Agents props
           agents={agents}
           selectedAgent={selectedAgent}

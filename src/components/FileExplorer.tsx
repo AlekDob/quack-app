@@ -68,8 +68,6 @@ interface FileExplorerProps {
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
   onMentionFile?: (filePath: string, fileName: string) => void;
-  modifiedEntries: GitStatusEntry[] | null;
-  gitRootPath: string | null;
 }
 
 function FileExplorer({
@@ -82,8 +80,6 @@ function FileExplorer({
   onOpenFile,
   onLoadChildren,
   onMentionFile,
-  modifiedEntries,
-  gitRootPath,
 }: FileExplorerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
@@ -116,47 +112,6 @@ function FileExplorer({
   }, [rootPath]);
 
   // Mappa dei file modificati per path (usa path relativo come chiave)
-  const modifiedFilesMap = useMemo(() => {
-    if (!modifiedEntries || !gitRootPath)
-      return new Map<string, GitStatusEntry>();
-
-    const map = new Map<string, GitStatusEntry>();
-    for (const entry of modifiedEntries) {
-      const fullPath = concatPath(gitRootPath, entry.path);
-      map.set(fullPath, entry);
-    }
-    return map;
-  }, [modifiedEntries, gitRootPath]);
-
-  const allModifiedFiles = useMemo(() => {
-    if (!modifiedEntries || !gitRootPath) {
-      return [] as Array<{
-        entry: DirectoryEntry;
-        gitEntry: GitStatusEntry;
-        displayPath: string;
-      }>;
-    }
-
-    return modifiedEntries.map((gitEntry) => {
-        const fullPath = concatPath(gitRootPath, gitEntry.path);
-        const displayPath = gitEntry.path;
-        const name = displayPath.split("/").filter(Boolean).pop() ?? displayPath;
-
-        const entry: DirectoryEntry = {
-          name,
-          path: fullPath,
-          is_dir: false,
-          is_symlink: false,
-        };
-
-        return {
-          entry,
-          gitEntry,
-          displayPath,
-        };
-      });
-  }, [gitRootPath, modifiedEntries]);
-
   useEffect(() => {
     if (!rootPath) {
       return;
@@ -377,14 +332,11 @@ function FileExplorer({
   );
 
   const renderEntries = useCallback(
-    (entries: DirectoryEntry[], depth = 0, skipModified = false) =>
+    (entries: DirectoryEntry[], depth = 0) =>
       entries
         .filter((entry) => {
           // Filtra per query search
           if (!fuzzyMatch(query, entry.name)) return false;
-          // Se skipModified è true, nascondi i file modificati (già mostrati sopra)
-          if (skipModified && !entry.is_dir && modifiedFilesMap.has(entry.path))
-            return false;
           return true;
         })
         .map((entry) => {
@@ -485,7 +437,7 @@ function FileExplorer({
                 isExpanded &&
                 tree[entry.path] &&
                 tree[entry.path].length > 0 &&
-                renderEntries(tree[entry.path], depth + 1, skipModified)}
+                renderEntries(tree[entry.path], depth + 1)}
             </Fragment>
           );
         }),
@@ -496,7 +448,6 @@ function FileExplorer({
       handleContextMenu,
       handleToggleDirectory,
       loadingNodes,
-      modifiedFilesMap,
       onOpenFile,
       prefetchDirectory,
       query,
@@ -595,98 +546,6 @@ function FileExplorer({
     [activeFilePath, handleContextMenu, onOpenFile, handleDragStart, onMentionFile]
   );
 
-  const renderModifiedFile = useCallback(
-    (item: {
-      entry: DirectoryEntry;
-      gitEntry: GitStatusEntry;
-      displayPath: string;
-    }) => {
-      const { entry, gitEntry, displayPath } = item;
-      const isActiveFile = activeFilePath === entry.path;
-      const additions = gitEntry.additions ?? 0;
-      const deletions = gitEntry.deletions ?? 0;
-      const hasStats = additions > 0 || deletions > 0;
-
-      // Determina il tipo di modifica
-      const isDeletedFile = gitEntry.staged_status === "Deleted" || gitEntry.unstaged_status === "Deleted";
-      const isNewFile = gitEntry.is_untracked;
-
-      // Determina classe in base al tipo
-      let fileType: string;
-
-      if (isDeletedFile) {
-        fileType = "deleted-file";
-      } else if (isNewFile) {
-        fileType = "new-file";
-      } else {
-        fileType = "modified";
-      }
-
-      const rowClass = [
-        "explorer-row",
-        "file",
-        fileType,
-        isActiveFile ? "active file-open" : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-      return (
-        <button
-          key={entry.path}
-          type="button"
-          className={rowClass}
-          style={{ paddingLeft: "12px" }}
-          title={displayPath}
-          onClick={() => {
-            // Don't open deleted files in preview drawer
-            if (!isDeletedFile) {
-              onOpenFile(entry);
-            }
-          }}
-          onContextMenu={(event) => handleContextMenu(event, entry)}
-          draggable={!isDeletedFile}
-          onDragStart={(event) => handleDragStart(event, entry)}
-        >
-          <span className="explorer-expander placeholder" aria-hidden="true" />
-          <FileIcon
-            name={entry.name}
-            isDirectory={false}
-            isOpen={false}
-            size={16}
-          />
-          <span className="explorer-name">{displayPath}</span>
-          {hasStats && (
-            <span className="explorer-git-stats">
-              {additions > 0 && <span className="additions">+{additions}</span>}
-              {deletions > 0 && <span className="deletions">-{deletions}</span>}
-            </span>
-          )}
-          {!isDeletedFile && (
-            <div className="explorer-file-actions">
-              <RevealInFinderButton path={entry.path} iconOnly />
-              {onMentionFile && (
-                <button
-                  type="button"
-                  className="explorer-mention-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMentionFile(entry.path, entry.name);
-                  }}
-                  title="Insert @file mention in chat"
-                  aria-label="Mention file in chat"
-                >
-                  @
-                </button>
-              )}
-            </div>
-          )}
-        </button>
-      );
-    },
-    [activeFilePath, handleContextMenu, onOpenFile, onMentionFile]
-  );
-
   return (
     <aside className="file-explorer">
       <div className="explorer-header">
@@ -743,27 +602,10 @@ function FileExplorer({
               <div className="empty-state">Empty folder</div>
             ) : (
               <div className="explorer-tree">
-                {/* Modified Files Group */}
-                {allModifiedFiles.length > 0 && (
-                  <div className="explorer-section modified-files-section">
-                    <div className="explorer-section-header">
-                      <span className="explorer-section-title">
-                        Modified Files
-                      </span>
-                      <span className="explorer-section-count">
-                        {allModifiedFiles.length}
-                      </span>
-                    </div>
-                    <div className="explorer-section-content">
-                      {allModifiedFiles.map((item) => renderModifiedFile(item))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Normal Files Tree */}
                 {rootEntries && rootEntries.length > 0 && (
                   <div className="explorer-section">
-                    {rootEntries && renderEntries(rootEntries, 0, true)}
+                    {rootEntries && renderEntries(rootEntries, 0)}
                   </div>
                 )}
               </div>
@@ -786,22 +628,17 @@ function FileExplorer({
 
 // Performance: Memo per evitare re-render quando cambiano solo terminali/git status
 export default memo(FileExplorer, (prevProps, nextProps) => {
-  // Re-render solo se tree, modifiedEntries, activePath o activeFilePath cambiano
+  // Re-render solo se tree, activePath o activeFilePath cambiano
   if (prevProps.rootPath !== nextProps.rootPath) return false
   if (prevProps.loading !== nextProps.loading) return false
   if (prevProps.error !== nextProps.error) return false
   if (prevProps.activePath !== nextProps.activePath) return false
   if (prevProps.activeFilePath !== nextProps.activeFilePath) return false
-  if (prevProps.gitRootPath !== nextProps.gitRootPath) return false
 
   // Check tree shallow (keys changed?)
   const prevKeys = Object.keys(prevProps.tree)
   const nextKeys = Object.keys(nextProps.tree)
   if (prevKeys.length !== nextKeys.length) return false
-
-  // Performance: Check array identity invece di length (molto più efficace)
-  // Con stableModifiedEntries da App.tsx, reference cambia solo quando entries cambiano davvero
-  if (prevProps.modifiedEntries !== nextProps.modifiedEntries) return false
 
   // Callbacks stabili da App.tsx
   return true
