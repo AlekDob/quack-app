@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, path::{Path, PathBuf}, process::Stdio, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_shell::ShellExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use once_cell::sync::Lazy;
@@ -105,26 +106,12 @@ const DEFAULT_MODEL: &str = "sonnet";
 const MAX_ATTACHMENTS: usize = 6;
 const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
 
-// Cache for Node.js executable path (computed once at first use)
-static NODE_EXECUTABLE_CACHE: Lazy<Option<PathBuf>> = Lazy::new(|| {
-    find_node_executable_internal()
-});
+/// Find system Node.js executable (fallback when sidecar is not available)
+/// This searches common Node.js installation paths
+fn find_system_node_executable() -> Option<PathBuf> {
+    log::info!("[Node.js] Searching for system Node.js installation...");
 
-/// Get cached Node.js executable path
-fn get_node_executable() -> Option<PathBuf> {
-    NODE_EXECUTABLE_CACHE.clone()
-}
-
-/// Find Node.js executable with robust search including NVM and common installation paths
-/// This is called only once and the result is cached
-fn find_node_executable_internal() -> Option<PathBuf> {
-    // Strategy: Search in order of preference
-    // 1. Check if 'node' is in PATH (works in dev mode and when Node.js is properly installed)
-    // 2. Common system paths (Homebrew, MacPorts, system-wide)
-    // 3. NVM paths (~/.nvm/versions/node/*/bin/node)
-    // 4. User-specific paths (~/.local/bin, ~/bin)
-
-    // Try standard PATH first (fastest, works for most cases)
+    // Try standard PATH first (fastest, works for dev mode)
     if let Ok(output) = std::process::Command::new("which").arg("node").output() {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
@@ -195,7 +182,7 @@ fn find_node_executable_internal() -> Option<PathBuf> {
         }
     }
 
-    log::error!("[Node.js] Node.js executable not found in any common location");
+    log::warn!("[Node.js] System Node.js executable not found in any common location");
     None
 }
 
@@ -803,41 +790,102 @@ pub async fn send_message_via_sdk_streaming(
     let node_sdk_dir = script_path.parent()
         .ok_or("Failed to get node-sdk directory".to_string())?;
 
-    // Find Node.js executable (cached, searches common locations)
-    log::info!("[SDK DEBUG] Searching for Node.js executable...");
-    let node_path = get_node_executable()
+    // Determine Node.js executable path
+    // Strategy:
+    // 1. In production mode: Try bundled sidecar first, then fallback to system Node.js
+    // 2. In development mode: Use system Node.js directly
+    log::info!("[SDK] Looking for Node.js executable...");
+
+    let is_production = !cfg!(debug_assertions);
+    let target_arch = if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else if cfg!(target_arch = "x86_64") {
+        "x86_64"
+    } else {
+        "unknown"
+    };
+
+    log::info!("[SDK] Mode: {}, Architecture: {}",
+        if is_production { "production" } else { "development" },
+        target_arch
+    );
+
+    let node_path = if is_production {
+        // Production mode: Try bundled sidecar first
+        let sidecar_name = if cfg!(target_arch = "aarch64") {
+            "node-sidecar-aarch64-apple-darwin"
+        } else if cfg!(target_arch = "x86_64") {
+            "node-sidecar-x86_64-apple-darwin"
+        } else {
+            "node-sidecar" // Fallback name (unlikely)
+        };
+
+        log::info!("[SDK] Looking for sidecar binary: {}", sidecar_name);
+
+        // Try to resolve the sidecar binary path from app resources
+        match app.path().resolve(
+            format!("binaries/{}", sidecar_name),
+            tauri::path::BaseDirectory::Resource
+        ) {
+            Ok(sidecar_path) => {
+                log::info!("[SDK] Resolved sidecar path: {:?}", sidecar_path);
+                if sidecar_path.exists() {
+                    log::info!("[SDK] ✅ Found bundled Node.js sidecar at: {:?}", sidecar_path);
+                    Some(sidecar_path)
+                } else {
+                    log::warn!("[SDK] ⚠️ Sidecar path resolved but file does not exist: {:?}", sidecar_path);
+                    log::warn!("[SDK] Falling back to system Node.js...");
+                    find_system_node_executable()
+                }
+            }
+            Err(e) => {
+                log::warn!("[SDK] ⚠️ Failed to resolve sidecar path: {}", e);
+                log::warn!("[SDK] Falling back to system Node.js...");
+                find_system_node_executable()
+            }
+        }
+    } else {
+        // Development mode: Use system Node.js directly (faster iteration)
+        log::info!("[SDK] Development mode - using system Node.js");
+        find_system_node_executable()
+    };
+
+    let node_path = node_path
         .ok_or_else(|| {
-            log::error!("[SDK DEBUG] Node.js executable not found!");
-            "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
+            log::error!("[SDK] ❌ Node.js executable not found!");
+            log::error!("[SDK] Production mode: {}", is_production);
+            log::error!("[SDK] Target architecture: {}", target_arch);
+            if is_production {
+                "Node.js executable not found. The bundled Node.js sidecar could not be located. Please reinstall the application.".to_string()
+            } else {
+                "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
+            }
         })?;
 
     log::info!("[SDK] Using Node.js at: {:?}", node_path);
 
-    // Spawn Node.js process
+    // Create the command with the resolved Node.js path
     let mut command = Command::new(&node_path);
     command
         .arg(&script_path)
         .arg(&config_str)
-        .current_dir(node_sdk_dir)  // Set working directory for node_modules resolution
+        .current_dir(node_sdk_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    // CRITICAL: Add node directory to PATH so the SDK can spawn child node processes
-    // The Claude Agent SDK internally spawns node processes and needs node in PATH
-    if let Some(node_dir) = node_path.parent() {
-        // Get current PATH or create empty one
-        let current_path = std::env::var("PATH").unwrap_or_default();
-        let node_dir_str = node_dir.to_string_lossy();
-
-        // Prepend node directory to PATH
-        let new_path = if current_path.is_empty() {
-            node_dir_str.to_string()
-        } else {
-            format!("{}:{}", node_dir_str, current_path)
-        };
-
-        log::info!("[SDK DEBUG] Setting PATH with node directory: {}", new_path);
-        command.env("PATH", new_path);
+    // Add node directory to PATH for SDK child processes (if using system Node.js)
+    if !node_path.to_string_lossy().contains("node-sidecar") {
+        if let Some(node_dir) = node_path.parent() {
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            let node_dir_str = node_dir.to_string_lossy();
+            let new_path = if current_path.is_empty() {
+                node_dir_str.to_string()
+            } else {
+                format!("{}:{}", node_dir_str, current_path)
+            };
+            log::info!("[SDK DEBUG] Setting PATH with node directory: {}", new_path);
+            command.env("PATH", new_path);
+        }
     }
 
     log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);

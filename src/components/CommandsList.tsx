@@ -5,6 +5,7 @@ import { CommandItem } from './CommandItem';
 interface CommandsListProps {
   customCommands: SlashCommand[];
   onUseCommand: (command: SlashCommand) => void;
+  onViewCommand: (command: SlashCommand) => void;
   onEditCommand: (command: SlashCommand) => void;
   onDeleteCommand: (command: SlashCommand) => void;
 }
@@ -12,6 +13,7 @@ interface CommandsListProps {
 export function CommandsList({
   customCommands,
   onUseCommand,
+  onViewCommand,
   onEditCommand,
   onDeleteCommand
 }: CommandsListProps) {
@@ -49,6 +51,7 @@ export function CommandsList({
                   key={command.name}
                   command={command}
                   onUse={onUseCommand}
+                  onView={onViewCommand}
                   onEdit={onEditCommand}
                   onDelete={onDeleteCommand}
                 />
@@ -80,6 +83,7 @@ export function CommandsList({
                   key={command.name}
                   command={command}
                   onUse={onUseCommand}
+                  onView={onViewCommand}
                   onEdit={onEditCommand}
                   onDelete={onDeleteCommand}
                 />

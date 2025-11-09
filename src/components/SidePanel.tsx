@@ -245,8 +245,6 @@ interface SidePanelProps {
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
   onMentionFile?: (filePath: string, fileName: string) => void;
-  modifiedEntries: GitStatusEntry[] | null;
-  gitRootPath: string | null;
 
   // Agents props
   agents: AgentInfo[];
@@ -279,6 +277,7 @@ interface SidePanelProps {
 
   // Commands props
   onUseCommand: (command: SlashCommand) => void;
+  onViewCommand: (command: SlashCommand) => void;
 
   // Context props
   tauriAvailable: boolean;
@@ -334,8 +333,6 @@ export default function SidePanel({
   onOpenFile,
   onLoadChildren,
   onMentionFile,
-  modifiedEntries,
-  gitRootPath,
 
   // Agents
   agents,
@@ -361,6 +358,7 @@ export default function SidePanel({
 
   // Commands
   onUseCommand,
+  onViewCommand,
 
   // Context
   tauriAvailable,
@@ -576,8 +574,6 @@ export default function SidePanel({
             onOpenFile={onOpenFile}
             onLoadChildren={onLoadChildren}
             onMentionFile={onMentionFile}
-            modifiedEntries={modifiedEntries}
-            gitRootPath={gitRootPath}
           />
           </div>
         )}
@@ -623,6 +619,7 @@ export default function SidePanel({
             <CommandsPanel
               basePath={rootPath || ''}
               onUseCommand={onUseCommand}
+              onViewCommand={onViewCommand}
             />
           </div>
         )}

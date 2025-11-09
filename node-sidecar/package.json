@@ -1,0 +1,25 @@
+{
+  "name": "quack-node-sidecar",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Node.js sidecar binary for Quack app",
+  "main": "index.js",
+  "bin": "index.js",
+  "scripts": {
+    "build:mac-arm": "pkg . --targets node20-macos-arm64 --output ../src-tauri/binaries/node-sidecar-aarch64-apple-darwin",
+    "build:mac-intel": "pkg . --targets node20-macos-x64 --output ../src-tauri/binaries/node-sidecar-x86_64-apple-darwin",
+    "build:all": "npm run build:mac-arm && npm run build:mac-intel"
+  },
+  "pkg": {
+    "scripts": "index.js",
+    "targets": [
+      "node20-macos-arm64",
+      "node20-macos-x64"
+    ],
+    "outputPath": "../src-tauri/binaries"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.15.0"
+  },
+  "dependencies": {}
+}

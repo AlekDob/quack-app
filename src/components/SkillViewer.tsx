@@ -245,9 +245,16 @@ export default function SkillViewer({
                         borderRadius: '4px',
                         cursor: file.is_dir ? 'pointer' : 'default',
                         transition: 'background 0.15s',
-                        ':hover': {
-                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                        },
+                      }}
+                      onMouseEnter={(e) => {
+                        if (file.is_dir) {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (file.is_dir) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
                       }}
                       title={file.path}
                       onClick={() => file.is_dir && handleToggleDir(file.path)}

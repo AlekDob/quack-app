@@ -7,9 +7,10 @@ import { CommandEditor } from './CommandEditor';
 interface CommandsPanelProps {
   basePath: string;
   onUseCommand: (command: SlashCommand) => void;
+  onViewCommand: (command: SlashCommand) => void;
 }
 
-export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
+export function CommandsPanel({ basePath, onUseCommand, onViewCommand }: CommandsPanelProps) {
   const {
     commands,
     loading,
@@ -127,6 +128,7 @@ export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
           <CommandsList
             customCommands={filteredCustom}
             onUseCommand={onUseCommand}
+            onViewCommand={onViewCommand}
             onEditCommand={handleEditCommand}
             onDeleteCommand={handleDeleteCommand}
           />
