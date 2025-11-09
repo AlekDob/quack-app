@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
@@ -42,6 +43,7 @@ import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
 import SkillViewer from "./components/SkillViewer";
+import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -50,6 +52,7 @@ import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
+import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
@@ -2934,7 +2937,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           type: 'skill',
           closable: true,
           skillName: skillInfo.name,
-          skillScope: skillInfo.scope,
+          skillScope: skillInfo.scope as 'global' | 'project',
           icon: <span style={{ fontSize: '14px' }}>⚡</span>,
         };
 
@@ -3031,6 +3034,41 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       duration: 2000,
     });
   }, []);
+
+  const handleViewCommand = useCallback((command: SlashCommand) => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      // Create a new tab for the command
+      const commandTabId = `command-${command.name}-${command.scope}`;
+
+      // Check if tab already exists
+      const existingTab = tabs.find(t => t.id === commandTabId);
+
+      if (existingTab) {
+        // Tab already exists, just switch to it
+        setActiveTabId(commandTabId);
+      } else {
+        // Create new command tab
+        const newTab: Tab = {
+          id: commandTabId,
+          label: command.name,
+          type: 'command',
+          closable: true,
+          command: command,
+          icon: <span style={{ fontSize: '14px' }}>/</span>,
+        };
+
+        setTabs(prevTabs => [...prevTabs, newTab]);
+        setActiveTabId(commandTabId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to open command: ${message}`);
+    }
+  }, [tauriAvailable, tabs]);
 
   const handleClearAgent = useCallback(() => {
     setActiveAgent(null);
@@ -3884,8 +3922,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     try {
       if (editingTerminal) {
-        // Update existing terminal
-        await invoke("update_terminal", {
+        // CRITICAL FIX: Update terminal with timeout to prevent freeze
+        await invokeWithTimeout("update_terminal", {
           id: editingTerminal.id,
           label: trimmedName,
           color: newTerminalColor,
@@ -3893,8 +3931,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           workingOn: trimmedWorkingOn || null,
           avatar: newTerminalAvatar,
           branch: newTerminalBranch || null,
-        });
+        }, 3000); // 3 second timeout
 
+        // Update state immediately (optimistic update)
         setTerminals((prev) =>
           prev.map((t) =>
             t.id === editingTerminal.id
@@ -3912,38 +3951,40 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           )
         );
 
-        // Save agent personality if configured
+        // CRITICAL FIX: Save personality in background (non-blocking)
+        // This prevents UI freeze if CLAUDE.md is large or filesystem is slow
         if (newTerminalPersonality && Object.keys(newTerminalPersonality).length > 0) {
-          try {
-            const fullPersonality: AgentPersonality = {
-              id: editingTerminal.id,
-              name: trimmedName,
-              role: newTerminalPersonality.role || '',
-              intro: newTerminalPersonality.intro || '', // ✅ FIXED: Now saving intro field
-              personality: newTerminalPersonality.personality || '',
-              quirks: newTerminalPersonality.quirks || '',
-              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
-              specialties: newTerminalPersonality.specialties || [],
-              skills: newTerminalPersonality.skills || [],
-              expressions: newTerminalPersonality.expressions || [],
-            };
+          const fullPersonality: AgentPersonality = {
+            id: editingTerminal.id,
+            name: trimmedName,
+            role: newTerminalPersonality.role || '',
+            intro: newTerminalPersonality.intro || '',
+            personality: newTerminalPersonality.personality || '',
+            quirks: newTerminalPersonality.quirks || '',
+            communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
+            specialties: newTerminalPersonality.specialties || [],
+            skills: newTerminalPersonality.skills || [],
+            expressions: newTerminalPersonality.expressions || [],
+          };
 
-            await invoke('save_agent_personality', {
-              projectPath: trimmedPath,
-              personality: fullPersonality,
-            });
-
-            // Inject personality into CLAUDE.md
-            await invoke('inject_personality_to_claude_md', {
-              projectPath: trimmedPath,
-              personality: fullPersonality,
-            });
-
-            console.log(`✅ Updated personality for agent "${trimmedName}"`);
-          } catch (error) {
+          // Fire and forget - don't block UI
+          fireAndForget('save_agent_personality', {
+            projectPath: trimmedPath,
+            personality: fullPersonality,
+          }, (error) => {
             console.error('Failed to save personality:', error);
-            // Don't block terminal update if personality save fails
-          }
+            toast.warning('Personality save failed but terminal updated successfully');
+          });
+
+          // Inject into CLAUDE.md also in background
+          fireAndForget('inject_personality_to_claude_md', {
+            projectPath: trimmedPath,
+            personality: fullPersonality,
+          }, (error) => {
+            console.error('Failed to inject personality to CLAUDE.md:', error);
+          });
+
+          console.log(`✅ Updated personality for agent "${trimmedName}" (saving in background)`);
         }
 
         // Force context panel refresh when agent is edited
@@ -3957,6 +3998,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           await loadDirectory(trimmedPath);
         }
 
+        // Close modal immediately - don't wait for personality save
         setShowNewTerminalModal(false);
         setEditingTerminal(null);
       } else {
@@ -4094,8 +4136,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } catch (error) {
       console.error("Unable to save terminal", error);
       const message = error instanceof Error ? error.message : String(error);
-      setNewTerminalError(message);
+
+      // CRITICAL FIX: Better error messages for timeout errors
+      if (message.includes('timeout') || message.includes('timed out')) {
+        setNewTerminalError('Operation timed out. Please try again or check your filesystem.');
+        toast.error('Save operation timed out', {
+          description: 'The filesystem might be slow. Your changes may not have been saved.',
+          duration: 5000,
+        });
+      } else {
+        setNewTerminalError(message);
+      }
     } finally {
+      // CRITICAL: Always reset this flag to prevent permanent UI freeze
       setCreatingTerminal(false);
     }
   }, [
@@ -6074,6 +6127,20 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+              {/* Command Viewer - shown when command tab is active */}
+              {activeTabId.startsWith('command-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'command' && activeTab.command) {
+                  return (
+                    <CommandViewer
+                      command={activeTab.command}
+                      onUseCommand={handleUseCommand}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (
                 <div style={{
@@ -6140,6 +6207,7 @@ You have access to all Bash tools to execute git commands like:
           onRefreshSkills={loadSkills}
           // Commands props
           onUseCommand={handleUseCommand}
+          onViewCommand={handleViewCommand}
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={handleOpenContextDrawer}

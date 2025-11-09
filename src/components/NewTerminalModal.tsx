@@ -125,17 +125,18 @@ function NewTerminalModal({
     }
   }, [open, path]);
 
-  // Cleanup blob URLs when modal closes (separate effect to avoid infinite loop)
+  // Cleanup blob URLs when modal closes or URLs change
+  // CRITICAL FIX: Always cleanup blob URLs to prevent memory leaks
   useEffect(() => {
     return () => {
-      // Cleanup on unmount or when modal closes
-      if (!open && Object.keys(customAvatarUrls).length > 0) {
-        Object.values(customAvatarUrls).forEach(url => {
+      // Always cleanup ALL blob URLs on unmount or when URLs change
+      Object.values(customAvatarUrls).forEach(url => {
+        if (url && url.startsWith('blob:')) {
           revokeAvatarUrl(url);
-        });
-      }
+        }
+      });
     };
-  }, [open]);
+  }, [customAvatarUrls]); // Depend on customAvatarUrls, not open
 
   async function loadCustomAvatars() {
     setLoadingAvatars(true);
@@ -143,29 +144,36 @@ function NewTerminalModal({
       const avatars = await listCustomAvatars();
       setCustomAvatars(avatars);
 
-      // Load URLs for all custom avatars IN PARALLEL (much faster!)
-      const urlPromises = avatars.map(async (avatar) => {
-        try {
-          const url = await getCustomAvatarUrl(avatar.id);
-          return { id: avatar.id, url };
-        } catch (err) {
-          console.error(`Failed to load URL for custom avatar ${avatar.id}:`, err);
-          return { id: avatar.id, url: null };
-        }
-      });
-
-      // Wait for all promises to resolve in parallel
-      const results = await Promise.all(urlPromises);
-
-      // Build URLs object from results
+      // CRITICAL FIX: Load avatars in BATCHES to prevent UI freeze
+      // Limit parallel loading to max 5 avatars at a time
+      const BATCH_SIZE = 5;
       const urls: Record<string, string> = {};
-      results.forEach(result => {
-        if (result.url) {
-          urls[result.id] = result.url;
-        }
-      });
 
-      setCustomAvatarUrls(urls);
+      for (let i = 0; i < avatars.length; i += BATCH_SIZE) {
+        const batch = avatars.slice(i, i + BATCH_SIZE);
+        const batchPromises = batch.map(async (avatar) => {
+          try {
+            const url = await getCustomAvatarUrl(avatar.id);
+            return { id: avatar.id, url };
+          } catch (err) {
+            console.error(`Failed to load URL for custom avatar ${avatar.id}:`, err);
+            return { id: avatar.id, url: null };
+          }
+        });
+
+        // Wait for current batch to complete before starting next
+        const batchResults = await Promise.all(batchPromises);
+
+        // Add batch results to URLs
+        batchResults.forEach(result => {
+          if (result.url) {
+            urls[result.id] = result.url;
+          }
+        });
+
+        // Update state progressively (show avatars as they load)
+        setCustomAvatarUrls(prev => ({ ...prev, ...urls }));
+      }
     } catch (err) {
       console.error('Failed to load custom avatars:', err);
     } finally {

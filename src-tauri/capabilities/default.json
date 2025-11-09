@@ -27,10 +27,23 @@
     "notification:default",
     "store:default",
     "shell:default",
+    "shell:allow-execute",
+    "shell:allow-spawn",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/node-sidecar",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
     "fs:default",
     "fs:allow-read-file",
     "fs:allow-app-read",
     "fs:allow-app-read-recursive",
+    "fs:read-all",
     "mic-recorder:default"
   ]
 }

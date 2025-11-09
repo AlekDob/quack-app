@@ -1,10 +1,11 @@
 import { memo, useState } from 'react';
+import type { SlashCommand } from '../hooks/useSlashCommands';
 import './TabBar.css';
 
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -15,6 +16,7 @@ export interface Tab {
   url?: string; // Current URL for browser tabs
   skillName?: string; // Skill name for skill tabs
   skillScope?: 'global' | 'project'; // Skill scope for skill tabs
+  command?: SlashCommand; // Full command object for command tabs
 }
 
 interface TabBarProps {

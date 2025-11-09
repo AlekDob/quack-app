@@ -507,8 +507,6 @@ function AppRefactored() {
           onMentionFile={(filePath, fileName) => {
             setPendingFileMention({ path: filePath, name: fileName, relativePath: fileName });
           }}
-          modifiedEntries={gitSummary?.entries || null}
-          gitRootPath={explorerRoot}
 
           // Agents props
           agents={agents}
@@ -555,6 +553,10 @@ function AppRefactored() {
           // Commands props
           onUseCommand={(command) => {
             setPendingSlashCommand(command);
+          }}
+          onViewCommand={() => {
+            // TODO: Implement command viewing in refactored app
+            console.log('Command view not implemented in refactored app');
           }}
 
           // Context props
