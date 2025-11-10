@@ -69,18 +69,15 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           {/* Pricing */}
           <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-5 mb-6">
             <div className="flex items-baseline justify-center gap-2 mb-2">
-              <span className="text-4xl font-bold text-white">$49</span>
-              <span className="text-sm text-gray-400">early bird</span>
+              <span className="text-4xl font-bold text-white">$99</span>
+              <span className="text-sm text-gray-400">/year</span>
             </div>
             <p className="text-center text-xs text-gray-400">
-              One-time payment • Lifetime license
+              Annual subscription • Use on up to 3 devices
             </p>
             <div className="mt-3 flex items-center justify-center gap-2 text-xs">
-              <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400">
-                Limited Time
-              </span>
-              <span className="text-gray-500">
-                Regular price: <span className="line-through">$79</span>
+              <span className="px-2 py-1 bg-green-500/20 border border-green-500/30 rounded text-green-400">
+                Cancel Anytime
               </span>
             </div>
           </div>
@@ -122,13 +119,14 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           <div className="space-y-3">
             <button
               onClick={() => {
-                // Open Lemon Squeezy checkout in browser using Tauri shell
-                open('https://quackbuild.lemonsqueezy.com/checkout/buy/69111d6b-9f87-4eeb-a1d6-202980eaa47f');
+                // Open Gumroad checkout in browser using Tauri shell
+                // TODO: Replace with actual Gumroad product permalink
+                open('https://your-username.gumroad.com/l/quack-pro-annual');
               }}
               className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold transition-all shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 flex items-center justify-center gap-2"
             >
               <Crown className="w-5 h-5" />
-              Purchase Quack Pro
+              Subscribe to Quack Pro
             </button>
 
             <button
@@ -142,7 +140,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           {/* Footer */}
           <div className="mt-6 pt-4 border-t border-gray-700/50 text-center">
             <p className="text-xs text-gray-500">
-              Secure payment via Lemon Squeezy • 14-day money-back guarantee
+              Secure payment via Gumroad • Cancel anytime • 14-day money-back guarantee
             </p>
           </div>
         </div>

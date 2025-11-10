@@ -14,12 +14,26 @@ interface ValidationResponse {
   license_data?: {
     key: string;
     email?: string;
+    device_id: string;  // NEW: Device ID from backend
     activated_at: number;
     expires_at?: number;
     license_type: string;
     valid: boolean;
   };
   error?: string;
+}
+
+// Generate a unique device ID for this installation
+// This will be stored with the license and used for device tracking
+function generateDeviceId(): string {
+  // Check if we already have a device ID stored
+  const stored = localStorage.getItem('quack_device_id');
+  if (stored) return stored;
+
+  // Generate new UUID v4
+  const deviceId = crypto.randomUUID();
+  localStorage.setItem('quack_device_id', deviceId);
+  return deviceId;
 }
 
 export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -41,8 +55,12 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, onS
     setValidationSuccess(false);
 
     try {
+      // Generate or retrieve device ID
+      const deviceId = generateDeviceId();
+
       const response = await invoke<ValidationResponse>('validate_license', {
         licenseKey: licenseKey.trim(),
+        deviceId, // NEW: Pass device ID to backend
       });
 
       if (response.valid && response.license_data) {
@@ -51,6 +69,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose, onS
         const licenseData: LicenseData = {
           key: response.license_data.key,
           email: response.license_data.email,
+          deviceId: response.license_data.device_id, // NEW: Store device ID
           activatedAt: response.license_data.activated_at * 1000, // Convert seconds to milliseconds
           expiresAt: response.license_data.expires_at ? response.license_data.expires_at * 1000 : undefined,
           type: response.license_data.license_type as 'lifetime' | 'subscription',

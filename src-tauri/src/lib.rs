@@ -150,14 +150,22 @@ pub fn run() {
         .plugin(tauri_plugin_mic_recorder::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            // 💰 Load Lemon Squeezy credentials from .env file
+            // 💰 Load Gumroad and Supabase credentials from .env file
             if dotenvy::dotenv().is_ok() {
-                if let Ok(api_key) = std::env::var("LEMON_SQUEEZY_API_KEY") {
-                    if let Ok(store_id) = std::env::var("LEMON_SQUEEZY_STORE_ID") {
-                        let license_state: tauri::State<license::LicenseState> = app.state();
-                        *license_state.api_key.lock().unwrap() = Some(api_key);
-                        *license_state.store_id.lock().unwrap() = Some(store_id);
-                        log::info!("🦆 Lemon Squeezy API credentials loaded from .env");
+                let license_state: tauri::State<license::LicenseState> = app.state();
+
+                // Load Gumroad Product ID
+                if let Ok(product_id) = std::env::var("GUMROAD_PRODUCT_ID") {
+                    *license_state.gumroad_product_id.lock().unwrap() = Some(product_id);
+                    log::info!("🦆 Gumroad Product ID loaded from .env");
+                }
+
+                // Load Supabase credentials
+                if let Ok(supabase_url) = std::env::var("SUPABASE_URL") {
+                    if let Ok(supabase_key) = std::env::var("SUPABASE_ANON_KEY") {
+                        *license_state.supabase_url.lock().unwrap() = Some(supabase_url);
+                        *license_state.supabase_key.lock().unwrap() = Some(supabase_key);
+                        log::info!("🦆 Supabase credentials loaded from .env");
                     }
                 }
             }
@@ -566,12 +574,11 @@ pub fn run() {
             sessions::get_session_details,
             sessions::delete_session,
             sessions::resume_session,
-            // 💰 License management commands
-            license::configure_license_api,
+            // 💰 License management commands (Gumroad + Supabase)
             license::validate_license,
+            license::revalidate_license,
             license::deactivate_license,
-            license::get_license_info,
-            license::revalidate_license
+            license::get_license_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
