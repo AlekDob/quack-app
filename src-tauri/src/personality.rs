@@ -3,18 +3,36 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::{Result, Context};
 
+/// REDESIGNED: More practical and focused on actual development needs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentPersonality {
     pub id: String,
     pub name: String,
-    pub role: String,
-    pub personality: String,
-    pub quirks: String,
+    pub role: String, // Mission/Role (e.g., "Backend Performance Specialist")
+
+    // New practical fields
+    #[serde(rename = "technicalContext", skip_serializing_if = "Option::is_none")]
+    pub technical_context: Option<String>, // Free-form technical context
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules: Option<Vec<String>>, // Rules & best practices
     #[serde(rename = "communicationStyle")]
-    pub communication_style: String,
-    pub specialties: Vec<String>,
-    pub skills: Vec<String>,
-    pub expressions: Vec<String>,
+    pub communication_style: String, // How the agent communicates
+    #[serde(rename = "customNotes", skip_serializing_if = "Option::is_none")]
+    pub custom_notes: Option<String>, // Additional free-form notes
+
+    // Legacy fields (kept for backwards compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub personality: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quirks: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub specialties: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skills: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expressions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intro: Option<String>,
 }
 
 impl Default for AgentPersonality {
@@ -23,12 +41,21 @@ impl Default for AgentPersonality {
             id: "default".to_string(),
             name: "Jack".to_string(),
             role: "Product Manager at Quack Agency".to_string(),
-            personality: "You coordinate feature development and sprint planning. You work on specific branches and invoke Protocol Droids when you need specialized expertise.".to_string(),
-            quirks: "You always respond with frequent 'quack quack' expressions and focus on coordinating work rather than doing it yourself.".to_string(),
+            technical_context: Some("Coordinates feature development across multiple tech stacks (Tauri, Next.js, Flutter, etc.)".to_string()),
+            rules: Some(vec![
+                "Always coordinate with specialized Protocol Droids for technical work".to_string(),
+                "Respond with frequent 'quack quack' expressions".to_string(),
+                "Focus on planning and coordination, not implementation".to_string(),
+            ]),
             communication_style: "friendly".to_string(),
-            specialties: vec![],
-            skills: vec![],
-            expressions: vec!["Quack quack!".to_string(), "Let me coordinate this with the right Protocol Droid!".to_string()],
+            custom_notes: Some("Experienced PM specializing in feature delivery and team coordination. Works on specific branches and delegates to specialists.".to_string()),
+            // Legacy fields (backwards compatibility)
+            personality: Some("You coordinate feature development and sprint planning. You work on specific branches and invoke Protocol Droids when you need specialized expertise.".to_string()),
+            quirks: Some("You always respond with frequent 'quack quack' expressions and focus on coordinating work rather than doing it yourself.".to_string()),
+            specialties: Some(vec![]),
+            skills: Some(vec![]),
+            expressions: Some(vec!["Quack quack!".to_string(), "Let me coordinate this with the right Protocol Droid!".to_string()]),
+            intro: Some("Experienced PM specializing in feature delivery and team coordination".to_string()),
         }
     }
 }
@@ -104,6 +131,51 @@ fn load_agent_personality_impl(
     Ok(personality)
 }
 
+/// Helper function to load agents from a directory
+fn load_agents_from_dir(agents_dir: &Path) -> Vec<(String, String)> {
+    let mut agents = Vec::new();
+
+    if !agents_dir.exists() {
+        return agents;
+    }
+
+    if let Ok(entries) = fs::read_dir(agents_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    // Parse name and description from frontmatter
+                    let mut name = None;
+                    let mut description = None;
+                    for line in content.lines().take(10) {
+                        if line.starts_with("name:") {
+                            name = Some(line.trim_start_matches("name:").trim().to_string());
+                        } else if line.starts_with("description:") {
+                            let desc = line.trim_start_matches("description:").trim();
+                            // Extract first part before | if present
+                            description = Some(
+                                desc.split('|')
+                                    .next()
+                                    .unwrap_or(desc)
+                                    .trim()
+                                    .to_string()
+                            );
+                        }
+                        if name.is_some() && description.is_some() {
+                            break;
+                        }
+                    }
+                    if let (Some(n), Some(d)) = (name, description) {
+                        agents.push((n, d));
+                    }
+                }
+            }
+        }
+    }
+
+    agents
+}
+
 /// Process CLAUDE.md template with personality variables
 #[tauri::command]
 pub fn inject_personality_to_claude_md(
@@ -120,49 +192,70 @@ fn inject_personality_to_claude_md_impl(
 ) -> Result<String> {
     let claude_md_path = project_path.join("CLAUDE.md");
 
-    // Generate agent header
+    // Generate agent header with NEW structure
     let mut agent_header = String::new();
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->\n");
     agent_header.push_str(&format!("Your name is **{}**, and you're the **{}**.\n\n",
         personality.name, personality.role));
-    agent_header.push_str(&format!("{}\n\n", personality.personality));
-    agent_header.push_str(&format!("{}\n\n", personality.quirks));
+
+    // Technical Context
+    if let Some(technical_context) = &personality.technical_context {
+        if !technical_context.is_empty() {
+            agent_header.push_str(&format!("**Technical Context:**\n{}\n\n", technical_context));
+        }
+    }
+
+    // Rules & Best Practices
+    if let Some(rules) = &personality.rules {
+        if !rules.is_empty() {
+            agent_header.push_str("**Rules & Best Practices:**\n");
+            for rule in rules {
+                agent_header.push_str(&format!("- {}\n", rule));
+            }
+            agent_header.push('\n');
+        }
+    }
+
+    // Communication Style
     agent_header.push_str(&format!("**Communication Style:** {}\n\n", personality.communication_style));
 
-    if !personality.specialties.is_empty() {
-        agent_header.push_str("**Your Specialties:**\n");
-        for specialty in &personality.specialties {
-            agent_header.push_str(&format!("- {}\n", specialty));
+    // Custom Notes
+    if let Some(custom_notes) = &personality.custom_notes {
+        if !custom_notes.is_empty() {
+            agent_header.push_str(&format!("**Notes:**\n{}\n\n", custom_notes));
         }
-        agent_header.push('\n');
-    }
-
-    if !personality.skills.is_empty() {
-        agent_header.push_str("**Skills to Remember:**\n");
-        for skill in &personality.skills {
-            agent_header.push_str(&format!("- {}\n", skill));
-        }
-        agent_header.push('\n');
-    }
-
-    if !personality.expressions.is_empty() {
-        agent_header.push_str("**Favorite Expressions:**\n");
-        for expression in &personality.expressions {
-            agent_header.push_str(&format!("- {}\n", expression));
-        }
-        agent_header.push('\n');
     }
 
     // Add Protocol Droids section
     agent_header.push_str("**Protocol Droids Available:**\n");
-    agent_header.push_str("You have access to specialized protocol droids (subagents) that assist you:\n");
-    agent_header.push_str("- Located in `.claude/agents/` (both project-level and global)\n");
-    agent_header.push_str("- These are technical specialists you invoke for specific expertise:\n");
-    agent_header.push_str("  - `julie-designer` → Frontend/UI specialist\n");
-    agent_header.push_str("  - `john-backend` → Backend/API specialist\n");
-    agent_header.push_str("  - `giuseppe-git-manager` → Git workflow specialist\n");
-    agent_header.push_str("  - `test-engineer` → Testing/QA specialist\n");
-    agent_header.push_str("  - `security-auditor` → Security specialist\n");
+    agent_header.push_str("You have access to specialized protocol droids (subagents) that assist you:\n\n");
+
+    // Load project-specific Protocol Droids from .claude/agents/
+    let project_agents_dir = project_path.join(".claude").join("agents");
+    let project_droids = load_agents_from_dir(&project_agents_dir);
+
+    // Add project-specific droids first
+    if !project_droids.is_empty() {
+        agent_header.push_str("**Project-Specific Protocol Droids:**\n");
+        for (name, desc) in project_droids {
+            agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
+        }
+        agent_header.push('\n');
+    }
+
+    // Load global Protocol Droids from ~/.claude/agents/
+    if let Some(home_dir) = std::env::var_os("HOME") {
+        let global_agents_dir = PathBuf::from(home_dir).join(".claude").join("agents");
+        let global_droids = load_agents_from_dir(&global_agents_dir);
+
+        if !global_droids.is_empty() {
+            agent_header.push_str("**Global Protocol Droids:**\n");
+            for (name, desc) in global_droids {
+                agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
+            }
+            agent_header.push('\n');
+        }
+    }
     agent_header.push_str("- **Your role**: Coordinate the implementation, delegate to Protocol Droids for specialized work\n");
     agent_header.push_str("- **Remember**: You're a PM managing a feature/sprint on a specific branch, not a technical specialist!\n\n");
 

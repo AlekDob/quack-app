@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
@@ -41,6 +42,8 @@ import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
+import SkillViewer from "./components/SkillViewer";
+import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -49,6 +52,7 @@ import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
+import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
@@ -745,7 +749,7 @@ function App() {
 
     // Save current tabs for previous agent (if any)
     if (previousId && previousId !== activeId) {
-      console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs);
+      // console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs); // Performance: Disabled logging
       setTabsByTerminal((prev) => {
         const updated = new Map(prev);
         // Filter out chat tab (always present) - save only file/terminal tabs
@@ -758,7 +762,7 @@ function App() {
     // Restore tabs for new active agent
     if (activeId) {
       const restoredTabs = tabsByTerminal.get(activeId) || [];
-      console.log(`🦆 [Tab Management] Restoring tabs for agent: ${activeId}`, restoredTabs);
+      // console.log(`🦆 [Tab Management] Restoring tabs for agent: ${activeId}`, restoredTabs); // Performance: Disabled logging
 
       // Always include chat tab + restored agent tabs
       setTabs([
@@ -871,7 +875,7 @@ function App() {
     // Get all agent IDs that have chat sessions
     const activeAgentIds = Array.from(chatSessions.keys());
 
-    console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds);
+    // console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds); // Performance: Disabled logging
 
     // Setup listener for each active agent
     const setupPromises = activeAgentIds.map(async (agentId) => {
@@ -881,7 +885,7 @@ function App() {
         const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
           const claudeEvent = event.payload;
 
-          console.log(`[Multi-Listener] Event received for agent ${agentId}:`, claudeEvent.type);
+          // console.log(`[Multi-Listener] Event received for agent ${agentId}:`, claudeEvent.type); // Performance: Disabled logging
 
           // Update chat session with incoming events
           setChatSessions((prev) => {
@@ -1718,17 +1722,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
   }, [gitSummary, selectedGitPath]);
 
-  // Performance: Stabilizza modifiedEntries reference per evitare re-render FileExplorer
-  const stableModifiedEntries = useMemo(() => {
-    if (!gitSummary?.entries) return null;
-    // Memoizza basandosi su length + primi path per shallow equality check
-    return gitSummary.entries;
-  }, [
-    gitSummary?.entries?.length,
-    gitSummary?.entries?.[0]?.path,
-    gitSummary?.entries?.[gitSummary.entries.length - 1]?.path
-  ]);
-
   const gridTemplateColumns = sidePanelCollapsed
     ? "360px minmax(0, 1fr) 0px"
     : "360px minmax(0, 1fr) 420px";
@@ -2191,47 +2184,58 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, terminals]);
 
+  // Auto-save terminals to storage (debounced to avoid excessive writes)
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
 
-    if (terminals.length > 0) {
-      void saveTerminalsToStorage(terminals);
-    } else {
-      // If no terminals, clean up storage
-      void (async () => {
-        try {
-          const store = await Store.load("quack-terminals.json");
-          await store.delete(STORAGE_KEY);
-          await store.save();
-        } catch {
-          // Ignore errors
-        }
-      })();
-    }
+    // Debounce storage save - wait 2 seconds after last change before saving
+    const saveTimer = setTimeout(() => {
+      if (terminals.length > 0) {
+        void saveTerminalsToStorage(terminals);
+      } else {
+        // If no terminals, clean up storage
+        void (async () => {
+          try {
+            const store = await Store.load("quack-terminals.json");
+            await store.delete(STORAGE_KEY);
+            await store.save();
+          } catch {
+            // Ignore errors
+          }
+        })();
+      }
+    }, 2000); // Wait 2 seconds before saving
+
+    return () => clearTimeout(saveTimer);
   }, [hasBootstrapped, tauriAvailable, terminals]);
 
-  // Auto-save tabs by terminal to storage
+  // Auto-save tabs by terminal to storage (debounced to avoid saving on every switch)
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
 
-    if (tabsByTerminal.size > 0) {
-      void saveTabsByTerminalToStorage(tabsByTerminal);
-    } else {
-      // If no tabs, clean up storage
-      void (async () => {
-        try {
-          const store = await Store.load("quack-terminals.json");
-          await store.delete(TABS_BY_TERMINAL_KEY);
-          await store.save();
-        } catch {
-          // Ignore errors
-        }
-      })();
-    }
+    // Debounce storage save - wait 2 seconds after last change before saving
+    const saveTimer = setTimeout(() => {
+      if (tabsByTerminal.size > 0) {
+        void saveTabsByTerminalToStorage(tabsByTerminal);
+      } else {
+        // If no tabs, clean up storage
+        void (async () => {
+          try {
+            const store = await Store.load("quack-terminals.json");
+            await store.delete(TABS_BY_TERMINAL_KEY);
+            await store.save();
+          } catch {
+            // Ignore errors
+          }
+        })();
+      }
+    }, 2000); // Wait 2 seconds before saving
+
+    return () => clearTimeout(saveTimer);
   }, [tabsByTerminal, tauriAvailable, hasBootstrapped]);
 
   // Auto-save Native Terminals when they change
@@ -2916,14 +2920,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
-      // Open the skill drawer with selected skill
-      setSelectedSkill(skillInfo);
-      setShowSkillDrawer(true);
+      // Create a new tab for the skill instead of opening drawer
+      const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
+
+      // Check if tab already exists
+      const existingTab = tabs.find(t => t.id === skillTabId);
+
+      if (existingTab) {
+        // Tab already exists, just switch to it
+        setActiveTabId(skillTabId);
+      } else {
+        // Create new skill tab
+        const newTab: Tab = {
+          id: skillTabId,
+          label: skillInfo.name.replace(/-/g, ' '),
+          type: 'skill',
+          closable: true,
+          skillName: skillInfo.name,
+          skillScope: skillInfo.scope as 'global' | 'project',
+          icon: <span style={{ fontSize: '14px' }}>⚡</span>,
+        };
+
+        setTabs(prevTabs => [...prevTabs, newTab]);
+        setActiveTabId(skillTabId);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to load skill: ${message}`);
+      toast.error(`Failed to open skill: ${message}`);
     }
-  }, [tauriAvailable]);
+  }, [tauriAvailable, tabs]);
 
   // Marketplace refresh handler - refreshes all panels when resources are installed
   const handleMarketplaceRefresh = useCallback(async () => {
@@ -3010,6 +3035,41 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
+  const handleViewCommand = useCallback((command: SlashCommand) => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    try {
+      // Create a new tab for the command
+      const commandTabId = `command-${command.name}-${command.scope}`;
+
+      // Check if tab already exists
+      const existingTab = tabs.find(t => t.id === commandTabId);
+
+      if (existingTab) {
+        // Tab already exists, just switch to it
+        setActiveTabId(commandTabId);
+      } else {
+        // Create new command tab
+        const newTab: Tab = {
+          id: commandTabId,
+          label: command.name,
+          type: 'command',
+          closable: true,
+          command: command,
+          icon: <span style={{ fontSize: '14px' }}>/</span>,
+        };
+
+        setTabs(prevTabs => [...prevTabs, newTab]);
+        setActiveTabId(commandTabId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to open command: ${message}`);
+    }
+  }, [tauriAvailable, tabs]);
+
   const handleClearAgent = useCallback(() => {
     setActiveAgent(null);
     toast.info('Agent deactivated', {
@@ -3020,20 +3080,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
 
   // Load Quack Agency agents on startup
+  // Load Agents on startup only (not on every terminal switch!)
   useEffect(() => {
-    if (!tauriAvailable) {
+    if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
     void loadAgents();
-  }, [loadAgents, tauriAvailable]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadAgents to prevent re-load on every switch
 
-  // Load Skills on startup
+  // Load Skills on startup only (not on every terminal switch!)
   useEffect(() => {
-    if (!tauriAvailable) {
+    if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
     void loadSkills();
-  }, [loadSkills, tauriAvailable]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadSkills to prevent re-load on every switch
 
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
@@ -3387,12 +3450,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               };
 
               recreated.push(terminalWithState);
-              console.log(`Recreated terminal: ${terminal.label}`, {
-                workingOn: metadata.workingOn,
-                avatar: metadata.avatar,
-                branch: metadata.branch,
-                personality: metadata.personality ? 'loaded' : 'none',
-              });
+              // console.log(`Recreated terminal: ${terminal.label}`, { // Performance: Disabled logging
+              //   workingOn: metadata.workingOn,
+              //   avatar: metadata.avatar,
+              //   branch: metadata.branch,
+              //   personality: metadata.personality ? 'loaded' : 'none',
+              // });
             } catch (error) {
               console.warn(
                 `Unable to recreate terminal ${metadata.label}`,
@@ -3859,8 +3922,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     try {
       if (editingTerminal) {
-        // Update existing terminal
-        await invoke("update_terminal", {
+        // CRITICAL FIX: Update terminal with timeout to prevent freeze
+        await invokeWithTimeout("update_terminal", {
           id: editingTerminal.id,
           label: trimmedName,
           color: newTerminalColor,
@@ -3868,8 +3931,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           workingOn: trimmedWorkingOn || null,
           avatar: newTerminalAvatar,
           branch: newTerminalBranch || null,
-        });
+        }, 3000); // 3 second timeout
 
+        // Update state immediately (optimistic update)
         setTerminals((prev) =>
           prev.map((t) =>
             t.id === editingTerminal.id
@@ -3887,38 +3951,40 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           )
         );
 
-        // Save agent personality if configured
+        // CRITICAL FIX: Save personality in background (non-blocking)
+        // This prevents UI freeze if CLAUDE.md is large or filesystem is slow
         if (newTerminalPersonality && Object.keys(newTerminalPersonality).length > 0) {
-          try {
-            const fullPersonality: AgentPersonality = {
-              id: editingTerminal.id,
-              name: trimmedName,
-              role: newTerminalPersonality.role || '',
-              intro: newTerminalPersonality.intro || '', // ✅ FIXED: Now saving intro field
-              personality: newTerminalPersonality.personality || '',
-              quirks: newTerminalPersonality.quirks || '',
-              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
-              specialties: newTerminalPersonality.specialties || [],
-              skills: newTerminalPersonality.skills || [],
-              expressions: newTerminalPersonality.expressions || [],
-            };
+          const fullPersonality: AgentPersonality = {
+            id: editingTerminal.id,
+            name: trimmedName,
+            role: newTerminalPersonality.role || '',
+            intro: newTerminalPersonality.intro || '',
+            personality: newTerminalPersonality.personality || '',
+            quirks: newTerminalPersonality.quirks || '',
+            communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
+            specialties: newTerminalPersonality.specialties || [],
+            skills: newTerminalPersonality.skills || [],
+            expressions: newTerminalPersonality.expressions || [],
+          };
 
-            await invoke('save_agent_personality', {
-              projectPath: trimmedPath,
-              personality: fullPersonality,
-            });
-
-            // Inject personality into CLAUDE.md
-            await invoke('inject_personality_to_claude_md', {
-              projectPath: trimmedPath,
-              personality: fullPersonality,
-            });
-
-            console.log(`✅ Updated personality for agent "${trimmedName}"`);
-          } catch (error) {
+          // Fire and forget - don't block UI
+          fireAndForget('save_agent_personality', {
+            projectPath: trimmedPath,
+            personality: fullPersonality,
+          }, (error) => {
             console.error('Failed to save personality:', error);
-            // Don't block terminal update if personality save fails
-          }
+            toast.warning('Personality save failed but terminal updated successfully');
+          });
+
+          // Inject into CLAUDE.md also in background
+          fireAndForget('inject_personality_to_claude_md', {
+            projectPath: trimmedPath,
+            personality: fullPersonality,
+          }, (error) => {
+            console.error('Failed to inject personality to CLAUDE.md:', error);
+          });
+
+          console.log(`✅ Updated personality for agent "${trimmedName}" (saving in background)`);
         }
 
         // Force context panel refresh when agent is edited
@@ -3932,6 +3998,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           await loadDirectory(trimmedPath);
         }
 
+        // Close modal immediately - don't wait for personality save
         setShowNewTerminalModal(false);
         setEditingTerminal(null);
       } else {
@@ -4069,8 +4136,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } catch (error) {
       console.error("Unable to save terminal", error);
       const message = error instanceof Error ? error.message : String(error);
-      setNewTerminalError(message);
+
+      // CRITICAL FIX: Better error messages for timeout errors
+      if (message.includes('timeout') || message.includes('timed out')) {
+        setNewTerminalError('Operation timed out. Please try again or check your filesystem.');
+        toast.error('Save operation timed out', {
+          description: 'The filesystem might be slow. Your changes may not have been saved.',
+          duration: 5000,
+        });
+      } else {
+        setNewTerminalError(message);
+      }
     } finally {
+      // CRITICAL: Always reset this flag to prevent permanent UI freeze
       setCreatingTerminal(false);
     }
   }, [
@@ -4609,6 +4687,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log(`✅ Closed agent terminal: ${tab.label} (${tab.terminalId})`);
     }
 
+    // If closing a file tab that is currently being previewed, reset preview state
+    if (tab?.type === 'file' && activeTabId === tabId) {
+      setPreviewFile(null);
+      setPreviewContent('');
+      setLoadingPreview(false);
+      setPreviewError(null);
+    }
+
     setTabs((prevTabs) => {
       const filtered = prevTabs.filter(t => t.id !== tabId);
 
@@ -4616,7 +4702,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       if (activeTabId === tabId) {
         const closedIndex = prevTabs.findIndex(t => t.id === tabId);
         const newActiveTab = filtered[Math.max(0, closedIndex - 1)];
-        setActiveTabId(newActiveTab?.id || 'chat');
+        const newActiveTabId = newActiveTab?.id || 'chat';
+
+        // Use handleTabClick instead of setActiveTabId to trigger file loading
+        handleTabClick(newActiveTabId);
       }
 
       return filtered;
@@ -4637,7 +4726,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return updated;
       });
     }
-  }, [activeTabId, activeId, tabs]);
+  }, [activeTabId, activeId, tabs, handleTabClick]);
 
   // Handle tab reorder via drag and drop
   const handleTabReorder = useCallback((reorderedTabs: Tab[]) => {
@@ -5127,12 +5216,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [refreshGitSummary, showGitDrawer]);
 
+  // Load git status on startup only (not on every terminal switch!)
   useEffect(() => {
-    if (!tauriAvailable) {
+    if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
     void refreshGitSummary();
-  }, [refreshGitSummary, tauriAvailable]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including refreshGitSummary to prevent re-load on every switch
 
   const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
     setSelectedGitPath(entry.path);
@@ -6031,6 +6122,36 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+              {/* Skill Viewer - shown when skill tab is active */}
+              {activeTabId.startsWith('skill-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'skill' && activeTab.skillName && activeTab.skillScope) {
+                  return (
+                    <SkillViewer
+                      skillName={activeTab.skillName}
+                      skillScope={activeTab.skillScope}
+                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      onRefresh={loadSkills}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Command Viewer - shown when command tab is active */}
+              {activeTabId.startsWith('command-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'command' && activeTab.command) {
+                  return (
+                    <CommandViewer
+                      command={activeTab.command}
+                      onUseCommand={handleUseCommand}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (
                 <div style={{
@@ -6075,8 +6196,6 @@ You have access to all Bash tools to execute git commands like:
           onOpenFile={handleOpenFilePreview}
           onLoadChildren={fetchDirectoryChildren}
           onMentionFile={handleMentionFile}
-          modifiedEntries={stableModifiedEntries}
-          gitRootPath={explorerRoot}
           // Agents props
           agents={agents}
           selectedAgent={selectedAgent}
@@ -6099,6 +6218,7 @@ You have access to all Bash tools to execute git commands like:
           onRefreshSkills={loadSkills}
           // Commands props
           onUseCommand={handleUseCommand}
+          onViewCommand={handleViewCommand}
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={handleOpenContextDrawer}

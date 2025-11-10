@@ -260,16 +260,22 @@ export interface AgentDetails extends AgentInfo {
 }
 
 // Agent Personality types (for dynamic CLAUDE.md generation)
+// REDESIGNED: More practical and focused on actual development needs
 export interface AgentPersonality {
   id: string;
   name: string;
-  role: string;
-  personality: string;
-  quirks: string;
-  communicationStyle: string;
-  specialties: string[];
-  skills: string[];
-  expressions: string[];
+  role: string; // Mission/Role (e.g., "Backend Performance Specialist")
+  technicalContext?: string; // Free-form technical context about current project
+  rules?: string[]; // Rules & best practices (e.g., "Max 3s timeout for Tauri calls")
+  communicationStyle: string; // How the agent communicates (friendly, professional, etc.)
+  customNotes?: string; // Additional free-form notes
+
+  // Legacy fields (kept for backwards compatibility during migration)
+  personality?: string;
+  quirks?: string;
+  specialties?: string[];
+  skills?: string[];
+  expressions?: string[];
   intro?: string;
 }
 

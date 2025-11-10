@@ -67,13 +67,17 @@ export default function AgentContextPanel({
           id: activeAgentId || '',
           name: activeAgentName || '',
           role: activeAgentPersonality.role || '',
-          intro: activeAgentPersonality.intro || '',
-          personality: activeAgentPersonality.personality || '',
-          quirks: activeAgentPersonality.quirks || '',
+          technicalContext: activeAgentPersonality.technicalContext,
+          rules: activeAgentPersonality.rules,
           communicationStyle: activeAgentPersonality.communicationStyle || 'friendly',
-          specialties: activeAgentPersonality.specialties || [],
-          skills: activeAgentPersonality.skills || [],
-          expressions: activeAgentPersonality.expressions || [],
+          customNotes: activeAgentPersonality.customNotes,
+          // Legacy fields (for backwards compatibility)
+          intro: activeAgentPersonality.intro,
+          personality: activeAgentPersonality.personality,
+          quirks: activeAgentPersonality.quirks,
+          specialties: activeAgentPersonality.specialties,
+          skills: activeAgentPersonality.skills,
+          expressions: activeAgentPersonality.expressions,
         };
         setPersonality(fullPersonality);
         console.log('✅ Loaded personality from state:', fullPersonality);
