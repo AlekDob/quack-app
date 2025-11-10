@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import type { AgentInfo } from '../types';
-import { AVAILABLE_AVATARS, getAvatarUrl, getRandomAvatar } from '../utils/agentAvatars';
 import { getRandomAgentName } from '../utils/agentNames';
 
 interface NewAgentModalProps {
@@ -37,8 +36,6 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
   const [color, setColor] = useState('blue');
   const [content, setContent] = useState('');
   const [scope, setScope] = useState<'global' | 'project'>('project');
-  const [workingOn, setWorkingOn] = useState('');
-  const [avatar, setAvatar] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,8 +48,6 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
       setColor('blue');
       setContent('');
       setScope('project');
-      setWorkingOn('');
-      setAvatar(getRandomAvatar()); // Set random avatar
       setError(null);
     }
   }, [isOpen, existingAgents]);
@@ -79,15 +74,6 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
       return;
     }
 
-    // Validate word count for "Working on" (max 5 words)
-    if (workingOn.trim()) {
-      const wordCount = workingOn.trim().split(/\s+/).length;
-      if (wordCount > 5) {
-        setError('Working on must be 5 words or less');
-        return;
-      }
-    }
-
     try {
       setSaving(true);
       setError(null);
@@ -98,8 +84,8 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
         color,
         content.trim(),
         scope,
-        workingOn.trim() || undefined,
-        avatar || undefined
+        undefined, // workingOn
+        undefined  // avatar
       );
       onClose();
     } catch (err) {
@@ -156,24 +142,6 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
             />
           </div>
 
-          {/* Working On */}
-          <div>
-            <label className="block text-xs font-medium text-white/70 mb-2">
-              What are you working on?
-            </label>
-            <input
-              type="text"
-              value={workingOn}
-              onChange={(e) => setWorkingOn(e.target.value)}
-              placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
-              maxLength={50}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
-            />
-            <p className="text-xs text-white/30 mt-1">
-              Brief context about what this agent is working on (max 5 words, optional)
-            </p>
-          </div>
-
           {/* Model */}
           <div>
             <label className="block text-xs font-medium text-white/70 mb-2">
@@ -223,38 +191,6 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
                 onChange={(e) => setColor(e.target.value)}
                 className="w-10 h-8 rounded border border-white/10 cursor-pointer"
               />
-            </div>
-          </div>
-
-          {/* Avatar */}
-          <div>
-            <label className="block text-xs font-medium text-white/70 mb-2">
-              Avatar
-            </label>
-            <p className="text-xs text-white/30 mb-2">Scroll for more avatars →</p>
-            <div className="relative w-full overflow-x-auto">
-              <div className="flex gap-2 pb-2">
-                {AVAILABLE_AVATARS.map((avatarName) => (
-                  <button
-                    key={avatarName}
-                    type="button"
-                    onClick={() => setAvatar(avatarName)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 transition-all overflow-hidden ${
-                      avatar === avatarName ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-white/10 hover:border-white/30'
-                    }`}
-                  >
-                    <img
-                      src={getAvatarUrl(avatarName)}
-                      alt="Duck avatar"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
 

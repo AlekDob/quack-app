@@ -143,30 +143,76 @@ fn load_agents_from_dir(agents_dir: &Path) -> Vec<(String, String)> {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    // Parse name and description from frontmatter
-                    let mut name = None;
-                    let mut description = None;
-                    for line in content.lines().take(10) {
-                        if line.starts_with("name:") {
-                            name = Some(line.trim_start_matches("name:").trim().to_string());
-                        } else if line.starts_with("description:") {
-                            let desc = line.trim_start_matches("description:").trim();
-                            // Extract first part before | if present
-                            description = Some(
-                                desc.split('|')
+                match fs::read_to_string(&path) {
+                    Ok(content) => {
+                        // Parse name and description from frontmatter
+                        let mut name = None;
+                        let mut description = None;
+                        let mut in_frontmatter = false;
+
+                        for (idx, line) in content.lines().enumerate() {
+                            // Skip empty lines at the start
+                            if idx == 0 && line.trim().is_empty() {
+                                continue;
+                            }
+
+                            // Handle YAML frontmatter delimiters
+                            if line.trim() == "---" {
+                                if idx == 0 || (idx == 1 && content.lines().next().map_or(false, |l| l.trim().is_empty())) {
+                                    in_frontmatter = true;
+                                    continue;
+                                } else if in_frontmatter {
+                                    // End of frontmatter
+                                    break;
+                                }
+                            }
+
+                            let trimmed = line.trim();
+
+                            if trimmed.starts_with("name:") {
+                                let value = trimmed.trim_start_matches("name:").trim();
+                                if !value.is_empty() {
+                                    name = Some(value.to_string());
+                                }
+                            } else if trimmed.starts_with("description:") {
+                                let value = trimmed.trim_start_matches("description:").trim();
+                                // Extract first part before | if present
+                                let desc = value.split('|')
                                     .next()
-                                    .unwrap_or(desc)
-                                    .trim()
-                                    .to_string()
-                            );
+                                    .unwrap_or(value)
+                                    .trim();
+                                if !desc.is_empty() {
+                                    description = Some(desc.to_string());
+                                }
+                            }
+
+                            // Stop after reasonable number of lines
+                            if idx > 20 {
+                                break;
+                            }
+
+                            if name.is_some() && description.is_some() {
+                                break;
+                            }
                         }
-                        if name.is_some() && description.is_some() {
-                            break;
+
+                        match (name, description) {
+                            (Some(n), Some(d)) => {
+                                agents.push((n, d));
+                            }
+                            (None, Some(_)) => {
+                                eprintln!("⚠️  Agent file {:?} missing 'name' field", path.file_name().unwrap_or_default());
+                            }
+                            (Some(_), None) => {
+                                eprintln!("⚠️  Agent file {:?} missing 'description' field", path.file_name().unwrap_or_default());
+                            }
+                            (None, None) => {
+                                eprintln!("⚠️  Agent file {:?} missing both 'name' and 'description' fields", path.file_name().unwrap_or_default());
+                            }
                         }
                     }
-                    if let (Some(n), Some(d)) = (name, description) {
-                        agents.push((n, d));
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to read agent file {:?}: {}", path.file_name().unwrap_or_default(), e);
                     }
                 }
             }
