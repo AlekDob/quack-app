@@ -5,6 +5,15 @@ import { fileURLToPath } from 'node:url'
 import { visualizer } from 'rollup-plugin-visualizer'
 import viteCompression from 'vite-plugin-compression'
 import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
+import crypto from 'node:crypto'
+
+// Polyfill for crypto.hash() (required for Node.js <21)
+if (typeof crypto.hash !== 'function') {
+  (crypto as any).hash = function(algorithm: string, data: crypto.BinaryLike, outputEncoding?: crypto.BinaryToTextEncoding) {
+    return crypto.createHash(algorithm).update(data).digest(outputEncoding as any);
+  };
+}
+
 const monacoEditorPlugin = (monacoEditorPluginModule as any).default || monacoEditorPluginModule
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
@@ -15,13 +24,18 @@ export default defineConfig(({ mode }) => {
   const isTauriDebug = !!process.env.TAURI_DEBUG
 
   return {
+    // Fix for Vite 7 crypto.hash error
+    define: {
+      'process.env.NODE_ENV': JSON.stringify(mode),
+    },
+
     plugins: [
       react(),
 
       // Monaco Editor plugin - handles web workers correctly in production
       monacoEditorPlugin({
         languageWorkers: ['typescript', 'json', 'css', 'html', 'editorWorkerService'],
-        globalAPI: false, // Use ES modules, not global monaco object
+        globalAPI: true,
       }),
 
       // Bundle analyzer - creates stats.html with bundle visualization

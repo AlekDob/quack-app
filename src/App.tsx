@@ -4687,6 +4687,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log(`✅ Closed agent terminal: ${tab.label} (${tab.terminalId})`);
     }
 
+    // If closing a file tab that is currently being previewed, reset preview state
+    if (tab?.type === 'file' && activeTabId === tabId) {
+      setPreviewFile(null);
+      setPreviewContent('');
+      setLoadingPreview(false);
+      setPreviewError(null);
+    }
+
     setTabs((prevTabs) => {
       const filtered = prevTabs.filter(t => t.id !== tabId);
 
@@ -4694,7 +4702,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       if (activeTabId === tabId) {
         const closedIndex = prevTabs.findIndex(t => t.id === tabId);
         const newActiveTab = filtered[Math.max(0, closedIndex - 1)];
-        setActiveTabId(newActiveTab?.id || 'chat');
+        const newActiveTabId = newActiveTab?.id || 'chat';
+
+        // Use handleTabClick instead of setActiveTabId to trigger file loading
+        handleTabClick(newActiveTabId);
       }
 
       return filtered;
@@ -4715,7 +4726,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return updated;
       });
     }
-  }, [activeTabId, activeId, tabs]);
+  }, [activeTabId, activeId, tabs, handleTabClick]);
 
   // Handle tab reorder via drag and drop
   const handleTabReorder = useCallback((reorderedTabs: Tab[]) => {

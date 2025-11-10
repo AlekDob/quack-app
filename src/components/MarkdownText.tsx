@@ -93,18 +93,18 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
         const text = headingMatch[2];
 
         // Dynamically create heading element
+        const headingKey = `heading-${idx}`;
         const headingProps = {
-          key: `heading-${idx}`,
           className: `md-heading md-h${level}`,
           dangerouslySetInnerHTML: { __html: processInlineMarkdown(text) },
         };
 
-        if (level === 1) elements.push(<h1 {...headingProps} />);
-        else if (level === 2) elements.push(<h2 {...headingProps} />);
-        else if (level === 3) elements.push(<h3 {...headingProps} />);
-        else if (level === 4) elements.push(<h4 {...headingProps} />);
-        else if (level === 5) elements.push(<h5 {...headingProps} />);
-        else elements.push(<h6 {...headingProps} />);
+        if (level === 1) elements.push(<h1 key={headingKey} {...headingProps} />);
+        else if (level === 2) elements.push(<h2 key={headingKey} {...headingProps} />);
+        else if (level === 3) elements.push(<h3 key={headingKey} {...headingProps} />);
+        else if (level === 4) elements.push(<h4 key={headingKey} {...headingProps} />);
+        else if (level === 5) elements.push(<h5 key={headingKey} {...headingProps} />);
+        else elements.push(<h6 key={headingKey} {...headingProps} />);
 
         return;
       }
