@@ -222,6 +222,109 @@ fn load_agents_from_dir(agents_dir: &Path) -> Vec<(String, String)> {
     agents
 }
 
+/// Helper function to load skills from a directory
+/// Skills are in subdirectories, each containing a SKILL.md file
+fn load_skills_from_dir(skills_dir: &Path) -> Vec<(String, String)> {
+    let mut skills = Vec::new();
+
+    if !skills_dir.exists() {
+        return skills;
+    }
+
+    if let Ok(entries) = fs::read_dir(skills_dir) {
+        for entry in entries.flatten() {
+            let skill_dir_path = entry.path();
+
+            // Only process directories
+            if !skill_dir_path.is_dir() {
+                continue;
+            }
+
+            // Look for SKILL.md inside the skill directory
+            let skill_md_path = skill_dir_path.join("SKILL.md");
+            if !skill_md_path.exists() {
+                eprintln!("⚠️  Skill directory {:?} missing SKILL.md file", skill_dir_path.file_name().unwrap_or_default());
+                continue;
+            }
+
+            match fs::read_to_string(&skill_md_path) {
+                Ok(content) => {
+                    // Parse name and description from frontmatter
+                    let mut name = None;
+                    let mut description = None;
+                    let mut in_frontmatter = false;
+
+                    for (idx, line) in content.lines().enumerate() {
+                        // Skip empty lines at the start
+                        if idx == 0 && line.trim().is_empty() {
+                            continue;
+                        }
+
+                        // Handle YAML frontmatter delimiters
+                        if line.trim() == "---" {
+                            if idx == 0 || (idx == 1 && content.lines().next().map_or(false, |l| l.trim().is_empty())) {
+                                in_frontmatter = true;
+                                continue;
+                            } else if in_frontmatter {
+                                // End of frontmatter
+                                break;
+                            }
+                        }
+
+                        let trimmed = line.trim();
+
+                        if trimmed.starts_with("name:") {
+                            let value = trimmed.trim_start_matches("name:").trim();
+                            if !value.is_empty() {
+                                name = Some(value.to_string());
+                            }
+                        } else if trimmed.starts_with("description:") {
+                            let value = trimmed.trim_start_matches("description:").trim();
+                            // Extract first part before | if present
+                            let desc = value.split('|')
+                                .next()
+                                .unwrap_or(value)
+                                .trim();
+                            if !desc.is_empty() {
+                                description = Some(desc.to_string());
+                            }
+                        }
+
+                        // Stop after reasonable number of lines
+                        if idx > 20 {
+                            break;
+                        }
+
+                        if name.is_some() && description.is_some() {
+                            break;
+                        }
+                    }
+
+                    match (name, description) {
+                        (Some(n), Some(d)) => {
+                            skills.push((n, d));
+                        }
+                        (None, Some(_)) => {
+                            eprintln!("⚠️  Skill file {:?} missing 'name' field", skill_md_path);
+                        }
+                        (Some(_), None) => {
+                            eprintln!("⚠️  Skill file {:?} missing 'description' field", skill_md_path);
+                        }
+                        (None, None) => {
+                            eprintln!("⚠️  Skill file {:?} missing both 'name' and 'description' fields", skill_md_path);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read skill file {:?}: {}", skill_md_path, e);
+                }
+            }
+        }
+    }
+
+    skills
+}
+
 /// Process CLAUDE.md template with personality variables
 #[tauri::command]
 pub fn inject_personality_to_claude_md(
@@ -304,6 +407,38 @@ fn inject_personality_to_claude_md_impl(
     }
     agent_header.push_str("- **Your role**: Coordinate the implementation, delegate to Protocol Droids for specialized work\n");
     agent_header.push_str("- **Remember**: You're a PM managing a feature/sprint on a specific branch, not a technical specialist!\n\n");
+
+    // Add Skills section
+    agent_header.push_str("**Skills Available:**\n");
+    agent_header.push_str("You have access to specialized skills that provide domain expertise:\n\n");
+
+    // Load project-specific Skills from .claude/skills/
+    let project_skills_dir = project_path.join(".claude").join("skills");
+    let project_skills = load_skills_from_dir(&project_skills_dir);
+
+    // Add project-specific skills first
+    if !project_skills.is_empty() {
+        agent_header.push_str("**Project-Specific Skills:**\n");
+        for (name, desc) in project_skills {
+            agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
+        }
+        agent_header.push('\n');
+    }
+
+    // Load global Skills from ~/.claude/skills/
+    if let Some(home_dir) = std::env::var_os("HOME") {
+        let global_skills_dir = PathBuf::from(home_dir).join(".claude").join("skills");
+        let global_skills = load_skills_from_dir(&global_skills_dir);
+
+        if !global_skills.is_empty() {
+            agent_header.push_str("**Global Skills:**\n");
+            for (name, desc) in global_skills {
+                agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
+            }
+            agent_header.push('\n');
+        }
+    }
+    agent_header.push_str("- **Usage**: Invoke skills when you need specialized knowledge or guidance in specific domains\n\n");
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 
