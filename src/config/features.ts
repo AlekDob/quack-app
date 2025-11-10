@@ -34,6 +34,7 @@ export const PRO_FEATURES = {
 export interface LicenseData {
   key: string;
   email?: string;
+  deviceId: string; // Unique device identifier for Supabase tracking
   activatedAt: number;
   expiresAt?: number; // For subscription model
   type: 'lifetime' | 'subscription';
@@ -198,7 +199,7 @@ export const needsRevalidation = (lastValidatedAt?: number): boolean => {
 };
 
 /**
- * Revalidate license with Lemon Squeezy API
+ * Revalidate license with Gumroad API
  * Returns true if license is still valid, false if it should be deactivated
  */
 export const revalidateLicense = async (): Promise<boolean> => {
@@ -209,9 +210,10 @@ export const revalidateLicense = async (): Promise<boolean> => {
     // Import invoke dynamically to avoid issues in non-Tauri environments
     const { invoke } = await import('@tauri-apps/api/core');
 
-    // Call backend revalidation
+    // Call backend revalidation (now requires deviceId for Gumroad + Supabase)
     const response = await invoke<{ valid: boolean; error?: string }>('revalidate_license', {
       licenseKey: licenseData.key,
+      deviceId: licenseData.deviceId,
     });
 
     if (response.valid) {

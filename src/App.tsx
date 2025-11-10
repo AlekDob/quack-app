@@ -3409,17 +3409,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const bootstrap = async () => {
       try {
-        // 💰 License revalidation check (every 7 days)
+        // 💰 License revalidation check (on every app startup)
         try {
-          const { getLicenseData, needsRevalidation, revalidateLicense } = await import('./config/features');
+          const { getLicenseData, revalidateLicense } = await import('./config/features');
           const licenseData = getLicenseData();
 
-          if (licenseData && needsRevalidation(licenseData.lastValidatedAt)) {
-            console.log('🦆 License needs revalidation - checking with Lemon Squeezy...');
+          // Always revalidate on app startup (no more 7-day check)
+          if (licenseData) {
+            console.log('🦆 Revalidating license on app startup (Gumroad + Supabase)...');
             const isStillValid = await revalidateLicense();
 
             if (!isStillValid) {
-              console.warn('⚠️ License is no longer valid (refunded or expired)');
+              console.warn('⚠️ License is no longer valid (refunded, expired, or subscription ended)');
               // Toast notification to inform user
               toast.error('License Deactivated', {
                 description: 'Your license is no longer valid. Switching to Free tier.',
