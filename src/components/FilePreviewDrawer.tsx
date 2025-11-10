@@ -6,8 +6,8 @@ import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
 
-// Lazy load the heavy Monaco Editor component
-const CodeEditor = lazy(() => import("./CodeEditor"));
+// Lazy load CodeMirror editor (lighter than Monaco, works better with Tauri)
+const CodeEditor = lazy(() => import("./CodeEditorCodeMirror"));
 
 interface FilePreviewDrawerProps {
   open: boolean;

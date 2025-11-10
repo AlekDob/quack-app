@@ -82,6 +82,48 @@ optimize_bundle() {
     echo "  → Removing source maps..."
     find "$RESOURCES_DIR/node-sdk/node_modules" -name "*.map" -type f -delete 2>/dev/null || true
 
+    # 5. Remove TypeScript definition files (not needed in production)
+    echo "  → Removing TypeScript definitions..."
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "*.d.ts" -type f -delete 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "*.d.ts.map" -type f -delete 2>/dev/null || true
+
+    # 6. Remove @types packages (not needed in production)
+    echo "  → Removing @types packages..."
+    rm -rf "$RESOURCES_DIR/node-sdk/node_modules/@types" 2>/dev/null || true
+
+    # 7. Remove documentation files
+    echo "  → Removing documentation..."
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "README.md" -type f -delete 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "CHANGELOG.md" -type f -delete 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "LICENSE" -type f -delete 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "*.markdown" -type f -delete 2>/dev/null || true
+
+    # 8. Remove test files
+    echo "  → Removing test files..."
+    find "$RESOURCES_DIR/node-sdk/node_modules" -type d -name "__tests__" -exec rm -rf {} + 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "*.test.js" -type f -delete 2>/dev/null || true
+    find "$RESOURCES_DIR/node-sdk/node_modules" -name "*.spec.js" -type f -delete 2>/dev/null || true
+
+    # 9. Remove @img/sharp-* unused platform binaries
+    echo "  → Removing unused sharp binaries..."
+    SHARP_DIR="$RESOURCES_DIR/node-sdk/node_modules/@img"
+    if [ -d "$SHARP_DIR" ]; then
+        # Keep only the current platform binary
+        if [[ "$ARCH_NAME" == *"Intel"* ]]; then
+            # Keep only x64 darwin
+            find "$SHARP_DIR" -type d -name "sharp-darwin-arm64" -exec rm -rf {} + 2>/dev/null || true
+            find "$SHARP_DIR" -type d -name "sharp-linux-*" -exec rm -rf {} + 2>/dev/null || true
+            find "$SHARP_DIR" -type d -name "sharp-win32-*" -exec rm -rf {} + 2>/dev/null || true
+        elif [[ "$ARCH_NAME" == *"Apple Silicon"* ]] || [[ "$ARCH_NAME" == *"ARM"* ]]; then
+            # Keep only arm64 darwin
+            find "$SHARP_DIR" -type d -name "sharp-darwin-x64" -exec rm -rf {} + 2>/dev/null || true
+            find "$SHARP_DIR" -type d -name "sharp-linux-*" -exec rm -rf {} + 2>/dev/null || true
+            find "$SHARP_DIR" -type d -name "sharp-win32-*" -exec rm -rf {} + 2>/dev/null || true
+        fi
+    fi
+
     # Get final size
     FINAL_SIZE=$(du -sh "$APP_PATH" | awk '{print $1}')
 

@@ -812,34 +812,44 @@ pub async fn send_message_via_sdk_streaming(
 
     let node_path = if is_production {
         // Production mode: Try bundled sidecar first
-        let sidecar_name = if cfg!(target_arch = "aarch64") {
-            "node-sidecar-aarch64-apple-darwin"
-        } else if cfg!(target_arch = "x86_64") {
-            "node-sidecar-x86_64-apple-darwin"
-        } else {
-            "node-sidecar" // Fallback name (unlikely)
-        };
+        // Note: Tauri places sidecar binaries in Contents/MacOS/ with the base name only
+        let sidecar_name = "node-sidecar";
 
         log::info!("[SDK] Looking for sidecar binary: {}", sidecar_name);
 
-        // Try to resolve the sidecar binary path from app resources
-        match app.path().resolve(
-            format!("binaries/{}", sidecar_name),
+        // Strategy 1: Try using app.path().resolve_resource
+        // Tauri should automatically find the sidecar in Contents/MacOS/
+        let sidecar_path = app.path().resolve(
+            sidecar_name,
             tauri::path::BaseDirectory::Resource
-        ) {
-            Ok(sidecar_path) => {
-                log::info!("[SDK] Resolved sidecar path: {:?}", sidecar_path);
-                if sidecar_path.exists() {
-                    log::info!("[SDK] ✅ Found bundled Node.js sidecar at: {:?}", sidecar_path);
-                    Some(sidecar_path)
-                } else {
-                    log::warn!("[SDK] ⚠️ Sidecar path resolved but file does not exist: {:?}", sidecar_path);
-                    log::warn!("[SDK] Falling back to system Node.js...");
-                    find_system_node_executable()
+        ).ok().or_else(|| {
+            // Strategy 2: Manual path construction
+            // Try to locate the app bundle and construct the path manually
+            if let Ok(exe_path) = std::env::current_exe() {
+                // exe_path is: /path/to/Quack.app/Contents/MacOS/Quack
+                if let Some(macos_dir) = exe_path.parent() {
+                    let manual_path = macos_dir.join(sidecar_name);
+                    log::info!("[SDK] Trying manual sidecar path: {:?}", manual_path);
+                    if manual_path.exists() {
+                        return Some(manual_path);
+                    }
                 }
             }
-            Err(e) => {
-                log::warn!("[SDK] ⚠️ Failed to resolve sidecar path: {}", e);
+            None
+        });
+
+        match sidecar_path {
+            Some(path) if path.exists() => {
+                log::info!("[SDK] ✅ Found bundled Node.js sidecar at: {:?}", path);
+                Some(path)
+            }
+            Some(path) => {
+                log::warn!("[SDK] ⚠️ Sidecar path resolved but file does not exist: {:?}", path);
+                log::warn!("[SDK] Falling back to system Node.js...");
+                find_system_node_executable()
+            }
+            None => {
+                log::warn!("[SDK] ⚠️ Failed to resolve sidecar path");
                 log::warn!("[SDK] Falling back to system Node.js...");
                 find_system_node_executable()
             }

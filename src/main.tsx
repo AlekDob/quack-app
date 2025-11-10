@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './config/monaco-environment' // Configure Monaco workers BEFORE anything else
 import './index.css'
 // TEMPORARY: Switch between App.tsx and AppRefactored.tsx for testing
 import App from './App.tsx'  // Original (6528 lines)
