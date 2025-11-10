@@ -489,41 +489,29 @@ function NewTerminalModal({
           </div>
         </div>
 
-        <div className="modal-section-divider" />
-
-        <label className="modal-field working-on-field">
-          <span className="field-label">What are you working on?</span>
-          <input
-            type="text"
-            className="working-on-input"
-            value={workingOn}
-            onChange={(event) => onWorkingOnChange?.(event.target.value)}
-            placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
-            maxLength={150}
-          />
-          <small className="field-hint">
-            Brief context about what this agent is working on (max 20 words, optional)
-          </small>
-        </label>
-
-        <div className="modal-section-divider" />
-
-        <PersonalityBuilder
-          personality={{
-            role: personality?.role || 'Feature Coordinator',
-            intro: personality?.intro || 'Experienced PM specializing in feature delivery and team coordination',
-            technicalContext: personality?.technicalContext || '',
-            rules: personality?.rules || [],
-            communicationStyle: personality?.communicationStyle || 'friendly',
-            customNotes: personality?.customNotes || '',
-            specialties: personality?.specialties || ['feature-planning', 'team-alignment'],
-            personality: personality?.personality || 'Organized. Proactive',
-            skills: personality?.skills || [],
-            expressions: personality?.expressions || []
-          }}
-          onPersonalityChange={onPersonalityChange || (() => {})}
-          availableSkills={availableSkills}
-        />
+        <div className="modal-field">
+          <span className="field-label">Agent color</span>
+          <div className="modal-color-grid">
+            {availableColors.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`modal-color-swatch ${preset === color ? 'selected' : ''}`}
+                style={{ backgroundColor: preset }}
+                onClick={() => onColorChange(preset)}
+                aria-label={`Select color ${preset}`}
+              />
+            ))}
+            <label className="modal-color-picker">
+              <input
+                type="color"
+                value={color}
+                onChange={(event) => onColorChange(event.target.value)}
+                aria-label="Choose a custom color"
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="modal-section-divider" />
 
@@ -661,29 +649,39 @@ function NewTerminalModal({
 
         <div className="modal-section-divider" />
 
-        <div className="modal-field">
-          <span className="field-label">Agent color</span>
-          <div className="modal-color-grid">
-            {availableColors.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className={`modal-color-swatch ${preset === color ? 'selected' : ''}`}
-                style={{ backgroundColor: preset }}
-                onClick={() => onColorChange(preset)}
-                aria-label={`Select color ${preset}`}
-              />
-            ))}
-            <label className="modal-color-picker">
-              <input
-                type="color"
-                value={color}
-                onChange={(event) => onColorChange(event.target.value)}
-                aria-label="Choose a custom color"
-              />
-            </label>
-          </div>
-        </div>
+        <label className="modal-field working-on-field">
+          <span className="field-label">What are you working on?</span>
+          <input
+            type="text"
+            className="working-on-input"
+            value={workingOn}
+            onChange={(event) => onWorkingOnChange?.(event.target.value)}
+            placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
+            maxLength={150}
+          />
+          <small className="field-hint">
+            Brief context about what this agent is working on (max 20 words, optional)
+          </small>
+        </label>
+
+        <div className="modal-section-divider" />
+
+        <PersonalityBuilder
+          personality={{
+            role: personality?.role || 'Feature Coordinator',
+            intro: personality?.intro || 'Experienced PM specializing in feature delivery and team coordination',
+            technicalContext: personality?.technicalContext || '',
+            rules: personality?.rules || [],
+            communicationStyle: personality?.communicationStyle || 'friendly',
+            customNotes: personality?.customNotes || '',
+            specialties: personality?.specialties || ['feature-planning', 'team-alignment'],
+            personality: personality?.personality || 'Organized. Proactive',
+            skills: personality?.skills || [],
+            expressions: personality?.expressions || []
+          }}
+          onPersonalityChange={onPersonalityChange || (() => {})}
+          availableSkills={availableSkills}
+        />
 
         {error && (
           <div className="modal-error">
