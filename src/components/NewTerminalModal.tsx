@@ -112,31 +112,37 @@ function NewTerminalModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load available skills and branches from backend
+  // CRITICAL FIX: Only load data when modal opens, not when editing
   useEffect(() => {
     if (open && path) {
       // Load skills
       setAvailableSkills(['quack-agents-architecture', 'tauri-drag-and-drop-guide']);
 
-      // Load Git branches
-      loadBranches();
+      // Only load branches if we don't have them yet (avoid reload on edit)
+      if (availableBranches.length === 0) {
+        loadBranches();
+      }
 
-      // Load custom avatars
-      loadCustomAvatars();
+      // Only load custom avatars if we don't have them yet (avoid reload on edit)
+      if (customAvatars.length === 0) {
+        loadCustomAvatars();
+      }
     }
   }, [open, path]);
 
-  // Cleanup blob URLs when modal closes or URLs change
-  // CRITICAL FIX: Always cleanup blob URLs to prevent memory leaks
+  // Cleanup blob URLs ONLY on component unmount (not when modal closes)
+  // CRITICAL FIX: Keep blob URLs cached for better performance when reopening modal
   useEffect(() => {
     return () => {
-      // Always cleanup ALL blob URLs on unmount or when URLs change
+      // Cleanup ALL blob URLs only when component unmounts
       Object.values(customAvatarUrls).forEach(url => {
         if (url && url.startsWith('blob:')) {
           revokeAvatarUrl(url);
         }
       });
     };
-  }, [customAvatarUrls]); // Depend on customAvatarUrls, not open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps = only runs on unmount
 
   async function loadCustomAvatars() {
     setLoadingAvatars(true);
@@ -144,10 +150,10 @@ function NewTerminalModal({
       const avatars = await listCustomAvatars();
       setCustomAvatars(avatars);
 
-      // CRITICAL FIX: Load avatars in BATCHES to prevent UI freeze
-      // Limit parallel loading to max 5 avatars at a time
-      const BATCH_SIZE = 5;
-      const urls: Record<string, string> = {};
+      // CRITICAL FIX: Load avatars in BATCHES with DELAY to prevent UI freeze
+      // Limit parallel loading to max 3 avatars at a time
+      const BATCH_SIZE = 3;
+      const BATCH_DELAY = 50; // ms delay between batches to keep UI responsive
 
       for (let i = 0; i < avatars.length; i += BATCH_SIZE) {
         const batch = avatars.slice(i, i + BATCH_SIZE);
@@ -161,18 +167,23 @@ function NewTerminalModal({
           }
         });
 
-        // Wait for current batch to complete before starting next
+        // Wait for current batch to complete
         const batchResults = await Promise.all(batchPromises);
 
-        // Add batch results to URLs
+        // Update state progressively (show avatars as they load)
+        const newUrls: Record<string, string> = {};
         batchResults.forEach(result => {
           if (result.url) {
-            urls[result.id] = result.url;
+            newUrls[result.id] = result.url;
           }
         });
 
-        // Update state progressively (show avatars as they load)
-        setCustomAvatarUrls(prev => ({ ...prev, ...urls }));
+        setCustomAvatarUrls(prev => ({ ...prev, ...newUrls }));
+
+        // Add delay between batches to keep UI responsive
+        if (i + BATCH_SIZE < avatars.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+        }
       }
     } catch (err) {
       console.error('Failed to load custom avatars:', err);
@@ -203,6 +214,9 @@ function NewTerminalModal({
     }
   }
 
+  // Track previous branch mode to detect changes and prevent loops
+  const prevBranchModeRef = useRef<'existing' | 'new'>(branchMode);
+
   // Generate suggested branch name based on agent name
   useEffect(() => {
     if (branchMode === 'new' && name && !newBranchName) {
@@ -215,20 +229,27 @@ function NewTerminalModal({
   }, [branchMode, name, newBranchName]);
 
   // Sync newBranchName to parent when in "new" mode
+  // CRITICAL FIX: Remove onBranchChange from deps to prevent infinite loops
   useEffect(() => {
-    if (branchMode === 'new' && newBranchName && onBranchChange) {
-      onBranchChange(newBranchName);
+    if (branchMode === 'new' && newBranchName) {
+      onBranchChange?.(newBranchName);
     }
-  }, [branchMode, newBranchName, onBranchChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchMode, newBranchName]);
 
   // Reset to current branch when switching back to "existing" mode
+  // CRITICAL FIX: Only trigger when mode actually changes, not on every render
   useEffect(() => {
-    if (branchMode === 'existing' && onBranchChange && availableBranches.length > 0) {
-      // Use the first available branch or current branch, not hardcoded 'main'
+    const modeChanged = prevBranchModeRef.current !== branchMode;
+    prevBranchModeRef.current = branchMode;
+
+    if (modeChanged && branchMode === 'existing' && availableBranches.length > 0) {
+      // Use the current branch or first available branch
       const currentBranch = availableBranches.find(b => b.isCurrent);
-      onBranchChange(currentBranch?.name || availableBranches[0]?.name || 'main');
+      onBranchChange?.(currentBranch?.name || availableBranches[0]?.name || 'main');
     }
-  }, [branchMode, onBranchChange, availableBranches]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchMode, availableBranches.length]); // Don't depend on full availableBranches array
 
   // Handle custom avatar upload
   async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -491,7 +512,10 @@ function NewTerminalModal({
           personality={{
             role: personality?.role || 'Feature Coordinator',
             intro: personality?.intro || 'Experienced PM specializing in feature delivery and team coordination',
+            technicalContext: personality?.technicalContext || '',
+            rules: personality?.rules || [],
             communicationStyle: personality?.communicationStyle || 'friendly',
+            customNotes: personality?.customNotes || '',
             specialties: personality?.specialties || ['feature-planning', 'team-alignment'],
             personality: personality?.personality || 'Organized. Proactive',
             skills: personality?.skills || [],

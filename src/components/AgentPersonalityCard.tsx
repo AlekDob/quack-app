@@ -10,29 +10,6 @@ interface AgentPersonalityCardProps {
   agentWorkingOn?: string | null;
 }
 
-const FOCUS_AREAS_MAP: Record<string, { label: string; icon: string }> = {
-  'feature-planning': { label: 'Feature Planning', icon: '🗺️' },
-  'sprint-management': { label: 'Sprint Management', icon: '🏃' },
-  'branch-coordination': { label: 'Branch Coordination', icon: '🌿' },
-  'team-alignment': { label: 'Team Alignment', icon: '🤝' },
-  'technical-oversight': { label: 'Technical Oversight', icon: '👁️' },
-  'quality-assurance': { label: 'Quality Assurance', icon: '✅' },
-  'delivery-tracking': { label: 'Delivery Tracking', icon: '📦' },
-  'stakeholder-comms': { label: 'Stakeholder Communication', icon: '💬' },
-};
-
-const PERSONALITY_TRAITS_MAP: Record<string, { label: string; icon: string }> = {
-  organized: { label: 'Organized', icon: '📋' },
-  proactive: { label: 'Proactive', icon: '⚡' },
-  pragmatic: { label: 'Pragmatic', icon: '🎯' },
-  strategic: { label: 'Strategic', icon: '♟️' },
-  collaborative: { label: 'Collaborative', icon: '🤝' },
-  'detail-oriented': { label: 'Detail-oriented', icon: '🔍' },
-  communicative: { label: 'Communicative', icon: '💬' },
-  'results-driven': { label: 'Results-driven', icon: '🎯' },
-  'mad-genius': { label: 'Mad Genius', icon: '🧪' },
-};
-
 const COMMUNICATION_STYLES_MAP: Record<string, string> = {
   professional: 'Professional',
   friendly: 'Friendly',
@@ -109,20 +86,6 @@ export default function AgentPersonalityCard({
     );
   }
 
-  // Extract personality traits from personality text
-  const getPersonalityTraits = () => {
-    if (!personality.personality) return [];
-    const traits: Array<{ id: string; label: string; icon: string }> = [];
-    Object.entries(PERSONALITY_TRAITS_MAP).forEach(([id, trait]) => {
-      if (personality.personality?.toLowerCase().includes(trait.label.toLowerCase())) {
-        traits.push({ id, ...trait });
-      }
-    });
-    return traits;
-  };
-
-  const personalityTraits = getPersonalityTraits();
-
   return (
     <div className="agent-personality-card">
       <div className="personality-header">
@@ -161,10 +124,24 @@ export default function AgentPersonalityCard({
         </div>
       </div>
 
-      {personality.intro && (
+      {personality.technicalContext && (
         <div className="personality-section">
-          <h4 className="section-title">About</h4>
-          <p className="personality-intro">{personality.intro}</p>
+          <h4 className="section-title">Technical Context</h4>
+          <p className="personality-intro">{personality.technicalContext}</p>
+        </div>
+      )}
+
+      {personality.rules && personality.rules.length > 0 && (
+        <div className="personality-section">
+          <h4 className="section-title">Rules & Best Practices</h4>
+          <div className="rules-list">
+            {personality.rules.map((rule, index) => (
+              <div key={index} className="rule-item">
+                <span className="rule-bullet">•</span>
+                <span className="rule-text">{rule}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -178,47 +155,10 @@ export default function AgentPersonalityCard({
         </div>
       )}
 
-      {personality.specialties && personality.specialties.length > 0 && (
+      {personality.customNotes && (
         <div className="personality-section">
-          <h4 className="section-title">Focus Areas</h4>
-          <div className="focus-areas-grid">
-            {personality.specialties.map((specialty) => {
-              const focusArea = FOCUS_AREAS_MAP[specialty];
-              return (
-                <div key={specialty} className="focus-area-badge">
-                  <span className="focus-label">
-                    {focusArea?.label || specialty}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {personalityTraits.length > 0 && (
-        <div className="personality-section">
-          <h4 className="section-title">Personality Traits</h4>
-          <div className="personality-traits-grid">
-            {personalityTraits.map((trait) => (
-              <div key={trait.id} className="personality-trait-badge">
-                <span className="trait-label">{trait.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {personality.skills && personality.skills.length > 0 && (
-        <div className="personality-section">
-          <h4 className="section-title">Skills to Remember</h4>
-          <div className="skills-list">
-            {personality.skills.map((skill) => (
-              <div key={skill} className="skill-badge">
-                {skill}
-              </div>
-            ))}
-          </div>
+          <h4 className="section-title">Custom Notes</h4>
+          <p className="personality-intro">{personality.customNotes}</p>
         </div>
       )}
 

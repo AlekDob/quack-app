@@ -390,12 +390,25 @@ function App() {
   const [newTerminalPersonality, setNewTerminalPersonality] = useState<Partial<AgentPersonality>>({
     role: 'Feature Coordinator',
     intro: 'Experienced PM specializing in feature delivery and team coordination',
+    technicalContext: '',
+    rules: [],
     communicationStyle: 'friendly',
+    customNotes: '',
     specialties: ['feature-planning', 'team-alignment'],
     personality: 'Organized. Proactive',
     skills: [],
     expressions: [],
   });
+
+  // Debug wrapper for setNewTerminalPersonality
+  const handlePersonalityChange = useCallback((newPersonality: Partial<AgentPersonality>) => {
+    setNewTerminalPersonality((prev) => {
+      console.log('🔍 handlePersonalityChange called');
+      console.log('🔍 Previous state:', JSON.stringify(prev, null, 2));
+      console.log('🔍 New personality:', JSON.stringify(newPersonality, null, 2));
+      return newPersonality;
+    });
+  }, []);
   const [newTerminalError, setNewTerminalError] = useState<string | null>(null);
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
@@ -3633,7 +3646,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     // Load personality from terminal state (already persisted)
     if (terminal.personality && Object.keys(terminal.personality).length > 0) {
-      setNewTerminalPersonality(terminal.personality);
+      setNewTerminalPersonality({
+        technicalContext: '',
+        rules: [],
+        customNotes: '',
+        ...terminal.personality,
+      });
       console.log('✅ Loaded personality from state for:', terminal.label);
     } else {
       // Try to load from Rust as fallback
@@ -3642,7 +3660,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           projectPath: terminal.cwd,
           personalityId: terminal.id,
         });
-        setNewTerminalPersonality(personality);
+        setNewTerminalPersonality({
+          technicalContext: '',
+          rules: [],
+          customNotes: '',
+          ...personality,
+        });
         console.log('✅ Loaded personality from Rust for:', terminal.label);
       } catch (error) {
         // No personality found - reset to default
@@ -6294,7 +6317,7 @@ You have access to all Bash tools to execute git commands like:
           onColorChange={setNewTerminalColor}
           onWorkingOnChange={setNewTerminalWorkingOn}
           onAvatarChange={setNewTerminalAvatar}
-          onPersonalityChange={setNewTerminalPersonality}
+          onPersonalityChange={handlePersonalityChange}
           onBranchChange={setNewTerminalBranch}
           onUseWorktreeChange={setNewTerminalUseWorktree}
           onBrowse={handleSelectDirectory}
