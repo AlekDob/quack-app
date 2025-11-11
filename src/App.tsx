@@ -3381,9 +3381,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [duckBackgroundImage, ducksPatternBackgroundImage, duckPattern3BackgroundImage]);
 
-  // Load saved background on mount
+  // Load saved background on mount (only after video ends)
   useEffect(() => {
-    if (!tauriAvailable) {
+    if (!tauriAvailable || !videoEnded) {
       return;
     }
 
@@ -3398,16 +3398,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
 
     void loadBackground();
-  }, [tauriAvailable, applyBackground]);
+  }, [tauriAvailable, videoEnded, applyBackground]);
 
-  // Apply background when it changes
+  // Apply background when it changes (only after video ends)
   useEffect(() => {
-    if (!currentBackground) {
+    if (!currentBackground || !videoEnded) {
       return;
     }
 
     applyBackground(currentBackground);
-  }, [currentBackground, applyBackground]);
+  }, [currentBackground, videoEnded, applyBackground]);
 
   const handleSelectBackground = useCallback(async (background: string) => {
     if (!tauriAvailable) {
