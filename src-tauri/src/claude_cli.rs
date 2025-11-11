@@ -100,6 +100,8 @@ pub struct ClaudeCliRequest {
     pub attachments: Option<Vec<String>>,
     pub agents: Option<Vec<AgentConfig>>,
     pub cwd: Option<String>,
+    // ✅ Session ID for conversation continuity (resume support)
+    pub session_id: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -693,6 +695,7 @@ pub async fn send_message_via_sdk_streaming(
         agents,
         cwd,
         attachments,
+        session_id, // ✅ Extract session_id for use in session management
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -702,11 +705,14 @@ pub async fn send_message_via_sdk_streaming(
             .and_then(|p| p.to_str().map(|s| s.to_string()))
     });
 
-    // Get existing session ID for this agent (for resume)
-    let current_session_id = session_state.get_session(&agent_id);
+    // ✅ CRITICAL FIX: Prioritize session ID from request (for resume), fallback to internal state
+    let current_session_id = session_id.clone()
+        .or_else(|| session_state.get_session(&agent_id));
 
-    if let Some(ref session_id) = current_session_id {
-        log::info!("[SDK] Resuming session for agent {}: {}", agent_id, session_id);
+    if let Some(ref sid) = current_session_id {
+        log::info!("[SDK] Resuming session for agent {}: {} (source: {})",
+            agent_id, sid,
+            if session_id.is_some() { "request" } else { "internal state" });
     } else {
         log::info!("[SDK] Starting new session for agent {}", agent_id);
     }
