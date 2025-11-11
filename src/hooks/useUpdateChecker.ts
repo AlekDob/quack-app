@@ -71,10 +71,11 @@ export function useUpdateChecker() {
     }
   }, []);
 
-  // Automatically check on mount
+  // Automatically check on mount (only once)
   useEffect(() => {
     checkForUpdates();
-  }, [checkForUpdates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount to avoid infinite loop
 
   return {
     isChecking,
