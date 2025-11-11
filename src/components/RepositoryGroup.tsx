@@ -21,7 +21,7 @@ import {
 import TerminalActivityBar from './TerminalActivityBar';
 import CommitHistoryModal from './CommitHistoryModal';
 import RevealInFinderButton from './RevealInFinderButton';
-import DragHandle from './DragHandle';
+// import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult } from '../types';
 
 interface RepositoryGroupProps {
@@ -62,6 +62,37 @@ function getBranchName(terminal: TerminalInfo): string {
   return 'main';
 }
 
+// 🦆 Helper to calculate relative time string
+function getRelativeTimeString(timestamp: number): { value: string; unit: string; minutes: number } | null {
+  if (!timestamp || timestamp === 0) return null;
+
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (minutes < 1) return { value: '<1', unit: 'M', minutes: 0 };
+  if (minutes < 60) return { value: String(minutes), unit: 'M', minutes };
+  if (hours < 24) return { value: String(hours), unit: 'H', minutes };
+  return { value: String(days), unit: 'D', minutes };
+}
+
+// 🦆 Helper to calculate color opacity based on freshness
+function getTimestampOpacity(minutes: number): number {
+  // Fresh (0-3 min): white full opacity (1.0)
+  if (minutes <= 3) return 1.0;
+
+  // Recent (3-30 min): gradual fade from 1.0 to 0.4
+  if (minutes <= 30) {
+    const fadeProgress = (minutes - 3) / 27; // 0 to 1 over 27 minutes
+    return 1.0 - (fadeProgress * 0.6); // From 1.0 to 0.4
+  }
+
+  // Old (30+ min): dim gray (0.4)
+  return 0.4;
+}
+
 // Sortable Agent Component with drag handle
 interface SortableAgentProps {
   agent: TerminalInfo;
@@ -91,6 +122,15 @@ function SortableAgent({
   isDraggingAny = false,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
+  // 🦆 Force re-render every minute to update relative time
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 60000); // Update every 60 seconds (1 minute)
+    return () => clearInterval(interval);
+  }, []);
 
   const {
     attributes,
@@ -141,6 +181,26 @@ function SortableAgent({
     onGitMenuToggle(showGitMenu ? null : agent.id);
   }, [onGitMenuToggle, showGitMenu, agent.id]);
 
+  // 🦆 Get last assistant message timestamp for this agent
+  const lastAssistantTimestamp = useMemo(() => {
+    if (!chatSessions) return 0;
+    const messages = chatSessions.get(agent.id);
+    if (!messages || messages.length === 0) return 0;
+
+    // Find LAST assistant message
+    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+    return lastAssistantMessage?.timestamp || 0;
+  }, [chatSessions, agent.id]);
+
+  // Get relative time string with opacity - re-calculate on tick change
+  const relativeTime = useMemo(() => getRelativeTimeString(lastAssistantTimestamp), [lastAssistantTimestamp, tick]);
+
+  // Calculate opacity based on freshness
+  const timestampOpacity = useMemo(() => {
+    if (!relativeTime) return 0.4;
+    return getTimestampOpacity(relativeTime.minutes);
+  }, [relativeTime]);
+
   return (
     <div
       ref={setNodeRef}
@@ -172,21 +232,44 @@ function SortableAgent({
           position: 'relative',
         }}
       >
-        {/* Drag Handle - positioned absolutely on the left */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '8px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-          }}
-        >
-          <DragHandle
-            isDragging={isDragging}
-            {...attributes}
-            {...listeners}
-          />
-        </div>
+        {/* 🦆 Relative Time Display - positioned absolutely on the left */}
+        {relativeTime && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '4px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '9px',
+              fontWeight: 600,
+              lineHeight: '1',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              minWidth: '20px',
+            }}
+          >
+            {/* Value - brighter for fresh messages */}
+            <div style={{
+              marginBottom: '1px',
+              color: `rgba(255, 255, 255, ${timestampOpacity})`,
+              transition: 'color 1s ease',
+            }}>
+              {relativeTime.value}
+            </div>
+            {/* Unit - slightly dimmer */}
+            <div style={{
+              fontSize: '7px',
+              color: `rgba(255, 255, 255, ${timestampOpacity * 0.75})`,
+              transition: 'color 1s ease',
+            }}>
+              {relativeTime.unit}
+            </div>
+          </div>
+        )}
 
         <div className="flex w-full items-center justify-between">
           <div className="flex w-full items-center gap-2 flex-1">

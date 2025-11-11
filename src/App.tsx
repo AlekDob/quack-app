@@ -1089,9 +1089,20 @@ function App() {
 
             if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
               const updatedMessages = [...agentMessages];
+
+              // 🦆 FIX: Update timestamp when assistant STARTS responding (first event with content)
+              // This ensures agents sort correctly (by response time, not user input time)
+              // Check if timestamp is still 0 (placeholder) and this is an assistant event with content
+              const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
+                                               claudeEvent.message?.content &&
+                                               claudeEvent.message.content.length > 0 &&
+                                               lastMsg.timestamp === 0;
+
               updatedMessages[updatedMessages.length - 1] = {
                 ...lastMsg,
                 events: [...(lastMsg.events || []), claudeEvent],
+                // Update timestamp ONLY when first assistant response arrives (timestamp was 0)
+                timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
               };
               newSessions.set(agentId, updatedMessages);
 
@@ -1376,7 +1387,9 @@ function App() {
       id: assistantMessageId,
       role: 'assistant',
       content: '',
-      timestamp: Date.now(),
+      // 🦆 FIX: Start with timestamp = 0 so it doesn't affect sorting until assistant responds
+      // Timestamp will be updated to Date.now() when first response arrives (see event listener)
+      timestamp: 0,
       status: 'streaming',
     };
 
