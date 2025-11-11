@@ -132,6 +132,7 @@ fn update_terminal_port(id: &str, port: u16) {
 #[tauri::command]
 pub fn create_terminal(
   app: AppHandle,
+  id: Option<String>,
   label: Option<String>,
   color: Option<String>,
   cwd: Option<String>,
@@ -139,7 +140,7 @@ pub fn create_terminal(
   avatar: Option<String>,
   branch: Option<String>,
 ) -> Result<TerminalInfo, String> {
-  create_terminal_impl(&app, label, color, cwd, working_on, avatar, branch).map_err(|err| err.to_string())
+  create_terminal_impl(&app, id, label, color, cwd, working_on, avatar, branch).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -235,6 +236,7 @@ pub fn update_terminal_working_on(
 
 fn create_terminal_impl(
   app: &AppHandle,
+  id_input: Option<String>,
   label: Option<String>,
   color: Option<String>,
   cwd_input: Option<String>,
@@ -249,7 +251,8 @@ fn create_terminal_impl(
     .map_err(|_| anyhow!("Errore di sincronizzazione"))?;
 
   let cwd = resolve_cwd(cwd_input)?;
-  let id = Uuid::new_v4().to_string();
+  // Use provided ID if available, otherwise generate new UUID
+  let id = id_input.unwrap_or_else(|| Uuid::new_v4().to_string());
   let display_label = label.unwrap_or_else(|| {
     registry.counter += 1;
     format!("Terminal {}", registry.counter)
