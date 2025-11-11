@@ -197,47 +197,11 @@ export default function AIAssistantSettings() {
         </div>
       </div>
 
-      {/* Usage Statistics */}
-      <SectionHeader
-        title="Usage Statistics"
-        description="Track your AI usage and estimated costs"
-      />
-      <div className="settings-group">
-        {loadingStats ? (
-          <div className="ai-stats-loading">Loading statistics...</div>
-        ) : stats ? (
-          <div className="ai-stats-grid">
-            <div className="ai-stat-card">
-              <div className="ai-stat-value">{formatTokens(stats.totalTokensUsed)}</div>
-              <div className="ai-stat-label">Tokens Used</div>
-            </div>
-
-            <div className="ai-stat-card">
-              <div className="ai-stat-value">{formatCost(stats.estimatedCost)}</div>
-              <div className="ai-stat-label">Estimated Cost</div>
-            </div>
-
-            <div className="ai-stat-card">
-              <div className="ai-stat-value">{stats.requestCount}</div>
-              <div className="ai-stat-label">Requests</div>
-            </div>
-          </div>
-        ) : (
-          <div className="ai-stats-empty">No usage data yet</div>
-        )}
-      </div>
-
       {/* Claude Authentication */}
       <SectionHeader title="Claude Integration" />
       <div className="settings-group">
         <ClaudeAuthSettings />
       </div>
-
-      {/* Features Info */}
-      <SectionHeader
-        title="Features"
-        description="Command assistant (press # for AI suggestions), rate limiting (max 10 requests/min), and smart caching (1 hour)"
-      />
     </div>
   );
 }

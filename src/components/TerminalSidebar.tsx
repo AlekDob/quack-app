@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Store } from '@tauri-apps/plugin-store';
+import { getCurrentVersion } from '../utils/version';
+import { useUpdateChecker } from '../hooks/useUpdateChecker';
 import {
   DndContext,
   closestCenter,
@@ -197,6 +199,15 @@ export default function TerminalSidebar({
   void _onReorder; // Drag & drop reordering functionality (currently disabled)
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
+  const [appVersion, setAppVersion] = useState('v0.0.0');
+
+  // Fetch app version on mount
+  useEffect(() => {
+    getCurrentVersion().then(version => setAppVersion(`v${version}`));
+  }, []);
+
+  // Check for updates
+  const { updateAvailable, latestRelease } = useUpdateChecker();
   // Metro style is now the only option (removed useMetroStyle state)
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
@@ -814,7 +825,26 @@ export default function TerminalSidebar({
               </svg>
               <span className="sidebar-settings-label">Settings</span>
             </div>
-            <span className="sidebar-settings-version">v1.0.0</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="sidebar-settings-version">{appVersion}</span>
+              {updateAvailable && latestRelease && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                    color: '#22c55e',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    fontWeight: 600,
+                    animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                  }}
+                  title={`New version ${latestRelease.tag_name} available`}
+                >
+                  UPDATE
+                </span>
+              )}
+            </div>
           </div>
         </button>
       )}

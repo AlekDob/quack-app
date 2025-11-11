@@ -181,21 +181,6 @@ export default function AppearanceSettings({
           }
         />
       </div>
-
-      <SectionHeader
-        title="Animations"
-        description="Control interface animations"
-      />
-      <div className="settings-group">
-        <div className="settings-info-box">
-          <svg className="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 16v-4"/>
-            <path d="M12 8h.01"/>
-          </svg>
-          <span>Animation settings coming soon</span>
-        </div>
-      </div>
     </div>
   );
 }

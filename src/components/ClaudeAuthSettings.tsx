@@ -278,7 +278,23 @@ export default function ClaudeAuthSettings() {
           <div className="auth-details saved-key">
             <div className="detail-row">
               <span className="detail-label">Saved Key:</span>
-              <span className="detail-value token-masked">{maskApiKey(savedApiKey)}</span>
+              <code
+                className="detail-value token-masked"
+                style={{
+                  display: 'inline-block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '300px',
+                  fontFamily: 'monospace',
+                  fontSize: '13px',
+                  padding: '4px 8px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '4px'
+                }}
+              >
+                {maskApiKey(savedApiKey)}
+              </code>
             </div>
           </div>
         )}
