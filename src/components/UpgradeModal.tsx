@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Crown, Check, Sparkles, Zap, Shield } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 import { FREE_LIMITS } from '../config/features';
+import { usePricingConfig, useCheckoutConfig, useFeaturesConfig } from '../hooks/useAppConfig';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -16,7 +17,35 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   onActivateLicense,
   limitType = 'terminals',
 }) => {
+  const { pricing } = usePricingConfig();
+  const { checkout } = useCheckoutConfig();
+  const { features } = useFeaturesConfig();
+
   if (!isOpen) return null;
+
+  // Map badge colors to Tailwind classes (for proper purging)
+  const badgeColorClasses = {
+    purple: 'bg-purple-500/20 border-purple-500/30 text-purple-400',
+    blue: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
+    green: 'bg-green-500/20 border-green-500/30 text-green-400',
+    yellow: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
+    orange: 'bg-orange-500/20 border-orange-500/30 text-orange-400',
+    red: 'bg-red-500/20 border-red-500/30 text-red-400',
+  };
+
+  const badgeClasses = badgeColorClasses[pricing.badge_color as keyof typeof badgeColorClasses] || badgeColorClasses.purple;
+
+  // Generate subscription type text
+  const getSubscriptionText = () => {
+    if (pricing.billing_period === 'lifetime') {
+      return 'Lifetime license';
+    } else if (pricing.billing_period === 'year') {
+      return 'Annual subscription';
+    } else if (pricing.billing_period === 'month') {
+      return 'Monthly subscription';
+    }
+    return 'License';
+  };
 
   const limitMessages = {
     terminals: `You've reached the free tier limit of ${FREE_LIMITS.maxTerminals} agents.`,
@@ -69,17 +98,28 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           {/* Pricing */}
           <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-5 mb-6">
             <div className="flex items-baseline justify-center gap-2 mb-2">
-              <span className="text-4xl font-bold text-white">$99</span>
-              <span className="text-sm text-gray-400">/year</span>
+              {pricing.original_price > pricing.current_price && (
+                <span className="text-lg text-gray-400 line-through">
+                  {pricing.currency === 'EUR' ? '€' : '$'}{pricing.original_price}
+                </span>
+              )}
+              <span className="text-4xl font-bold text-white">
+                {pricing.currency === 'EUR' ? '€' : '$'}{pricing.current_price}
+              </span>
+              {pricing.billing_period !== 'lifetime' && (
+                <span className="text-sm text-gray-400">/{pricing.billing_period}</span>
+              )}
             </div>
             <p className="text-center text-xs text-gray-400">
-              Annual subscription • Use on up to 3 devices
+              {getSubscriptionText()} • Use on {features.max_devices === 1 ? '1 device' : `up to ${features.max_devices} devices`}
             </p>
-            <div className="mt-3 flex items-center justify-center gap-2 text-xs">
-              <span className="px-2 py-1 bg-green-500/20 border border-green-500/30 rounded text-green-400">
-                Cancel Anytime
-              </span>
-            </div>
+            {pricing.badge_text && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs">
+                <span className={`px-2 py-1 border rounded ${badgeClasses}`}>
+                  {pricing.badge_text}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Features List */}
@@ -120,8 +160,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             <button
               onClick={() => {
                 // Open Gumroad checkout in browser using Tauri shell
-                // TODO: Replace with actual Gumroad product permalink
-                open('https://your-username.gumroad.com/l/quack-pro-annual');
+                open(checkout.gumroad_url);
               }}
               className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold transition-all shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 flex items-center justify-center gap-2"
             >
