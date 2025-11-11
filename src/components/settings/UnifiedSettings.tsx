@@ -45,12 +45,7 @@ export default function UnifiedSettings({
       case 'notifications':
         return <NotificationSettings />;
       case 'appearance':
-        return (
-          <AppearanceSettings
-            currentBackground={currentBackground}
-            onSelectBackground={onSelectBackground}
-          />
-        );
+        return <AppearanceSettings />;
       case 'terminal':
         return <TerminalSettings />;
       case 'about':
