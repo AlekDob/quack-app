@@ -150,24 +150,28 @@ pub fn run() {
         .plugin(tauri_plugin_mic_recorder::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            // 💰 Load Gumroad and Supabase credentials from .env file
-            if dotenvy::dotenv().is_ok() {
-                let license_state: tauri::State<license::LicenseState> = app.state();
+            // 💰 Load Gumroad and Supabase credentials (baked in at build time)
+            // These are loaded from .env during compilation via build.rs
+            let license_state: tauri::State<license::LicenseState> = app.state();
 
-                // Load Gumroad Product ID
-                if let Ok(product_id) = std::env::var("GUMROAD_PRODUCT_ID") {
-                    *license_state.gumroad_product_id.lock().unwrap() = Some(product_id);
-                    log::info!("🦆 Gumroad Product ID loaded from .env");
-                }
+            // Load Gumroad Product ID (compile-time environment variable)
+            if let Some(product_id) = option_env!("GUMROAD_PRODUCT_ID") {
+                *license_state.gumroad_product_id.lock().unwrap() = Some(product_id.to_string());
+                log::info!("🦆 Gumroad Product ID loaded from build-time environment");
+            } else {
+                log::warn!("⚠️ Gumroad Product ID not configured at build time");
+            }
 
-                // Load Supabase credentials
-                if let Ok(supabase_url) = std::env::var("SUPABASE_URL") {
-                    if let Ok(supabase_key) = std::env::var("SUPABASE_ANON_KEY") {
-                        *license_state.supabase_url.lock().unwrap() = Some(supabase_url);
-                        *license_state.supabase_key.lock().unwrap() = Some(supabase_key);
-                        log::info!("🦆 Supabase credentials loaded from .env");
-                    }
-                }
+            // Load Supabase credentials (compile-time environment variables)
+            if let (Some(supabase_url), Some(supabase_key)) = (
+                option_env!("SUPABASE_URL"),
+                option_env!("SUPABASE_ANON_KEY")
+            ) {
+                *license_state.supabase_url.lock().unwrap() = Some(supabase_url.to_string());
+                *license_state.supabase_key.lock().unwrap() = Some(supabase_key.to_string());
+                log::info!("🦆 Supabase credentials loaded from build-time environment");
+            } else {
+                log::warn!("⚠️ Supabase credentials not configured at build time");
             }
 
             // Initialize Telegram Central Polling State
