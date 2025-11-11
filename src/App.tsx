@@ -1274,6 +1274,8 @@ function App() {
               filePath: activeAgent.file_path,
             }] : undefined,
             cwd: workingDir,
+            // ✅ CRITICAL FIX: Pass saved session ID to backend for conversation continuity
+            sessionId: chatSessionIds.get(activeId),
           },
         }),
         abortPromise,
@@ -1311,6 +1313,13 @@ function App() {
         },
       ];
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
+
+      // ✅ CRITICAL FIX: Save session ID for resume support
+      setChatSessionIds((prev) => {
+        const updated = new Map(prev);
+        updated.set(activeId, response.session_id);
+        return updated;
+      });
 
       // Track usage from Claude Agent SDK (with full token details!)
       const agentLabel = activeTerminal?.label || activeAgent?.name || 'AI Assistant';
@@ -3025,6 +3034,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     if (!tauriAvailable) {
       return;
     }
+
+    // ✅ FREE TIER VALIDATION: Check terminal limit before creating (same as NewTerminalModal)
+    if (!canCreateTerminal(terminals.length)) {
+      toast.error('Free tier limited to 3 terminals', {
+        description: 'Upgrade to Pro for unlimited terminals',
+        duration: 5000,
+      });
+      return;
+    }
+
     try {
       const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
       await invoke<string>("create_agent", {
@@ -5620,6 +5639,15 @@ You have access to all Bash tools to execute git commands like:
       return;
     }
 
+    // ✅ FREE TIER VALIDATION: Check terminal limit before resuming (creates new terminal)
+    if (!canCreateTerminal(terminals.length)) {
+      toast.error('Free tier limited to 3 terminals', {
+        description: 'Upgrade to Pro for unlimited terminals',
+        duration: 5000,
+      });
+      return;
+    }
+
     setCreatingTerminal(true);
 
     try {
@@ -5698,6 +5726,15 @@ You have access to all Bash tools to execute git commands like:
         updated.set(createdWithState.id, chatMessages);
         return updated;
       });
+
+      // ✅ CRITICAL FIX: Preserve session ID so next message continues the conversation
+      setChatSessionIds((prev) => {
+        const updated = new Map(prev);
+        updated.set(createdWithState.id, sessionId);
+        return updated;
+      });
+
+      console.log('[Resume] Session ID preserved:', sessionId);
 
       // 7. Set token usage if available
       setChatTokensMap((prev) => {

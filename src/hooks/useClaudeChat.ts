@@ -15,7 +15,11 @@ export interface ChatSendOptions {
   onComplete?: () => void; // Callback when chat completes successfully
 }
 
-export function useClaudeChat() {
+export interface UseClaudeChatOptions {
+  initialSessionId?: string;
+}
+
+export function useClaudeChat(options?: UseClaudeChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(true); // SDK always available
@@ -30,7 +34,8 @@ export function useClaudeChat() {
   });
 
   // Store the Claude SDK session ID for resume
-  const claudeSessionId = useRef<string | undefined>(undefined);
+  // ✅ Initialize with provided session ID for resume support
+  const claudeSessionId = useRef<string | undefined>(options?.initialSessionId);
 
   // Store abort controller for canceling streams
   const abortControllerRef = useRef<AbortController | null>(null);
