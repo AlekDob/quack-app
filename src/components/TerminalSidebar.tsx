@@ -24,7 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
-// import DragHandle from "./DragHandle"; // 🦆 DISABLED - replaced with timestamp display
+import DragHandle from "./DragHandle";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult } from "../types";
 
 // Sortable Repository Group wrapper
@@ -74,7 +74,7 @@ function SortableRepositoryGroup({
       style={style}
       className="sortable-repository-group group relative"
     >
-      {/* 🦆 Drag Handle - DISABLED (not working properly, replaced with timestamp display)
+      {/* 🦆 Drag Handle for Repository Groups - ENABLED (important for project organization) */}
       <div
         className="absolute left-0 top-[10px] z-10"
         style={{
@@ -90,10 +90,10 @@ function SortableRepositoryGroup({
           {...listeners}
         />
       </div>
-      */}
 
-      {/* Repository Group - no extra padding needed now */}
+      {/* Repository Group with extra padding for drag handle */}
       <div
+        style={{ paddingLeft: '16px' }}
         onMouseEnter={() => !isDragging && setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
