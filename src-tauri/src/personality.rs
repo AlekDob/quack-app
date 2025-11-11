@@ -375,70 +375,20 @@ fn inject_personality_to_claude_md_impl(
         }
     }
 
-    // Add Protocol Droids section
+    // Add Protocol Droids section (optimized - no descriptions loaded)
     agent_header.push_str("**Protocol Droids Available:**\n");
-    agent_header.push_str("You have access to specialized protocol droids (subagents) that assist you:\n\n");
-
-    // Load project-specific Protocol Droids from .claude/agents/
-    let project_agents_dir = project_path.join(".claude").join("agents");
-    let project_droids = load_agents_from_dir(&project_agents_dir);
-
-    // Add project-specific droids first
-    if !project_droids.is_empty() {
-        agent_header.push_str("**Project-Specific Protocol Droids:**\n");
-        for (name, desc) in project_droids {
-            agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
-        }
-        agent_header.push('\n');
-    }
-
-    // Load global Protocol Droids from ~/.claude/agents/
-    if let Some(home_dir) = std::env::var_os("HOME") {
-        let global_agents_dir = PathBuf::from(home_dir).join(".claude").join("agents");
-        let global_droids = load_agents_from_dir(&global_agents_dir);
-
-        if !global_droids.is_empty() {
-            agent_header.push_str("**Global Protocol Droids:**\n");
-            for (name, desc) in global_droids {
-                agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
-            }
-            agent_header.push('\n');
-        }
-    }
+    agent_header.push_str("Specialized subagents that assist with specific tasks. Dynamically loaded when invoked via the Task tool.\n\n");
+    agent_header.push_str("**Project-Specific Protocol Droids:** `.claude/agents/`\n");
+    agent_header.push_str("**Global Protocol Droids:** `~/.claude/agents/`\n\n");
+    agent_header.push_str("Use the Task tool to invoke agents with their subagent_type. Each agent's full description and capabilities are loaded dynamically when needed.\n\n");
     agent_header.push_str("- **Your role**: Coordinate the implementation, delegate to Protocol Droids for specialized work\n");
     agent_header.push_str("- **Remember**: You're a PM managing a feature/sprint on a specific branch, not a technical specialist!\n\n");
 
-    // Add Skills section
+    // Add Skills section (optimized - no descriptions loaded)
     agent_header.push_str("**Skills Available:**\n");
-    agent_header.push_str("You have access to specialized skills that provide domain expertise:\n\n");
-
-    // Load project-specific Skills from .claude/skills/
-    let project_skills_dir = project_path.join(".claude").join("skills");
-    let project_skills = load_skills_from_dir(&project_skills_dir);
-
-    // Add project-specific skills first
-    if !project_skills.is_empty() {
-        agent_header.push_str("**Project-Specific Skills:**\n");
-        for (name, desc) in project_skills {
-            agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
-        }
-        agent_header.push('\n');
-    }
-
-    // Load global Skills from ~/.claude/skills/
-    if let Some(home_dir) = std::env::var_os("HOME") {
-        let global_skills_dir = PathBuf::from(home_dir).join(".claude").join("skills");
-        let global_skills = load_skills_from_dir(&global_skills_dir);
-
-        if !global_skills.is_empty() {
-            agent_header.push_str("**Global Skills:**\n");
-            for (name, desc) in global_skills {
-                agent_header.push_str(&format!("  - `{}` → {}\n", name, desc));
-            }
-            agent_header.push('\n');
-        }
-    }
-    agent_header.push_str("- **Usage**: Invoke skills when you need specialized knowledge or guidance in specific domains\n\n");
+    agent_header.push_str("Specialized knowledge domains that provide expert guidance. Dynamically loaded via the Skill tool.\n\n");
+    agent_header.push_str("**Project-Specific Skills:** `.claude/skills/`\n\n");
+    agent_header.push_str("Use the Skill tool to invoke skills by name. Each skill's documentation and capabilities are loaded dynamically when needed.\n\n");
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 
