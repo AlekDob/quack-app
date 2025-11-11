@@ -158,6 +158,51 @@ function debounce<T extends (...args: unknown[]) => void>(
   return debounced as T & { cancel: () => void };
 }
 
+// ============================================
+// Storage Version System
+// ============================================
+// Track storage format version to detect incompatible changes
+// Increment this when storage structure changes between app versions
+const STORAGE_VERSION = 1;
+const STORAGE_VERSION_KEY = "storageVersion";
+
+// Check storage version and reset if incompatible
+const checkStorageVersion = async (): Promise<boolean> => {
+  try {
+    const store = await Store.load("quack-terminals.json");
+    const storedVersion = await store.get<number>(STORAGE_VERSION_KEY);
+
+    if (storedVersion === undefined) {
+      // First time - set version
+      console.log("🦆 First launch - initializing storage version:", STORAGE_VERSION);
+      await store.set(STORAGE_VERSION_KEY, STORAGE_VERSION);
+      await store.save();
+      return true;
+    }
+
+    if (storedVersion !== STORAGE_VERSION) {
+      console.warn(`🦆 Storage version mismatch! Stored: ${storedVersion}, Current: ${STORAGE_VERSION}`);
+      console.warn("🦆 Clearing incompatible storage data to prevent corruption");
+      toast.error(`Storage format updated - resetting to clean state`);
+
+      // Clear all storage keys
+      await store.clear();
+
+      // Set new version
+      await store.set(STORAGE_VERSION_KEY, STORAGE_VERSION);
+      await store.save();
+
+      return false; // Version mismatch - data was cleared
+    }
+
+    console.log("🦆 Storage version check passed:", STORAGE_VERSION);
+    return true; // Version matches
+  } catch (error) {
+    console.error("🦆 Error checking storage version:", error);
+    return true; // Continue anyway - defensive approach
+  }
+};
+
 const STORAGE_KEY = "terminals";
 
 const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
@@ -186,9 +231,42 @@ const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
   try {
     const store = await Store.load("quack-terminals.json");
     const stored = await store.get<TerminalMetadata[]>(STORAGE_KEY);
-    return stored ?? [];
+
+    // ✅ DEFENSIVE: Validate data structure before returning
+    if (!stored) {
+      return [];
+    }
+
+    if (!Array.isArray(stored)) {
+      console.error("🦆 Storage corruption detected: terminals is not an array", typeof stored);
+      toast.error("Terminal storage corrupted - resetting to clean state");
+      // Clear corrupted data
+      await store.delete(STORAGE_KEY);
+      await store.save();
+      return [];
+    }
+
+    // ✅ DEFENSIVE: Validate each terminal has required fields
+    const validated = stored.filter((t: any) => {
+      if (!t || typeof t !== 'object') {
+        console.warn("🦆 Skipping invalid terminal entry:", t);
+        return false;
+      }
+      if (!t.id || !t.label) {
+        console.warn("🦆 Skipping terminal missing id/label:", t);
+        return false;
+      }
+      return true;
+    });
+
+    if (validated.length !== stored.length) {
+      console.warn(`🦆 Filtered out ${stored.length - validated.length} corrupted terminal entries`);
+    }
+
+    return validated;
   } catch (error) {
-    console.warn("Unable to load saved terminals", error);
+    console.error("🦆 Critical error loading terminals:", error);
+    toast.error("Failed to load terminals - starting fresh");
     return [];
   }
 };
@@ -220,18 +298,42 @@ const loadTabsByTerminalFromStorage = async (): Promise<Map<string, Tab[]>> => {
     const store = await Store.load("quack-terminals.json");
     const stored = await store.get<Record<string, Tab[]>>(TABS_BY_TERMINAL_KEY);
 
-    if (stored) {
-      // Convert plain object back to Map
+    if (!stored) {
+      return new Map();
+    }
+
+    // ✅ DEFENSIVE: Validate that stored is actually an object
+    if (typeof stored !== 'object' || Array.isArray(stored)) {
+      console.error("🦆 Storage corruption detected: tabsByTerminal is not an object", typeof stored);
+      toast.error("Tab storage corrupted - resetting to clean state");
+      await store.delete(TABS_BY_TERMINAL_KEY);
+      await store.save();
+      return new Map();
+    }
+
+    // ✅ DEFENSIVE: Wrap Object.entries in try-catch to handle edge cases
+    try {
       const map = new Map<string, Tab[]>();
       Object.entries(stored).forEach(([terminalId, tabs]) => {
-        map.set(terminalId, tabs);
+        // Validate each entry
+        if (typeof terminalId === 'string' && Array.isArray(tabs)) {
+          map.set(terminalId, tabs);
+        } else {
+          console.warn("🦆 Skipping invalid tab entry for terminal:", terminalId);
+        }
       });
       console.log(`Loaded tabs for ${map.size} terminals from storage`);
       return map;
+    } catch (entriesError) {
+      console.error("🦆 Error parsing tabsByTerminal entries:", entriesError);
+      toast.error("Tab storage parsing failed - resetting");
+      await store.delete(TABS_BY_TERMINAL_KEY);
+      await store.save();
+      return new Map();
     }
-    return new Map();
   } catch (error) {
-    console.warn("Unable to load saved tabs by terminal", error);
+    console.error("🦆 Critical error loading tabs by terminal:", error);
+    toast.error("Failed to load tabs - starting fresh");
     return new Map();
   }
 };
@@ -262,9 +364,41 @@ const loadNativeTerminalsFromStorage = async (): Promise<NativeTerminal[]> => {
   try {
     const store = await Store.load("quack-terminals.json");
     const stored = await store.get<NativeTerminal[]>(NATIVE_TERMINALS_STORAGE_KEY);
-    return stored ?? [];
+
+    // ✅ DEFENSIVE: Validate data structure before returning
+    if (!stored) {
+      return [];
+    }
+
+    if (!Array.isArray(stored)) {
+      console.error("🦆 Storage corruption detected: nativeTerminals is not an array", typeof stored);
+      toast.error("Native terminal storage corrupted - resetting to clean state");
+      await store.delete(NATIVE_TERMINALS_STORAGE_KEY);
+      await store.save();
+      return [];
+    }
+
+    // ✅ DEFENSIVE: Validate each native terminal has required fields
+    const validated = stored.filter((t: any) => {
+      if (!t || typeof t !== 'object') {
+        console.warn("🦆 Skipping invalid native terminal entry:", t);
+        return false;
+      }
+      if (!t.id || !t.name) {
+        console.warn("🦆 Skipping native terminal missing id/name:", t);
+        return false;
+      }
+      return true;
+    });
+
+    if (validated.length !== stored.length) {
+      console.warn(`🦆 Filtered out ${stored.length - validated.length} corrupted native terminal entries`);
+    }
+
+    return validated;
   } catch (error) {
-    console.warn("Unable to load saved native terminals", error);
+    console.error("🦆 Critical error loading native terminals:", error);
+    toast.error("Failed to load native terminals - starting fresh");
     return [];
   }
 };
@@ -292,13 +426,42 @@ const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
   try {
     const store = await Store.load("quack-agent-chats.json");
     const stored = await store.get<AgentChat[]>(AGENT_CHATS_KEY);
-    if (stored) {
-      console.log(`Loaded ${stored.length} AgentChats from storage`);
-      return stored;
+
+    // ✅ DEFENSIVE: Validate data structure before returning
+    if (!stored) {
+      return [];
     }
-    return [];
+
+    if (!Array.isArray(stored)) {
+      console.error("🦆 Storage corruption detected: agentChats is not an array", typeof stored);
+      toast.error("Agent chat storage corrupted - resetting to clean state");
+      await store.delete(AGENT_CHATS_KEY);
+      await store.save();
+      return [];
+    }
+
+    // ✅ DEFENSIVE: Validate each agent chat has required fields
+    const validated = stored.filter((chat: any) => {
+      if (!chat || typeof chat !== 'object') {
+        console.warn("🦆 Skipping invalid agent chat entry:", chat);
+        return false;
+      }
+      if (!chat.id || !chat.name) {
+        console.warn("🦆 Skipping agent chat missing id/name:", chat);
+        return false;
+      }
+      return true;
+    });
+
+    if (validated.length !== stored.length) {
+      console.warn(`🦆 Filtered out ${stored.length - validated.length} corrupted agent chat entries`);
+    }
+
+    console.log(`Loaded ${validated.length} AgentChats from storage`);
+    return validated;
   } catch (error) {
-    console.warn("Unable to load AgentChats:", error);
+    console.error("🦆 Critical error loading AgentChats:", error);
+    toast.error("Failed to load agent chats - starting fresh");
     return [];
   }
 };
@@ -3471,6 +3634,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           console.warn('License revalidation check failed (non-critical):', licenseError);
         }
 
+        // ✅ DEFENSIVE: Check storage version before loading any data
+        // This prevents crashes from incompatible data formats after app updates
+        await checkStorageVersion();
+
         // Try to load saved terminals
         const savedMetadata = await loadTerminalsFromStorage();
 
@@ -4664,7 +4831,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         if (isImage) {
           // Load image as base64
-          const base64Data = await invoke<string>("read_image_as_base64", {
+          const base64Data = await invoke<string>("read_file_preview", {
             path: entry.path,
           });
 
@@ -5016,7 +5183,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       if (isImage) {
         // Reload image as base64
-        const base64Data = await invoke<string>("read_image_as_base64", {
+        const base64Data = await invoke<string>("read_file_preview", {
           path: previewFile.path,
         });
 
