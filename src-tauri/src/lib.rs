@@ -213,17 +213,11 @@ pub fn run() {
                     .accelerator("Cmd+Shift+I")
                     .build(app)?;
 
-                let backgrounds_id = "open_backgrounds";
-                let backgrounds = tauri::menu::MenuItemBuilder::with_id(backgrounds_id, "Backgrounds...")
-                    .accelerator("Cmd+Shift+B")
-                    .build(app)?;
-
                 let quack_menu = SubmenuBuilder::new(app, "Quack")
                     .item(&toggle_perf)
                     .separator()
                     .item(&ai_settings)
                     .item(&watch_intro)
-                    .item(&backgrounds)
                     .separator()
                     .quit()
                     .build()?;
@@ -267,13 +261,6 @@ pub fn run() {
                         tauri::async_runtime::spawn(async move {
                             if let Err(e) = app_handle.emit("watch-intro", ()) {
                                 log::error!("Failed to emit watch-intro event: {}", e);
-                            }
-                        });
-                    } else if event.id() == backgrounds_id {
-                        let app_handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            if let Err(e) = app_handle.emit("open-backgrounds", ()) {
-                                log::error!("Failed to emit open-backgrounds event: {}", e);
                             }
                         });
                     }

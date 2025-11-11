@@ -548,6 +548,22 @@ function App() {
     }
   }, [isProUser, proBannerExpanded]);
 
+  // Listen for license modal open event from settings
+  useEffect(() => {
+    const handleOpenLicenseModal = () => {
+      console.log('[App.tsx] open-license-modal event received - opening LicenseModal');
+      // Close Settings panel
+      setShowSettings(false);
+      // Close UpgradeModal if it was open
+      setShowUpgradeModal(false);
+      // Open LicenseModal
+      setShowLicenseModal(true);
+    };
+
+    window.addEventListener('open-license-modal', handleOpenLicenseModal);
+    return () => window.removeEventListener('open-license-modal', handleOpenLicenseModal);
+  }, []);
+
   // Telegram Central Bot state
   const [showTelegramSetup, setShowTelegramSetup] = useState(false);
 
@@ -6509,8 +6525,6 @@ You have access to all Bash tools to execute git commands like:
         {showSettings && (
           <UnifiedSettings
             onClose={() => setShowSettings(false)}
-            currentBackground={currentBackground}
-            onSelectBackground={handleSelectBackground}
           />
         )}
 

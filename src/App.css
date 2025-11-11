@@ -7998,6 +7998,7 @@ button.directory-chooser:hover {
 .sidebar-settings-content {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
   width: 100%;
 }
@@ -8005,6 +8006,7 @@ button.directory-chooser:hover {
 .sidebar-settings-top {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -8018,7 +8020,6 @@ button.directory-chooser:hover {
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
-  flex: 1;
 }
 
 .sidebar-settings-version {
@@ -8026,7 +8027,6 @@ button.directory-chooser:hover {
   font-weight: 400;
   opacity: 0.6;
   line-height: 1;
-  padding-left: 28px; /* Aligns with label (icon width + gap) */
 }
 
 /* ========================================

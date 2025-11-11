@@ -175,6 +175,7 @@ export default function LicenseSettings() {
               <button
                 className="license-activate-button"
                 onClick={() => {
+                  console.log('[LicenseSettings] Activate License clicked - dispatching open-license-modal event');
                   // Emit event to open license modal (handled by App.tsx)
                   window.dispatchEvent(new CustomEvent('open-license-modal'));
                 }}
