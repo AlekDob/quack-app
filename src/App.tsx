@@ -86,6 +86,7 @@ import type {
 import { getRandomName } from "./utils/agentNames";
 
 interface TerminalMetadata {
+  id: string; // ✅ CRITICAL FIX: Store ID to preserve personality linkage across restarts!
   label: string;
   color: string;
   cwd: string;
@@ -162,8 +163,9 @@ const STORAGE_KEY = "terminals";
 const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
   try {
     const store = await Store.load("quack-terminals.json");
-    // Save terminal metadata including personality
+    // Save terminal metadata including personality AND ID for persistence
     const metadata = terminals.map((t) => ({
+      id: t.id, // ✅ CRITICAL FIX: Save ID to preserve personality linkage!
       label: t.label,
       color: t.color,
       cwd: t.cwd,
@@ -3461,6 +3463,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           for (const metadata of savedMetadata) {
             try {
               const terminal = await invoke<TerminalInfo>("create_terminal", {
+                id: metadata.id, // ✅ CRITICAL: Pass saved ID to maintain personality linkage
                 label: metadata.label,
                 color: metadata.color,
                 cwd: metadata.cwd,
@@ -3480,6 +3483,57 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               };
 
               recreated.push(terminalWithState);
+
+              // ✅ ONE-TIME MIGRATION: For old save files, check if personality file exists
+              // If personality data exists in state but file doesn't exist, create it
+              if (metadata.personality && terminal.id) {
+                try {
+                  // Check if personality file already exists
+                  const loadedPersonality = await invoke<AgentPersonality>('load_agent_personality', {
+                    projectPath: metadata.cwd,
+                    personalityId: terminal.id,
+                  });
+
+                  // Only create if we got default (file doesn't exist)
+                  if (loadedPersonality.id === 'default') {
+                    console.log(`📝 Creating personality file for "${metadata.label}" from saved state...`);
+
+                    const personalityToSave: AgentPersonality = {
+                      id: terminal.id,
+                      name: metadata.label,
+                      role: metadata.personality.role || 'Feature Coordinator',
+                      technicalContext: metadata.personality.technicalContext,
+                      rules: metadata.personality.rules,
+                      communicationStyle: metadata.personality.communicationStyle || 'friendly',
+                      customNotes: metadata.personality.customNotes,
+                      // Legacy fields
+                      intro: metadata.personality.intro,
+                      personality: metadata.personality.personality,
+                      quirks: metadata.personality.quirks,
+                      specialties: metadata.personality.specialties,
+                      skills: metadata.personality.skills,
+                      expressions: metadata.personality.expressions,
+                    };
+
+                    await invoke('save_agent_personality', {
+                      projectPath: metadata.cwd,
+                      personality: personalityToSave,
+                    });
+
+                    await invoke('inject_personality_to_claude_md', {
+                      projectPath: metadata.cwd,
+                      personality: personalityToSave,
+                    });
+
+                    console.log(`✅ Created personality file for "${metadata.label}"`);
+                  } else {
+                    console.log(`✅ Personality file already exists for "${metadata.label}"`);
+                  }
+                } catch (err) {
+                  console.warn(`Could not check/create personality for ${metadata.label}:`, err);
+                }
+              }
+
               // console.log(`Recreated terminal: ${terminal.label}`, { // Performance: Disabled logging
               //   workingOn: metadata.workingOn,
               //   avatar: metadata.avatar,
@@ -3998,10 +4052,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             id: editingTerminal.id,
             name: trimmedName,
             role: newTerminalPersonality.role || '',
+            technicalContext: newTerminalPersonality.technicalContext || undefined,
+            rules: newTerminalPersonality.rules || undefined,
+            communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
+            customNotes: newTerminalPersonality.customNotes || undefined,
+            // Legacy fields (kept for backwards compatibility)
             intro: newTerminalPersonality.intro || '',
             personality: newTerminalPersonality.personality || '',
             quirks: newTerminalPersonality.quirks || '',
-            communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
             specialties: newTerminalPersonality.specialties || [],
             skills: newTerminalPersonality.skills || [],
             expressions: newTerminalPersonality.expressions || [],
@@ -4141,10 +4199,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               id: createdWithState.id,
               name: trimmedName,
               role: newTerminalPersonality.role || '',
-              intro: newTerminalPersonality.intro || '', // ✅ FIXED: Now saving intro field
+              technicalContext: newTerminalPersonality.technicalContext || undefined,
+              rules: newTerminalPersonality.rules || undefined,
+              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
+              customNotes: newTerminalPersonality.customNotes || undefined,
+              // Legacy fields (kept for backwards compatibility)
+              intro: newTerminalPersonality.intro || '',
               personality: newTerminalPersonality.personality || '',
               quirks: newTerminalPersonality.quirks || '',
-              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
               specialties: newTerminalPersonality.specialties || [],
               skills: newTerminalPersonality.skills || [],
               expressions: newTerminalPersonality.expressions || [],
@@ -4336,9 +4398,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         // Load and inject personality into CLAUDE.md
         try {
+          console.log(`🔍 Loading personality for "${terminal.label}" (ID: ${terminal.id}) from ${terminal.cwd}`);
           const personality = await invoke<AgentPersonality>('load_agent_personality', {
             projectPath: terminal.cwd,
             personalityId: terminal.id,
+          });
+
+          console.log(`🔍 Loaded personality:`, {
+            id: personality.id,
+            name: personality.name,
+            role: personality.role,
+            technicalContext: personality.technicalContext?.substring(0, 50) + '...',
+            customNotes: personality.customNotes?.substring(0, 50) + '...',
           });
 
           // Inject into CLAUDE.md
@@ -4350,6 +4421,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           console.log(`✅ Injected personality for "${terminal.label}" into CLAUDE.md`);
         } catch (error) {
           // No personality found or injection failed - not critical
+          console.error(`❌ Failed to inject personality for "${terminal.label}":`, error);
           console.log(`No personality to inject for "${terminal.label}"`);
         }
       }
