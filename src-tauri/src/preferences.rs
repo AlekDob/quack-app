@@ -34,7 +34,7 @@ fn default_ai_model() -> String {
 }
 
 fn default_background() -> String {
-    "duck.png".to_string()
+    "gradient-black-plain".to_string()
 }
 
 impl Default for AppPreferences {

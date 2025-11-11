@@ -50,7 +50,7 @@ body,
 body {
   background-color: #000000; /* Black background for clean splash screen */
   /* Background image set dynamically by App.tsx */
-  background-size: 50%;
+  background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
