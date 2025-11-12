@@ -10,7 +10,7 @@ export interface Tab {
   filePath?: string;
   color?: string; // Color indicator for chat tabs
   terminalId?: string; // Reference to terminal instance for agent-terminal tabs
-  icon?: React.ReactNode; // Icon to display before label (e.g., terminal icon)
+  icon?: React.ReactNode; // DEPRECATED: Icon is now rendered based on tab.type to avoid React serialization issues
   agentName?: string; // Agent name for agent tabs
   agentScope?: 'global' | 'project'; // Agent scope for agent tabs
   url?: string; // Current URL for browser tabs
@@ -132,9 +132,22 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
               aria-hidden="true"
             />
           )}
-          {tab.icon && (
+          {tab.type === 'agent-terminal' && (
             <span className="tab-icon" aria-hidden="true">
-              {tab.icon}
+              {/* Terminal icon - rendered here instead of from tab.icon to avoid React serialization issues */}
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+                <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9zM3.5 3a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-9zM5.146 6.146a.5.5 0 0 1 .708 0L7 7.293l1.146-1.147a.5.5 0 0 1 .708.708L7.707 8l1.147 1.146a.5.5 0 0 1-.708.708L7 8.707l-1.146 1.147a.5.5 0 0 1-.708-.708L6.293 8 5.146 6.854a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </span>
+          )}
+          {tab.type === 'skill' && (
+            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
+              ⚡
+            </span>
+          )}
+          {tab.type === 'command' && (
+            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
+              /
             </span>
           )}
           <span className="tab-label">{tab.label}</span>

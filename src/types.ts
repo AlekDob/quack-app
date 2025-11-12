@@ -30,6 +30,12 @@ export interface AgentChat {
   createdAt: number;
   avatar?: string;
   personality?: any;
+  sessionId?: string; // Claude Agent SDK session ID for resume & message persistence
+  // Token usage for stamina preservation
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
 }
 
 export interface TerminalInfo {

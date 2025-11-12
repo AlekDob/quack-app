@@ -811,3 +811,45 @@ pub fn resume_session(session_id: String) -> Result<SessionDetails, String> {
     // Reuse get_session_details which already loads full conversation
     get_session_details(session_id)
 }
+
+/// Get messages for an agent chat by agent ID and optional session ID
+/// This is used to load chat history when reopening an agent
+#[command]
+pub fn get_agent_chat_messages(
+    agent_id: String,
+    session_id: Option<String>,
+) -> Result<Vec<SessionHistoryMessage>, String> {
+    // If session_id is provided, try to load from that specific session
+    if let Some(sid) = session_id {
+        match get_session_details(sid) {
+            Ok(details) => return Ok(details.messages),
+            Err(e) => {
+                log::warn!("Failed to load session {}: {}", agent_id, e);
+                // Fall through to return empty messages
+            }
+        }
+    }
+
+    // If no session_id or session not found, return empty messages
+    // (agent will start fresh)
+    Ok(Vec::new())
+}
+
+/// Save agent chat messages to storage
+/// This creates/updates the session file with the provided messages
+#[command]
+pub fn save_agent_chat_messages(
+    agent_id: String,
+    messages: Vec<SessionHistoryMessage>,
+    session_id: Option<String>,
+) -> Result<(), String> {
+    // For now, we don't save messages separately from sessions
+    // The Claude Agent SDK handles saving to .jsonl files
+    // This is a placeholder for future implementation if needed
+    log::debug!(
+        "save_agent_chat_messages called for agent {} with {} messages",
+        agent_id,
+        messages.len()
+    );
+    Ok(())
+}

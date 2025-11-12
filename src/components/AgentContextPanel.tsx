@@ -11,6 +11,13 @@ interface ContextFile {
   exists: boolean;
 }
 
+interface ContextFileStats {
+  char_count: number;
+  word_count: number;
+  line_count: number;
+  score: 'good' | 'warning' | 'bad';
+}
+
 interface AgentContextPanelProps {
   tauriAvailable: boolean;
   activeAgentId?: string | null;
@@ -42,6 +49,8 @@ export default function AgentContextPanel({
 }: AgentContextPanelProps) {
   const [personality, setPersonality] = useState<AgentPersonality | null>(null);
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
+  const [globalStats, setGlobalStats] = useState<ContextFileStats | null>(null);
+  const [projectStats, setProjectStats] = useState<ContextFileStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [personalityCollapsed, setPersonalityCollapsed] = useState(false);
   const [globalCollapsed, setGlobalCollapsed] = useState(false);
@@ -108,6 +117,30 @@ export default function AgentContextPanel({
         });
         console.log('Loaded CLAUDE.md files:', files);
         setContextFiles(files);
+
+        // Load stats for global CLAUDE.md
+        try {
+          const gStats = await invoke<ContextFileStats>('get_claude_md_stats', {
+            scope: 'global',
+            workingDir: activeAgentCwd || null,
+          });
+          setGlobalStats(gStats);
+        } catch (error) {
+          console.error('Failed to load global CLAUDE.md stats:', error);
+          setGlobalStats(null);
+        }
+
+        // Load stats for project CLAUDE.md
+        try {
+          const pStats = await invoke<ContextFileStats>('get_claude_md_stats', {
+            scope: 'project',
+            workingDir: activeAgentCwd || null,
+          });
+          setProjectStats(pStats);
+        } catch (error) {
+          console.error('Failed to load project CLAUDE.md stats:', error);
+          setProjectStats(null);
+        }
       } catch (error) {
         console.error('Failed to load CLAUDE.md files:', error);
         setContextFiles([]);
@@ -189,6 +222,47 @@ export default function AgentContextPanel({
 
   const globalFiles = contextFiles.filter((f) => f.scope === 'global');
   const projectFiles = contextFiles.filter((f) => f.scope === 'project');
+
+  // Helper function to render stats badge
+  const renderStatsBadge = (stats: ContextFileStats | null) => {
+    if (!stats || stats.char_count === 0) return null;
+
+    const getScoreColor = (score: string) => {
+      switch (score) {
+        case 'good':
+          return '#4ecdc4'; // green
+        case 'warning':
+          return '#f8b739'; // yellow/orange
+        case 'bad':
+          return '#ff6b6b'; // red
+        default:
+          return '#999';
+      }
+    };
+
+    const formatNumber = (num: number) => {
+      if (num >= 1000) {
+        return `${(num / 1000).toFixed(1)}k`;
+      }
+      return num.toString();
+    };
+
+    return (
+      <span
+        style={{
+          fontSize: '0.75em',
+          padding: '2px 6px',
+          borderRadius: '8px',
+          background: `${getScoreColor(stats.score)}15`,
+          color: getScoreColor(stats.score),
+          fontWeight: 600,
+          marginLeft: '6px',
+        }}
+      >
+        {formatNumber(stats.char_count)}
+      </span>
+    );
+  };
 
   return (
     <div className="agent-context-panel">
@@ -377,6 +451,7 @@ export default function AgentContextPanel({
               </svg>
               <span>Global Context</span>
               <span className="context-count-badge">{globalFiles.length}</span>
+              {renderStatsBadge(globalStats)}
             </div>
           </div>
 
@@ -464,6 +539,7 @@ export default function AgentContextPanel({
               </svg>
               <span>Project Context</span>
               <span className="context-count-badge">{projectFiles.length}</span>
+              {renderStatsBadge(projectStats)}
             </div>
           </div>
 

@@ -55,13 +55,40 @@ serve(async (req) => {
 
   try {
     // Parse webhook payload from Gumroad
-    const payload: GumroadWebhookPayload = await req.json()
+    // Gumroad sends data as application/x-www-form-urlencoded, NOT JSON!
+    const contentType = req.headers.get('content-type') || ''
+    let payload: GumroadWebhookPayload
+
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Parse URL-encoded form data
+      const formData = await req.text()
+      const params = new URLSearchParams(formData)
+
+      // Convert URLSearchParams to object
+      payload = {} as GumroadWebhookPayload
+      for (const [key, value] of params.entries()) {
+        // Handle nested card object
+        if (key.startsWith('card[')) {
+          if (!payload.card) payload.card = {} as any
+          const cardKey = key.match(/card\[(\w+)\]/)?.[1]
+          if (cardKey) {
+            (payload.card as any)[cardKey] = value || null
+          }
+        } else {
+          (payload as any)[key] = value
+        }
+      }
+    } else {
+      // Fallback to JSON parsing (in case Gumroad changes format)
+      payload = await req.json()
+    }
 
     console.log('🦆 Received Gumroad webhook:', {
       order_number: payload.order_number,
       product_id: payload.product_id,
       email: payload.email,
       license_key: payload.license_key?.substring(0, 10) + '...',
+      content_type: contentType,
     })
 
     // Validate required fields
