@@ -17,6 +17,12 @@ export interface ChatSendOptions {
 
 export interface UseClaudeChatOptions {
   initialSessionId?: string;
+  initialTokens?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+  };
 }
 
 export function useClaudeChat(options?: UseClaudeChatOptions) {
@@ -26,11 +32,12 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   const [error, setError] = useState<string | null>(null);
 
   // Track cumulative session tokens
+  // ✅ Initialize with provided tokens for stamina preservation
   const [sessionTokens, setSessionTokens] = useState({
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheCreationTokens: 0,
-    cacheReadTokens: 0,
+    inputTokens: options?.initialTokens?.inputTokens ?? 0,
+    outputTokens: options?.initialTokens?.outputTokens ?? 0,
+    cacheCreationTokens: options?.initialTokens?.cacheCreationTokens ?? 0,
+    cacheReadTokens: options?.initialTokens?.cacheReadTokens ?? 0,
   });
 
   // Store the Claude SDK session ID for resume
@@ -53,6 +60,11 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   // Send message to Claude using the SDK with streaming
   const sendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
+
+    // CRITICAL: Check if conversation is getting too long (warn at ~20 messages)
+    if (messages.length > 20) {
+      console.warn('[useClaudeChat] ⚠️ Conversation is getting long. Consider using /compact or clearing conversation.');
+    }
 
     // Save the prompt for restoration on abort
     lastPromptRef.current = content;
@@ -88,8 +100,9 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      // Generate unique stream ID for this chat instance
-      const streamId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Generate unique stream ID for this chat instance with better entropy
+      // Using Date.now(), Math.random(), and performance.now() for maximum uniqueness
+      const streamId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now().toString(36).substr(2, 6)}`;
 
       // Stream message using Claude Agent SDK with unique streamId
       const stream = streamClaudeMessage(content, {
@@ -114,7 +127,22 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
           // Capture session ID from system init event
           if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
             console.log('[useClaudeChat] Captured session ID:', event.session_id);
+            const isResumingSession = claudeSessionId.current === event.session_id;
             claudeSessionId.current = event.session_id;
+
+            // If resuming an existing session, add a system message to inform the user
+            if (isResumingSession && messages.length === 2) { // Only user + assistant placeholder
+              setMessages((prev) => [
+                {
+                  id: `msg-system-resume-${Date.now()}`,
+                  role: 'system' as const,
+                  content: '📜 Continuing previous conversation...',
+                  timestamp: Date.now(),
+                  status: 'complete' as const,
+                },
+                ...prev,
+              ]);
+            }
           }
 
           // Accumulate assistant text from assistant events
@@ -222,7 +250,19 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
           } else if (errorMessage.includes('working directory') || errorMessage.includes('cwd')) {
             errorDetails = 'Working directory is not accessible. Check file permissions.';
           } else if (errorMessage.includes('exit status: 1')) {
-            errorDetails = 'Claude SDK process crashed. Check console for more details. Common causes: invalid API key, rate limiting, or corrupted CLAUDE.md file.';
+            errorDetails = 'Claude SDK process crashed. Common causes:\n\n' +
+              '• **Prompt too long**: Use `/compact` to compress the conversation\n' +
+              '• **CLAUDE.md too large**: Reduce the size of your project context file\n' +
+              '• **Rate limiting**: Wait a few minutes and try again\n' +
+              '• **Invalid API key**: Check your Anthropic API key in settings\n\n' +
+              'Try using `/compact` or "Clear Conversation" to start fresh.';
+          } else if (errorMessage.toLowerCase().includes('prompt') && errorMessage.toLowerCase().includes('too long')) {
+            errorDetails = '**Prompt is too long!**\n\n' +
+              'Your conversation history + context is too large. Try:\n\n' +
+              '• Use `/compact` to compress the conversation while keeping context\n' +
+              '• Use "Clear Conversation" to start fresh\n' +
+              '• Reduce the size of your CLAUDE.md file\n' +
+              '• Send shorter messages';
           }
         } else if (typeof err === 'string') {
           errorMessage = err;
@@ -246,7 +286,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       setIsLoading(false);
       abortControllerRef.current = null; // Clean up
     }
-  }, [isLoading]);
+  }, [isLoading, messages.length]);
 
   // Abort current streaming
   const abortStream = useCallback(() => {
@@ -268,19 +308,28 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     // 1. Abort any active streams for this specific session
     if (claudeSessionId.current) {
       console.log('[useClaudeChat] Aborting active stream for session:', claudeSessionId.current);
-      abortSessionStream(claudeSessionId.current); // This will cancel only this session's stream
+      try {
+        abortSessionStream(claudeSessionId.current); // This will cancel only this session's stream
+      } catch (err) {
+        console.warn('[useClaudeChat] Failed to abort session stream (session might be corrupted):', err);
+      }
     }
 
     // 2. Abort current stream controller if any
     if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
       console.log('[useClaudeChat] Aborting current stream controller');
-      abortControllerRef.current.abort();
+      try {
+        abortControllerRef.current.abort();
+      } catch (err) {
+        console.warn('[useClaudeChat] Failed to abort stream controller:', err);
+      }
     }
 
     // 3. Clear messages
     setMessages([]);
 
     // 4. Clear session ID to start fresh (prevents SDK from resuming old session)
+    const oldSessionId = claudeSessionId.current;
     claudeSessionId.current = undefined;
 
     // 5. Clear last prompt
@@ -294,12 +343,37 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       cacheReadTokens: 0,
     });
 
+    // 7. Try to notify backend to delete session files
+    if (oldSessionId) {
+      invoke('delete_claude_session', { sessionId: oldSessionId })
+        .then(() => console.log('[useClaudeChat] Backend session deleted:', oldSessionId))
+        .catch(err => console.warn('[useClaudeChat] Failed to delete backend session (might not exist):', err));
+    }
+
     console.log('[useClaudeChat] Conversation cleared - new session will start fresh');
   }, []);
 
   // Get current session ID (useful for debugging)
   const getCurrentSessionId = useCallback(() => {
     return claudeSessionId.current;
+  }, []);
+
+  // Save messages to persistent storage (called after each message)
+  const saveMessagesToStorage = useCallback(async (agentId: string, messagesToSave: ChatMessage[]) => {
+    try {
+      await invoke('save_agent_chat_messages', {
+        agentId,
+        messages: messagesToSave.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        })),
+        sessionId: claudeSessionId.current,
+      });
+      console.log('[useClaudeChat] Messages saved to storage:', messagesToSave.length);
+    } catch (err) {
+      console.error('[useClaudeChat] Failed to save messages:', err);
+    }
   }, []);
 
   // Load historical messages from a resumed session
@@ -347,6 +421,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     initialize,
     getCurrentSessionId,
     sessionTokens,
-    loadHistoricalMessages, // Add new function to return
+    loadHistoricalMessages,
+    saveMessagesToStorage,
+    sessionId: claudeSessionId.current, // Expose current session ID for persistence
   };
 }

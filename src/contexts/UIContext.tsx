@@ -93,7 +93,7 @@ interface UIContextValue {
   setProBannerExpanded: (expanded: boolean) => void;
 
   // Actions - Tabs
-  setTabs: (tabs: Tab[]) => void;
+  setTabs: React.Dispatch<React.SetStateAction<Tab[]>>;
   setActiveTabId: (id: string) => void;
   addTab: (tab: Tab) => void;
   removeTab: (id: string) => void;

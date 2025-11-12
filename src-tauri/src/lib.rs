@@ -435,6 +435,7 @@ pub fn run() {
             context::list_context_md_files,
             context::get_claude_md_details,
             context::save_claude_md_content,
+            context::get_claude_md_stats,
             fs::list_directory,
             fs::get_home_directory,
             fs::read_file_content,

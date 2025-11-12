@@ -1,12 +1,7 @@
 {
-  "id": "d0883467-b8e5-49a2-ab65-9f204fd5b71b",
-  "name": "Agent Pierre",
-  "role": "Feature Coordinatorsss",
-  "technicalContext": "Testing",
-  "rules": [
-    "Prefer readability over cleverness",
-    "Avoid premature optimization"
-  ],
+  "id": "ab851462-cab7-4667-a292-2e9e07ef762a",
+  "name": "Agent Ivan",
+  "role": "Feature Coordinator",
   "communicationStyle": "friendly",
   "personality": "Organized. Proactive",
   "quirks": "",

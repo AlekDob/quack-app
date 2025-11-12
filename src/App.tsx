@@ -48,6 +48,7 @@ import BrowserManager from "./components/BrowserManager";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
+import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditor";
 import { parseDiff } from "./lib/diffParser";
@@ -700,7 +701,25 @@ function App() {
   const [upgradeLimitType, setUpgradeLimitType] = useState<'terminals' | 'groups' | 'backgrounds' | 'agency' | 'sync'>('terminals');
   const [isProUser, setIsProUser] = useState(isPro());
   const [proBannerExpanded, setProBannerExpanded] = useState(true);
+  const [claudeCliAvailable, setClaudeCliAvailable] = useState<boolean | null>(null);
+  const [claudeAuthBannerExpanded, setClaudeAuthBannerExpanded] = useState(true);
+  const [claudeAuthBannerDismissed, setClaudeAuthBannerDismissed] = useState(false);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
+
+  // Check Claude CLI availability on mount
+  useEffect(() => {
+    const checkClaudeCli = async () => {
+      try {
+        const available = await invoke<boolean>('check_claude_cli_available');
+        setClaudeCliAvailable(available);
+      } catch (error) {
+        console.error('Failed to check Claude CLI availability:', error);
+        setClaudeCliAvailable(false);
+      }
+    };
+
+    checkClaudeCli();
+  }, []);
 
   // Auto-collapse ProBanner after 10 seconds
   useEffect(() => {
@@ -783,6 +802,19 @@ function App() {
       const newMap = new Map(prev);
       newMap.set(agentId, sessionId);
       return newMap;
+    });
+
+    // 🦆 SESSION PERSISTENCE: Save session ID in AgentChat for persistence across app restarts
+    setAgentChats((prev) => {
+      return prev.map((agent) => {
+        if (agent.id === agentId) {
+          return {
+            ...agent,
+            sessionId: sessionId,
+          };
+        }
+        return agent;
+      });
     });
 
     setUsageSessions((prev) => {
@@ -1154,6 +1186,22 @@ function App() {
                            updatedTokens.cacheCreationTokens + updatedTokens.cacheReadTokens;
               console.log(`[Token Tracking] Accumulated tokens for agent ${agentId}: ${total} total`, updatedTokens);
 
+              // 🦆 STAMINA PRESERVATION: Update agentChats with new token counts
+              setAgentChats((prev) => {
+                return prev.map((agent) => {
+                  if (agent.id === agentId) {
+                    return {
+                      ...agent,
+                      inputTokens: updatedTokens.inputTokens,
+                      outputTokens: updatedTokens.outputTokens,
+                      cacheCreationTokens: updatedTokens.cacheCreationTokens,
+                      cacheReadTokens: updatedTokens.cacheReadTokens,
+                    };
+                  }
+                  return agent;
+                });
+              });
+
               return newMap;
             });
           }
@@ -1310,6 +1358,25 @@ function App() {
 
     // Get current agent's chat session
     const currentMessages = chatSessions.get(activeId) ?? [];
+
+    // 🦆 SESSION PERSISTENCE: Show "Continuing conversation" message if this is first message with existing session
+    const existingSessionId = chatSessionIds.get(activeId);
+    const isFirstMessage = currentMessages.length === 0;
+    if (existingSessionId && isFirstMessage) {
+      const resumeMessage: ChatMessage = {
+        id: `msg-system-resume-${Date.now()}`,
+        role: 'system',
+        content: '📜 Continuing previous conversation...',
+        timestamp: Date.now(),
+        status: 'complete',
+      };
+
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        newSessions.set(activeId, [resumeMessage]);
+        return newSessions;
+      });
+    }
 
     // 🦆 Create AgentChat automatically if it doesn't exist (for UI-created agents)
     if (!agentChats.find(a => a.id === activeId)) {
@@ -1495,6 +1562,19 @@ function App() {
         const updated = new Map(prev);
         updated.set(activeId, response.session_id);
         return updated;
+      });
+
+      // 🦆 SESSION PERSISTENCE: Save session ID in AgentChat for persistence across app restarts
+      setAgentChats((prev) => {
+        return prev.map((agent) => {
+          if (agent.id === activeId) {
+            return {
+              ...agent,
+              sessionId: response.session_id,
+            };
+          }
+          return agent;
+        });
       });
 
       // Track usage from Claude Agent SDK (with full token details!)
@@ -1802,6 +1882,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const newMap = new Map(prev);
         newMap.delete(activeId);
         return newMap;
+      });
+
+      // 🦆 STAMINA PRESERVATION: Reset token counts in agentChats
+      setAgentChats((prev) => {
+        return prev.map((agent) => {
+          if (agent.id === activeId) {
+            return {
+              ...agent,
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheCreationTokens: 0,
+              cacheReadTokens: 0,
+            };
+          }
+          return agent;
+        });
       });
 
       toast.success('Conversation cleared');
@@ -3154,7 +3250,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           closable: true,
           skillName: skillInfo.name,
           skillScope: skillInfo.scope as 'global' | 'project',
-          icon: <span style={{ fontSize: '14px' }}>⚡</span>,
+          // icon removed - rendered directly in TabBar to avoid React serialization issues
         };
 
         setTabs(prevTabs => [...prevTabs, newTab]);
@@ -3284,7 +3380,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           type: 'command',
           closable: true,
           command: command,
-          icon: <span style={{ fontSize: '14px' }}>/</span>,
+          // icon removed - rendered directly in TabBar to avoid React serialization issues
         };
 
         setTabs(prevTabs => [...prevTabs, newTab]);
@@ -3754,6 +3850,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           const existingChats = await loadAgentChatsFromStorage();
           if (existingChats.length > 0) {
             setAgentChats(existingChats);
+
+            // 🦆 STAMINA PRESERVATION: Initialize chatTokensMap with saved token counts
+            const initialTokensMap = new Map<string, {
+              inputTokens: number;
+              outputTokens: number;
+              cacheCreationTokens: number;
+              cacheReadTokens: number;
+            }>();
+            const initialSessionIds = new Map<string, string>();
+
+            existingChats.forEach((agent) => {
+              // Load tokens
+              if (agent.inputTokens !== undefined || agent.outputTokens !== undefined) {
+                initialTokensMap.set(agent.id, {
+                  inputTokens: agent.inputTokens ?? 0,
+                  outputTokens: agent.outputTokens ?? 0,
+                  cacheCreationTokens: agent.cacheCreationTokens ?? 0,
+                  cacheReadTokens: agent.cacheReadTokens ?? 0,
+                });
+              }
+
+              // 🦆 SESSION PERSISTENCE: Load session IDs
+              if (agent.sessionId) {
+                initialSessionIds.set(agent.id, agent.sessionId);
+              }
+            });
+
+            if (initialTokensMap.size > 0) {
+              setChatTokensMap(initialTokensMap);
+              console.log(`[Stamina Preservation] Loaded tokens for ${initialTokensMap.size} agents`);
+            }
+
+            if (initialSessionIds.size > 0) {
+              setChatSessionIds(initialSessionIds);
+              console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
+            }
           }
 
           // Load tabs by terminal from storage
@@ -3774,6 +3906,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           const existingChats = await loadAgentChatsFromStorage();
           if (existingChats.length > 0) {
             setAgentChats(existingChats);
+
+            // 🦆 STAMINA PRESERVATION: Initialize chatTokensMap with saved token counts
+            const initialTokensMap = new Map<string, {
+              inputTokens: number;
+              outputTokens: number;
+              cacheCreationTokens: number;
+              cacheReadTokens: number;
+            }>();
+            const initialSessionIds = new Map<string, string>();
+
+            existingChats.forEach((agent) => {
+              // Load tokens
+              if (agent.inputTokens !== undefined || agent.outputTokens !== undefined) {
+                initialTokensMap.set(agent.id, {
+                  inputTokens: agent.inputTokens ?? 0,
+                  outputTokens: agent.outputTokens ?? 0,
+                  cacheCreationTokens: agent.cacheCreationTokens ?? 0,
+                  cacheReadTokens: agent.cacheReadTokens ?? 0,
+                });
+              }
+
+              // 🦆 SESSION PERSISTENCE: Load session IDs
+              if (agent.sessionId) {
+                initialSessionIds.set(agent.id, agent.sessionId);
+              }
+            });
+
+            if (initialTokensMap.size > 0) {
+              setChatTokensMap(initialTokensMap);
+              console.log(`[Stamina Preservation] Loaded tokens for ${initialTokensMap.size} agents`);
+            }
+
+            if (initialSessionIds.size > 0) {
+              setChatSessionIds(initialSessionIds);
+              console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
+            }
           }
         }
       } catch (error) {
@@ -4201,11 +4369,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    // Validate word count for "Working on" (max 5 words)
+    // Validate word count for "Working on" (max 20 words)
     if (trimmedWorkingOn) {
       const wordCount = trimmedWorkingOn.split(/\s+/).length;
-      if (wordCount > 5) {
-        setNewTerminalError('Working on must be 5 words or less');
+      if (wordCount > 20) {
+        setNewTerminalError('Working on must be 20 words or less');
         return;
       }
     }
@@ -4744,7 +4912,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         closable: true,
         color: currentAgent?.color || COLORS[0],
         terminalId: created.id,
-        icon: <TerminalIcon />,
+        // icon removed - rendered directly in TabBar to avoid React serialization issues
       };
 
       setTabs((prevTabs) => [...prevTabs, agentTerminalTab]);
@@ -5438,7 +5606,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           closable: true,
           color: currentAgent?.color || COLORS[0],
           terminalId: created.id,
-          icon: <TerminalIcon />,
+          // icon removed - rendered directly in TabBar to avoid React serialization issues
         };
 
         setTabs((prevTabs) => [...prevTabs, agentTerminalTab]);
@@ -5914,6 +6082,19 @@ You have access to all Bash tools to execute git commands like:
         return updated;
       });
 
+      // 🦆 SESSION PERSISTENCE: Save session ID in AgentChat for persistence across app restarts
+      setAgentChats((prev) => {
+        return prev.map((agent) => {
+          if (agent.id === createdWithState.id) {
+            return {
+              ...agent,
+              sessionId: sessionId,
+            };
+          }
+          return agent;
+        });
+      });
+
       console.log('[Resume] Session ID preserved:', sessionId);
 
       // 7. Set token usage if available
@@ -6192,6 +6373,20 @@ You have access to all Bash tools to execute git commands like:
     <>
       <TitleBar />
 
+      {/* 🔐 Claude Auth Banner - Fixed at top when CLI not available */}
+      {claudeCliAvailable === false && !claudeAuthBannerDismissed && (
+        <ClaudeAuthBanner
+          onOpenSettings={() => {
+            setShowSettings(true);
+            // Auto-navigate to AI Assistant section if possible
+          }}
+          onDismiss={() => setClaudeAuthBannerDismissed(true)}
+          dismissible={true}
+          isExpanded={claudeAuthBannerExpanded}
+          onToggle={() => setClaudeAuthBannerExpanded(!claudeAuthBannerExpanded)}
+        />
+      )}
+
       {/* 💰 Pro Banner - Fixed at bottom with collapse to badge */}
       {!isProUser && (
         <ProBanner
@@ -6363,7 +6558,12 @@ You have access to all Bash tools to execute git commands like:
               gitBranch={gitBranch}
               // Working on field
               workingOn={activeTerminal?.workingOn}
-              onWorkingOnChange={(value) => activeTerminal && handleUpdateWorkingOn(activeTerminal.id, value)}
+              onWorkingOnChange={(value) => {
+                // CRITICAL FIX: Don't update if modal is open for editing to prevent infinite loop
+                if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
+                  handleUpdateWorkingOn(activeTerminal.id, value);
+                }
+              }}
             />
               )}
 

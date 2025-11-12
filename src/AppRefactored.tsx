@@ -40,12 +40,13 @@ const SkillDrawer = lazy(() => import("./components/SkillDrawer"));
 const TelegramSetup = lazy(() => import("./components/TelegramSetup"));
 const DiffDrawer = lazy(() => import("./components/DiffDrawer"));
 const SavedCommandModal = lazy(() => import("./components/SavedCommandModal"));
+const AgentViewer = lazy(() => import("./components/AgentViewer"));
 
 // Import skeleton loaders
 import SettingsSkeleton from "./components/skeletons/SettingsSkeleton";
 import ModalSkeleton from "./components/skeletons/ModalSkeleton";
 import ChatView from "./components/ChatView";
-import TabBar from "./components/TabBar";
+import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -516,8 +517,29 @@ function AppRefactored() {
           agentsDirectoryExists={agentsDirectoryExists}
           workingDir={explorerPath}
           onSelectAgent={(agent: AgentInfo) => {
-            // Convert AgentInfo to AgentDetails when needed
-            setSelectedAgent(agent as AgentDetails | null);
+            // Create or select agent tab instead of setting selectedAgent
+            const agentTabId = `agent-${agent.name}-${agent.scope}`;
+
+            // Check if tab already exists
+            const existingTab = tabs.find(t => t.id === agentTabId);
+
+            if (existingTab) {
+              // Tab already exists, just activate it
+              setActiveTabId(agentTabId);
+            } else {
+              // Create new agent tab
+              const newTab: Tab = {
+                id: agentTabId,
+                label: agent.name.replace(/-/g, ' '),
+                type: 'agent' as const,
+                closable: true,
+                agentName: agent.name,
+                agentScope: agent.scope as 'global' | 'project',
+              };
+
+              setTabs((prevTabs: Tab[]) => [...prevTabs, newTab]);
+              setActiveTabId(agentTabId);
+            }
           }}
           onUseAgent={(agent) => {
             setPendingAgentMention(agent);
@@ -648,7 +670,36 @@ function AppRefactored() {
                 // Handle send message
                 console.log('Send message:', content);
               }}
+              // Agent display info
+              agentName={activeAgent?.name || 'Jack'}
+              agentAvatar={activeAgent?.avatar}
+              // Project context
+              projectName={projectName}
+              gitBranch={gitBranch}
             />
+          ) : activeTabId.startsWith('agent-') ? (
+            /* Agent Viewer - shown when agent tab is active */
+            (() => {
+              const activeTab = tabs.find(t => t.id === activeTabId);
+              if (activeTab?.type === 'agent' && activeTab.agentName && activeTab.agentScope) {
+                return (
+                  <Suspense fallback={<ModalSkeleton />}>
+                    <AgentViewer
+                      agentName={activeTab.agentName}
+                      agentScope={activeTab.agentScope}
+                      workingDir={explorerPath}
+                      onRefresh={() => {
+                        setLoadingAgents(true);
+                        // TODO: Refresh agents
+                        setLoadingAgents(false);
+                        setAgentRefreshKey(prev => prev + 1);
+                      }}
+                    />
+                  </Suspense>
+                );
+              }
+              return null;
+            })()
           ) : (
             <TerminalSidebar
               terminals={terminals}
@@ -919,7 +970,34 @@ function AppRefactored() {
             workingDir={explorerPath}
             directoryExists={agentsDirectoryExists}
             onClose={() => setShowQuackAgencyDrawer(false)}
-            onSelectAgent={(agent) => setSelectedAgent(agent as AgentDetails | null)}
+            onSelectAgent={(agent: AgentInfo) => {
+              // Create or select agent tab instead of setting selectedAgent
+              const agentTabId = `agent-${agent.name}-${agent.scope}`;
+
+              // Check if tab already exists
+              const existingTab = tabs.find(t => t.id === agentTabId);
+
+              if (existingTab) {
+                // Tab already exists, just activate it
+                setActiveTabId(agentTabId);
+              } else {
+                // Create new agent tab
+                const newTab: Tab = {
+                  id: agentTabId,
+                  label: agent.name.replace(/-/g, ' '),
+                  type: 'agent' as const,
+                  closable: true,
+                  agentName: agent.name,
+                  agentScope: agent.scope as 'global' | 'project',
+                };
+
+                setTabs((prevTabs: Tab[]) => [...prevTabs, newTab]);
+                setActiveTabId(agentTabId);
+              }
+
+              // Close the drawer after selecting
+              setShowQuackAgencyDrawer(false);
+            }}
             onRefresh={() => {
               // Refresh agents
               setAgentRefreshKey(prev => prev + 1);

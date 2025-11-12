@@ -89,6 +89,47 @@ export interface ClaudeSDKStreamEvent {
 // Session isolation: Track active streams per session to prevent conflicts
 const activeStreams = new Map<string, AbortController>();
 
+// Event deduplication: Track seen event IDs to prevent duplicates
+const seenEventIds = new Map<string, Set<string>>(); // sessionKey -> Set of event IDs
+
+/**
+ * Generate a unique event ID from an event object
+ */
+function generateEventId(event: any, eventType: string): string {
+  // For assistant events with message ID, use that
+  if (event.message?.id) {
+    return `${eventType}-${event.message.id}`;
+  }
+
+  // For events with explicit session + timestamp, use those
+  if (event.session_id && event.timestamp) {
+    return `${eventType}-${event.session_id}-${event.timestamp}`;
+  }
+
+  // Fallback: hash the event content
+  const contentHash = JSON.stringify({
+    type: eventType,
+    content: event.message?.content,
+    result: event.result,
+    error: event.error,
+  });
+
+  return `${eventType}-${hashString(contentHash)}`;
+}
+
+/**
+ * Simple string hash function for event deduplication
+ */
+function hashString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
 /**
  * Send a message to Claude using the official Claude Agent SDK
  * with real-time streaming support and proper session isolation
@@ -100,7 +141,8 @@ export async function* streamClaudeMessage(
   options: ClaudeSDKOptions = {}
 ): AsyncGenerator<ClaudeSDKStreamEvent> {
   const startTime = Date.now();
-  const streamId = options.streamId || `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Generate stream ID with better entropy if not provided
+  const streamId = options.streamId || `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now().toString(36).substr(2, 6)}`;
   const timeout = options.timeout || 5 * 60 * 1000; // Default: 5 minutes
 
   // Create unique session key for isolation
@@ -114,6 +156,12 @@ export async function* streamClaudeMessage(
     console.warn(`[claudeSDK:${streamId}] Cancelling existing stream for session: ${sessionKey}`);
     existingController.abort();
     activeStreams.delete(sessionKey);
+  }
+
+  // Initialize event tracking for this session
+  if (!seenEventIds.has(sessionKey)) {
+    seenEventIds.set(sessionKey, new Set());
+    console.log(`[claudeSDK:${streamId}] Initialized event tracking for session: ${sessionKey}`);
   }
 
   // Create new abort controller for this session
@@ -240,14 +288,28 @@ export async function* streamClaudeMessage(
       const claudeEvent = convertSDKEventToClaudeEvent(event);
 
       if (claudeEvent) {
+        // 🦆 DEDUPLICATION: Generate unique event ID and check if we've seen it before
+        const eventId = generateEventId(event, claudeEvent.type);
+        const sessionEvents = seenEventIds.get(sessionKey);
+
+        if (sessionEvents && sessionEvents.has(eventId)) {
+          console.warn(`[claudeSDK:${streamId}] 🦆 DUPLICATE EVENT DETECTED AND SKIPPED - Event ID: ${eventId.substring(0, 20)}... Type: ${claudeEvent.type}`);
+          continue; // Skip this duplicate event
+        }
+
+        // Mark this event as seen
+        if (sessionEvents) {
+          sessionEvents.add(eventId);
+        }
+
         events.push(claudeEvent);
 
-        // Log significant events
+        // Log significant events with event ID
         if (claudeEvent.type === 'system') {
-          console.log(`[claudeSDK:${streamId}] System event - session: ${claudeEvent.session_id}`);
+          console.log(`[claudeSDK:${streamId}] System event - session: ${claudeEvent.session_id} [${eventId.substring(0, 12)}...]`);
         } else if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
           const hasToolUse = claudeEvent.message.content.some(b => b.type === 'tool_use');
-          console.log(`[claudeSDK:${streamId}] Assistant event - ${claudeEvent.message.content.length} blocks${hasToolUse ? ' (includes tool use)' : ''}`);
+          console.log(`[claudeSDK:${streamId}] Assistant event - ${claudeEvent.message.content.length} blocks${hasToolUse ? ' (includes tool use)' : ''} [${eventId.substring(0, 12)}...]`);
         }
 
         // Emit the event
@@ -322,6 +384,13 @@ export async function* streamClaudeMessage(
 
     // Clean up active stream for this session
     activeStreams.delete(sessionKey);
+
+    // Clean up event tracking for this session to prevent memory leaks
+    // Note: We keep event IDs for a short time to prevent duplicates from late events
+    setTimeout(() => {
+      seenEventIds.delete(sessionKey);
+      console.log(`[claudeSDK:${streamId}] Cleaned up event tracking for session: ${sessionKey}`);
+    }, 5000); // Keep for 5 seconds after stream ends
   }
 }
 
@@ -422,6 +491,9 @@ export function abortSessionStream(sessionId: string): void {
     console.log(`[claudeSDK] Aborting stream for session: ${sessionId}`);
     controller.abort();
     activeStreams.delete(sessionId);
+
+    // Also clean up event tracking
+    seenEventIds.delete(sessionId);
   } else {
     console.log(`[claudeSDK] No active stream found for session: ${sessionId}`);
   }
@@ -437,6 +509,10 @@ export function abortAllStreams(): void {
     controller.abort();
   });
   activeStreams.clear();
+
+  // Also clear all event tracking
+  seenEventIds.clear();
+  console.log(`[claudeSDK] Cleared all event tracking data`);
 }
 
 /**

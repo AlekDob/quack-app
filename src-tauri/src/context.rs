@@ -18,6 +18,14 @@ pub struct ContextDetails {
     pub file_path: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContextFileStats {
+    pub char_count: usize,
+    pub word_count: usize,
+    pub line_count: usize,
+    pub score: String, // "good", "warning", "bad"
+}
+
 /// Get the global CLAUDE.md directory (~/.claude/)
 fn get_global_claude_directory() -> Result<PathBuf, String> {
     let home_dir = dirs::home_dir().ok_or_else(|| "Failed to get home directory".to_string())?;
@@ -227,4 +235,68 @@ pub fn save_claude_md_content(
         .map_err(|e| format!("Failed to write CLAUDE.md: {}", e))?;
 
     Ok(())
+}
+
+/// Get statistics for CLAUDE.md file (character count, word count, health score)
+#[tauri::command]
+pub fn get_claude_md_stats(
+    scope: String,
+    working_dir: Option<String>,
+) -> Result<ContextFileStats, String> {
+    let file_path = if scope == "global" {
+        let global_dir = get_global_claude_directory()?;
+        global_dir.join("CLAUDE.md")
+    } else {
+        // Project scope: check .claude/CLAUDE.md first, then root CLAUDE.md
+        let project_dir = get_project_claude_directory(working_dir.clone())?;
+        let dotclaude_file = project_dir.join("CLAUDE.md");
+
+        if dotclaude_file.exists() {
+            dotclaude_file
+        } else {
+            // Try root CLAUDE.md
+            let base_dir = if let Some(ref dir) = working_dir {
+                PathBuf::from(dir)
+            } else {
+                std::env::current_dir()
+                    .map_err(|e| format!("Failed to get current directory: {}", e))?
+            };
+            base_dir.join("CLAUDE.md")
+        }
+    };
+
+    if !file_path.exists() {
+        return Ok(ContextFileStats {
+            char_count: 0,
+            word_count: 0,
+            line_count: 0,
+            score: "good".to_string(),
+        });
+    }
+
+    let content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read CLAUDE.md: {}", e))?;
+
+    let char_count = content.chars().count();
+    let word_count = content.split_whitespace().count();
+    let line_count = content.lines().count();
+
+    // Calculate score based on character count
+    // Good: < 10,000 chars (like our optimized version: ~8,000)
+    // Warning: 10,000 - 25,000 chars
+    // Bad: > 25,000 chars (like the old version: ~32,000)
+    let score = if char_count < 10_000 {
+        "good".to_string()
+    } else if char_count < 25_000 {
+        "warning".to_string()
+    } else {
+        "bad".to_string()
+    };
+
+    Ok(ContextFileStats {
+        char_count,
+        word_count,
+        line_count,
+        score,
+    })
 }
