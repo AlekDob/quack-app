@@ -55,7 +55,12 @@ export default function GitOperationsDropdown({
       ];
 
   return (
-    <div className="git-operations-dropdown" ref={dropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+    <div
+      className="git-operations-dropdown"
+      ref={dropdownRef}
+      style={{ position: 'relative', display: 'inline-block' }}
+      onMouseLeave={() => setIsOpen(false)}
+    >
       <button
         className="branch-badge-with-menu"
         onClick={(e) => {
