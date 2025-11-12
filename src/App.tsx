@@ -770,6 +770,9 @@ function App() {
   // Track stream count for UI display (Map of agentId -> count)
   // const [activeStreamCounts, setActiveStreamCounts] = useState<Map<string, number>>(new Map());
 
+  // 🦆 SESSION PERSISTENCE: Track which agents have already shown the resume message (to prevent duplicates)
+  const resumeMessageShownRef = useRef<Set<string>>(new Set());
+
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
@@ -1300,6 +1303,42 @@ function App() {
     };
   }, [tauriAvailable, chatSessions]); // 🦆 Now depends on chatSessions, not activeId!
 
+  // 🦆 SESSION PERSISTENCE: Show "Continuing conversation" message when switching to agent with saved session
+  useEffect(() => {
+    if (!activeId) return;
+
+    // Check if we've already shown the message for this agent
+    if (resumeMessageShownRef.current.has(activeId)) return;
+
+    // Check if this agent has a saved session ID
+    const savedSessionId = chatSessionIds.get(activeId);
+    if (!savedSessionId) return;
+
+    // Check if chat is empty (no messages yet)
+    const currentMessages = chatSessions.get(activeId) ?? [];
+    if (currentMessages.length > 0) return; // Already has messages, don't show the banner
+
+    // Show "Continuing conversation" message
+    const resumeMessage: ChatMessage = {
+      id: `msg-system-resume-${Date.now()}`,
+      role: 'assistant',
+      content: '📜 **Previous conversation detected**\n\nThis agent has an active session. The conversation history is preserved and will continue from where you left off.\n\n💡 Right-click the agent and select "Reset Agent" to start fresh.',
+      timestamp: Date.now(),
+      status: 'complete',
+    };
+
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      newSessions.set(activeId, [resumeMessage]);
+      return newSessions;
+    });
+
+    // Mark this agent as having shown the resume message
+    resumeMessageShownRef.current.add(activeId);
+
+    console.log(`[Session Persistence] Showed resume message for agent ${activeId} with session ${savedSessionId}`);
+  }, [activeId, chatSessionIds]);
+
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !activeId) return;
@@ -1359,25 +1398,6 @@ function App() {
     // Get current agent's chat session
     const currentMessages = chatSessions.get(activeId) ?? [];
 
-    // 🦆 SESSION PERSISTENCE: Show "Continuing conversation" message if this is first message with existing session
-    const existingSessionId = chatSessionIds.get(activeId);
-    const isFirstMessage = currentMessages.length === 0;
-    if (existingSessionId && isFirstMessage) {
-      const resumeMessage: ChatMessage = {
-        id: `msg-system-resume-${Date.now()}`,
-        role: 'system',
-        content: '📜 Continuing previous conversation...',
-        timestamp: Date.now(),
-        status: 'complete',
-      };
-
-      setChatSessions((prev) => {
-        const newSessions = new Map(prev);
-        newSessions.set(activeId, [resumeMessage]);
-        return newSessions;
-      });
-    }
-
     // 🦆 Create AgentChat automatically if it doesn't exist (for UI-created agents)
     if (!agentChats.find(a => a.id === activeId)) {
       // Get terminal info for this activeId
@@ -1428,7 +1448,7 @@ function App() {
       const agentSystemMessage: ChatMessage = {
         id: `msg-${Date.now()}-agent-system`,
         role: 'system',
-        content: `🦆 Invocando agente: **${activeAgent.name}**`,
+        content: `🦆 Invoking agent: **${activeAgent.name}**`,
         timestamp: Date.now() + 1, // Slightly after user message
         status: 'complete',
       };
@@ -1884,12 +1904,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
 
-      // 🦆 STAMINA PRESERVATION: Reset token counts in agentChats
+      // Clear session ID for this agent
+      setChatSessionIds((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(activeId);
+        return newMap;
+      });
+
+      // Clear resume message flag so it can show again if a new session is created
+      resumeMessageShownRef.current.delete(activeId);
+
+      // 🦆 STAMINA PRESERVATION: Reset token counts and session ID in agentChats
       setAgentChats((prev) => {
         return prev.map((agent) => {
           if (agent.id === activeId) {
             return {
               ...agent,
+              sessionId: undefined,
               inputTokens: 0,
               outputTokens: 0,
               cacheCreationTokens: 0,
