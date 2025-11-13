@@ -6404,7 +6404,7 @@ You have access to all Bash tools to execute git commands like:
     <>
       <TitleBar />
 
-      {/* 🔐 Claude Auth Banner - Fixed at top when CLI not available */}
+      {/* 🔐 Claude Auth Banner - Fixed at bottom when CLI not available */}
       {claudeCliAvailable === false && !claudeAuthBannerDismissed && (
         <ClaudeAuthBanner
           onOpenSettings={() => {
@@ -6419,7 +6419,8 @@ You have access to all Bash tools to execute git commands like:
       )}
 
       {/* 💰 Pro Banner - Fixed at bottom with collapse to badge */}
-      {!isProUser && (
+      {/* Only show if auth banner is not visible (priority system) */}
+      {!isProUser && !(claudeCliAvailable === false && !claudeAuthBannerDismissed) && (
         <ProBanner
           onUpgrade={() => handleShowUpgrade('terminals')}
           isExpanded={proBannerExpanded}
@@ -6643,6 +6644,9 @@ You have access to all Bash tools to execute git commands like:
                         console.error("Failed to reveal in Finder:", error);
                         toast.error("Failed to reveal in Finder");
                       }
+                    }}
+                    onClose={() => {
+                      handleTabClose(activeTabId);
                     }}
                     disabled={loadingPreview}
                     formatting={formattingPreview}

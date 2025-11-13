@@ -1,0 +1,50 @@
+# Example Agent Rules
+# This file contains sample rules for testing drag & drop import
+
+// Core Development Rules
+Always write tests for critical functionality
+Use TypeScript strict mode for type safety
+Follow the existing code style and patterns
+Document complex logic with inline comments
+
+// Performance & Optimization
+Avoid premature optimization - profile first
+Use React.memo() only when necessary
+Lazy load heavy components and libraries
+Keep bundle size under control
+
+// Git & Version Control
+Write clear, descriptive commit messages
+Keep commits small and focused
+Review your own PR before requesting review
+Never commit sensitive data or API keys
+
+// Code Quality
+Prefer composition over inheritance
+Keep functions pure when possible
+Handle errors gracefully with try/catch
+Use meaningful variable and function names
+
+// UI/UX Guidelines
+Ensure all interactive elements are accessible
+Test on different screen sizes
+Provide loading states for async operations
+Show clear error messages to users
+
+// Security Best Practices
+Validate all user inputs
+Sanitize data before rendering
+Use HTTPS for all API calls
+Keep dependencies up to date
+
+// Testing
+Test edge cases and error scenarios
+Mock external dependencies in tests
+Aim for meaningful test coverage
+Write integration tests for critical flows
+
+// Communication
+Ask clarifying questions when unclear
+Document breaking changes
+Keep stakeholders informed of progress
+Share knowledge with the team

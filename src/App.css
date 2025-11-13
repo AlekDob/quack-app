@@ -169,6 +169,8 @@
   backdrop-filter: blur(12px);
   z-index: 1000;
   padding: 1.5rem;
+  /* Add bottom padding to avoid overlapping with fixed banners at bottom (auth, pro, etc) */
+  padding-bottom: max(1.5rem, 140px);
 }
 
 .modal-panel {

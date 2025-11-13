@@ -80,7 +80,7 @@ export default function ClaudeAuthSettings() {
               <br />
               To enable chat features, please authenticate Claude Code from your terminal:
               <ol>
-                <li>Run: <code>claude auth login</code></li>
+                <li>Run: <code>claude /login</code></li>
                 <li>Follow the authentication process</li>
                 <li>Restart Quack to detect the credentials</li>
               </ol>

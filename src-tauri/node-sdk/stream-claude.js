@@ -105,6 +105,16 @@ async function* generateMessages() {
 
 async function main() {
   try {
+    // Check if ANTHROPIC_API_KEY is present (log warning if missing, but let SDK handle it)
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('[WARN] ⚠️ ANTHROPIC_API_KEY not found in environment');
+      console.error('[WARN] The SDK will attempt to use default credentials');
+      console.error('[WARN] If authentication fails, please run: claude login');
+      // Don't exit - let the SDK try and provide its own error message
+    } else {
+      console.error('[DEBUG] ✅ ANTHROPIC_API_KEY found in environment');
+    }
+
     // Build SDK options
     const options = {
       model,

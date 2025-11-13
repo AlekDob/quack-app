@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type { AgentPersonality } from '../types';
 import './PersonalityBuilder.css';
 
@@ -6,6 +9,7 @@ interface PersonalityBuilderProps {
   personality: Partial<AgentPersonality>;
   onPersonalityChange: (personality: Partial<AgentPersonality>) => void;
   availableSkills: string[];
+  isModalOpen?: boolean; // Enable file drop listener only when modal is open
 }
 
 const COMMUNICATION_STYLES = [
@@ -35,9 +39,11 @@ const SUGGESTED_RULES = [
 function PersonalityBuilder({
   personality,
   onPersonalityChange,
+  isModalOpen = true, // Default true for backward compatibility
 }: PersonalityBuilderProps) {
   const [expanded, setExpanded] = useState(true);
   const [newRule, setNewRule] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleAddRule = () => {
     if (!newRule.trim()) return;
@@ -93,6 +99,130 @@ function PersonalityBuilder({
   const handleCustomNotesChange = (customNotes: string) => {
     onPersonalityChange({ ...personality, customNotes });
   };
+
+  // Handle file picker import
+  const handleImportFromFile = async () => {
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        filters: [{
+          name: 'Text Files',
+          extensions: ['txt', 'md', 'markdown', 'text']
+        }]
+      });
+
+      if (selected && typeof selected === 'string') {
+        await importRulesFromFile(selected);
+      }
+    } catch (error) {
+      console.error('Failed to open file picker:', error);
+      alert('Failed to open file picker. Please try again.');
+    }
+  };
+
+  // Import rules from a file path
+  const importRulesFromFile = async (filePath: string) => {
+    // Only accept text files (.txt, .md, etc.)
+    const validExtensions = ['.txt', '.md', '.markdown', '.text'];
+    const isValidFile = validExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+
+    if (!isValidFile) {
+      alert('Please drop a text file (.txt, .md, .markdown)');
+      return;
+    }
+
+    try {
+      // Read file content
+      const content = await invoke<string>('read_file_content', { path: filePath });
+
+      // Parse rules from file (each non-empty line becomes a rule)
+      const newRules = content
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => {
+          // Skip empty lines and comments (lines starting with #, //, or /*)
+          if (!line) return false;
+          if (line.startsWith('#')) return false;
+          if (line.startsWith('//')) return false;
+          if (line.startsWith('/*')) return false;
+          if (line.startsWith('*')) return false;
+          return true;
+        })
+        .map(line => {
+          // Clean markdown list syntax (- , * , 1. , etc.)
+          return line.replace(/^[-*+]\s+/, '').replace(/^\d+\.\s+/, '');
+        });
+
+      if (newRules.length === 0) {
+        alert('No valid rules found in file');
+        return;
+      }
+
+      // Merge with existing rules (avoid duplicates)
+      const currentRules = personality.rules || [];
+      const uniqueNewRules = newRules.filter(rule => !currentRules.includes(rule));
+
+      if (uniqueNewRules.length === 0) {
+        alert('All rules from file already exist');
+        return;
+      }
+
+      onPersonalityChange({
+        ...personality,
+        rules: [...currentRules, ...uniqueNewRules],
+      });
+
+      const fileName = filePath.split('/').pop() || filePath;
+      console.log(`Imported ${uniqueNewRules.length} rules from ${fileName}`);
+    } catch (error) {
+      console.error('Failed to read file:', error);
+      alert('Failed to read file. Please try again.');
+    }
+  };
+
+  // Listen to Tauri file drop events - ONLY when modal is open
+  useEffect(() => {
+    // Skip if modal is not open
+    if (!isModalOpen) {
+      return;
+    }
+
+    let unlistenHover: UnlistenFn | undefined;
+    let unlistenCancelled: UnlistenFn | undefined;
+    let unlistenDrop: UnlistenFn | undefined;
+
+    const setupFileDropListener = async () => {
+      // Listen for file drop hover
+      unlistenHover = await listen<string[]>('tauri://file-drop-hover', () => {
+        setIsDragging(true);
+      });
+
+      // Listen for file drop cancelled
+      unlistenCancelled = await listen<void>('tauri://file-drop-cancelled', () => {
+        setIsDragging(false);
+      });
+
+      // Listen for file drop
+      unlistenDrop = await listen<string[]>('tauri://file-drop', async (event) => {
+        setIsDragging(false);
+        const files = event.payload;
+
+        if (files.length > 0) {
+          const filePath = files[0];
+          await importRulesFromFile(filePath);
+        }
+      });
+    };
+
+    setupFileDropListener();
+
+    // Cleanup when modal closes or component unmounts
+    return () => {
+      if (unlistenHover) unlistenHover();
+      if (unlistenCancelled) unlistenCancelled();
+      if (unlistenDrop) unlistenDrop();
+    };
+  }, [isModalOpen, personality.rules, onPersonalityChange]);
 
   return (
     <div className="personality-builder">
@@ -167,7 +297,13 @@ function PersonalityBuilder({
 
             {/* Current Rules */}
             {(personality.rules && personality.rules.length > 0) ? (
-              <div className="rules-list">
+              <div className={`rules-list ${isDragging ? 'dragging' : ''}`}>
+                {isDragging && (
+                  <div className="drop-overlay">
+                    <span className="drop-overlay-icon">📥</span>
+                    <span className="drop-overlay-text">Drop file to import more rules...</span>
+                  </div>
+                )}
                 {personality.rules.map((rule, index) => (
                   <div key={index} className="rule-item">
                     <span className="rule-bullet">•</span>
@@ -187,9 +323,13 @@ function PersonalityBuilder({
                 ))}
               </div>
             ) : (
-              <div className="rules-empty">
+              <div className={`rules-empty ${isDragging ? 'dragging' : ''}`}>
                 <span className="rules-empty-icon">📋</span>
-                <span className="rules-empty-text">No rules yet. Add custom rules or select from suggestions below.</span>
+                <span className="rules-empty-text">
+                  {isDragging
+                    ? 'Drop file to import rules...'
+                    : 'No rules yet. Add custom rules or select from suggestions below.'}
+                </span>
               </div>
             )}
 
@@ -220,6 +360,23 @@ function PersonalityBuilder({
                 </svg>
                 Add
               </button>
+            </div>
+
+            {/* Import from File Button */}
+            <div className="import-file-section">
+              <button
+                type="button"
+                className="import-file-button"
+                onClick={handleImportFromFile}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Import from file
+              </button>
+              <span className="import-file-hint">or drag & drop a .txt or .md file</span>
             </div>
 
             {/* Suggested Rules */}

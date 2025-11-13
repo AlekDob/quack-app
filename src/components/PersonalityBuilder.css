@@ -315,10 +315,55 @@
 
 /* Rules & Best Practices */
 .rules-list {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
   margin-bottom: 0.75rem;
+  transition: all 0.2s;
+}
+
+.rules-list.dragging {
+  border: 2px dashed rgba(242, 140, 82, 0.5);
+  border-radius: 6px;
+  background: rgba(242, 140, 82, 0.05);
+}
+
+.drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(242, 140, 82, 0.1);
+  border-radius: 6px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.drop-overlay-icon {
+  font-size: 2.5rem;
+  animation: bounce 0.6s ease-in-out infinite;
+}
+
+.drop-overlay-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(242, 140, 82, 1);
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .rule-item {
@@ -434,22 +479,85 @@
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  padding: 1.5rem;
+  padding: 0.875rem 1rem;
   margin-bottom: 0.75rem;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.rules-empty.dragging {
+  border-color: rgba(242, 140, 82, 0.5);
+  border-width: 2px;
+  background: rgba(242, 140, 82, 0.08);
 }
 
 .rules-empty-icon {
-  font-size: 2rem;
+  font-size: 1.25rem;
   opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.rules-empty.dragging .rules-empty-icon {
+  animation: bounce 0.6s ease-in-out infinite;
+  opacity: 1;
 }
 
 .rules-empty-text {
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.5);
   text-align: center;
+  font-style: italic;
+  transition: all 0.2s;
+}
+
+.rules-empty.dragging .rules-empty-text {
+  color: rgba(242, 140, 82, 1);
+  font-weight: 500;
+}
+
+/* Import from File */
+.import-file-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+.import-file-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(78, 205, 196, 0.15);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.import-file-button:hover {
+  background: rgba(78, 205, 196, 0.25);
+  border-color: rgba(78, 205, 196, 0.5);
+  transform: translateY(-1px);
+}
+
+.import-file-button svg {
+  flex-shrink: 0;
+}
+
+.import-file-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
   font-style: italic;
 }
 

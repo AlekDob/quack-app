@@ -362,7 +362,7 @@ function NewTerminalModal({
         <div className="modal-field">
           <span className="field-label">Avatar</span>
           <span className="field-hint">
-            {customAvatars.length > 0 ? 'Custom and default avatars →' : 'Scroll for more avatars →'}
+            {customAvatars.length > 0 ? 'Custom and default avatars ↓' : 'Scroll for more avatars ↓'}
           </span>
           {uploadError && (
             <div className="avatar-upload-error">
@@ -649,23 +649,6 @@ function NewTerminalModal({
 
         <div className="modal-section-divider" />
 
-        <label className="modal-field working-on-field">
-          <span className="field-label">What are you working on?</span>
-          <input
-            type="text"
-            className="working-on-input"
-            value={workingOn}
-            onChange={(event) => onWorkingOnChange?.(event.target.value)}
-            placeholder="e.g., 'AI implementation' or 'UI section X improvement'"
-            maxLength={150}
-          />
-          <small className="field-hint">
-            Brief context about what this agent is working on (max 20 words, optional)
-          </small>
-        </label>
-
-        <div className="modal-section-divider" />
-
         <PersonalityBuilder
           personality={{
             role: personality?.role || 'Feature Coordinator',
@@ -681,6 +664,7 @@ function NewTerminalModal({
           }}
           onPersonalityChange={onPersonalityChange || (() => {})}
           availableSkills={availableSkills}
+          isModalOpen={open}
         />
 
         {error && (

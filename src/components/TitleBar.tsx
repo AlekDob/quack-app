@@ -104,13 +104,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
 
   const handleMaximize = async () => {
     const window = getCurrentWindow();
-    const isCurrentlyMaximized = await window.isMaximized();
-    if (isCurrentlyMaximized) {
-      await window.unmaximize();
+    const isCurrentlyFullscreen = await window.isFullscreen();
+    if (isCurrentlyFullscreen) {
+      await window.setFullscreen(false);
     } else {
-      await window.maximize();
+      await window.setFullscreen(true);
     }
-    setIsMaximized(!isCurrentlyMaximized);
+    setIsMaximized(!isCurrentlyFullscreen);
   };
 
   const handleClose = async () => {

@@ -889,6 +889,39 @@ pub async fn send_message_via_sdk_streaming(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // ✅ Try to read Claude Code credentials and pass to Node.js SDK (optional)
+    // The SDK can also use ANTHROPIC_API_KEY from environment if already set
+    use crate::claude_auth;
+
+    // Check if ANTHROPIC_API_KEY is already in environment (user-provided)
+    let has_env_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
+
+    if has_env_key {
+        log::info!("[SDK] ✅ ANTHROPIC_API_KEY found in environment, using it");
+        // Pass through existing environment variable
+        if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+            command.env("ANTHROPIC_API_KEY", key);
+        }
+    } else {
+        // Try to read from Claude Code credentials
+        match claude_auth::get_claude_credentials() {
+            Ok(Some(credentials)) => {
+                log::info!("[SDK] ✅ Found Claude Code credentials (type: {:?}), using them", credentials.auth_type);
+                command.env("ANTHROPIC_API_KEY", &credentials.token);
+            }
+            Ok(None) => {
+                log::warn!("[SDK] ⚠️ No Claude Code credentials found");
+                log::warn!("[SDK] SDK will attempt to use default credentials or fail with helpful error");
+                // Don't block - let SDK handle it and provide error
+            }
+            Err(e) => {
+                log::warn!("[SDK] ⚠️ Failed to read Claude Code credentials: {}", e);
+                log::warn!("[SDK] SDK will attempt to use default credentials or fail with helpful error");
+                // Don't block - let SDK handle it
+            }
+        }
+    }
+
     // Add node directory to PATH for SDK child processes (if using system Node.js)
     if !node_path.to_string_lossy().contains("node-sidecar") {
         if let Some(node_dir) = node_path.parent() {

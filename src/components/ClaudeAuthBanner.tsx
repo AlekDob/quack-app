@@ -36,8 +36,9 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
       <div
         style={{
           position: 'fixed',
-          top: '12px',
-          right: '12px',
+          bottom: '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
           zIndex: 100,
           animation: 'popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         }}
@@ -45,11 +46,11 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
         <style>{`
           @keyframes popIn {
             0% {
-              transform: scale(0) rotate(-180deg);
+              transform: translateX(-50%) scale(0) rotate(-180deg);
               opacity: 0;
             }
             100% {
-              transform: scale(1) rotate(0deg);
+              transform: translateX(-50%) scale(1) rotate(0deg);
               opacity: 1;
             }
           }
@@ -67,20 +68,20 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
     );
   }
 
-  // Expanded state - full banner at top
+  // Expanded state - full banner at bottom
   return (
     <div
       style={{
         position: 'fixed',
-        top: 0,
+        bottom: 0,
         left: 0,
         right: 0,
         zIndex: 100,
         animation: isAnimating
-          ? 'slideUpFadeOut 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards'
-          : 'slideDownFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          ? 'slideDownFadeOut 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards'
+          : 'slideUpFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
       }}
-      className="bg-gradient-to-r from-orange-500/20 via-red-500/20 to-orange-500/20 border-b border-orange-500/50 px-6 py-4 flex items-start justify-between overflow-hidden backdrop-blur-sm"
+      className="bg-gradient-to-r from-orange-500/20 via-red-500/20 to-orange-500/20 border-t border-orange-500/50 px-6 py-4 flex items-start justify-between overflow-hidden backdrop-blur-sm"
     >
       <style>{`
         @keyframes slideDownFadeIn {
@@ -145,7 +146,7 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
             <li className="flex items-center gap-2">
               <Terminal className="w-3 h-3 text-orange-300 flex-shrink-0" />
               <span>
-                Run: <code className="px-1.5 py-0.5 bg-black/30 rounded text-orange-200 font-mono">claude auth login</code>
+                Run: <code className="px-1.5 py-0.5 bg-black/30 rounded text-orange-200 font-mono">claude /login</code>
               </span>
             </li>
             <li>Follow the authentication process in your browser</li>
@@ -163,7 +164,7 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
             title="Collapse banner"
           >
-            <ChevronUp className="w-4 h-4 text-gray-400 hover:text-gray-200" />
+            <ChevronDown className="w-4 h-4 text-gray-400 hover:text-gray-200" />
           </button>
         )}
 
@@ -180,10 +181,10 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
         {dismissible && onDismiss && (
           <button
             onClick={onDismiss}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title="Dismiss (will show again on restart)"
+            className="p-2 rounded-lg bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all hover:scale-105"
+            title="Dismiss banner (will show again on restart)"
           >
-            <X className="w-4 h-4 text-gray-400 hover:text-gray-200" />
+            <X className="w-5 h-5 text-white/80 hover:text-red-300" />
           </button>
         )}
       </div>
