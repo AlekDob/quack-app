@@ -431,6 +431,67 @@ fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
     Err(anyhow!("Impossibile trovare la directory .git"))
 }
 
+#[tauri::command]
+pub fn is_git_repository(path: String) -> bool {
+    let dir = PathBuf::from(path);
+    let mut current = dir.as_path();
+
+    loop {
+        if current.join(".git").exists() {
+            return true;
+        }
+        match current.parent() {
+            Some(parent) => current = parent,
+            None => return false,
+        }
+    }
+}
+
+#[tauri::command]
+pub fn git_init(path: String) -> Result<String, String> {
+    let dir = PathBuf::from(&path);
+
+    // Verify directory exists
+    if !dir.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+
+    // Initialize git repository
+    let output = Command::new("git")
+        .current_dir(&dir)
+        .args(&["init"])
+        .output()
+        .map_err(|e| format!("Failed to run git init: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git init failed: {}", stderr));
+    }
+
+    // Create an initial commit to establish the main branch
+    // First, check if there's a .gitignore or any files to commit
+    let add_output = Command::new("git")
+        .current_dir(&dir)
+        .args(&["add", "-A"])
+        .output()
+        .map_err(|e| format!("Failed to stage files: {}", e))?;
+
+    // Create initial commit (allow empty if no files exist)
+    let commit_output = Command::new("git")
+        .current_dir(&dir)
+        .args(&["commit", "--allow-empty", "-m", "Initial commit"])
+        .output()
+        .map_err(|e| format!("Failed to create initial commit: {}", e))?;
+
+    if !commit_output.status.success() {
+        let stderr = String::from_utf8_lossy(&commit_output.stderr);
+        return Err(format!("Failed to create initial commit: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(format!("Git repository initialized at: {}\nCreated initial commit on main branch", path))
+}
+
 fn run_git(root: &PathBuf, args: &[&str], allow_non_zero: bool) -> Result<String> {
     let output = Command::new("git")
         .current_dir(root)

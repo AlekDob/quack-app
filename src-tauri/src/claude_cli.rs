@@ -223,13 +223,34 @@ pub struct ToolDiffEvent {
     pub lines: Vec<ToolDiffLine>,
 }
 
-/// Find the Claude CLI executable path with robust search including NVM and user directories
-fn find_claude_cli_path() -> Option<String> {
+/// Find the Claude CLI executable path with robust search including NVM, Volta, and user directories
+pub fn find_claude_cli_path() -> Option<String> {
     // Strategy: Search in order of preference
-    // 1. Common system paths (Homebrew, MacPorts, system-wide)
-    // 2. User-specific paths (~/.local/bin, ~/bin)
-    // 3. NVM paths (~/.nvm/versions/node/*/bin/claude)
-    // 4. Fallback to 'which claude' to use system PATH
+    // 1. Try Volta's 'which claude' first (respects Volta toolchain)
+    // 2. Common system paths (Homebrew, MacPorts, system-wide)
+    // 3. User-specific paths (~/.local/bin, ~/bin)
+    // 4. NVM paths (~/.nvm/versions/node/*/bin/claude)
+    // 5. Volta paths (~/.volta/bin/claude)
+    // 6. Fallback to system 'which claude'
+
+    log::info!("[Claude CLI] Starting search for Claude executable...");
+
+    // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
+    // This respects Volta's toolchain and version management
+    if let Ok(output) = std::process::Command::new("volta")
+        .args(["which", "claude"])
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(path_str) = String::from_utf8(output.stdout) {
+                let path = path_str.trim();
+                if !path.is_empty() && Path::new(path).exists() {
+                    log::info!("[Claude CLI] ✅ Found via Volta: {}", path);
+                    return Some(path.to_string());
+                }
+            }
+        }
+    }
 
     let mut search_paths: Vec<String> = vec![
         // Standard package manager paths
@@ -241,6 +262,9 @@ fn find_claude_cli_path() -> Option<String> {
 
     // Add user-specific paths
     if let Ok(home) = std::env::var("HOME") {
+        // Volta-managed global binaries (high priority)
+        search_paths.push(format!("{}/.volta/bin/claude", home));
+
         search_paths.push(format!("{}/.local/bin/claude", home));
         search_paths.push(format!("{}/bin/claude", home));
 
@@ -257,19 +281,39 @@ fn find_claude_cli_path() -> Option<String> {
                 }
             }
         }
+
+        // Search in Volta toolchain directories
+        let volta_base = format!("{}/.volta/tools/image/claude", home);
+        if let Ok(entries) = fs::read_dir(&volta_base) {
+            for entry in entries.filter_map(Result::ok) {
+                let version_path = entry.path();
+                if version_path.is_dir() {
+                    let claude_path = version_path.join("bin/claude");
+                    if let Some(path_str) = claude_path.to_str() {
+                        search_paths.push(path_str.to_string());
+                    }
+                }
+            }
+        }
     }
 
     // Try each search path
+    log::info!("[Claude CLI] Checking {} search paths...", search_paths.len());
     for path in &search_paths {
         if Path::new(path).exists() {
             // Verify it's executable by running --version
+            log::debug!("[Claude CLI] Testing path: {}", path);
             let output = std::process::Command::new(path)
                 .arg("--version")
                 .output();
 
             if let Ok(output) = output {
                 if output.status.success() {
-                    log::info!("Found Claude CLI at: {}", path);
+                    if let Ok(version) = String::from_utf8(output.stdout) {
+                        log::info!("[Claude CLI] ✅ Found at: {} (version: {})", path, version.trim());
+                    } else {
+                        log::info!("[Claude CLI] ✅ Found at: {}", path);
+                    }
                     return Some(path.to_string());
                 }
             }
@@ -277,6 +321,7 @@ fn find_claude_cli_path() -> Option<String> {
     }
 
     // Fallback: Try using 'which' to find claude in PATH
+    log::info!("[Claude CLI] Trying 'which claude' as fallback...");
     if let Ok(output) = std::process::Command::new("which")
         .arg("claude")
         .output()
@@ -285,14 +330,16 @@ fn find_claude_cli_path() -> Option<String> {
             if let Ok(path) = String::from_utf8(output.stdout) {
                 let path = path.trim();
                 if !path.is_empty() && Path::new(path).exists() {
-                    log::info!("Found Claude CLI via 'which' at: {}", path);
+                    log::info!("[Claude CLI] ✅ Found via 'which' at: {}", path);
                     return Some(path.to_string());
                 }
             }
         }
     }
 
-    log::warn!("Claude CLI not found in any known location");
+    log::warn!("[Claude CLI] ❌ Not found in any known location");
+    log::warn!("[Claude CLI] Searched {} paths + Volta + system PATH", search_paths.len());
+    log::warn!("[Claude CLI] Tip: Install via 'npm install -g @anthropic-ai/claude-code' or use ANTHROPIC_API_KEY");
     None
 }
 
@@ -906,8 +953,20 @@ pub async fn send_message_via_sdk_streaming(
         // Try to read from Claude Code credentials
         match claude_auth::get_claude_credentials() {
             Ok(Some(credentials)) => {
-                log::info!("[SDK] ✅ Found Claude Code credentials (type: {:?}), using them", credentials.auth_type);
-                command.env("ANTHROPIC_API_KEY", &credentials.token);
+                log::info!("[SDK] ✅ Found Claude Code credentials (type: {:?})", credentials.auth_type);
+
+                // Only set ANTHROPIC_API_KEY for API key authentication
+                // For OAuth, the SDK will read credentials from ~/.claude.json automatically
+                match credentials.auth_type {
+                    crate::claude_auth::AuthType::ApiKey => {
+                        log::info!("[SDK] Setting ANTHROPIC_API_KEY from credentials file");
+                        command.env("ANTHROPIC_API_KEY", &credentials.token);
+                    }
+                    crate::claude_auth::AuthType::OAuth => {
+                        log::info!("[SDK] OAuth authentication detected - SDK will use ~/.claude.json automatically");
+                        // Don't set ANTHROPIC_API_KEY for OAuth - let SDK handle it
+                    }
+                }
             }
             Ok(None) => {
                 log::warn!("[SDK] ⚠️ No Claude Code credentials found");

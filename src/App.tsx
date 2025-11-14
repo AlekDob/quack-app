@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
+import { useClaudeCliAvailability } from "./contexts/TestModeContext";
+import { getTestModeStoreName } from "./utils/testModeStorage";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
@@ -170,7 +172,7 @@ const STORAGE_VERSION_KEY = "storageVersion";
 // Check storage version and reset if incompatible
 const checkStorageVersion = async (): Promise<boolean> => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     const storedVersion = await store.get<number>(STORAGE_VERSION_KEY);
 
     if (storedVersion === undefined) {
@@ -208,7 +210,7 @@ const STORAGE_KEY = "terminals";
 
 const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     // Save terminal metadata including personality AND ID for persistence
     const metadata = terminals.map((t) => ({
       id: t.id, // ✅ CRITICAL FIX: Save ID to preserve personality linkage!
@@ -230,7 +232,7 @@ const saveTerminalsToStorage = async (terminals: TerminalInfo[]) => {
 
 const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     const stored = await store.get<TerminalMetadata[]>(STORAGE_KEY);
 
     // ✅ DEFENSIVE: Validate data structure before returning
@@ -280,7 +282,7 @@ const TABS_BY_TERMINAL_KEY = "tabsByTerminal";
 
 const saveTabsByTerminalToStorage = async (tabsByTerminal: Map<string, Tab[]>) => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     // Convert Map to plain object for storage
     const obj: Record<string, Tab[]> = {};
     tabsByTerminal.forEach((tabs, terminalId) => {
@@ -296,7 +298,7 @@ const saveTabsByTerminalToStorage = async (tabsByTerminal: Map<string, Tab[]>) =
 
 const loadTabsByTerminalFromStorage = async (): Promise<Map<string, Tab[]>> => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     const stored = await store.get<Record<string, Tab[]>>(TABS_BY_TERMINAL_KEY);
 
     if (!stored) {
@@ -346,7 +348,7 @@ const NATIVE_TERMINALS_STORAGE_KEY = "nativeTerminals";
 
 const saveNativeTerminalsToStorage = async (terminals: NativeTerminal[]) => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     // Mark all as closed on save (they might not be running when app restarts)
     const metadata = terminals.map((t) => ({
       ...t,
@@ -363,7 +365,7 @@ const saveNativeTerminalsToStorage = async (terminals: NativeTerminal[]) => {
 
 const loadNativeTerminalsFromStorage = async (): Promise<NativeTerminal[]> => {
   try {
-    const store = await Store.load("quack-terminals.json");
+    const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     const stored = await store.get<NativeTerminal[]>(NATIVE_TERMINALS_STORAGE_KEY);
 
     // ✅ DEFENSIVE: Validate data structure before returning
@@ -413,7 +415,7 @@ const AGENT_CHATS_KEY = "agentChats";
 
 const saveAgentChatsToStorage = async (chats: AgentChat[]): Promise<void> => {
   try {
-    const store = await Store.load("quack-agent-chats.json");
+    const store = await Store.load(getTestModeStoreName("quack-agent-chats.json"));
     await store.set(AGENT_CHATS_KEY, chats);
     await store.save();
     console.log(`Saved ${chats.length} AgentChats to storage`);
@@ -425,7 +427,7 @@ const saveAgentChatsToStorage = async (chats: AgentChat[]): Promise<void> => {
 
 const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
   try {
-    const store = await Store.load("quack-agent-chats.json");
+    const store = await Store.load(getTestModeStoreName("quack-agent-chats.json"));
     const stored = await store.get<AgentChat[]>(AGENT_CHATS_KEY);
 
     // ✅ DEFENSIVE: Validate data structure before returning
@@ -706,20 +708,14 @@ function App() {
   const [claudeAuthBannerDismissed, setClaudeAuthBannerDismissed] = useState(false);
   const [currentBackground, setCurrentBackground] = useState("duck.png");
 
-  // Check Claude CLI availability on mount
-  useEffect(() => {
-    const checkClaudeCli = async () => {
-      try {
-        const available = await invoke<boolean>('check_claude_cli_available');
-        setClaudeCliAvailable(available);
-      } catch (error) {
-        console.error('Failed to check Claude CLI availability:', error);
-        setClaudeCliAvailable(false);
-      }
-    };
+  // Check Claude CLI availability on mount (with test mode support)
+  const claudeCliAvailabilityHook = useClaudeCliAvailability();
 
-    checkClaudeCli();
-  }, []);
+  useEffect(() => {
+    if (claudeCliAvailabilityHook !== null) {
+      setClaudeCliAvailable(claudeCliAvailabilityHook);
+    }
+  }, [claudeCliAvailabilityHook]);
 
   // Auto-collapse ProBanner after 10 seconds
   useEffect(() => {
@@ -2541,7 +2537,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         // If no terminals, clean up storage
         void (async () => {
           try {
-            const store = await Store.load("quack-terminals.json");
+            const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
             await store.delete(STORAGE_KEY);
             await store.save();
           } catch {
@@ -2568,7 +2564,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         // If no tabs, clean up storage
         void (async () => {
           try {
-            const store = await Store.load("quack-terminals.json");
+            const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
             await store.delete(TABS_BY_TERMINAL_KEY);
             await store.save();
           } catch {
@@ -2593,7 +2589,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // If no native terminals, clean up storage
       void (async () => {
         try {
-          const store = await Store.load("quack-terminals.json");
+          const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
           await store.delete(NATIVE_TERMINALS_STORAGE_KEY);
           await store.save();
         } catch {
@@ -4325,6 +4321,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalColor(defaultColor);
     setNewTerminalWorkingOn(""); // Reset working on field
     setNewTerminalAvatar("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg"); // Reset to first avatar
+    setNewTerminalBranch(""); // 🔧 FIX: Reset branch to empty string - modal will load current branch
+    setNewTerminalUseWorktree(false); // Reset worktree option
     setNewTerminalPersonality({ // Reset personality to default
       role: 'Feature Coordinator',
       intro: 'Experienced PM specializing in feature delivery and team coordination',
@@ -4499,20 +4497,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setEditingTerminal(null);
       } else {
         // Create new terminal - SIMPLE! No AgentChat logic
-        console.log('Creating terminal with avatar:', newTerminalAvatar, 'branch:', newTerminalBranch);
+        console.log('🔍 DEBUG: Creating terminal with avatar:', newTerminalAvatar);
+        console.log('🔍 DEBUG: newTerminalBranch:', JSON.stringify(newTerminalBranch), 'type:', typeof newTerminalBranch, 'length:', newTerminalBranch?.length);
+        console.log('🔍 DEBUG: newTerminalUseWorktree:', newTerminalUseWorktree);
 
         // Handle Git branch creation and worktree if specified
         let worktreePath: string | undefined;
-        if (newTerminalBranch) {
+        if (newTerminalBranch && newTerminalBranch.trim()) {
           try {
             // Check if branch exists
             const branches = await invoke<Array<{name: string, isCurrent: boolean, hasRemote: boolean}>>('git_list_branches', {
               rootPath: trimmedPath
             });
+            console.log('🔍 DEBUG: Available branches:', branches.map(b => `${b.name}${b.isCurrent ? ' (current)' : ''}`).join(', '));
 
             const branchExists = branches.some(b => b.name === newTerminalBranch);
+            console.log('🔍 DEBUG: Branch exists?', branchExists, 'Branch name:', newTerminalBranch);
 
-            if (newTerminalUseWorktree && !branchExists) {
+            // 🔧 CRITICAL FIX: If branch is "main" and doesn't exist, skip Git operations
+            // This happens when the modal default wasn't properly overridden
+            if (newTerminalBranch === 'main' && !branchExists) {
+              console.warn('⚠️ SKIPPING: Branch "main" does not exist in repository. Using current branch instead.');
+              // Don't try to create or switch - just use current branch
+            } else if (newTerminalUseWorktree && !branchExists) {
               // Create worktree for new branch
               console.log(`Creating worktree for new branch: ${newTerminalBranch}`);
 
@@ -4540,12 +4547,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
                 rootPath: trimmedPath
               });
             } else {
-              // Branch exists, just switch to it (no worktree)
-              console.log(`Switching to existing branch: ${newTerminalBranch}`);
-              await invoke('git_switch_branch', {
-                branchName: newTerminalBranch,
-                rootPath: trimmedPath
-              });
+              // Branch exists - check if we need to switch to it
+              const currentBranch = branches.find(b => b.isCurrent);
+              if (currentBranch && currentBranch.name === newTerminalBranch) {
+                // Already on the target branch, no need to switch
+                console.log(`Already on branch: ${newTerminalBranch}, skipping switch`);
+              } else {
+                // Switch to the existing branch
+                console.log(`Switching to existing branch: ${newTerminalBranch}`);
+                await invoke('git_switch_branch', {
+                  branchName: newTerminalBranch,
+                  rootPath: trimmedPath
+                });
+              }
             }
           } catch (err) {
             console.warn('Git branch/worktree operation failed:', err);
@@ -6430,7 +6444,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed ? 'side-panel-collapsed' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || !activeId ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -6484,7 +6498,7 @@ You have access to all Bash tools to execute git commands like:
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
         <section className="terminal-pane">
           {terminals.length === 0 ? (
-            /* Video background when no agents */
+            /* Image background when no agents */
             <div
               style={{
                 width: '100%',
@@ -6493,20 +6507,16 @@ You have access to all Bash tools to execute git commands like:
                 overflow: 'hidden',
               }}
             >
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
+              <img
+                src="/images/quack-agent.jpeg"
+                alt="Quack Agent"
                 style={{
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
                   objectPosition: 'center',
                 }}
-              >
-                <source src="/video/introquack.mp4" type="video/mp4" />
-              </video>
+              />
             </div>
           ) : (
             /* Chat area when agents are active */

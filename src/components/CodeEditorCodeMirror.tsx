@@ -2,58 +2,108 @@ import { useEffect, useRef, useCallback } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import { bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, HighlightStyle } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
 import { javascript } from "@codemirror/lang-javascript";
 
-// Custom theme with black background and high contrast colors
+// Custom theme inspired by Atom One Dark / Material Palenight with pure black background
 const customTheme = EditorView.theme({
   "&": {
-    backgroundColor: "#1E1E1E !important", // Dark gray (VS Code dark)
-    color: "#D4D4D4", // Light gray text for dark background
+    backgroundColor: "#000000 !important", // Pure black background
+    color: "#abb2bf", // Soft gray text
   },
   ".cm-content": {
-    caretColor: "#FFFFFF", // White cursor
+    caretColor: "#528bff", // Blue cursor
   },
   ".cm-gutters": {
-    backgroundColor: "#1E1E1E !important",
-    borderRight: "1px solid #333333",
-    color: "#858585",
+    backgroundColor: "#000000 !important",
+    borderRight: "1px solid #1a1a1a",
+    color: "#636d83", // Muted gray for line numbers
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "#0a0a0a !important",
+    color: "#abb2bf",
   },
   ".cm-scroller": {
-    backgroundColor: "#1E1E1E !important",
+    backgroundColor: "#000000 !important",
   },
   ".cm-line": {
-    color: "#D4D4D4", // Light gray for default text
+    color: "#abb2bf", // Soft gray for default text
   },
-  // Cursor visibility - white for dark background
+  ".cm-activeLine": {
+    backgroundColor: "rgba(153, 187, 255, 0.04) !important", // Subtle highlight
+  },
+  // Cursor visibility
   ".cm-cursor, .cm-dropCursor": {
-    borderLeftColor: "#FFFFFF !important",
+    borderLeftColor: "#528bff !important",
     borderLeftWidth: "2px",
   },
   "&.cm-focused .cm-cursor": {
-    borderLeftColor: "#FFFFFF !important",
+    borderLeftColor: "#528bff !important",
   },
   "&.cm-focused": {
     outline: "none",
   },
   ".cm-selectionBackground, ::selection": {
-    backgroundColor: "rgba(255, 255, 255, 0.2) !important",
+    backgroundColor: "rgba(67, 76, 94, 0.6) !important", // Atom One Dark selection
   },
   "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(255, 255, 255, 0.2) !important",
+    backgroundColor: "rgba(67, 76, 94, 0.8) !important",
   },
-  // Syntax colors optimized for black background - brighter for better contrast
-  ".cm-string": { color: "#FF6B6B" }, // Bright red for strings
-  ".cm-number": { color: "#B5CEA8" }, // Light green for numbers
-  ".cm-keyword": { color: "#C792EA" }, // Bright purple for keywords
-  ".cm-operator": { color: "#89DDFF" }, // Bright cyan for operators
-  ".cm-variableName": { color: "#82AAFF" }, // Bright blue for variables
-  ".cm-propertyName": { color: "#82AAFF" }, // Bright blue for properties
-  ".cm-comment": { color: "#6A9955" }, // Green for comments
-  ".cm-atom": { color: "#F78C6C" }, // Orange for atoms (true/false/null)
-  ".cm-meta": { color: "#C792EA" }, // Purple for meta
-  ".cm-bracket": { color: "#FFD700" }, // Gold for brackets
+  // Syntax colors - Minimal monochrome theme with purple accents
+  ".cm-string": { color: "#ce9178" }, // Muted orange/brown for strings (not bright red)
+  ".cm-number": { color: "#b5cea8" }, // Muted sage green for numbers
+  ".cm-keyword": { color: "#c586c0" }, // Muted purple/magenta for keywords (export, import, etc.)
+  ".cm-operator": { color: "#909090" }, // Gray for operators
+  ".cm-variableName": { color: "#9cdcfe" }, // Light blue for variables (not bright blue)
+  ".cm-propertyName": { color: "#9cdcfe" }, // Light blue for properties
+  ".cm-comment": { color: "#6a9955", fontStyle: "italic" }, // Muted green for comments
+  ".cm-atom": { color: "#569cd6" }, // Muted blue for atoms (true/false/null)
+  ".cm-meta": { color: "#808080" }, // Gray for meta
+  ".cm-bracket": { color: "#808080" }, // Gray for brackets
+  ".cm-tag": { color: "#569cd6" }, // Muted blue for HTML tags (not red)
+  ".cm-attributeName": { color: "#9cdcfe" }, // Light blue for attributes
+  ".cm-attributeValue": { color: "#ce9178" }, // Muted orange for attribute values
+  ".cm-typeName": { color: "#4ec9b0" }, // Teal for types
+  ".cm-definition": { color: "#dcdcaa" }, // Yellow-gray for definitions (function names)
+  ".cm-matchingBracket": {
+    backgroundColor: "rgba(97, 175, 239, 0.2) !important",
+    outline: "1px solid rgba(97, 175, 239, 0.5)",
+  },
+  ".cm-nonmatchingBracket": {
+    color: "#e06c75 !important",
+  },
 });
+
+// Custom syntax highlighting - VS Code Dark+ inspired with muted colors
+const customHighlightStyle = HighlightStyle.define([
+  { tag: t.keyword, color: "#c586c0" }, // Muted purple for keywords
+  { tag: t.name, color: "#9cdcfe" }, // Light blue for names
+  { tag: t.deleted, color: "#ce9178" },
+  { tag: t.inserted, color: "#b5cea8" },
+  { tag: t.changed, color: "#569cd6" },
+  { tag: t.invalid, color: "#f44747" },
+  { tag: t.comment, color: "#6a9955", fontStyle: "italic" }, // Green for comments
+  { tag: t.variableName, color: "#9cdcfe" }, // Light blue for variables
+  { tag: [t.string, t.special(t.brace)], color: "#ce9178" }, // Muted orange for strings
+  { tag: t.number, color: "#b5cea8" }, // Muted green for numbers
+  { tag: t.bool, color: "#569cd6" }, // Muted blue for booleans
+  { tag: t.null, color: "#569cd6" }, // Muted blue for null
+  { tag: t.operator, color: "#d4d4d4" }, // Light gray for operators
+  { tag: t.punctuation, color: "#d4d4d4" }, // Light gray for punctuation
+  { tag: t.bracket, color: "#ffd700" }, // Gold for brackets
+  { tag: t.angleBracket, color: "#808080" }, // Gray for angle brackets
+  { tag: t.tagName, color: "#569cd6" }, // Muted blue for tags (not red)
+  { tag: t.attributeName, color: "#9cdcfe" }, // Light blue for attributes
+  { tag: t.className, color: "#4ec9b0" }, // Teal for class names
+  { tag: t.propertyName, color: "#9cdcfe" }, // Light blue for properties
+  { tag: t.function(t.variableName), color: "#dcdcaa" }, // Yellow-gray for function names
+  { tag: t.definition(t.variableName), color: "#dcdcaa" }, // Yellow-gray for definitions
+  { tag: t.typeName, color: "#4ec9b0" }, // Teal for types
+  { tag: t.self, color: "#569cd6" }, // Muted blue for self/this
+  { tag: t.constant(t.variableName), color: "#4fc1ff" }, // Light blue for constants
+]);
+
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { json } from "@codemirror/lang-json";
@@ -184,7 +234,7 @@ export default function CodeEditorCodeMirror({
         foldGutter(),
         indentOnInput(),
         bracketMatching(),
-        syntaxHighlighting(defaultHighlightStyle),
+        syntaxHighlighting(customHighlightStyle),
         customTheme, // Custom theme with visible cursor for dark background
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(readOnly),
@@ -236,7 +286,7 @@ export default function CodeEditorCodeMirror({
       style={{
         width: "100%",
         height: "100%",
-        overflow: "auto",
+        overflow: "auto", // Restored to "auto" to allow scrolling
         fontFamily: 'JetBrains Mono, SF Mono, Monaco, Inconsolata, "Courier New", monospace',
         fontSize: "14px",
       }}

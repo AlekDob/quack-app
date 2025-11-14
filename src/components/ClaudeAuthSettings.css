@@ -1,0 +1,218 @@
+/* Minimal Authentication Settings Styles */
+
+.claude-auth-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.auth-section {
+  padding: 1.5rem;
+  background: rgba(12, 16, 24, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.section-title {
+  margin: 1rem 0 0 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Status Grid */
+.auth-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.status-card {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.2s;
+}
+
+.status-dot.active {
+  background: #10b981;
+}
+
+.status-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.status-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.status-detail {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+}
+
+/* Setup Instructions */
+.setup-method {
+  margin-bottom: 1.5rem;
+}
+
+.setup-method:last-child {
+  margin-bottom: 0;
+}
+
+.setup-method h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.setup-method ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+}
+
+.setup-method li {
+  margin-bottom: 0.375rem;
+}
+
+.setup-method code {
+  padding: 0.125rem 0.375rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: rgba(242, 140, 82, 0.9);
+}
+
+.setup-method pre {
+  margin: 0.375rem 0 0 0;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  overflow-x: auto;
+}
+
+/* Loading State */
+.auth-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.auth-loading .spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(242, 140, 82, 0.8);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* OAuth Section */
+.oauth-section .auth-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.detail-value {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: monospace;
+}
+
+.detail-value-with-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 60%;
+}
+
+.open-file-button-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: rgba(242, 140, 82, 0.1);
+  border: 1px solid rgba(242, 140, 82, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(242, 140, 82, 0.9);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.open-file-button-inline:hover {
+  background: rgba(242, 140, 82, 0.2);
+  border-color: rgba(242, 140, 82, 0.3);
+}
+
+.open-file-button-inline svg {
+  width: 14px;
+  height: 14px;
+}
+
+.token-masked {
+  letter-spacing: 0.1em;
+}
+
+.credential-path {
+  word-break: break-all;
+  text-align: right;
+}

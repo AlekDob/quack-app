@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useTestMode } from '../contexts/TestModeContext';
 
 interface TitleBarProps {
   title?: string;
@@ -24,12 +25,19 @@ const QUOTES = [
 ];
 
 export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
+  // Test mode context
+  const { isTestMode, isAuthenticated, toggleAuthentication, resetTestData } = useTestMode();
+
   // Determine default title based on environment
-  const defaultTitle = import.meta.env.DEV ? "🦆🧪 Quack [DEV MODE]" : "🦆 Quack";
+  const defaultTitle = isTestMode
+    ? "🦆🧪 Quack [TEST MODE]"
+    : import.meta.env.DEV
+      ? "🦆🧪 Quack [DEV MODE]"
+      : "🦆 Quack";
   const finalTitle = title || defaultTitle;
 
-  // Dev mode styling
-  const isDevMode = import.meta.env.DEV;
+  // Dev mode styling (also applies to test mode)
+  const isDevMode = import.meta.env.DEV || isTestMode;
 
   const [displayText, setDisplayText] = useState(finalTitle);
   const [_isMaximized, setIsMaximized] = useState(false);
@@ -162,6 +170,84 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title }) => {
       }}>
         {displayText}
       </div>
+
+      {/* Test Mode Controls - posizione assoluta a destra */}
+      {isTestMode && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          position: 'absolute',
+          right: '12px',
+          zIndex: 2,
+          alignItems: 'center'
+        }}>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'rgba(255, 255, 255, 0.9)',
+            backgroundColor: 'rgba(236, 127, 69, 0.8)',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            letterSpacing: '0.5px'
+          }}>
+            🧪 TEST
+          </span>
+
+          <button
+            onClick={toggleAuthentication}
+            style={{
+              fontSize: '11px',
+              fontWeight: '600',
+              color: 'rgba(255, 255, 255, 0.95)',
+              backgroundColor: isAuthenticated ? 'rgba(102, 204, 153, 0.8)' : 'rgba(255, 107, 107, 0.8)',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              letterSpacing: '0.3px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.opacity = '1';
+            }}
+            title={isAuthenticated ? 'Click to simulate logout' : 'Click to simulate login'}
+          >
+            {isAuthenticated ? '🔓 Logout' : '🔐 Login'}
+          </button>
+
+          <button
+            onClick={resetTestData}
+            style={{
+              fontSize: '11px',
+              fontWeight: '600',
+              color: 'rgba(255, 255, 255, 0.95)',
+              backgroundColor: 'rgba(255, 184, 77, 0.8)',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              letterSpacing: '0.3px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.opacity = '1';
+            }}
+            title="Reset all test data"
+          >
+            🗑️ Reset
+          </button>
+        </div>
+      )}
 
       {/* Pulsanti window controls - posizione assoluta a sinistra (stile macOS) */}
       <div style={{

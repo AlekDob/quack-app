@@ -360,14 +360,11 @@ function PersonalityBuilder({
                 </svg>
                 Add
               </button>
-            </div>
-
-            {/* Import from File Button */}
-            <div className="import-file-section">
               <button
                 type="button"
-                className="import-file-button"
+                className="rule-import-button"
                 onClick={handleImportFromFile}
+                title="Import rules from file"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -376,7 +373,6 @@ function PersonalityBuilder({
                 </svg>
                 Import from file
               </button>
-              <span className="import-file-hint">or drag & drop a .txt or .md file</span>
             </div>
 
             {/* Suggested Rules */}

@@ -831,13 +831,14 @@ button.directory-chooser:hover {
   display: flex;
   flex-direction: column;
   padding: 0; /* Remove padding in embedded mode for full Monaco Editor height */
-  /* REMOVED overflow: hidden - was hiding Monaco Editor content */
+  overflow: hidden; /* CRITICAL: Prevent double scrollbar - editor has its own scrollbar */
 }
 
 .preview-embedded .editor-container {
   flex: 1;
   min-height: 0;
   height: 100%; /* CRITICAL: Monaco Editor needs explicit height to render */
+  overflow: hidden; /* Ensure editor container doesn't create extra scrollbar */
 }
 
 /* Markdown preview styling - lighter background */
@@ -1744,6 +1745,14 @@ button.directory-chooser:hover {
   grid-column: 2;
   grid-row: 1 / 3;
 }
+
+/* When no agents are active and side panel is hidden, extend terminal pane to full width */
+.app-shell.side-panel-collapsed.no-agents .terminal-pane {
+  grid-column: 2 / 4; /* Extend to cover both column 2 and 3 */
+  background: transparent; /* Remove background for clean video display */
+  backdrop-filter: none; /* Remove backdrop filter */
+  -webkit-backdrop-filter: none; /* Remove webkit backdrop filter */
+}
 .removed-panel-resizer {
   grid-column: 3;
   cursor: col-resize;
@@ -2299,6 +2308,7 @@ button.directory-chooser:hover {
   width: 0px; /* ← Completely hidden */
   max-width: 0px;
   overflow: hidden; /* ← Hide all content */
+  border-left: none; /* ← Remove border when collapsed */
 }
 
 /* Hide content when collapsed */
@@ -9045,6 +9055,99 @@ button.directory-chooser:hover {
 }
 
 /* ========================================= */
+/* Git Warning Section - Not initialized */
+/* ========================================= */
+
+.git-warning-section {
+  margin: 1rem 0;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 152, 0, 0.08));
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.git-warning-section:hover {
+  border-color: rgba(255, 193, 7, 0.4);
+  box-shadow: 0 8px 32px rgba(255, 193, 7, 0.15);
+  transform: translateY(-2px);
+}
+
+.git-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.git-warning-header svg {
+  color: rgba(255, 193, 7, 0.9);
+  flex-shrink: 0;
+}
+
+.git-warning-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 193, 7, 0.95);
+  letter-spacing: 0.5px;
+}
+
+.git-warning-text {
+  font-size: 0.825rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+}
+
+.git-init-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(77, 212, 179, 0.15), rgba(105, 179, 231, 0.15));
+  border: 1.5px solid rgba(77, 212, 179, 0.3);
+  border-radius: 8px;
+  color: rgba(77, 212, 179, 0.95);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.git-init-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(77, 212, 179, 0.25), rgba(105, 179, 231, 0.25));
+  border-color: rgba(77, 212, 179, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(77, 212, 179, 0.25);
+}
+
+.git-init-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.git-init-button svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.git-init-button .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(77, 212, 179, 0.3);
+  border-top-color: rgba(77, 212, 179, 0.9);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Git Branch Section - Cool & Prominent */
 /* ========================================= */
 
@@ -10670,5 +10773,78 @@ button.directory-chooser:hover {
 .help-content p strong {
   color: #a8b6dd;
   font-weight: 600;
+}
+
+/* Typewriter Animation for alternating "Project" and "Agent" */
+.typewriter-text {
+  display: inline-block;
+  position: relative;
+  white-space: nowrap;
+}
+
+.typewriter-text::before {
+  content: "Create your first ";
+  display: inline;
+}
+
+.typewriter-text::after {
+  content: "";
+  display: inline;
+  border-right: 2px solid #f28c52;
+  animation: typewriterCycle 8s steps(7, end) infinite, blink 0.75s step-end infinite;
+}
+
+@keyframes typewriterCycle {
+  /* Type "Project" */
+  0% { content: ""; }
+  5% { content: "P"; }
+  7.5% { content: "Pr"; }
+  10% { content: "Pro"; }
+  12.5% { content: "Proj"; }
+  15% { content: "Proje"; }
+  17.5% { content: "Projec"; }
+  20% { content: "Project"; }
+
+  /* Pause with "Project" */
+  20%, 35% { content: "Project"; }
+
+  /* Delete "Project" */
+  37.5% { content: "Projec"; }
+  40% { content: "Proje"; }
+  42.5% { content: "Proj"; }
+  45% { content: "Pro"; }
+  47.5% { content: "Pr"; }
+  50% { content: "P"; }
+  52.5% { content: ""; }
+
+  /* Type "Agent" */
+  55% { content: "A"; }
+  57.5% { content: "Ag"; }
+  60% { content: "Age"; }
+  62.5% { content: "Agen"; }
+  65% { content: "Agent"; }
+
+  /* Pause with "Agent" */
+  65%, 85% { content: "Agent"; }
+
+  /* Delete "Agent" */
+  87.5% { content: "Agen"; }
+  90% { content: "Age"; }
+  92.5% { content: "Ag"; }
+  95% { content: "A"; }
+  97.5% { content: ""; }
+  100% { content: ""; }
+}
+
+@keyframes blink {
+  50% {
+    border-color: transparent;
+  }
+}
+
+/* Remove cursor animation on hover for better readability */
+.animated-button:hover .typewriter-text::after {
+  animation: none;
+  border-right: none;
 }
 

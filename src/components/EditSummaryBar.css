@@ -1,0 +1,272 @@
+/* Edit Summary Bar - Persistent footer component */
+.edit-summary-bar {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-top: 1px solid rgba(34, 197, 94, 0.25);
+  border-bottom: 1px solid rgba(34, 197, 94, 0.25);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  flex-shrink: 0; /* Don't shrink when space is tight */
+}
+
+/* Header - Always visible */
+.edit-summary-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.edit-summary-bar-header:hover {
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.edit-summary-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(34, 197, 94, 1);
+}
+
+.edit-summary-bar-title svg {
+  color: rgba(34, 197, 94, 0.8);
+  flex-shrink: 0;
+}
+
+.edit-summary-bar-label {
+  color: var(--color-text);
+}
+
+/* Separator between modified and deleted sections */
+.edit-summary-bar-separator {
+  color: rgba(156, 163, 175, 0.5);
+  margin: 0 4px;
+}
+
+/* Deleted files - red theme */
+.edit-summary-bar-delete-icon {
+  color: rgba(239, 68, 68, 0.8) !important;
+}
+
+.edit-summary-bar-label-delete {
+  color: rgba(239, 68, 68, 1);
+}
+
+.edit-summary-bar-badge {
+  padding: 2px 8px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(34, 197, 94, 1);
+}
+
+.edit-summary-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-summary-bar-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: rgba(239, 68, 68, 0.8);
+}
+
+.edit-summary-bar-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: rgba(239, 68, 68, 1);
+}
+
+.edit-summary-bar-chevron {
+  color: rgba(34, 197, 94, 0.7);
+  transition: transform 0.3s ease;
+}
+
+.edit-summary-bar-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+/* Content - Expandable */
+.edit-summary-bar-content {
+  padding: 0 16px 12px 16px;
+  animation: slideDown 0.3s ease;
+}
+
+/* Section containers */
+.edit-summary-bar-section {
+  margin-bottom: 12px;
+}
+
+.edit-summary-bar-section:last-child {
+  margin-bottom: 0;
+}
+
+.edit-summary-bar-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+/* Deleted files section - red theme */
+.edit-summary-bar-section-delete .edit-summary-bar-section-title {
+  color: rgba(239, 68, 68, 0.8);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.edit-summary-bar-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.edit-summary-bar-file {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-summary-bar-file:hover {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  transform: translateX(4px);
+}
+
+.edit-summary-bar-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0; /* Enable text truncation */
+}
+
+.edit-summary-bar-file-info svg {
+  color: rgba(34, 197, 94, 0.6);
+  flex-shrink: 0;
+}
+
+.edit-summary-bar-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.edit-summary-bar-file-path {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.edit-summary-bar-file-count {
+  font-size: 11px;
+  color: rgba(34, 197, 94, 0.8);
+  background: rgba(34, 197, 94, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* Deleted file items - red theme */
+.edit-summary-bar-file-deleted {
+  border-color: rgba(239, 68, 68, 0.15);
+  cursor: default; /* Not clickable */
+}
+
+.edit-summary-bar-file-deleted:hover {
+  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.25);
+  transform: none; /* No slide animation */
+}
+
+.edit-summary-bar-file-deleted .edit-summary-bar-file-info svg {
+  color: rgba(239, 68, 68, 0.6);
+}
+
+.edit-summary-bar-file-deleted .edit-summary-bar-file-name {
+  color: rgba(239, 68, 68, 0.9);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+/* Footer actions */
+.edit-summary-bar-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+.edit-summary-bar-open-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(34, 197, 94, 1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-summary-bar-open-all-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.5);
+  transform: translateY(-1px);
+}
+
+.edit-summary-bar-open-all-btn svg {
+  color: rgba(34, 197, 94, 0.8);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .edit-summary-bar-file {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .edit-summary-bar-file:hover {
+    background: rgba(34, 197, 94, 0.08);
+  }
+}

@@ -8,8 +8,9 @@
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { readFileSync } from 'fs';
-import { extname } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { extname, join } from 'path';
+import { homedir } from 'os';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -103,16 +104,86 @@ async function* generateMessages() {
   };
 }
 
+/**
+ * Verify authentication is available before initializing SDK
+ * Returns: { hasAuth: boolean, authMethod: string, error?: string }
+ */
+function checkAuthentication() {
+  // Priority 1: Check for ANTHROPIC_API_KEY
+  if (process.env.ANTHROPIC_API_KEY) {
+    const keyPreview = process.env.ANTHROPIC_API_KEY.substring(0, 8) + '...';
+    console.error(`[Auth] ANTHROPIC_API_KEY found: ${keyPreview}`);
+    return { hasAuth: true, authMethod: 'ANTHROPIC_API_KEY' };
+  }
+
+  // Priority 2: Check for Claude Code credentials in multiple locations
+  // Claude Code can store credentials in several places
+  const credentialPaths = [
+    join(homedir(), '.claude.json'),                          // New OAuth format
+    join(homedir(), '.claude', '.credentials.json'),          // Standard format
+    join(homedir(), '.config', 'claude-code', 'auth.json'),  // Alternative location
+  ];
+
+  for (const credsPath of credentialPaths) {
+    try {
+      if (!existsSync(credsPath)) continue;
+
+      const creds = JSON.parse(readFileSync(credsPath, 'utf8'));
+
+      // Check for OAuth account (new format)
+      if (creds.oauthAccount && typeof creds.oauthAccount === 'object') {
+        console.error(`[Auth] Claude Code OAuth found at ${credsPath}`);
+        return { hasAuth: true, authMethod: 'Claude Code OAuth' };
+      }
+
+      // Check for standard credentials
+      if (creds.session_key || creds.access_token || creds.api_key) {
+        console.error(`[Auth] Claude Code credentials found at ${credsPath}`);
+        return { hasAuth: true, authMethod: 'Claude Code credentials' };
+      }
+    } catch (err) {
+      console.error(`[Auth] Could not check ${credsPath}:`, err.message);
+    }
+  }
+
+  // Priority 3: Check for Bedrock/Vertex environment variables
+  if (process.env.CLAUDE_CODE_USE_BEDROCK === '1') {
+    console.error('[Auth] Amazon Bedrock authentication enabled');
+    return { hasAuth: true, authMethod: 'Amazon Bedrock' };
+  }
+
+  if (process.env.CLAUDE_CODE_USE_VERTEX === '1') {
+    console.error('[Auth] Google Vertex AI authentication enabled');
+    return { hasAuth: true, authMethod: 'Google Vertex AI' };
+  }
+
+  // No authentication found
+  console.error('[Auth] No authentication found');
+  return {
+    hasAuth: false,
+    authMethod: 'none',
+    error: 'No authentication method available. Please either:\n' +
+           '  1. Set ANTHROPIC_API_KEY environment variable\n' +
+           '  2. Run: claude login (to authenticate with Claude Code)\n' +
+           '  3. Configure Amazon Bedrock or Google Vertex AI'
+  };
+}
+
 async function main() {
   try {
-    // Check if ANTHROPIC_API_KEY is present (log warning if missing, but let SDK handle it)
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error('[WARN] ⚠️ ANTHROPIC_API_KEY not found in environment');
-      console.error('[WARN] The SDK will attempt to use default credentials');
-      console.error('[WARN] If authentication fails, please run: claude login');
-      // Don't exit - let the SDK try and provide its own error message
+    // Check authentication and log warnings, but don't block
+    const authCheck = checkAuthentication();
+
+    if (!authCheck.hasAuth) {
+      // Log warning but let SDK try anyway (SDK has its own auth resolution)
+      console.error('[Auth] WARNING: No explicit authentication found');
+      console.error('[Auth] SDK will attempt to use default authentication methods');
+      console.error('[Auth] If this fails, please either:');
+      console.error('[Auth]   1. Set ANTHROPIC_API_KEY environment variable');
+      console.error('[Auth]   2. Run: claude login (to authenticate with Claude Code)');
+      console.error('[Auth]   3. Configure Amazon Bedrock or Google Vertex AI');
     } else {
-      console.error('[DEBUG] ✅ ANTHROPIC_API_KEY found in environment');
+      console.error(`[Auth] Using authentication method: ${authCheck.authMethod}`);
     }
 
     // Build SDK options

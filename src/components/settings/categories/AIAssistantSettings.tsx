@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { TokenStats } from '../../../types';
 import ClaudeAuthSettings from '../../ClaudeAuthSettings';
+import AuthDebugPanel from '../../AuthDebugPanel';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSInput from '../controls/IOSInput';
@@ -201,6 +202,15 @@ export default function AIAssistantSettings() {
       <SectionHeader title="Claude Integration" />
       <div className="settings-group">
         <ClaudeAuthSettings />
+      </div>
+
+      {/* Debug Panel */}
+      <SectionHeader
+        title="Authentication Debug"
+        description="Diagnostic information for troubleshooting authentication issues"
+      />
+      <div className="settings-group">
+        <AuthDebugPanel />
       </div>
     </div>
   );

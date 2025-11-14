@@ -4,21 +4,24 @@ import { ChatProvider } from './ChatContext';
 import { FileSystemProvider } from './FileSystemContext';
 import { GitProvider } from './GitContext';
 import { UIProvider } from './UIContext';
+import { TestModeProvider } from './TestModeContext';
 
 // Combined provider component that wraps all contexts
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
   return (
-    <UIProvider>
-      <TerminalProvider>
-        <ChatProvider>
-          <FileSystemProvider>
-            <GitProvider>
-              {children}
-            </GitProvider>
-          </FileSystemProvider>
-        </ChatProvider>
-      </TerminalProvider>
-    </UIProvider>
+    <TestModeProvider>
+      <UIProvider>
+        <TerminalProvider>
+          <ChatProvider>
+            <FileSystemProvider>
+              <GitProvider>
+                {children}
+              </GitProvider>
+            </FileSystemProvider>
+          </ChatProvider>
+        </TerminalProvider>
+      </UIProvider>
+    </TestModeProvider>
   );
 };
 
@@ -28,3 +31,4 @@ export { useChat } from './ChatContext';
 export { useFileSystem } from './FileSystemContext';
 export { useGit } from './GitContext';
 export { useUI } from './UIContext';
+export { useTestMode, useClaudeCliAvailability } from './TestModeContext';

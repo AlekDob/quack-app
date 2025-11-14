@@ -4,34 +4,34 @@
 
 /* Reduce overall font sizes */
 .file-explorer .explorer-title {
-  font-size: 0.7rem; /* 0.82rem → 0.7rem */
+  font-size: 0.65rem; /* 0.7rem → 0.65rem - more compact */
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .file-explorer .explorer-path {
-  font-size: 0.6rem; /* 0.62rem → 0.6rem */
+  font-size: 0.58rem; /* 0.6rem → 0.58rem - more compact */
 }
 
 .file-explorer .explorer-search {
-  font-size: 0.65rem; /* 0.68rem → 0.65rem */
-  padding: 0.3rem 0.5rem; /* Reduced padding */
+  font-size: 0.62rem; /* 0.65rem → 0.62rem - more compact */
+  padding: 0.25rem 0.45rem; /* 0.3rem 0.5rem → reduced padding */
   cursor: text; /* Keep text cursor only in input */
 }
 
 .file-explorer .explorer-root-label {
-  font-size: 0.7rem; /* 0.74rem → 0.7rem */
+  font-size: 0.65rem; /* 0.7rem → 0.65rem - more compact */
   font-weight: 600;
-  margin-bottom: 0.25rem; /* 0.35rem → 0.25rem */
+  margin-bottom: 0.15rem; /* 0.25rem → 0.15rem - less space */
 }
 
 /* Compact rows - minimal borders like VSCode */
 .file-explorer .explorer-row {
-  gap: 0.35rem; /* 0.45rem → 0.35rem */
-  padding: 0.15rem 0.4rem; /* 0.25rem 0.5rem → 0.15rem 0.4rem */
+  gap: 0.3rem; /* 0.35rem → 0.3rem - more compact */
+  padding: 0.1rem 0.35rem; /* 0.15rem 0.4rem → 0.1rem 0.35rem - more compact */
   margin-bottom: 0; /* Remove margin between rows */
-  border-radius: 4px; /* 8px → 4px */
+  border-radius: 3px; /* 4px → 3px - smaller */
   border: none; /* Remove heavy borders */
   background: transparent; /* Start transparent */
   backdrop-filter: none;
@@ -70,20 +70,20 @@
 
 /* Compact expander */
 .file-explorer .explorer-expander {
-  width: 14px; /* 16px → 14px */
-  font-size: 0.7rem; /* 0.78rem → 0.7rem */
+  width: 12px; /* 14px → 12px - more compact */
+  font-size: 0.65rem; /* 0.7rem → 0.65rem - smaller */
 }
 
 /* Icon size - compact */
 .file-explorer .explorer-icon {
-  width: 16px; /* 18px → 16px */
-  height: 16px;
+  width: 15px; /* 16px → 15px - slightly smaller */
+  height: 15px;
 }
 
 /* File name - smaller */
 .file-explorer .explorer-name {
-  font-size: 0.68rem; /* 0.7rem → 0.68rem */
-  line-height: 1.4;
+  font-size: 0.65rem; /* 0.68rem → 0.65rem - more compact */
+  line-height: 1.3; /* 1.4 → 1.3 - tighter line height */
 }
 
 /* Count badge - smaller */
@@ -139,12 +139,12 @@
   justify-content: center;
 }
 
-/* Reveal in Finder button - minimal, no background */
+/* Reveal in Finder button - minimal, no background, extra compact */
 .file-explorer .reveal-in-finder-btn {
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px !important;
-  min-height: 16px !important;
+  width: 13px !important; /* 16px → 13px - more compact */
+  height: 13px !important;
+  min-width: 13px !important;
+  min-height: 13px !important;
   padding: 0 !important;
   border-radius: 0 !important; /* No border radius */
   border: none !important; /* No border */
@@ -161,8 +161,8 @@
 }
 
 .file-explorer .reveal-in-finder-btn svg {
-  width: 12px !important; /* Icon only, slightly larger for visibility */
-  height: 12px !important;
+  width: 10px !important; /* 12px → 10px - smaller icon */
+  height: 10px !important;
   opacity: 0.6 !important; /* Subtle icon */
 }
 
@@ -172,13 +172,13 @@
 
 /* Compact content padding */
 .file-explorer .explorer-content {
-  padding: 0.3rem 0.5rem 0.5rem; /* 0.45rem 0.75rem 0.85rem → reduced */
+  padding: 0.2rem 0.4rem 0.4rem; /* 0.3rem 0.5rem 0.5rem → more compact */
 }
 
 /* Header - more compact */
 .file-explorer .explorer-header {
-  padding: 0.7rem 0.85rem; /* 0.85rem 1rem → reduced */
-  gap: 0.25rem; /* 0.3rem → 0.25rem */
+  padding: 0.5rem 0.7rem; /* 0.7rem 0.85rem → more compact */
+  gap: 0.2rem; /* 0.25rem → 0.2rem - tighter spacing */
 }
 
 /* Empty state */

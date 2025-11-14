@@ -79,7 +79,7 @@ function NewTerminalModal({
   workingOn = '',
   avatar,
   personality,
-  branch = 'main',
+  branch = '',
   useWorktree = false,
   availableColors,
   selectingDirectory,
@@ -102,6 +102,8 @@ function NewTerminalModal({
   const [newBranchName, setNewBranchName] = useState('');
   const [fromCurrentBranch, setFromCurrentBranch] = useState(true);
   const [loadingBranches, setLoadingBranches] = useState(false);
+  const [isGitRepository, setIsGitRepository] = useState<boolean | null>(null);
+  const [initializingGit, setInitializingGit] = useState(false);
 
   // Custom avatar management
   const [customAvatars, setCustomAvatars] = useState<CustomAvatarInfo[]>([]);
@@ -118,10 +120,8 @@ function NewTerminalModal({
       // Load skills
       setAvailableSkills(['quack-agents-architecture', 'tauri-drag-and-drop-guide']);
 
-      // Only load branches if we don't have them yet (avoid reload on edit)
-      if (availableBranches.length === 0) {
-        loadBranches();
-      }
+      // Check if directory is a git repository and load branches
+      checkGitRepository();
 
       // Only load custom avatars if we don't have them yet (avoid reload on edit)
       if (customAvatars.length === 0) {
@@ -192,6 +192,25 @@ function NewTerminalModal({
     }
   }
 
+  async function checkGitRepository() {
+    if (!path) return;
+
+    try {
+      const isGit = await invoke<boolean>('is_git_repository', { path });
+      setIsGitRepository(isGit);
+
+      if (isGit) {
+        await loadBranches();
+      } else {
+        setAvailableBranches([]);
+      }
+    } catch (err) {
+      console.error('Failed to check Git repository:', err);
+      setIsGitRepository(false);
+      setAvailableBranches([]);
+    }
+  }
+
   async function loadBranches() {
     if (!path) return;
 
@@ -201,16 +220,41 @@ function NewTerminalModal({
         rootPath: path
       });
       setAvailableBranches(branches);
+      setIsGitRepository(true);
 
-      // Ensure 'main' is selected if branch is empty/undefined
-      if (!branch && onBranchChange) {
-        onBranchChange('main');
+      // If we have branches, select the current one or the first one
+      if (branches.length > 0 && !branch && onBranchChange) {
+        const currentBranch = branches.find(b => b.isCurrent);
+        if (currentBranch) {
+          onBranchChange(currentBranch.name);
+        } else {
+          onBranchChange(branches[0].name);
+        }
       }
     } catch (err) {
       console.warn('Could not load branches (not a git repository?):', err);
       setAvailableBranches([]);
+      setIsGitRepository(false);
     } finally {
       setLoadingBranches(false);
+    }
+  }
+
+  async function handleGitInit() {
+    if (!path) return;
+
+    setInitializingGit(true);
+    try {
+      const result = await invoke<string>('git_init', { path });
+      console.log('Git initialized:', result);
+
+      // Reload branches after initialization
+      await checkGitRepository();
+    } catch (err) {
+      console.error('Failed to initialize Git:', err);
+      alert(`Failed to initialize Git repository: ${err}`);
+    } finally {
+      setInitializingGit(false);
     }
   }
 
@@ -530,6 +574,46 @@ function NewTerminalModal({
             {selectingDirectory ? 'Opening Finder…' : 'Choose directory'}
           </button>
         </div>
+
+        {/* Show Git warning if not a repository, otherwise show Git branch section */}
+        {isGitRepository === false && path && (
+          <div className="git-warning-section">
+            <div className="git-warning-header">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span className="git-warning-title">Git repository not found</span>
+            </div>
+            <p className="git-warning-text">
+              This directory is not a Git repository. Initialize Git to use branch management features.
+            </p>
+            <button
+              type="button"
+              className="git-init-button"
+              onClick={handleGitInit}
+              disabled={initializingGit}
+            >
+              {initializingGit ? (
+                <>
+                  <span className="spinner"></span>
+                  Initializing Git...
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="6" y1="3" x2="6" y2="15"></line>
+                    <circle cx="18" cy="6" r="3"></circle>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <path d="M18 9a9 9 0 0 1-9 9"></path>
+                  </svg>
+                  Initialize Git Repository
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
         {availableBranches.length > 0 && (
           <div className="git-branch-section">

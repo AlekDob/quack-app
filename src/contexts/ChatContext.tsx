@@ -17,12 +17,19 @@ interface TokenStats {
   stepCount: number;
 }
 
+interface FileEdit {
+  filePath: string;
+  editCount: number;
+  lineNumbers: number[];
+}
+
 interface ChatContextValue {
   // Chat sessions state
   chatSessions: Map<string, ChatMessage[]>;
   chatLoadingMap: Map<string, boolean>;
   chatTokensMap: Map<string, TokenStats>;
   chatSessionIds: Map<string, string>; // Map agentId -> Claude session ID
+  sessionFileEdits: Map<string, FileEdit[]>; // Map agentId -> FileEdit[]
 
   // Agent state
   activeAgent: AgentInfo | null;
@@ -48,6 +55,11 @@ interface ChatContextValue {
   updateChatTokens: (agentId: string, tokens: Partial<TokenStats>) => void;
   setSessionId: (agentId: string, sessionId: string) => void;
 
+  // File edits tracking
+  addFileEdit: (agentId: string, filePath: string, lineNumbers?: number[]) => void;
+  clearFileEdits: (agentId: string) => void;
+  getFileEdits: (agentId: string) => FileEdit[];
+
   // Settings management
   updateAgentChatSettings: (agentId: string, settings: Partial<AgentChatSettings>) => void;
   getAgentChatSettings: (agentId: string) => AgentChatSettings;
@@ -60,6 +72,8 @@ interface ChatContextValue {
   saveChatHistory: (agentId: string) => Promise<void>;
   loadChatHistory: (agentId: string) => Promise<void>;
 }
+
+export type { FileEdit };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
@@ -75,6 +89,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
   const [chatTokensMap, setChatTokensMap] = useState<Map<string, TokenStats>>(new Map());
   const [chatSessionIds, setChatSessionIds] = useState<Map<string, string>>(new Map());
+  const [sessionFileEdits, setSessionFileEdits] = useState<Map<string, FileEdit[]>>(new Map());
 
   const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null);
   const [agentChats, setAgentChats] = useState<AgentChat[]>([]);
@@ -174,6 +189,45 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       return newMap;
     });
   }, []);
+
+  // File edits tracking
+  const addFileEdit = useCallback((agentId: string, filePath: string, lineNumbers: number[] = []) => {
+    setSessionFileEdits(prev => {
+      const newMap = new Map(prev);
+      const edits = newMap.get(agentId) || [];
+
+      // Find existing edit for this file
+      const existingEditIndex = edits.findIndex(edit => edit.filePath === filePath);
+
+      if (existingEditIndex >= 0) {
+        // Update existing edit
+        const updatedEdits = [...edits];
+        updatedEdits[existingEditIndex] = {
+          ...updatedEdits[existingEditIndex],
+          editCount: updatedEdits[existingEditIndex].editCount + 1,
+          lineNumbers: [...new Set([...updatedEdits[existingEditIndex].lineNumbers, ...lineNumbers])],
+        };
+        newMap.set(agentId, updatedEdits);
+      } else {
+        // Add new edit
+        newMap.set(agentId, [...edits, { filePath, editCount: 1, lineNumbers }]);
+      }
+
+      return newMap;
+    });
+  }, []);
+
+  const clearFileEdits = useCallback((agentId: string) => {
+    setSessionFileEdits(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(agentId);
+      return newMap;
+    });
+  }, []);
+
+  const getFileEdits = useCallback((agentId: string): FileEdit[] => {
+    return sessionFileEdits.get(agentId) || [];
+  }, [sessionFileEdits]);
 
   // Agent chat management
   const addAgentChat = useCallback((chat: AgentChat) => {
@@ -344,6 +398,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     chatLoadingMap,
     chatTokensMap,
     chatSessionIds,
+    sessionFileEdits,
     activeAgent,
     agentChats,
     activeAgentChatId,
@@ -360,6 +415,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     setChatLoading,
     updateChatTokens,
     setSessionId,
+    addFileEdit,
+    clearFileEdits,
+    getFileEdits,
     updateAgentChatSettings,
     getAgentChatSettings,
     addUsageSession,

@@ -482,15 +482,18 @@ export default function SidePanel({
     // },
   ];
 
+  // Auto-hide panel when no agent is selected
+  const shouldBeCollapsed = isCollapsed || !activeAgentId;
+
   return (
-    <aside className={`side-panel ${isCollapsed ? 'collapsed' : ''}`}>
+    <aside className={`side-panel ${shouldBeCollapsed ? 'collapsed' : ''}`}>
       {/* Toggle button */}
       {onToggleCollapse && (
         <button
           type="button"
           className="side-panel-toggle"
           onClick={onToggleCollapse}
-          aria-label={isCollapsed ? "Expand side panel" : "Collapse side panel"}
+          aria-label={shouldBeCollapsed ? "Expand side panel" : "Collapse side panel"}
         >
           <svg
             viewBox="0 0 20 20"
@@ -498,7 +501,7 @@ export default function SidePanel({
             height="16"
             aria-hidden="true"
             style={{
-              transform: isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+              transform: shouldBeCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
               transition: 'transform 0.3s ease'
             }}
           >

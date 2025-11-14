@@ -885,7 +885,7 @@ export default function ChatInput({
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault(); // DON'T stopPropagation!
     setIsDragOver(false);
 
@@ -893,6 +893,125 @@ export default function ChatInput({
 
     if (!textareaRef.current) return;
 
+    // Check if files are being dropped from Finder (native files)
+    const finderFiles = Array.from(e.dataTransfer.files);
+    if (finderFiles.length > 0) {
+      console.log('[Drop] Native files from Finder:', finderFiles.length);
+
+      // Process each file
+      for (const file of finderFiles) {
+        // Check if it's an image
+        const isImage = file.type.startsWith('image/');
+        console.log('[Drop] File:', file.name, 'Type:', file.type, 'Is Image:', isImage);
+
+        if (isImage) {
+          // Handle image: add as attachment (like paste)
+          if (attachments.length >= MAX_ATTACHMENTS) {
+            setError(`Quack! Max ${MAX_ATTACHMENTS} attachments per message.`);
+            break;
+          }
+
+          if (file.size > MAX_FILE_SIZE) {
+            setError(`Image ${file.name} is larger than 15MB.`);
+            continue;
+          }
+
+          try {
+            const extensionFromMime = mimeToExtension(file.type);
+            const nameExtension = (() => {
+              const parts = file.name?.split('.') ?? [];
+              if (parts.length > 1) {
+                return parts.pop();
+              }
+              return undefined;
+            })();
+            const extension = extensionFromMime ?? nameExtension ?? 'png';
+            const base64 = await readFileAsBase64(file);
+
+            const tempPath = await invoke<string>('save_clipboard_file', {
+              dataBase64: base64,
+              extension,
+              suggestedName: file.name ?? null,
+            });
+
+            const entry = await createAttachmentFromPath(tempPath);
+            if (entry) {
+              setAttachments((prev) => [...prev, entry]);
+              setError(null);
+            }
+          } catch (err) {
+            console.error('Failed to process dropped image', err);
+            const message =
+              err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+            setError(`Unable to attach image: ${message}`);
+          }
+        } else {
+          // Handle non-image file: insert file path
+          // Use the file path from the file object
+          // Note: In Tauri, we need to get the real path
+          try {
+            // Create a temporary path for the dropped file
+            // We can read the file and save it temporarily, then get its path
+            const fileReader = new FileReader();
+
+            fileReader.onload = async () => {
+              try {
+                const arrayBuffer = fileReader.result as ArrayBuffer;
+                const uint8Array = new Uint8Array(arrayBuffer);
+                const base64 = btoa(String.fromCharCode(...uint8Array));
+
+                // Save the file temporarily to get a path
+                const tempPath = await invoke<string>('save_clipboard_file', {
+                  dataBase64: base64,
+                  extension: file.name.split('.').pop() || 'txt',
+                  suggestedName: file.name ?? null,
+                });
+
+                // Calculate relative path if basePath is available
+                let relativePath = tempPath;
+                if (basePath && tempPath.startsWith(basePath)) {
+                  relativePath = tempPath.substring(basePath.length).replace(/^\//, '');
+                }
+
+                // Insert @file:path at cursor position
+                const cursorPos = textareaRef.current?.selectionStart || 0;
+                const beforeCursor = input.substring(0, cursorPos);
+                const afterCursor = input.substring(cursorPos);
+
+                // Add space before @ if needed
+                const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+                const prefix = needsSpaceBefore ? ' ' : '';
+                const mention = `${prefix}@file:${relativePath} `;
+                const newInput = beforeCursor + mention + afterCursor;
+
+                console.log('[Drop] New input with file path:', newInput);
+                setInput(newInput);
+
+                // Position cursor after mention
+                setTimeout(() => {
+                  if (textareaRef.current) {
+                    textareaRef.current.focus();
+                    const newCursorPos = beforeCursor.length + mention.length;
+                    textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                  }
+                }, 0);
+              } catch (err) {
+                console.error('Failed to save dropped file:', err);
+                setError(`Unable to process file: ${file.name}`);
+              }
+            };
+
+            fileReader.readAsArrayBuffer(file);
+          } catch (err) {
+            console.error('Failed to read dropped file:', err);
+            setError(`Unable to read file: ${file.name}`);
+          }
+        }
+      }
+      return;
+    }
+
+    // Fallback: handle internal file explorer drops (existing logic)
     // Try to get the dropped file data (try both formats)
     let fileDataStr = e.dataTransfer.getData('application/quack-file');
     console.log('[Drop] application/quack-file data:', fileDataStr);
@@ -967,7 +1086,7 @@ export default function ChatInput({
     } catch (err) {
       console.error('Failed to parse dropped file data:', err, fileDataStr);
     }
-  }, [input, setInput, basePath]);
+  }, [input, setInput, basePath, attachments.length, mimeToExtension, readFileAsBase64, createAttachmentFromPath]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Handle command autocomplete navigation

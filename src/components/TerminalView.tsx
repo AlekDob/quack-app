@@ -299,10 +299,27 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         setWinSizeChars: true,
       },
       theme: {
-        background: 'rgba(15, 17, 21, 0.2)',
-        foreground: '#f0f2f6',
-        cursor: '#f28c52',
-        selectionBackground: 'rgba(242, 140, 82, 0.38)',
+        background: '#000000', // Classic black background
+        foreground: '#00ff00', // Classic green text (like old terminals)
+        cursor: '#00ff00', // Green cursor
+        selectionBackground: 'rgba(0, 255, 0, 0.3)', // Green selection
+        // Classic terminal colors
+        black: '#000000',
+        red: '#cd0000',
+        green: '#00cd00',
+        yellow: '#cdcd00',
+        blue: '#0000ee',
+        magenta: '#cd00cd',
+        cyan: '#00cdcd',
+        white: '#e5e5e5',
+        brightBlack: '#7f7f7f',
+        brightRed: '#ff0000',
+        brightGreen: '#00ff00',
+        brightYellow: '#ffff00',
+        brightBlue: '#5c5cff',
+        brightMagenta: '#ff00ff',
+        brightCyan: '#00ffff',
+        brightWhite: '#ffffff',
       },
     })
 

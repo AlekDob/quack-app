@@ -136,22 +136,12 @@ export const ClaudeAuthBanner: React.FC<ClaudeAuthBannerProps> = ({
           <AlertCircle className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-white mb-1">
-            Claude Code CLI Not Available
+          <p className="text-sm font-bold text-white mb-2">
+            Authentication Required
           </p>
-          <p className="text-xs text-gray-200 mb-2">
-            To use AI chat features, please authenticate Claude Code from your terminal:
+          <p className="text-xs text-gray-200 mb-3">
+            Configure authentication to use AI features. Open Settings for detailed instructions.
           </p>
-          <ol className="text-xs text-gray-200 space-y-1 list-decimal list-inside">
-            <li className="flex items-center gap-2">
-              <Terminal className="w-3 h-3 text-orange-300 flex-shrink-0" />
-              <span>
-                Run: <code className="px-1.5 py-0.5 bg-black/30 rounded text-orange-200 font-mono">claude /login</code>
-              </span>
-            </li>
-            <li>Follow the authentication process in your browser</li>
-            <li>Restart Quack to detect the credentials</li>
-          </ol>
         </div>
       </div>
 

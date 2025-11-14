@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
+import EditSummaryBar from './EditSummaryBar';
 import type { ChatMessage, AgentInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -11,6 +12,16 @@ import type {
   PermissionMode,
 } from '../hooks/useClaudeChat';
 import './ChatView.css';
+
+interface FileEdit {
+  filePath: string;
+  editCount: number;
+  lineNumbers: number[];
+}
+
+interface FileDeleted {
+  filePath: string;
+}
 
 interface ChatViewProps {
   messages: ChatMessage[];
@@ -158,6 +169,73 @@ export default function ChatView({
     });
   };
 
+  // Track file edits and deletions from the LAST assistant message only
+  const { currentFileEdits, currentFileDeletes } = useMemo(() => {
+    // Find the last assistant message (most recent AI response)
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find(msg => msg.role === 'assistant');
+
+    if (!lastAssistantMessage) return { currentFileEdits: [], currentFileDeletes: [] };
+
+    // Collect file edits and deletions from tool calls in the last message
+    const fileEdits: Map<string, FileEdit> = new Map();
+    const fileDeletes: Set<string> = new Set();
+
+    // Check if message has events (ClaudeEvent[] format)
+    if (lastAssistantMessage.events && Array.isArray(lastAssistantMessage.events)) {
+      lastAssistantMessage.events.forEach((event: any) => {
+        if (event.type === 'assistant' && event.message?.content) {
+          const content = event.message.content;
+          if (Array.isArray(content)) {
+            content.forEach((item: any) => {
+              if (item.type === 'tool_use') {
+                const toolName = item.name?.toLowerCase();
+                const input = item.input;
+
+                // Track Edit and Write tool calls
+                if ((toolName === 'edit' || toolName === 'write') && input?.file_path) {
+                  const filePath = input.file_path;
+                  if (!fileEdits.has(filePath)) {
+                    fileEdits.set(filePath, {
+                      filePath,
+                      editCount: 0,
+                      lineNumbers: [],
+                    });
+                  }
+                  const edit = fileEdits.get(filePath)!;
+                  edit.editCount++;
+                }
+
+                // Track Bash commands with rm
+                if (toolName === 'bash' && input?.command) {
+                  const command = input.command as string;
+                  // Match rm commands: rm file.txt, rm -rf dir/, rm *.txt, etc.
+                  const rmMatch = command.match(/\brm\s+(?:-[^\s]*\s+)?(.+)/);
+                  if (rmMatch) {
+                    const filePaths = rmMatch[1].split(/\s+/).filter(p => p && !p.startsWith('-'));
+                    filePaths.forEach(path => {
+                      // Clean up the path (remove quotes, wildcards for display)
+                      const cleanPath = path.replace(/['"]/g, '').trim();
+                      if (cleanPath) {
+                        fileDeletes.add(cleanPath);
+                      }
+                    });
+                  }
+                }
+              }
+            });
+          }
+        }
+      });
+    }
+
+    return {
+      currentFileEdits: Array.from(fileEdits.values()),
+      currentFileDeletes: Array.from(fileDeletes).map(filePath => ({ filePath }))
+    };
+  }, [messages]);
+
   // Keyboard shortcuts: Shift+Tab to cycle modes, ESC to abort
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -213,6 +291,19 @@ export default function ChatView({
         projectName={projectName}
         gitBranch={gitBranch}
       />
+      {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
+        <EditSummaryBar
+          edits={currentFileEdits}
+          deletes={currentFileDeletes}
+          onFileClick={onFilePathClick}
+          onClear={() => {
+            // The edits are derived from messages, so to "clear" them
+            // we would need to modify the messages array (not recommended)
+            // Instead, just hide the bar by doing nothing
+            console.log('Edits are automatically cleared when a new message arrives');
+          }}
+        />
+      )}
       <div className="chat-view-footer">
         <div className="chat-view-footer-controls">
           <ChatSettingsMenu

@@ -764,7 +764,8 @@ export default function TerminalSidebar({
               <button
                 type="button"
                 onClick={onCreateAgent}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2"
+                className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 animated-button"
+                title="Start to Quack"
                 style={{
                   background: 'rgba(242, 140, 82, 0.1)',
                   border: '1px solid rgba(242, 140, 82, 0.3)',
@@ -783,7 +784,7 @@ export default function TerminalSidebar({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                Create your first agent
+                <span className="typewriter-text"></span>
               </button>
             </div>
           </div>

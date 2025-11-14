@@ -439,6 +439,11 @@ pub fn open_file_in_editor(path: String) -> Result<(), String> {
     open_file_in_editor_impl(path).map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+pub fn open_file_externally(path: String) -> Result<(), String> {
+    open_file_externally_impl(path).map_err(|err| err.to_string())
+}
+
 fn open_file_in_editor_impl(path: String) -> Result<()> {
     let file_path = PathBuf::from(&path);
 
@@ -534,6 +539,41 @@ fn open_file_in_editor_impl(path: String) -> Result<()> {
                 .spawn()
                 .with_context(|| format!("Failed to open file {:?}", file_path))?;
         }
+    }
+
+    Ok(())
+}
+
+fn open_file_externally_impl(path: String) -> Result<()> {
+    let file_path = PathBuf::from(&path);
+
+    if !file_path.exists() {
+        return Err(anyhow!("File does not exist: {:?}", file_path));
+    }
+
+    // Use platform-specific command to open file with default application
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&file_path)
+            .spawn()
+            .with_context(|| format!("Failed to open file {:?}", file_path))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&file_path)
+            .spawn()
+            .with_context(|| format!("Failed to open file {:?}", file_path))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(&["/C", "start", "", path.as_str()])
+            .spawn()
+            .with_context(|| format!("Failed to open file {:?}", file_path))?;
     }
 
     Ok(())

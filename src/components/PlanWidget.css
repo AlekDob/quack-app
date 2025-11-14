@@ -1,10 +1,10 @@
 .plan-widget {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
   border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 12px;
-  margin: 12px 0;
+  border-radius: 8px; /* 12px → 8px - more compact */
+  margin: 8px 0; /* 12px → 8px - less vertical space */
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08); /* Smaller shadow */
   animation: plan-slide-in 0.3s ease-out;
 }
 
@@ -23,7 +23,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 10px 12px; /* 14px 16px → 10px 12px - more compact */
   cursor: pointer;
   user-select: none;
   background: rgba(255, 255, 255, 0.4);
@@ -38,17 +38,19 @@
 .plan-widget-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px; /* 10px → 8px - tighter spacing */
   flex: 1;
 }
 
 .plan-widget-icon {
   color: #6366f1;
   flex-shrink: 0;
+  width: 16px; /* Slightly smaller icon */
+  height: 16px;
 }
 
 .plan-title-text {
-  font-size: 14px;
+  font-size: 13px; /* 14px → 13px - smaller */
   font-weight: 600;
   color: #1e293b;
 }
@@ -56,12 +58,12 @@
 .plan-widget-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 2px 6px; /* 2px 8px → 2px 6px - more compact */
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
-  font-size: 11px;
+  font-size: 10px; /* 11px → 10px - smaller */
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 4px; /* 6px → 4px - smaller */
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -69,20 +71,25 @@
 .plan-widget-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px; /* 8px → 6px - tighter spacing */
 }
 
 .plan-widget-copy-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 4px; /* 6px → 4px - smaller button */
   background: rgba(99, 102, 241, 0.1);
   border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 6px;
+  border-radius: 4px; /* 6px → 4px - smaller */
   cursor: pointer;
   transition: all 0.2s ease;
   color: #6366f1;
+}
+
+.plan-widget-copy-btn svg {
+  width: 14px; /* Smaller icon */
+  height: 14px;
 }
 
 .plan-widget-copy-btn:hover {
@@ -109,9 +116,10 @@
 }
 
 .plan-widget-markdown {
-  padding: 16px 20px;
+  padding: 12px 14px; /* 16px 20px → 12px 14px - more compact */
   color: #334155;
-  line-height: 1.6;
+  line-height: 1.5; /* 1.6 → 1.5 - tighter line height */
+  font-size: 13px; /* Smaller base font */
 }
 
 /* Style markdown headers inside plan */
@@ -119,36 +127,36 @@
 .plan-widget-markdown h2,
 .plan-widget-markdown h3 {
   color: #6366f1;
-  margin-top: 16px;
-  margin-bottom: 8px;
+  margin-top: 12px; /* 16px → 12px - less vertical space */
+  margin-bottom: 6px; /* 8px → 6px - less vertical space */
 }
 
 .plan-widget-markdown h1 {
-  font-size: 15px;
+  font-size: 14px; /* 15px → 14px - smaller */
   font-weight: 700;
   border-bottom: 2px solid rgba(99, 102, 241, 0.2);
-  padding-bottom: 6px;
+  padding-bottom: 4px; /* 6px → 4px - more compact */
 }
 
 .plan-widget-markdown h2 {
-  font-size: 14px;
+  font-size: 13px; /* 14px → 13px - smaller */
   font-weight: 600;
 }
 
 .plan-widget-markdown h3 {
-  font-size: 12px;
+  font-size: 12px; /* Same - already small */
   font-weight: 600;
 }
 
 .plan-widget-markdown ul,
 .plan-widget-markdown ol {
-  margin-left: 20px;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-left: 16px; /* 20px → 16px - less indent */
+  margin-top: 6px; /* 8px → 6px - less vertical space */
+  margin-bottom: 6px; /* 8px → 6px - less vertical space */
 }
 
 .plan-widget-markdown li {
-  margin-bottom: 4px;
+  margin-bottom: 3px; /* 4px → 3px - tighter spacing */
 }
 
 .plan-widget-markdown strong {
@@ -159,18 +167,18 @@
 .plan-widget-markdown code {
   background: rgba(99, 102, 241, 0.1);
   color: #6366f1;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: 1px 4px; /* 2px 6px → 1px 4px - more compact */
+  border-radius: 3px; /* 4px → 3px - smaller */
+  font-size: 12px; /* 13px → 12px - smaller */
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 .plan-widget-markdown p {
-  margin-bottom: 8px;
+  margin-bottom: 6px; /* 8px → 6px - less vertical space */
 }
 
 .plan-widget-footer {
-  padding: 12px 16px;
+  padding: 8px 12px; /* 12px 16px → 8px 12px - more compact */
   background: rgba(99, 102, 241, 0.05);
   border-top: 1px solid rgba(99, 102, 241, 0.1);
 }
@@ -178,14 +186,16 @@
 .plan-widget-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px; /* 8px → 6px - tighter spacing */
+  font-size: 11px; /* 12px → 11px - smaller */
   color: #64748b;
 }
 
 .plan-widget-info svg {
   color: #6366f1;
   flex-shrink: 0;
+  width: 14px; /* Smaller icon */
+  height: 14px;
 }
 
 /* Dark mode support */
