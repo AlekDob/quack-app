@@ -1522,6 +1522,7 @@ button.directory-chooser:hover {
   overflow-wrap: break-word;
   line-height: 1.2;
   margin-top: -0.2rem;
+  text-align: left;
 }
 
 .terminal-status {
