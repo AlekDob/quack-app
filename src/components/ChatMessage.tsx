@@ -347,21 +347,27 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
             {message.events.map((event, idx) => {
-              // Generate unique key based on event properties to avoid React key warnings and duplicate rendering
+              // Generate unique key based on event properties (deduplicated by useClaudeChat)
+              // Priority: Use stable IDs from event data, avoid using index
               const eventKey = (() => {
-                // Try to use session_id if available
+                // System events: Use subtype + session_id (guaranteed unique)
+                if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
+                  return `system-${event.subtype}-${event.session_id}`;
+                }
+                // Assistant events: Use message ID if available
+                if (event.type === 'assistant' && 'message' in event && event.message?.id) {
+                  return `assistant-${event.message.id}`;
+                }
+                // Result events: Use session_id (only one result per session)
+                if (event.type === 'result' && 'session_id' in event) {
+                  return `result-${event.session_id}`;
+                }
+                // User events: Use session_id + index as fallback
                 if ('session_id' in event && event.session_id) {
                   return `${event.type}-${event.session_id}-${idx}`;
                 }
-                // For assistant events with content blocks, use first content block ID if available
-                if (event.type === 'assistant' && 'content' in event && Array.isArray(event.content) && event.content.length > 0) {
-                  const firstBlock = event.content[0];
-                  if ('id' in firstBlock && firstBlock.id) {
-                    return `${event.type}-${firstBlock.id}-${idx}`;
-                  }
-                }
-                // Fallback to timestamp + index
-                return `${event.type}-${message.timestamp}-${idx}`;
+                // Fallback: Use message ID + index (last resort)
+                return `${event.type}-${message.id}-${idx}`;
               })();
 
               return (

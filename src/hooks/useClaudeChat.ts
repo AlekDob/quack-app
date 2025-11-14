@@ -116,12 +116,42 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       });
 
       const events: ClaudeEvent[] = [];
+      const seenEventIds = new Set<string>(); // Track unique event identifiers
       let assistantContent = '';
+
+      // Helper function to generate unique event ID for deduplication
+      const getEventId = (event: ClaudeEvent): string => {
+        if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
+          return `system-${event.subtype}-${event.session_id}`;
+        }
+        if (event.type === 'assistant' && 'message' in event && event.message?.id) {
+          return `assistant-${event.message.id}`;
+        }
+        if (event.type === 'user' && 'session_id' in event) {
+          // User events might not have unique IDs, use session + timestamp hash
+          const hash = JSON.stringify(event).substring(0, 50);
+          return `user-${event.session_id}-${hash}`;
+        }
+        if (event.type === 'result' && 'session_id' in event) {
+          return `result-${event.session_id}`;
+        }
+        // Fallback: use full JSON hash for unknown event types
+        return `${event.type}-${JSON.stringify(event).substring(0, 100)}`;
+      };
 
       // Process streaming events
       for await (const chunk of stream) {
         if (chunk.type === 'event' && chunk.event) {
           const event = chunk.event;
+
+          // ✅ Deduplicate events using unique ID
+          const eventId = getEventId(event);
+          if (seenEventIds.has(eventId)) {
+            console.warn('[useClaudeChat] Duplicate event detected and skipped:', eventId);
+            continue; // Skip duplicate event
+          }
+
+          seenEventIds.add(eventId);
           events.push(event);
 
           // Capture session ID from system init event
@@ -165,7 +195,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             }));
           }
 
-          // Update message with streaming content
+          // Update message with streaming content (events array is already deduplicated)
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
@@ -173,7 +203,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
                     ...msg,
                     content: assistantContent,
                     status: 'streaming' as const,
-                    events: [...events],
+                    events: [...events], // Already deduplicated array
                   }
                 : msg
             )

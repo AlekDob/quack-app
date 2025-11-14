@@ -190,6 +190,11 @@
   - `assistant`: Assistant messages with text and tool_use blocks
   - `user`: User messages with tool_result blocks
   - `result`: Final results with usage stats and cost tracking
+  - **Event Deduplication**: Implemented in `useClaudeChat.ts` to prevent duplicate rendering
+    - Tracks unique event IDs using a `Set<string>` during streaming
+    - Generates stable IDs based on event type and properties (session_id, message.id, etc.)
+    - Skips duplicate events with warning logs for debugging
+    - Ensures clean UI rendering without visual duplicates
 - **HTTP Hooks**: External tool integration via `http://127.0.0.1:6768/terminal/status`
   - Receives status updates from Claude Code, Factory.ai, or other tools
   - Payload: `{ id/label, status: "busy"|"idle", notify: bool }`

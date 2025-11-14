@@ -1,6 +1,17 @@
+/**
+ * New Terminal Modal - REFACTORED with 2-Step Process
+ *
+ * Step 1: Project Context (Directory + Git Branch)
+ * Step 2: Agent Selection (Choose existing OR Create new)
+ *
+ * This version integrates with the agent storage system to allow
+ * reusing agents across multiple projects.
+ */
+
 import { useState, useEffect, useRef } from 'react';
-import type { AgentPersonality, GitBranch } from '../types';
+import type { AgentPersonality, GitBranch, SavedAgent } from '../types';
 import PersonalityBuilder from './PersonalityBuilder';
+import AgentSelector from './AgentSelector';
 import { invoke } from '@tauri-apps/api/core';
 import {
   uploadCustomAvatar,
@@ -11,6 +22,7 @@ import {
   revokeAvatarUrl,
   type CustomAvatarInfo
 } from '../utils/customAvatarStorage';
+import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
 
 // Available duck avatars from /images/ducks/avatars/
 const AVAILABLE_AVATARS = [
@@ -32,14 +44,11 @@ const AVAILABLE_AVATARS = [
   'fa574b2f56d31adfc5900e4bfd116f9cddff17a0.png',
 ]
 
-// Helper function to get avatar image URL (works in both dev and production)
+// Helper function to get avatar image URL
 function getAvatarUrl(avatarName: string): string {
-  // Check if we're in Tauri context
   if (window.__TAURI__) {
-    // In Tauri v2, use asset:// protocol for bundled resources
     return `asset://localhost/images/ducks/avatars/${avatarName}`;
   }
-  // In dev mode, use standard public path
   return `/images/ducks/avatars/${avatarName}`;
 }
 
@@ -70,6 +79,9 @@ interface NewTerminalModalProps {
   onConfirm: () => void
 }
 
+type ModalStep = 'context' | 'agent';
+type AgentMode = 'select' | 'create';
+
 function NewTerminalModal({
   open,
   isEditing = false,
@@ -96,6 +108,11 @@ function NewTerminalModal({
   onCancel,
   onConfirm,
 }: NewTerminalModalProps) {
+  // Step management
+  const [currentStep, setCurrentStep] = useState<ModalStep>('context');
+  const [agentMode, setAgentMode] = useState<AgentMode>('select');
+
+  // Git branch state
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
   const [availableBranches, setAvailableBranches] = useState<GitBranch[]>([]);
   const [branchMode, setBranchMode] = useState<'existing' | 'new'>('existing');
@@ -113,36 +130,36 @@ function NewTerminalModal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load available skills and branches from backend
-  // CRITICAL FIX: Only load data when modal opens, not when editing
+  // Reset to step 1 when modal opens
+  useEffect(() => {
+    if (open) {
+      setCurrentStep('context');
+      setAgentMode('select');
+    }
+  }, [open]);
+
+  // Load data when modal opens
   useEffect(() => {
     if (open && path) {
-      // Load skills
       setAvailableSkills(['quack-agents-architecture', 'tauri-drag-and-drop-guide']);
-
-      // Check if directory is a git repository and load branches
       checkGitRepository();
 
-      // Only load custom avatars if we don't have them yet (avoid reload on edit)
       if (customAvatars.length === 0) {
         loadCustomAvatars();
       }
     }
   }, [open, path]);
 
-  // Cleanup blob URLs ONLY on component unmount (not when modal closes)
-  // CRITICAL FIX: Keep blob URLs cached for better performance when reopening modal
+  // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
-      // Cleanup ALL blob URLs only when component unmounts
       Object.values(customAvatarUrls).forEach(url => {
         if (url && url.startsWith('blob:')) {
           revokeAvatarUrl(url);
         }
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps = only runs on unmount
+  }, []);
 
   async function loadCustomAvatars() {
     setLoadingAvatars(true);
@@ -150,10 +167,8 @@ function NewTerminalModal({
       const avatars = await listCustomAvatars();
       setCustomAvatars(avatars);
 
-      // CRITICAL FIX: Load avatars in BATCHES with DELAY to prevent UI freeze
-      // Limit parallel loading to max 3 avatars at a time
       const BATCH_SIZE = 3;
-      const BATCH_DELAY = 50; // ms delay between batches to keep UI responsive
+      const BATCH_DELAY = 50;
 
       for (let i = 0; i < avatars.length; i += BATCH_SIZE) {
         const batch = avatars.slice(i, i + BATCH_SIZE);
@@ -167,10 +182,7 @@ function NewTerminalModal({
           }
         });
 
-        // Wait for current batch to complete
         const batchResults = await Promise.all(batchPromises);
-
-        // Update state progressively (show avatars as they load)
         const newUrls: Record<string, string> = {};
         batchResults.forEach(result => {
           if (result.url) {
@@ -180,7 +192,6 @@ function NewTerminalModal({
 
         setCustomAvatarUrls(prev => ({ ...prev, ...newUrls }));
 
-        // Add delay between batches to keep UI responsive
         if (i + BATCH_SIZE < avatars.length) {
           await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
@@ -222,7 +233,6 @@ function NewTerminalModal({
       setAvailableBranches(branches);
       setIsGitRepository(true);
 
-      // If we have branches, select the current one or the first one
       if (branches.length > 0 && !branch && onBranchChange) {
         const currentBranch = branches.find(b => b.isCurrent);
         if (currentBranch) {
@@ -247,8 +257,6 @@ function NewTerminalModal({
     try {
       const result = await invoke<string>('git_init', { path });
       console.log('Git initialized:', result);
-
-      // Reload branches after initialization
       await checkGitRepository();
     } catch (err) {
       console.error('Failed to initialize Git:', err);
@@ -258,10 +266,9 @@ function NewTerminalModal({
     }
   }
 
-  // Track previous branch mode to detect changes and prevent loops
+  // Branch name generation
   const prevBranchModeRef = useRef<'existing' | 'new'>(branchMode);
 
-  // Generate suggested branch name based on agent name
   useEffect(() => {
     if (branchMode === 'new' && name && !newBranchName) {
       const sanitized = name
@@ -272,35 +279,27 @@ function NewTerminalModal({
     }
   }, [branchMode, name, newBranchName]);
 
-  // Sync newBranchName to parent when in "new" mode
-  // CRITICAL FIX: Remove onBranchChange from deps to prevent infinite loops
   useEffect(() => {
     if (branchMode === 'new' && newBranchName) {
       onBranchChange?.(newBranchName);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchMode, newBranchName]);
 
-  // Reset to current branch when switching back to "existing" mode
-  // CRITICAL FIX: Only trigger when mode actually changes, not on every render
   useEffect(() => {
     const modeChanged = prevBranchModeRef.current !== branchMode;
     prevBranchModeRef.current = branchMode;
 
     if (modeChanged && branchMode === 'existing' && availableBranches.length > 0) {
-      // Use the current branch or first available branch
       const currentBranch = availableBranches.find(b => b.isCurrent);
       onBranchChange?.(currentBranch?.name || availableBranches[0]?.name || 'main');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchMode, availableBranches.length]); // Don't depend on full availableBranches array
+  }, [branchMode, availableBranches.length]);
 
-  // Handle custom avatar upload
+  // Avatar upload
   async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file
     const validationError = validateAvatarFile(file);
     if (validationError) {
       setUploadError(validationError);
@@ -311,31 +310,22 @@ function NewTerminalModal({
     setUploadError(null);
 
     try {
-      // Upload avatar
       const avatarInfo = await uploadCustomAvatar(file);
-
-      // Get avatar URL
       const avatarUrl = await getCustomAvatarUrl(avatarInfo.id);
-
-      // Update custom avatars list
       setCustomAvatars(prev => [avatarInfo, ...prev]);
       setCustomAvatarUrls(prev => ({ ...prev, [avatarInfo.id]: avatarUrl }));
-
-      // Select the newly uploaded avatar
       onAvatarChange?.(avatarInfo.id);
     } catch (err) {
       console.error('Failed to upload avatar:', err);
       setUploadError('Failed to upload avatar. Please try again.');
-    } finally{
+    } finally {
       setUploadingAvatar(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   }
 
-  // Handle custom avatar deletion
   async function handleDeleteCustomAvatar(avatarId: string, event: React.MouseEvent) {
     event.stopPropagation();
     event.preventDefault();
@@ -346,8 +336,6 @@ function NewTerminalModal({
 
     try {
       await deleteCustomAvatar(avatarId);
-
-      // Remove from state
       setCustomAvatars(prev => prev.filter(a => a.id !== avatarId));
       setCustomAvatarUrls(prev => {
         const newUrls = { ...prev };
@@ -355,29 +343,87 @@ function NewTerminalModal({
         return newUrls;
       });
 
-      // If this was the selected avatar, clear selection
       if (avatar === avatarId) {
         onAvatarChange?.('');
       }
-
-      console.log('Custom avatar deleted:', avatarId);
     } catch (err) {
       console.error('Failed to delete custom avatar:', err);
       alert('Failed to delete avatar. Please try again.');
     }
   }
 
+  // Agent selection handlers
+  function handleSelectAgent(agent: SavedAgent) {
+    // Load agent data into form
+    onNameChange(agent.name);
+    onColorChange(agent.color);
+    onAvatarChange?.(agent.avatar);
+    onWorkingOnChange?.(agent.workingOn || '');
+    onPersonalityChange?.(agent.personality);
+
+    // Mark agent as used
+    markAgentAsUsed(agent.id);
+
+    // Move to confirm
+    setAgentMode('create');
+  }
+
+  function handleCreateNewAgent() {
+    setAgentMode('create');
+  }
+
+  function handleBackToAgentSelection() {
+    setAgentMode('select');
+  }
+
+  function handleBackToContext() {
+    setCurrentStep('context');
+    setAgentMode('select');
+  }
+
+  function handleContinueToAgent() {
+    if (!path.trim()) {
+      alert('Please select a working directory');
+      return;
+    }
+    setCurrentStep('agent');
+  }
+
+  async function handleFinalConfirm() {
+    // Save agent to storage before creating terminal
+    try {
+      saveAgent({
+        name,
+        avatar: avatar || '',
+        color,
+        workingOn,
+        personality: personality || {}
+      });
+    } catch (err) {
+      console.warn('Failed to save agent to storage:', err);
+      // Don't block terminal creation if save fails
+    }
+
+    // Call original onConfirm
+    onConfirm();
+  }
+
   if (!open) {
-    return null
+    return null;
   }
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel agent-modal">
+        {/* Header */}
         <div className="modal-header">
           <div>
-            <h2>{isEditing ? '✏️ Edit agent' : '✨ Create new agent'}</h2>
-            <p className="modal-subtitle">Configure your agent settings</p>
+            <h2>
+              {isEditing ? '✏️ Edit agent' : '✨ Create new agent'}
+            </h2>
+            <p className="modal-subtitle">
+              {currentStep === 'context' ? 'Step 1: Project Context' : 'Step 2: Choose Agent'}
+            </p>
           </div>
           <button
             type="button"
@@ -392,400 +438,428 @@ function NewTerminalModal({
           </button>
         </div>
 
-        <label className="modal-field">
-          <span className="field-label">Agent name</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="e.g. API Server"
-            autoFocus
-          />
-        </label>
-
-        <div className="modal-field">
-          <span className="field-label">Avatar</span>
-          <span className="field-hint">
-            {customAvatars.length > 0 ? 'Custom and default avatars ↓' : 'Scroll for more avatars ↓'}
-          </span>
-          {uploadError && (
-            <div className="avatar-upload-error">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              {uploadError}
-            </div>
-          )}
-          <div className="avatar-grid-container">
-            <div className="avatar-grid">
-              {/* Upload Button - First Item */}
+        {/* STEP 1: Project Context */}
+        {currentStep === 'context' && (
+          <>
+            <div className="modal-field">
+              <span className="field-label">Working directory</span>
+              <div className="modal-selected-path">{path || 'No directory selected'}</div>
               <button
                 type="button"
-                className="avatar-upload-button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAvatar}
-                aria-label="Upload custom avatar"
+                className="directory-chooser"
+                onClick={onBrowse}
+                disabled={selectingDirectory}
               >
-                {uploadingAvatar ? (
-                  <div className="avatar-upload-spinner">
-                    <svg className="spinner-icon" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10" strokeWidth="3" />
-                    </svg>
-                  </div>
-                ) : (
-                  <>
-                    <svg className="plus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    <span className="upload-label">Upload</span>
-                  </>
-                )}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                {selectingDirectory ? 'Opening Finder…' : 'Choose directory'}
               </button>
+            </div>
 
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                style={{ display: 'none' }}
-              />
-
-              {/* Custom Avatars */}
-              {customAvatars.map((customAvatar) => (
+            {/* Git Section */}
+            {isGitRepository === false && path && (
+              <div className="git-warning-section">
+                <div className="git-warning-header">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <span className="git-warning-title">Git repository not found</span>
+                </div>
+                <p className="git-warning-text">
+                  This directory is not a Git repository. Initialize Git to use branch management features.
+                </p>
                 <button
-                  key={customAvatar.id}
                   type="button"
-                  className={`avatar-option custom-avatar ${avatar === customAvatar.id ? 'selected' : ''} ${!customAvatarUrls[customAvatar.id] && loadingAvatars ? 'loading' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    // Only allow selection if avatar is loaded
-                    if (customAvatarUrls[customAvatar.id]) {
-                      onAvatarChange?.(customAvatar.id);
-                    }
-                  }}
-                  aria-label={`Select custom avatar ${customAvatar.originalName}`}
-                  disabled={!customAvatarUrls[customAvatar.id] && loadingAvatars}
+                  className="git-init-button"
+                  onClick={handleGitInit}
+                  disabled={initializingGit}
                 >
-                  {customAvatarUrls[customAvatar.id] ? (
-                    <img
-                      src={customAvatarUrls[customAvatar.id]}
-                      alt={customAvatar.originalName}
-                      className="avatar-image"
-                    />
-                  ) : loadingAvatars ? (
-                    // Show spinner while loading
-                    <div className="avatar-loading-spinner">
-                      <svg className="spinner-icon" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                  {initializingGit ? (
+                    <>
+                      <span className="spinner"></span>
+                      Initializing Git...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="6" y1="3" x2="6" y2="15"></line>
+                        <circle cx="18" cy="6" r="3"></circle>
+                        <circle cx="6" cy="18" r="3"></circle>
+                        <path d="M18 9a9 9 0 0 1-9 9"></path>
                       </svg>
-                    </div>
-                  ) : null}
-                  {/* Delete button for custom avatars - only show when loaded */}
-                  {customAvatarUrls[customAvatar.id] && (
-                    <button
-                      type="button"
-                      className="avatar-delete-button"
-                      onClick={(e) => handleDeleteCustomAvatar(customAvatar.id, e)}
-                      aria-label="Delete custom avatar"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
+                      Initialize Git Repository
+                    </>
                   )}
                 </button>
-              ))}
+              </div>
+            )}
 
-              {/* Default Avatars */}
-              {AVAILABLE_AVATARS.map((avatarName) => (
-                <button
-                  key={avatarName}
-                  type="button"
-                  className={`avatar-option ${avatar === avatarName ? 'selected' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Avatar clicked:', avatarName);
-                    onAvatarChange?.(avatarName);
-                  }}
-                  aria-label={`Select ${avatarName} avatar`}
-                >
-                  <img
-                    src={getAvatarUrl(avatarName)}
-                    alt={avatarName}
-                    className="avatar-image"
-                    onError={(e) => {
-                      // If image fails to load, show a placeholder
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      console.error(`Failed to load avatar: ${avatarName}`);
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="modal-field">
-          <span className="field-label">Agent color</span>
-          <div className="modal-color-grid">
-            {availableColors.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className={`modal-color-swatch ${preset === color ? 'selected' : ''}`}
-                style={{ backgroundColor: preset }}
-                onClick={() => onColorChange(preset)}
-                aria-label={`Select color ${preset}`}
-              />
-            ))}
-            <label className="modal-color-picker">
-              <input
-                type="color"
-                value={color}
-                onChange={(event) => onColorChange(event.target.value)}
-                aria-label="Choose a custom color"
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="modal-section-divider" />
-
-        <div className="modal-field">
-          <span className="field-label">Working directory</span>
-          <div className="modal-selected-path">{path || 'No directory selected'}</div>
-          <button
-            type="button"
-            className="directory-chooser"
-            onClick={onBrowse}
-            disabled={selectingDirectory}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-            {selectingDirectory ? 'Opening Finder…' : 'Choose directory'}
-          </button>
-        </div>
-
-        {/* Show Git warning if not a repository, otherwise show Git branch section */}
-        {isGitRepository === false && path && (
-          <div className="git-warning-section">
-            <div className="git-warning-header">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <span className="git-warning-title">Git repository not found</span>
-            </div>
-            <p className="git-warning-text">
-              This directory is not a Git repository. Initialize Git to use branch management features.
-            </p>
-            <button
-              type="button"
-              className="git-init-button"
-              onClick={handleGitInit}
-              disabled={initializingGit}
-            >
-              {initializingGit ? (
-                <>
-                  <span className="spinner"></span>
-                  Initializing Git...
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {availableBranches.length > 0 && (
+              <div className="git-branch-section">
+                <div className="git-branch-header">
+                  <svg className="git-branch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="6" y1="3" x2="6" y2="15"></line>
                     <circle cx="18" cy="6" r="3"></circle>
                     <circle cx="6" cy="18" r="3"></circle>
                     <path d="M18 9a9 9 0 0 1-9 9"></path>
                   </svg>
-                  Initialize Git Repository
-                </>
-              )}
-            </button>
-          </div>
-        )}
+                  <div className="git-branch-header-text">
+                    <span className="git-branch-title">Git Branch</span>
+                    <span className="git-branch-subtitle">Agent workspace</span>
+                  </div>
+                  <span className="git-badge">GIT</span>
+                </div>
 
-        {availableBranches.length > 0 && (
-          <div className="git-branch-section">
-            <div className="git-branch-header">
-              <svg className="git-branch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="6" y1="3" x2="6" y2="15"></line>
-                <circle cx="18" cy="6" r="3"></circle>
-                <circle cx="6" cy="18" r="3"></circle>
-                <path d="M18 9a9 9 0 0 1-9 9"></path>
-              </svg>
-              <div className="git-branch-header-text">
-                <span className="git-branch-title">Git Branch</span>
-                <span className="git-branch-subtitle">Agent workspace</span>
+                <div className="git-branch-mode-selector">
+                  <label className={`git-mode-option ${branchMode === 'existing' ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      checked={branchMode === 'existing'}
+                      onChange={() => setBranchMode('existing')}
+                    />
+                    <svg className="git-mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="6" y1="3" x2="6" y2="15"></line>
+                      <circle cx="18" cy="6" r="3"></circle>
+                      <circle cx="6" cy="18" r="3"></circle>
+                      <path d="M18 9a9 9 0 0 1-9 9"></path>
+                    </svg>
+                    <span>Use existing</span>
+                  </label>
+                  <label className={`git-mode-option ${branchMode === 'new' ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      checked={branchMode === 'new'}
+                      onChange={() => setBranchMode('new')}
+                    />
+                    <svg className="git-mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="16"></line>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    <span>Create new</span>
+                  </label>
+                </div>
+
+                {branchMode === 'existing' ? (
+                  <div className="git-branch-input-wrapper">
+                    <select
+                      value={branch}
+                      onChange={(e) => onBranchChange?.(e.target.value)}
+                      disabled={loadingBranches}
+                      className="git-branch-select"
+                    >
+                      {loadingBranches ? (
+                        <option>Loading branches...</option>
+                      ) : (
+                        availableBranches.map((b) => (
+                          <option key={b.name} value={b.name}>
+                            {b.name} {b.isCurrent ? '⭐' : ''} {b.hasRemote ? '☁️' : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <svg className="git-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="git-branch-create-mode">
+                    <input
+                      type="text"
+                      value={newBranchName}
+                      onChange={(e) => setNewBranchName(e.target.value)}
+                      placeholder="e.g., feature/agent-name"
+                      className="git-branch-input"
+                    />
+                    <label className="git-branch-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={fromCurrentBranch}
+                        onChange={(e) => setFromCurrentBranch(e.target.checked)}
+                      />
+                      <span className="git-checkbox-checkmark"></span>
+                      <span className="git-checkbox-label">
+                        Branch from current ({availableBranches.find(b => b.isCurrent)?.name || 'main'})
+                      </span>
+                    </label>
+                    <small className="git-branch-hint">
+                      🌿 Agent will work on this branch independently
+                    </small>
+                  </div>
+                )}
+
+                {branchMode === 'new' && newBranchName && (
+                  <label className="git-branch-checkbox" style={{ marginTop: '12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={useWorktree}
+                      onChange={(e) => onUseWorktreeChange?.(e.target.checked)}
+                    />
+                    <span className="git-checkbox-checkmark"></span>
+                    <span className="git-checkbox-label">
+                      Use Git Worktree (isolated directory)
+                    </span>
+                  </label>
+                )}
+                {useWorktree && branchMode === 'new' && (
+                  <small className="git-branch-hint" style={{ marginTop: '8px', display: 'block' }}>
+                    🌳 Creates a separate directory for this agent - perfect for frequent switching!
+                  </small>
+                )}
               </div>
-              <span className="git-badge">GIT</span>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={onCancel}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={handleContinueToAgent}
+                disabled={!path.trim()}
+              >
+                Continue →
+              </button>
             </div>
-
-            <div className="git-branch-mode-selector">
-              <label className={`git-mode-option ${branchMode === 'existing' ? 'active' : ''}`}>
-                <input
-                  type="radio"
-                  checked={branchMode === 'existing'}
-                  onChange={() => setBranchMode('existing')}
-                />
-                <svg className="git-mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="6" y1="3" x2="6" y2="15"></line>
-                  <circle cx="18" cy="6" r="3"></circle>
-                  <circle cx="6" cy="18" r="3"></circle>
-                  <path d="M18 9a9 9 0 0 1-9 9"></path>
-                </svg>
-                <span>Use existing</span>
-              </label>
-              <label className={`git-mode-option ${branchMode === 'new' ? 'active' : ''}`}>
-                <input
-                  type="radio"
-                  checked={branchMode === 'new'}
-                  onChange={() => setBranchMode('new')}
-                />
-                <svg className="git-mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="16"></line>
-                  <line x1="8" y1="12" x2="16" y2="12"></line>
-                </svg>
-                <span>Create new</span>
-              </label>
-            </div>
-
-            {branchMode === 'existing' ? (
-              <div className="git-branch-input-wrapper">
-                <select
-                  value={branch}
-                  onChange={(e) => onBranchChange?.(e.target.value)}
-                  disabled={loadingBranches}
-                  className="git-branch-select"
-                >
-                  {loadingBranches ? (
-                    <option>Loading branches...</option>
-                  ) : (
-                    availableBranches.map((b) => (
-                      <option key={b.name} value={b.name}>
-                        {b.name} {b.isCurrent ? '⭐' : ''} {b.hasRemote ? '☁️' : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <svg className="git-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </div>
-            ) : (
-              <div className="git-branch-create-mode">
-                <input
-                  type="text"
-                  value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
-                  placeholder="e.g., feature/agent-name"
-                  className="git-branch-input"
-                />
-                <label className="git-branch-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={fromCurrentBranch}
-                    onChange={(e) => setFromCurrentBranch(e.target.checked)}
-                  />
-                  <span className="git-checkbox-checkmark"></span>
-                  <span className="git-checkbox-label">
-                    Branch from current ({availableBranches.find(b => b.isCurrent)?.name || 'main'})
-                  </span>
-                </label>
-                <small className="git-branch-hint">
-                  🌿 Agent will work on this branch independently
-                </small>
-              </div>
-            )}
-
-            {/* Worktree Option - only show for new branches */}
-            {branchMode === 'new' && newBranchName && (
-              <label className="git-branch-checkbox" style={{ marginTop: '12px' }}>
-                <input
-                  type="checkbox"
-                  checked={useWorktree}
-                  onChange={(e) => onUseWorktreeChange?.(e.target.checked)}
-                />
-                <span className="git-checkbox-checkmark"></span>
-                <span className="git-checkbox-label">
-                  Use Git Worktree (isolated directory)
-                </span>
-              </label>
-            )}
-            {useWorktree && branchMode === 'new' && (
-              <small className="git-branch-hint" style={{ marginTop: '8px', display: 'block' }}>
-                🌳 Creates a separate directory for this agent - perfect for frequent switching!
-              </small>
-            )}
-          </div>
+          </>
         )}
 
-        <div className="modal-section-divider" />
-
-        <PersonalityBuilder
-          personality={{
-            role: personality?.role || 'Feature Coordinator',
-            intro: personality?.intro || 'Experienced PM specializing in feature delivery and team coordination',
-            technicalContext: personality?.technicalContext || '',
-            rules: personality?.rules || [],
-            communicationStyle: personality?.communicationStyle || 'friendly',
-            customNotes: personality?.customNotes || '',
-            specialties: personality?.specialties || ['feature-planning', 'team-alignment'],
-            personality: personality?.personality || 'Organized. Proactive',
-            skills: personality?.skills || [],
-            expressions: personality?.expressions || []
-          }}
-          onPersonalityChange={onPersonalityChange || (() => {})}
-          availableSkills={availableSkills}
-          isModalOpen={open}
-        />
-
-        {error && (
-          <div className="modal-error">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="modal-actions">
-          <button type="button" className="secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="primary"
-            onClick={onConfirm}
-            disabled={!name.trim() || !path.trim() || creating}
-          >
-            {creating ? (
+        {/* STEP 2: Agent Selection */}
+        {currentStep === 'agent' && (
+          <>
+            {agentMode === 'select' ? (
               <>
-                <span className="spinner"></span>
-                {isEditing ? 'Saving…' : 'Creating…'}
+                <AgentSelector
+                  onSelectAgent={handleSelectAgent}
+                  onCreateNew={handleCreateNewAgent}
+                />
+
+                <div className="modal-actions">
+                  <button type="button" className="secondary" onClick={handleBackToContext}>
+                    ← Back
+                  </button>
+                </div>
               </>
             ) : (
-              isEditing ? 'Save changes' : 'Create agent'
+              <>
+                {/* Create/Edit Agent Form */}
+                <label className="modal-field">
+                  <span className="field-label">Agent name</span>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(event) => onNameChange(event.target.value)}
+                    placeholder="e.g. API Server"
+                    autoFocus
+                  />
+                </label>
+
+                <div className="modal-field">
+                  <span className="field-label">Avatar</span>
+                  <span className="field-hint">
+                    {customAvatars.length > 0 ? 'Custom and default avatars ↓' : 'Scroll for more avatars ↓'}
+                  </span>
+                  {uploadError && (
+                    <div className="avatar-upload-error">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      {uploadError}
+                    </div>
+                  )}
+                  <div className="avatar-grid-container">
+                    <div className="avatar-grid">
+                      <button
+                        type="button"
+                        className="avatar-upload-button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        aria-label="Upload custom avatar"
+                      >
+                        {uploadingAvatar ? (
+                          <div className="avatar-upload-spinner">
+                            <svg className="spinner-icon" viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <>
+                            <svg className="plus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <line x1="12" y1="5" x2="12" y2="19"></line>
+                              <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span className="upload-label">Upload</span>
+                          </>
+                        )}
+                      </button>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        style={{ display: 'none' }}
+                      />
+
+                      {customAvatars.map((customAvatar) => (
+                        <button
+                          key={customAvatar.id}
+                          type="button"
+                          className={`avatar-option custom-avatar ${avatar === customAvatar.id ? 'selected' : ''} ${!customAvatarUrls[customAvatar.id] && loadingAvatars ? 'loading' : ''}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (customAvatarUrls[customAvatar.id]) {
+                              onAvatarChange?.(customAvatar.id);
+                            }
+                          }}
+                          aria-label={`Select custom avatar ${customAvatar.originalName}`}
+                          disabled={!customAvatarUrls[customAvatar.id] && loadingAvatars}
+                        >
+                          {customAvatarUrls[customAvatar.id] ? (
+                            <img
+                              src={customAvatarUrls[customAvatar.id]}
+                              alt={customAvatar.originalName}
+                              className="avatar-image"
+                            />
+                          ) : loadingAvatars ? (
+                            <div className="avatar-loading-spinner">
+                              <svg className="spinner-icon" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                              </svg>
+                            </div>
+                          ) : null}
+                          {customAvatarUrls[customAvatar.id] && (
+                            <button
+                              type="button"
+                              className="avatar-delete-button"
+                              onClick={(e) => handleDeleteCustomAvatar(customAvatar.id, e)}
+                              aria-label="Delete custom avatar"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
+                          )}
+                        </button>
+                      ))}
+
+                      {AVAILABLE_AVATARS.map((avatarName) => (
+                        <button
+                          key={avatarName}
+                          type="button"
+                          className={`avatar-option ${avatar === avatarName ? 'selected' : ''}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onAvatarChange?.(avatarName);
+                          }}
+                          aria-label={`Select ${avatarName} avatar`}
+                        >
+                          <img
+                            src={getAvatarUrl(avatarName)}
+                            alt={avatarName}
+                            className="avatar-image"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="modal-field">
+                  <span className="field-label">Agent color</span>
+                  <div className="modal-color-grid">
+                    {availableColors.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`modal-color-swatch ${preset === color ? 'selected' : ''}`}
+                        style={{ backgroundColor: preset }}
+                        onClick={() => onColorChange(preset)}
+                        aria-label={`Select color ${preset}`}
+                      />
+                    ))}
+                    <label className="modal-color-picker">
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(event) => onColorChange(event.target.value)}
+                        aria-label="Choose a custom color"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="modal-section-divider" />
+
+                <PersonalityBuilder
+                  personality={{
+                    role: personality?.role || 'Feature Coordinator',
+                    intro: personality?.intro || 'Experienced PM specializing in feature delivery and team coordination',
+                    technicalContext: personality?.technicalContext || '',
+                    rules: personality?.rules || [],
+                    communicationStyle: personality?.communicationStyle || 'friendly',
+                    customNotes: personality?.customNotes || '',
+                    specialties: personality?.specialties || ['feature-planning', 'team-alignment'],
+                    personality: personality?.personality || 'Organized. Proactive',
+                    skills: personality?.skills || [],
+                    expressions: personality?.expressions || []
+                  }}
+                  onPersonalityChange={onPersonalityChange || (() => {})}
+                  availableSkills={availableSkills}
+                  isModalOpen={open}
+                />
+
+                {error && (
+                  <div className="modal-error">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <div className="modal-actions">
+                  <button type="button" className="secondary" onClick={handleBackToAgentSelection}>
+                    ← Back to selection
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={handleFinalConfirm}
+                    disabled={!name.trim() || !path.trim() || creating}
+                  >
+                    {creating ? (
+                      <>
+                        <span className="spinner"></span>
+                        {isEditing ? 'Saving…' : 'Creating…'}
+                      </>
+                    ) : (
+                      isEditing ? 'Save changes' : 'Create agent'
+                    )}
+                  </button>
+                </div>
+              </>
             )}
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </div>
-  )
+  );
 }
 
-// Performance: Memo disabled to allow real-time updates when selecting avatar/color
-export default NewTerminalModal
+export default NewTerminalModal;

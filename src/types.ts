@@ -285,6 +285,19 @@ export interface AgentPersonality {
   intro?: string;
 }
 
+// Saved Agent types (for agent reusability across projects)
+export interface SavedAgent {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
+  workingOn?: string;
+  personality: Partial<AgentPersonality>;
+  createdAt: number;
+  lastUsed: number;
+  usageCount: number; // Track how many times this agent has been used
+}
+
 // Skills types (similar to Agents)
 export interface SkillInfo {
   name: string;
