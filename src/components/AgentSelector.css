@@ -188,7 +188,6 @@
   background: rgba(0, 0, 0, 0.2);
   border: 2px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  cursor: pointer;
   transition: all 0.2s ease;
   text-align: center;
 }
@@ -198,12 +197,6 @@
   border-color: currentColor;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.agent-card:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
 }
 
 .agent-card-avatar-wrapper {
@@ -291,6 +284,64 @@
 .agent-card-stat svg {
   flex-shrink: 0;
   opacity: 0.7;
+}
+
+/* Action Buttons */
+.agent-card-actions {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding-top: 8px;
+}
+
+.agent-card-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1.5px solid;
+}
+
+.agent-card-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-card-action-btn svg {
+  flex-shrink: 0;
+}
+
+/* Use Button - Green theme */
+.agent-card-use-btn {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: rgba(34, 197, 94, 1);
+}
+
+.agent-card-use-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(16, 185, 129, 0.25) 100%);
+  border-color: rgba(34, 197, 94, 0.6);
+  transform: translateY(-1px);
+}
+
+/* Edit Button - Blue theme */
+.agent-card-edit-btn {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: rgba(59, 130, 246, 1);
+}
+
+.agent-card-edit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.25) 100%);
+  border-color: rgba(59, 130, 246, 0.6);
+  transform: translateY(-1px);
 }
 
 /* Delete Button */

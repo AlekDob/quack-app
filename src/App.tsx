@@ -4150,6 +4150,66 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setShowNewTerminalModal(true);
   }, []);
 
+  // Handle editing agent from Agent Context Panel
+  const handleEditAgentFromContext = useCallback(async () => {
+    const activeTerminal = terminals.find((t) => t.id === activeId);
+    if (!activeTerminal) {
+      console.warn('No active terminal to edit');
+      return;
+    }
+
+    // Load terminal data for editing
+    setEditingTerminal(activeTerminal);
+    setNewTerminalName(activeTerminal.label);
+    setNewTerminalColor(activeTerminal.color);
+    setNewTerminalPath(activeTerminal.cwd);
+    setNewTerminalWorkingOn(activeTerminal.workingOn || "");
+    setNewTerminalAvatar(activeTerminal.avatar || "68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
+    setNewTerminalError(null);
+
+    // Load personality from terminal state
+    if (activeTerminal.personality && Object.keys(activeTerminal.personality).length > 0) {
+      setNewTerminalPersonality({
+        technicalContext: '',
+        rules: [],
+        customNotes: '',
+        ...activeTerminal.personality,
+      });
+      console.log('✅ Loaded personality from state for:', activeTerminal.label);
+    } else {
+      // Try to load from Rust as fallback
+      try {
+        const personality = await invoke<AgentPersonality>('load_agent_personality', {
+          projectPath: activeTerminal.cwd,
+          personalityId: activeTerminal.id,
+        });
+        setNewTerminalPersonality({
+          technicalContext: '',
+          rules: [],
+          customNotes: '',
+          ...personality,
+        });
+        console.log('✅ Loaded personality from Rust for:', activeTerminal.label);
+      } catch (error) {
+        // No personality found - use current personality or default
+        console.log('No existing personality found, using current or default');
+        setNewTerminalPersonality(activeTerminal.personality || {
+          role: 'Feature Coordinator',
+          intro: 'Experienced PM specializing in feature delivery and team coordination',
+          communicationStyle: 'friendly',
+          specialties: ['feature-planning', 'team-alignment'],
+          personality: 'Organized. Proactive',
+          skills: [],
+          expressions: [],
+        });
+      }
+    }
+
+    // Open modal with initial step = 'agent' and mode = 'create' (form)
+    // This will show the agent form directly, skipping project context
+    setShowNewTerminalModal(true);
+  }, [activeId, terminals]);
+
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
     // Update terminal workingOn field
     setTerminals((prevTerminals) =>
@@ -6821,6 +6881,7 @@ You have access to all Bash tools to execute git commands like:
           projectName={projectName}
           gitBranch={gitBranch}
           agentRefreshKey={agentRefreshKey}
+          onEditAgent={handleEditAgentFromContext}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}
@@ -6852,6 +6913,8 @@ You have access to all Bash tools to execute git commands like:
         <NewTerminalModal
           open={showNewTerminalModal}
           isEditing={editingTerminal !== null}
+          initialStep={editingTerminal !== null ? 'agent' : 'context'}
+          initialAgentMode={editingTerminal !== null ? 'create' : 'select'}
           name={newTerminalName}
           path={newTerminalPath}
           color={newTerminalColor}

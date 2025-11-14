@@ -17,7 +17,8 @@ import {
 import './AgentSelector.css';
 
 interface AgentSelectorProps {
-  onSelectAgent: (agent: SavedAgent) => void;
+  onUseAgent: (agent: SavedAgent) => void;
+  onEditAgent: (agent: SavedAgent) => void;
   onCreateNew: () => void;
 }
 
@@ -40,7 +41,7 @@ function getAvatarUrl(avatarName: string): string {
   return `/images/ducks/avatars/${avatarName}`;
 }
 
-export default function AgentSelector({ onSelectAgent, onCreateNew }: AgentSelectorProps) {
+export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
@@ -78,10 +79,10 @@ export default function AgentSelector({ onSelectAgent, onCreateNew }: AgentSelec
     try {
       const success = deleteAgent(agentId);
       if (success) {
-        // Force re-render by clearing search query momentarily
-        const currentQuery = searchQuery;
-        setSearchQuery('');
-        setTimeout(() => setSearchQuery(currentQuery), 10);
+        // Force re-render by toggling sortMode
+        const currentSort = sortMode;
+        setSortMode('alphabetical');
+        setTimeout(() => setSortMode(currentSort), 0);
       } else {
         alert('Failed to delete agent. Please try again.');
       }
@@ -190,12 +191,9 @@ export default function AgentSelector({ onSelectAgent, onCreateNew }: AgentSelec
           </div>
         ) : (
           agents.map((agent) => (
-            <button
+            <div
               key={agent.id}
-              type="button"
               className="agent-card"
-              onClick={() => onSelectAgent(agent)}
-              disabled={deletingAgentId === agent.id}
               style={{ borderColor: agent.color }}
             >
               {/* Avatar */}
@@ -244,6 +242,35 @@ export default function AgentSelector({ onSelectAgent, onCreateNew }: AgentSelec
                 </span>
               </div>
 
+              {/* Action Buttons */}
+              <div className="agent-card-actions">
+                <button
+                  type="button"
+                  className="agent-card-action-btn agent-card-use-btn"
+                  onClick={() => onUseAgent(agent)}
+                  disabled={deletingAgentId === agent.id}
+                  title="Use this agent immediately"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                  Use
+                </button>
+                <button
+                  type="button"
+                  className="agent-card-action-btn agent-card-edit-btn"
+                  onClick={() => onEditAgent(agent)}
+                  disabled={deletingAgentId === agent.id}
+                  title="Edit before using"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  Edit
+                </button>
+              </div>
+
               {/* Delete Button */}
               <button
                 type="button"
@@ -263,7 +290,7 @@ export default function AgentSelector({ onSelectAgent, onCreateNew }: AgentSelec
                   </svg>
                 )}
               </button>
-            </button>
+            </div>
           ))
         )}
       </div>

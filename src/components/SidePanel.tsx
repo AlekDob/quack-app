@@ -293,6 +293,7 @@ interface SidePanelProps {
   projectName?: string;
   gitBranch?: string;
   agentRefreshKey?: number; // Added: forces context panel refresh when agent is edited
+  onEditAgent?: () => void; // Added: callback to edit current agent
 
   // Terminal props
   activeTerminalId: string | null;
@@ -374,6 +375,7 @@ export default function SidePanel({
   projectName,
   gitBranch,
   agentRefreshKey, // Added: forces context panel refresh when agent is edited
+  onEditAgent, // Added: callback to edit current agent
 
   // Terminal
   activeTerminalId,
@@ -561,6 +563,7 @@ export default function SidePanel({
               projectName={projectName}
               gitBranch={gitBranch}
               refreshKey={agentRefreshKey}
+              onEditAgent={onEditAgent}
             />
           </div>
         )}

@@ -55,6 +55,8 @@ function getAvatarUrl(avatarName: string): string {
 interface NewTerminalModalProps {
   open: boolean
   isEditing?: boolean
+  initialStep?: 'context' | 'agent' // NEW: Allow specifying which step to start at
+  initialAgentMode?: 'select' | 'create' // NEW: Specify agent mode when starting at agent step
   name: string
   path: string
   color: string
@@ -85,6 +87,8 @@ type AgentMode = 'select' | 'create';
 function NewTerminalModal({
   open,
   isEditing = false,
+  initialStep = 'context', // NEW: default to 'context'
+  initialAgentMode = 'select', // NEW: default to 'select'
   name,
   path,
   color,
@@ -109,8 +113,9 @@ function NewTerminalModal({
   onConfirm,
 }: NewTerminalModalProps) {
   // Step management
-  const [currentStep, setCurrentStep] = useState<ModalStep>('context');
-  const [agentMode, setAgentMode] = useState<AgentMode>('select');
+  const [currentStep, setCurrentStep] = useState<ModalStep>(initialStep);
+  const [agentMode, setAgentMode] = useState<AgentMode>(initialAgentMode);
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
 
   // Git branch state
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
@@ -130,13 +135,17 @@ function NewTerminalModal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset to step 1 when modal opens
+  // Reset to initial step when modal opens
   useEffect(() => {
     if (open) {
-      setCurrentStep('context');
-      setAgentMode('select');
+      setCurrentStep(initialStep);
+      setAgentMode(initialAgentMode);
+      // Only clear editingAgentId if not editing
+      if (!isEditing) {
+        setEditingAgentId(null);
+      }
     }
-  }, [open]);
+  }, [open, initialStep, initialAgentMode, isEditing]);
 
   // Load data when modal opens
   useEffect(() => {
@@ -353,8 +362,39 @@ function NewTerminalModal({
   }
 
   // Agent selection handlers
-  function handleSelectAgent(agent: SavedAgent) {
-    // Load agent data into form
+  function handleUseAgent(agent: SavedAgent) {
+    // Mark agent as used
+    markAgentAsUsed(agent.id);
+
+    // Save agent to storage (in case it's been modified)
+    try {
+      saveAgent({
+        name: agent.name,
+        avatar: agent.avatar || '',
+        color: agent.color,
+        workingOn: agent.workingOn,
+        personality: agent.personality || {}
+      });
+    } catch (err) {
+      console.warn('Failed to save agent to storage:', err);
+    }
+
+    // Load agent data into parent state and immediately confirm
+    // We need to batch these updates by calling them all before onConfirm
+    onNameChange(agent.name);
+    onColorChange(agent.color);
+    onAvatarChange?.(agent.avatar);
+    onWorkingOnChange?.(agent.workingOn || '');
+    onPersonalityChange?.(agent.personality);
+
+    // Use requestAnimationFrame to ensure state updates are flushed
+    requestAnimationFrame(() => {
+      onConfirm();
+    });
+  }
+
+  function handleEditAgent(agent: SavedAgent) {
+    // Load agent data into form for editing
     onNameChange(agent.name);
     onColorChange(agent.color);
     onAvatarChange?.(agent.avatar);
@@ -364,15 +404,22 @@ function NewTerminalModal({
     // Mark agent as used
     markAgentAsUsed(agent.id);
 
-    // Move to confirm
+    // Save the agent ID so we know we're editing (not creating new)
+    setEditingAgentId(agent.id);
+
+    // Move to create form so user can edit
     setAgentMode('create');
   }
 
   function handleCreateNewAgent() {
+    // Clear editing state when creating new agent
+    setEditingAgentId(null);
     setAgentMode('create');
   }
 
   function handleBackToAgentSelection() {
+    // Clear editing state when going back
+    setEditingAgentId(null);
     setAgentMode('select');
   }
 
@@ -390,21 +437,32 @@ function NewTerminalModal({
   }
 
   async function handleFinalConfirm() {
-    // Save agent to storage before creating terminal
+    // Save or update agent in storage
     try {
-      saveAgent({
+      const savedAgent = saveAgent({
         name,
         avatar: avatar || '',
         color,
         workingOn,
         personality: personality || {}
       });
+
+      // If we're editing an agent from the grid (not a terminal),
+      // just save and go back to selection
+      if (editingAgentId && !isEditing) {
+        console.log('Updated agent:', savedAgent);
+        // Clear editing state and go back to agent selection
+        setEditingAgentId(null);
+        setAgentMode('select');
+        return; // DON'T create terminal, just save and return
+      }
     } catch (err) {
       console.warn('Failed to save agent to storage:', err);
-      // Don't block terminal creation if save fails
+      // Don't block terminal creation/update if save fails
     }
 
-    // Call original onConfirm
+    // Create new terminal OR update existing terminal
+    // Call original onConfirm (App.tsx will handle create vs update based on editingTerminal)
     onConfirm();
   }
 
@@ -634,7 +692,8 @@ function NewTerminalModal({
             {agentMode === 'select' ? (
               <>
                 <AgentSelector
-                  onSelectAgent={handleSelectAgent}
+                  onUseAgent={handleUseAgent}
+                  onEditAgent={handleEditAgent}
                   onCreateNew={handleCreateNewAgent}
                 />
 
@@ -846,10 +905,10 @@ function NewTerminalModal({
                     {creating ? (
                       <>
                         <span className="spinner"></span>
-                        {isEditing ? 'Saving…' : 'Creating…'}
+                        {editingAgentId ? 'Saving…' : 'Creating…'}
                       </>
                     ) : (
-                      isEditing ? 'Save changes' : 'Create agent'
+                      editingAgentId ? 'Save changes' : 'Create agent'
                     )}
                   </button>
                 </div>
