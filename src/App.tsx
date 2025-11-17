@@ -6583,6 +6583,7 @@ You have access to all Bash tools to execute git commands like:
             <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Action Icons - aligned right above tabs */}
               <ActionIcons
+              projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
               onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
               onUsageClick={async () => {

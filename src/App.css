@@ -10306,7 +10306,7 @@ button.directory-chooser:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem;
+  padding: 1.25rem 0;
   border-bottom: 1px solid rgba(168, 182, 221, 0.1);
 }
 

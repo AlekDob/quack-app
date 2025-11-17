@@ -1,10 +1,13 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { EditorView, keymap, lineNumbers, Decoration } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, HighlightStyle } from "@codemirror/language";
+import { highlightSelectionMatches } from "@codemirror/search";
 import { tags as t } from "@lezer/highlight";
 import { javascript } from "@codemirror/lang-javascript";
+import { StateField, StateEffect } from "@codemirror/state";
+import type { Range } from "@codemirror/state";
 
 // Custom theme inspired by Atom One Dark / Material Palenight with pure black background
 const customTheme = EditorView.theme({
@@ -73,6 +76,102 @@ const customTheme = EditorView.theme({
   ".cm-nonmatchingBracket": {
     color: "#e06c75 !important",
   },
+  // Search panel styling
+  ".cm-searchMatch": {
+    backgroundColor: "rgba(255, 215, 0, 0.3) !important",
+    border: "1px solid rgba(255, 215, 0, 0.5)",
+  },
+  ".cm-searchMatch-selected": {
+    backgroundColor: "rgba(255, 165, 0, 0.5) !important",
+    border: "1px solid rgba(255, 165, 0, 0.8)",
+  },
+  ".cm-panels": {
+    backgroundColor: "#1a1a1a !important",
+    color: "#ffffff !important",
+    borderBottom: "1px solid #2a2a2a !important",
+    position: "sticky !important",
+    top: "0 !important",
+    zIndex: "100 !important",
+  },
+  ".cm-panels-top": {
+    borderBottom: "1px solid #2a2a2a !important",
+  },
+  ".cm-panel": {
+    padding: "8px 12px !important",
+  },
+  ".cm-panel input": {
+    backgroundColor: "#0a0a0a !important",
+    color: "#ffffff !important",
+    border: "1px solid #3a3a3a !important",
+    padding: "6px 10px !important",
+    borderRadius: "4px !important",
+    fontSize: "13px !important",
+  },
+  ".cm-panel input:focus": {
+    outline: "none !important",
+    border: "1px solid #528bff !important",
+  },
+  ".cm-panel button": {
+    backgroundColor: "#2a2a2a !important",
+    color: "#ffffff !important",
+    border: "1px solid #3a3a3a !important",
+    padding: "6px 12px !important",
+    borderRadius: "4px !important",
+    cursor: "pointer !important",
+    fontSize: "12px !important",
+    fontWeight: "500 !important",
+    transition: "all 0.15s ease !important",
+  },
+  ".cm-panel button:hover": {
+    backgroundColor: "#3a3a3a !important",
+    borderColor: "#4a4a4a !important",
+  },
+  ".cm-panel button:active": {
+    backgroundColor: "#4a4a4a !important",
+  },
+  ".cm-panel label": {
+    color: "#ffffff !important",
+    fontSize: "12px !important",
+  },
+  ".cm-panel input[type=checkbox]": {
+    cursor: "pointer !important",
+  },
+  // Force panel to top with higher specificity
+  "&.cm-editor .cm-panels-bottom": {
+    order: "-1 !important",
+    borderTop: "none !important",
+    borderBottom: "1px solid #2a2a2a !important",
+  },
+  // Make buttons more visible
+  "&.cm-editor .cm-button": {
+    backgroundColor: "#2a2a2a !important",
+    color: "#ffffff !important",
+    border: "1px solid #3a3a3a !important",
+    padding: "6px 12px !important",
+    borderRadius: "4px !important",
+  },
+  "&.cm-editor .cm-button:hover": {
+    backgroundColor: "#3a3a3a !important",
+  },
+  // Textfield styling
+  "&.cm-editor .cm-textfield": {
+    backgroundColor: "#0a0a0a !important",
+    color: "#ffffff !important",
+    border: "1px solid #3a3a3a !important",
+    borderRadius: "4px !important",
+  },
+  // Custom search match highlighting
+  ".cm-search-match": {
+    backgroundColor: "rgba(255, 215, 0, 0.25) !important",
+    border: "1px solid rgba(255, 215, 0, 0.4)",
+    borderRadius: "2px",
+  },
+  ".cm-search-match-current": {
+    backgroundColor: "rgba(242, 140, 82, 0.4) !important",
+    border: "1px solid rgba(242, 140, 82, 0.6)",
+    borderRadius: "2px",
+    outline: "2px solid rgba(242, 140, 82, 0.3)",
+  },
 });
 
 // Custom syntax highlighting - VS Code Dark+ inspired with muted colors
@@ -118,6 +217,21 @@ export interface DiffInfo {
 }
 
 export type { DiffInfo as DiffInfoType };
+
+export interface SearchOptions {
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
+export interface CodeEditorRef {
+  search: (query: string, options: SearchOptions) => { total: number; current: number };
+  nextMatch: () => void;
+  previousMatch: () => void;
+  clearSearch: () => void;
+  replace: (replaceText: string) => void;
+  replaceAll: (replaceText: string) => void;
+}
 
 interface CodeEditorProps {
   content: string;
@@ -184,7 +298,32 @@ const getLanguageExtension = (language: string) => {
   }
 };
 
-export default function CodeEditorCodeMirror({
+// Search state management
+const setSearchMatches = StateEffect.define<Range<Decoration>[]>();
+const searchMatchesField = StateField.define<Range<Decoration>[]>({
+  create() {
+    return [];
+  },
+  update(matches, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setSearchMatches)) {
+        return effect.value;
+      }
+    }
+    return matches;
+  },
+  provide: f => EditorView.decorations.from(f, matches => Decoration.set(matches))
+});
+
+const searchMatchDecoration = Decoration.mark({
+  class: "cm-search-match"
+});
+
+const currentSearchMatchDecoration = Decoration.mark({
+  class: "cm-search-match-current"
+});
+
+const CodeEditorCodeMirror = forwardRef<CodeEditorRef, CodeEditorProps>(({
   content,
   filename,
   language,
@@ -192,10 +331,12 @@ export default function CodeEditorCodeMirror({
   onChange,
   onSave,
   diffInfo,
-}: CodeEditorProps) {
+}, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isInternalChangeRef = useRef(false); // Track if change is from user typing
+  const searchMatchesRef = useRef<{ from: number; to: number }[]>([]);
+  const currentMatchIndexRef = useRef(0);
 
   const detectedLanguage = language || getLanguageFromFilename(filename);
 
@@ -208,6 +349,188 @@ export default function CodeEditorCodeMirror({
     },
     [onChange]
   );
+
+  // Search functionality
+  const performSearch = useCallback((query: string, options: SearchOptions) => {
+    if (!viewRef.current || !query) {
+      searchMatchesRef.current = [];
+      currentMatchIndexRef.current = 0;
+      viewRef.current?.dispatch({
+        effects: setSearchMatches.of([])
+      });
+      return { total: 0, current: 0 };
+    }
+
+    const view = viewRef.current;
+    const text = view.state.doc.toString();
+    const matches: { from: number; to: number }[] = [];
+
+    try {
+      let searchRegex: RegExp;
+      if (options.regex) {
+        searchRegex = new RegExp(query, options.caseSensitive ? 'g' : 'gi');
+      } else {
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = options.wholeWord ? `\\b${escapedQuery}\\b` : escapedQuery;
+        searchRegex = new RegExp(pattern, options.caseSensitive ? 'g' : 'gi');
+      }
+
+      let match;
+      while ((match = searchRegex.exec(text)) !== null) {
+        matches.push({ from: match.index, to: match.index + match[0].length });
+      }
+
+      searchMatchesRef.current = matches;
+      currentMatchIndexRef.current = matches.length > 0 ? 0 : -1;
+
+      // Create decorations
+      const decorations = matches.map((m, i) => {
+        const decoration = i === 0 ? currentSearchMatchDecoration : searchMatchDecoration;
+        return decoration.range(m.from, m.to);
+      });
+
+      view.dispatch({
+        effects: setSearchMatches.of(decorations)
+      });
+
+      // Scroll to first match
+      if (matches.length > 0) {
+        view.dispatch({
+          selection: { anchor: matches[0].from },
+          scrollIntoView: true
+        });
+      }
+
+      return { total: matches.length, current: matches.length > 0 ? 1 : 0 };
+    } catch (error) {
+      console.error('Search error:', error);
+      return { total: 0, current: 0 };
+    }
+  }, []);
+
+  const nextMatch = useCallback(() => {
+    if (!viewRef.current || searchMatchesRef.current.length === 0) return;
+
+    const matches = searchMatchesRef.current;
+    currentMatchIndexRef.current = (currentMatchIndexRef.current + 1) % matches.length;
+    const currentMatch = matches[currentMatchIndexRef.current];
+
+    // Update decorations
+    const decorations = matches.map((m, i) => {
+      const decoration = i === currentMatchIndexRef.current ? currentSearchMatchDecoration : searchMatchDecoration;
+      return decoration.range(m.from, m.to);
+    });
+
+    viewRef.current.dispatch({
+      effects: setSearchMatches.of(decorations),
+      selection: { anchor: currentMatch.from },
+      scrollIntoView: true
+    });
+  }, []);
+
+  const previousMatch = useCallback(() => {
+    if (!viewRef.current || searchMatchesRef.current.length === 0) return;
+
+    const matches = searchMatchesRef.current;
+    currentMatchIndexRef.current = currentMatchIndexRef.current === 0
+      ? matches.length - 1
+      : currentMatchIndexRef.current - 1;
+    const currentMatch = matches[currentMatchIndexRef.current];
+
+    // Update decorations
+    const decorations = matches.map((m, i) => {
+      const decoration = i === currentMatchIndexRef.current ? currentSearchMatchDecoration : searchMatchDecoration;
+      return decoration.range(m.from, m.to);
+    });
+
+    viewRef.current.dispatch({
+      effects: setSearchMatches.of(decorations),
+      selection: { anchor: currentMatch.from },
+      scrollIntoView: true
+    });
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    searchMatchesRef.current = [];
+    currentMatchIndexRef.current = 0;
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: setSearchMatches.of([])
+      });
+    }
+  }, []);
+
+  const replace = useCallback((replaceText: string) => {
+    if (!viewRef.current || searchMatchesRef.current.length === 0) return;
+
+    const matches = searchMatchesRef.current;
+    const currentIndex = currentMatchIndexRef.current;
+    if (currentIndex < 0 || currentIndex >= matches.length) return;
+
+    const currentMatch = matches[currentIndex];
+
+    // Replace current match
+    viewRef.current.dispatch({
+      changes: {
+        from: currentMatch.from,
+        to: currentMatch.to,
+        insert: replaceText
+      }
+    });
+
+    // Update matches list (remove replaced match)
+    const newMatches = matches.filter((_, i) => i !== currentIndex);
+    searchMatchesRef.current = newMatches;
+
+    // Adjust current index
+    if (newMatches.length === 0) {
+      currentMatchIndexRef.current = -1;
+      viewRef.current.dispatch({
+        effects: setSearchMatches.of([])
+      });
+    } else {
+      currentMatchIndexRef.current = Math.min(currentIndex, newMatches.length - 1);
+      const decorations = newMatches.map((m, i) => {
+        const decoration = i === currentMatchIndexRef.current ? currentSearchMatchDecoration : searchMatchDecoration;
+        return decoration.range(m.from, m.to);
+      });
+      viewRef.current.dispatch({
+        effects: setSearchMatches.of(decorations)
+      });
+    }
+  }, []);
+
+  const replaceAll = useCallback((replaceText: string) => {
+    if (!viewRef.current || searchMatchesRef.current.length === 0) return;
+
+    const matches = searchMatchesRef.current;
+
+    // Replace all matches in reverse order (to maintain positions)
+    const changes = [...matches].reverse().map(match => ({
+      from: match.from,
+      to: match.to,
+      insert: replaceText
+    }));
+
+    viewRef.current.dispatch({
+      changes,
+      effects: setSearchMatches.of([])
+    });
+
+    // Clear matches
+    searchMatchesRef.current = [];
+    currentMatchIndexRef.current = -1;
+  }, []);
+
+  // Expose search methods via ref
+  useImperativeHandle(ref, () => ({
+    search: performSearch,
+    nextMatch,
+    previousMatch,
+    clearSearch,
+    replace,
+    replaceAll
+  }), [performSearch, nextMatch, previousMatch, clearSearch, replace, replaceAll]);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -238,6 +561,8 @@ export default function CodeEditorCodeMirror({
         customTheme, // Custom theme with visible cursor for dark background
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(readOnly),
+        highlightSelectionMatches(), // Highlight matching selections
+        searchMatchesField, // Add search matches field
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         saveKeyBinding,
         EditorView.updateListener.of((update) => {
@@ -292,4 +617,8 @@ export default function CodeEditorCodeMirror({
       }}
     />
   );
-}
+});
+
+CodeEditorCodeMirror.displayName = 'CodeEditorCodeMirror';
+
+export default CodeEditorCodeMirror;

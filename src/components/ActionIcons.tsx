@@ -2,6 +2,7 @@ import { memo } from 'react';
 import './ActionIcons.css';
 
 interface ActionIconsProps {
+  projectPath?: string;
   onGitClick: () => void;
   onPluginsClick: () => void;
   onUsageClick: () => void;
@@ -13,6 +14,7 @@ interface ActionIconsProps {
 }
 
 function ActionIcons({
+  projectPath,
   onGitClick,
   onPluginsClick,
   onUsageClick,
@@ -22,8 +24,15 @@ function ActionIcons({
   onToggleSidePanel,
   sidePanelCollapsed,
 }: ActionIconsProps) {
+  // Extract project name from path
+  const projectName = projectPath ? projectPath.split('/').filter(Boolean).pop() : '';
+
   return (
     <div className="action-icons">
+      {/* Project Name */}
+      {projectName && (
+        <span className="project-name">{projectName}</span>
+      )}
       {/* Git Icon */}
       <button
         type="button"

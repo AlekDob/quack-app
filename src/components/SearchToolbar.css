@@ -1,0 +1,217 @@
+/* Search Toolbar - Replaces preview-toolbar when active */
+.search-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Container for search and replace inputs */
+.search-inputs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  max-width: 400px;
+}
+
+/* Input wrapper with match count */
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.replace-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  padding: 6px 80px 6px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.search-input:focus {
+  border-color: rgba(242, 140, 82, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.search-match-count {
+  position: absolute;
+  right: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+/* Options buttons */
+.search-options {
+  display: flex;
+  gap: 4px;
+}
+
+.search-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.search-option-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.search-option-btn.active {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+  border-color: rgba(242, 140, 82, 0.3);
+}
+
+.search-option-btn.active:hover {
+  background: rgba(242, 140, 82, 0.25);
+  border-color: rgba(242, 140, 82, 0.4);
+}
+
+/* Navigation buttons */
+.search-navigation {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.search-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.search-nav-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.95);
+}
+
+.search-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.search-nav-btn svg {
+  flex-shrink: 0;
+}
+
+/* Close button */
+.search-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-close-btn:hover {
+  background: rgba(255, 0, 0, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(255, 0, 0, 0.3);
+}
+
+.search-close-btn:active {
+  background: rgba(255, 0, 0, 0.25);
+  transform: scale(0.95);
+}
+
+.search-close-btn svg {
+  flex-shrink: 0;
+}
+
+/* Replace actions */
+.search-replace-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.search-replace-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.search-replace-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.search-replace-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.95);
+}
+
+.search-replace-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

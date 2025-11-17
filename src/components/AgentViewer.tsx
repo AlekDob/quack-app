@@ -414,11 +414,6 @@ export default function AgentViewer({
               onChange={handleContentChange}
               language="markdown"
               readOnly={false}
-              editorThemeExtension={{
-                ".cm-scroller": {
-                  paddingBottom: "10px"
-                }
-              }}
             />
           </div>
         </div>

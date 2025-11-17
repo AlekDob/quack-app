@@ -57,6 +57,7 @@ interface NewTerminalModalProps {
   isEditing?: boolean
   initialStep?: 'context' | 'agent' // NEW: Allow specifying which step to start at
   initialAgentMode?: 'select' | 'create' // NEW: Specify agent mode when starting at agent step
+  initialEditingAgentId?: string | null // NEW: Agent ID when editing an existing agent
   name: string
   path: string
   color: string
@@ -89,6 +90,7 @@ function NewTerminalModal({
   isEditing = false,
   initialStep = 'context', // NEW: default to 'context'
   initialAgentMode = 'select', // NEW: default to 'select'
+  initialEditingAgentId = null, // NEW: default to null
   name,
   path,
   color,
@@ -115,7 +117,7 @@ function NewTerminalModal({
   // Step management
   const [currentStep, setCurrentStep] = useState<ModalStep>(initialStep);
   const [agentMode, setAgentMode] = useState<AgentMode>(initialAgentMode);
-  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(initialEditingAgentId);
 
   // Git branch state
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
@@ -140,12 +142,9 @@ function NewTerminalModal({
     if (open) {
       setCurrentStep(initialStep);
       setAgentMode(initialAgentMode);
-      // Only clear editingAgentId if not editing
-      if (!isEditing) {
-        setEditingAgentId(null);
-      }
+      setEditingAgentId(initialEditingAgentId);
     }
-  }, [open, initialStep, initialAgentMode, isEditing]);
+  }, [open, initialStep, initialAgentMode, initialEditingAgentId]);
 
   // Load data when modal opens
   useEffect(() => {
@@ -394,6 +393,12 @@ function NewTerminalModal({
   }
 
   function handleEditAgent(agent: SavedAgent) {
+    console.log('[handleEditAgent] START - agent.id:', agent.id);
+
+    // Save the agent ID FIRST so we know we're editing (not creating new)
+    setEditingAgentId(agent.id);
+    console.log('[handleEditAgent] Called setEditingAgentId with:', agent.id);
+
     // Load agent data into form for editing
     onNameChange(agent.name);
     onColorChange(agent.color);
@@ -404,11 +409,9 @@ function NewTerminalModal({
     // Mark agent as used
     markAgentAsUsed(agent.id);
 
-    // Save the agent ID so we know we're editing (not creating new)
-    setEditingAgentId(agent.id);
-
     // Move to create form so user can edit
     setAgentMode('create');
+    console.log('[handleEditAgent] END');
   }
 
   function handleCreateNewAgent() {
@@ -902,14 +905,18 @@ function NewTerminalModal({
                     onClick={handleFinalConfirm}
                     disabled={!name.trim() || !path.trim() || creating}
                   >
-                    {creating ? (
-                      <>
-                        <span className="spinner"></span>
-                        {editingAgentId ? 'Saving…' : 'Creating…'}
-                      </>
-                    ) : (
-                      editingAgentId ? 'Save changes' : 'Create agent'
-                    )}
+                    {(() => {
+                      console.log('[BUTTON RENDER] editingAgentId:', editingAgentId);
+                      if (creating) {
+                        return (
+                          <>
+                            <span className="spinner"></span>
+                            {editingAgentId ? 'Saving…' : 'Creating…'}
+                          </>
+                        );
+                      }
+                      return editingAgentId ? 'Save Agent' : 'Create agent';
+                    })()}
                   </button>
                 </div>
               </>

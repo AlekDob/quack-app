@@ -1,10 +1,12 @@
-import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef, lazy, Suspense } from "react";
+import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef, lazy, Suspense, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import type { DiffInfo } from "./CodeEditor";
 import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
+import SearchToolbar, { type SearchOptions } from "./SearchToolbar";
+import type { CodeEditorRef } from "./CodeEditorCodeMirror";
 
 // Lazy load CodeMirror editor (lighter than Monaco, works better with Tauri)
 const CodeEditor = lazy(() => import("./CodeEditorCodeMirror"));
@@ -53,6 +55,10 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
   const [editedContent, setEditedContent] = useState(content);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [searchMatchCount, setSearchMatchCount] = useState(0);
+  const [currentSearchMatch, setCurrentSearchMatch] = useState(0);
+  const codeEditorRef = useRef<CodeEditorRef>(null);
 
   // Notify parent when hasUnsavedChanges state changes
   useEffect(() => {
@@ -102,7 +108,55 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
     setEditedContent(content);
     setHasUnsavedChanges(false);
     setIsEditMode(false); // Always start in preview mode
+    setIsSearchActive(false); // Close search when switching files
   }, [path, content]);
+
+  // Search handlers
+  const handleSearch = useCallback((query: string, options: SearchOptions) => {
+    if (!codeEditorRef.current) return;
+    const result = codeEditorRef.current.search(query, options);
+    setSearchMatchCount(result.total);
+    setCurrentSearchMatch(result.current);
+  }, []);
+
+  const handleNextMatch = useCallback(() => {
+    if (!codeEditorRef.current) return;
+    codeEditorRef.current.nextMatch();
+    setCurrentSearchMatch(prev => (prev < searchMatchCount ? prev + 1 : 1));
+  }, [searchMatchCount]);
+
+  const handlePreviousMatch = useCallback(() => {
+    if (!codeEditorRef.current) return;
+    codeEditorRef.current.previousMatch();
+    setCurrentSearchMatch(prev => (prev > 1 ? prev - 1 : searchMatchCount));
+  }, [searchMatchCount]);
+
+  const handleCloseSearch = useCallback(() => {
+    if (codeEditorRef.current) {
+      codeEditorRef.current.clearSearch();
+    }
+    setIsSearchActive(false);
+    setSearchMatchCount(0);
+    setCurrentSearchMatch(0);
+  }, []);
+
+  const handleReplace = useCallback((replaceText: string) => {
+    if (!codeEditorRef.current) return;
+    codeEditorRef.current.replace(replaceText);
+    // Update match count after replace
+    setSearchMatchCount(prev => Math.max(0, prev - 1));
+    if (searchMatchCount <= 1) {
+      setCurrentSearchMatch(0);
+    }
+  }, [searchMatchCount]);
+
+  const handleReplaceAll = useCallback((replaceText: string) => {
+    if (!codeEditorRef.current) return;
+    codeEditorRef.current.replaceAll(replaceText);
+    // Clear match count after replace all
+    setSearchMatchCount(0);
+    setCurrentSearchMatch(0);
+  }, []);
 
   // Check if file is an image
   const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'];
@@ -110,6 +164,19 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
 
   // Check if file is markdown
   const isMarkdownFile = filename ? filename.toLowerCase().endsWith('.md') : false;
+
+  // Keyboard shortcut: Cmd+F / Ctrl+F to toggle search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !isImageFile) {
+        e.preventDefault();
+        setIsSearchActive(prev => !prev); // Toggle instead of always true
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isImageFile]);
 
   if (!open) {
     return null;
@@ -119,75 +186,97 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
   const renderContent = () => {
     return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <header className={`preview-toolbar ${embedded ? 'embedded' : ''}`}>
-        <div className="preview-meta">
-          <span className="preview-filename">{filename ?? "File"}</span>
-          {path && <span className="preview-path">{path}</span>}
-          {loading && <span className="preview-status">Caricamento…</span>}
-          {error && !loading && (
-            <span className="preview-error">{error}</span>
-          )}
-        </div>
-        <div className="preview-actions">
-          {/* Hide toolbar buttons in embedded mode - use bottom file-action-buttons instead */}
-          {!embedded && (
-            <>
-              {!isImageFile && (
-                <>
-                  <button
-                    type="button"
-                    className="preview-action"
-                    onClick={onRefresh}
-                    disabled={loading || formatting}
-                    title="Reload file from disk"
-                  >
-                    Reload
-                  </button>
-                  {!isMarkdownFile && (
+      {/* Search toolbar - replaces header when active */}
+      {isSearchActive && !isImageFile ? (
+        <SearchToolbar
+          onSearch={handleSearch}
+          onNext={handleNextMatch}
+          onPrevious={handlePreviousMatch}
+          onClose={handleCloseSearch}
+          onReplace={handleReplace}
+          onReplaceAll={handleReplaceAll}
+          matchCount={searchMatchCount}
+          currentMatch={currentSearchMatch}
+        />
+      ) : (
+        <header className={`preview-toolbar ${embedded ? 'embedded' : ''}`}>
+          <div className="preview-meta">
+            <span className="preview-filename">{filename ?? "File"}</span>
+            {path && <span className="preview-path">{path}</span>}
+            {loading && <span className="preview-status">Caricamento…</span>}
+            {error && !loading && (
+              <span className="preview-error">{error}</span>
+            )}
+          </div>
+          <div className="preview-actions">
+            {/* Hide toolbar buttons in embedded mode - use bottom file-action-buttons instead */}
+            {!embedded && (
+              <>
+                {!isImageFile && (
+                  <>
                     <button
                       type="button"
                       className="preview-action"
-                      onClick={onFormat}
+                      onClick={onRefresh}
                       disabled={loading || formatting}
-                      title="Format code"
+                      title="Reload file from disk"
                     >
-                      {formatting ? "Formatting…" : "Format"}
+                      Reload
                     </button>
-                  )}
-                  {onSave && (
+                    {!isMarkdownFile && (
+                      <button
+                        type="button"
+                        className="preview-action"
+                        onClick={onFormat}
+                        disabled={loading || formatting}
+                        title="Format code"
+                      >
+                        {formatting ? "Formatting…" : "Format"}
+                      </button>
+                    )}
+                    {onSave && (
+                      <button
+                        type="button"
+                        className={`preview-action save ${hasUnsavedChanges ? "active" : ""}`}
+                        onClick={() => handleSave()}
+                        disabled={!hasUnsavedChanges}
+                        title={hasUnsavedChanges ? "Save changes (⌘S)" : "No changes to save"}
+                      >
+                        {hasUnsavedChanges ? "Save *" : "Saved"}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className={`preview-action save ${hasUnsavedChanges ? "active" : ""}`}
-                      onClick={() => handleSave()}
-                      disabled={!hasUnsavedChanges}
-                      title={hasUnsavedChanges ? "Save changes (⌘S)" : "No changes to save"}
+                      className="preview-action"
+                      onClick={() => setIsSearchActive(true)}
+                      title="Search in file (⌘F)"
                     >
-                      {hasUnsavedChanges ? "Save *" : "Saved"}
+                      Search
                     </button>
-                  )}
-                </>
-              )}
-              {path && (
-                <>
-                  <button
-                    type="button"
-                    className="preview-action"
-                    onClick={handleOpenInEditor}
-                    disabled={loading}
-                    title="Open in default IDE"
-                  >
-                    Open with IDE
-                  </button>
-                  <RevealInFinderButton path={path} className="preview-action" />
-                </>
-              )}
-              <button type="button" className="preview-close" onClick={onClose} title="Close preview">
-                Close
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+                  </>
+                )}
+                {path && (
+                  <>
+                    <button
+                      type="button"
+                      className="preview-action"
+                      onClick={handleOpenInEditor}
+                      disabled={loading}
+                      title="Open in default IDE"
+                    >
+                      Open with IDE
+                    </button>
+                    <RevealInFinderButton path={path} className="preview-action" />
+                  </>
+                )}
+                <button type="button" className="preview-close" onClick={onClose} title="Close preview">
+                  Close
+                </button>
+              </>
+            )}
+          </div>
+        </header>
+      )}
       <div
         className="preview-content"
         data-loading={loading}
@@ -215,6 +304,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
             {isEditMode ? (
               <Suspense fallback={<CodeEditorSkeleton />}>
                 <CodeEditor
+                  ref={codeEditorRef}
                   content={editedContent}
                   filename={filename}
                   readOnly={false}
@@ -233,6 +323,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
           <div className="editor-container">
             <Suspense fallback={<CodeEditorSkeleton />}>
               <CodeEditor
+                ref={codeEditorRef}
                 content={editedContent}
                 filename={filename}
                 readOnly={false}
