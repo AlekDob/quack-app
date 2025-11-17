@@ -79,7 +79,7 @@ interface NewTerminalModalProps {
   onUseWorktreeChange?: (useWorktree: boolean) => void
   onBrowse: () => void
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: (agentData?: SavedAgent) => void
 }
 
 type ModalStep = 'context' | 'agent';
@@ -378,18 +378,9 @@ function NewTerminalModal({
       console.warn('Failed to save agent to storage:', err);
     }
 
-    // Load agent data into parent state and immediately confirm
-    // We need to batch these updates by calling them all before onConfirm
-    onNameChange(agent.name);
-    onColorChange(agent.color);
-    onAvatarChange?.(agent.avatar);
-    onWorkingOnChange?.(agent.workingOn || '');
-    onPersonalityChange?.(agent.personality);
-
-    // Use requestAnimationFrame to ensure state updates are flushed
-    requestAnimationFrame(() => {
-      onConfirm();
-    });
+    // Pass agent data directly to onConfirm to avoid state timing issues
+    // The parent component will use this data instead of reading from state
+    onConfirm(agent);
   }
 
   function handleEditAgent(agent: SavedAgent) {

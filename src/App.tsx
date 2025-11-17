@@ -85,6 +85,7 @@ import type {
   UsageStats,
   AgentPersonality,
   SessionInfo,
+  SavedAgent,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
 
@@ -4439,14 +4440,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [explorerPath, newTerminalPath, selectingDirectory, tauriAvailable]);
 
-  const handleConfirmNewTerminal = useCallback(async () => {
+  const handleConfirmNewTerminal = useCallback(async (agentData?: SavedAgent) => {
     if (!tauriAvailable || creatingTerminal) {
       return;
     }
 
-    const trimmedName = newTerminalName.trim();
-    const trimmedPath = newTerminalPath.trim();
-    const trimmedWorkingOn = newTerminalWorkingOn.trim();
+    // Use agent data if provided (from "Use" button), otherwise use state
+    const trimmedName = agentData?.name || newTerminalName.trim();
+    const trimmedPath = newTerminalPath.trim(); // Path always from state (project context)
+    const trimmedWorkingOn = agentData?.workingOn?.trim() || newTerminalWorkingOn.trim();
+    const agentColor = agentData?.color || newTerminalColor;
+    const agentAvatar = agentData?.avatar || newTerminalAvatar;
+    const agentPersonality = agentData?.personality || newTerminalPersonality;
 
     if (!trimmedName) {
       setNewTerminalError("Enter a terminal name.");
@@ -4476,10 +4481,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         await invokeWithTimeout("update_terminal", {
           id: editingTerminal.id,
           label: trimmedName,
-          color: newTerminalColor,
+          color: agentColor,
           cwd: trimmedPath,
           workingOn: trimmedWorkingOn || null,
-          avatar: newTerminalAvatar,
+          avatar: agentAvatar,
           branch: newTerminalBranch || null,
         }, 3000); // 3 second timeout
 
@@ -4490,12 +4495,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               ? {
                   ...t,
                   label: trimmedName,
-                  color: newTerminalColor,
+                  color: agentColor,
                   cwd: trimmedPath,
                   workingOn: trimmedWorkingOn || undefined,
-                  avatar: newTerminalAvatar,
+                  avatar: agentAvatar,
                   branch: newTerminalBranch || undefined,
-                  personality: newTerminalPersonality, // Update personality in state
+                  personality: agentPersonality, // Update personality in state
                 }
               : t
           )
@@ -4503,22 +4508,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         // CRITICAL FIX: Save personality in background (non-blocking)
         // This prevents UI freeze if CLAUDE.md is large or filesystem is slow
-        if (newTerminalPersonality && Object.keys(newTerminalPersonality).length > 0) {
+        if (agentPersonality && Object.keys(agentPersonality).length > 0) {
           const fullPersonality: AgentPersonality = {
             id: editingTerminal.id,
             name: trimmedName,
-            role: newTerminalPersonality.role || '',
-            technicalContext: newTerminalPersonality.technicalContext || undefined,
-            rules: newTerminalPersonality.rules || undefined,
-            communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
-            customNotes: newTerminalPersonality.customNotes || undefined,
+            role: agentPersonality.role || '',
+            technicalContext: agentPersonality.technicalContext || undefined,
+            rules: agentPersonality.rules || undefined,
+            communicationStyle: agentPersonality.communicationStyle || 'friendly',
+            customNotes: agentPersonality.customNotes || undefined,
             // Legacy fields (kept for backwards compatibility)
-            intro: newTerminalPersonality.intro || '',
-            personality: newTerminalPersonality.personality || '',
-            quirks: newTerminalPersonality.quirks || '',
-            specialties: newTerminalPersonality.specialties || [],
-            skills: newTerminalPersonality.skills || [],
-            expressions: newTerminalPersonality.expressions || [],
+            intro: agentPersonality.intro || '',
+            personality: agentPersonality.personality || '',
+            quirks: agentPersonality.quirks || '',
+            specialties: agentPersonality.specialties || [],
+            skills: agentPersonality.skills || [],
+            expressions: agentPersonality.expressions || [],
           };
 
           // Fire and forget - don't block UI
@@ -4633,10 +4638,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         const created = await invoke<TerminalInfo>("create_terminal", {
           label: trimmedName,
-          color: newTerminalColor,
+          color: agentColor,
           cwd: effectivePath,
           workingOn: trimmedWorkingOn || null,
-          avatar: newTerminalAvatar,
+          avatar: agentAvatar,
           branch: newTerminalBranch || null,
         });
 
@@ -4647,11 +4652,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           hasResponded: false,
           responseStartTime: null,
           workingOn: trimmedWorkingOn || undefined,
-          avatar: newTerminalAvatar,
+          avatar: agentAvatar,
           branch: newTerminalBranch || undefined,
           useWorktree: newTerminalUseWorktree && !!worktreePath,
           worktreePath: worktreePath,
-          personality: newTerminalPersonality, // Store personality in state
+          personality: agentPersonality, // Store personality in state
         };
 
         // Save metadata for Telegram notifications immediately
@@ -4665,23 +4670,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         clearTerminalAttention(createdWithState.id);
 
         // Save agent personality if configured
-        if (newTerminalPersonality && Object.keys(newTerminalPersonality).length > 0) {
+        if (agentPersonality && Object.keys(agentPersonality).length > 0) {
           try {
             const fullPersonality: AgentPersonality = {
               id: createdWithState.id,
               name: trimmedName,
-              role: newTerminalPersonality.role || '',
-              technicalContext: newTerminalPersonality.technicalContext || undefined,
-              rules: newTerminalPersonality.rules || undefined,
-              communicationStyle: newTerminalPersonality.communicationStyle || 'friendly',
-              customNotes: newTerminalPersonality.customNotes || undefined,
+              role: agentPersonality.role || '',
+              technicalContext: agentPersonality.technicalContext || undefined,
+              rules: agentPersonality.rules || undefined,
+              communicationStyle: agentPersonality.communicationStyle || 'friendly',
+              customNotes: agentPersonality.customNotes || undefined,
               // Legacy fields (kept for backwards compatibility)
-              intro: newTerminalPersonality.intro || '',
-              personality: newTerminalPersonality.personality || '',
-              quirks: newTerminalPersonality.quirks || '',
-              specialties: newTerminalPersonality.specialties || [],
-              skills: newTerminalPersonality.skills || [],
-              expressions: newTerminalPersonality.expressions || [],
+              intro: agentPersonality.intro || '',
+              personality: agentPersonality.personality || '',
+              quirks: agentPersonality.quirks || '',
+              specialties: agentPersonality.specialties || [],
+              skills: agentPersonality.skills || [],
+              expressions: agentPersonality.expressions || [],
             };
 
             await invoke('save_agent_personality', {
