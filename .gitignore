@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tauri binaries (auto-generated, too large for GitHub)
+src-tauri/binaries/
