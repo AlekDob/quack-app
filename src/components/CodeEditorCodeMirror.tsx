@@ -172,6 +172,22 @@ const customTheme = EditorView.theme({
     borderRadius: "2px",
     outline: "2px solid rgba(242, 140, 82, 0.3)",
   },
+  // Diff highlighting for modified lines
+  ".cm-line-added": {
+    backgroundColor: "rgba(0, 255, 0, 0.10) !important",
+    borderLeft: "2px solid rgba(0, 255, 0, 0.5)",
+    paddingLeft: "6px",
+  },
+  ".cm-line-modified": {
+    backgroundColor: "rgba(255, 220, 0, 0.15) !important",
+    borderLeft: "2px solid rgba(255, 220, 0, 0.7)",
+    paddingLeft: "6px",
+  },
+  ".cm-line-removed": {
+    backgroundColor: "rgba(255, 0, 0, 0.08) !important",
+    borderLeft: "2px solid rgba(255, 0, 0, 0.5)",
+    paddingLeft: "6px",
+  },
 });
 
 // Custom syntax highlighting - VS Code Dark+ inspired with muted colors
@@ -233,6 +249,11 @@ export interface CodeEditorRef {
   replaceAll: (replaceText: string) => void;
 }
 
+export interface LineChange {
+  line: number;
+  type: 'added' | 'modified' | 'removed';
+}
+
 interface CodeEditorProps {
   content: string;
   filename: string | null;
@@ -241,6 +262,7 @@ interface CodeEditorProps {
   onChange?: (value: string) => void;
   onSave?: (value: string) => void;
   diffInfo?: DiffInfo | null;
+  lineChanges?: LineChange[]; // New prop for detailed line-by-line diff
 }
 
 const getLanguageFromFilename = (filename: string | null): string => {
@@ -323,6 +345,35 @@ const currentSearchMatchDecoration = Decoration.mark({
   class: "cm-search-match-current"
 });
 
+// Diff highlighting state management
+const setDiffDecorations = StateEffect.define<Range<Decoration>[]>();
+const diffDecorationsField = StateField.define<Range<Decoration>[]>({
+  create() {
+    return [];
+  },
+  update(decorations, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setDiffDecorations)) {
+        return effect.value;
+      }
+    }
+    return decorations;
+  },
+  provide: f => EditorView.decorations.from(f, decorations => Decoration.set(decorations))
+});
+
+const lineAddedDecoration = Decoration.line({
+  class: "cm-line-added"
+});
+
+const lineModifiedDecoration = Decoration.line({
+  class: "cm-line-modified"
+});
+
+const lineRemovedDecoration = Decoration.line({
+  class: "cm-line-removed"
+});
+
 const CodeEditorCodeMirror = forwardRef<CodeEditorRef, CodeEditorProps>(({
   content,
   filename,
@@ -331,6 +382,7 @@ const CodeEditorCodeMirror = forwardRef<CodeEditorRef, CodeEditorProps>(({
   onChange,
   onSave,
   diffInfo,
+  lineChanges,
 }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -563,6 +615,7 @@ const CodeEditorCodeMirror = forwardRef<CodeEditorRef, CodeEditorProps>(({
         EditorState.readOnly.of(readOnly),
         highlightSelectionMatches(), // Highlight matching selections
         searchMatchesField, // Add search matches field
+        diffDecorationsField, // Add diff decorations field
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         saveKeyBinding,
         EditorView.updateListener.of((update) => {
@@ -604,6 +657,84 @@ const CodeEditorCodeMirror = forwardRef<CodeEditorRef, CodeEditorProps>(({
     // Reset the internal change flag after processing
     isInternalChangeRef.current = false;
   }, [content]);
+
+  // Apply diff decorations when lineChanges or diffInfo changes
+  useEffect(() => {
+    if (!viewRef.current) return;
+
+    console.log('[CodeEditor] Applying decorations - lineChanges:', lineChanges, 'diffInfo:', diffInfo);
+
+    const decorations: Range<Decoration>[] = [];
+
+    // Apply lineChanges if provided (preferred, more detailed)
+    if (lineChanges && lineChanges.length > 0) {
+      lineChanges.forEach((change) => {
+        // Line numbers are 1-indexed, CodeMirror uses 0-indexed
+        const lineNumber = change.line - 1;
+        if (lineNumber < 0) return;
+
+        try {
+          const line = viewRef.current!.state.doc.line(lineNumber + 1);
+          let decoration: Decoration;
+
+          switch (change.type) {
+            case 'added':
+              decoration = lineAddedDecoration;
+              break;
+            case 'modified':
+              decoration = lineModifiedDecoration;
+              break;
+            case 'removed':
+              decoration = lineRemovedDecoration;
+              break;
+            default:
+              return;
+          }
+
+          decorations.push(decoration.range(line.from));
+        } catch (error) {
+          console.warn(`Failed to apply decoration for line ${change.line}:`, error);
+        }
+      });
+    }
+    // Fallback to diffInfo if lineChanges not provided
+    else if (diffInfo) {
+      // Apply additions
+      diffInfo.additions?.forEach((lineNum) => {
+        try {
+          const line = viewRef.current!.state.doc.line(lineNum);
+          decorations.push(lineAddedDecoration.range(line.from));
+        } catch (error) {
+          console.warn(`Failed to apply added decoration for line ${lineNum}:`, error);
+        }
+      });
+
+      // Apply modifications
+      diffInfo.modifications?.forEach((lineNum) => {
+        try {
+          const line = viewRef.current!.state.doc.line(lineNum);
+          decorations.push(lineModifiedDecoration.range(line.from));
+        } catch (error) {
+          console.warn(`Failed to apply modified decoration for line ${lineNum}:`, error);
+        }
+      });
+
+      // Apply deletions
+      diffInfo.deletions?.forEach((lineNum) => {
+        try {
+          const line = viewRef.current!.state.doc.line(lineNum);
+          decorations.push(lineRemovedDecoration.range(line.from));
+        } catch (error) {
+          console.warn(`Failed to apply removed decoration for line ${lineNum}:`, error);
+        }
+      });
+    }
+
+    // Apply decorations
+    viewRef.current.dispatch({
+      effects: setDiffDecorations.of(decorations)
+    });
+  }, [lineChanges, diffInfo]);
 
   return (
     <div

@@ -38,7 +38,7 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
-import ChatView from "./components/ChatView";
+import ChatView, { type LineChange } from "./components/ChatView";
 import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
@@ -600,6 +600,7 @@ function App() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [formattingPreview, setFormattingPreview] = useState(false);
   const [previewDiffInfo, setPreviewDiffInfo] = useState<DiffInfo | null>(null);
+  const [previewLineChanges, setPreviewLineChanges] = useState<LineChange[] | null>(null);
   const [previewHasUnsavedChanges, setPreviewHasUnsavedChanges] = useState(false);
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
@@ -5066,7 +5067,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   );
 
   const handleOpenFilePreview = useCallback(
-    async (entry: DirectoryEntry) => {
+    async (entry: DirectoryEntry, lineChanges?: LineChange[]) => {
       if (!tauriAvailable || entry.is_dir) {
         return;
       }
@@ -5113,6 +5114,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setPreviewImageData(null);
       setPreviewError(null);
       setPreviewDiffInfo(null);
+      setPreviewLineChanges(lineChanges || null);
       setLoadingPreview(true);
 
       try {
@@ -5193,7 +5195,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [tauriAvailable, gitSummary, explorerRoot, activeId]
   );
 
-  const handleFilePathClick = useCallback((path: string) => {
+  const handleFilePathClick = useCallback((path: string, lineChanges?: LineChange[]) => {
     const name = path.split('/').pop() || path;
     // Create a fake DirectoryEntry to open the file
     const fakeEntry: DirectoryEntry = {
@@ -5203,7 +5205,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       is_symlink: false,
     };
     // Use handleOpenFilePreview to actually load file content
-    handleOpenFilePreview(fakeEntry);
+    handleOpenFilePreview(fakeEntry, lineChanges);
   }, [handleOpenFilePreview]);
 
   // Handler to open Browser Manager tab
@@ -6688,6 +6690,7 @@ You have access to all Bash tools to execute git commands like:
                     error={previewError}
                     formatting={formattingPreview}
                     diffInfo={previewDiffInfo}
+                    lineChanges={previewLineChanges ?? undefined}
                     onClose={() => setActiveTabId('chat')}
                     onRefresh={handleRefreshPreview}
                     onFormat={handleFormatPreview}
@@ -6955,6 +6958,7 @@ You have access to all Bash tools to execute git commands like:
           error={previewError}
           formatting={formattingPreview}
           diffInfo={previewDiffInfo}
+          lineChanges={previewLineChanges ?? undefined}
           imageData={previewImageData}
           onClose={handleClosePreview}
           onRefresh={handleRefreshPreview}

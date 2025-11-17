@@ -6,7 +6,7 @@ import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
 import SearchToolbar, { type SearchOptions } from "./SearchToolbar";
-import type { CodeEditorRef } from "./CodeEditorCodeMirror";
+import type { CodeEditorRef, LineChange } from "./CodeEditorCodeMirror";
 
 // Lazy load CodeMirror editor (lighter than Monaco, works better with Tauri)
 const CodeEditor = lazy(() => import("./CodeEditorCodeMirror"));
@@ -20,6 +20,7 @@ interface FilePreviewDrawerProps {
   error: string | null;
   formatting: boolean;
   diffInfo?: DiffInfo | null;
+  lineChanges?: LineChange[]; // Detailed line-by-line changes for diff highlighting
   onClose: () => void;
   onRefresh: () => void;
   onFormat: () => void;
@@ -44,6 +45,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
   error,
   formatting,
   diffInfo,
+  lineChanges,
   onClose,
   onRefresh,
   onFormat,
@@ -311,6 +313,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                   onChange={handleContentChange}
                   onSave={handleSave}
                   diffInfo={diffInfo}
+                  lineChanges={lineChanges}
                 />
               </Suspense>
             ) : (
@@ -330,6 +333,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                 onChange={handleContentChange}
                 onSave={handleSave}
                 diffInfo={diffInfo}
+                lineChanges={lineChanges}
               />
             </Suspense>
           </div>

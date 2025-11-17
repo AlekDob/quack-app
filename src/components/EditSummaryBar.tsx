@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import './EditSummaryBar.css';
 
+export interface LineChange {
+  line: number;
+  type: 'added' | 'modified' | 'removed';
+}
+
 export interface FileEdit {
   filePath: string;
   editCount: number;
   lineNumbers: number[];
+  lineChanges?: LineChange[]; // Detailed line-by-line changes for diff highlighting
 }
 
 export interface FileDeleted {
@@ -14,7 +20,7 @@ export interface FileDeleted {
 interface EditSummaryBarProps {
   edits: FileEdit[];
   deletes?: FileDeleted[];
-  onFileClick?: (filePath: string) => void;
+  onFileClick?: (filePath: string, lineChanges?: LineChange[]) => void;
   onClear?: () => void;
   onClearEdits?: () => void; // Deprecated, use onClear
 }
@@ -33,15 +39,15 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
   const hasEdits = edits.length > 0;
   const hasDeletes = deletes.length > 0;
 
-  const handleFileClick = (filePath: string) => {
+  const handleFileClick = (filePath: string, lineChanges?: LineChange[]) => {
     if (onFileClick) {
-      onFileClick(filePath);
+      onFileClick(filePath, lineChanges);
     }
   };
 
   const handleOpenAll = () => {
     if (onFileClick) {
-      edits.forEach(edit => onFileClick(edit.filePath));
+      edits.forEach(edit => onFileClick(edit.filePath, edit.lineChanges));
     }
   };
 
@@ -114,7 +120,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
                     <div
                       key={index}
                       className="edit-summary-bar-file"
-                      onClick={() => handleFileClick(edit.filePath)}
+                      onClick={() => handleFileClick(edit.filePath, edit.lineChanges)}
                     >
                       <div className="edit-summary-bar-file-info">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

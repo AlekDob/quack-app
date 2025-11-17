@@ -13,10 +13,16 @@ import type {
 } from '../hooks/useClaudeChat';
 import './ChatView.css';
 
-interface FileEdit {
+export interface LineChange {
+  line: number;
+  type: 'added' | 'modified' | 'removed';
+}
+
+export interface FileEdit {
   filePath: string;
   editCount: number;
   lineNumbers: number[];
+  lineChanges?: LineChange[]; // Detailed line-by-line changes for diff highlighting
 }
 
 interface FileDeleted {
@@ -31,7 +37,7 @@ interface ChatViewProps {
   onClearAgent?: () => void;
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
-  onFilePathClick?: (path: string) => void;
+  onFilePathClick?: (path: string, lineChanges?: LineChange[]) => void;
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
   pendingFileMention?: { name: string; path: string; relativePath: string } | null;
@@ -169,6 +175,35 @@ export default function ChatView({
     });
   };
 
+  // Helper function to compute line-by-line diff
+  const computeLineChanges = (oldString: string = '', newString: string = ''): LineChange[] => {
+    const oldLines = oldString.split('\n');
+    const newLines = newString.split('\n');
+    const changes: LineChange[] = [];
+
+    // Simple diff algorithm: compare line by line
+    // This is a basic implementation - for production you might want a more sophisticated algorithm
+    const maxLines = Math.max(oldLines.length, newLines.length);
+
+    for (let i = 0; i < maxLines; i++) {
+      const oldLine = oldLines[i];
+      const newLine = newLines[i];
+
+      if (oldLine === undefined && newLine !== undefined) {
+        // Line was added
+        changes.push({ line: i + 1, type: 'added' });
+      } else if (oldLine !== undefined && newLine === undefined) {
+        // Line was removed
+        changes.push({ line: i + 1, type: 'removed' });
+      } else if (oldLine !== newLine) {
+        // Line was modified
+        changes.push({ line: i + 1, type: 'modified' });
+      }
+    }
+
+    return changes;
+  };
+
   // Track file edits and deletions from the LAST assistant message only
   const { currentFileEdits, currentFileDeletes } = useMemo(() => {
     // Find the last assistant message (most recent AI response)
@@ -201,10 +236,23 @@ export default function ChatView({
                       filePath,
                       editCount: 0,
                       lineNumbers: [],
+                      lineChanges: [], // Initialize empty array for line-by-line changes
                     });
                   }
                   const edit = fileEdits.get(filePath)!;
                   edit.editCount++;
+
+                  // Compute line changes for Edit tool (has old_string and new_string)
+                  if (toolName === 'edit' && input.old_string && input.new_string) {
+                    const changes = computeLineChanges(input.old_string, input.new_string);
+
+                    // Debug: log the changes
+                    console.log('[ChatView] Computed line changes for', filePath, ':', changes);
+
+                    edit.lineChanges!.push(...changes);
+                  }
+                  // For Write tool, we don't have old_string, so we can't compute precise diffs
+                  // The Write tool creates or overwrites entire files
                 }
 
                 // Track Bash commands with rm
