@@ -2,7 +2,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { AgentDetails } from "../types";
 import MarkdownText from "./MarkdownText";
-import CodeEditor from "./CodeEditor";
+import CodeEditorCodeMirror from "./CodeEditorCodeMirror";
 import RevealInFinderButton from "./RevealInFinderButton";
 import { AgentAvatar } from "./AgentAvatar";
 import "./AgentViewer.css";
@@ -372,10 +372,9 @@ export default function AgentViewer({
                 onChange={(e) => handleModelChange(e.target.value)}
                 disabled={isSaving}
               >
-                <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
-                <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
-                <option value="claude-sonnet-3-5-20241022">claude-sonnet-3-5-20241022</option>
-                <option value="claude-haiku-3-5-20241022">claude-haiku-3-5-20241022</option>
+                <option value="claude-opus-4-20250514">opus</option>
+                <option value="claude-sonnet-4-20250514">sonnet</option>
+                <option value="claude-haiku-3-5-20241022">haiku</option>
               </select>
             </div>
 
@@ -409,12 +408,17 @@ export default function AgentViewer({
 
           {/* Code Editor */}
           <div className="agent-viewer-editor">
-            <CodeEditor
+            <CodeEditorCodeMirror
               content={editContent}
               filename={`${agent.name}.md`}
               onChange={handleContentChange}
               language="markdown"
               readOnly={false}
+              editorThemeExtension={{
+                ".cm-scroller": {
+                  paddingBottom: "10px"
+                }
+              }}
             />
           </div>
         </div>

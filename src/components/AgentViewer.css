@@ -363,8 +363,9 @@
 /* Editor Section */
 .agent-viewer-editor {
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
   min-height: 400px;
+  padding-bottom: 20px;
 }
 
 /* Scrollbar Styling */

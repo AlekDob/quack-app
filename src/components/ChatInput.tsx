@@ -96,6 +96,7 @@ export default function ChatInput({
   const [localInput, setLocalInput] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Determine if controlled or uncontrolled
@@ -429,9 +430,14 @@ export default function ChatInput({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 50)}px`;
-  }, [input]);
+    if (isFocused) {
+      // When focused, expand to 120px regardless of content
+      textarea.style.height = '120px';
+    } else {
+      // When not focused, remove inline height to let CSS min-height take control
+      textarea.style.height = '';
+    }
+  }, [input, isFocused]);
 
   // Insert agent mention when requested from panel
   useEffect(() => {
@@ -1333,7 +1339,13 @@ export default function ChatInput({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={placeholder}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={
+              isFocused
+                ? `⇧ + ↵ new line | ↵ send`
+                : placeholder
+            }
             disabled={disabled}
             rows={1}
           />
