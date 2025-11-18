@@ -44,6 +44,11 @@
   - Solution: Content-based event IDs + stable session keys
   - Tests: 37 passing tests in `src/tests/`
 
+- **`GLOBAL_SKILLS_VISIBILITY_FIX.md`** ✅ - Global skills not visible in projects without local skills (RESOLVED)
+  - Root cause: Early return prevented backend call
+  - Solution: Always call list_skills regardless of directory existence
+  - Tests: 9 passing tests in `src/tests/skills.globalVisibility.test.ts`
+
 - **`AVATAR_IMAGES_FIX.md`** - Avatar image loading fixes
 
 ### How to Add New Bug Fix Docs
@@ -79,7 +84,11 @@ npm run test:coverage # Coverage report
 - ✅ Event deduplication (17 tests)
 - ✅ Session key stability (9 tests)
 - ✅ Integration scenarios (11 tests)
-- **Total**: 37 tests, all passing
+- ✅ Global skills visibility (9 tests)
+- ✅ Terminal storage (17 tests)
+- ✅ Terminal utils (40 tests)
+- ✅ Agent chat storage (13 tests)
+- **Total**: 116 tests, all passing
 
 ---
 
