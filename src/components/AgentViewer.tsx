@@ -25,6 +25,19 @@ const AGENT_COLORS: Record<string, string> = {
   pink: "#EC4899",
 };
 
+// Model name mapping for display and storage
+const getModelDisplayName = (model: string): string => {
+  if (model.includes("opus")) return "opus";
+  if (model.includes("sonnet")) return "sonnet";
+  if (model.includes("haiku")) return "haiku";
+  return model; // fallback to full model name
+};
+
+// Convert full model name to short name for storage
+const getShortModelName = (model: string): string => {
+  return getModelDisplayName(model);
+};
+
 // Icon components
 const icons: Record<string, ReactNode> = {
   edit: (
@@ -112,10 +125,11 @@ export default function AgentViewer({
   const handleEdit = () => {
     if (!agent) return;
 
+    const shortModel = getShortModelName(agent.model);
     setEditContent(agent.content);
     setOriginalContent(agent.content);
-    setEditModel(agent.model);
-    setOriginalModel(agent.model);
+    setEditModel(shortModel);
+    setOriginalModel(shortModel);
     setEditColor(agent.color);
     setOriginalColor(agent.color);
     setEditDescription(agent.description);
@@ -279,7 +293,7 @@ export default function AgentViewer({
               </div>
 
               <div className="agent-viewer-meta">
-                <span className="agent-viewer-model">Model: {agent.model}</span>
+                <span className="agent-viewer-model">Model: {getModelDisplayName(agent.model)}</span>
                 <span className="agent-viewer-scope">
                   {agentScope === 'global' ? '🌍 Global' : '📁 Project'}
                 </span>
@@ -336,17 +350,15 @@ export default function AgentViewer({
               >
                 <span>Cancel</span>
               </button>
-              {hasChanges && (
-                <button
-                  type="button"
-                  className="agent-viewer-button agent-viewer-save"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                >
-                  {icons.save}
-                  <span>{isSaving ? "Saving..." : "Save"}</span>
-                </button>
-              )}
+              <button
+                type="button"
+                className="agent-viewer-button agent-viewer-save"
+                onClick={handleSave}
+                disabled={isSaving || !hasChanges}
+              >
+                {icons.save}
+                <span>{isSaving ? "Saving..." : "Save"}</span>
+              </button>
             </div>
           </div>
 
@@ -372,9 +384,9 @@ export default function AgentViewer({
                 onChange={(e) => handleModelChange(e.target.value)}
                 disabled={isSaving}
               >
-                <option value="claude-opus-4-20250514">opus</option>
-                <option value="claude-sonnet-4-20250514">sonnet</option>
-                <option value="claude-haiku-3-5-20241022">haiku</option>
+                <option value="opus">opus</option>
+                <option value="sonnet">sonnet</option>
+                <option value="haiku">haiku</option>
               </select>
             </div>
 
