@@ -69,6 +69,10 @@ import {
   type TerminalMetadata,
 } from "./services/terminalStorage";
 import {
+  saveAgentChatsToStorage,
+  loadAgentChatsFromStorage,
+} from "./services/agentChatStorage";
+import {
   TERMINAL_COLORS,
   stripAnsi,
   normalizeKey,
@@ -160,70 +164,8 @@ const checkStorageVersion = async (): Promise<boolean> => {
   }
 };
 
-// ============================================
-// AgentChat Storage Functions (Phase 1)
-// ============================================
-
-const AGENT_CHATS_KEY = "agentChats";
-// No migration keys needed anymore!
-
-const saveAgentChatsToStorage = async (chats: AgentChat[]): Promise<void> => {
-  try {
-    const store = await Store.load(getTestModeStoreName("quack-agent-chats.json"));
-    await store.set(AGENT_CHATS_KEY, chats);
-    await store.save();
-    console.log(`Saved ${chats.length} AgentChats to storage`);
-  } catch (error) {
-    console.error("Failed to save AgentChats:", error);
-    toast.error("Failed to save workspace configuration");
-  }
-};
-
-const loadAgentChatsFromStorage = async (): Promise<AgentChat[]> => {
-  try {
-    const store = await Store.load(getTestModeStoreName("quack-agent-chats.json"));
-    const stored = await store.get<AgentChat[]>(AGENT_CHATS_KEY);
-
-    // ✅ DEFENSIVE: Validate data structure before returning
-    if (!stored) {
-      return [];
-    }
-
-    if (!Array.isArray(stored)) {
-      console.error("🦆 Storage corruption detected: agentChats is not an array", typeof stored);
-      toast.error("Agent chat storage corrupted - resetting to clean state");
-      await store.delete(AGENT_CHATS_KEY);
-      await store.save();
-      return [];
-    }
-
-    // ✅ DEFENSIVE: Validate each agent chat has required fields
-    const validated = stored.filter((chat: any) => {
-      if (!chat || typeof chat !== 'object') {
-        console.warn("🦆 Skipping invalid agent chat entry:", chat);
-        return false;
-      }
-      if (!chat.id || !chat.name) {
-        console.warn("🦆 Skipping agent chat missing id/name:", chat);
-        return false;
-      }
-      return true;
-    });
-
-    if (validated.length !== stored.length) {
-      console.warn(`🦆 Filtered out ${stored.length - validated.length} corrupted agent chat entries`);
-    }
-
-    console.log(`Loaded ${validated.length} AgentChats from storage`);
-    return validated;
-  } catch (error) {
-    console.error("🦆 Critical error loading AgentChats:", error);
-    toast.error("Failed to load agent chats - starting fresh");
-    return [];
-  }
-};
-
-// NO storage for activeAgentChat - not needed!
+// AgentChat Storage moved to src/services/agentChatStorage.ts
+// Import the functions below
 
 // ============================================
 // Random Agent Names
