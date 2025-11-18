@@ -119,24 +119,44 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       const seenEventIds = new Set<string>(); // Track unique event identifiers
       let assistantContent = '';
 
-      // Helper function to generate unique event ID for deduplication
+      // 🦆 FIX: Enhanced helper function to generate STABLE unique event IDs for deduplication
       const getEventId = (event: ClaudeEvent): string => {
-        if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
-          return `system-${event.subtype}-${event.session_id}`;
+        // For system events: use subtype only (session_id might not be set yet)
+        if (event.type === 'system' && 'subtype' in event) {
+          return `system-${event.subtype}`;
         }
-        if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-          return `assistant-${event.message.id}`;
+
+        // For assistant events: use message.id if available, otherwise hash content
+        if (event.type === 'assistant' && 'message' in event) {
+          if (event.message?.id) {
+            return `assistant-${event.message.id}`;
+          }
+          // Fallback: hash the content blocks to detect duplicates
+          const contentHash = event.message?.content
+            ?.map((b: any) => `${b.type}-${b.text?.substring(0, 20) || b.name || ''}`)
+            .join('|') || '';
+          return `assistant-${contentHash.substring(0, 50)}`;
         }
-        if (event.type === 'user' && 'session_id' in event) {
-          // User events might not have unique IDs, use session + timestamp hash
-          const hash = JSON.stringify(event).substring(0, 50);
-          return `user-${event.session_id}-${hash}`;
+
+        // For user events: hash the tool results content
+        if (event.type === 'user' && 'message' in event) {
+          const contentHash = event.message?.content
+            ?.map((b: any) => `${b.type}-${b.tool_use_id || ''}`)
+            .join('|') || '';
+          return `user-${contentHash.substring(0, 50)}`;
         }
-        if (event.type === 'result' && 'session_id' in event) {
-          return `result-${event.session_id}`;
+
+        // For result events: use session_id if available, otherwise timestamp
+        if (event.type === 'result') {
+          return `result-${event.session_id || Date.now()}`;
         }
-        // Fallback: use full JSON hash for unknown event types
-        return `${event.type}-${JSON.stringify(event).substring(0, 100)}`;
+
+        // Fallback: hash the entire event object
+        const eventHash = JSON.stringify(event)
+          .split('')
+          .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
+          .toString(36);
+        return `${event.type}-${eventHash}`;
       };
 
       // Process streaming events
@@ -144,15 +164,17 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
         if (chunk.type === 'event' && chunk.event) {
           const event = chunk.event;
 
-          // ✅ Deduplicate events using unique ID
+          // 🦆 FIX: Deduplicate events using STABLE unique ID
           const eventId = getEventId(event);
           if (seenEventIds.has(eventId)) {
-            console.warn('[useClaudeChat] Duplicate event detected and skipped:', eventId);
+            console.warn('[useClaudeChat] 🦆 DUPLICATE DETECTED IN APP LAYER - Event ID:', eventId, 'Type:', event.type);
+            console.warn('[useClaudeChat] Total unique events so far:', seenEventIds.size, 'Total duplicates prevented:', events.length);
             continue; // Skip duplicate event
           }
 
           seenEventIds.add(eventId);
           events.push(event);
+          console.log('[useClaudeChat] ✅ New unique event added - ID:', eventId.substring(0, 30), 'Type:', event.type, 'Total:', events.length);
 
           // Capture session ID from system init event
           if (event.type === 'system' && event.subtype === 'init' && event.session_id) {

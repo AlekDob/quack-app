@@ -27,6 +27,11 @@
     "analyze:deps": "npm ls --depth=0 --prod | head -20",
     "clean": "rm -rf dist node_modules/.vite",
     "clean:all": "rm -rf dist node_modules src-tauri/target",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:dedup": "vitest run src/tests/eventDeduplication.test.ts src/tests/sessionKeyStability.test.ts",
     "test:dev": "VITE_TEST_MODE=true npm run tauri:dev",
     "test:clean": "rm -f ~/Library/Application\\ Support/com.quack.terminal/*-TEST.json && echo '✅ Test data cleaned!'",
     "test:reset": "npm run test:clean && echo '🧪 Starting Quack in TEST MODE...' && npm run test:dev"
@@ -88,11 +93,13 @@
     "@types/react-dom": "^19.1.9",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.0.3",
+    "@vitest/ui": "^4.0.10",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.4.0",
+    "happy-dom": "^20.0.10",
     "postcss": "^8.5.6",
     "rollup-plugin-visualizer": "^6.0.5",
     "tailwindcss": "^3.4.13",
@@ -101,6 +108,7 @@
     "typescript-eslint": "^8.44.0",
     "vite": "^7.1.7",
     "vite-plugin-compression": "^0.5.1",
-    "vite-plugin-monaco-editor": "^1.1.0"
+    "vite-plugin-monaco-editor": "^1.1.0",
+    "vitest": "^4.0.10"
   }
 }

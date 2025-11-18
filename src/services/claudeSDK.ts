@@ -93,25 +93,42 @@ const activeStreams = new Map<string, AbortController>();
 const seenEventIds = new Map<string, Set<string>>(); // sessionKey -> Set of event IDs
 
 /**
- * Generate a unique event ID from an event object
+ * 🦆 FIX: Generate a STABLE unique event ID from an event object
+ * This ID must be consistent across multiple calls for the same logical event
  */
 function generateEventId(event: any, eventType: string): string {
-  // For assistant events with message ID, use that
+  // For assistant events: prioritize message.id, fallback to content hash
   if (event.message?.id) {
     return `${eventType}-${event.message.id}`;
   }
 
-  // For events with explicit session + timestamp, use those
-  if (event.session_id && event.timestamp) {
-    return `${eventType}-${event.session_id}-${event.timestamp}`;
+  // For system events: use subtype only (session_id might not exist initially)
+  if (eventType === 'system' && event.subtype) {
+    return `${eventType}-${event.subtype}`;
   }
 
-  // Fallback: hash the event content
+  // For result events: use session_id if available
+  if (eventType === 'result' && event.session_id) {
+    return `${eventType}-${event.session_id}`;
+  }
+
+  // For events with content: hash the actual content, not the wrapper
+  if (event.message?.content) {
+    const contentHash = Array.isArray(event.message.content)
+      ? event.message.content.map((block: any) =>
+          `${block.type}-${block.text?.substring(0, 20) || block.name || block.tool_use_id || ''}`
+        ).join('|')
+      : JSON.stringify(event.message.content);
+    return `${eventType}-${hashString(contentHash)}`;
+  }
+
+  // Fallback: hash the entire event structure
   const contentHash = JSON.stringify({
     type: eventType,
     content: event.message?.content,
     result: event.result,
     error: event.error,
+    subtype: event.subtype,
   });
 
   return `${eventType}-${hashString(contentHash)}`;
@@ -145,10 +162,11 @@ export async function* streamClaudeMessage(
   const streamId = options.streamId || `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now().toString(36).substr(2, 6)}`;
   const timeout = options.timeout || 5 * 60 * 1000; // Default: 5 minutes
 
-  // Create unique session key for isolation
-  const sessionKey = options.sessionId || streamId;
+  // 🦆 FIX: Use streamId as STABLE session key for event deduplication
+  // This ensures seenEventIds tracking remains consistent even if sessionId changes during stream
+  const sessionKey = streamId;
 
-  console.log(`[claudeSDK:${streamId}] Starting stream for session: ${sessionKey} with timeout: ${timeout}ms`);
+  console.log(`[claudeSDK:${streamId}] Starting stream for session: ${sessionKey} (resuming: ${options.sessionId || 'new'}) with timeout: ${timeout}ms`);
 
   // Cancel any existing stream for this session
   const existingController = activeStreams.get(sessionKey);
