@@ -68,6 +68,15 @@ import {
   loadNativeTerminalsFromStorage,
   type TerminalMetadata,
 } from "./services/terminalStorage";
+import {
+  TERMINAL_COLORS,
+  stripAnsi,
+  normalizeKey,
+  slugify,
+  chunkContainsPrompt,
+  debounce,
+  getRandomTerminalColor,
+} from "./utils/terminalUtils";
 
 import type {
   AgentChat,
@@ -103,62 +112,8 @@ import "./components/MetroStyle.css";
 
 const INTRO_REPLAY_DURATION_MS = 5000;
 
-const COLORS = [
-  "#f28c52",
-  "#ffb26f",
-  "#ffd166",
-  "#f77aa6",
-  "#4dd4b3",
-  "#8fa6ff",
-  "#f2a57b",
-];
-
 // Notification settings
 const NOTIFY_ACTIVE_TERMINAL = true; // Send notifications even for active terminal
-
-// eslint-disable-next-line no-control-regex
-const ANSI_REGEX = new RegExp("\\x1B\\[[0-9;?]*[ -/]*[@-~]", "g");
-// eslint-disable-next-line no-control-regex
-const OSC_REGEX = new RegExp("\\x1B\\][^\\x07]*\\x07", "g");
-const PROMPT_REGEX = /(?:[$#%>|❯])\s*$/;
-
-const normalizeKey = (value: string): string => value.trim().toLowerCase();
-const slugify = (value: string): string =>
-  normalizeKey(value).replace(/[^a-z0-9]+/g, "-");
-
-const stripAnsi = (text: string): string =>
-  text.replace(OSC_REGEX, "").replace(ANSI_REGEX, "");
-
-const chunkContainsPrompt = (text: string): boolean => {
-  const sanitized = stripAnsi(text).replace(/\r/g, "\n");
-  const lines = sanitized
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .filter(Boolean);
-  if (lines.length === 0) {
-    return false;
-  }
-  return PROMPT_REGEX.test(lines[lines.length - 1]);
-};
-
-// Debounce utility for auto-save
-function debounce<T extends (...args: unknown[]) => void>(
-  func: T,
-  wait: number
-): T & { cancel: () => void } {
-  let timeout: NodeJS.Timeout | null = null;
-
-  const debounced = (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-
-  debounced.cancel = () => {
-    if (timeout) clearTimeout(timeout);
-  };
-
-  return debounced as T & { cancel: () => void };
-}
 
 // ============================================
 // Storage Version System
@@ -349,7 +304,7 @@ function App() {
   const [showNewTerminalModal, setShowNewTerminalModal] = useState(false);
   const [newTerminalName, setNewTerminalName] = useState("");
   const [newTerminalPath, setNewTerminalPath] = useState("");
-  const [newTerminalColor, setNewTerminalColor] = useState(COLORS[0]);
+  const [newTerminalColor, setNewTerminalColor] = useState(TERMINAL_COLORS[0]);
   const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
   const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
   const [newTerminalBranch, setNewTerminalBranch] = useState("");
@@ -822,7 +777,7 @@ function App() {
       const newAgent: AgentChat = {
         id: newAgentId,
         name: `Agent ${agentChats.length + 1}`,
-        color: COLORS[agentChats.length % COLORS.length],
+        color: TERMINAL_COLORS[agentChats.length % COLORS.length],
         cwd: explorerPath,
         createdAt: Date.now(),
       };
@@ -1753,7 +1708,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Create backend terminal (PTY)
       const created = await invoke<TerminalInfo>('create_terminal', {
         label: terminalLabel,
-        color: currentAgent?.color || COLORS[0],
+        color: currentAgent?.color || TERMINAL_COLORS[0],
         cwd: terminalCwd,
       });
 
@@ -1762,7 +1717,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         id: created.id,
         name: terminalLabel,
         agentId: activeId, // Associate with active agent
-        color: currentAgent?.color || COLORS[0],
+        color: currentAgent?.color || TERMINAL_COLORS[0],
         cwd: terminalCwd,
         alive: true,
         createdAt: Date.now(),
@@ -1776,7 +1731,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         label: terminalLabel,
         type: 'agent-terminal',
         closable: true,
-        color: currentAgent?.color || COLORS[0],
+        color: currentAgent?.color || TERMINAL_COLORS[0],
         terminalId: created.id,
       };
 
@@ -4176,7 +4131,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setEditingTerminal(null);
     setNewTerminalError(null);
     const index = terminals.length;
-    const defaultColor = COLORS[index % COLORS.length];
+    const defaultColor = TERMINAL_COLORS[index % COLORS.length];
     setNewTerminalName(getRandomName()); // Random international agent name (140+ names)
     setNewTerminalColor(defaultColor);
     setNewTerminalWorkingOn(""); // Reset working on field
@@ -4572,7 +4527,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const autoName = `Terminal ${nextNumber}`;
 
       // Pick random color from COLORS array
-      const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const randomColor = TERMINAL_COLORS[Math.floor(Math.random() * COLORS.length)];
 
       // SIMPLE: Use active terminal's CWD (same root of work)
       const cwd = activeTerminal.cwd;
@@ -4795,7 +4750,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Create backend terminal (PTY)
       const created = await invoke<TerminalInfo>("create_terminal", {
         label: terminalName,
-        color: currentAgent?.color || COLORS[0],
+        color: currentAgent?.color || TERMINAL_COLORS[0],
         cwd: terminalCwd,
       });
 
@@ -4804,7 +4759,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         id: created.id,
         name: terminalName,
         agentId: activeId, // Associate with active agent
-        color: currentAgent?.color || COLORS[0],
+        color: currentAgent?.color || TERMINAL_COLORS[0],
         cwd: terminalCwd,
         alive: true,
         status: "idle",
@@ -4819,7 +4774,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         label: terminalName,
         type: 'agent-terminal',
         closable: true,
-        color: currentAgent?.color || COLORS[0],
+        color: currentAgent?.color || TERMINAL_COLORS[0],
         terminalId: created.id,
         // icon removed - rendered directly in TabBar to avoid React serialization issues
       };
@@ -5489,7 +5444,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         // Create backend terminal (PTY)
         const created = await invoke<TerminalInfo>("create_terminal", {
           label,
-          color: currentAgent?.color || COLORS[0],
+          color: currentAgent?.color || TERMINAL_COLORS[0],
           cwd: terminalCwd,
         });
 
@@ -5498,7 +5453,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           id: created.id,
           name: label,
           agentId: activeId, // Associate with active agent
-          color: currentAgent?.color || COLORS[0],
+          color: currentAgent?.color || TERMINAL_COLORS[0],
           cwd: terminalCwd,
           alive: true,
           status: "busy",
@@ -5514,7 +5469,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           label,
           type: 'agent-terminal',
           closable: true,
-          color: currentAgent?.color || COLORS[0],
+          color: currentAgent?.color || TERMINAL_COLORS[0],
           terminalId: created.id,
           // icon removed - rendered directly in TabBar to avoid React serialization issues
         };
@@ -5942,7 +5897,7 @@ You have access to all Bash tools to execute git commands like:
       console.log('[Resume] Creating terminal:', terminalName, 'cwd:', workingDirectory);
       const created = await invoke<TerminalInfo>('create_terminal', {
         label: terminalName,
-        color: COLORS[terminals.length % COLORS.length],
+        color: TERMINAL_COLORS[terminals.length % COLORS.length],
         cwd: workingDirectory,
         workingOn: null,
         avatar: '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg', // Default duck avatar
@@ -6730,7 +6685,7 @@ You have access to all Bash tools to execute git commands like:
           personality={newTerminalPersonality}
           branch={newTerminalBranch}
           useWorktree={newTerminalUseWorktree}
-          availableColors={COLORS}
+          availableColors={TERMINAL_COLORS}
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
           error={newTerminalError}
