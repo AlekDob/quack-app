@@ -1,178 +1,285 @@
-# 📚 Quack App Documentation
+# 📚 Quack Documentation Hub
 
-Welcome to the Quack App documentation! This directory contains comprehensive guides, technical analysis, and troubleshooting documentation.
-
----
-
-## 📖 Table of Contents
-
-### Architecture & Design
-- **[architecture.md](./architecture.md)** - Complete application architecture overview
-  - Component structure
-  - Terminal system
-  - Git integration
-  - AI assistant architecture
-  - Full technical documentation
-
-### Bug Fixes & Analysis
-- **[MESSAGE_DUPLICATION_FIX.md](./MESSAGE_DUPLICATION_FIX.md)** - 🦆 Message duplication bug fix
-  - Root cause analysis
-  - Technical solution
-  - Implementation details
-  - Test plan
-
-- **[TEST_RESULTS.md](./TEST_RESULTS.md)** - Test suite results (37/37 passing ✅)
-  - Event deduplication tests
-  - Session key stability tests
-  - Integration tests
-  - Performance benchmarks
-
-- **[VERIFICATION_GUIDE.md](./VERIFICATION_GUIDE.md)** - Manual testing guide
-  - 6 verification scenarios
-  - Step-by-step instructions
-  - Debugging checklist
-  - Report templates
-
-### Build & Development
-- **[CLAUDE_SDK_BUILD_FIX.md](./CLAUDE_SDK_BUILD_FIX.md)** - Claude SDK build issues
-- **[claude-sdk-integration.md](./claude-sdk-integration.md)** - SDK integration guide
-
-### Analysis & Reports
-- **[analysis-report.md](./analysis-report.md)** - General analysis reports
-- **[token-counter-implementation.md](./token-counter-implementation.md)** - Token counter implementation
+**All project documentation is organized here.** Use `grep` or search to find specific topics.
 
 ---
 
-## 🐛 Bug Fixes Overview
+## 📖 Quick Navigation
 
-### Message Duplication Fix (2025-01-16) ✅
+| Category | Location | Description |
+|----------|----------|-------------|
+| 🏗️ **Architecture** | `01-architecture.md` | Complete system architecture |
+| 🐛 **Bug Fixes** | `02-bug-fixes/` | Bug analysis & solutions |
+| 🧪 **Testing** | `03-testing/` | Test results & verification |
+| 🔧 **Build & Setup** | `04-build-setup/` | Build issues & SDK setup |
+| ✨ **Features** | `05-features/` | Feature implementations |
+| 🎨 **Design** | `06-design/` | UI/UX design docs |
+| 📦 **Archive** | `07-archive/` | Deprecated/old docs |
 
-**Status**: RESOLVED - All tests passing (37/37)
+---
 
-**Problem**:
-- Messages appearing 2-3x in chat UI
-- Random occurrence, affecting all agents in a project
+## 🏗️ Architecture
 
-**Root Cause**:
-1. Session key instability (changed from `streamId` to `sessionId` mid-stream)
-2. Weak event ID generation (timestamp-based instead of content-based)
-3. Unsynchronized multi-layer deduplication
+**Main File**: `01-architecture.md`
 
-**Solution**:
-- Stable session key (always uses `streamId`)
-- Content-based event ID hashing
-- Defense-in-depth deduplication (SDK + hook layer)
+**Topics Covered**:
+- Application structure & component hierarchy
+- Terminal system (xterm.js, PTY, sessions)
+- Git integration (status, commits, branches)
+- AI assistant (Claude Agent SDK integration)
+- File explorer & Monaco editor
+- State management (Zustand, Context)
+- MCP servers & plugin system
 
-**Files Modified**:
-- `src/services/claudeSDK.ts` - Session key stability
-- `src/hooks/useClaudeChat.ts` - Enhanced deduplication
+**When to Update**: Any architectural changes, new major features, system design modifications
 
-**Tests Created**:
-- `src/tests/eventDeduplication.test.ts` (17 tests)
-- `src/tests/sessionKeyStability.test.ts` (9 tests)
-- `src/tests/integration.deduplication.test.ts` (11 tests)
+---
 
-**Quick Verification**:
+## 🐛 Bug Fixes (`02-bug-fixes/`)
+
+### Active Fixes
+- **`MESSAGE_DUPLICATION_FIX.md`** ✅ - Message duplication bug (RESOLVED)
+  - Root cause: Session key instability
+  - Solution: Content-based event IDs + stable session keys
+  - Tests: 37 passing tests in `src/tests/`
+
+- **`AVATAR_IMAGES_FIX.md`** - Avatar image loading fixes
+
+### How to Add New Bug Fix Docs
+1. Create: `02-bug-fixes/BUG_NAME_FIX.md`
+2. Include: Problem, Root Cause, Solution, Tests, Verification
+3. Update this README with a summary
+
+---
+
+## 🧪 Testing (`03-testing/`)
+
+**We use Vitest** for all testing - fast, modern, integrated with Vite.
+
+### Test Documentation
+- **`TEST_RESULTS.md`** - Latest test suite results (37/37 passing ✅)
+- **`VERIFICATION_GUIDE.md`** - Manual testing procedures
+- **`TEST_MODE.md`** - Test mode setup & usage
+
+### Test Commands
 ```bash
-npm run test:dedup
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:ui       # Interactive UI
+npm run test:coverage # Coverage report
 ```
 
-**Detailed Guide**: See [VERIFICATION_GUIDE.md](./VERIFICATION_GUIDE.md)
+### Test Structure
+- **Unit tests**: `src/**/*.test.ts` - Test individual functions/components
+- **Integration tests**: `src/tests/integration.*.test.ts` - Test complete flows
+- **Performance tests**: Included in integration tests (benchmarks)
 
----
-
-## 🧪 Testing
-
-### Run Tests
-```bash
-# All tests
-npm test
-
-# Deduplication tests only
-npm run test:dedup
-
-# Watch mode
-npm run test:watch
-
-# UI mode
-npm run test:ui
-
-# Coverage report
-npm run test:coverage
-```
-
-### Test Coverage
+### Current Test Coverage
 - ✅ Event deduplication (17 tests)
 - ✅ Session key stability (9 tests)
 - ✅ Integration scenarios (11 tests)
-- ✅ Performance benchmarks
-- ✅ Edge cases (malformed events, long content, concurrency)
+- **Total**: 37 tests, all passing
 
 ---
 
-## 🚀 Quick Start
+## 🔧 Build & Setup (`04-build-setup/`)
 
-### Development
-```bash
-npm run tauri dev
+### SDK & Build Issues
+- **`CLAUDE_SDK_BUILD_FIX.md`** - Claude SDK build issues & solutions
+- **`claude-sdk-integration.md`** - SDK integration guide
+- **`CLAUDE_CODE_AUTH_FIX.md`** - Authentication fixes
+
+### Common Build Issues
+1. **Node SDK not found**: Run `npm run prepare-node-sdk`
+2. **Tauri build fails**: Check Rust version (1.77.2+)
+3. **SDK stream errors**: See `MESSAGE_DUPLICATION_FIX.md`
+
+---
+
+## ✨ Features (`05-features/`)
+
+### Implemented Features
+- **`PERFORMANCE_OPTIMIZATIONS.md`** - Performance improvements
+- **`PLUGIN_MARKETPLACE_IMPLEMENTATION.md`** - Plugin marketplace system
+- **`token-counter-implementation.md`** - Token usage tracking
+
+### Feature Documentation Template
+```markdown
+# Feature Name
+
+## Problem
+<what problem does this solve>
+
+## Solution
+<how it works>
+
+## Implementation
+<code changes, files modified>
+
+## Testing
+<how to test, expected behavior>
+
+## Performance
+<performance impact, benchmarks>
 ```
 
-### Build
+---
+
+## 🎨 Design (`06-design/`)
+
+### Design System
+- **`metro-design-implementation.md`** - Metro design system
+- **`metro-design-visual-guide.md`** - Visual guidelines
+- **`metro-style-fixes.md`** - Style fixes
+- **`metro-style-implementation.md`** - Style implementation
+
+### Design Principles
+- Metro/Modern UI inspired
+- Glassmorphism effects
+- Dark theme first
+- Responsive layouts
+
+---
+
+## 📦 Archive (`07-archive/`)
+
+**Deprecated or outdated documentation** - kept for reference only.
+
+Contents:
+- Gumroad migration docs (replaced by new licensing system)
+- Old analysis reports
+- Legacy schemas
+- Initial project requirements
+
+**Note**: Archive docs may not reflect current implementation.
+
+---
+
+## 🔍 How to Find Information
+
+### By Topic (grep examples)
 ```bash
-npm run build
-npm run tauri:build
+# Find all mentions of "event deduplication"
+grep -r "event deduplication" docs/
+
+# Find bug fixes
+ls docs/02-bug-fixes/
+
+# Find test-related docs
+grep -r "vitest\|test" docs/
+
+# Find architecture info about terminals
+grep -r "terminal" docs/01-architecture.md
 ```
 
-### Testing
+### By File Type
 ```bash
-npm test
+# All markdown docs
+find docs/ -name "*.md"
+
+# Bug fixes only
+ls docs/02-bug-fixes/
+
+# Testing docs only
+ls docs/03-testing/
+```
+
+### By Date (recent changes)
+```bash
+# Files modified in last 7 days
+find docs/ -mtime -7 -name "*.md"
 ```
 
 ---
 
-## 📊 Project Statistics
+## 📝 Documentation Standards
 
-**Total Tests**: 37 (all passing ✅)
-**Code Coverage**: Event deduplication, session management, integration flows
-**Performance**: <500ms for 100 message exchanges
-**Stability**: Zero duplicates in all 37 test scenarios
+### File Naming Convention
+- Use **descriptive names**: `MESSAGE_DUPLICATION_FIX.md` not `fix.md`
+- Use **UPPERCASE** for major docs: `README.md`, `FIX.md`
+- Use **lowercase** for component docs: `architecture.md`
+- Include **date** for time-sensitive docs: `2025-01-16-release-notes.md`
 
----
+### Document Structure
+1. **Title** (# heading)
+2. **Problem/Context** (what & why)
+3. **Solution/Implementation** (how)
+4. **Testing/Verification** (proof)
+5. **Examples/Screenshots** (visuals)
+6. **References/Links** (related docs)
 
-## 🔧 Troubleshooting
+### When to Create New Docs
+- ✅ New features (major functionality)
+- ✅ Bug fixes (with root cause analysis)
+- ✅ Architecture changes
+- ✅ Performance optimizations
+- ❌ Minor code cleanup (use git commit messages)
+- ❌ Config changes (unless complex)
 
-### Message Duplication Issues
-1. Check console for `🦆 DUPLICATE DETECTED` warnings
-2. Verify session key stability (should be `stream-xxx`)
-3. Run deduplication tests: `npm run test:dedup`
-4. Follow [VERIFICATION_GUIDE.md](./VERIFICATION_GUIDE.md)
-
-### Build Issues
-- See [CLAUDE_SDK_BUILD_FIX.md](./CLAUDE_SDK_BUILD_FIX.md)
-
-### General Issues
-- Check [architecture.md](./architecture.md) for system overview
-- Review [analysis-report.md](./analysis-report.md)
-
----
-
-## 📝 Contributing
-
-When adding new documentation:
-1. Place files in the appropriate category
-2. Update this README.md with links
-3. Follow the existing documentation structure
-4. Include code examples and test results when applicable
+### When to Update Existing Docs
+- `01-architecture.md` - Any architectural changes
+- `02-bug-fixes/` - When fixing bugs
+- `03-testing/` - After adding/updating tests
+- `README.md` (this file) - When adding new doc categories
 
 ---
 
-## 🦆 About Quack
+## 🎯 Document Categories Explained
 
-Quack is a multi-agentic Tauri desktop app with integrated terminals, file explorer, Git, AI assistant, voice recording, PIP windows, marketplace, and MCP servers - powered by Claude Agent SDK.
+### 01 - Architecture
+**Purpose**: Single source of truth for system design
+**Audience**: New developers, complex debugging
+**Update Frequency**: Every major feature/refactor
 
-**Tech Stack**: Tauri 2.8.5, React 19.1.1, TypeScript 5.8.3, Claude Agent SDK 0.1.14
+### 02 - Bug Fixes
+**Purpose**: Root cause analysis & solutions
+**Audience**: Developers debugging similar issues
+**Update Frequency**: Each significant bug fix
+
+### 03 - Testing
+**Purpose**: Test documentation & verification procedures
+**Audience**: QA, developers writing tests
+**Update Frequency**: After test suite changes
+
+### 04 - Build & Setup
+**Purpose**: Resolve build/setup issues
+**Audience**: New developers, CI/CD
+**Update Frequency**: When build process changes
+
+### 05 - Features
+**Purpose**: Feature implementation details
+**Audience**: Developers extending features
+**Update Frequency**: Each new feature
+
+### 06 - Design
+**Purpose**: UI/UX design guidelines
+**Audience**: Frontend developers, designers
+**Update Frequency**: Design system updates
+
+### 07 - Archive
+**Purpose**: Historical reference
+**Audience**: Rare (legacy context)
+**Update Frequency**: Never (read-only)
 
 ---
+
+## 🚀 Quick Start for New Contributors
+
+1. **Read first**: `01-architecture.md` - Understand the system
+2. **Set up testing**: `03-testing/TEST_MODE.md` - Run tests
+3. **Check recent fixes**: `02-bug-fixes/` - Known issues
+4. **Review build setup**: `04-build-setup/` - Resolve build errors
+
+---
+
+## 📊 Documentation Health
 
 **Last Updated**: 2025-01-16
-**Version**: 0.1.3
+**Total Docs**: 26+ files
+**Test Coverage**: 37 tests passing ✅
+**Active Categories**: 7
+**Deprecated Docs**: 9 (in archive)
+
+---
+
+**Need help?** Search docs with `grep -r "your-topic" docs/` or check the category folders above!

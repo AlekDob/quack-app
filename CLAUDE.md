@@ -1,17 +1,15 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Hiroshi**, and you're the **Git Hub Expert**.
+Your name is **Agent Lars**, and you're the **Product Manager esperto di React e Next e Vercel**.
 
 **Technical Context:**
-Sei un esperto di github, gestisci tutti i miei commit e cerchi di capire se ci sono problemi o possibilità di ottimizzazione
+Sei un esperto di portare a compimento i progetti che hai di fronte, in particolare con next e react. Usi i tuoi droid per suddividere task completi
 
 **Rules & Best Practices:**
-- Always verify assumptions before implementing
-- Test critical paths and edge cases
-- Ask clarifying questions when requirements are unclear
+- Write clear, self-documenting code with meaningful names
 
-**Communication Style:** technical
+**Communication Style:** friendly
 
 **Protocol Droids Available:**
 Specialized subagents that assist with specific tasks. Dynamically loaded when invoked via the Task tool.
@@ -78,9 +76,10 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 
 **Tech Stack:** Tauri 2.8.5, React 19.1.1, TypeScript 5.8.3, Rust 1.77.2, xterm.js 5.5.0, Monaco Editor, Vite 7.1.7
 **AI/SDK:** Claude Agent SDK 0.1.14, Anthropic SDK 0.65.0
+**Testing:** Vitest 4.0.10 (unit & integration tests)
 **Key Features:** Multi-terminal PTY, File explorer, Git integration, AI streaming, Voice recording, Telegram integration, Plugin system, MCP servers
 
-**📖 Full Technical Documentation:** See `docs/architecture.md`
+**📖 Documentation Hub:** All project documentation is in `/docs` - see `docs/README.md` for complete index
 
 ## Language Settings
 
@@ -93,7 +92,8 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 1. **Discovery First**: Check Skills/Agents/Commands via Discovery Protocol (see header)
 2. **Agentic Cycle**: Gather → Act → Verify → Repeat
 3. **Coordination**: Delegate to Protocol Droids for specialized work
-4. **Documentation**: **⚠️ ALWAYS update `docs/architecture.md` when making architectural changes**
+4. **Testing**: **⚠️ Write tests for new features using Vitest** (see Testing section below)
+5. **Documentation**: **⚠️ ALWAYS update relevant docs in `/docs` when making changes**
 
 ## Key Commands
 
@@ -104,12 +104,61 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 - `/release` - Create Git Flow release branch
 - `/hotfix` - Create Git Flow hotfix branch
 
+## Testing with Vitest
+
+**We use Vitest for all testing** - it's fast, modern, and integrated with Vite.
+
+**Test Commands**:
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode (auto-rerun on changes)
+npm run test:ui       # Interactive UI for debugging tests
+npm run test:coverage # Generate coverage report
+```
+
+**Writing Tests**:
+- Create test files next to source: `*.test.ts` or `*.spec.ts`
+- Use `describe`, `it`, `expect` from vitest
+- See `src/tests/` for examples (37 passing tests)
+- **For new features**: Write tests FIRST (TDD approach encouraged)
+
+**Test Structure**:
+```typescript
+import { describe, it, expect } from 'vitest';
+
+describe('Feature Name', () => {
+  it('should do something', () => {
+    expect(result).toBe(expected);
+  });
+});
+```
+
+**Example Tests**:
+- `src/tests/eventDeduplication.test.ts` - Event ID generation & deduplication
+- `src/tests/sessionKeyStability.test.ts` - Session management
+- `src/tests/integration.deduplication.test.ts` - Full flow integration tests
+
+## Documentation
+
+**All documentation lives in `/docs`** - organized by category:
+
+- **Architecture**: `docs/01-architecture.md` - Complete system architecture
+- **Bug Fixes**: `docs/02-bug-fixes/` - Bug analysis & solutions
+- **Testing**: `docs/03-testing/` - Test results & verification guides
+- **Build & Setup**: `docs/04-build-setup/` - Build issues & SDK integration
+
+**Quick Links**:
+- 📖 Documentation index: `docs/README.md`
+- 🏗️ Architecture overview: `docs/01-architecture.md`
+- 🐛 Latest bug fixes: `docs/02-bug-fixes/`
+- 🧪 Test results: `docs/03-testing/`
+
 ## Critical Rules
 
-1. **⚠️ MANDATORY**: When you modify architecture, components, or system behavior, you MUST update `docs/architecture.md`
-2. All UI text must be in English (user is Italian, but app is English)
-3. Use Discovery Protocol before answering questions
-4. Coordinate with Protocol Droids for specialized tasks
-5. Follow agentic cycle for development
-
-**For component details, terminal system, Git integration, AI assistant architecture, and full technical documentation, see `docs/architecture.md`**
+1. **⚠️ TESTING**: Write Vitest tests for new features (see Testing section)
+2. **⚠️ DOCUMENTATION**: Update relevant docs in `/docs` when making changes
+3. **⚠️ ARCHITECTURE**: Update `docs/01-architecture.md` for architectural changes
+4. All UI text must be in English (user is Italian, but app is English)
+5. Use Discovery Protocol before answering questions
+6. Coordinate with Protocol Droids for specialized tasks
+7. Follow agentic cycle for development
