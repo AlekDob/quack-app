@@ -15,6 +15,7 @@
 | ✨ **Features** | `05-features/` | Feature implementations |
 | 🎨 **Design** | `06-design/` | UI/UX design docs |
 | 📦 **Archive** | `07-archive/` | Deprecated/old docs |
+| 🚀 **Optimizations** | `08-optimizations/` | **NEW!** Performance & refactoring tracking |
 
 ---
 
@@ -147,11 +148,93 @@ npm run test:coverage # Coverage report
 
 Contents:
 - Gumroad migration docs (replaced by new licensing system)
-- Old analysis reports
 - Legacy schemas
 - Initial project requirements
 
 **Note**: Archive docs may not reflect current implementation.
+**Moved to Optimizations**: `analysis-report.md` → `08-optimizations/00-analysis/`
+
+---
+
+## 🚀 Optimizations (`08-optimizations/`) **NEW!**
+
+**Comprehensive tracking system for all optimization work** based on the technical analysis report.
+
+### Structure
+
+- **`00-analysis/`** - Original comprehensive analysis (1780 lines)
+  - `analysis-report.md` - Full technical audit
+  - Test coverage gaps (0% → 80% target)
+  - Architectural violations (App.tsx 7,293 lines)
+  - Performance issues (bundle size, duplication)
+  - 3-week action plan
+
+- **`01-completed/`** ✅ - Finished optimizations
+  - `message-duplication-fix.md` - Event deduplication (DONE ✅)
+
+- **`02-in-progress/`** 🔄 - Currently working on
+  - Currently empty - ready for next task!
+
+- **`03-priority-0-critical/`** 🔴 - Must fix for production
+  - `app-tsx-refactoring.md` - Reduce 7,293 → <300 lines (3 weeks)
+  - `remove-monaco-editor.md` - Remove duplicated editor (-350KB) ⚡ 1h
+  - `test-coverage-expansion.md` - Reach 80% coverage
+  - `chatinput-refactoring.md` - Reduce 1,540 → <400 lines
+  - `repository-group-refactoring.md` - Reduce 1,643 → <300 lines
+
+- **`04-priority-1-high/`** 🟡 - Significant impact
+  - `lazy-loading-components.md` - Lazy load heavy components (-560KB)
+  - `logger-replacement.md` - Replace 1,125 console.log statements
+  - `tree-shaking-optimization.md` - Optimize imports (-40KB) ⚡ 45min
+  - Test suites for chat, terminal, git modules
+
+- **`05-priority-2-medium/`** 🟠 - Quality improvements
+  - `vite-config-optimization.md` - Advanced build optimizations
+  - `bundle-analysis.md` - Comprehensive metrics
+  - `delete-old-files.md` - Remove deprecated files ⚡ 5min
+  - ESLint audit, TypeScript `any` elimination, CI/CD
+
+### Quick Wins ⚡
+
+High-impact, low-effort tasks:
+
+| Task | Effort | Impact | Savings |
+|------|--------|--------|---------|
+| Remove Monaco Editor | 1h | 🔥🔥🔥 | -350KB |
+| Delete old files | 5min | 🔥 | -791 lines |
+| Tree-shake Lucide | 45min | 🔥 | -40KB |
+
+**Total**: ~2 hours for -390KB + better organization!
+
+### Progress Dashboard
+
+| Priority | Total | Done | In Progress | Pending | % |
+|----------|-------|------|-------------|---------|---|
+| P0 🔴 | 7 | 1 | 0 | 6 | 14% |
+| P1 🟡 | 8 | 0 | 0 | 8 | 0% |
+| P2 🟠 | 6 | 0 | 0 | 6 | 0% |
+| **TOTAL** | **21** | **1** | **0** | **20** | **5%** |
+
+### Usage
+
+```bash
+# View all optimization tasks
+ls docs/08-optimizations/
+
+# Find P0 critical tasks
+ls docs/08-optimizations/03-priority-0-critical/
+
+# Check completed work
+ls docs/08-optimizations/01-completed/
+
+# Search for specific optimization
+grep -r "monaco" docs/08-optimizations/
+
+# View dashboard
+cat docs/08-optimizations/README.md
+```
+
+**When to Update**: After completing any optimization task, update dashboard and move task file to `01-completed/`
 
 ---
 
@@ -261,6 +344,12 @@ find docs/ -mtime -7 -name "*.md"
 **Audience**: Rare (legacy context)
 **Update Frequency**: Never (read-only)
 
+### 08 - Optimizations **NEW!**
+**Purpose**: Track performance & refactoring work from analysis report
+**Audience**: Developers working on optimizations, project managers
+**Update Frequency**: After each optimization task completion
+**Structure**: Organized by priority (P0/P1/P2) and status (pending/in-progress/completed)
+
 ---
 
 ## 🚀 Quick Start for New Contributors
@@ -269,16 +358,18 @@ find docs/ -mtime -7 -name "*.md"
 2. **Set up testing**: `03-testing/TEST_MODE.md` - Run tests
 3. **Check recent fixes**: `02-bug-fixes/` - Known issues
 4. **Review build setup**: `04-build-setup/` - Resolve build errors
+5. **View optimizations**: `08-optimizations/README.md` - See improvement roadmap
 
 ---
 
 ## 📊 Documentation Health
 
 **Last Updated**: 2025-01-16
-**Total Docs**: 26+ files
-**Test Coverage**: 37 tests passing ✅
-**Active Categories**: 7
-**Deprecated Docs**: 9 (in archive)
+**Total Docs**: 35+ files (added optimization tracking)
+**Test Coverage**: 37 tests passing ✅ (15% coverage, target 80%)
+**Active Categories**: 8 (NEW: Optimizations tracking!)
+**Optimization Tasks**: 21 identified (1 completed, 20 pending)
+**Deprecated Docs**: 8 (in archive) - Moved analysis-report to optimizations
 
 ---
 
