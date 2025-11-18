@@ -12,7 +12,7 @@
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
 import type { AgentChat } from "../types";
-import { getTestModeStoreName } from "../contexts/TestModeContext";
+import { getTestModeStoreName } from "../utils/testModeStorage";
 
 // Storage key for agent chats
 const AGENT_CHATS_KEY = "agentChats";

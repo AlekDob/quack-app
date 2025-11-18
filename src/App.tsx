@@ -719,7 +719,7 @@ function App() {
       const newAgent: AgentChat = {
         id: newAgentId,
         name: `Agent ${agentChats.length + 1}`,
-        color: TERMINAL_COLORS[agentChats.length % COLORS.length],
+        color: TERMINAL_COLORS[agentChats.length % TERMINAL_COLORS.length],
         cwd: explorerPath,
         createdAt: Date.now(),
       };
@@ -4073,7 +4073,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setEditingTerminal(null);
     setNewTerminalError(null);
     const index = terminals.length;
-    const defaultColor = TERMINAL_COLORS[index % COLORS.length];
+    const defaultColor = TERMINAL_COLORS[index % TERMINAL_COLORS.length];
     setNewTerminalName(getRandomName()); // Random international agent name (140+ names)
     setNewTerminalColor(defaultColor);
     setNewTerminalWorkingOn(""); // Reset working on field
@@ -4468,8 +4468,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const nextNumber = terminalNumbers.length > 0 ? Math.max(...terminalNumbers) + 1 : terminals.length + 1;
       const autoName = `Terminal ${nextNumber}`;
 
-      // Pick random color from COLORS array
-      const randomColor = TERMINAL_COLORS[Math.floor(Math.random() * COLORS.length)];
+      // Pick random color from TERMINAL_COLORS array
+      const randomColor = TERMINAL_COLORS[Math.floor(Math.random() * TERMINAL_COLORS.length)];
 
       // SIMPLE: Use active terminal's CWD (same root of work)
       const cwd = activeTerminal.cwd;
@@ -5839,7 +5839,7 @@ You have access to all Bash tools to execute git commands like:
       console.log('[Resume] Creating terminal:', terminalName, 'cwd:', workingDirectory);
       const created = await invoke<TerminalInfo>('create_terminal', {
         label: terminalName,
-        color: TERMINAL_COLORS[terminals.length % COLORS.length],
+        color: TERMINAL_COLORS[terminals.length % TERMINAL_COLORS.length],
         cwd: workingDirectory,
         workingOn: null,
         avatar: '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg', // Default duck avatar

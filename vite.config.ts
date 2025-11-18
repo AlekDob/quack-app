@@ -129,7 +129,6 @@ export default defineConfig(({ mode }) => {
             // UI libraries
             if (id.includes('lucide-react') ||
                 id.includes('sonner') ||
-                id.includes('react-hotkeys-hook') ||
                 id.includes('react-colorful')) {
               return 'ui-vendor';
             }
@@ -209,7 +208,6 @@ export default defineConfig(({ mode }) => {
         '@tauri-apps/plugin-store',
         'lucide-react',
         'sonner',
-        'react-hotkeys-hook',
       ],
       exclude: [
         '@anthropic-ai/claude-agent-sdk', // Don't pre-bundle SDK

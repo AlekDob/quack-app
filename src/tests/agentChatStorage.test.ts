@@ -29,8 +29,8 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock test mode context
-vi.mock("../contexts/TestModeContext", () => ({
+// Mock test mode storage
+vi.mock("../utils/testModeStorage", () => ({
   getTestModeStoreName: (name: string) => name,
 }));
 
