@@ -542,12 +542,24 @@ export type MCPServerStatus =
   | 'running'
   | 'error';
 
+export type MCPTransportType = 'stdio' | 'http' | 'sse';
+
 export interface MCPServer {
   id: string;
   name: string;
   type: MCPServerType;
-  command: string;
-  args: string[];
+  transport: MCPTransportType; // Transport protocol type
+
+  // Stdio fields (optional, only for stdio transport)
+  command?: string;
+  args?: string[];
+
+  // HTTP/SSE fields (optional, only for http/sse transport)
+  url?: string;
+  headers?: Record<string, string>;
+  method?: string; // HTTP method (default: POST)
+
+  // Common fields
   env?: Record<string, string>;
   enabled: boolean;
   status: MCPServerStatus;
@@ -555,11 +567,27 @@ export interface MCPServer {
   scope: 'global' | 'project'; // Indicates where the MCP is configured
 }
 
-export interface MCPServerConfig {
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-}
+// Discriminated union for MCP server configurations
+export type MCPServerConfig =
+  | {
+      type: 'stdio';
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+    }
+  | {
+      type: 'http';
+      url: string;
+      headers?: Record<string, string>;
+      method?: string;
+      env?: Record<string, string>;
+    }
+  | {
+      type: 'sse';
+      url: string;
+      headers?: Record<string, string>;
+      env?: Record<string, string>;
+    };
 
 export interface MCPConfigFile {
   mcpServers: Record<string, MCPServerConfig>;

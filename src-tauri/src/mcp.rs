@@ -4,12 +4,35 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
+/// MCP Server configuration with support for multiple transport types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MCPServerConfig {
-    pub command: String,
-    pub args: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub env: Option<HashMap<String, String>>,
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum MCPServerConfig {
+    /// Standard input/output transport (command-line based)
+    Stdio {
+        command: String,
+        args: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        env: Option<HashMap<String, String>>,
+    },
+    /// HTTP transport (REST API based)
+    Http {
+        url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        headers: Option<HashMap<String, String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        method: Option<String>, // Default: "POST"
+        #[serde(skip_serializing_if = "Option::is_none")]
+        env: Option<HashMap<String, String>>,
+    },
+    /// Server-Sent Events transport (event streaming)
+    Sse {
+        url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        headers: Option<HashMap<String, String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        env: Option<HashMap<String, String>>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,8 +47,23 @@ pub struct MCPServer {
     pub name: String,
     #[serde(rename = "type")]
     pub server_type: String,
-    pub command: String,
-    pub args: Vec<String>,
+    pub transport: String, // "stdio" | "http" | "sse"
+
+    // Stdio fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<String>>,
+
+    // HTTP/SSE fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
+
+    // Common fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<HashMap<String, String>>,
     pub enabled: bool,
@@ -96,18 +134,64 @@ fn config_to_servers(config: MCPConfigFile, scope: &str) -> Vec<MCPServer> {
         .mcp_servers
         .into_iter()
         .map(|(id, server_config)| {
-            let server_type = infer_server_type(&id, &server_config.command);
-            MCPServer {
-                id: id.clone(),
-                name: id,
-                server_type,
-                command: server_config.command,
-                args: server_config.args,
-                env: server_config.env,
-                enabled: true,
-                status: "stopped".to_string(),
-                error: None,
-                scope: scope.to_string(),
+            match server_config {
+                MCPServerConfig::Stdio { command, args, env } => {
+                    let server_type = infer_server_type(&id, &command);
+                    MCPServer {
+                        id: id.clone(),
+                        name: id,
+                        server_type,
+                        transport: "stdio".to_string(),
+                        command: Some(command),
+                        args: Some(args),
+                        url: None,
+                        headers: None,
+                        method: None,
+                        env,
+                        enabled: true,
+                        status: "stopped".to_string(),
+                        error: None,
+                        scope: scope.to_string(),
+                    }
+                }
+                MCPServerConfig::Http { url, headers, method, env } => {
+                    let server_type = infer_server_type(&id, &url);
+                    MCPServer {
+                        id: id.clone(),
+                        name: id,
+                        server_type,
+                        transport: "http".to_string(),
+                        command: None,
+                        args: None,
+                        url: Some(url),
+                        headers,
+                        method,
+                        env,
+                        enabled: true,
+                        status: "stopped".to_string(),
+                        error: None,
+                        scope: scope.to_string(),
+                    }
+                }
+                MCPServerConfig::Sse { url, headers, env } => {
+                    let server_type = infer_server_type(&id, &url);
+                    MCPServer {
+                        id: id.clone(),
+                        name: id,
+                        server_type,
+                        transport: "sse".to_string(),
+                        command: None,
+                        args: None,
+                        url: Some(url),
+                        headers,
+                        method: None,
+                        env,
+                        enabled: true,
+                        status: "stopped".to_string(),
+                        error: None,
+                        scope: scope.to_string(),
+                    }
+                }
             }
         })
         .collect()
@@ -168,23 +252,74 @@ pub async fn get_mcp_server(
     server_id: String,
     working_dir: Option<String>,
 ) -> Result<Option<MCPServer>, String> {
+    // Helper to convert config to MCPServer
+    let config_to_server = |id: String, config: &MCPServerConfig, scope: &str| -> MCPServer {
+        match config {
+            MCPServerConfig::Stdio { command, args, env } => {
+                let server_type = infer_server_type(&id, command);
+                MCPServer {
+                    id: id.clone(),
+                    name: id,
+                    server_type,
+                    transport: "stdio".to_string(),
+                    command: Some(command.clone()),
+                    args: Some(args.clone()),
+                    url: None,
+                    headers: None,
+                    method: None,
+                    env: env.clone(),
+                    enabled: true,
+                    status: "stopped".to_string(),
+                    error: None,
+                    scope: scope.to_string(),
+                }
+            }
+            MCPServerConfig::Http { url, headers, method, env } => {
+                let server_type = infer_server_type(&id, url);
+                MCPServer {
+                    id: id.clone(),
+                    name: id,
+                    server_type,
+                    transport: "http".to_string(),
+                    command: None,
+                    args: None,
+                    url: Some(url.clone()),
+                    headers: headers.clone(),
+                    method: method.clone(),
+                    env: env.clone(),
+                    enabled: true,
+                    status: "stopped".to_string(),
+                    error: None,
+                    scope: scope.to_string(),
+                }
+            }
+            MCPServerConfig::Sse { url, headers, env } => {
+                let server_type = infer_server_type(&id, url);
+                MCPServer {
+                    id: id.clone(),
+                    name: id,
+                    server_type,
+                    transport: "sse".to_string(),
+                    command: None,
+                    args: None,
+                    url: Some(url.clone()),
+                    headers: headers.clone(),
+                    method: None,
+                    env: env.clone(),
+                    enabled: true,
+                    status: "stopped".to_string(),
+                    error: None,
+                    scope: scope.to_string(),
+                }
+            }
+        }
+    };
+
     // First check global config
     if let Ok(global_path) = get_global_mcp_config_path() {
         if let Ok(global_config) = read_mcp_config(&global_path) {
             if let Some(server_config) = global_config.mcp_servers.get(&server_id) {
-                let server_type = infer_server_type(&server_id, &server_config.command);
-                return Ok(Some(MCPServer {
-                    id: server_id.clone(),
-                    name: server_id,
-                    server_type,
-                    command: server_config.command.clone(),
-                    args: server_config.args.clone(),
-                    env: server_config.env.clone(),
-                    enabled: true,
-                    status: "stopped".to_string(),
-                    error: None,
-                    scope: "global".to_string(),
-                }));
+                return Ok(Some(config_to_server(server_id, server_config, "global")));
             }
         }
     }
@@ -194,19 +329,7 @@ pub async fn get_mcp_server(
     let project_config = read_mcp_config(&project_path)?;
 
     if let Some(server_config) = project_config.mcp_servers.get(&server_id) {
-        let server_type = infer_server_type(&server_id, &server_config.command);
-        Ok(Some(MCPServer {
-            id: server_id.clone(),
-            name: server_id,
-            server_type,
-            command: server_config.command.clone(),
-            args: server_config.args.clone(),
-            env: server_config.env.clone(),
-            enabled: true,
-            status: "stopped".to_string(),
-            error: None,
-            scope: "project".to_string(),
-        }))
+        Ok(Some(config_to_server(server_id, server_config, "project")))
     } else {
         Ok(None)
     }
@@ -222,10 +345,24 @@ pub async fn save_mcp_server(
     let config_path = get_mcp_config_path(&app, working_dir)?;
     let mut config = read_mcp_config(&config_path)?;
 
-    let server_config = MCPServerConfig {
-        command: server.command,
-        args: server.args,
-        env: server.env,
+    let server_config = match server.transport.as_str() {
+        "stdio" => MCPServerConfig::Stdio {
+            command: server.command.ok_or("Command required for stdio transport")?,
+            args: server.args.ok_or("Args required for stdio transport")?,
+            env: server.env,
+        },
+        "http" => MCPServerConfig::Http {
+            url: server.url.ok_or("URL required for HTTP transport")?,
+            headers: server.headers,
+            method: server.method,
+            env: server.env,
+        },
+        "sse" => MCPServerConfig::Sse {
+            url: server.url.ok_or("URL required for SSE transport")?,
+            headers: server.headers,
+            env: server.env,
+        },
+        _ => return Err(format!("Unknown transport type: {}", server.transport)),
     };
 
     config.mcp_servers.insert(server.id, server_config);
@@ -256,7 +393,7 @@ pub async fn get_mcp_templates() -> Result<Vec<MCPTemplate>, String> {
             description: "Access local files and directories".to_string(),
             template_type: "filesystem".to_string(),
             icon: "folder".to_string(),
-            config: MCPServerConfig {
+            config: MCPServerConfig::Stdio {
                 command: "npx".to_string(),
                 args: vec!["@modelcontextprotocol/server-filesystem".to_string()],
                 env: Some({
@@ -272,7 +409,7 @@ pub async fn get_mcp_templates() -> Result<Vec<MCPTemplate>, String> {
             description: "Interact with GitHub repositories".to_string(),
             template_type: "github".to_string(),
             icon: "github".to_string(),
-            config: MCPServerConfig {
+            config: MCPServerConfig::Stdio {
                 command: "npx".to_string(),
                 args: vec!["@modelcontextprotocol/server-github".to_string()],
                 env: Some({
@@ -288,7 +425,7 @@ pub async fn get_mcp_templates() -> Result<Vec<MCPTemplate>, String> {
             description: "Send and receive Slack messages".to_string(),
             template_type: "slack".to_string(),
             icon: "slack".to_string(),
-            config: MCPServerConfig {
+            config: MCPServerConfig::Stdio {
                 command: "npx".to_string(),
                 args: vec!["@modelcontextprotocol/server-slack".to_string()],
                 env: Some({
@@ -304,7 +441,7 @@ pub async fn get_mcp_templates() -> Result<Vec<MCPTemplate>, String> {
             description: "Query PostgreSQL databases".to_string(),
             template_type: "database".to_string(),
             icon: "database".to_string(),
-            config: MCPServerConfig {
+            config: MCPServerConfig::Stdio {
                 command: "npx".to_string(),
                 args: vec!["@modelcontextprotocol/server-postgres".to_string()],
                 env: Some({
@@ -320,43 +457,171 @@ pub async fn get_mcp_templates() -> Result<Vec<MCPTemplate>, String> {
             description: "Browser automation with Puppeteer".to_string(),
             template_type: "puppeteer".to_string(),
             icon: "browser".to_string(),
-            config: MCPServerConfig {
+            config: MCPServerConfig::Stdio {
                 command: "npx".to_string(),
                 args: vec!["@modelcontextprotocol/server-puppeteer".to_string()],
                 env: None,
             },
         },
+        MCPTemplate {
+            id: "context7".to_string(),
+            name: "Context7".to_string(),
+            description: "Semantic search and knowledge base powered by Upstash Vector".to_string(),
+            template_type: "database".to_string(),
+            icon: "database".to_string(),
+            config: MCPServerConfig::Stdio {
+                command: "npx".to_string(),
+                args: vec!["-y".to_string(), "@upstash/context7-mcp".to_string()],
+                env: Some({
+                    let mut env = HashMap::new();
+                    env.insert("CONTEXT7_API_KEY".to_string(), "${CONTEXT7_API_KEY}".to_string());
+                    env
+                }),
+            },
+        },
     ])
 }
 
-/// Test MCP server connection (basic validation)
+/// Test HTTP/SSE server connection by making an actual HTTP request
+async fn test_http_connection(
+    url: &str,
+    headers: &Option<HashMap<String, String>>,
+    method: Option<&str>,
+) -> Result<bool, String> {
+    use std::time::Duration;
+
+    // Create HTTP client with timeout
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    // Build request with appropriate HTTP method (default to GET for testing)
+    let http_method = method.unwrap_or("GET");
+    let mut request = match http_method.to_uppercase().as_str() {
+        "GET" => client.get(url),
+        "POST" => client.post(url),
+        "PUT" => client.put(url),
+        "PATCH" => client.patch(url),
+        "DELETE" => client.delete(url),
+        "HEAD" => client.head(url),
+        _ => client.get(url), // Fallback to GET for unknown methods
+    };
+
+    // Add custom headers if provided
+    if let Some(headers) = headers {
+        for (key, value) in headers {
+            request = request.header(key, value);
+        }
+    }
+
+    // Send request
+    match request.send().await {
+        Ok(response) => {
+            let status = response.status();
+            if status.is_success() || status.is_redirection() {
+                Ok(true)
+            } else {
+                Err(format!("Server returned HTTP {}: {}", status.as_u16(), status.canonical_reason().unwrap_or("Unknown")))
+            }
+        }
+        Err(e) => {
+            if e.is_timeout() {
+                Err("Connection timeout after 5 seconds".to_string())
+            } else if e.is_connect() {
+                Err(format!("Connection failed: {}", e))
+            } else {
+                Err(format!("Request failed: {}", e))
+            }
+        }
+    }
+}
+
+/// Test stdio server connection by attempting to spawn the process
+async fn test_stdio_connection(
+    command: &str,
+    args: &[String],
+) -> Result<bool, String> {
+    use std::time::Duration;
+    use tokio::process::Command;
+
+    // Try to spawn the process
+    let mut child = Command::new(command)
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                format!("Command '{}' not found. Make sure it's installed and in PATH.", command)
+            } else {
+                format!("Failed to spawn process: {}", e)
+            }
+        })?;
+
+    // Wait up to 2 seconds to see if process starts successfully
+    match tokio::time::timeout(Duration::from_secs(2), child.wait()).await {
+        Ok(Ok(status)) => {
+            // Process exited within 2 seconds
+            if status.success() {
+                Ok(true) // Process ran and exited successfully
+            } else {
+                Err(format!("Process exited with error code: {}", status.code().unwrap_or(-1)))
+            }
+        }
+        Ok(Err(e)) => {
+            Err(format!("Process error: {}", e))
+        }
+        Err(_) => {
+            // Timeout - process is still running (good sign for MCP servers!)
+            child.kill().await.ok(); // Clean up
+            Ok(true) // Process started and stayed alive
+        }
+    }
+}
+
+/// Test MCP server connection (performs actual connectivity test)
 #[tauri::command]
 pub async fn test_mcp_connection(
     _app: AppHandle,
     server: MCPServer,
 ) -> Result<bool, String> {
-    // Basic validation: check if command exists and is executable
-    // In a real implementation, you might try to spawn the process briefly
+    // Perform actual connection test based on transport type
+    match server.transport.as_str() {
+        "stdio" => {
+            // Validate fields first
+            let command = server.command.as_ref()
+                .ok_or("Command is required for stdio transport")?;
+            let args = server.args.as_ref()
+                .ok_or("Args are required for stdio transport")?;
 
-    if server.command.is_empty() {
-        return Err("Command cannot be empty".to_string());
-    }
-
-    if server.args.is_empty() {
-        return Err("Args cannot be empty".to_string());
-    }
-
-    // Validate environment variables format
-    if let Some(env) = &server.env {
-        for (key, value) in env {
-            if key.is_empty() {
-                return Err("Environment variable key cannot be empty".to_string());
+            if command.is_empty() {
+                return Err("Command cannot be empty".to_string());
             }
-            if value.is_empty() {
-                return Err(format!("Environment variable {} value cannot be empty", key));
+
+            // Test actual stdio connection
+            test_stdio_connection(command, args).await
+        }
+        "http" | "sse" => {
+            // Validate fields first
+            let url = server.url.as_ref()
+                .ok_or(format!("URL is required for {} transport", server.transport))?;
+
+            if url.is_empty() {
+                return Err("URL cannot be empty".to_string());
             }
+
+            // Validate URL format
+            if !url.starts_with("http://") && !url.starts_with("https://") {
+                return Err("URL must start with http:// or https://".to_string());
+            }
+
+            // Test actual HTTP connection with configured method
+            test_http_connection(url, &server.headers, server.method.as_deref()).await
+        }
+        _ => {
+            Err(format!("Unknown transport type: {}", server.transport))
         }
     }
-
-    Ok(true)
 }

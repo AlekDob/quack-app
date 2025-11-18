@@ -133,12 +133,17 @@ export default function MCPServerCard({
               </div>
             </div>
 
-            {/* Command */}
+            {/* Command/URL */}
             <div
               className="text-xs font-mono truncate mb-2"
               style={{ color: "rgba(255, 255, 255, 0.5)" }}
             >
-              {server.command} {server.args.join(" ")}
+              {server.transport === "stdio" && server.command && server.args && (
+                <>{server.command} {server.args.join(" ")}</>
+              )}
+              {(server.transport === "http" || server.transport === "sse") && server.url && (
+                <>{server.transport.toUpperCase()}: {server.url}</>
+              )}
             </div>
 
             {/* Error message */}

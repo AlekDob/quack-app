@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import type { MCPServer, MCPTemplate, MCPServerType } from "../types";
+import type { MCPServer, MCPTemplate, MCPServerType, MCPTransportType } from "../types";
 
 /**
  * MCP Server Modal - Add/Edit MCP server configuration
  * Supports both manual configuration and template-based setup
+ * Supports stdio, HTTP, and SSE transport types
  */
 
 interface MCPServerModalProps {
@@ -21,12 +22,28 @@ export default function MCPServerModal({
   onSave,
   onClose,
 }: MCPServerModalProps) {
+  // Determine initial transport type from server or template
+  const getInitialTransport = (): MCPTransportType => {
+    if (server) return server.transport;
+    if (template && 'type' in template.config) return template.config.type as MCPTransportType;
+    return 'stdio'; // Default to stdio
+  };
+
+  const [transport, setTransport] = useState<MCPTransportType>(getInitialTransport());
+
   const [formData, setFormData] = useState<MCPServer>({
     id: server?.id || template?.id || "",
     name: server?.name || template?.name || "",
     type: server?.type || template?.type || ("custom" as MCPServerType),
-    command: server?.command || template?.config.command || "",
-    args: server?.args || template?.config.args || [],
+    transport,
+    // Stdio fields
+    command: server?.command || (template && 'command' in template.config ? template.config.command : undefined),
+    args: server?.args || (template && 'args' in template.config ? template.config.args : undefined),
+    // HTTP/SSE fields
+    url: server?.url || (template && 'url' in template.config ? template.config.url : undefined),
+    headers: server?.headers || (template && 'headers' in template.config ? template.config.headers : undefined),
+    method: server?.method || (template && 'method' in template.config ? template.config.method : undefined),
+    // Common fields
     env: server?.env || template?.config.env || {},
     enabled: server?.enabled ?? true,
     status: "stopped",
@@ -34,13 +51,21 @@ export default function MCPServerModal({
   });
 
   const [argsText, setArgsText] = useState(
-    formData.args.join(" ")
+    formData.args?.join(" ") || ""
   );
 
   const [envText, setEnvText] = useState(
     formData.env
       ? Object.entries(formData.env)
           .map(([key, value]) => `${key}=${value}`)
+          .join("\n")
+      : ""
+  );
+
+  const [headersText, setHeadersText] = useState(
+    formData.headers
+      ? Object.entries(formData.headers)
+          .map(([key, value]) => `${key}: ${value}`)
           .join("\n")
       : ""
   );
@@ -56,16 +81,35 @@ export default function MCPServerModal({
     if (selectedTemplateId) {
       const foundTemplate = templates.find((t) => t.id === selectedTemplateId);
       if (foundTemplate) {
+        const templateTransport = foundTemplate.config.type as MCPTransportType;
+        setTransport(templateTransport);
+
         setFormData({
           ...formData,
           id: foundTemplate.id,
           name: foundTemplate.name,
           type: foundTemplate.type,
-          command: foundTemplate.config.command,
-          args: foundTemplate.config.args,
+          transport: templateTransport,
+          command: 'command' in foundTemplate.config ? foundTemplate.config.command : undefined,
+          args: 'args' in foundTemplate.config ? foundTemplate.config.args : undefined,
+          url: 'url' in foundTemplate.config ? foundTemplate.config.url : undefined,
+          headers: 'headers' in foundTemplate.config ? foundTemplate.config.headers : undefined,
+          method: 'method' in foundTemplate.config ? foundTemplate.config.method : undefined,
           env: foundTemplate.config.env || {},
         });
-        setArgsText(foundTemplate.config.args.join(" "));
+
+        if ('args' in foundTemplate.config && foundTemplate.config.args) {
+          setArgsText(foundTemplate.config.args.join(" "));
+        }
+
+        if ('headers' in foundTemplate.config && foundTemplate.config.headers) {
+          setHeadersText(
+            Object.entries(foundTemplate.config.headers)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join("\n")
+          );
+        }
+
         setEnvText(
           foundTemplate.config.env
             ? Object.entries(foundTemplate.config.env)
@@ -83,12 +127,6 @@ export default function MCPServerModal({
     setSaving(true);
 
     try {
-      // Parse args from text
-      const args = argsText
-        .trim()
-        .split(/\s+/)
-        .filter((arg) => arg.length > 0);
-
       // Parse env from text (KEY=value format, one per line)
       const env: Record<string, string> = {};
       if (envText.trim()) {
@@ -103,11 +141,52 @@ export default function MCPServerModal({
         });
       }
 
-      const serverToSave: MCPServer = {
-        ...formData,
-        args,
-        env: Object.keys(env).length > 0 ? env : undefined,
-      };
+      // Parse headers from text (KEY: value format, one per line)
+      const headers: Record<string, string> = {};
+      if (headersText.trim()) {
+        headersText.split("\n").forEach((line) => {
+          const trimmed = line.trim();
+          if (trimmed) {
+            const [key, ...valueParts] = trimmed.split(":");
+            if (key) {
+              headers[key.trim()] = valueParts.join(":").trim();
+            }
+          }
+        });
+      }
+
+      let serverToSave: MCPServer;
+
+      if (transport === 'stdio') {
+        // Parse args from text for stdio transport
+        const args = argsText
+          .trim()
+          .split(/\s+/)
+          .filter((arg) => arg.length > 0);
+
+        serverToSave = {
+          ...formData,
+          transport: 'stdio',
+          command: formData.command,
+          args,
+          url: undefined,
+          headers: undefined,
+          method: undefined,
+          env: Object.keys(env).length > 0 ? env : undefined,
+        };
+      } else {
+        // HTTP/SSE transport
+        serverToSave = {
+          ...formData,
+          transport,
+          command: undefined,
+          args: undefined,
+          url: formData.url,
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
+          method: transport === 'http' ? (formData.method || 'POST') : undefined,
+          env: Object.keys(env).length > 0 ? env : undefined,
+        };
+      }
 
       await onSave(serverToSave);
     } catch (err) {
@@ -158,14 +237,14 @@ export default function MCPServerModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Template selector (only for new servers) */}
-          {!server && templates.length > 0 && (
+          {/* Template selector - Always visible */}
+          {templates.length > 0 && (
             <div>
               <label
                 className="block text-xs font-medium mb-2"
                 style={{ color: "rgba(255, 255, 255, 0.7)" }}
               >
-                Template (optional)
+                Start from Template (optional)
               </label>
               <select
                 value={selectedTemplateId}
@@ -184,6 +263,12 @@ export default function MCPServerModal({
                   </option>
                 ))}
               </select>
+              <p
+                className="text-xs mt-1"
+                style={{ color: "rgba(255, 255, 255, 0.5)" }}
+              >
+                Select a template to auto-populate fields below
+              </p>
             </div>
           )}
 
@@ -242,59 +327,184 @@ export default function MCPServerModal({
             />
           </div>
 
-          {/* Command */}
+          {/* Transport Type */}
           <div>
             <label
               className="block text-xs font-medium mb-2"
               style={{ color: "rgba(255, 255, 255, 0.7)" }}
             >
-              Command *
+              Transport Type *
             </label>
-            <input
-              type="text"
-              value={formData.command}
-              onChange={(e) =>
-                setFormData({ ...formData, command: e.target.value })
-              }
-              required
-              placeholder="e.g., npx"
-              className="w-full px-3 py-2 rounded text-sm font-mono"
+            <select
+              value={transport}
+              onChange={(e) => {
+                const newTransport = e.target.value as MCPTransportType;
+                setTransport(newTransport);
+                setFormData({ ...formData, transport: newTransport });
+              }}
+              className="w-full px-3 py-2 rounded text-sm"
               style={{
                 background: "rgba(255, 255, 255, 0.05)",
                 border: "1px solid rgba(255, 255, 255, 0.12)",
                 color: "rgba(255, 255, 255, 0.9)",
               }}
-            />
-          </div>
-
-          {/* Arguments */}
-          <div>
-            <label
-              className="block text-xs font-medium mb-2"
-              style={{ color: "rgba(255, 255, 255, 0.7)" }}
             >
-              Arguments *
-            </label>
-            <input
-              type="text"
-              value={argsText}
-              onChange={(e) => setArgsText(e.target.value)}
-              required
-              placeholder="e.g., @modelcontextprotocol/server-github"
-              className="w-full px-3 py-2 rounded text-sm font-mono"
-              style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                color: "rgba(255, 255, 255, 0.9)",
-              }}
-            />
+              <option value="stdio">stdio (Command-line)</option>
+              <option value="http">HTTP (REST API)</option>
+              <option value="sse">SSE (Server-Sent Events)</option>
+            </select>
             <p
               className="text-xs mt-1"
               style={{ color: "rgba(255, 255, 255, 0.5)" }}
             >
-              Space-separated command arguments
+              Protocol used to communicate with the MCP server
             </p>
           </div>
+
+          {/* Conditional fields based on transport type */}
+          {transport === 'stdio' && (
+            <>
+              {/* Command */}
+              <div>
+                <label
+                  className="block text-xs font-medium mb-2"
+                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                >
+                  Command *
+                </label>
+                <input
+                  type="text"
+                  value={formData.command || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, command: e.target.value })
+                  }
+                  required
+                  placeholder="e.g., npx"
+                  className="w-full px-3 py-2 rounded text-sm font-mono"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "rgba(255, 255, 255, 0.9)",
+                  }}
+                />
+              </div>
+
+              {/* Arguments */}
+              <div>
+                <label
+                  className="block text-xs font-medium mb-2"
+                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                >
+                  Arguments *
+                </label>
+                <input
+                  type="text"
+                  value={argsText}
+                  onChange={(e) => setArgsText(e.target.value)}
+                  required
+                  placeholder="e.g., @modelcontextprotocol/server-github"
+                  className="w-full px-3 py-2 rounded text-sm font-mono"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "rgba(255, 255, 255, 0.9)",
+                  }}
+                />
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "rgba(255, 255, 255, 0.5)" }}
+                >
+                  Space-separated command arguments
+                </p>
+              </div>
+            </>
+          )}
+
+          {(transport === 'http' || transport === 'sse') && (
+            <>
+              {/* URL */}
+              <div>
+                <label
+                  className="block text-xs font-medium mb-2"
+                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                >
+                  URL *
+                </label>
+                <input
+                  type="url"
+                  value={formData.url || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, url: e.target.value })
+                  }
+                  required
+                  placeholder="https://example.com/mcp"
+                  className="w-full px-3 py-2 rounded text-sm font-mono"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "rgba(255, 255, 255, 0.9)",
+                  }}
+                />
+              </div>
+
+              {/* HTTP Method (only for HTTP transport) */}
+              {transport === 'http' && (
+                <div>
+                  <label
+                    className="block text-xs font-medium mb-2"
+                    style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                  >
+                    HTTP Method (optional)
+                  </label>
+                  <select
+                    value={formData.method || "POST"}
+                    onChange={(e) =>
+                      setFormData({ ...formData, method: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded text-sm"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "rgba(255, 255, 255, 0.9)",
+                    }}
+                  >
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                  </select>
+                </div>
+              )}
+
+              {/* HTTP Headers */}
+              <div>
+                <label
+                  className="block text-xs font-medium mb-2"
+                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
+                >
+                  HTTP Headers (optional)
+                </label>
+                <textarea
+                  value={headersText}
+                  onChange={(e) => setHeadersText(e.target.value)}
+                  rows={4}
+                  placeholder="Authorization: Bearer YOUR_TOKEN&#10;Content-Type: application/json&#10;X-Custom-Header: value"
+                  className="w-full px-3 py-2 rounded text-sm font-mono resize-none"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "rgba(255, 255, 255, 0.9)",
+                  }}
+                />
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "rgba(255, 255, 255, 0.5)" }}
+                >
+                  One per line in KEY: VALUE format (e.g., Authorization: Bearer token)
+                </p>
+              </div>
+            </>
+          )}
 
           {/* Environment Variables */}
           <div>
