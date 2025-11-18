@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { MCPServer, MCPTemplate, MCPServerType, MCPTransportType } from "../types";
+import MCPTemplateCard from "./MCPTemplateCard";
 
 /**
  * MCP Server Modal - Add/Edit MCP server configuration
@@ -235,40 +236,83 @@ export default function MCPServerModal({
           </button>
         </div>
 
+        {/* Template Cards Section - Only show when adding new server */}
+        {!server && templates.length > 0 && (
+          <div
+            className="px-6 py-4 border-b"
+            style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}
+          >
+            <h3
+              className="text-sm font-semibold mb-3"
+              style={{ color: "rgba(255, 255, 255, 0.7)" }}
+            >
+              Quick start with templates:
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {templates.map((t) => (
+                <MCPTemplateCard
+                  key={t.id}
+                  template={t}
+                  onClick={(template) => setSelectedTemplateId(template.id)}
+                />
+              ))}
+            </div>
+            <div
+              className="mt-3 pt-3 border-t text-center text-xs"
+              style={{
+                borderColor: "rgba(255, 255, 255, 0.1)",
+                color: "rgba(255, 255, 255, 0.5)",
+              }}
+            >
+              Or configure a custom server below
+            </div>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Template selector - Always visible */}
-          {templates.length > 0 && (
-            <div>
-              <label
-                className="block text-xs font-medium mb-2"
-                style={{ color: "rgba(255, 255, 255, 0.7)" }}
+          {/* Template indicator when template is selected */}
+          {selectedTemplateId && (
+            <div
+              className="p-3 rounded-lg flex items-start gap-3"
+              style={{
+                background: "rgba(242, 140, 82, 0.1)",
+                border: "1px solid rgba(242, 140, 82, 0.3)",
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ color: "#f28c52", flexShrink: 0 }}
               >
-                Start from Template (optional)
-              </label>
-              <select
-                value={selectedTemplateId}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="w-full px-3 py-2 rounded text-sm"
-                style={{
-                  background: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  color: "rgba(255, 255, 255, 0.9)",
-                }}
-              >
-                <option value="">Custom configuration</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} - {t.description}
-                  </option>
-                ))}
-              </select>
-              <p
-                className="text-xs mt-1"
-                style={{ color: "rgba(255, 255, 255, 0.5)" }}
-              >
-                Select a template to auto-populate fields below
-              </p>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium" style={{ color: "#f28c52" }}>
+                  Using {templates.find((t) => t.id === selectedTemplateId)?.name} template
+                </p>
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "rgba(255, 255, 255, 0.6)" }}
+                >
+                  Fields below are pre-filled. You can customize them before saving.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplateId("")}
+                  className="text-xs mt-2 underline"
+                  style={{ color: "#f28c52" }}
+                >
+                  Clear and start from scratch
+                </button>
+              </div>
             </div>
           )}
 

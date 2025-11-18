@@ -3,6 +3,7 @@ import type { MCPServer, MCPTemplate } from "../types";
 import { useMCPServers } from "../hooks/useMCPServers";
 import MCPServerCard from "./MCPServerCard";
 import MCPServerModal from "./MCPServerModal";
+import MCPTemplateCard from "./MCPTemplateCard";
 
 /**
  * MCP Panel - Management interface for MCP (Model Context Protocol) servers
@@ -208,83 +209,74 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
         {!loading && !error && servers.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
             <svg
-              width="48"
-              height="48"
+              width="64"
+              height="64"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="mb-4"
-              style={{ color: "rgba(255, 255, 255, 0.3)" }}
+              className="mb-6"
+              style={{ color: "rgba(242, 140, 82, 0.4)" }}
             >
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               <circle cx="12" cy="16" r="1" />
             </svg>
             <h4
-              className="text-base font-semibold mb-2"
+              className="text-lg font-bold mb-2"
               style={{ color: "#f28c52" }}
             >
               No MCP Servers
             </h4>
             <p
-              className="text-sm mb-6 max-w-xs"
+              className="text-sm mb-8 max-w-md leading-relaxed"
               style={{ color: "rgba(255, 255, 255, 0.6)" }}
             >
-              Add your first MCP server to extend Claude's capabilities with
-              external tools and services.
+              MCP (Model Context Protocol) servers extend Claude's capabilities
+              with external tools, APIs, and data sources. Get started by adding
+              a server from templates or create a custom one.
             </p>
 
-            {/* Quick templates */}
+            {/* Template cards grid */}
             {templates.length > 0 && (
-              <div className="w-full max-w-sm mt-4">
+              <div className="w-full max-w-2xl">
                 <p
-                  className="text-xs font-medium mb-3"
-                  style={{ color: "rgba(255, 255, 255, 0.5)" }}
+                  className="text-sm font-semibold mb-4 text-left"
+                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
                 >
                   Quick start with templates:
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {templates.slice(0, 4).map((template) => (
-                    <button
+                <div className="grid grid-cols-2 gap-3">
+                  {templates.map((template) => (
+                    <MCPTemplateCard
                       key={template.id}
-                      type="button"
-                      onClick={() => handleUseTemplate(template)}
-                      className="p-3 rounded-lg text-left transition-all duration-200"
-                      style={{
-                        background: "rgba(12, 16, 24, 0.6)",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(242, 140, 82, 0.08)";
-                        e.currentTarget.style.borderColor =
-                          "rgba(242, 140, 82, 0.2)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(12, 16, 24, 0.6)";
-                        e.currentTarget.style.borderColor =
-                          "rgba(255, 255, 255, 0.08)";
-                      }}
-                    >
-                      <div
-                        className="text-xs font-medium"
-                        style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                      >
-                        {template.name}
-                      </div>
-                      <div
-                        className="text-xs mt-1"
-                        style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                      >
-                        {template.description}
-                      </div>
-                    </button>
+                      template={template}
+                      onClick={handleUseTemplate}
+                    />
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddServer}
+                  className="mt-6 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "rgba(255, 255, 255, 0.8)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background =
+                      "rgba(255, 255, 255, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background =
+                      "rgba(255, 255, 255, 0.05)";
+                  }}
+                >
+                  Or create a custom server
+                </button>
               </div>
             )}
           </div>
