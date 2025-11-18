@@ -2925,18 +2925,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     try {
       const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
 
-      // Check if skills directory exists
+      // Check if PROJECT skills directory exists (for UI display purposes)
       const dirExists = await invoke<boolean>("check_skills_directory", {
         workingDir,
       });
       setSkillsDirectoryExists(dirExists);
 
-      if (!dirExists) {
-        setSkills([]);
-        setSkillsError(null); // Clear error if directory just doesn't exist
-        return;
-      }
-
+      // ALWAYS call list_skills - it will return global skills even if project dir doesn't exist
       const skillsList = await invoke<SkillInfo[]>("list_skills", {
         workingDir,
       });

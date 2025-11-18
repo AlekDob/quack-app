@@ -130,13 +130,19 @@ export default function SkillsPanel({
               className="text-base font-semibold mb-2"
               style={{ color: "#f28c52" }}
             >
-              No Skills Directory
+              No Project Skills
             </h4>
             <p
               className="text-sm mb-6 max-w-xs"
               style={{ color: "rgba(255, 255, 255, 0.6)" }}
             >
-              Create a <code className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "rgba(242, 140, 82, 0.1)", color: "#f28c52" }}>.claude/skills/</code> directory to add custom skills.
+              Create a <code className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "rgba(242, 140, 82, 0.1)", color: "#f28c52" }}>.claude/skills/</code> directory in this project to add project-specific skills.
+            </p>
+            <p
+              className="text-xs max-w-xs"
+              style={{ color: "rgba(255, 255, 255, 0.4)" }}
+            >
+              💡 Global skills from <code className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "rgba(255, 255, 255, 0.05)", color: "rgba(255, 255, 255, 0.6)" }}>~/.claude/skills/</code> should still be visible above.
             </p>
           </div>
         )}
