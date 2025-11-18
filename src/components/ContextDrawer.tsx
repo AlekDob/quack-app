@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import MarkdownText from "./MarkdownText";
-import CodeEditor from "./CodeEditor";
+import CodeEditorCodeMirror from "./CodeEditorCodeMirror";
 import RevealInFinderButton from "./RevealInFinderButton";
 
 interface ContextDrawerProps {
@@ -270,7 +270,7 @@ export default function ContextDrawer({
                   </div>
 
                   <div className="agent-markdown-editor">
-                    <CodeEditor
+                    <CodeEditorCodeMirror
                       content={editContent}
                       filename="CLAUDE.md"
                       onChange={handleContentChange}

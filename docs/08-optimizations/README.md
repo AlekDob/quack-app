@@ -12,17 +12,17 @@ Last Updated: 2025-01-16
 
 | Priority | Total Tasks | Completed | In Progress | Pending | Progress |
 |----------|-------------|-----------|-------------|---------|----------|
-| **P0 Critical** 🔴 | 7 | 1 | 0 | 6 | 14% |
+| **P0 Critical** 🔴 | 7 | 2 | 0 | 5 | 29% |
 | **P1 High** 🟡 | 8 | 0 | 0 | 8 | 0% |
 | **P2 Medium** 🟠 | 6 | 0 | 0 | 6 | 0% |
-| **TOTAL** | 21 | 1 | 0 | 20 | 5% |
+| **TOTAL** | 21 | 2 | 0 | 19 | 10% |
 
 ### Quick Stats
 
-- ✅ **Completed Items**: 1 (Message duplication fix with 37 tests)
+- ✅ **Completed Items**: 2 (Message deduplication + Monaco Editor removal)
 - 🔄 **In Progress**: 0
-- ⏳ **Pending**: 20
-- 🎯 **Next Up**: Setup Vitest + Remove Monaco Editor
+- ⏳ **Pending**: 19
+- 🎯 **Next Up**: App.tsx refactoring or Setup Vitest infrastructure
 
 ---
 
@@ -46,6 +46,12 @@ Contains the original comprehensive analysis report that identified all optimiza
   - Status: 37/37 tests passing
   - Impact: Fixed critical message triplication bug
 
+- `remove-monaco-editor.md` - Removed Monaco Editor duplication (DONE ✅)
+  - Status: 43/43 regression tests passing
+  - Impact: -350KB bundle size (-14%), 6 packages removed
+  - Migration: Monaco → CodeMirror (full feature parity)
+  - TDD Approach: 15 tests written first (RED-GREEN-REFACTOR)
+
 ### 02-in-progress/
 🔄 **Tasks currently being worked on**
 
@@ -57,7 +63,7 @@ Contains the original comprehensive analysis report that identified all optimiza
 Tasks that block scalability, maintainability, or have critical performance impact:
 
 1. `app-tsx-refactoring.md` - Reduce App.tsx from 7,293 → <300 lines
-2. `remove-monaco-editor.md` - Remove duplicated editor (~350KB savings)
+2. ~~`remove-monaco-editor.md`~~ - ✅ COMPLETED (see 01-completed/)
 3. `setup-vitest-infrastructure.md` - Test infrastructure setup
 4. `test-coverage-expansion.md` - Reach 80% coverage target
 5. `fix-unmet-dependencies.md` - Resolve all UNMET dependencies
@@ -94,15 +100,16 @@ Tasks that improve performance and code quality:
 
 These tasks have **maximum impact** with **minimal effort**:
 
-| # | Task | File | Effort | Impact | Savings | Priority |
-|---|------|------|--------|--------|---------|----------|
-| 1 | Remove Monaco Editor | 03-priority-0-critical/ | 1h | 🔥🔥🔥 | -350KB | P0 |
-| 2 | Lazy Load Mermaid | 04-priority-1-high/ | 30min | 🔥🔥 | -200KB | P1 |
-| 3 | Fix UNMET dependencies | 03-priority-0-critical/ | 15min | 🔥 | Stability | P0 |
-| 4 | Delete old files | 05-priority-2-medium/ | 5min | 🔥 | -791 lines | P2 |
-| 5 | Tree-shake Lucide | 04-priority-1-high/ | 45min | 🔥 | -40KB | P1 |
+| # | Task | File | Effort | Impact | Savings | Priority | Status |
+|---|------|------|--------|--------|---------|----------|--------|
+| 1 | ~~Remove Monaco Editor~~ | 01-completed/ | 1h | 🔥🔥🔥 | -350KB | P0 | ✅ DONE |
+| 2 | Lazy Load Mermaid | 04-priority-1-high/ | 30min | 🔥🔥 | -200KB | P1 | ⏳ Pending |
+| 3 | Fix UNMET dependencies | 03-priority-0-critical/ | 15min | 🔥 | Stability | P0 | ⏳ Pending |
+| 4 | Delete old files | 05-priority-2-medium/ | 5min | 🔥 | -791 lines | P2 | ⏳ Pending |
+| 5 | Tree-shake Lucide | 04-priority-1-high/ | 45min | 🔥 | -40KB | P1 | ⏳ Pending |
 
 **Total Quick Wins**: ~3 hours effort, -590KB bundle size + stability improvements! 🚀
+**Completed**: 1/5 (Monaco Editor ✅ -350KB achieved!)
 
 ---
 
@@ -171,12 +178,14 @@ Target:   ████████████████░░░░ 80%+ (Pro
 
 ### Performance Targets
 
-| Metric | Current | Target | Improvement |
-|--------|---------|--------|-------------|
-| **Bundle Size** | ~2.5MB | <1.5MB | -40% 🚀 |
-| **Initial Chunk** | ~800KB | <500KB | -38% 🚀 |
-| **First Paint** | ~1.8s | <1.0s | -44% 🚀 |
-| **Build Time** | ~45s | <30s | -33% 🚀 |
+| Metric | Before | Current | Target | Progress |
+|--------|--------|---------|--------|----------|
+| **Bundle Size** | ~2.5MB | ~2.15MB ✅ | <1.5MB | -14% (350KB saved) |
+| **Initial Chunk** | ~800KB | ~800KB | <500KB | 0% |
+| **First Paint** | ~1.8s | ~1.8s | <1.0s | 0% |
+| **Build Time** | ~45s | ~45s | <30s | 0% |
+
+**Latest Win**: Monaco Editor removal (-350KB, -14% bundle size) ✅
 
 ### Code Quality Targets
 

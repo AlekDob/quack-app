@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AgentInfo, AgentDetails } from "../types";
 import QuackAgencySetupWizard from "./QuackAgencySetupWizard";
 import MarkdownText from "./MarkdownText";
-import CodeEditor from "./CodeEditor";
+import CodeEditorCodeMirror from "./CodeEditorCodeMirror";
 import RevealInFinderButton from "./RevealInFinderButton";
 
 interface QuackAgencyDrawerProps {
@@ -575,7 +575,7 @@ export default function QuackAgencyDrawer({
                   </div>
 
                   <div className="agent-markdown-editor">
-                    <CodeEditor
+                    <CodeEditorCodeMirror
                       content={editContent}
                       filename={`${selectedAgent.name}.md`}
                       onChange={handleContentChange}

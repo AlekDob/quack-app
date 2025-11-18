@@ -4,7 +4,6 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { visualizer } from 'rollup-plugin-visualizer'
 import viteCompression from 'vite-plugin-compression'
-import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
 import crypto from 'node:crypto'
 
 // Polyfill for crypto.hash() (required for Node.js <21)
@@ -13,8 +12,6 @@ if (typeof crypto.hash !== 'function') {
     return crypto.createHash(algorithm).update(data).digest(outputEncoding as any);
   };
 }
-
-const monacoEditorPlugin = (monacoEditorPluginModule as any).default || monacoEditorPluginModule
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -31,12 +28,6 @@ export default defineConfig(({ mode }) => {
 
     plugins: [
       react(),
-
-      // Monaco Editor plugin - handles web workers correctly in production
-      monacoEditorPlugin({
-        languageWorkers: ['typescript', 'json', 'css', 'html', 'editorWorkerService'],
-        globalAPI: true,
-      }),
 
       // Bundle analyzer - creates stats.html with bundle visualization
       isProduction && visualizer({
@@ -111,11 +102,6 @@ export default defineConfig(({ mode }) => {
         output: {
           // Manual chunking strategy for optimal code splitting
           manualChunks: (id) => {
-            // Monaco Editor - HEAVY (~300KB) - Load on demand
-            if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
-              return 'monaco-editor';
-            }
-
             // XTerm - Terminal library (~150KB)
             if (id.includes('@xterm/xterm') || id.includes('xterm')) {
               return 'xterm';
@@ -192,13 +178,7 @@ export default defineConfig(({ mode }) => {
           },
 
           // Naming strategy for chunks
-          chunkFileNames: (chunkInfo) => {
-            const facadeModuleId = chunkInfo.facadeModuleId ? chunkInfo.facadeModuleId.split('/').pop() : '';
-            if (facadeModuleId && facadeModuleId.includes('monaco')) {
-              return 'assets/monaco-[hash].js';
-            }
-            return 'assets/[name]-[hash].js';
-          },
+          chunkFileNames: 'assets/[name]-[hash].js',
           entryFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash][extname]',
 
@@ -233,7 +213,6 @@ export default defineConfig(({ mode }) => {
       ],
       exclude: [
         '@anthropic-ai/claude-agent-sdk', // Don't pre-bundle SDK
-        // monaco-editor now handled by vite-plugin-monaco-editor
       ],
       // Force dependency optimization
       force: isDevelopment,

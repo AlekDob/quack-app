@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef, lazy, Suspense, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import type { DiffInfo } from "./CodeEditor";
+import type { DiffInfo } from "./CodeEditorCodeMirror";
 import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";

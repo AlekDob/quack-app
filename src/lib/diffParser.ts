@@ -1,4 +1,4 @@
-import type { DiffInfo } from "../components/CodeEditor";
+import type { DiffInfo } from "../components/CodeEditorCodeMirror";
 
 /**
  * Parsa il diff Git in formato unified e estrae i numeri di linea modificati
