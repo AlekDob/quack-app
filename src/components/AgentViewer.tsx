@@ -29,7 +29,9 @@ const AGENT_COLORS: Record<string, string> = {
 const getModelDisplayName = (model: string): string => {
   if (model.includes("opus")) return "opus";
   if (model.includes("sonnet")) return "sonnet";
-  if (model.includes("haiku")) return "haiku";
+  // Check for Haiku 3.5 BEFORE generic haiku check
+  if (model.includes("3-5-haiku") || model.includes("3.5-haiku")) return "haiku-3.5";
+  if (model.includes("haiku")) return "haiku"; // Haiku 4.5 (default)
   return model; // fallback to full model name
 };
 

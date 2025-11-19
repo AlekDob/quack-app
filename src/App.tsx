@@ -1887,6 +1887,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
   // Agent Chat Settings helpers - get or create settings for current agent
+  // Normalize model name from legacy full IDs to short names
+  const normalizeModelName = (model: string): 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5' => {
+    if (model.includes("opus")) return "opus";
+    if (model.includes("sonnet")) return "sonnet";
+    // Check for Haiku 3.5 BEFORE generic haiku check
+    if (model.includes("3-5-haiku") || model.includes("3.5-haiku")) return "haiku-3.5";
+    if (model.includes("haiku")) return "haiku"; // Haiku 4.5 (default)
+    return "sonnet"; // Fallback to sonnet if unknown
+  };
+
   const getCurrentAgentSettings = useCallback((): AgentChatSettings => {
     if (!activeId) {
       // Default settings when no agent is active
@@ -1900,7 +1910,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const existing = agentChatSettings.get(activeId);
     if (existing) {
-      return existing;
+      // Normalize the model name in case it's a legacy full ID
+      return {
+        ...existing,
+        model: normalizeModelName(existing.model),
+      };
     }
 
     // Initialize default settings for new agent

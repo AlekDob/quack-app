@@ -1422,7 +1422,7 @@ export default function ChatInput({
             onBlur={() => setIsFocused(false)}
             placeholder={
               isFocused
-                ? `⇧ + ↵ new line | ↵ send`
+                ? `⇧ + ↵ new line | ↵ send | @ to mention droids or files | / to invoke commands`
                 : placeholder
             }
             disabled={disabled}
