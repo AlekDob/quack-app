@@ -50,6 +50,12 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   // Store last prompt for restoration on abort
   const lastPromptRef = useRef<string>('');
 
+  // 🦆 FIX: Persistent event deduplication across ALL message streams
+  // This Set persists for the entire hook lifecycle to prevent duplicates
+  // even if React re-renders or state updates trigger multiple renders
+  // IMPORTANT: Never clear this Set - it's the source of truth for deduplication
+  const seenEventIdsRef = useRef<Set<string>>(new Set());
+
   // Initialize (SDK doesn't need initialization)
   const initialize = useCallback(async () => {
     setIsConfigured(true);
@@ -116,7 +122,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       });
 
       const events: ClaudeEvent[] = [];
-      const seenEventIds = new Set<string>(); // Track unique event identifiers
+      // 🦆 FIX: Use persistent ref instead of local Set to survive re-renders
+      const seenEventIds = seenEventIdsRef.current;
       let assistantContent = '';
 
       // 🦆 FIX: Enhanced helper function to generate STABLE unique event IDs for deduplication
@@ -394,6 +401,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       cacheCreationTokens: 0,
       cacheReadTokens: 0,
     });
+
+    // 6.5. 🦆 FIX: Clear event deduplication Set to start fresh
+    seenEventIdsRef.current.clear();
+    console.log('[useClaudeChat] Event deduplication Set cleared');
 
     // 7. Try to notify backend to delete session files
     if (oldSessionId) {

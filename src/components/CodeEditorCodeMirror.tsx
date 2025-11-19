@@ -730,6 +730,10 @@ const CodeEditorCodeMirror = forwardRef<CodeEditorRef, CodeEditorProps>(({
       });
     }
 
+    // ⚠️ IMPORTANT: CodeMirror requires decorations to be sorted by `from` position
+    // If decorations are not sorted, it throws: "Ranges must be added sorted by `from` position and `startSide`"
+    decorations.sort((a, b) => a.from - b.from);
+
     // Apply decorations
     viewRef.current.dispatch({
       effects: setDiffDecorations.of(decorations)

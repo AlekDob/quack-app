@@ -66,6 +66,9 @@ import {
   loadTabsByTerminalFromStorage,
   saveNativeTerminalsToStorage,
   loadNativeTerminalsFromStorage,
+  STORAGE_KEY,
+  TABS_BY_TERMINAL_KEY,
+  NATIVE_TERMINALS_STORAGE_KEY,
   type TerminalMetadata,
 } from "./services/terminalStorage";
 import {
@@ -246,7 +249,7 @@ function App() {
   const [showNewTerminalModal, setShowNewTerminalModal] = useState(false);
   const [newTerminalName, setNewTerminalName] = useState("");
   const [newTerminalPath, setNewTerminalPath] = useState("");
-  const [newTerminalColor, setNewTerminalColor] = useState(TERMINAL_COLORS[0]);
+  const [newTerminalColor, setNewTerminalColor] = useState<string>(TERMINAL_COLORS[0]);
   const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
   const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
   const [newTerminalBranch, setNewTerminalBranch] = useState("");
@@ -4869,7 +4872,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               rootPath: explorerRoot,
             });
 
-            setPreviewDiffInfo(parseDiff(diff));
+            const diffInfo = parseDiff(diff);
+            setPreviewDiffInfo(diffInfo);
+
+            // 🔧 FIX: If no lineChanges provided from AI, convert diffInfo to LineChange[] format
+            // This ensures decorations are shown when clicking "View Modified Files" from chat
+            if (!lineChanges || lineChanges.length === 0) {
+              const convertedLineChanges: LineChange[] = [
+                ...diffInfo.additions.map(line => ({ line, type: 'added' as const })),
+                ...diffInfo.modifications.map(line => ({ line, type: 'modified' as const })),
+                ...diffInfo.deletions.map(line => ({ line, type: 'removed' as const })),
+              ];
+              setPreviewLineChanges(convertedLineChanges);
+              console.log('[handleOpenFilePreview] Converted diffInfo to lineChanges:', convertedLineChanges.length, 'changes');
+            }
           } catch (diffError) {
             console.warn("Unable to load diff:", diffError);
           }

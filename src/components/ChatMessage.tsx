@@ -346,41 +346,89 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {message.events.map((event, idx) => {
-              // Generate unique key based on event properties (deduplicated by useClaudeChat)
-              // Priority: Use stable IDs from event data, avoid using index
-              const eventKey = (() => {
-                // System events: Use subtype + session_id (guaranteed unique)
-                if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
-                  return `system-${event.subtype}-${event.session_id}`;
-                }
-                // Assistant events: Use message ID if available
-                if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-                  return `assistant-${event.message.id}`;
-                }
-                // Result events: Use session_id (only one result per session)
-                if (event.type === 'result' && 'session_id' in event) {
-                  return `result-${event.session_id}`;
-                }
-                // User events: Use session_id + index as fallback
-                if ('session_id' in event && event.session_id) {
-                  return `${event.type}-${event.session_id}-${idx}`;
-                }
-                // Fallback: Use message ID + index (last resort)
-                return `${event.type}-${message.id}-${idx}`;
-              })();
+            {(() => {
+              // 🦆 FIX: FORCED deduplication at render layer as final safeguard
+              // This prevents UI duplicates even if backend deduplication fails
+              const seenKeys = new Set<string>();
+              const uniqueEvents: typeof message.events = [];
 
-              return (
-                <StreamMessage
-                  key={eventKey}
-                  message={event}
-                  streamMessages={message.events || []}
-                  onFilePathClick={onFilePathClick}
-                  agentName={agentName}
-                  agentAvatar={agentAvatar}
-                />
-              );
-            })}
+              for (const event of message.events) {
+                // Generate unique key (same logic as before)
+                const eventKey = (() => {
+                  if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
+                    return `system-${event.subtype}-${event.session_id}`;
+                  }
+                  if (event.type === 'assistant' && 'message' in event && event.message?.id) {
+                    return `assistant-${event.message.id}`;
+                  }
+                  if (event.type === 'result' && 'session_id' in event) {
+                    return `result-${event.session_id}`;
+                  }
+                  if ('session_id' in event && event.session_id) {
+                    // Use content hash for uniqueness instead of index
+                    const contentHash = JSON.stringify(event).substring(0, 100);
+                    return `${event.type}-${event.session_id}-${contentHash}`;
+                  }
+                  // Last resort: hash the event
+                  const eventHash = JSON.stringify(event)
+                    .split('')
+                    .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
+                    .toString(36);
+                  return `${event.type}-${message.id}-${eventHash}`;
+                })();
+
+                // Skip if already seen
+                if (seenKeys.has(eventKey)) {
+                  console.warn('[ChatMessage] 🦆 DUPLICATE DETECTED IN RENDER LAYER - Key:', eventKey.substring(0, 50));
+                  continue;
+                }
+
+                seenKeys.add(eventKey);
+                uniqueEvents.push(event);
+              }
+
+              console.log(`[ChatMessage] Rendered ${uniqueEvents.length} unique events (${message.events.length - uniqueEvents.length} duplicates removed)`);
+
+              return uniqueEvents.map((event, idx) => {
+                // Generate key again for React (stable key generation)
+                const eventKey = (() => {
+                  // System events: Use subtype + session_id (guaranteed unique)
+                  if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
+                    return `system-${event.subtype}-${event.session_id}`;
+                  }
+                  // Assistant events: Use message ID if available
+                  if (event.type === 'assistant' && 'message' in event && event.message?.id) {
+                    return `assistant-${event.message.id}`;
+                  }
+                  // Result events: Use session_id (only one result per session)
+                  if (event.type === 'result' && 'session_id' in event) {
+                    return `result-${event.session_id}`;
+                  }
+                  // User events: Use session_id + content hash (no index!)
+                  if ('session_id' in event && event.session_id) {
+                    const contentHash = JSON.stringify(event).substring(0, 100);
+                    return `${event.type}-${event.session_id}-${contentHash}`;
+                  }
+                  // Fallback: Use message ID + content hash (no index!)
+                  const eventHash = JSON.stringify(event)
+                    .split('')
+                    .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
+                    .toString(36);
+                  return `${event.type}-${message.id}-${eventHash}`;
+                })();
+
+                return (
+                  <StreamMessage
+                    key={eventKey}
+                    message={event}
+                    streamMessages={message.events || []}
+                    onFilePathClick={onFilePathClick}
+                    agentName={agentName}
+                    agentAvatar={agentAvatar}
+                  />
+                );
+              });
+            })()}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
