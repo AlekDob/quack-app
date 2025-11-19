@@ -16,7 +16,7 @@ export default function MCPTemplateCard({
 }: MCPTemplateCardProps) {
   // Icon mapping based on template type
   const getIcon = () => {
-    switch (template.template_type) {
+    switch (template.type) {
       case "filesystem":
         return (
           <svg
@@ -49,7 +49,7 @@ export default function MCPTemplateCard({
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
           </svg>
         );
-      case "api":
+      case "github": // mapped to "api" visual
         return (
           <svg
             width="24"
@@ -66,7 +66,7 @@ export default function MCPTemplateCard({
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
         );
-      case "cloud":
+      case "slack": // mapped to "cloud" visual
         return (
           <svg
             width="24"
@@ -81,7 +81,8 @@ export default function MCPTemplateCard({
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
           </svg>
         );
-      case "productivity":
+      case "puppeteer": // mapped to "productivity" visual
+      case "playwright":
         return (
           <svg
             width="24"

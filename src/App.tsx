@@ -75,6 +75,7 @@ import {
   saveAgentChatsToStorage,
   loadAgentChatsFromStorage,
 } from "./services/agentChatStorage";
+import { getDuckdroidUrl } from "./utils/agentAvatars";
 import {
   TERMINAL_COLORS,
   stripAnsi,
@@ -2891,7 +2892,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         agentScope: agentInfo.scope as 'global' | 'project',
         icon: (
           <img
-            src={agentInfo.avatar ? `/images/ducks/avatars/${agentInfo.avatar}` : '/duckdroid.png'}
+            src={agentInfo.avatar ? `/images/ducks/new-avatars/${agentInfo.avatar}` : getDuckdroidUrl()}
             alt="Agent"
             style={{ width: '16px', height: '16px', borderRadius: '3px' }}
           />

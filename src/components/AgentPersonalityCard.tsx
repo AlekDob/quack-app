@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import type { AgentPersonality } from '../types';
 import './AgentPersonalityCard.css';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
+import { getAvatarUrl } from '../utils/agentAvatars';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface AgentPersonalityCardProps {
   personality: AgentPersonality | null;
@@ -18,17 +20,6 @@ const COMMUNICATION_STYLES_MAP: Record<string, string> = {
   sarcastic: 'Sarcastic',
 };
 
-// Helper function to get avatar image URL (works in both dev and production)
-function getAvatarUrl(avatarName: string): string {
-  // Check if we're in Tauri context
-  if (window.__TAURI__) {
-    // In Tauri v2, use asset:// protocol for bundled resources
-    return `asset://localhost/images/ducks/avatars/${avatarName}`;
-  }
-  // In dev mode, use standard public path
-  return `/images/ducks/avatars/${avatarName}`;
-}
-
 export default function AgentPersonalityCard({
   personality,
   agentName,
@@ -37,13 +28,22 @@ export default function AgentPersonalityCard({
 }: AgentPersonalityCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // Load avatar URL (custom or default)
+  // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
   useEffect(() => {
     let isMounted = true;
 
     async function loadAvatarUrl() {
+      // If no avatar specified, use duck30.jpeg fallback
       if (!agentAvatar) {
-        setAvatarUrl(null);
+        console.log('[AgentPersonalityCard] No avatar specified, using duck30.jpeg fallback');
+        if (isMounted) {
+          // Use duck30.jpeg as fallback for agents with undefined avatar
+          if (window.__TAURI__) {
+            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+          } else {
+            setAvatarUrl('/duck30.jpeg');
+          }
+        }
         return;
       }
 
@@ -57,7 +57,12 @@ export default function AgentPersonalityCard({
         } catch (error) {
           console.error('Failed to load custom avatar:', error);
           if (isMounted) {
-            setAvatarUrl(null);
+            // Fallback to duck30.jpeg if custom avatar fails
+            if (window.__TAURI__) {
+              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+            } else {
+              setAvatarUrl('/duck30.jpeg');
+            }
           }
         }
       } else {
@@ -90,18 +95,19 @@ export default function AgentPersonalityCard({
     <div className="agent-personality-card">
       <div className="personality-header">
         <div className="personality-avatar">
-          {agentAvatar && avatarUrl ? (
+          {avatarUrl ? (
             <img
               src={avatarUrl}
               alt={agentName || personality.name}
               className="avatar-image"
               onError={(e) => {
-                // Fallback to SVG icon if image fails to load
                 const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  parent.innerHTML = '<svg class="avatar-icon-svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="3"/><path d="M5 17a5 5 0 0 1 10 0"/></svg>';
+                console.error('[AgentPersonalityCard] Image failed to load, using fallback duck30.jpeg:', avatarUrl);
+                // Always fallback to duck30.jpeg on error
+                if (window.__TAURI__) {
+                  target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset');
+                } else {
+                  target.src = '/duck30.jpeg';
                 }
               }}
             />

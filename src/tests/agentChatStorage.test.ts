@@ -45,9 +45,10 @@ describe("agentChatStorage", () => {
         {
           id: "chat-1",
           name: "Project Alpha",
-          terminals: ["term-1", "term-2"],
-          createdAt: new Date().toISOString(),
-        } as AgentChat,
+          color: "#ff0000",
+          cwd: "/home/user/project",
+          createdAt: Date.now(),
+        },
       ];
 
       await saveAgentChatsToStorage(chats);

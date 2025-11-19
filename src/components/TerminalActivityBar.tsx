@@ -9,10 +9,10 @@ function getAvatarUrl(avatarName: string): string {
   if (window.__TAURI__) {
     // In production, use convertFileSrc with the expected resource path
     // Tauri will handle the path resolution automatically
-    return convertFileSrc(`/images/ducks/avatars/${avatarName}`, 'asset')
+    return convertFileSrc(`/images/ducks/new-avatars/${avatarName}`, 'asset')
   }
   // In dev mode, use standard public path
-  return `/images/ducks/avatars/${avatarName}`
+  return `/images/ducks/new-avatars/${avatarName}`
 }
 
 interface TerminalActivityBarProps {
@@ -62,13 +62,22 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
     console.log(`[${terminal.label}] 🎯 isActive changed to: ${isActive}`)
   }, [isActive, terminal.label])
 
-  // Load custom avatar URL if needed
+  // Load custom avatar URL if needed - WITH FALLBACK for undefined avatars
   useEffect(() => {
     let isMounted = true
 
     async function loadAvatarUrl() {
+      // If no avatar specified, use duck30.jpeg fallback
       if (!terminal.avatar) {
-        setAvatarUrl(null)
+        console.log('[TerminalActivityBar] No avatar specified, using duck30.jpeg fallback')
+        if (isMounted) {
+          // Use duck30.jpeg as fallback for terminals with undefined avatar
+          if (window.__TAURI__) {
+            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'))
+          } else {
+            setAvatarUrl('/duck30.jpeg')
+          }
+        }
         return
       }
 
@@ -82,7 +91,12 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
         } catch (error) {
           console.error('Failed to load custom avatar:', error)
           if (isMounted) {
-            setAvatarUrl(null)
+            // Fallback to duck30.jpeg if custom avatar fails
+            if (window.__TAURI__) {
+              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'))
+            } else {
+              setAvatarUrl('/duck30.jpeg')
+            }
           }
         }
       } else {
@@ -163,8 +177,8 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
 
   return (
     <>
-      {/* Only show avatar if it exists - no fallback dot */}
-      {terminal.avatar && avatarUrl && (
+      {/* ALWAYS show avatar - fallback to duck30.jpeg if not specified */}
+      {avatarUrl && (
         <div
           className="terminal-avatar-container"
           onMouseEnter={() => setIsHovering(true)}
@@ -181,9 +195,12 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
               alt={terminal.label}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                // Fallback for default avatars only
-                if (terminal.avatar && !isCustomAvatar(terminal.avatar)) {
-                  target.src = `/images/ducks/${terminal.avatar}`;
+                console.error('[TerminalActivityBar] Image failed to load, using fallback duck30.jpeg:', avatarUrl)
+                // Always fallback to duck30.jpeg on error
+                if (window.__TAURI__) {
+                  target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
+                } else {
+                  target.src = '/duck30.jpeg'
                 }
               }}
             />

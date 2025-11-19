@@ -72,11 +72,16 @@ async function loadMCPServers(workingDir?: string): Promise<Record<string, {
     }> = {};
 
     enabledServers.forEach(server => {
-      mcpServers[server.id] = {
-        command: server.command,
-        args: server.args,
-        env: server.env,
-      };
+      // Only include servers with valid command and args
+      if (server.command && server.args) {
+        mcpServers[server.id] = {
+          command: server.command,
+          args: server.args,
+          env: server.env,
+        };
+      } else {
+        console.warn(`🔍 [MCP DEBUG] Skipping server "${server.id}" - missing command or args`);
+      }
     });
 
     console.log('🔍 [MCP DEBUG] Final mcpServers object keys:', Object.keys(mcpServers).join(', '));

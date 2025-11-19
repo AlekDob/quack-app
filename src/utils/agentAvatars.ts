@@ -5,6 +5,7 @@
  * Supports both default avatars and custom uploaded avatars.
  */
 
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { getCustomAvatarUrl, isCustomAvatar } from './customAvatarStorage';
 
 // Type augmentation for Tauri
@@ -14,52 +15,94 @@ declare global {
   }
 }
 
-// Available duck avatars from /images/ducks/avatars/
+// Available duck avatars from /images/ducks/new-avatars/
 export const AVAILABLE_AVATARS = [
-  '24d6c816fe40a284f2451b1469c5e6d63d236e53.png',
-  '5a1b030fb3b46f153f9b4f786a56570d828d2d2f.png',
-  '5c275f841f212073cbddbe734d1979a6c2f17ab8.png',
-  '5ef21f43a917b3bbe86dad58669fdad1c9f3e7c1.png',
-  '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg',
-  '94ab4eb6a469bf7f9de538e5c2f3dc3f2637fddf.jpeg',
-  '99d6b811344a0bd98d18246ca8208314e8b490f3.png',
-  '9e56d5e5edfcef59ce2aba2b96130dad44ce1135.png',
-  'ab7cadc881ab08dcc27d8a8a1f3cb3e8af002216.png',
-  'bafc4d0ca4264fb26f014f27c641d860ff356f7a.png',
-  'c036fd117629d44e78464dd12d95760f0f0b3d9b.png',
-  'd305287d5c861601e285b34ec5a8c7835ae9f8ea.png',
-  'de8b5bfa62130bde399a6cb5255323ac949756ec.png',
-  'e34736e96c3537509d80e78454d6e88ebe18cc2a.png',
-  'e98b4d01e977b8572b85c44cad2e32bbfde68902.jpeg',
-  'fa574b2f56d31adfc5900e4bfd116f9cddff17a0.png',
+  'duck1.jpeg',
+  'duck2.jpeg',
+  'duck3.jpeg',
+  'duck4.jpeg',
+  'duck5.jpeg',
+  'duck6.jpeg',
+  'duck7.jpeg',
+  'duck8.jpeg',
+  'duck9.jpeg',
+  'duck10.jpeg',
+  'duck11.jpeg',
+  'duck12.jpeg',
+  'duck13.jpeg',
+  'duck14.jpeg',
+  'duck15.jpeg',
+  'duck16.jpeg',
+  'duck17.jpeg',
+  'duck18.jpeg',
+  'duck19.jpeg',
+  'duck20.jpeg',
+  'duck21.jpeg',
+  'duck22.jpeg',
+  'duck23.jpeg',
+  'duck24.jpeg',
+  'duck25.jpeg',
+  'duck26.jpeg',
+  'duck27.jpeg',
+  'duck28.jpeg',
+  'duck29.jpeg',
+  'duck30.jpeg',
+  'duck31.jpeg',
+  'duck32.jpeg',
+  'duck33.jpeg',
+  'duck34.jpeg',
+  'duck35.jpeg',
 ];
 
 /**
  * Get the correct URL for an avatar image
  * Handles both dev mode and production build paths
- * @param avatarName - Avatar filename (e.g., "24d6c816fe40a284f2451b1469c5e6d63d236e53.png")
+ * @param avatarName - Avatar filename (e.g., "duck1.jpeg")
  * @returns Full URL to the avatar image
  */
 export function getAvatarUrl(avatarName: string): string {
   if (window.__TAURI__) {
-    // In Tauri v2, use asset:// protocol for bundled resources
-    return `asset://localhost/images/ducks/avatars/${avatarName}`;
+    // In Tauri v2, use convertFileSrc for proper asset protocol handling
+    return convertFileSrc(`/images/ducks/new-avatars/${avatarName}`, 'asset');
   }
   // In dev mode, use standard public path
-  return `/images/ducks/avatars/${avatarName}`;
+  return `/images/ducks/new-avatars/${avatarName}`;
 }
 
 /**
- * Get the duckdroid avatar URL (default for agents without custom avatar)
- * @returns Full URL to the duckdroid image
+ * Get the droid avatar URL (default for agents without custom avatar)
+ * @returns Full URL to the droid image
  */
 export function getDuckdroidUrl(): string {
+  let url: string;
   if (window.__TAURI__) {
-    // In Tauri v2, use asset:// protocol for bundled resources
-    return `asset://localhost/images/duckdroid.png`;
+    // In Tauri v2, use convertFileSrc for proper asset protocol handling
+    url = convertFileSrc('/images/droid.jpeg', 'asset');
+    console.log('[getDuckdroidUrl] TAURI mode - URL:', url);
+  } else {
+    // In dev mode, use standard public path
+    url = `/droid.jpeg`;
+    console.log('[getDuckdroidUrl] DEV mode - URL:', url);
   }
-  // In dev mode, use standard public path
-  return `/duckdroid.png`;
+  return url;
+}
+
+/**
+ * Get the fallback duck avatar URL (for old avatars that don't exist anymore)
+ * @returns Full URL to duck30.jpeg
+ */
+export function getFallbackDuckUrl(): string {
+  let url: string;
+  if (window.__TAURI__) {
+    // In Tauri v2, use convertFileSrc for proper asset protocol handling
+    url = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset');
+    console.log('[getFallbackDuckUrl] TAURI mode - URL:', url);
+  } else {
+    // In dev mode, use standard public path
+    url = `/duck30.jpeg`;
+    console.log('[getFallbackDuckUrl] DEV mode - URL:', url);
+  }
+  return url;
 }
 
 /**
@@ -77,24 +120,30 @@ export function getRandomAvatar(): string {
  * @returns Avatar image URL or Promise for custom avatars
  */
 export function getAgentAvatar(_agentName: string, avatarFilename?: string): string | Promise<string> {
-  // If no avatar specified, use default duckdroid
-  if (!avatarFilename) {
+  console.log('[getAgentAvatar] Called with:', { agentName: _agentName, avatarFilename });
+
+  // If no avatar specified or empty string, use default duckdroid
+  if (!avatarFilename || avatarFilename.trim() === '') {
+    console.log('[getAgentAvatar] No avatar or empty string, using duckdroid');
     return getDuckdroidUrl();
   }
 
   // Check if it's a custom avatar (UUID format)
   if (isCustomAvatar(avatarFilename)) {
+    console.log('[getAgentAvatar] Custom avatar detected');
     // Return promise for custom avatar URL
     return getCustomAvatarUrl(avatarFilename);
   }
 
-  // Check if it's a default avatar
+  // Check if it's a default avatar from new-avatars
   if (AVAILABLE_AVATARS.includes(avatarFilename)) {
+    console.log('[getAgentAvatar] Default avatar found:', avatarFilename);
     return getAvatarUrl(avatarFilename);
   }
 
-  // Fallback to duckdroid if avatar not found
-  return getDuckdroidUrl();
+  // Fallback for old avatars that don't exist anymore - use duck30.jpeg
+  console.log('[getAgentAvatar] Old avatar not found, using fallback duck30.jpeg');
+  return getFallbackDuckUrl();
 }
 
 /**

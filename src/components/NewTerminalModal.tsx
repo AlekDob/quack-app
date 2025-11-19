@@ -23,34 +23,7 @@ import {
   type CustomAvatarInfo
 } from '../utils/customAvatarStorage';
 import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
-
-// Available duck avatars from /images/ducks/avatars/
-const AVAILABLE_AVATARS = [
-  '24d6c816fe40a284f2451b1469c5e6d63d236e53.png',
-  '5a1b030fb3b46f153f9b4f786a56570d828d2d2f.png',
-  '5c275f841f212073cbddbe734d1979a6c2f17ab8.png',
-  '5ef21f43a917b3bbe86dad58669fdad1c9f3e7c1.png',
-  '68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg',
-  '94ab4eb6a469bf7f9de538e5c2f3dc3f2637fddf.jpeg',
-  '99d6b811344a0bd98d18246ca8208314e8b490f3.png',
-  '9e56d5e5edfcef59ce2aba2b96130dad44ce1135.png',
-  'ab7cadc881ab08dcc27d8a8a1f3cb3e8af002216.png',
-  'bafc4d0ca4264fb26f014f27c641d860ff356f7a.png',
-  'c036fd117629d44e78464dd12d95760f0f0b3d9b.png',
-  'd305287d5c861601e285b34ec5a8c7835ae9f8ea.png',
-  'de8b5bfa62130bde399a6cb5255323ac949756ec.png',
-  'e34736e96c3537509d80e78454d6e88ebe18cc2a.png',
-  'e98b4d01e977b8572b85c44cad2e32bbfde68902.jpeg',
-  'fa574b2f56d31adfc5900e4bfd116f9cddff17a0.png',
-]
-
-// Helper function to get avatar image URL
-function getAvatarUrl(avatarName: string): string {
-  if (window.__TAURI__) {
-    return `asset://localhost/images/ducks/avatars/${avatarName}`;
-  }
-  return `/images/ducks/avatars/${avatarName}`;
-}
+import { AVAILABLE_AVATARS, getAvatarUrl } from '../utils/agentAvatars';
 
 interface NewTerminalModalProps {
   open: boolean
@@ -66,7 +39,7 @@ interface NewTerminalModalProps {
   personality?: Partial<AgentPersonality>
   branch?: string
   useWorktree?: boolean
-  availableColors: string[]
+  availableColors: readonly string[]
   selectingDirectory: boolean
   creating: boolean
   error: string | null

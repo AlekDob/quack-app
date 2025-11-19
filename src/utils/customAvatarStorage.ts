@@ -5,6 +5,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { getDuckdroidUrl } from './agentAvatars';
 
 export interface CustomAvatarInfo {
   id: string;
@@ -94,8 +95,8 @@ export async function getCustomAvatarUrl(avatarId: string): Promise<string> {
     return blobUrl;
   } catch (error) {
     console.error('Failed to get custom avatar URL:', error);
-    // Return fallback/placeholder
-    return '/duckdroid.png';
+    // Return fallback/placeholder - use getDuckdroidUrl for proper Tauri path
+    return getDuckdroidUrl();
   }
 }
 

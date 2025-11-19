@@ -8,7 +8,8 @@ import {
   loadNativeTerminalsFromStorage,
   type TerminalMetadata,
 } from '../services/terminalStorage';
-import type { TerminalInfo, NativeTerminal, Tab } from '../types';
+import type { TerminalInfo, NativeTerminal } from '../types';
+import type { Tab } from '../components/TabBar';
 
 /**
  * Terminal Storage Service Tests
@@ -54,10 +55,11 @@ describe('terminalStorage', () => {
           label: 'Terminal 1',
           color: '#ff0000',
           cwd: '/home/user',
+          alive: true,
           workingOn: 'Feature X',
           avatar: 'avatar1.jpg',
           branch: 'main',
-          personality: { name: 'Agent 1' },
+          personality: { name: 'Agent 1' } as any,
         },
       ];
 
@@ -115,7 +117,7 @@ describe('terminalStorage', () => {
     it('should convert Map to object for storage', async () => {
       const tabsMap = new Map<string, Tab[]>();
       tabsMap.set('term-1', [
-        { id: 'tab-1', label: 'Tab 1', type: 'chat' },
+        { id: 'tab-1', label: 'Tab 1', type: 'chat', closable: false },
       ]);
 
       await saveTabsByTerminalToStorage(tabsMap);
@@ -155,8 +157,12 @@ describe('terminalStorage', () => {
         {
           id: 'native-1',
           name: 'Native Terminal 1',
+          app: 'Terminal',
+          color: '#00ff00',
+          directory: '/home/user',
           isOpen: true,
           pid: 12345,
+          createdAt: Date.now(),
         },
       ];
 

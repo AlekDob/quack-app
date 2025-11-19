@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getAgentAvatar } from '../utils/agentAvatars';
+import { getAgentAvatar, getDuckdroidUrl } from '../utils/agentAvatars';
 
 /**
  * Hook to load agent avatar asynchronously
@@ -14,19 +14,26 @@ import { getAgentAvatar } from '../utils/agentAvatars';
  * @returns Avatar URL (or empty string while loading)
  */
 export function useAgentAvatar(agentName: string, avatarFilename?: string): string {
-  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  // Initialize with duckdroid URL instead of empty string to avoid flash of broken image
+  const [avatarUrl, setAvatarUrl] = useState<string>(getDuckdroidUrl());
 
   useEffect(() => {
+    console.log('[useAgentAvatar] Effect running:', { agentName, avatarFilename });
     const result = getAgentAvatar(agentName, avatarFilename);
 
     // Handle both sync (string) and async (Promise) returns
     if (typeof result === 'string') {
+      console.log('[useAgentAvatar] Sync result:', result);
       setAvatarUrl(result);
     } else {
-      result.then(setAvatarUrl).catch(err => {
-        console.error('Failed to load avatar:', err);
-        // Fallback to duckdroid on error
-        setAvatarUrl('/duckdroid.png');
+      console.log('[useAgentAvatar] Async result (Promise)');
+      result.then((url) => {
+        console.log('[useAgentAvatar] Promise resolved:', url);
+        setAvatarUrl(url);
+      }).catch(err => {
+        console.error('[useAgentAvatar] Promise failed:', err);
+        // Fallback to droid on error - use getDuckdroidUrl for proper Tauri path
+        setAvatarUrl(getDuckdroidUrl());
       });
     }
   }, [agentName, avatarFilename]);

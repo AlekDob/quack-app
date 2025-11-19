@@ -1,6 +1,8 @@
 import { useRef, useCallback, useMemo, useEffect } from "react";
-import Editor from "@monaco-editor/react";
-import type * as monaco from "monaco-editor";
+// DEPRECATED: Monaco Editor removed in favor of CodeMirror (see docs/08-optimizations/01-completed/remove-monaco-editor.md)
+// Use CodeEditorCodeMirror.tsx instead
+// import Editor from "@monaco-editor/react";
+// import type * as monaco from "monaco-editor";
 
 export interface DiffInfo {
   additions: number[]; // Array di numeri di linea aggiunte
@@ -98,7 +100,18 @@ export default function CodeEditor({
   onSave,
   diffInfo,
 }: CodeEditorProps) {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  // DEPRECATED: This component is no longer used - replaced by CodeEditorCodeMirror
+  // Return a migration notice instead
+  return (
+    <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+      <p>⚠️ CodeEditor (Monaco) is deprecated</p>
+      <p>Use CodeEditorCodeMirror instead</p>
+      <p>See: docs/08-optimizations/01-completed/remove-monaco-editor.md</p>
+    </div>
+  );
+
+  /* COMMENTED OUT - Monaco Editor code
+  const editorRef = useRef<any | null>(null);
   const decorationsRef = useRef<string[]>([]);
 
   const detectedLanguage = useMemo(() => {
@@ -253,19 +266,21 @@ export default function CodeEditor({
   }, [diffInfo, applyDiffDecorations]);
 
   return (
-    <Editor
-      height="100%"
-      language={detectedLanguage}
-      value={content}
-      theme="vs-dark"
-      onChange={handleChange}
-      onMount={handleEditorDidMount}
-      options={{
-        readOnly,
-        contextmenu: true,
-        selectOnLineNumbers: true,
-        automaticLayout: true,
-      }}
-    />
+    <div>Monaco Editor Deprecated</div>
+    // <Editor
+    //   height="100%"
+    //   language={detectedLanguage}
+    //   value={content}
+    //   theme="vs-dark"
+    //   onChange={handleChange}
+    //   onMount={handleEditorDidMount}
+    //   options={{
+    //     readOnly,
+    //     contextmenu: true,
+    //     selectOnLineNumbers: true,
+    //     automaticLayout: true,
+    //   }}
+    // />
   );
+  */
 }

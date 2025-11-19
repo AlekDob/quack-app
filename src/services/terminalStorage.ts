@@ -10,7 +10,8 @@
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
 import { getTestModeStoreName } from "../utils/testModeStorage";
-import type { TerminalInfo, NativeTerminal, Tab } from "../types";
+import type { TerminalInfo, NativeTerminal } from "../types";
+import type { Tab } from "../components/TabBar";
 
 // ============================================
 // Types
@@ -34,9 +35,9 @@ export interface TerminalMetadata {
 // Storage Keys
 // ============================================
 
-const STORAGE_KEY = "terminals";
-const TABS_BY_TERMINAL_KEY = "tabsByTerminal";
-const NATIVE_TERMINALS_STORAGE_KEY = "nativeTerminals";
+export const STORAGE_KEY = "terminals";
+export const TABS_BY_TERMINAL_KEY = "tabsByTerminal";
+export const NATIVE_TERMINALS_STORAGE_KEY = "nativeTerminals";
 
 // ============================================
 // Terminal Storage Functions

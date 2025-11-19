@@ -14,6 +14,8 @@ import {
   searchAgents,
   deleteAgent
 } from '../utils/agentStorage';
+import { getAvatarUrl } from '../utils/agentAvatars';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import './AgentSelector.css';
 
 interface AgentSelectorProps {
@@ -23,23 +25,6 @@ interface AgentSelectorProps {
 }
 
 type SortMode = 'recent' | 'frequent' | 'alphabetical';
-
-// Helper function to get avatar image URL
-function getAvatarUrl(avatarName: string): string {
-  // Check if it's a custom avatar (starts with 'custom-')
-  if (avatarName.startsWith('custom-')) {
-    // Custom avatars are handled separately via blob URLs
-    return ''; // Placeholder - actual URL loaded via customAvatarUrls
-  }
-
-  // Check if we're in Tauri context
-  if (window.__TAURI__) {
-    // In Tauri v2, use asset:// protocol for bundled resources
-    return `asset://localhost/images/ducks/avatars/${avatarName}`;
-  }
-  // In dev mode, use standard public path
-  return `/images/ducks/avatars/${avatarName}`;
-}
 
 export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,7 +181,7 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
               className="agent-card"
               style={{ borderColor: agent.color }}
             >
-              {/* Avatar */}
+              {/* Avatar - ALWAYS show with fallback */}
               <div className="agent-card-avatar-wrapper">
                 <div
                   className="agent-card-avatar"
@@ -205,16 +190,24 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
                     borderColor: agent.color
                   }}
                 >
-                  {agent.avatar && (
-                    <img
-                      src={getAvatarUrl(agent.avatar)}
-                      alt={agent.name}
-                      onError={(e) => {
-                        // Hide image if it fails to load
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  )}
+                  <img
+                    src={agent.avatar ? getAvatarUrl(agent.avatar) : (
+                      window.__TAURI__
+                        ? convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
+                        : '/duck30.jpeg'
+                    )}
+                    alt={agent.name}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      console.error('[AgentSelector] Image failed to load, using fallback duck30.jpeg');
+                      // Always fallback to duck30.jpeg on error
+                      if (window.__TAURI__) {
+                        target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset');
+                      } else {
+                        target.src = '/duck30.jpeg';
+                      }
+                    }}
+                  />
                 </div>
               </div>
 
