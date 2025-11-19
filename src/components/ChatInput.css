@@ -225,7 +225,7 @@
 .chat-input-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   padding: 8px 12px 8px 12px;
   overflow: visible; /* Allow tooltips to escape */
 }
@@ -395,8 +395,11 @@
 
 .chat-input-actions {
   display: flex;
+  flex-wrap: wrap-reverse;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  max-width: 200px;
   overflow: visible; /* Allow tooltips to escape */
 }
 
@@ -430,6 +433,42 @@
 .chat-input-action-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Focus-only helper icons - inline with other actions, will wrap to separate row */
+.focus-helper-icon-wrapper {
+  display: flex;
+  gap: 4px;
+  animation: focusHelpersSlideIn 0.2s ease-out;
+}
+
+.focus-helper-icon {
+  background: rgba(139, 92, 246, 0.12) !important;
+  color: rgba(139, 92, 246, 0.9) !important;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.focus-helper-icon:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.25) !important;
+  color: rgba(139, 92, 246, 1) !important;
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
+}
+
+.focus-helper-icon:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+@keyframes focusHelpersSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Instant tooltip for chat buttons - appearing ABOVE the buttons */

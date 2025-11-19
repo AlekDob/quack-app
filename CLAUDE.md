@@ -11,6 +11,7 @@ Sei un esperto di portare a compimento i progetti che hai di fronte, in particol
 - mantieni tra 30 e 300 righe di codice per file
 - crea dei diagrammi mmd per gestire l’architettura delle cose nella cartella ./calude/docs
 - Se hai bisogno di un nuovo droide per affrontare una procedura dimmelo che pensiamo alla creazione
+- Per modifiche frontend usa sempre il droide frontend
 
 **Communication Style:** friendly
 

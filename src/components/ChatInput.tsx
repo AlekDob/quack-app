@@ -167,6 +167,9 @@ export default function ChatInput({
   // Voice recording state
   const [showVoiceModal, setShowVoiceModal] = useState(false);
 
+  // XML tag auto-complete state
+  const [xmlTagPair, setXmlTagPair] = useState<{ start: number; end: number; tagName: string } | null>(null);
+
   // Microphone recorder hook (uses tauri-plugin-mic-recorder + Whisper API)
   const {
     isListening,
@@ -536,6 +539,82 @@ export default function ChatInput({
       onCommandInserted();
     }
   }, [pendingSlashCommand, onCommandInserted, input, setInput]);
+
+  // Auto-update XML closing tag when editing opening tag
+  useEffect(() => {
+    if (!textareaRef.current || !xmlTagPair) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const selectionEnd = textareaRef.current.selectionEnd;
+    const hasSelection = cursorPos !== selectionEnd;
+
+    // Find the opening tag boundaries
+    const openingTagStart = xmlTagPair.start;
+    const openingTagEnd = input.indexOf('>', openingTagStart);
+
+    if (openingTagEnd === -1) {
+      // Opening tag malformed or incomplete
+      setXmlTagPair(null);
+      return;
+    }
+
+    // Check if cursor is within the opening tag (including selection)
+    const isWithinOpeningTag = cursorPos >= openingTagStart && cursorPos <= openingTagEnd + 1;
+
+    if (!isWithinOpeningTag && !hasSelection) {
+      // User moved cursor outside the opening tag, stop tracking
+      setXmlTagPair(null);
+      return;
+    }
+
+    // Extract current tag name from opening tag
+    const currentOpeningTag = input.substring(openingTagStart, openingTagEnd + 1);
+    const tagNameMatch = currentOpeningTag.match(/<(\w+)/);
+
+    if (!tagNameMatch) {
+      // Tag name is gone or malformed
+      setXmlTagPair(null);
+      return;
+    }
+
+    const newTagName = tagNameMatch[1];
+
+    // Only update if tag name actually changed
+    if (newTagName !== xmlTagPair.tagName) {
+      // Find the closing tag
+      const expectedClosingTag = `</${xmlTagPair.tagName}>`;
+      const closingTagStart = input.lastIndexOf(expectedClosingTag);
+
+      if (closingTagStart !== -1 && closingTagStart > openingTagEnd) {
+        // Replace old closing tag with new one
+        const beforeClosing = input.substring(0, closingTagStart);
+        const afterClosing = input.substring(closingTagStart + expectedClosingTag.length);
+        const newInput = beforeClosing + `</${newTagName}>` + afterClosing;
+
+        // Update state
+        setInput(newInput);
+        setXmlTagPair({
+          start: xmlTagPair.start,
+          end: xmlTagPair.end,
+          tagName: newTagName
+        });
+
+        // Preserve cursor/selection position
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            if (hasSelection) {
+              // Restore selection if user had text selected
+              textareaRef.current.setSelectionRange(cursorPos, selectionEnd);
+            } else {
+              // Restore cursor position
+              textareaRef.current.setSelectionRange(cursorPos, cursorPos);
+            }
+          }
+        }, 0);
+      }
+    }
+  }, [input, xmlTagPair, setInput]);
 
   const guessMimeType = useCallback((filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
@@ -1484,6 +1563,87 @@ export default function ChatInput({
               </svg>
             )}
           </button>
+          {/* Focus-only helper icons - at end so they wrap to top with wrap-reverse */}
+          {isFocused && (
+            <div className="focus-helper-icon-wrapper">
+              <button
+                type="button"
+                className="chat-input-action-btn focus-helper-icon"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (!textareaRef.current) return;
+                  const cursorPos = textareaRef.current.selectionStart;
+                  const beforeCursor = input.substring(0, cursorPos);
+                  const afterCursor = input.substring(cursorPos);
+                  const newInput = beforeCursor + '\n_ ' + afterCursor;
+                  setInput(newInput);
+
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                      const newCursorPos = cursorPos + 3;
+                      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                    }
+                  }, 0);
+                }}
+                disabled={disabled}
+                data-tooltip="New line with _ "
+                aria-label="New line with underscore"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M2 3l4 4m0 0l-4 4m4-4h8M5 13h6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="chat-input-action-btn focus-helper-icon"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (!textareaRef.current) return;
+                  const cursorPos = textareaRef.current.selectionStart;
+                  const beforeCursor = input.substring(0, cursorPos);
+                  const afterCursor = input.substring(cursorPos);
+
+                  const openTagMatch = beforeCursor.match(/<(\w+)(?:\s[^>]*)?>(?![\s\S]*<\/\1>)/);
+
+                  if (openTagMatch) {
+                    // There's an open tag - add closing tag
+                    const tagName = openTagMatch[1];
+                    const newInput = beforeCursor + `</${tagName}>` + afterCursor;
+                    setInput(newInput);
+
+                    setTimeout(() => {
+                      if (textareaRef.current) {
+                        textareaRef.current.focus();
+                        const newCursorPos = cursorPos + tagName.length + 3;
+                        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                      }
+                    }, 0);
+                  } else {
+                    // No open tag - insert only opening tag, let user type
+                    const newInput = beforeCursor + '<tag>' + afterCursor;
+                    setInput(newInput);
+
+                    setTimeout(() => {
+                      if (textareaRef.current) {
+                        textareaRef.current.focus();
+                        const startPos = cursorPos + 1;
+                        const endPos = cursorPos + 4;
+                        textareaRef.current.setSelectionRange(startPos, endPos);
+                      }
+                    }, 0);
+                  }
+                }}
+                disabled={disabled}
+                data-tooltip="XML tag (smart)"
+                aria-label="XML tag"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M4 5L2 8l2 3M12 5l2 3-2 3M9 3L7 13" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          )}
           </div>
         </div>
       </div>

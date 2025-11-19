@@ -7,6 +7,7 @@ import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import cyberducksAvatar from '../../images/cyberducks.png';
 import './ChatMessage.css';
 import './StreamMessage.css';
@@ -63,13 +64,22 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
   const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load avatar URL (custom or default)
+  // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
   useEffect(() => {
     let isMounted = true;
 
     async function loadAvatarUrl() {
+      // If no avatar specified, use duck30.jpeg fallback
       if (!agentAvatar) {
-        setAvatarUrl(null);
+        console.log('[ChatMessage] No avatar specified, using duck30.jpeg fallback');
+        if (isMounted) {
+          // Use duck30.jpeg as fallback for agents with undefined avatar
+          if (window.__TAURI__) {
+            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+          } else {
+            setAvatarUrl('/duck30.jpeg');
+          }
+        }
         return;
       }
 
@@ -83,7 +93,12 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
         } catch (error) {
           console.error('Failed to load custom avatar in chat:', error);
           if (isMounted) {
-            setAvatarUrl(null);
+            // Fallback to duck30.jpeg if custom avatar fails
+            if (window.__TAURI__) {
+              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+            } else {
+              setAvatarUrl('/duck30.jpeg');
+            }
           }
         }
       } else {
