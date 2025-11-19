@@ -41,14 +41,27 @@ async function loadMCPServers(workingDir?: string): Promise<Record<string, {
   env?: Record<string, string>;
 }> | undefined> {
   try {
+    console.log('🔍 [MCP DEBUG] loadMCPServers called with workingDir:', workingDir || '(undefined)');
+
     const servers = await invoke<MCPServer[]>('list_mcp_servers', {
       workingDir: workingDir || null,
+    });
+
+    console.log('🔍 [MCP DEBUG] Backend returned', servers.length, 'MCP servers:');
+    servers.forEach(server => {
+      console.log(`  - ${server.id} (enabled: ${server.enabled}, scope: ${server.scope}, command: ${server.command})`);
     });
 
     // Filter only enabled servers and convert to SDK format
     const enabledServers = servers.filter(server => server.enabled);
 
+    console.log('🔍 [MCP DEBUG] After filtering enabled servers:', enabledServers.length, 'servers');
+    enabledServers.forEach(server => {
+      console.log(`  ✅ ${server.id}`);
+    });
+
     if (enabledServers.length === 0) {
+      console.log('🔍 [MCP DEBUG] No enabled servers found, returning undefined');
       return undefined;
     }
 
@@ -66,9 +79,10 @@ async function loadMCPServers(workingDir?: string): Promise<Record<string, {
       };
     });
 
+    console.log('🔍 [MCP DEBUG] Final mcpServers object keys:', Object.keys(mcpServers).join(', '));
     return mcpServers;
   } catch (error) {
-    console.warn('Failed to load MCP servers:', error);
+    console.warn('❌ [MCP DEBUG] Failed to load MCP servers:', error);
     return undefined;
   }
 }
@@ -222,9 +236,13 @@ export async function* streamClaudeMessage(
           : undefined; // 'act' mode = undefined = auto-approve in SDK
 
     // Load MCP servers from .mcp.json (if not explicitly provided)
+    console.log('🔍 [MCP DEBUG] Checking if mcpServers provided in options:', !!options.mcpServers);
     let mcpServers = options.mcpServers;
     if (!mcpServers) {
+      console.log('🔍 [MCP DEBUG] Loading MCP servers from backend with workingDirectory:', workingDirectory || '(undefined)');
       mcpServers = await loadMCPServers(workingDirectory);
+    } else {
+      console.log('🔍 [MCP DEBUG] Using provided mcpServers:', Object.keys(mcpServers).join(', '));
     }
 
     // Build options object - SDK expects { prompt, options }
@@ -245,13 +263,22 @@ export async function* streamClaudeMessage(
 
     if (workingDirectory) {
       sdkOptions.cwd = workingDirectory;
+      console.log('🔍 [MCP DEBUG] Setting SDK cwd to:', workingDirectory);
     }
 
     // Add MCP servers if available
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       sdkOptions.mcpServers = mcpServers;
-      console.log('MCP servers loaded:', Object.keys(mcpServers));
+      console.log('🔌 [MCP DEBUG] MCP servers PASSED TO SDK:', Object.keys(mcpServers).join(', '));
+      console.log('🔌 [MCP DEBUG] Full mcpServers config:', JSON.stringify(mcpServers, null, 2));
+      console.log('🦆 All MCP tools will be automatically available from these servers');
+    } else {
+      console.log('⚠️ [MCP DEBUG] NO MCP servers passed to SDK - SDK will only have default tools');
     }
+
+    // 🦆 FIX: DO NOT hardcode allowedTools - let SDK load all tools from user's MCP servers
+    // This allows each user to load their own MCP servers from .mcp.json without code changes
+    // If you need to restrict tools, users can configure it in their .claude/settings.json
 
     // Call Claude SDK with streaming - correct API: query({ prompt, options })
     const stream = query({
@@ -422,13 +449,51 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
 
   // System event
   if (eventType === 'system') {
+    const tools = event.tools || event.availableTools || [];
+
+    // Log discovered tools when system initializes
+    if (event.subtype === 'init' || !event.subtype) {
+      console.log('🔍 [MCP DEBUG] System Initialized event - SDK discovered', tools.length, 'tools');
+
+      // Log MCP tools specifically
+      const mcpTools = tools.filter((t: string) => t.startsWith('mcp__'));
+      if (mcpTools.length > 0) {
+        console.log('🔌 [MCP DEBUG] MCP tools discovered by SDK:');
+        // Group by server
+        const serverGroups: Record<string, string[]> = {};
+        mcpTools.forEach((tool: string) => {
+          const parts = tool.split('__');
+          if (parts.length >= 2) {
+            const serverName = parts[1];
+            if (!serverGroups[serverName]) {
+              serverGroups[serverName] = [];
+            }
+            serverGroups[serverName].push(tool);
+          }
+        });
+
+        Object.entries(serverGroups).forEach(([server, serverTools]) => {
+          console.log(`  📦 ${server}: ${serverTools.length} tools`);
+          serverTools.forEach(tool => console.log(`    - ${tool}`));
+        });
+      } else {
+        console.log('⚠️ [MCP DEBUG] NO MCP tools discovered by SDK!');
+      }
+
+      // Log non-MCP tools
+      const nonMcpTools = tools.filter((t: string) => !t.startsWith('mcp__'));
+      if (nonMcpTools.length > 0) {
+        console.log('🔧 [MCP DEBUG] Built-in tools:', nonMcpTools.join(', '));
+      }
+    }
+
     return {
       type: 'system',
       subtype: event.subtype || 'init',
       session_id: event.session_id || event.sessionId,
       model: event.model,
       cwd: event.cwd || event.workingDirectory,
-      tools: event.tools || event.availableTools,
+      tools: tools,
     };
   }
 

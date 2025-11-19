@@ -12,6 +12,9 @@ export interface UseMCPServersReturn {
   updateServer: (server: MCPServer) => Promise<void>;
   deleteServer: (serverId: string) => Promise<void>;
   testConnection: (server: MCPServer) => Promise<boolean>;
+  stopServer: (serverId: string) => Promise<void>;
+  restartServer: (serverId: string) => Promise<void>;
+  getServerStatus: (serverId: string) => Promise<string>;
 }
 
 export function useMCPServers(workingDir?: string): UseMCPServersReturn {
@@ -106,6 +109,45 @@ export function useMCPServers(workingDir?: string): UseMCPServersReturn {
     }
   }, []);
 
+  const stopServer = useCallback(
+    async (serverId: string) => {
+      try {
+        await invoke('stop_mcp_server', { serverId });
+        await refreshServers();
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to stop server: ${errorMessage}`);
+      }
+    },
+    [refreshServers]
+  );
+
+  const restartServer = useCallback(
+    async (serverId: string) => {
+      try {
+        await invoke('restart_mcp_server', {
+          serverId,
+          workingDir: workingDir || null,
+        });
+        await refreshServers();
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to restart server: ${errorMessage}`);
+      }
+    },
+    [workingDir, refreshServers]
+  );
+
+  const getServerStatus = useCallback(async (serverId: string): Promise<string> => {
+    try {
+      const status = await invoke<string>('get_mcp_server_status', { serverId });
+      return status;
+    } catch (err) {
+      console.error('Failed to get server status:', err);
+      return 'unknown';
+    }
+  }, []);
+
   useEffect(() => {
     refreshServers();
     loadTemplates();
@@ -121,5 +163,8 @@ export function useMCPServers(workingDir?: string): UseMCPServersReturn {
     updateServer,
     deleteServer,
     testConnection,
+    stopServer,
+    restartServer,
+    getServerStatus,
   };
 }

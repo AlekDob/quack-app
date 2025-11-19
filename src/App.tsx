@@ -6535,7 +6535,7 @@ You have access to all Bash tools to execute git commands like:
           loadingAgents={loadingAgents}
           agentsError={agentsError}
           agentsDirectoryExists={agentsDirectoryExists}
-          workingDir={activeTerminal?.cwd ?? explorerPath}
+          workingDir={activeTerminal?.cwd ?? undefined}
           onSelectAgent={handleSelectAgent}
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}

@@ -9,7 +9,6 @@ interface MCPServerCardProps {
   server: MCPServer;
   onEdit: (server: MCPServer) => void;
   onDelete: (serverId: string) => void;
-  onToggleEnabled: (server: MCPServer) => void;
   onTestConnection: (server: MCPServer) => void;
 }
 
@@ -77,7 +76,6 @@ export default function MCPServerCard({
   server,
   onEdit,
   onDelete,
-  onToggleEnabled,
   onTestConnection,
 }: MCPServerCardProps) {
   const statusConfig = STATUS_CONFIG[server.status] || STATUS_CONFIG.stopped;
@@ -173,30 +171,6 @@ export default function MCPServerCard({
               </div>
             )}
           </div>
-
-          {/* Enable toggle */}
-          <button
-            type="button"
-            onClick={() => onToggleEnabled(server)}
-            className="flex-shrink-0 w-10 h-5 rounded-full transition-all duration-200"
-            style={{
-              background: server.enabled
-                ? "rgba(16, 185, 129, 0.3)"
-                : "rgba(255, 255, 255, 0.1)",
-              border: server.enabled
-                ? "1px solid rgba(16, 185, 129, 0.5)"
-                : "1px solid rgba(255, 255, 255, 0.2)",
-              position: "relative",
-            }}
-          >
-            <div
-              className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all duration-200"
-              style={{
-                left: server.enabled ? "calc(100% - 1rem)" : "0.125rem",
-                background: server.enabled ? "#10B981" : "#6B7280",
-              }}
-            />
-          </button>
         </div>
       </div>
 

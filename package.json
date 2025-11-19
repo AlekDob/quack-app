@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "preview:build": "npm run build && npm run preview",
     "tauri": "cargo tauri",
-    "tauri:dev": "cargo tauri dev",
+    "tauri:dev": "./scripts/dev.sh",
     "tauri:build": "npm run build:secure && cargo tauri build && ./scripts/optimize-bundle.sh",
     "tauri:build:intel": "npm run build:secure && cargo tauri build --target x86_64-apple-darwin && ./scripts/optimize-bundle.sh",
     "tauri:build:universal": "npm run build:secure && cargo tauri build --target universal-apple-darwin && ./scripts/optimize-bundle.sh",

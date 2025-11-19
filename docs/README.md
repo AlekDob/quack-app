@@ -49,6 +49,21 @@
   - Solution: Always call list_skills regardless of directory existence
   - Tests: 9 passing tests in `src/tests/skills.globalVisibility.test.ts`
 
+- **`rust-send-trait-fix.md`** ✅ - Rust Send trait violation in MCP process manager (RESOLVED)
+  - Root cause: MutexGuard held across .await boundary
+  - Solution: Extract Child from mutex before awaiting
+  - Tests: 40 passing tests (18 process lifecycle + 22 auto-start)
+
+- **`mcp-auto-start.md`** ✅ - MCP servers auto-start implementation (COMPLETED)
+  - Feature: Automatic stdio server spawning when loading .mcp.json
+  - Implementation: Process lifecycle management with proper mutex handling
+  - Tests: 22 passing tests in `src/tests/mcp.autostart.test.ts`
+
+- **`03-mcp-integration-fix.md`** ✅ - MCP integration compilation errors (RESOLVED)
+  - Root cause: Missing Emitter trait import + string type mismatches
+  - Solution: Added trait import, fixed string conversions in mcp.rs
+  - Environment: Created dev.sh script for proper PATH setup (Node + Cargo)
+
 - **`AVATAR_IMAGES_FIX.md`** - Avatar image loading fixes
 
 ### How to Add New Bug Fix Docs
@@ -88,7 +103,9 @@ npm run test:coverage # Coverage report
 - ✅ Terminal storage (17 tests)
 - ✅ Terminal utils (40 tests)
 - ✅ Agent chat storage (13 tests)
-- **Total**: 116 tests, all passing
+- ✅ MCP auto-start (22 tests)
+- ✅ MCP process lifecycle (18 tests)
+- **Total**: 156 tests, all passing
 
 ---
 
@@ -112,6 +129,7 @@ npm run test:coverage # Coverage report
 - **`PERFORMANCE_OPTIMIZATIONS.md`** - Performance improvements
 - **`PLUGIN_MARKETPLACE_IMPLEMENTATION.md`** - Plugin marketplace system
 - **`token-counter-implementation.md`** - Token usage tracking
+- **`MCP_CONFIGURATION.md`** ✅ - Model Context Protocol setup & configuration guide
 
 ### Feature Documentation Template
 ```markdown

@@ -26,6 +26,8 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
     updateServer,
     deleteServer,
     testConnection,
+    stopServer,
+    restartServer,
   } = useMCPServers(workingDir);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -33,6 +35,7 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<MCPTemplate | null>(
     null
   );
+  const [deletingServer, setDeletingServer] = useState<string | null>(null);
 
   const handleRefresh = async () => {
     await refreshServers();
@@ -74,13 +77,25 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
   };
 
   const handleDeleteServer = async (serverId: string) => {
-    if (window.confirm("Are you sure you want to delete this MCP server?")) {
-      try {
-        await deleteServer(serverId);
-      } catch (err) {
-        console.error("Failed to delete server:", err);
-        alert(`Failed to delete server: ${err}`);
-      }
+    // Prevent double deletion (in case of double-click or race condition)
+    if (deletingServer === serverId) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete this MCP server?");
+
+    if (!confirmed) {
+      return; // User cancelled
+    }
+
+    try {
+      setDeletingServer(serverId);
+      await deleteServer(serverId);
+    } catch (err) {
+      console.error("Failed to delete server:", err);
+      alert(`Failed to delete server: ${err}`);
+    } finally {
+      setDeletingServer(null);
     }
   };
 
@@ -104,8 +119,26 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
     }
   };
 
+  const handleStopServer = async (serverId: string) => {
+    try {
+      await stopServer(serverId);
+    } catch (err) {
+      console.error("Failed to stop server:", err);
+      alert(`Failed to stop server: ${err}`);
+    }
+  };
+
+  const handleRestartServer = async (serverId: string) => {
+    try {
+      await restartServer(serverId);
+    } catch (err) {
+      console.error("Failed to restart server:", err);
+      alert(`Failed to restart server: ${err}`);
+    }
+  };
+
   return (
-    <div className="mcp-panel">
+    <div className="mcp-panel flex flex-col h-full">
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 border-b"
@@ -207,7 +240,7 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
         )}
 
         {!loading && !error && servers.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+          <div className="flex flex-col items-center py-12 px-6 text-center">
             <svg
               width="64"
               height="64"
@@ -326,7 +359,6 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
                         server={server}
                         onEdit={handleEditServer}
                         onDelete={handleDeleteServer}
-                        onToggleEnabled={handleToggleEnabled}
                         onTestConnection={handleTestConnection}
                       />
                     ))}
@@ -374,7 +406,6 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
                         server={server}
                         onEdit={handleEditServer}
                         onDelete={handleDeleteServer}
-                        onToggleEnabled={handleToggleEnabled}
                         onTestConnection={handleTestConnection}
                       />
                     ))}

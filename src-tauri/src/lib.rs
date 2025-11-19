@@ -141,6 +141,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(SessionState::new()) // Register global session state
         .manage(license::LicenseState::default()) // Register license state
+        .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -541,6 +542,9 @@ pub fn run() {
             mcp::delete_mcp_server,
             mcp::get_mcp_templates,
             mcp::test_mcp_connection,
+            mcp::stop_mcp_server,
+            mcp::restart_mcp_server,
+            mcp::get_mcp_server_status,
             plugins::list_available_plugins,
             plugins::list_installed_plugins,
             plugins::install_plugin,
