@@ -8,6 +8,7 @@ import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
 import TerminalSettings from './categories/TerminalSettings';
+import DebugSettings from './categories/DebugSettings';
 import AboutSettings from './categories/AboutSettings';
 import './UnifiedSettings.css';
 
@@ -48,6 +49,8 @@ export default function UnifiedSettings({
         return <AppearanceSettings />;
       case 'terminal':
         return <TerminalSettings />;
+      case 'debug':
+        return <DebugSettings />;
       case 'about':
         return <AboutSettings />;
       default:

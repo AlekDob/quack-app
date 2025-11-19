@@ -1,0 +1,355 @@
+/* Debug Panel Styles */
+
+.debug-panel {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: var(--text-primary);
+}
+
+.debug-panel-header {
+  margin-bottom: 24px;
+}
+
+.debug-panel-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.debug-panel-description {
+  color: var(--text-secondary);
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Controls */
+.debug-panel-controls {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.debug-control-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.debug-toggle-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.debug-toggle-btn.enabled {
+  background: #00ff9530;
+  border-color: #00ff95;
+  color: #00ff95;
+}
+
+.debug-toggle-btn.disabled {
+  background: var(--bg-tertiary);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.debug-toggle-btn:hover {
+  transform: translateY(-2px);
+}
+
+.debug-action-btn {
+  padding: 10px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.debug-action-btn:hover {
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+}
+
+/* Stats */
+.debug-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.debug-stat {
+  background: var(--bg-tertiary);
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.debug-stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.debug-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Filters */
+.debug-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.debug-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-filter-group label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.debug-filter-group select {
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.debug-filter-group input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Logs */
+.debug-logs {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 400px;
+  max-height: 600px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.debug-logs-disabled,
+.debug-logs-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.debug-logs-disabled p,
+.debug-logs-empty p {
+  margin: 8px 0;
+}
+
+.debug-enable-btn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.debug-enable-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+/* Log Entries */
+.debug-logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debug-log-entry {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 12px 16px;
+  border-left: 4px solid transparent;
+}
+
+.debug-log-entry.info {
+  border-left-color: #00D9FF;
+}
+
+.debug-log-entry.warn {
+  border-left-color: #ffaa00;
+  background: rgba(255, 170, 0, 0.05);
+}
+
+.debug-log-entry.error {
+  border-left-color: #ff4444;
+  background: rgba(255, 68, 68, 0.05);
+}
+
+.debug-log-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.debug-log-icon {
+  font-size: 16px;
+}
+
+.debug-log-timestamp {
+  color: var(--text-secondary);
+  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+}
+
+.debug-log-category {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.debug-log-message {
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.debug-log-data,
+.debug-log-stack {
+  margin-top: 8px;
+}
+
+.debug-log-data summary,
+.debug-log-stack summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.debug-log-data summary:hover,
+.debug-log-stack summary:hover {
+  color: var(--text-primary);
+}
+
+.debug-log-data pre,
+.debug-log-stack pre {
+  background: var(--bg-primary);
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  overflow-x: auto;
+  margin: 8px 0 0 0;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Help */
+.debug-panel-help {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.debug-panel-help h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+}
+
+.debug-panel-help ul {
+  margin: 0 0 20px 0;
+  padding-left: 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.debug-panel-help ul:last-child {
+  margin-bottom: 0;
+}
+
+.debug-panel-help li {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.debug-panel-help strong {
+  color: var(--text-primary);
+}
+
+/* Scrollbar */
+.debug-logs::-webkit-scrollbar {
+  width: 8px;
+}
+
+.debug-logs::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.debug-logs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.debug-logs::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .debug-panel {
+    padding: 16px;
+  }
+
+  .debug-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .debug-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .debug-filter-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .debug-filter-group select {
+    width: 100%;
+  }
+
+  .debug-logs {
+    max-height: 400px;
+  }
+}

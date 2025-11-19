@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import type { ChatAttachment, ChatMessage, ClaudeEvent } from '../types';
 import { streamClaudeMessage, abortSessionStream } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
+import debugLogger from '../services/debugLogger';
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
@@ -176,12 +177,30 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
           if (seenEventIds.has(eventId)) {
             console.warn('[useClaudeChat] 🦆 DUPLICATE DETECTED IN APP LAYER - Event ID:', eventId, 'Type:', event.type);
             console.warn('[useClaudeChat] Total unique events so far:', seenEventIds.size, 'Total duplicates prevented:', events.length);
+
+            // 🦆 DEBUG: Log duplicate to debug logger
+            debugLogger.warn('deduplication', 'Duplicate event detected in APP layer', {
+              eventId: eventId.substring(0, 50),
+              eventType: event.type,
+              totalUniqueEvents: seenEventIds.size,
+              totalDuplicatesPrevented: events.length,
+              sessionId: claudeSessionId.current,
+              streamId,
+            });
+
             continue; // Skip duplicate event
           }
 
           seenEventIds.add(eventId);
           events.push(event);
           console.log('[useClaudeChat] ✅ New unique event added - ID:', eventId.substring(0, 30), 'Type:', event.type, 'Total:', events.length);
+
+          // 🦆 DEBUG: Log unique event
+          debugLogger.info('events', 'New unique event added', {
+            eventId: eventId.substring(0, 50),
+            eventType: event.type,
+            totalEvents: events.length,
+          });
 
           // Capture session ID from system init event
           if (event.type === 'system' && event.subtype === 'init' && event.session_id) {

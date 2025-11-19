@@ -7,6 +7,7 @@ export type SettingsCategory =
   | 'notifications'
   | 'appearance'
   | 'terminal'
+  | 'debug'
   | 'about';
 
 interface CategoryItem {
@@ -26,6 +27,7 @@ const categories: CategoryItem[] = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'terminal', label: 'Terminal' },
+  { id: 'debug', label: '🦆 Debug' },
   { id: 'about', label: 'About' },
 ];
 
