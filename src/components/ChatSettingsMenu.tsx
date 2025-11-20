@@ -17,7 +17,6 @@ const modelOptions = [
   { value: 'sonnet', label: 'Sonnet 4.5' },
   { value: 'haiku', label: 'Haiku 4.5' },
   { value: 'haiku-3.5', label: 'Haiku 3.5' },
-  { value: 'haiku-test', label: 'Haiku Test (3.5)' },
 ];
 
 const thinkingModeOptions = [
