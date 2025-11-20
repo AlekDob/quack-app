@@ -31,6 +31,7 @@ const getModelDisplayName = (model: string): string => {
   if (model.includes("sonnet")) return "sonnet";
   // Check for Haiku 3.5 BEFORE generic haiku check
   if (model.includes("3-5-haiku") || model.includes("3.5-haiku")) return "haiku-3.5";
+  if (model.includes("haiku-test")) return "haiku-test";
   if (model.includes("haiku")) return "haiku"; // Haiku 4.5 (default)
   return model; // fallback to full model name
 };
@@ -388,7 +389,9 @@ export default function AgentViewer({
               >
                 <option value="opus">opus</option>
                 <option value="sonnet">sonnet</option>
-                <option value="haiku">haiku</option>
+                <option value="haiku">haiku (4.5)</option>
+                <option value="haiku-3.5">haiku (3.5)</option>
+                <option value="haiku-test">haiku-test (3.5)</option>
               </select>
             </div>
 
