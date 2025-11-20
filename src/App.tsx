@@ -1888,11 +1888,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Agent Chat Settings helpers - get or create settings for current agent
   // Normalize model name from legacy full IDs to short names
-  const normalizeModelName = (model: string): 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5' => {
+  const normalizeModelName = (model: string): 'opus' | 'sonnet' | 'haiku' => {
     if (model.includes("opus")) return "opus";
     if (model.includes("sonnet")) return "sonnet";
-    // Check for Haiku 3.5 BEFORE generic haiku check
-    if (model.includes("3-5-haiku") || model.includes("3.5-haiku")) return "haiku-3.5";
     if (model.includes("haiku")) return "haiku"; // Haiku 4.5 (default)
     return "sonnet"; // Fallback to sonnet if unknown
   };
@@ -6362,7 +6360,7 @@ You have access to all Bash tools to execute git commands like:
               // Agent Chat Settings - persistent per-agent state
               inputDraft={currentSettings.inputDraft}
               onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
-              model={currentSettings.model as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5'}
+              model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
               onModelChange={(model) => updateAgentSettings({ model })}
               thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
               onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}

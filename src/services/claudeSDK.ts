@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ClaudeEvent, MCPServer } from '../types';
 
 export interface ClaudeSDKOptions {
-  model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5';
+  model?: 'opus' | 'sonnet' | 'haiku';
   thinkingMode?: string;
   permissionMode?: 'plan' | 'act' | 'bypass';
   sessionId?: string;
@@ -24,7 +24,6 @@ export interface ClaudeSDKOptions {
 function getModelId(model: string): string {
   const modelMap: Record<string, string> = {
     'haiku': 'claude-haiku-4-5',                 // Haiku 4.5 (latest)
-    'haiku-3.5': 'claude-3-5-haiku-20241022',    // Haiku 3.5
     'sonnet': 'claude-sonnet-4-5-20250929',      // Sonnet 4.5 (latest)
     'opus': 'claude-opus-4-1-20250805',          // Opus 4.1 (latest)
   };

@@ -48,8 +48,8 @@ interface ChatViewProps {
   // Agent Chat Settings - controlled from parent
   inputDraft?: string;
   onInputDraftChange?: (draft: string) => void;
-  model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5';
-  onModelChange?: (model: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5') => void;
+  model?: 'opus' | 'sonnet' | 'haiku';
+  onModelChange?: (model: 'opus' | 'sonnet' | 'haiku') => void;
   thinkingMode?: ThinkingMode;
   onThinkingModeChange?: (mode: ThinkingMode) => void;
   permissionMode?: PermissionMode;
@@ -358,7 +358,7 @@ export default function ChatView({
             model={model}
             thinkingMode={thinkingMode}
             permissionMode={permissionMode}
-            onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5')}
+            onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku')}
             onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
             onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
             disabled={isLoading}
