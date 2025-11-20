@@ -252,12 +252,20 @@ export async function* streamClaudeMessage(
     }
 
     // Build options object - SDK expects { prompt, options }
+    const modelId = getModelId(model);
+    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - Input: "${model}" → Mapped to: "${modelId}"`);
+    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - getModelId function returned:`, modelId);
+    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - typeof modelId:`, typeof modelId);
+
     const sdkOptions: any = {
-      model: getModelId(model), // Map friendly name to API model ID
+      model: modelId, // Map friendly name to API model ID
       permissionMode: sdkPermissionMode,
       // Enable automatic reading of CLAUDE.md, slash commands, and project settings
       settingSources: ['project', 'user', 'local'],
     };
+
+    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - sdkOptions.model AFTER assignment:`, sdkOptions.model);
+    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - Full sdkOptions object:`, JSON.stringify(sdkOptions, null, 2));
 
     if (thinkingMode) {
       sdkOptions.thinkingMode = thinkingMode;

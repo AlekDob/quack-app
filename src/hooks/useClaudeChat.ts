@@ -9,7 +9,7 @@ export type PermissionMode = 'plan' | 'bypass';
 
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
-  model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5';
+  model?: 'opus' | 'sonnet' | 'haiku' | 'haiku-3.5' | 'haiku-test';
   thinkingMode?: ThinkingMode;
   permissionMode?: PermissionMode;
   workingDirectory?: string;
