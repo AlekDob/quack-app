@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import FileStatusBadge, { type FileStatus } from './FileStatusBadge';
+import FileDiffButton from './FileDiffButton';
 import './EditSummaryBar.css';
 
 export interface LineChange {
@@ -11,6 +13,7 @@ export interface FileEdit {
   editCount: number;
   lineNumbers: number[];
   lineChanges?: LineChange[]; // Detailed line-by-line changes for diff highlighting
+  status?: 'created' | 'modified'; // NEW: Track if file was created or modified
 }
 
 export interface FileDeleted {
@@ -21,11 +24,12 @@ interface EditSummaryBarProps {
   edits: FileEdit[];
   deletes?: FileDeleted[];
   onFileClick?: (filePath: string, lineChanges?: LineChange[]) => void;
+  onDiffClick?: (filePath: string, status: FileStatus) => void; // NEW: Handler for diff button
   onClear?: () => void;
   onClearEdits?: () => void; // Deprecated, use onClear
 }
 
-export default function EditSummaryBar({ edits, deletes = [], onFileClick, onClear, onClearEdits }: EditSummaryBarProps) {
+export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDiffClick, onClear, onClearEdits }: EditSummaryBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Support both onClear and deprecated onClearEdits
@@ -35,13 +39,24 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
     return null; // Don't show if no edits or deletes
   }
 
+  // Separate files by status (NEW vs MODIFIED)
+  const newFiles = edits.filter(edit => edit.status === 'created');
+  const modifiedFiles = edits.filter(edit => edit.status !== 'created'); // includes undefined (backwards compat)
+
   const totalChanges = edits.reduce((sum, edit) => sum + edit.editCount, 0);
-  const hasEdits = edits.length > 0;
+  const hasNewFiles = newFiles.length > 0;
+  const hasModifiedFiles = modifiedFiles.length > 0;
   const hasDeletes = deletes.length > 0;
 
   const handleFileClick = (filePath: string, lineChanges?: LineChange[]) => {
     if (onFileClick) {
       onFileClick(filePath, lineChanges);
+    }
+  };
+
+  const handleDiffClick = (filePath: string, status: FileStatus) => {
+    if (onDiffClick) {
+      onDiffClick(filePath, status);
     }
   };
 
@@ -55,17 +70,18 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
     <div className="edit-summary-bar">
       <div className="edit-summary-bar-header" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="edit-summary-bar-title">
-          {hasEdits && (
+          {(hasNewFiles || hasModifiedFiles) && (
             <>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
               <span className="edit-summary-bar-label">Files Modified ({edits.length})</span>
-              <span className="edit-summary-bar-badge">{totalChanges} {totalChanges === 1 ? 'change' : 'changes'}</span>
+              {hasNewFiles && <span className="edit-summary-bar-badge">{newFiles.length} new</span>}
+              {hasModifiedFiles && <span className="edit-summary-bar-badge">{modifiedFiles.length} edited</span>}
             </>
           )}
-          {hasEdits && hasDeletes && <span className="edit-summary-bar-separator">•</span>}
+          {(hasNewFiles || hasModifiedFiles) && hasDeletes && <span className="edit-summary-bar-separator">•</span>}
           {hasDeletes && (
             <>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="edit-summary-bar-delete-icon">
@@ -77,21 +93,6 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
           )}
         </div>
         <div className="edit-summary-bar-actions">
-          {handleClear && (edits.length > 0 || deletes.length > 0) && (
-            <button
-              className="edit-summary-bar-clear-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClear();
-              }}
-              title="Clear list"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
           <svg
             className={`edit-summary-bar-chevron ${isExpanded ? 'expanded' : ''}`}
             width="14"
@@ -108,11 +109,12 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
 
       {isExpanded && (
         <div className="edit-summary-bar-content">
-          {hasEdits && (
+          {/* NEW FILES Section */}
+          {hasNewFiles && (
             <div className="edit-summary-bar-section">
-              <div className="edit-summary-bar-section-title">Modified</div>
+              <div className="edit-summary-bar-section-title">New Files</div>
               <div className="edit-summary-bar-files">
-                {edits.map((edit, index) => {
+                {newFiles.map((edit, index) => {
                   const fileName = edit.filePath.split('/').pop() || edit.filePath;
                   const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
 
@@ -120,7 +122,6 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
                     <div
                       key={index}
                       className="edit-summary-bar-file"
-                      onClick={() => handleFileClick(edit.filePath, edit.lineChanges)}
                     >
                       <div className="edit-summary-bar-file-info">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -128,11 +129,25 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
                           <polyline points="13 2 13 9 20 9" />
                         </svg>
                         <span className="edit-summary-bar-file-name">{fileName}</span>
+                        <FileStatusBadge status="created" />
                         {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
                       </div>
-                      <span className="edit-summary-bar-file-count">
-                        {edit.editCount} {edit.editCount === 1 ? 'edit' : 'edits'}
-                      </span>
+                      <div className="edit-summary-bar-file-actions">
+                        <FileDiffButton
+                          filePath={edit.filePath}
+                          onDiffClick={(path) => handleDiffClick(path, 'created')}
+                        />
+                        <button
+                          className="edit-summary-bar-open-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFileClick(edit.filePath, edit.lineChanges);
+                          }}
+                          title="Open file"
+                        >
+                          Open
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -140,6 +155,56 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
             </div>
           )}
 
+          {/* MODIFIED FILES Section */}
+          {hasModifiedFiles && (
+            <div className="edit-summary-bar-section">
+              <div className="edit-summary-bar-section-title">Modified</div>
+              <div className="edit-summary-bar-files">
+                {modifiedFiles.map((edit, index) => {
+                  const fileName = edit.filePath.split('/').pop() || edit.filePath;
+                  const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
+
+                  return (
+                    <div
+                      key={index}
+                      className="edit-summary-bar-file"
+                    >
+                      <div className="edit-summary-bar-file-info">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                          <polyline points="13 2 13 9 20 9" />
+                        </svg>
+                        <span className="edit-summary-bar-file-name">{fileName}</span>
+                        <FileStatusBadge status="modified" />
+                        {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                      </div>
+                      <div className="edit-summary-bar-file-actions">
+                        <span className="edit-summary-bar-file-count">
+                          {edit.editCount} {edit.editCount === 1 ? 'edit' : 'edits'}
+                        </span>
+                        <FileDiffButton
+                          filePath={edit.filePath}
+                          onDiffClick={(path) => handleDiffClick(path, 'modified')}
+                        />
+                        <button
+                          className="edit-summary-bar-open-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFileClick(edit.filePath, edit.lineChanges);
+                          }}
+                          title="Open file"
+                        >
+                          Open
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* DELETED FILES Section */}
           {hasDeletes && (
             <div className="edit-summary-bar-section edit-summary-bar-section-delete">
               <div className="edit-summary-bar-section-title">Deleted</div>
@@ -159,7 +224,14 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
                           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                         </svg>
                         <span className="edit-summary-bar-file-name">{fileName}</span>
+                        <FileStatusBadge status="deleted" />
                         {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                      </div>
+                      <div className="edit-summary-bar-file-actions">
+                        <FileDiffButton
+                          filePath={deleted.filePath}
+                          onDiffClick={(path) => handleDiffClick(path, 'deleted')}
+                        />
                       </div>
                     </div>
                   );
@@ -168,7 +240,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onCle
             </div>
           )}
 
-          {hasEdits && (
+          {(hasNewFiles || hasModifiedFiles) && (
             <div className="edit-summary-bar-footer">
               <button
                 className="edit-summary-bar-open-all-btn"

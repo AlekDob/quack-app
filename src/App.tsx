@@ -38,7 +38,7 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
-import ChatView, { type LineChange } from "./components/ChatView";
+import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
 import { AgentTerminalTab } from "./components/AgentTerminalTab";
@@ -351,6 +351,10 @@ function App() {
       return new Set();
     }
   });
+  // NEW: Track modified files for FileExplorer indicators
+  const [modifiedFiles, setModifiedFiles] = useState<Map<string, 'created' | 'modified' | 'deleted'>>(new Map());
+  // NEW: Track complete file edits for line highlighting
+  const [fileEditsMap, setFileEditsMap] = useState<Map<string, FileEdit>>(new Map());
   const [editingTerminal, setEditingTerminal] = useState<TerminalInfo | null>(
     null
   );
@@ -4778,6 +4782,17 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return;
       }
 
+      // Check if file is modified by AI and has lineChanges
+      // If lineChanges not provided, check fileEditsMap
+      let finalLineChanges = lineChanges;
+      if (!finalLineChanges) {
+        const fileEdit = fileEditsMap.get(entry.path);
+        if (fileEdit && fileEdit.lineChanges && fileEdit.lineChanges.length > 0) {
+          finalLineChanges = fileEdit.lineChanges;
+          console.log('[handleOpenFilePreview] Auto-loaded lineChanges for modified file:', entry.path, finalLineChanges.length, 'changes');
+        }
+      }
+
       // Create or activate tab for this file
       const fileTabId = `file-${entry.path}`;
       const newFileTab = {
@@ -4820,7 +4835,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setPreviewImageData(null);
       setPreviewError(null);
       setPreviewDiffInfo(null);
-      setPreviewLineChanges(lineChanges || null);
+      setPreviewLineChanges(finalLineChanges || null);
       setLoadingPreview(true);
 
       try {
@@ -4911,7 +4926,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setLoadingPreview(false);
       }
     },
-    [tauriAvailable, gitSummary, explorerRoot, activeId]
+    [tauriAvailable, gitSummary, explorerRoot, activeId, fileEditsMap]
   );
 
   const handleFilePathClick = useCallback((path: string, lineChanges?: LineChange[]) => {
@@ -4926,6 +4941,150 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Use handleOpenFilePreview to actually load file content
     handleOpenFilePreview(fakeEntry, lineChanges);
   }, [handleOpenFilePreview]);
+
+  // Handler to open diff drawer from EditSummaryBar
+  const handleDiffClick = useCallback(async (filePath: string, status: 'created' | 'modified' | 'deleted') => {
+    console.log('[App] Diff clicked for:', filePath, 'status:', status);
+
+    setDiffLoading(true);
+    setDiffError(null);
+    setShowDiffDrawer(true);
+
+    try {
+      const rootPath = activeTerminal?.cwd ?? explorerRoot ?? explorerPath ?? undefined;
+      let diffContent = '';
+
+      if (status === 'created') {
+        // File created: Read content and show all as added lines
+        try {
+          const content = await invoke<string>('read_file_content', {
+            path: filePath,
+            rootPath
+          });
+
+          // Format as unified diff with all lines as additions
+          const lines = content.split('\n');
+          diffContent = `diff --git a/${filePath} b/${filePath}\n`;
+          diffContent += `new file\n`;
+          diffContent += `--- /dev/null\n`;
+          diffContent += `+++ b/${filePath}\n`;
+          diffContent += `@@ -0,0 +1,${lines.length} @@\n`;
+          diffContent += lines.map(line => `+${line}`).join('\n');
+        } catch (err) {
+          console.error('[handleDiffClick] Failed to read created file:', err);
+          throw new Error(`Failed to read file: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } else if (status === 'modified') {
+        // File modified: Use git diff
+        try {
+          // Convert absolute path to relative if needed
+          let relativePath = filePath;
+          if (rootPath && filePath.startsWith(rootPath)) {
+            relativePath = filePath.substring(rootPath.length);
+            if (relativePath.startsWith('/')) {
+              relativePath = relativePath.substring(1);
+            }
+          }
+
+          diffContent = await invoke<string>('git_diff', {
+            path: relativePath,
+            staged: false,
+            untracked: false,
+            rootPath,
+          });
+
+          if (!diffContent || diffContent.trim() === '') {
+            // If no diff, file might be untracked or not in git
+            // Fall back to showing entire file as new
+            const content = await invoke<string>('read_file_content', {
+              path: filePath,
+              rootPath
+            });
+            const lines = content.split('\n');
+            diffContent = `diff --git a/${filePath} b/${filePath}\n`;
+            diffContent += `new file\n`;
+            diffContent += `--- /dev/null\n`;
+            diffContent += `+++ b/${filePath}\n`;
+            diffContent += `@@ -0,0 +1,${lines.length} @@\n`;
+            diffContent += lines.map(line => `+${line}`).join('\n');
+          }
+        } catch (err) {
+          console.error('[handleDiffClick] Failed to get git diff:', err);
+          throw new Error(`Failed to get diff: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } else if (status === 'deleted') {
+        // File deleted: Show previous content as removed lines
+        try {
+          // Try to get the deleted content from git
+          let relativePath = filePath;
+          if (rootPath && filePath.startsWith(rootPath)) {
+            relativePath = filePath.substring(rootPath.length);
+            if (relativePath.startsWith('/')) {
+              relativePath = relativePath.substring(1);
+            }
+          }
+
+          // Get diff for deleted file
+          diffContent = await invoke<string>('git_diff', {
+            path: relativePath,
+            staged: false,
+            untracked: false,
+            rootPath,
+          });
+
+          if (!diffContent || diffContent.trim() === '') {
+            // If no git history, show placeholder
+            diffContent = `diff --git a/${filePath} b/${filePath}\n`;
+            diffContent += `deleted file\n`;
+            diffContent += `--- a/${filePath}\n`;
+            diffContent += `+++ /dev/null\n`;
+            diffContent += `@@ -1 +0,0 @@\n`;
+            diffContent += `-File was deleted (no git history available)`;
+          }
+        } catch (err) {
+          console.error('[handleDiffClick] Failed to get deleted file diff:', err);
+          throw new Error(`Failed to get deleted file diff: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      setDiffContent(diffContent);
+      setDiffLoading(false);
+
+      toast.success(`Diff loaded for ${filePath}`, {
+        description: `Status: ${status}`,
+        duration: 2000,
+      });
+    } catch (err) {
+      console.error('[handleDiffClick] Error loading diff:', err);
+      setDiffError(err instanceof Error ? err.message : String(err));
+      setDiffLoading(false);
+
+      toast.error('Failed to load diff', {
+        description: err instanceof Error ? err.message : String(err),
+        duration: 3000,
+      });
+    }
+  }, [activeTerminal?.cwd, explorerRoot, explorerPath]);
+
+  // Handler to update modified files map (for FileExplorer indicators)
+  const handleEditsChange = useCallback((edits: FileEdit[], deletes: FileDeleted[]) => {
+    const newModifiedFiles = new Map<string, 'created' | 'modified' | 'deleted'>();
+    const newFileEditsMap = new Map<string, FileEdit>();
+
+    // Add all edited files with their status and complete info
+    edits.forEach(edit => {
+      newModifiedFiles.set(edit.filePath, edit.status || 'modified');
+      newFileEditsMap.set(edit.filePath, edit);
+    });
+
+    // Add all deleted files
+    deletes.forEach(deleted => {
+      newModifiedFiles.set(deleted.filePath, 'deleted');
+    });
+
+    setModifiedFiles(newModifiedFiles);
+    setFileEditsMap(newFileEditsMap);
+  }, []);
 
   // Handler to open Browser Manager tab
   const handleOpenBrowserTab = useCallback(() => {
@@ -6350,6 +6509,8 @@ You have access to all Bash tools to execute git commands like:
               agents={agents}
               onSelectAgent={handleUseAgent}
               onFilePathClick={handleFilePathClick}
+              onDiffClick={handleDiffClick} // NEW: Diff drawer handler
+              onEditsChange={handleEditsChange} // NEW: Track modified files
               pendingAgentMention={pendingAgentMention}
               onMentionInserted={() => setPendingAgentMention(null)}
               pendingFileMention={pendingFileMention}
@@ -6555,6 +6716,7 @@ You have access to all Bash tools to execute git commands like:
           error={explorerError}
           activePath={explorerPath}
           activeFilePath={previewFile?.path ?? null}
+          modifiedFiles={modifiedFiles}
           onOpenFile={handleOpenFilePreview}
           onLoadChildren={fetchDirectoryChildren}
           onMentionFile={handleMentionFile}

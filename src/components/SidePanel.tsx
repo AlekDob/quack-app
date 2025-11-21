@@ -242,6 +242,7 @@ interface SidePanelProps {
   error: string | null;
   activePath: string;
   activeFilePath: string | null;
+  modifiedFiles?: Map<string, 'created' | 'modified' | 'deleted'>; // NEW: Track modified files
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
   onMentionFile?: (filePath: string, fileName: string) => void;
@@ -331,6 +332,7 @@ export default function SidePanel({
   error,
   activePath,
   activeFilePath,
+  modifiedFiles, // NEW: Track modified files
   onOpenFile,
   onLoadChildren,
   onMentionFile,
@@ -577,6 +579,7 @@ export default function SidePanel({
             error={error}
             activePath={activePath}
             activeFilePath={activeFilePath}
+            modifiedFiles={modifiedFiles}
             onOpenFile={onOpenFile}
             onLoadChildren={onLoadChildren}
             onMentionFile={onMentionFile}

@@ -203,6 +203,40 @@
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;
+  margin-right: 8px;
+}
+
+/* File actions container (Diff + Open buttons) */
+.edit-summary-bar-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Open button */
+.edit-summary-bar-open-btn {
+  padding: 4px 10px;
+  height: 24px; /* Fixed height for alignment with Diff button */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px solid rgba(156, 163, 175, 0.2);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(156, 163, 175, 0.9);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-summary-bar-open-btn:hover {
+  background: rgba(156, 163, 175, 0.2);
+  border-color: rgba(156, 163, 175, 0.4);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 /* Deleted file items - red theme */

@@ -23,9 +23,10 @@ export interface FileEdit {
   editCount: number;
   lineNumbers: number[];
   lineChanges?: LineChange[]; // Detailed line-by-line changes for diff highlighting
+  status?: 'created' | 'modified'; // NEW: Track if file was created or modified
 }
 
-interface FileDeleted {
+export interface FileDeleted {
   filePath: string;
 }
 
@@ -38,6 +39,8 @@ interface ChatViewProps {
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
   onFilePathClick?: (path: string, lineChanges?: LineChange[]) => void;
+  onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void; // NEW: Diff drawer handler
+  onEditsChange?: (edits: FileEdit[], deletes: FileDeleted[]) => void; // NEW: Notify parent when edits change
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
   pendingFileMention?: { name: string; path: string; relativePath: string } | null;
@@ -92,6 +95,8 @@ export default function ChatView({
   agents,
   onSelectAgent,
   onFilePathClick,
+  onDiffClick, // NEW: Diff drawer handler
+  onEditsChange, // NEW: Notify parent when edits change
   pendingAgentMention,
   onMentionInserted,
   pendingFileMention,
@@ -231,14 +236,25 @@ export default function ChatView({
                 // Track Edit and Write tool calls
                 if ((toolName === 'edit' || toolName === 'write') && input?.file_path) {
                   const filePath = input.file_path;
+
+                  // Determine status: Edit tool = modified, Write tool = likely created
+                  const status: 'created' | 'modified' = toolName === 'write' ? 'created' : 'modified';
+
                   if (!fileEdits.has(filePath)) {
                     fileEdits.set(filePath, {
                       filePath,
                       editCount: 0,
                       lineNumbers: [],
                       lineChanges: [], // Initialize empty array for line-by-line changes
+                      status, // NEW: Track file creation vs modification
                     });
+                  } else {
+                    // If file already tracked and we see an Edit tool, mark as modified
+                    if (toolName === 'edit') {
+                      fileEdits.get(filePath)!.status = 'modified';
+                    }
                   }
+
                   const edit = fileEdits.get(filePath)!;
                   edit.editCount++;
 
@@ -283,6 +299,13 @@ export default function ChatView({
       currentFileDeletes: Array.from(fileDeletes).map(filePath => ({ filePath }))
     };
   }, [messages]);
+
+  // Notify parent when edits change (for FileExplorer indicators)
+  useEffect(() => {
+    if (onEditsChange) {
+      onEditsChange(currentFileEdits, currentFileDeletes);
+    }
+  }, [currentFileEdits, currentFileDeletes, onEditsChange]);
 
   // Keyboard shortcuts: Shift+Tab to cycle modes, ESC to abort
   useEffect(() => {
@@ -344,6 +367,7 @@ export default function ChatView({
           edits={currentFileEdits}
           deletes={currentFileDeletes}
           onFileClick={onFilePathClick}
+          onDiffClick={onDiffClick} // NEW: Pass diff handler
           onClear={() => {
             // The edits are derived from messages, so to "clear" them
             // we would need to modify the messages array (not recommended)

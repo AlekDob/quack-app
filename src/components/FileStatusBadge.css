@@ -1,0 +1,36 @@
+/* FileStatusBadge - Badge colorati per stato file */
+
+.file-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  margin-left: 6px;
+}
+
+/* NEW - File creato (verde) */
+.file-status-badge-new {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* MOD - File modificato (blu) */
+.file-status-badge-mod {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* DEL - File eliminato (rosso) */
+.file-status-badge-del {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}

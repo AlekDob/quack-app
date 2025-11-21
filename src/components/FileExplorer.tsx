@@ -68,6 +68,7 @@ interface FileExplorerProps {
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
   onMentionFile?: (filePath: string, fileName: string) => void;
+  modifiedFiles?: Map<string, 'created' | 'modified' | 'deleted'>; // NEW: Track modified files
 }
 
 function FileExplorer({
@@ -80,6 +81,7 @@ function FileExplorer({
   onOpenFile,
   onLoadChildren,
   onMentionFile,
+  modifiedFiles, // NEW: Modified files tracking
 }: FileExplorerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
@@ -362,11 +364,17 @@ function FileExplorer({
               : null;
           const paddingLeft = 8 + depth * 10; // Reduced from 12 + depth * 14 for compact VSCode style
 
+          // Add modified file background class
+          const modificationStatus = !isDirectory && modifiedFiles?.has(entry.path)
+            ? modifiedFiles.get(entry.path)
+            : null;
+
           const rowClass = [
             "explorer-row",
             isDirectory ? "directory" : "file",
             isActiveDirectory || isActiveFile ? "active" : "",
             isActiveFile ? "file-open" : "",
+            modificationStatus ? `file-modified-${modificationStatus}` : "",
           ]
             .filter(Boolean)
             .join(" ");
@@ -408,6 +416,13 @@ function FileExplorer({
                   isOpen={isExpanded}
                   size={16}
                 />
+                {/* Show modification indicator for files */}
+                {!isDirectory && modifiedFiles?.has(entry.path) && (
+                  <span
+                    className={`file-modified-indicator file-modified-indicator-${modifiedFiles.get(entry.path)}`}
+                    title={`File ${modifiedFiles.get(entry.path)}`}
+                  />
+                )}
                 <span className="explorer-name">{entry.name}</span>
                 {isDirectory && displayCount !== null && (
                   <span className="explorer-count" aria-hidden="true">
@@ -448,6 +463,7 @@ function FileExplorer({
       handleContextMenu,
       handleToggleDirectory,
       loadingNodes,
+      modifiedFiles, // NEW: Include modifiedFiles for reactivity
       onOpenFile,
       prefetchDirectory,
       query,
