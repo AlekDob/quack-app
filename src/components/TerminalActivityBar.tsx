@@ -124,6 +124,38 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
     return !messages || messages.length === 0
   }, [chatSessions, terminal.id])
 
+  // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
+  const isDormant = useMemo(() => {
+    if (!chatSessions) {
+      console.log(`[${terminal.label}] 💤 isDormant=false (no chatSessions)`)
+      return false
+    }
+    const messages = chatSessions.get(terminal.id)
+    if (!messages || messages.length === 0) {
+      console.log(`[${terminal.label}] 💤 isDormant=false (no messages)`)
+      return false
+    }
+
+    // Check if agent has any user messages (actual interaction)
+    const hasUserMessage = messages.some(msg => msg.role === 'user');
+    // Check if agent has any real assistant responses (not just "Previous conversation detected")
+    const hasAssistantResponse = messages.some(msg =>
+      msg.role === 'assistant' &&
+      !msg.content?.includes('Previous conversation detected') &&
+      !msg.content?.includes('**Previous conversation detected**')
+    );
+
+    const result = !hasUserMessage && !hasAssistantResponse
+    console.log(`[${terminal.label}] 💤 isDormant=${result} (hasUserMessage=${hasUserMessage}, hasAssistantResponse=${hasAssistantResponse})`)
+
+    return result
+  }, [chatSessions, terminal.id, terminal.label])
+
+  // Debug: Log when waitingForResponse changes (AFTER isDormant is defined)
+  useEffect(() => {
+    console.log(`[${terminal.label}] 🔔 waitingForResponse=${terminal.waitingForResponse}, isDormant=${isDormant}`)
+  }, [terminal.waitingForResponse, isDormant, terminal.label])
+
   // Check if there are unread messages (agent responded but terminal not active)
   const hasUnreadMessages = useMemo(() => {
     if (!chatSessions || isActive) {
@@ -136,12 +168,18 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
       return false
     }
 
+    // If agent is dormant (only "Previous conversation detected"), no unread messages
+    if (isDormant) {
+      console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (dormant)`)
+      return false
+    }
+
     // Check if there's at least one assistant message
     const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant')
     const result = lastAssistantMessage !== undefined
     console.log(`[${terminal.label}] 💬 hasUnreadMessages=${result} (isActive=${isActive}, hasAssistantMsg=${lastAssistantMessage !== undefined})`)
     return result
-  }, [chatSessions, terminal.id, isActive, terminal.label])
+  }, [chatSessions, terminal.id, isActive, terminal.label, isDormant])
 
   // Memoize last message calculation
   const lastMessage = useMemo((): string | null => {
@@ -161,19 +199,23 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
   // Memoize badge calculation
   const badge = useMemo(() => {
     if (isBusy) return '⚡'
+    // 🚨 CRITICAL: Check isDormant BEFORE isWaitingForResponse!
+    // Dormant agents should NEVER show 💬 even if waitingForResponse is true
+    if (isChatEmpty || isDormant) return '💤' // Empty chat or dormant (only "Previous conversation detected")
+    // NO badge when agent is active (regardless of dormancy or unread messages)
+    if (isActive) return ''
+    // Now check isWaitingForResponse (only for non-dormant agents)
     if (isWaitingForResponse) return '💬'
-    // New logic: 💤 for empty chat, 💬 for unread messages, nothing if read
-    if (isChatEmpty) return '💤' // Empty chat - never had messages
     if (hasUnreadMessages) return '💬' // Has unread messages from assistant
     return '' // No badge when all messages are read
-  }, [isBusy, isWaitingForResponse, isChatEmpty, hasUnreadMessages])
+  }, [isBusy, isWaitingForResponse, isActive, isChatEmpty, isDormant, hasUnreadMessages])
 
   const badgeClassName = useMemo(() => {
     if (isWaitingForResponse) return 'terminal-status-badge waiting'
-    if (isChatEmpty) return 'terminal-status-badge sleeping' // Reuse sleeping style for empty chat
+    if (isChatEmpty || isDormant) return 'terminal-status-badge sleeping' // Sleeping style for empty chat or dormant
     if (hasUnreadMessages) return 'terminal-status-badge waiting' // Use waiting style for unread (pulsing)
     return 'terminal-status-badge'
-  }, [isWaitingForResponse, isChatEmpty, hasUnreadMessages])
+  }, [isWaitingForResponse, isChatEmpty, isDormant, hasUnreadMessages])
 
   return (
     <>
@@ -185,7 +227,7 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
           onMouseLeave={() => setIsHovering(false)}
         >
           <div
-            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : isChatEmpty ? 'sleeping' : hasUnreadMessages ? 'waiting' : ''}`}
+            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : (isChatEmpty || isDormant) ? 'sleeping' : hasUnreadMessages ? 'waiting' : ''}`}
             style={{
               '--avatar-border-color': terminal.color,
             } as React.CSSProperties}

@@ -164,10 +164,55 @@ function SortableAgent({
     zIndex: 10,
   }), [agent.color, isWorktree]);
 
-  // Memoize agent card background style
-  const agentCardBg = useMemo(() => 
-    isActive ? `${agent.color}15` : isHovered ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
-  , [isActive, isHovered, agent.color]);
+  // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
+  const isDormant = useMemo(() => {
+    if (!chatSessions) {
+      console.log(`[${agent.label}] 💤 isDormant=false (no chatSessions)`)
+      return false;
+    }
+    const messages = chatSessions.get(agent.id);
+    if (!messages || messages.length === 0) {
+      console.log(`[${agent.label}] 💤 isDormant=false (no messages)`)
+      return false;
+    }
+
+    // Check if agent has any user messages (actual interaction)
+    const hasUserMessage = messages.some(msg => msg.role === 'user');
+    // Check if agent has any real assistant responses (not just "Previous conversation detected")
+    const hasAssistantResponse = messages.some(msg =>
+      msg.role === 'assistant' &&
+      !msg.content?.includes('Previous conversation detected') &&
+      !msg.content?.includes('**Previous conversation detected**')
+    );
+
+    const result = !hasUserMessage && !hasAssistantResponse
+    console.log(`[${agent.label}] 💤 isDormant=${result} (hasUserMessage=${hasUserMessage}, hasAssistantResponse=${hasAssistantResponse})`)
+
+    return result;
+  }, [chatSessions, agent.id, agent.label]);
+
+  // Check if agent is waiting for response (has unread messages)
+  const hasUnreadMessages = useMemo(() => {
+    if (!chatSessions || isActive) return false;
+    const messages = chatSessions.get(agent.id);
+    if (!messages || messages.length === 0) return false;
+
+    // If agent is dormant, no unread messages
+    if (isDormant) return false;
+
+    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+    return lastAssistantMessage !== undefined;
+  }, [chatSessions, agent.id, isActive, isDormant]);
+
+  // Memoize agent card background style - highlight when waiting for response
+  const agentCardBg = useMemo(() => {
+    if (isActive) return `${agent.color}15`;
+    // IMPORTANT: Dormant agents should NEVER be highlighted, even if waitingForResponse is true
+    if (isDormant) return isHovered ? 'rgba(255, 255, 255, 0.03)' : 'transparent';
+    if (agent.waitingForResponse || hasUnreadMessages) return 'rgba(59, 130, 246, 0.18)'; // Blue highlight for waiting (slightly brighter)
+    if (isHovered) return 'rgba(255, 255, 255, 0.03)';
+    return 'transparent';
+  }, [isActive, isHovered, agent.color, agent.waitingForResponse, hasUnreadMessages, isDormant]);
 
   // Memoize callbacks to prevent recreation
   const handleSelect = useCallback(() => onSelect(agent), [onSelect, agent]);
@@ -232,8 +277,8 @@ function SortableAgent({
           position: 'relative',
         }}
       >
-        {/* 🦆 Relative Time Display - positioned absolutely on the left */}
-        {relativeTime && (
+        {/* 🦆 Relative Time Display - positioned absolutely on the left - ONLY show when NOT active */}
+        {relativeTime && !isActive && (
           <div
             style={{
               position: 'absolute',
@@ -1275,6 +1320,37 @@ export default function RepositoryGroup({
                       const isActive = agent.id === activeId;
                       const isHovered = agent.id === hoveredAgentId;
 
+                      // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
+                      const isDormant = (() => {
+                        if (!chatSessions) return false;
+                        const messages = chatSessions.get(agent.id);
+                        if (!messages || messages.length === 0) return false;
+
+                        // Check if agent has any user messages (actual interaction)
+                        const hasUserMessage = messages.some(msg => msg.role === 'user');
+                        // Check if agent has any real assistant responses (not just "Previous conversation detected")
+                        const hasAssistantResponse = messages.some(msg =>
+                          msg.role === 'assistant' &&
+                          !msg.content?.includes('Previous conversation detected') &&
+                          !msg.content?.includes('**Previous conversation detected**')
+                        );
+
+                        return !hasUserMessage && !hasAssistantResponse;
+                      })();
+
+                      // Check if agent has unread messages
+                      const hasUnreadMessages = (() => {
+                        if (!chatSessions || isActive) return false;
+                        const messages = chatSessions.get(agent.id);
+                        if (!messages || messages.length === 0) return false;
+
+                        // If agent is dormant, no unread messages
+                        if (isDormant) return false;
+
+                        const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+                        return lastAssistantMessage !== undefined;
+                      })();
+
                       return (
                         <div
                           key={agent.id}
@@ -1310,6 +1386,10 @@ export default function RepositoryGroup({
                               padding: '8px 12px',
                               background: isActive
                                 ? `${agent.color}15`  // Use agent color for active
+                                : isDormant
+                                ? (isHovered ? 'rgba(255, 255, 255, 0.03)' : 'transparent') // Dormant agents NEVER highlighted
+                                : (agent.waitingForResponse || hasUnreadMessages)
+                                ? 'rgba(59, 130, 246, 0.18)' // Blue highlight for waiting (slightly brighter)
                                 : isHovered
                                 ? 'rgba(255, 255, 255, 0.03)'
                                 : 'transparent',

@@ -650,11 +650,39 @@ function App() {
         // Check if chat is waiting for user response
         const chatMessages = chatSessions.get(terminal.id) ?? [];
         const lastMessage = chatMessages[chatMessages.length - 1];
+
+        // Check if agent is dormant (ONLY has "Previous conversation detected" assistant message, no user messages)
+        // An agent is dormant if:
+        // 1. It has no user messages (no actual interaction yet)
+        // 2. AND it has no real assistant responses (only "Previous conversation detected")
+        const hasUserMessage = chatMessages.some(msg => msg.role === 'user');
+        const hasAssistantResponse = chatMessages.some(msg =>
+          msg.role === 'assistant' &&
+          !msg.content?.includes('Previous conversation detected') &&
+          !msg.content?.includes('**Previous conversation detected**')
+        );
+        const isDormant = chatMessages.length > 0 && !hasUserMessage && !hasAssistantResponse;
+
         const isWaitingForResponse =
           !isLoading && // Not currently loading
           chatMessages.length > 0 && // Has messages
+          !isDormant && // 🚨 NOT dormant (don't show 💬 for agents without user interaction)
           lastMessage?.role === 'assistant' && // Last message is from assistant
           lastMessage?.status === 'complete'; // Message is complete
+
+        // Debug logging
+        if (terminal.label === 'Agent Carlos') {
+          console.log(`[App.tsx] 🔔 ${terminal.label} waitingForResponse calculation:`, {
+            isLoading,
+            messagesCount: chatMessages.length,
+            hasUserMessage,
+            hasAssistantResponse,
+            isDormant,
+            lastMessageRole: lastMessage?.role,
+            lastMessageStatus: lastMessage?.status,
+            result: isWaitingForResponse
+          });
+        }
 
         // Only update if something actually changed to avoid unnecessary re-renders
         if (
