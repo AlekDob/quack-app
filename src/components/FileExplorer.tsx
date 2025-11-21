@@ -490,77 +490,200 @@ function FileExplorer({
     event.dataTransfer.setData('text/plain', entry.path); // Fallback
   }, []);
 
-  const renderSearchResult = useCallback(
-    (result: SearchResult) => {
-      const isActiveFile = activeFilePath === result.path;
+  // State for expanded folders in search results
+  const [expandedSearchFolders, setExpandedSearchFolders] = useState<Set<string>>(new Set());
 
-      // Convert SearchResult to DirectoryEntry for compatibility
-      const entry: DirectoryEntry = {
-        name: result.name,
-        path: result.path,
-        is_dir: result.is_dir,
-        is_symlink: result.is_symlink,
-      };
+  // Build hierarchical structure from search results
+  const hierarchicalSearchResults = useMemo(() => {
+    if (!searchResults.length || !rootPath) return [];
 
-      const rowClass = [
-        "explorer-row",
-        result.is_dir ? "directory" : "file",
-        isActiveFile ? "active file-open" : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
+    // Group results by parent folder
+    const folderMap = new Map<string, SearchResult[]>();
 
-      // Search results - minimal padding for breathing room
-      const paddingLeft = 4;
+    for (const result of searchResults) {
+      if (!result.relative_path) continue;
 
-      return (
-        <button
-          key={result.path}
-          type="button"
-          className={rowClass}
-          style={{ paddingLeft: `${paddingLeft}px` }}
-          title={result.relative_path}
-          onClick={() => onOpenFile(entry)}
-          onContextMenu={(event) => handleContextMenu(event, entry)}
-          draggable={!result.is_dir}
-          onDragStart={(event) => handleDragStart(event, entry)}
-        >
-          {/* No expander placeholder for search results - saves space */}
-          <FileIcon
-            name={result.name}
-            isDirectory={result.is_dir}
-            isOpen={false}
-            size={16}
-          />
-          <div className="explorer-file-info">
-            <span className="explorer-name">{result.name}</span>
-            <span className="explorer-path-hint" title={result.relative_path}>
-              {result.relative_path}
-            </span>
-          </div>
-          {/* Show actions for both files AND directories */}
-          <div className="explorer-file-actions">
-            <RevealInFinderButton path={result.path} iconOnly />
-            {onMentionFile && (
-              <button
-                type="button"
-                className="explorer-mention-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMentionFile(result.path, result.name);
-                }}
-                title={result.is_dir ? "Insert @folder mention in chat" : "Insert @file mention in chat"}
-                aria-label={result.is_dir ? "Mention folder in chat" : "Mention file in chat"}
-              >
-                @
-              </button>
-            )}
-          </div>
-        </button>
-      );
-    },
-    [activeFilePath, handleContextMenu, onOpenFile, handleDragStart, onMentionFile]
-  );
+      // Extract parent folder path
+      const pathParts = result.relative_path.split('/');
+      const parentPath = pathParts.slice(0, -1).join('/') || '/';
+
+      if (!folderMap.has(parentPath)) {
+        folderMap.set(parentPath, []);
+      }
+      folderMap.get(parentPath)!.push(result);
+    }
+
+    // Sort folders by depth (shallowest first)
+    const sortedFolders = Array.from(folderMap.keys()).sort((a, b) => {
+      const depthA = a === '/' ? 0 : a.split('/').length;
+      const depthB = b === '/' ? 0 : b.split('/').length;
+      return depthA - depthB;
+    });
+
+    // Build hierarchical structure
+    interface HierarchicalNode {
+      type: 'folder' | 'file';
+      name: string;
+      path: string;
+      relativePath: string;
+      depth: number;
+      result?: SearchResult;
+      children?: SearchResult[];
+    }
+
+    const nodes: HierarchicalNode[] = [];
+
+    for (const folderPath of sortedFolders) {
+      const files = folderMap.get(folderPath)!;
+      const depth = folderPath === '/' ? 0 : folderPath.split('/').filter(Boolean).length;
+
+      // Get folder name
+      const folderName = folderPath === '/'
+        ? rootLabel
+        : folderPath.split('/').filter(Boolean).pop() || folderPath;
+
+      // Add folder node
+      nodes.push({
+        type: 'folder',
+        name: folderName,
+        path: folderPath,
+        relativePath: folderPath,
+        depth,
+        children: files,
+      });
+    }
+
+    return nodes;
+  }, [searchResults, rootPath, rootLabel]);
+
+  // Auto-expand all folders when search results change
+  useEffect(() => {
+    if (hierarchicalSearchResults.length > 0) {
+      const allFolders = new Set(hierarchicalSearchResults.map(node => node.path));
+      setExpandedSearchFolders(allFolders);
+    } else {
+      setExpandedSearchFolders(new Set());
+    }
+  }, [hierarchicalSearchResults]);
+
+  const renderSearchResultHierarchy = useCallback(() => {
+    if (!hierarchicalSearchResults.length) return null;
+
+    return hierarchicalSearchResults.map((node) => {
+      if (node.type === 'folder') {
+        const isExpanded = expandedSearchFolders.has(node.path);
+        const paddingLeft = 8 + node.depth * 10;
+
+        return (
+          <Fragment key={node.path}>
+            {/* Folder header */}
+            <button
+              type="button"
+              className="explorer-row directory"
+              style={{ paddingLeft: `${paddingLeft}px` }}
+              onClick={() => {
+                setExpandedSearchFolders((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(node.path)) {
+                    next.delete(node.path);
+                  } else {
+                    next.add(node.path);
+                  }
+                  return next;
+                });
+              }}
+            >
+              <span
+                className={`explorer-expander ${isExpanded ? 'open' : ''}`}
+                aria-hidden="true"
+              />
+              <FileIcon
+                name={node.name}
+                isDirectory={true}
+                isOpen={isExpanded}
+                size={16}
+              />
+              <span className="explorer-name">{node.name}</span>
+              <span className="explorer-count" aria-hidden="true">
+                {node.children?.length || 0}
+              </span>
+            </button>
+
+            {/* Files under this folder */}
+            {isExpanded && node.children?.map((result) => {
+              const isActiveFile = activeFilePath === result.path;
+              const entry: DirectoryEntry = {
+                name: result.name,
+                path: result.path,
+                is_dir: result.is_dir,
+                is_symlink: result.is_symlink,
+              };
+
+              const rowClass = [
+                "explorer-row",
+                "file",
+                isActiveFile ? "active file-open" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              const filePaddingLeft = 8 + (node.depth + 1) * 10;
+
+              return (
+                <button
+                  key={result.path}
+                  type="button"
+                  className={rowClass}
+                  style={{ paddingLeft: `${filePaddingLeft}px` }}
+                  title={result.relative_path}
+                  onClick={() => onOpenFile(entry)}
+                  onContextMenu={(event) => handleContextMenu(event, entry)}
+                  draggable={true}
+                  onDragStart={(event) => handleDragStart(event, entry)}
+                >
+                  <span className="explorer-expander placeholder" aria-hidden="true" />
+                  <FileIcon
+                    name={result.name}
+                    isDirectory={false}
+                    isOpen={false}
+                    size={16}
+                  />
+                  <span className="explorer-name">{result.name}</span>
+                  <div className="explorer-file-actions">
+                    <RevealInFinderButton path={result.path} iconOnly />
+                    {onMentionFile && (
+                      <button
+                        type="button"
+                        className="explorer-mention-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMentionFile(result.path, result.name);
+                        }}
+                        title="Insert @file mention in chat"
+                        aria-label="Mention file in chat"
+                      >
+                        @
+                      </button>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </Fragment>
+        );
+      }
+
+      return null;
+    });
+  }, [
+    hierarchicalSearchResults,
+    expandedSearchFolders,
+    activeFilePath,
+    onOpenFile,
+    handleContextMenu,
+    handleDragStart,
+    onMentionFile,
+  ]);
 
   return (
     <aside className="file-explorer">
@@ -600,7 +723,7 @@ function FileExplorer({
                 </span>
               </div>
               <div className="explorer-section-content">
-                {searchResults.map((result) => renderSearchResult(result))}
+                {renderSearchResultHierarchy()}
               </div>
             </div>
           </div>
