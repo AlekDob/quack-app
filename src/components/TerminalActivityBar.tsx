@@ -219,55 +219,7 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
 
   return (
     <>
-      {/* ALWAYS show avatar - fallback to duck30.jpeg if not specified */}
-      {avatarUrl && (
-        <div
-          className="terminal-avatar-container"
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
-        >
-          <div
-            className={`terminal-avatar ${isBusy ? 'pulsing' : isWaitingForResponse ? 'waiting' : (isChatEmpty || isDormant) ? 'sleeping' : hasUnreadMessages ? 'waiting' : ''}`}
-            style={{
-              '--avatar-border-color': terminal.color,
-            } as React.CSSProperties}
-          >
-            <img
-              src={avatarUrl}
-              alt={terminal.label}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                console.error('[TerminalActivityBar] Image failed to load, using fallback duck30.jpeg:', avatarUrl)
-                // Always fallback to duck30.jpeg on error
-                if (window.__TAURI__) {
-                  target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
-                } else {
-                  target.src = '/duck30.jpeg'
-                }
-              }}
-            />
-          </div>
-
-          {/* Tooltip fumetto */}
-          {isHovering && (terminal.workingOn || lastMessage) && (
-            <div className="avatar-tooltip">
-              <div className="avatar-tooltip-arrow" />
-              <div className="avatar-tooltip-content">
-                {terminal.workingOn && (
-                  <div className="avatar-tooltip-working">
-                    <strong>Working on:</strong> {terminal.workingOn}
-                  </div>
-                )}
-                {lastMessage && (
-                  <div className="avatar-tooltip-message">
-                    <strong>Last message:</strong> {lastMessage}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* 🎨 AVATAR HIDDEN - Now shown in RepositoryGroup as letter avatar */}
 
       {/* Terminal details - name takes all available space with flex: 1 */}
       <div className="terminal-details" style={{ flex: 1 }}>

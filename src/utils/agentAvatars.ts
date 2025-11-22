@@ -74,14 +74,16 @@ export function getAvatarUrl(avatarName: string): string {
  * @returns Full URL to the droid image
  */
 export function getDuckdroidUrl(): string {
+  // Cache buster to force image reload when updated
+  const cacheBuster = `?v=2`;
   let url: string;
   if (window.__TAURI__) {
     // In Tauri v2, use convertFileSrc for proper asset protocol handling
-    url = convertFileSrc('/images/droid.jpeg', 'asset');
+    url = convertFileSrc('/images/droid.jpeg', 'asset') + cacheBuster;
     console.log('[getDuckdroidUrl] TAURI mode - URL:', url);
   } else {
     // In dev mode, use standard public path
-    url = `/droid.jpeg`;
+    url = `/droid.jpeg${cacheBuster}`;
     console.log('[getDuckdroidUrl] DEV mode - URL:', url);
   }
   return url;

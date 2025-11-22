@@ -1,5 +1,6 @@
 import { type MouseEvent, useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { Store } from '@tauri-apps/plugin-store';
 import {
   DndContext,
@@ -21,6 +22,7 @@ import {
 import TerminalActivityBar from './TerminalActivityBar';
 import CommitHistoryModal from './CommitHistoryModal';
 import RevealInFinderButton from './RevealInFinderButton';
+import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult } from '../types';
 
@@ -32,12 +34,24 @@ interface RepositoryGroupProps {
   isCollapsed: boolean;
   activeId: string | null;
   chatSessions?: Map<string, ChatMessage[]>;
+  lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
   onToggle: () => void;
   onSelect: (terminal: TerminalInfo) => void;
   onClose: (id: string) => void;
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
   onOpenGitPanel?: () => void; // NEW: Function to open Git Panel drawer
   gitRefreshTrigger?: number; // NEW: Trigger to refresh git status after commit
+}
+
+// Helper function to get avatar image URL (works in both dev and production)
+function getAvatarUrl(avatarName: string): string {
+  // Check if we're in Tauri context
+  if (window.__TAURI__) {
+    // In production, use convertFileSrc with the expected resource path
+    return convertFileSrc(`/images/ducks/new-avatars/${avatarName}`, 'asset')
+  }
+  // In dev mode, use standard public path
+  return `/images/ducks/new-avatars/${avatarName}`
 }
 
 // Helper to extract repository name from path
@@ -98,6 +112,7 @@ interface SortableAgentProps {
   agent: TerminalInfo;
   isActive: boolean;
   chatSessions?: Map<string, ChatMessage[]>;
+  lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
   onSelect: (terminal: TerminalInfo) => void;
   onClose: (id: string) => void;
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
@@ -112,6 +127,7 @@ function SortableAgent({
   agent,
   isActive,
   chatSessions,
+  lastReadTimestamps,
   onSelect,
   onClose,
   onContextMenu,
@@ -122,6 +138,7 @@ function SortableAgent({
   isDraggingAny = false,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   // 🦆 Force re-render every minute to update relative time
   const [tick, setTick] = useState(0);
 
@@ -131,6 +148,56 @@ function SortableAgent({
     }, 60000); // Update every 60 seconds (1 minute)
     return () => clearInterval(interval);
   }, []);
+
+  // 🎨 Load avatar URL from agent.avatar
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvatarUrl() {
+      // If no avatar specified, use duck30.jpeg fallback
+      if (!agent.avatar) {
+        if (isMounted) {
+          if (window.__TAURI__) {
+            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+          } else {
+            setAvatarUrl('/duck30.jpeg');
+          }
+        }
+        return;
+      }
+
+      // Check if it's a custom avatar (UUID format)
+      if (isCustomAvatar(agent.avatar)) {
+        try {
+          const url = await getCustomAvatarUrl(agent.avatar);
+          if (isMounted) {
+            setAvatarUrl(url);
+          }
+        } catch (error) {
+          console.error('Failed to load custom avatar:', error);
+          if (isMounted) {
+            // Fallback to duck30.jpeg if custom avatar fails
+            if (window.__TAURI__) {
+              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+            } else {
+              setAvatarUrl('/duck30.jpeg');
+            }
+          }
+        }
+      } else {
+        // Default avatar - use getAvatarUrl helper
+        if (isMounted) {
+          setAvatarUrl(getAvatarUrl(agent.avatar));
+        }
+      }
+    }
+
+    loadAvatarUrl();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [agent.avatar]);
 
   const {
     attributes,
@@ -148,21 +215,6 @@ function SortableAgent({
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
   }), [transform, isDragging, transition]);
-
-  // Memoize metro station style
-  const metroStationStyle = useMemo(() => ({
-    position: 'absolute' as const,
-    left: '16px',
-    top: '50%',
-    width: '10px',
-    height: '10px',
-    transform: isWorktree ? 'translateY(-50%) rotate(45deg)' : 'translateY(-50%)',
-    borderRadius: isWorktree ? '0' : '50%',
-    background: agent.color,
-    border: `2px solid ${agent.color}`,
-    boxShadow: `0 0 8px ${agent.color}66`,
-    zIndex: 10,
-  }), [agent.color, isWorktree]);
 
   // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
   const isDormant = useMemo(() => {
@@ -204,15 +256,54 @@ function SortableAgent({
     return lastAssistantMessage !== undefined;
   }, [chatSessions, agent.id, isActive, isDormant]);
 
-  // Memoize agent card background style - highlight when waiting for response
+  // 🦆 Get last assistant message timestamp for this agent
+  const lastAssistantTimestamp = useMemo(() => {
+    if (!chatSessions) return 0;
+    const messages = chatSessions.get(agent.id);
+    if (!messages || messages.length === 0) return 0;
+
+    // Find LAST assistant message
+    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+    return lastAssistantMessage?.timestamp || 0;
+  }, [chatSessions, agent.id]);
+
+  // 🔵 Get last read timestamp for this agent
+  const lastReadTimestamp = useMemo(() => {
+    if (!lastReadTimestamps) return 0;
+    return lastReadTimestamps.get(agent.id) || 0;
+  }, [lastReadTimestamps, agent.id]);
+
+  // Memoize agent card background style - NO highlight for waiting (badge dot instead!)
   const agentCardBg = useMemo(() => {
-    if (isActive) return `${agent.color}15`;
-    // IMPORTANT: Dormant agents should NEVER be highlighted, even if waitingForResponse is true
-    if (isDormant) return isHovered ? 'rgba(255, 255, 255, 0.03)' : 'transparent';
-    if (agent.waitingForResponse || hasUnreadMessages) return 'rgba(59, 130, 246, 0.18)'; // Blue highlight for waiting (slightly brighter)
+    if (isActive) return `${agent.color}28`; // Increased from 15 to 28 (2x opacity, ~16%)
     if (isHovered) return 'rgba(255, 255, 255, 0.03)';
     return 'transparent';
-  }, [isActive, isHovered, agent.color, agent.waitingForResponse, hasUnreadMessages, isDormant]);
+  }, [isActive, isHovered, agent.color]);
+
+  // 🔵 Show notification badge dot when agent has NEW unread messages (read-once system)
+  // Badge appears when: NOT active + agent responded AFTER last read
+  const showNotificationBadge = useMemo(() => {
+    if (isActive || isDormant) return false; // No badge when active or dormant
+
+    // 🔵 TIMESTAMP COMPARISON: Badge shows ONLY if agent responded AFTER last read
+    // This creates "read-once" behavior: badge disappears when clicked, only reappears for NEW messages
+    return lastAssistantTimestamp > lastReadTimestamp;
+  }, [isActive, isDormant, lastAssistantTimestamp, lastReadTimestamp]);
+
+  // Memoize metro station style - DYNAMIC based on notification state (MUST be after showNotificationBadge)
+  const metroStationStyle = useMemo(() => ({
+    width: '10px',
+    height: '10px',
+    transform: isWorktree ? 'rotate(45deg)' : 'none',
+    borderRadius: isWorktree ? '0' : '50%',
+    // 🎨 Dynamic background: FULL agent color when unread, TRANSPARENT when read
+    background: showNotificationBadge ? agent.color : 'transparent',
+    // 🎨 Dynamic border: NO border when unread (full color), agent color BORDER when read
+    border: showNotificationBadge ? 'none' : `2px solid ${agent.color}66`, // 66 = ~40% opacity
+    boxShadow: showNotificationBadge ? `0 0 8px ${agent.color}99, 0 0 12px ${agent.color}66` : 'none',
+    flexShrink: 0,
+    transition: 'all 0.3s ease',
+  }), [isWorktree, showNotificationBadge, agent.color]);
 
   // Memoize callbacks to prevent recreation
   const handleSelect = useCallback(() => onSelect(agent), [onSelect, agent]);
@@ -225,17 +316,6 @@ function SortableAgent({
     e.stopPropagation();
     onGitMenuToggle(showGitMenu ? null : agent.id);
   }, [onGitMenuToggle, showGitMenu, agent.id]);
-
-  // 🦆 Get last assistant message timestamp for this agent
-  const lastAssistantTimestamp = useMemo(() => {
-    if (!chatSessions) return 0;
-    const messages = chatSessions.get(agent.id);
-    if (!messages || messages.length === 0) return 0;
-
-    // Find LAST assistant message
-    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
-    return lastAssistantMessage?.timestamp || 0;
-  }, [chatSessions, agent.id]);
 
   // Get relative time string with opacity - re-calculate on tick change
   const relativeTime = useMemo(() => getRelativeTimeString(lastAssistantTimestamp), [lastAssistantTimestamp, tick]);
@@ -253,38 +333,18 @@ function SortableAgent({
         ...style,
         marginBottom: '8px',
         position: 'relative' as const,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
       }}
       className="group"
     >
-      {/* Metro Station Dot/Diamond */}
-      <div className="metro-station" style={metroStationStyle} />
-
-      {/* Agent Card */}
-      <div
-        className="agent-card flex items-center"
-        onClick={handleSelect}
-        onContextMenu={handleContextMenu}
-        onMouseEnter={() => !isDraggingAny && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{
-          marginLeft: '36px',
-          padding: '8px 12px',
-          paddingLeft: '24px',
-          background: agentCardBg,
-          borderRadius: '6px',
-          cursor: 'pointer',
-          transition: 'background 0.2s ease',
-          position: 'relative',
-        }}
-      >
-        {/* 🦆 Relative Time Display - positioned absolutely on the left - ONLY show when NOT active */}
-        {relativeTime && !isActive && (
+      {/* LEFT SECTION: Timing + Metro Station (OUTSIDE colored background) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '35px' }}>
+        {/* 🦆 Relative Time - ALWAYS visible, positioned left of metro-station */}
+        {relativeTime ? (
           <div
             style={{
-              position: 'absolute',
-              left: '4px',
-              top: '50%',
-              transform: 'translateY(-50%)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -297,24 +357,104 @@ function SortableAgent({
               minWidth: '20px',
             }}
           >
-            {/* Value - brighter for fresh messages */}
+            {/* Value - agent color when <5 min, white otherwise */}
             <div style={{
               marginBottom: '1px',
-              color: `rgba(255, 255, 255, ${timestampOpacity})`,
+              color: relativeTime.minutes < 5 ? agent.color : `rgba(255, 255, 255, ${timestampOpacity})`,
               transition: 'color 1s ease',
             }}>
               {relativeTime.value}
             </div>
-            {/* Unit - slightly dimmer */}
+            {/* Unit - agent color when <5 min, slightly dimmer white otherwise */}
             <div style={{
               fontSize: '7px',
-              color: `rgba(255, 255, 255, ${timestampOpacity * 0.75})`,
+              color: relativeTime.minutes < 5 ? agent.color : `rgba(255, 255, 255, ${timestampOpacity * 0.75})`,
               transition: 'color 1s ease',
             }}>
               {relativeTime.unit}
             </div>
           </div>
-        )}
+        ) : null}
+
+        {/* Metro Station Dot/Diamond */}
+        <div className="metro-station" style={metroStationStyle} />
+      </div>
+
+      {/* RIGHT SECTION: Colored Background with Avatar + Content */}
+      <div
+        className="agent-card flex items-center"
+        onClick={handleSelect}
+        onContextMenu={handleContextMenu}
+        onMouseEnter={() => !isDraggingAny && setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          flex: 1,
+          padding: '8px 12px',
+          paddingLeft: '8px',
+          background: agentCardBg,
+          borderRadius: '6px',
+          cursor: 'pointer',
+          transition: 'background 0.2s ease',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          minHeight: '48px',
+        }}
+      >
+        {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '6px',
+            border: `2px solid ${agent.color}66`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={agent.label}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                console.error('[RepositoryGroup] Image failed to load, using fallback duck30.jpeg:', avatarUrl)
+                // Always fallback to duck30.jpeg on error
+                if (window.__TAURI__) {
+                  target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
+                } else {
+                  target.src = '/duck30.jpeg'
+                }
+              }}
+            />
+          ) : (
+            // Fallback to letter while loading
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                background: `linear-gradient(135deg, ${agent.color}40, ${agent.color}20)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                fontWeight: 700,
+                color: agent.color,
+              }}
+            >
+              {agent.label.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
 
         <div className="flex w-full items-center justify-between">
           <div className="flex w-full items-center gap-2 flex-1">
@@ -333,6 +473,7 @@ function SortableAgent({
               display: 'flex',
               alignItems: 'center',
               marginLeft: 'auto',
+              gap: '4px',
             }}
           >
             {/* Git Branch Icon */}
@@ -629,7 +770,8 @@ const MemoizedSortableAgent = memo(SortableAgent, (prevProps, nextProps) => {
     prevProps.showGitMenu === nextProps.showGitMenu &&
     prevProps.isDraggingAny === nextProps.isDraggingAny &&
     prevProps.isWorktree === nextProps.isWorktree &&
-    prevProps.chatSessions === nextProps.chatSessions
+    prevProps.chatSessions === nextProps.chatSessions &&
+    prevProps.lastReadTimestamps === nextProps.lastReadTimestamps
   )
 });
 
@@ -641,6 +783,7 @@ export default function RepositoryGroup({
   isCollapsed,
   activeId,
   chatSessions,
+  lastReadTimestamps,
   onToggle,
   onSelect,
   onClose,
@@ -1177,6 +1320,7 @@ export default function RepositoryGroup({
                         agent={agent}
                         isActive={agent.id === activeId}
                         chatSessions={chatSessions}
+                        lastReadTimestamps={lastReadTimestamps}
                         onSelect={onSelect}
                         onClose={onClose}
                         onContextMenu={onContextMenu}
@@ -1351,30 +1495,87 @@ export default function RepositoryGroup({
                         return lastAssistantMessage !== undefined;
                       })();
 
+                      // Calculate last assistant timestamp for worktree agents (same as SortableAgent)
+                      const lastAssistantTimestamp = (() => {
+                        if (!chatSessions) return 0;
+                        const messages = chatSessions.get(agent.id);
+                        if (!messages || messages.length === 0) return 0;
+                        const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+                        return lastAssistantMessage?.timestamp || 0;
+                      })();
+
+                      // 🔵 Show notification badge dot for worktree agents (read-once system)
+                      const lastReadTimestamp = lastReadTimestamps?.get(agent.id) || 0;
+                      const showNotificationBadge = !isActive && !isDormant && (lastAssistantTimestamp > lastReadTimestamp);
+
+                      const relativeTime = getRelativeTimeString(lastAssistantTimestamp);
+                      const timestampOpacity = relativeTime ? getTimestampOpacity(relativeTime.minutes) : 0.4;
+
                       return (
                         <div
                           key={agent.id}
-                          className="relative"
-                          style={{ marginBottom: '8px' }}
+                          style={{
+                            marginBottom: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
                         >
-                          {/* Metro Station DIAMOND for worktrees! */}
-                          <div
-                            className="metro-station-diamond"
-                            style={{
-                              position: 'absolute',
-                              left: '16px',
-                              top: '50%',
-                              width: '10px',
-                              height: '10px',
-                              transform: 'translateY(-50%) rotate(45deg)',  // DIAMOND shape!
-                              background: agent.color,
-                              border: `2px solid ${agent.color}`,
-                              boxShadow: `0 0 8px ${agent.color}66`,
-                              zIndex: 10,
-                            }}
-                          />
+                          {/* LEFT SECTION: Timing + Metro Station (OUTSIDE colored background) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '35px' }}>
+                            {/* 🦆 Relative Time - ALWAYS visible, positioned left of metro-station */}
+                            {relativeTime ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '9px',
+                                  fontWeight: 600,
+                                  lineHeight: '1',
+                                  pointerEvents: 'none',
+                                  userSelect: 'none',
+                                  minWidth: '20px',
+                                }}
+                              >
+                                <div style={{
+                                  marginBottom: '1px',
+                                  color: relativeTime.minutes < 5 ? agent.color : `rgba(255, 255, 255, ${timestampOpacity})`,
+                                  transition: 'color 1s ease',
+                                }}>
+                                  {relativeTime.value}
+                                </div>
+                                <div style={{
+                                  fontSize: '7px',
+                                  color: relativeTime.minutes < 5 ? agent.color : `rgba(255, 255, 255, ${timestampOpacity * 0.75})`,
+                                  transition: 'color 1s ease',
+                                }}>
+                                  {relativeTime.unit}
+                                </div>
+                              </div>
+                            ) : null}
 
-                          {/* Agent Card */}
+                            {/* Metro Station DIAMOND for worktrees! - DYNAMIC based on notification state */}
+                            <div
+                              className="metro-station-diamond"
+                              style={{
+                                width: '10px',
+                                height: '10px',
+                                transform: 'rotate(45deg)',  // DIAMOND shape!
+                                borderRadius: '0',
+                                // 🎨 Dynamic background: FULL agent color when unread, TRANSPARENT when read
+                                background: showNotificationBadge ? agent.color : 'transparent',
+                                // 🎨 Dynamic border: NO border when unread (full color), agent color BORDER when read
+                                border: showNotificationBadge ? 'none' : `2px solid ${agent.color}66`, // 66 = ~40% opacity
+                                boxShadow: showNotificationBadge ? `0 0 8px ${agent.color}99, 0 0 12px ${agent.color}66` : 'none',
+                                flexShrink: 0,
+                                transition: 'all 0.3s ease',
+                              }}
+                            />
+                          </div>
+
+                          {/* RIGHT SECTION: Colored Background with Avatar + Content */}
                           <div
                             className={`agent-card`}
                             onClick={() => onSelect(agent)}
@@ -1382,22 +1583,117 @@ export default function RepositoryGroup({
                             onMouseEnter={() => setHoveredAgentId(agent.id)}
                             onMouseLeave={() => setHoveredAgentId(null)}
                             style={{
-                              marginLeft: '36px',
+                              flex: 1,
                               padding: '8px 12px',
+                              paddingLeft: '8px',
                               background: isActive
-                                ? `${agent.color}15`  // Use agent color for active
-                                : isDormant
-                                ? (isHovered ? 'rgba(255, 255, 255, 0.03)' : 'transparent') // Dormant agents NEVER highlighted
-                                : (agent.waitingForResponse || hasUnreadMessages)
-                                ? 'rgba(59, 130, 246, 0.18)' // Blue highlight for waiting (slightly brighter)
+                                ? `${agent.color}28`  // Increased from 15 to 28 (2x opacity, ~16%)
                                 : isHovered
                                 ? 'rgba(255, 255, 255, 0.03)'
                                 : 'transparent',
                               borderRadius: '6px',
                               cursor: 'pointer',
                               transition: 'background 0.2s ease',
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              minHeight: '48px',
                             }}
                           >
+                            {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
+                            <div
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '6px',
+                                border: `2px solid ${agent.color}66`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {(() => {
+                                // Load avatar URL for worktree agents (inline)
+                                const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+                                useEffect(() => {
+                                  let isMounted = true;
+
+                                  async function loadAvatarUrl() {
+                                    if (!agent.avatar) {
+                                      if (isMounted) {
+                                        if (window.__TAURI__) {
+                                          setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+                                        } else {
+                                          setAvatarUrl('/duck30.jpeg');
+                                        }
+                                      }
+                                      return;
+                                    }
+
+                                    if (isCustomAvatar(agent.avatar)) {
+                                      try {
+                                        const url = await getCustomAvatarUrl(agent.avatar);
+                                        if (isMounted) setAvatarUrl(url);
+                                      } catch (error) {
+                                        if (isMounted) {
+                                          if (window.__TAURI__) {
+                                            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+                                          } else {
+                                            setAvatarUrl('/duck30.jpeg');
+                                          }
+                                        }
+                                      }
+                                    } else {
+                                      if (isMounted) setAvatarUrl(getAvatarUrl(agent.avatar));
+                                    }
+                                  }
+
+                                  loadAvatarUrl();
+                                  return () => { isMounted = false; };
+                                }, [agent.avatar]);
+
+                                return avatarUrl ? (
+                                  <img
+                                    src={avatarUrl}
+                                    alt={agent.label}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                    }}
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      if (window.__TAURI__) {
+                                        target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
+                                      } else {
+                                        target.src = '/duck30.jpeg'
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      background: `linear-gradient(135deg, ${agent.color}40, ${agent.color}20)`,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '16px',
+                                      fontWeight: 700,
+                                      color: agent.color,
+                                    }}
+                                  >
+                                    {agent.label.charAt(0).toUpperCase()}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
                             <div className="flex w-full items-center justify-between">
                               <div className="flex w-full items-center gap-2 flex-1">
                                 <TerminalActivityBar
@@ -1408,13 +1704,14 @@ export default function RepositoryGroup({
                                 />
                               </div>
 
-                              {/* Action buttons wrapper - NO GAP between icons */}
+                              {/* Action buttons wrapper */}
                               <div
                                 className="icons-wrapper"
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
                                   marginLeft: 'auto',
+                                  gap: '4px',
                                 }}
                               >
                                 {/* Git Branch Icon - shown on hover */}

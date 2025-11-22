@@ -216,6 +216,11 @@ function App() {
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // 🔵 Read-once notification badge system: Track last read timestamp for each agent
+  // When user clicks an agent, we mark it as "read" by storing current timestamp
+  // Badge shows only if lastAssistantMessage > lastRead (new message after last read)
+  const [lastReadTimestamps, setLastReadTimestamps] = useState<Map<string, number>>(new Map());
+
   // NEW: Agent Terminals - Terminali integrati XTerm associati agli agenti (separati da terminals)
   const [agentTerminals, setAgentTerminals] = useState<AgentTerminal[]>([]);
 
@@ -639,6 +644,17 @@ function App() {
       []
     )
   );
+
+  // 🔵 Mark agent as "read" when it becomes active
+  useEffect(() => {
+    if (activeId) {
+      setLastReadTimestamps((prev) => {
+        const updated = new Map(prev);
+        updated.set(activeId, Date.now());
+        return updated;
+      });
+    }
+  }, [activeId]);
 
   // Sync terminal status with chatLoadingMap and check if waiting for response
   useEffect(() => {
@@ -6453,6 +6469,7 @@ You have access to all Bash tools to execute git commands like:
           quackSoundEnabled={quackSoundEnabled}
           // Chat sessions
           chatSessions={chatSessions}
+          lastReadTimestamps={lastReadTimestamps}
           // Terminal props
           onAdd={handleOpenNewTerminalModal}
           onSelect={handleSelectTerminal}

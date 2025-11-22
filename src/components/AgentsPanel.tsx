@@ -82,7 +82,7 @@ export default function AgentsPanel({
       >
         <div>
           <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
-            Duck Agents
+            Droids
           </h3>
           <p className="text-xs" style={{ color: "rgba(255, 255, 255, 0.5)", marginTop: "2px" }}>
             Sub Agents
@@ -120,7 +120,7 @@ export default function AgentsPanel({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search agents..."
+                placeholder="Search droids..."
                 className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
               />
               <svg
@@ -142,7 +142,7 @@ export default function AgentsPanel({
               onClick={() => setModalOpen(true)}
               className="px-3 py-2 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200 whitespace-nowrap"
             >
-              + New Agent
+              + New Droid
             </button>
           </div>
         </div>
@@ -260,7 +260,7 @@ export default function AgentsPanel({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
                   </svg>
-                  <span>Global Protocol Droids</span>
+                  <span>Global Droids</span>
                   <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "global").length}</span>
                 </button>
                 {globalExpanded && (
@@ -402,7 +402,7 @@ export default function AgentsPanel({
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                   </svg>
-                  <span>Project Protocol Droids</span>
+                  <span>Project Droids</span>
                   <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "project").length}</span>
                 </button>
                 {projectExpanded && (

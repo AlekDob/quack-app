@@ -466,6 +466,16 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
     // Log discovered tools when system initializes
     if (event.subtype === 'init' || !event.subtype) {
       console.log('🔍 [MCP DEBUG] System Initialized event - SDK discovered', tools.length, 'tools');
+      console.log('🚨 [DORMANT DEBUG] ===== System Initialized message WILL BE CREATED =====');
+      console.log('🚨 [DORMANT DEBUG] This message will make the agent ACTIVE (not dormant)');
+      console.log('🚨 [DORMANT DEBUG] Event details:', {
+        type: event.type,
+        subtype: event.subtype,
+        session_id: event.session_id,
+        timestamp: new Date().toISOString()
+      });
+      console.log('🚨 [DORMANT DEBUG] Stack trace:', new Error().stack);
+      console.log('🚨 [DORMANT DEBUG] ============================================');
 
       // Log MCP tools specifically
       const mcpTools = tools.filter((t: string) => t.startsWith('mcp__'));

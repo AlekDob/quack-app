@@ -37,6 +37,7 @@ interface SortableRepositoryGroupProps {
   isCollapsed: boolean;
   activeId: string | null;
   chatSessions?: Map<string, ChatMessage[]>;
+  lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
   onToggle: () => void;
   onSelect: (terminal: TerminalInfo) => void;
   onClose: (id: string) => void;
@@ -144,6 +145,7 @@ interface TerminalSidebarProps {
   quackSoundEnabled?: boolean;
   // Chat sessions
   chatSessions?: Map<string, ChatMessage[]>;
+  lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
   // Terminal props
   onAdd: () => void; // Will be used by "+" button for terminal creation
   onSelect: (id: string) => void;
@@ -179,6 +181,7 @@ export default function TerminalSidebar({
   quackSoundEnabled,
   // Chat sessions
   chatSessions,
+  lastReadTimestamps,
   // Terminal props
   onAdd,
   onSelect,
@@ -712,6 +715,7 @@ export default function TerminalSidebar({
                     isCollapsed={isCollapsed}
                     activeId={activeId}
                     chatSessions={chatSessions}
+                    lastReadTimestamps={lastReadTimestamps}
                     onToggle={() => onToggleGroup(repoKey)}
                     onSelect={handleSelectTerminal}
                     onClose={onClose}
