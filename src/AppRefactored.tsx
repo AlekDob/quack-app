@@ -773,6 +773,7 @@ function AppRefactored() {
           onTelegramClick={() => setShowTelegramSetup(true)}
           onTerminalClick={() => setShowNewTerminalModal(true)}
           onBrowserClick={() => {}}
+          onDroidFactoryClick={() => {}}
           onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
           sidePanelCollapsed={sidePanelCollapsed}
         />

@@ -51,6 +51,8 @@ import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
+import { DroidFactoryDrawer } from "./components/droid-factory";
+import { useDroidFactory } from "./hooks/useDroidFactory";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
@@ -207,6 +209,13 @@ function App() {
       return false;
     }
   });
+
+  // Droid Factory hook
+  const {
+    droidFactoryOpen,
+    setDroidFactoryOpen,
+    userStats,
+  } = useDroidFactory();
 
   // AgentChat state (workspace containers for terminal tabs)
   // AgentChats kept for UI grouping only - NOT linked to terminals!
@@ -6555,6 +6564,7 @@ You have access to all Bash tools to execute git commands like:
               onTelegramClick={() => setShowTelegramSetup(true)}
               onTerminalClick={handleCreateAgentTerminal}
               onBrowserClick={handleOpenBrowserTab}
+              onDroidFactoryClick={() => setDroidFactoryOpen(true)}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
             />
@@ -7140,6 +7150,13 @@ You have access to all Bash tools to execute git commands like:
         <TelegramSetup
           open={showTelegramSetup}
           onClose={() => setShowTelegramSetup(false)}
+        />
+
+        <DroidFactoryDrawer
+          open={droidFactoryOpen}
+          onClose={() => setDroidFactoryOpen(false)}
+          onSendMessage={sendMessageForAgent}
+          userStats={userStats}
         />
       </div>
 
