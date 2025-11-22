@@ -1,4 +1,5 @@
-import React, { createContext, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import type { MaxPlanStats, MaxPlanType, MaxPlanConfig, MaxPlanHistoryData } from '../hooks/maxPlanTypes';
 import { useMaxPlanTracking } from '../hooks/useMaxPlanTracking';
 import { useMaxPlanNotifications } from '../hooks/useMaxPlanNotifications';

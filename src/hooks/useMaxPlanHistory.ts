@@ -22,7 +22,7 @@ export function useMaxPlanHistory() {
   /**
    * Record today's usage (called when message count increments)
    */
-  const recordUsage = (messageCount: number, totalTokens: number, planType: MaxPlanType) => {
+  const recordUsage = (messageCount: number, tokensUsed: number, planType: MaxPlanType) => {
     const today = getTodayDateString();
 
     setHistory((prev) => {
@@ -31,10 +31,10 @@ export function useMaxPlanHistory() {
 
       if (existingDayIndex >= 0) {
         // Update existing day
-        dailyUsage[existingDayIndex] = { date: today, messageCount, totalTokens, planType };
+        dailyUsage[existingDayIndex] = { date: today, messageCount, totalTokens: tokensUsed, planType };
       } else {
         // Add new day
-        dailyUsage.push({ date: today, messageCount, totalTokens, planType });
+        dailyUsage.push({ date: today, messageCount, totalTokens: tokensUsed, planType });
       }
 
       // Sort by date (newest first) and limit to MAX_HISTORY_DAYS

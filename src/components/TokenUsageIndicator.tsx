@@ -39,8 +39,17 @@ function TokenUsageIndicator({
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { stats: maxPlanStats, history, clearHistory, exportHistory } = useMaxPlan();
-  const maxPlanStats = null;
-  const history = { daily: [], weekly: [], totalMessages: 0, totalTokens: 0 };
+  const maxPlanStats = undefined;
+  const history = {
+    dailyUsage: [],
+    weeklyUsage: [],
+    totalMessages: 0,
+    totalTokens: 0,
+    averageMessagesPerDay: 0,
+    averageTokensPerDay: 0,
+    peakDay: null,
+    peakWeek: null,
+  };
   const clearHistory = () => {};
   const exportHistory = () => '';
 

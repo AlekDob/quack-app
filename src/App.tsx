@@ -4144,6 +4144,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return newMap;
     });
 
+    // 🦆 NEW: Clear resume message flag so it doesn't show again for fresh session
+    resumeMessageShownRef.current.delete(terminal.id);
+
+    // 🦆 NEW: Abort any active stream for this agent to ensure clean slate
+    // Use sessionId if available (what claudeSDK tracks), otherwise use agentId as fallback
+    const streamKeyToAbort = sessionId || terminal.id;
+    try {
+      const { abortSessionStream } = await import('./services/claudeSDK');
+      abortSessionStream(streamKeyToAbort);
+      console.log(`✅ Aborted active stream for agent ${terminal.id} (session: ${streamKeyToAbort})`);
+    } catch (error) {
+      console.warn('Failed to abort stream:', error);
+    }
+
     toast.success(`Agent reset: ${terminal.label} - Stamina restored to 100%! 🦆`);
   }, [chatSessionIds, tauriAvailable]);
 
