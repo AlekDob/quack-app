@@ -229,9 +229,14 @@ function SessionCard({ session, onClick }: SessionCardProps) {
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h4 className="text-sm font-medium text-white/90 line-clamp-2 flex-1 group-hover:text-white transition-colors">
-          {session.title}
-        </h4>
+        <div className="flex-1">
+          <h4 className="text-sm font-medium text-white/90 line-clamp-2 group-hover:text-white transition-colors">
+            {session.title}
+          </h4>
+          <p className="text-[10px] text-white/30 mt-1 font-mono">
+            {session.id}
+          </p>
+        </div>
         <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded border uppercase ${statusColor}`}>
           {session.status}
         </span>

@@ -40,6 +40,7 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onOpenFile?: (path: string) => void;
   onFilePathClick?: (path: string) => void;
+  onSessionIdClick?: (sessionId: string) => void;
   agentName?: string;
   agentAvatar?: string;
   projectName?: string;
@@ -47,12 +48,16 @@ interface ChatMessageProps {
   isLastUserMessage?: boolean;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
   const attachments = message.attachments ?? [];
+
+  // Check if this is a resume session message
+  const isResumeMessage = message.metadata?.isResumeMessage === true;
+  const sessionId = message.metadata?.sessionId as string | undefined;
 
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -221,8 +226,57 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, agentName = 'Jack',
     ? isTruncated(message.content, 30, 250)
     : false;
 
-  // Render text with @mentions as inline chips
+  // Render text with @mentions as inline chips and clickable Session ID
   const renderTextWithMentions = (text: string) => {
+    // If this is a resume message with sessionId, make it clickable
+    if (isResumeMessage && sessionId && onSessionIdClick) {
+      // Replace Session ID: `sessionId` with clickable element
+      const sessionIdPattern = /Session ID: `([^`]+)`/g;
+      const parts: React.ReactNode[] = [];
+      let lastIndex = 0;
+      let match;
+
+      while ((match = sessionIdPattern.exec(text)) !== null) {
+        // Add text before Session ID
+        if (match.index > lastIndex) {
+          parts.push(text.substring(lastIndex, match.index));
+        }
+
+        // Capture match values before adding to parts (to avoid closure issues)
+        const capturedSessionId = match[1];
+        const capturedIndex = match.index;
+
+        // Add clickable Session ID
+        parts.push(
+          <span key={`session-${capturedIndex}`}>
+            Session ID:{' '}
+            <button
+              onClick={() => onSessionIdClick(capturedSessionId)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-mono text-xs transition-colors cursor-pointer border border-blue-500/30 hover:border-blue-500/50"
+              title="Click to view session details"
+            >
+              <span>{capturedSessionId}</span>
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+          </span>
+        );
+
+        lastIndex = match.index + match[0].length;
+      }
+
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
+      }
+
+      if (parts.length > 0) {
+        return parts;
+      }
+    }
+
+    // Default: Render with @mentions
     const mentions = parseAgentMentions(text);
 
     if (mentions.length === 0) {

@@ -39,6 +39,7 @@ interface ChatViewProps {
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
   onFilePathClick?: (path: string, lineChanges?: LineChange[]) => void;
+  onSessionIdClick?: (sessionId: string) => void;
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void; // NEW: Diff drawer handler
   onEditsChange?: (edits: FileEdit[], deletes: FileDeleted[]) => void; // NEW: Notify parent when edits change
   pendingAgentMention?: AgentInfo | null;
@@ -95,6 +96,7 @@ export default function ChatView({
   agents,
   onSelectAgent,
   onFilePathClick,
+  onSessionIdClick,
   onDiffClick, // NEW: Diff drawer handler
   onEditsChange, // NEW: Notify parent when edits change
   pendingAgentMention,
@@ -357,6 +359,7 @@ export default function ChatView({
         messages={messages}
         loading={isLoading}
         onFilePathClick={onFilePathClick}
+        onSessionIdClick={onSessionIdClick}
         agentName={agentName}
         agentAvatar={agentAvatar}
         projectName={projectName}

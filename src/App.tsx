@@ -1067,9 +1067,10 @@ function App() {
     const resumeMessage: ChatMessage = {
       id: `msg-system-resume-${Date.now()}`,
       role: 'assistant',
-      content: '📜 **Previous conversation detected**\n\nThis agent has an active session. The conversation history is preserved and will continue from where you left off.\n\n💡 Right-click the agent and select "Reset Agent" to start fresh.',
+      content: `📜 **Previous conversation detected**\n\nSession ID: \`${savedSessionId}\`\n\nThis agent has an active session. The conversation history is preserved and will continue from where you left off.\n\n💡 Right-click the agent and select "Reset Agent" to start fresh.`,
       timestamp: Date.now(),
       status: 'complete',
+      metadata: { sessionId: savedSessionId, isResumeMessage: true }, // Add metadata for click handling
     };
 
     setChatSessions((prev) => {
@@ -6031,6 +6032,18 @@ You have access to all Bash tools to execute git commands like:
     setSessionDetailsDrawerOpen(true);
   }, []);
 
+  const handleSessionIdClick = useCallback(async (sessionId: string) => {
+    // Load session details and open drawer
+    try {
+      const sessionDetails = await invoke<SessionInfo>('get_session_details', { sessionId });
+      setSelectedSession(sessionDetails);
+      setSessionDetailsDrawerOpen(true);
+    } catch (error) {
+      console.error('[handleSessionIdClick] Failed to load session:', error);
+      toast.error('Failed to load session details');
+    }
+  }, []);
+
   const handleResumeSession = useCallback(async (sessionId: string) => {
     if (!tauriAvailable || creatingTerminal) {
       return;
@@ -6569,6 +6582,7 @@ You have access to all Bash tools to execute git commands like:
               agents={agents}
               onSelectAgent={handleUseAgent}
               onFilePathClick={handleFilePathClick}
+              onSessionIdClick={handleSessionIdClick}
               onDiffClick={handleDiffClick} // NEW: Diff drawer handler
               onEditsChange={handleEditsChange} // NEW: Track modified files
               pendingAgentMention={pendingAgentMention}
@@ -6936,6 +6950,7 @@ You have access to all Bash tools to execute git commands like:
         <SessionDetailsDrawer
           isOpen={sessionDetailsDrawerOpen}
           sessionId={selectedSession?.id || null}
+          currentActiveSessionId={activeId ? chatSessionIds.get(activeId) : undefined}
           onClose={() => setSessionDetailsDrawerOpen(false)}
           onResumeSession={handleResumeSession}
           onDeleteSession={handleDeleteSession}

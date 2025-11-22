@@ -379,6 +379,7 @@ export interface ChatMessage {
   error?: string;
   attachments?: ChatAttachment[];
   events?: ClaudeEvent[]; // Claude CLI events for streaming visualization
+  metadata?: Record<string, unknown>; // Additional metadata for special messages
 }
 
 export interface ChatSession {

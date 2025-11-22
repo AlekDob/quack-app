@@ -404,10 +404,29 @@ Also, check out <#documentation> for more guides. 🦆
 
 ## Resources
 
+### scripts/
+
+This skill includes scripts for automated posting:
+
+- `post_to_discord.py` - Python script for posting to Discord with proper JSON escaping, emoji support, and image attachments
+
+**Usage:**
+```bash
+# Simple text post
+python3 scripts/post_to_discord.py "Your message here 🦆"
+
+# Post with image
+python3 scripts/post_to_discord.py "Feature announcement!" --image screenshot.png
+
+# Post from file
+python3 scripts/post_to_discord.py --file update.txt --image demo.png
+```
+
 ### references/
 
 This skill includes reference documents with detailed guides and templates:
 
+- `post_templates.md` - Pre-formatted message templates for announcements, updates, events, and community posts
 - `community_templates.md` - Message templates, announcement formats, event planning checklists
 - `moderation_guidelines.md` - Detailed moderation scenarios, escalation procedures, ban appeal process
 - `growth_playbook.md` - Month-by-month community growth strategies, marketing tactics, partnership ideas
@@ -434,6 +453,149 @@ This skill includes assets for immediate use:
 7. **Document Everything**: FAQs, guides, decisions - make knowledge accessible
 8. **Foster Community Leaders**: Empower members to help each other and lead discussions
 
+### 10. Posting Updates to Discord
+
+**Discord Webhook Integration:**
+
+The Quack Discord community uses webhooks for automated posting. When posting development updates, feature announcements, or community content, use the proper JSON format and include rich media.
+
+**Webhook URL:**
+```
+https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ
+```
+
+**Basic Text Post (JSON format):**
+
+```bash
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Your message here"}'
+```
+
+**Post with Image Attachment:**
+
+When posting with images, use `multipart/form-data` format:
+
+```bash
+curl -X POST "https://discord.com/api/webhooks/1432322294201581569/KG2eqmKPm6MIYTAAZzKmexICqfTJYtT5MouTVnwSPLSDoxSk-JQwSAEjT4K1BtzXABeZ" \
+  -F "file=@/path/to/image.png" \
+  -F "payload_json={\"content\":\"Your message here\"}"
+```
+
+**⚠️ Important JSON Formatting Rules:**
+
+1. **Escape special characters**: Quotes, backslashes, newlines
+2. **No emoji in JSON strings**: Discord webhooks may reject emoji in `payload_json`. Use plain text or HTML entities.
+3. **Newlines**: Use `\n` for line breaks
+4. **Quotes**: Escape with `\"`
+
+**Recommended Workflow for Complex Posts:**
+
+1. Write message content in plain text file
+2. Use Python/Node.js script to properly escape JSON
+3. Test with simple curl first
+4. Add image attachment last
+
+**Message Style Guide for Updates:**
+
+**Feature Announcements:**
+```
+New Feature: [Feature Name]
+
+We just shipped [feature description]!
+
+What's new:
+- Feature 1
+- Feature 2
+- Feature 3
+
+Why this matters:
+- Benefit 1
+- Benefit 2
+
+Check out the screenshot to see it in action!
+
+#QuackApp #FeatureName #ProductivityTools
+```
+
+**Bug Fix Announcements:**
+```
+Bug Fix: [Issue Description]
+
+Fixed: [Detailed explanation]
+
+Impact:
+- Who was affected
+- What's improved now
+
+Thanks to @username for reporting!
+
+#QuackApp #BugFix
+```
+
+**Daily Progress Updates:**
+```
+Dev Update - [Date]
+
+Today's progress:
+✅ Completed task 1
+✅ Completed task 2
+🚧 In progress: task 3
+
+Tomorrow:
+🎯 Goal 1
+🎯 Goal 2
+
+Building in public, day by day!
+
+#QuackApp #BuildInPublic
+```
+
+**Community Milestones:**
+```
+🎉 Milestone: [Achievement]
+
+We just hit [number/achievement]!
+
+Thanks to our amazing community for:
+- Contribution 1
+- Contribution 2
+
+You make Quack better every day! 🦆
+
+#QuackApp #CommunityWins
+```
+
+**Emoji Usage Guidelines:**
+
+- Use emoji for visual interest and scannability
+- Common emoji for Quack:
+  - 🦆 (brand emoji - use frequently)
+  - ✅ (completed items)
+  - 🚧 (in progress)
+  - 🐛 (bug fixes)
+  - 🚀 (new features)
+  - 💡 (ideas/suggestions)
+  - 🎉 (celebrations)
+  - 📊 (metrics/data)
+  - 👀 (sneak peeks)
+
+**Hashtag Strategy:**
+
+Always include 2-4 hashtags:
+- `#QuackApp` (always)
+- `#FeatureName` (specific feature)
+- `#Category` (BuildInPublic, BugFix, UXImprovement, etc.)
+- `#Tech` (if relevant: Claude, Tauri, React, etc.)
+
+**Image Best Practices:**
+
+- **Screenshots**: 1920x1080 or 16:9 aspect ratio
+- **File size**: Under 8MB for fast loading
+- **Format**: PNG for UI screenshots, JPG for photos
+- **Content**: Show the feature in action, not just static UI
+- **Annotations**: Use arrows or highlights to draw attention
+
 ## Common Scenarios Checklist
 
 - [ ] **New member joins**: Welcome message, assign role, encourage introduction
@@ -446,3 +608,4 @@ This skill includes assets for immediate use:
 - [ ] **Weekly update**: Post changelog, share metrics, highlight community contributions
 - [ ] **Conflict arises**: Assess severity, de-escalate, enforce rules fairly, document
 - [ ] **Community milestone**: Celebrate publicly, thank contributors, share achievements
+- [ ] **Posting update with image**: Use multipart/form-data format, avoid emoji in JSON, test first

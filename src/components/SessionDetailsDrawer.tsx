@@ -7,6 +7,7 @@ import MarkdownText from './MarkdownText';
 interface SessionDetailsDrawerProps {
   isOpen: boolean;
   sessionId: string | null;
+  currentActiveSessionId?: string;
   onClose: () => void;
   onResumeSession: (sessionId: string) => void;
   onExportSession?: (sessionId: string) => void;
@@ -16,6 +17,7 @@ interface SessionDetailsDrawerProps {
 export default function SessionDetailsDrawer({
   isOpen,
   sessionId,
+  currentActiveSessionId,
   onClose,
   onResumeSession,
   onExportSession: _onExportSession,
@@ -383,17 +385,26 @@ export default function SessionDetailsDrawer({
           {/* Footer Actions */}
           <footer className="flex-shrink-0 px-6 py-4 border-t border-white/10 bg-black/30 backdrop-blur-md">
             <div className="flex items-center justify-between gap-3">
-              {/* Resume Session - Always visible */}
-              <button
-                onClick={handleResume}
-                disabled={!details}
-                className="px-4 py-2.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                </svg>
-                Resume Session
-              </button>
+              {/* Resume Session - Hidden if this is the current active session */}
+              {sessionId !== currentActiveSessionId ? (
+                <button
+                  onClick={handleResume}
+                  disabled={!details}
+                  className="px-4 py-2.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                  Resume Session
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/20 text-green-400 text-sm">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Active Session
+                </div>
+              )}
 
               {/* Delete Actions */}
               <div className="flex items-center gap-3">
