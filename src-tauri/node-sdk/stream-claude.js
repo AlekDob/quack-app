@@ -25,6 +25,7 @@ const {
   sessionId,
   agents,
   attachments, // Array of file paths for images/attachments
+  outputFormat, // Structured outputs configuration
 } = config;
 
 // Emit event via stdout
@@ -222,7 +223,6 @@ async function main() {
 
     console.error(`[DEBUG] Prompt: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
     console.error(`[DEBUG] Attachments:`, attachments ? attachments.length : 0);
-    console.error(`[DEBUG] Options:`, JSON.stringify(options, null, 2));
 
     if (agents && Array.isArray(agents) && agents.length > 0) {
       // Transform agents to SDK format
@@ -234,6 +234,14 @@ async function main() {
       }));
       console.error(`[DEBUG] Using ${agents.length} agent(s)`);
     }
+
+    // Add structured outputs if provided
+    if (outputFormat) {
+      options.outputFormat = outputFormat;
+      console.error(`[DEBUG] Using structured outputs with schema:`, JSON.stringify(outputFormat, null, 2));
+    }
+
+    console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
 
     // Query Claude with streaming input mode (supports images)
     // Use AsyncGenerator if we have attachments, otherwise use simple prompt

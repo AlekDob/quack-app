@@ -102,6 +102,8 @@ pub struct ClaudeCliRequest {
     pub cwd: Option<String>,
     // ✅ Session ID for conversation continuity (resume support)
     pub session_id: Option<String>,
+    // ✅ Structured outputs support
+    pub output_format: Option<serde_json::Value>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -743,6 +745,7 @@ pub async fn send_message_via_sdk_streaming(
         cwd,
         attachments,
         session_id, // ✅ Extract session_id for use in session management
+        output_format, // ✅ Extract output_format for structured outputs
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -820,6 +823,12 @@ pub async fn send_message_via_sdk_streaming(
     if let Some(attachment_list) = attachments {
         config["attachments"] = serde_json::json!(attachment_list);
         log::info!("[SDK DEBUG] Adding {} attachments to config", attachment_list.len());
+    }
+
+    // Add outputFormat if provided (for structured outputs)
+    if let Some(output_fmt) = output_format {
+        config["outputFormat"] = output_fmt;
+        log::info!("[SDK DEBUG] Adding outputFormat to config for structured outputs");
     }
 
     let config_str = config.to_string();

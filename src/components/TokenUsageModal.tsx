@@ -1,4 +1,6 @@
 import './TokenUsageModal.css';
+import type { MaxPlanStats } from '../hooks/maxPlanTypes';
+import { formatTimeRemaining, formatTime, getPlanDisplayName } from '../hooks/useMaxPlanTracking';
 
 interface TokenUsageModalProps {
   inputTokens: number;
@@ -17,6 +19,9 @@ interface TokenUsageModalProps {
   onClose: () => void;
   onCompact?: () => void;
   onClear?: () => void;
+  onShowAnalytics?: () => void;
+  // Max Plan tracking (optional)
+  maxPlanStats?: MaxPlanStats;
 }
 
 export default function TokenUsageModal({
@@ -30,6 +35,8 @@ export default function TokenUsageModal({
   onClose,
   onCompact,
   onClear,
+  onShowAnalytics,
+  maxPlanStats,
 }: TokenUsageModalProps) {
   const totalTokens = inputTokens + outputTokens;
   const remainingTokens = maxTokens - totalTokens;
@@ -156,6 +163,96 @@ export default function TokenUsageModal({
               </>
             )}
           </div>
+
+          {/* Max Plan Status (if available) */}
+          {maxPlanStats && (
+            <div className="max-plan-status">
+              <div className="max-plan-header">
+                <span className="max-plan-icon">💎</span>
+                <span className="max-plan-title">{getPlanDisplayName(maxPlanStats.planType).toUpperCase()} PLAN</span>
+              </div>
+
+              <div className="max-plan-breakdown">
+                {/* Messages Used */}
+                <div className="max-plan-item">
+                  <span className="max-plan-label">Messages</span>
+                  <span className="max-plan-value">
+                    {maxPlanStats.messageCount}/{maxPlanStats.messageLimit}
+                    <span className="max-plan-percentage"> ({Math.round(maxPlanStats.messagePercentage)}%)</span>
+                  </span>
+                </div>
+
+                {/* Burn Rate */}
+                {maxPlanStats.burnRatePerHour > 0 && (
+                  <div className="max-plan-item">
+                    <span className="max-plan-label">Burn Rate</span>
+                    <span className="max-plan-value">{maxPlanStats.burnRatePerHour.toFixed(1)}/hr</span>
+                  </div>
+                )}
+
+                {/* Est. Time Until Limit */}
+                {maxPlanStats.estimatedTimeUntilLimit < Infinity && maxPlanStats.estimatedTimeUntilLimit > 0 && (
+                  <div className="max-plan-item">
+                    <span className="max-plan-label">Est. Duration</span>
+                    <span className="max-plan-value">{formatTimeRemaining(maxPlanStats.estimatedTimeUntilLimit)}</span>
+                  </div>
+                )}
+
+                <div className="max-plan-divider" />
+
+                {/* Session Info */}
+                <div className="max-plan-section-title">⏰ SESSION INFO</div>
+
+                <div className="max-plan-item">
+                  <span className="max-plan-label">Started</span>
+                  <span className="max-plan-value">{formatTime(maxPlanStats.sessionStartTime)}</span>
+                </div>
+
+                <div className="max-plan-item">
+                  <span className="max-plan-label">Window Ends</span>
+                  <span className="max-plan-value">{formatTime(maxPlanStats.windowEndsAt)}</span>
+                </div>
+
+                <div className="max-plan-item">
+                  <span className="max-plan-label">Time Remaining</span>
+                  <span className="max-plan-value">{formatTimeRemaining(maxPlanStats.timeRemaining)}</span>
+                </div>
+              </div>
+
+              {/* Warning if near limit */}
+              {maxPlanStats.isCritical && (
+                <div className="max-plan-warning critical">
+                  <span className="max-plan-warning-icon">🚨</span>
+                  <span className="max-plan-warning-text">
+                    You've used {Math.round(maxPlanStats.messagePercentage)}% of your message limit.
+                    Window resets at {formatTime(maxPlanStats.windowEndsAt)}.
+                  </span>
+                </div>
+              )}
+              {maxPlanStats.isNearLimit && !maxPlanStats.isCritical && (
+                <div className="max-plan-warning warning">
+                  <span className="max-plan-warning-icon">⚠️</span>
+                  <span className="max-plan-warning-text">
+                    Approaching message limit ({Math.round(maxPlanStats.messagePercentage)}%).
+                    Consider compacting or waiting for window reset.
+                  </span>
+                </div>
+              )}
+
+              {/* View Analytics Button */}
+              {onShowAnalytics && (
+                <button
+                  className="max-plan-analytics-btn"
+                  onClick={() => {
+                    onShowAnalytics();
+                    onClose();
+                  }}
+                >
+                  📊 View Analytics
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Suggestion Card */}
           <div className={`token-suggestion ${status.level}`}>

@@ -78,6 +78,8 @@ import {
   loadAgentChatsFromStorage,
 } from "./services/agentChatStorage";
 import { getDuckdroidUrl } from "./utils/agentAvatars";
+// TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
+// import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
 import {
   TERMINAL_COLORS,
   stripAnsi,
@@ -185,7 +187,7 @@ const checkStorageVersion = async (): Promise<boolean> => {
 // ============================================
 // NO migration needed! Terminals are independent entities, grouped only by cwd in the UI
 
-function App() {
+function AppContent() {
   // Load assets INSIDE the component, not at module level
   const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
   const notificationAudio = new URL("../sounds/quack.mp3", import.meta.url).href;
@@ -217,6 +219,9 @@ function App() {
     setDroidFactoryOpen,
     userStats,
   } = useDroidFactory();
+
+  // TEMPORARILY DISABLED: Max Plan tracking
+  // const { incrementMessageCount } = useMaxPlan();
 
   // AgentChat state (workspace containers for terminal tabs)
   // AgentChats kept for UI grouping only - NOT linked to terminals!
@@ -921,6 +926,9 @@ function App() {
           // We must manually accumulate across all turns to get total session usage
           if (claudeEvent.type === 'result' && claudeEvent.usage) {
             const usage = claudeEvent.usage;
+
+            // TEMPORARILY DISABLED: Max Plan tracking
+            // incrementMessageCount();
 
             setChatTokensMap((prev) => {
               const newMap = new Map(prev);
@@ -7267,6 +7275,20 @@ You have access to all Bash tools to execute git commands like:
       <Toaster position="bottom-right" richColors closeButton />
     </>
   );
+}
+
+// TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error
+// function App() {
+//   return (
+//     <MaxPlanProvider>
+//       <AppContent />
+//     </MaxPlanProvider>
+//   );
+// }
+
+// Temporary: Direct export without MaxPlanProvider
+function App() {
+  return <AppContent />;
 }
 
 export default App;

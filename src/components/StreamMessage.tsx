@@ -15,6 +15,8 @@ import { TaskAgentAvatar } from './TaskAgentAvatar';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent} from '../types';
+import { BugReportWidget, WebAnalysisCard } from './structured-outputs';
+import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
@@ -347,6 +349,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
 
   // Result message - final summary with consolidated layout
   if (message.type === 'result') {
+    // Check for structured output in the message
+    const structuredOutput = (message as any).structured_output;
+
     // Check if the result text is already shown in the last assistant message
     // to avoid duplication
     const lastAssistantMessage = useMemo(() => {
@@ -412,13 +417,31 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
           )}
         </div>
-        <div className="assistant-content">
+        <div className="assistant-content" style={{ width: '100%' }}>
           <div className="assistant-name">{agentName}</div>
-          {message.result && (
+
+          {/* Structured Output Widgets */}
+          {structuredOutput && isBugReportOutput(structuredOutput) && (
+            <BugReportWidget
+              data={structuredOutput}
+              onFileClick={(path, line) => onFilePathClick?.(line ? `${path}:${line}` : path)}
+            />
+          )}
+          {structuredOutput && isWebAnalysisOutput(structuredOutput) && (
+            <WebAnalysisCard
+              data={structuredOutput}
+              onLinkClick={(url) => window.open(url, '_blank')}
+            />
+          )}
+
+          {/* Regular text result */}
+          {message.result && !structuredOutput && (
             <div className="assistant-message-text">
               <MarkdownText>{message.result}</MarkdownText>
             </div>
           )}
+
+          {/* Error display */}
           {message.error && (
             <div className="result-error-inline">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -427,6 +450,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
               {message.error}
             </div>
           )}
+
+          {/* Stats */}
           <div className="result-stats-compact">
             {message.duration_ms !== undefined && (
               <span className="result-stat-inline">

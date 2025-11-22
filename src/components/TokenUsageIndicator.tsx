@@ -1,6 +1,10 @@
 import { useState, memo } from 'react';
 import './TokenUsageIndicator.css';
 import TokenUsageModal from './TokenUsageModal';
+import MaxPlanStatsModal from './MaxPlanStatsModal';
+// TEMPORARILY DISABLED: MaxPlanProvider
+// import { useMaxPlan } from '../contexts/MaxPlanContext';
+import { toast } from 'sonner';
 
 interface TokenUsageIndicatorProps {
   inputTokens: number;
@@ -31,6 +35,14 @@ function TokenUsageIndicator({
   onClear,
 }: TokenUsageIndicatorProps) {
   const [showModal, setShowModal] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // TEMPORARILY DISABLED: Max Plan tracking
+  // const { stats: maxPlanStats, history, clearHistory, exportHistory } = useMaxPlan();
+  const maxPlanStats = null;
+  const history = { daily: [], weekly: [], totalMessages: 0, totalTokens: 0 };
+  const clearHistory = () => {};
+  const exportHistory = () => '';
 
   // Calculate totals
   const totalTokens = inputTokens + outputTokens;
@@ -88,6 +100,29 @@ function TokenUsageIndicator({
   };
 
   const status = getDuckStatus();
+
+  // Handler functions for analytics modal
+  const handleExportHistory = () => {
+    const json = exportHistory();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `maxplan-history-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('📥 History exported successfully!');
+  };
+
+  const handleClearHistory = () => {
+    if (confirm('Are you sure you want to clear all usage history? This cannot be undone.')) {
+      clearHistory();
+      toast.success('🗑️ Usage history cleared!');
+      setShowAnalytics(false);
+    }
+  };
 
   // Format token count (45.2k, 120k, etc.) - unused but kept for potential future use
   // const formatTokens = (tokens: number) => {
@@ -148,6 +183,17 @@ function TokenUsageIndicator({
           onClose={() => setShowModal(false)}
           onCompact={onCompact}
           onClear={onClear}
+          onShowAnalytics={() => setShowAnalytics(true)}
+          maxPlanStats={maxPlanStats}
+        />
+      )}
+
+      {showAnalytics && (
+        <MaxPlanStatsModal
+          history={history}
+          onClose={() => setShowAnalytics(false)}
+          onExport={handleExportHistory}
+          onClear={handleClearHistory}
         />
       )}
     </>
