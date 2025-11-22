@@ -5,6 +5,7 @@ import { DroidWizard } from './DroidWizard';
 import { DroidCollection } from './DroidCollection';
 import { AssemblyLine } from './AssemblyLine';
 import { validateDroidSpec } from '../../services/droidFactory';
+import { useDrawerAnimation } from '../../hooks/useDrawerAnimation';
 import type { DroidSpec, UserStats } from './types';
 
 interface DroidFactoryDrawerProps {
@@ -25,6 +26,7 @@ export function DroidFactoryDrawer({
   const [activeTab, setActiveTab] = useState<DroidFactoryTab>('templates');
   const [isCreating, setIsCreating] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<DroidSpec | null>(null);
+  const { isClosing, handleClose, getClassName } = useDrawerAnimation(onClose);
 
   const handleTemplateSelect = (template: DroidSpec) => {
     setSelectedTemplate(template);
@@ -41,6 +43,16 @@ export function DroidFactoryDrawer({
 
     // Generate message to send to AI with instructions to read the skill
     const message = `I need you to create a new AI agent (droid).
+
+**IMPORTANT - Check for existing droids first:**
+Before creating, please check if similar droids already exist in:
+1. ~/.claude/agents/ (global droids)
+2. .claude/agents/ (project droids)
+
+If you find existing droids with similar names, descriptions, or purposes, please:
+- List them for me
+- Ask if I want to proceed anyway or use an existing one
+- Only create the new droid after I confirm
 
 Please read the instructions in public/embedded-skills/droid-factory/SKILL.md to understand how to create droids properly.
 
@@ -77,7 +89,7 @@ Save the agent file to .claude/agents/${spec.name}.md in the current project.`;
     }, 800);
   };
 
-  if (!open) return null;
+  if (!open && !isClosing) return null;
 
   return (
     <>
@@ -85,12 +97,12 @@ Save the agent file to .claude/agents/${spec.name}.md in the current project.`;
       <div
         className="fixed inset-0 z-40"
         style={{ background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)' }}
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Drawer */}
       <div
-        className="fixed inset-y-0 right-0 z-50 flex flex-col"
+        className={getClassName('fixed inset-y-0 right-0 z-50 flex flex-col')}
         style={{
           width: '600px',
           maxWidth: '100vw',
@@ -112,7 +124,7 @@ Save the agent file to .claude/agents/${spec.name}.md in the current project.`;
           </h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 rounded hover:bg-white/10 transition-colors"
             style={{ color: 'rgba(255, 255, 255, 0.7)' }}
           >

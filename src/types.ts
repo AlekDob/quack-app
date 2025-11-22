@@ -415,9 +415,9 @@ export interface StreamChunk {
   toolCall?: ChatToolCall;
 }
 
-// Claude CLI Event types (matching Rust backend)
+// Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
-  type: 'system' | 'assistant' | 'user' | 'result';
+  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop';
 }
 
 export interface ClaudeSystemEvent extends ClaudeEventBase {
@@ -472,9 +472,86 @@ export interface ClaudeResultEvent extends ClaudeEventBase {
   cost_usd?: number;
   duration_ms?: number;
   usage?: UsageStats;
+  stop_reason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
 }
 
-export type ClaudeEvent = ClaudeSystemEvent | ClaudeAssistantEvent | ClaudeUserEvent | ClaudeResultEvent;
+// NEW SDK Events
+export interface ClaudeAgentEvent extends ClaudeEventBase {
+  type: 'agent';
+  action: 'start' | 'stop';
+  agent_name?: string;
+  agent_type?: string;
+  session_id?: string;
+}
+
+export interface ClaudeErrorEvent extends ClaudeEventBase {
+  type: 'error';
+  error: string;
+  code?: string;
+  session_id?: string;
+}
+
+export interface ClaudeMessageStartEvent extends ClaudeEventBase {
+  type: 'message_start';
+  session_id?: string;
+}
+
+export interface ClaudeMessageDeltaEvent extends ClaudeEventBase {
+  type: 'message_delta';
+  delta: {
+    stop_reason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
+    stop_sequence?: string;
+  };
+  usage?: UsageStats;
+  session_id?: string;
+}
+
+export interface ClaudeMessageStopEvent extends ClaudeEventBase {
+  type: 'message_stop';
+  session_id?: string;
+}
+
+export interface ClaudeContentBlockStartEvent extends ClaudeEventBase {
+  type: 'content_block_start';
+  index: number;
+  content_block: {
+    type: 'text' | 'tool_use';
+    id?: string;
+    name?: string;
+  };
+  session_id?: string;
+}
+
+export interface ClaudeContentBlockDeltaEvent extends ClaudeEventBase {
+  type: 'content_block_delta';
+  index: number;
+  delta: {
+    type: 'text_delta' | 'input_json_delta';
+    text?: string;
+    partial_json?: string;
+  };
+  session_id?: string;
+}
+
+export interface ClaudeContentBlockStopEvent extends ClaudeEventBase {
+  type: 'content_block_stop';
+  index: number;
+  session_id?: string;
+}
+
+export type ClaudeEvent =
+  | ClaudeSystemEvent
+  | ClaudeAssistantEvent
+  | ClaudeUserEvent
+  | ClaudeResultEvent
+  | ClaudeAgentEvent
+  | ClaudeErrorEvent
+  | ClaudeMessageStartEvent
+  | ClaudeMessageDeltaEvent
+  | ClaudeMessageStopEvent
+  | ClaudeContentBlockStartEvent
+  | ClaudeContentBlockDeltaEvent
+  | ClaudeContentBlockStopEvent;
 
 // Slash Commands types
 export type SlashCommandScope = 'built-in' | 'project' | 'user' | 'plugin' | 'mcp';

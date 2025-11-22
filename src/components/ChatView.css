@@ -129,6 +129,53 @@
   cursor: not-allowed;
 }
 
+.chat-stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+  color: rgba(239, 68, 68, 1);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(239, 68, 68, 0);
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+.chat-stop-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3), 0 0 12px rgba(239, 68, 68, 0.2);
+  animation: none;
+}
+
+.chat-stop-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.3);
+}
+
+.chat-stop-btn svg {
+  flex-shrink: 0;
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 8px 2px rgba(239, 68, 68, 0.3);
+  }
+}
+
 .active-agent-indicator {
   display: inline-flex;
   align-items: center;

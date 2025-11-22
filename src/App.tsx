@@ -119,6 +119,7 @@ import { getRandomName } from "./utils/agentNames";
 
 import "./App.css";
 import "./components/MetroStyle.css";
+import "./components/DrawerAnimations.css";
 
 const INTRO_REPLAY_DURATION_MS = 5000;
 

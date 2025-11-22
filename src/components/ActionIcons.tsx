@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { Wrench } from 'lucide-react';
 import './ActionIcons.css';
 
 interface ActionIconsProps {
@@ -184,27 +185,7 @@ function ActionIcons({
         onClick={onDroidFactoryClick}
         aria-label="Open Droid Factory"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect
-            x="4"
-            y="4"
-            width="8"
-            height="8"
-            rx="1"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            fill="none"
-          />
-          <circle cx="7" cy="7" r="0.8" fill="currentColor" />
-          <circle cx="9" cy="7" r="0.8" fill="currentColor" />
-          <path
-            d="M6.5 9.5C6.5 9.5 7 10 8 10C9 10 9.5 9.5 9.5 9.5"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-          <path d="M4 3L8 1L12 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Wrench className="w-4 h-4" />
         <span className="action-icon-tooltip">Droid Factory</span>
       </button>
 

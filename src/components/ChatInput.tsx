@@ -1515,53 +1515,28 @@ export default function ChatInput({
           </button>
           <button
             type="button"
-            className={`chat-input-send ${isStreaming ? 'streaming' : ''}`}
-            onClick={() => {
-              if (isStreaming) {
-                handleStop();
-              } else {
-                void handleSend();
-              }
-            }}
-            disabled={!isStreaming && (disabled || (!input.trim() && attachments.length === 0))}
-            data-tooltip={isStreaming ? 'Stop streaming' : 'Send (⌘+Enter)'}
-            aria-label={isStreaming ? 'Stop streaming' : 'Send message'}
+            className="chat-input-send"
+            onClick={() => void handleSend()}
+            disabled={disabled || (!input.trim() && attachments.length === 0)}
+            data-tooltip="Send (⌘+Enter)"
+            aria-label="Send message"
           >
-            {isStreaming ? (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
                 fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect
-                  x="3"
-                  y="3"
-                  width="10"
-                  height="10"
-                  rx="1"
-                  fill="currentColor"
-                />
-              </svg>
-            ) : (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
-                  fill="currentColor"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
           {/* Focus-only helper icons - at end so they wrap to top with wrap-reverse */}
           {isFocused && (

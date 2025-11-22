@@ -279,6 +279,72 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
     return null;
   }
 
+  // Agent event - subagent start/stop
+  if (message.type === 'agent') {
+    const agentEvent = message as any;
+
+    if (agentEvent.action === 'start') {
+      return (
+        <div className="stream-message subagent-message">
+          <div className="tool-widget task-widget">
+            <div className="tool-widget-header">
+              <div className="tool-widget-title">
+                <TaskAgentAvatar subagentType={agentEvent.agent_type || agentEvent.agent_name || 'subagent'} />
+                <span>Subagent: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
+              </div>
+              <span className="tool-widget-meta">Starting...</span>
+              <div className="tool-widget-loading">
+                <div className="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (agentEvent.action === 'stop') {
+      return (
+        <div className="stream-message subagent-message">
+          <div className="tool-widget task-widget">
+            <div className="tool-widget-header">
+              <div className="tool-widget-title">
+                <TaskAgentAvatar subagentType={agentEvent.agent_type || agentEvent.agent_name || 'subagent'} />
+                <span>Subagent: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
+              </div>
+              <span className="tool-widget-meta" style={{ color: '#00D9FF' }}>Completed</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // Error event - show errors prominently
+  if (message.type === 'error') {
+    const errorEvent = message as any;
+
+    return (
+      <div className="stream-message error-message">
+        <div className="tool-widget" style={{ borderLeft: '3px solid #ff4757' }}>
+          <div className="tool-widget-header">
+            <div className="tool-widget-title">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="#ff4757">
+                <path d="M4.47.22A.75.75 0 015 0h6a.75.75 0 01.53.22l4.25 4.25c.141.14.22.331.22.53v6a.75.75 0 01-.22.53l-4.25 4.25A.75.75 0 0111 16H5a.75.75 0 01-.53-.22L.22 11.53A.75.75 0 010 11V5a.75.75 0 01.22-.53L4.47.22z"/>
+              </svg>
+              <span style={{ color: '#ff4757' }}>Stream Error</span>
+            </div>
+          </div>
+          <div className="tool-widget-content">
+            <div style={{ color: '#ff4757', padding: '8px', backgroundColor: 'rgba(255, 71, 87, 0.1)', borderRadius: '4px' }}>
+              {errorEvent.error}
+              {errorEvent.code && <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.7 }}>Code: {errorEvent.code}</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Result message - final summary with consolidated layout
   if (message.type === 'result') {
     // Check if the result text is already shown in the last assistant message
@@ -320,6 +386,11 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
           {message.usage && (
             <span className="result-stat-inline">
               Tokens: {message.usage.input_tokens + message.usage.output_tokens} ({message.usage.input_tokens} in, {message.usage.output_tokens} out)
+            </span>
+          )}
+          {message.stop_reason && (
+            <span className="result-stat-inline" style={{ color: message.stop_reason === 'end_turn' ? '#00D9FF' : '#F7931E' }}>
+              Stop: {message.stop_reason}
             </span>
           )}
           {message.session_id && (
@@ -365,6 +436,11 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             {message.usage && (
               <span className="result-stat-inline">
                 Tokens: {message.usage.input_tokens + message.usage.output_tokens} ({message.usage.input_tokens} in, {message.usage.output_tokens} out)
+              </span>
+            )}
+            {message.stop_reason && (
+              <span className="result-stat-inline" style={{ color: message.stop_reason === 'end_turn' ? '#00D9FF' : '#F7931E' }}>
+                Stop: {message.stop_reason}
               </span>
             )}
             {message.session_id && (
