@@ -26,7 +26,7 @@ function SystemMessage({ agentName, content }: { agentName: string | null; conte
               alt={agentName}
               className="agent-system-avatar"
             />
-            <span>Invoking agent: <strong>{agentName}</strong></span>
+            <span>Invoking droid: <strong>{agentName}</strong></span>
           </>
         ) : (
           content
@@ -313,7 +313,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
 
   // System messages (agent invocation) - render as centered notification
   if (isSystem) {
-    // Extract agent name from content (format: "🦆 Invoking agent: **agent name**")
+    // Extract agent name from content (format: "🦆 Invoking droid: **agent name**")
     const agentNameMatch = message.content.match(/\*\*(.*?)\*\*/);
     const extractedAgentName = agentNameMatch ? agentNameMatch[1] : null;
 

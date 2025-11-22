@@ -1304,10 +1304,10 @@ export default function ChatInput({
           {filteredAgents.length > 0 && (
             <div className="mention-section">
               <div className="mention-section-header">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 13c0-2.5 2.5-4 6-4s6 1.5 6 4v2H2v-2Z" opacity="0.8"/>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2L10.5 4.5H8C6.9 4.5 6 5.4 6 6.5V8.5H4V11.5H6V13.5H4V16.5H6V18.5C6 19.6 6.9 20.5 8 20.5H16C17.1 20.5 18 19.6 18 18.5V16.5H20V13.5H18V11.5H20V8.5H18V6.5C18 5.4 17.1 4.5 16 4.5H13.5L12 2M12 5.5C12.83 5.5 13.5 6.17 13.5 7C13.5 7.83 12.83 8.5 12 8.5C11.17 8.5 10.5 7.83 10.5 7C10.5 6.17 11.17 5.5 12 5.5M10 11C10.55 11 11 11.45 11 12C11 12.55 10.55 13 10 13C9.45 13 9 12.55 9 12C9 11.45 9.45 11 10 11M14 11C14.55 11 15 11.45 15 12C15 12.55 14.55 13 14 13C13.45 13 13 12.55 13 12C13 11.45 13.45 11 14 11M10 16H14V17H10V16Z" opacity="0.8"/>
                 </svg>
-                <span>Agents</span>
+                <span>Droids</span>
               </div>
               {filteredAgents.map((agent, index) => (
                 <button

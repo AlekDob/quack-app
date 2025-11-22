@@ -28,6 +28,21 @@ function DiffDrawer({
 }: DiffDrawerProps) {
   if (!selected) return null
 
+  // Extract actual file path from diff content if available (more reliable than selected.path)
+  const getFilePathFromDiff = () => {
+    if (!diffContent) return selected.path;
+
+    // Look for "diff --git a/path b/path" or "+++ b/path"
+    const diffMatch = diffContent.match(/\+\+\+ b\/(.+?)(?:\n|$)/);
+    if (diffMatch && diffMatch[1]) {
+      return diffMatch[1];
+    }
+
+    return selected.path;
+  };
+
+  const displayPath = getFilePathFromDiff();
+
   return (
     <>
       {/* Backdrop */}
@@ -38,7 +53,7 @@ function DiffDrawer({
         {/* Header */}
         <div className="diff-drawer-header">
           <div className="diff-drawer-header-left">
-            <span className="diff-drawer-filename">{selected.path}</span>
+            <span className="diff-drawer-filename">{displayPath}</span>
             {selected.original_path && (
               <span className="diff-drawer-rename">from {selected.original_path}</span>
             )}
@@ -142,7 +157,8 @@ function DiffDrawer({
                       fontWeight,
                     }}
                   >
-                    {displayText}
+                    <span className="diff-line-number">{index + 1}</span>
+                    <span className="diff-line-content">{displayText}</span>
                   </div>
                 )
               })}

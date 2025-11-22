@@ -1202,11 +1202,14 @@ function App() {
     // If agent is selected, add system message showing agent invocation
     if (activeAgent) {
       const agentSystemMessage: ChatMessage = {
-        id: `msg-${Date.now()}-agent-system`,
+        id: `msg-${Date.now()}-agent-system-${activeId}`, // Include activeId for uniqueness
         role: 'system',
-        content: `🦆 Invoking agent: **${activeAgent.name}**`,
+        content: `🦆 Invoking droid: **${activeAgent.name}**`,
         timestamp: Date.now() + 1, // Slightly after user message
         status: 'complete',
+        metadata: {
+          sessionId: activeId, // Track which session this message belongs to
+        },
       };
       messagesToAdd.push(agentSystemMessage);
     }
@@ -1791,7 +1794,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Compute current agent's chat messages and loading state
   const currentAgentMessages = useMemo(() => {
-    return activeId ? (chatSessions.get(activeId) ?? []) : [];
+    const messages = activeId ? (chatSessions.get(activeId) ?? []) : [];
+    console.log(`[ChatView] Loading messages for activeId="${activeId}": ${messages.length} messages`);
+    return messages;
   }, [activeId, chatSessions]);
 
   const currentAgentLoading = useMemo(() => {

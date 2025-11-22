@@ -237,7 +237,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   <div className="tool-widget-header">
                     <div className="tool-widget-title">
                       <TaskAgentAvatar subagentType={subagentType} />
-                      <span>Agent: <strong>{subagentType.replace(/-/g, ' ')}</strong></span>
+                      <span>Droid: <strong>{subagentType.replace(/-/g, ' ')}</strong></span>
                     </div>
                     <span className="tool-widget-meta">{description}</span>
                     {!toolResult && (
@@ -290,7 +290,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             <div className="tool-widget-header">
               <div className="tool-widget-title">
                 <TaskAgentAvatar subagentType={agentEvent.agent_type || agentEvent.agent_name || 'subagent'} />
-                <span>Subagent: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
+                <span>Droid: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
               </div>
               <span className="tool-widget-meta">Starting...</span>
               <div className="tool-widget-loading">
@@ -309,7 +309,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             <div className="tool-widget-header">
               <div className="tool-widget-title">
                 <TaskAgentAvatar subagentType={agentEvent.agent_type || agentEvent.agent_name || 'subagent'} />
-                <span>Subagent: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
+                <span>Droid: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
               </div>
               <span className="tool-widget-meta" style={{ color: '#00D9FF' }}>Completed</span>
             </div>
