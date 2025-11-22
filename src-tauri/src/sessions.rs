@@ -521,6 +521,29 @@ pub fn delete_session(session_id: String) -> Result<(), String> {
     }
 }
 
+/// Reset agent session - deletes session file AND clears agent's session state
+/// This is used when user clicks "Reset Agent" to start completely fresh
+#[command]
+pub fn reset_agent_session(
+    agent_id: String,
+    session_id: String,
+    session_state: tauri::State<crate::SessionState>,
+) -> Result<(), String> {
+    log::info!("Resetting agent session: agent_id={}, session_id={}", agent_id, session_id);
+
+    // 1. Delete the session file (if it exists)
+    if let Err(e) = delete_session(session_id.clone()) {
+        log::warn!("Failed to delete session file for {}: {}", session_id, e);
+        // Continue even if delete fails - we still want to clear the state
+    }
+
+    // 2. Clear session state mapping for this agent
+    session_state.remove_session(&agent_id);
+    log::info!("Cleared session state for agent: {}", agent_id);
+
+    Ok(())
+}
+
 /// Parse session metadata from jsonl content (full scan for details view)
 fn parse_session_metadata_with_path(
     content: &str,

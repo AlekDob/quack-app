@@ -4073,7 +4073,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable]);
 
-  const handleResetTerminal = useCallback((terminal: TerminalInfo) => {
+  const handleResetTerminal = useCallback(async (terminal: TerminalInfo) => {
+    // ✅ CRITICAL FIX: Get session ID BEFORE clearing state
+    const sessionId = chatSessionIds.get(terminal.id);
+
+    // ✅ Reset agent session in backend (Rust) - deletes session file AND clears internal state
+    if (sessionId && tauriAvailable) {
+      try {
+        await invoke('reset_agent_session', {
+          agentId: terminal.id,
+          sessionId
+        });
+        console.log(`✅ Backend session reset complete for agent ${terminal.id}`);
+      } catch (error) {
+        console.error('Failed to reset backend session:', error);
+        // Continue with frontend cleanup even if backend reset fails
+      }
+    }
+
     // Clear chat session for this terminal
     setChatSessions((prev) => {
       const newMap = new Map(prev);
@@ -4081,10 +4098,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return newMap;
     });
 
-    // Get session ID for this terminal to remove usage data
+    // Remove session ID from frontend state
     setChatSessionIds((prev) => {
-      const sessionId = prev.get(terminal.id);
-
       // Remove usage sessions for this session ID
       if (sessionId) {
         setUsageSessions((prevSessions) =>
@@ -4106,7 +4121,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     toast.success(`Agent reset: ${terminal.label} - Stamina restored to 100%! 🦆`);
-  }, []);
+  }, [chatSessionIds, tauriAvailable]);
 
   const handleReorderTerminals = useCallback((reorderedIds: string[]) => {
     setTerminals((prev) => {

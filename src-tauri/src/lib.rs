@@ -60,6 +60,13 @@ impl SessionState {
             sessions.insert(agent_id, session_id);
         }
     }
+
+    /// Remove session mapping for an agent (used when resetting agent)
+    pub fn remove_session(&self, agent_id: &str) {
+        if let Ok(mut sessions) = self.sessions.lock() {
+            sessions.remove(agent_id);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -573,6 +580,7 @@ pub fn run() {
             sessions::get_all_sessions_info,
             sessions::get_session_details,
             sessions::delete_session,
+            sessions::reset_agent_session,
             sessions::resume_session,
             // 💰 License management commands (Gumroad + Supabase)
             license::validate_license,
