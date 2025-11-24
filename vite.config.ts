@@ -99,6 +99,18 @@ export default defineConfig(({ mode }) => {
           browser: resolve(rootDir, 'browser.html'),
         },
 
+        // External dependencies - don't bundle Node.js modules
+        // Note: These will be resolved at runtime by Tauri/Node.js
+        external: (id: string) => {
+          // Externalize the Claude SDK and all Node.js built-ins
+          if (id.includes('@anthropic-ai/claude-agent-sdk')) {
+            return true;
+          }
+          // Node.js built-in modules
+          const builtins = ['fs', 'path', 'child_process', 'crypto', 'os', 'stream', 'url', 'readline', 'fs/promises', 'util', 'events'];
+          return builtins.includes(id);
+        },
+
         output: {
           // Manual chunking strategy for optimal code splitting
           manualChunks: (id) => {
@@ -183,9 +195,6 @@ export default defineConfig(({ mode }) => {
 
           // Optimize for tree-shaking
           compact: isProduction,
-
-          // External dependencies (if any)
-          // external: [],
         },
 
         // Tree-shaking options
@@ -214,6 +223,13 @@ export default defineConfig(({ mode }) => {
       ],
       // Force dependency optimization
       force: isDevelopment,
+
+      // Configure Node.js polyfills for Tauri
+      esbuildOptions: {
+        define: {
+          global: 'globalThis',
+        },
+      },
     },
 
     // CSS options

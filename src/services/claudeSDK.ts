@@ -1,4 +1,5 @@
-import { query } from '@anthropic-ai/claude-agent-sdk';
+// TEMPORARY: Commented out to fix build - Claude SDK should run only in backend
+// import { query } from '@anthropic-ai/claude-agent-sdk';
 import { invoke } from '@tauri-apps/api/core';
 import type { ClaudeEvent, MCPServer } from '../types';
 
@@ -292,6 +293,11 @@ export async function* streamClaudeMessage(
     // This allows each user to load their own MCP servers from .mcp.json without code changes
     // If you need to restrict tools, users can configure it in their .claude/settings.json
 
+    // TEMPORARY: Throw error instead of calling SDK directly
+    // TODO: Refactor to use Tauri backend (stream-claude.js) instead
+    throw new Error('Claude SDK should be called via Tauri backend, not directly from frontend');
+
+    /*
     // Call Claude SDK with streaming - correct API: query({ prompt, options })
     const stream = query({
       prompt,
@@ -398,6 +404,7 @@ export async function* streamClaudeMessage(
         },
       },
     };
+    */
   } catch (error) {
     const duration = Date.now() - startTime;
     const isTimeout = error instanceof Error && error.message.includes('timeout');

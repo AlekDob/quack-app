@@ -61,9 +61,40 @@ const icons: Record<string, ReactNode> = {
   ),
   agents: (
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-      <path
-        d="M10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm-5 9a3 3 0 0 0-3 3v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1a3 3 0 0 0-3-3H5Z"
-        fill="currentColor"
+      {/* Robot head */}
+      <rect
+        x="4"
+        y="4"
+        width="12"
+        height="12"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      {/* Antenna */}
+      <line
+        x1="10"
+        y1="2"
+        x2="10"
+        y2="4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="10" cy="2" r="1" fill="currentColor" />
+      {/* Eyes */}
+      <circle cx="7.5" cy="9" r="1.3" fill="currentColor" />
+      <circle cx="12.5" cy="9" r="1.3" fill="currentColor" />
+      {/* Mouth */}
+      <line
+        x1="7.5"
+        y1="13"
+        x2="12.5"
+        y2="13"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
     </svg>
   ),
@@ -435,7 +466,7 @@ export default function SidePanel({
     },
     {
       id: "agents" as TabId,
-      label: "Sub Agents",
+      label: "Droids",
       icon: icons.agents,
       badge: agents.length,
       hasContent: agents.length > 0,
