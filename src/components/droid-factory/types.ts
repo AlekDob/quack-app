@@ -1,3 +1,5 @@
+export type FactoryMode = 'droid' | 'skill';
+
 export interface DroidSpec {
   name: string; // lowercase-with-hyphens
   displayName: string; // Human-readable name
@@ -6,6 +8,17 @@ export interface DroidSpec {
   tools: string[]; // Tool permissions
   model: 'sonnet' | 'opus' | 'haiku' | 'inherit';
   specialization: string; // Area of expertise
+  icon?: string; // Emoji icon
+}
+
+export interface SkillSpec {
+  name: string; // lowercase-with-hyphens
+  displayName: string; // Human-readable name
+  description: string; // Clear, concise purpose when to use this skill
+  category: 'workflow' | 'tool-integration' | 'domain-expertise' | 'bundled-resources';
+  hasScripts: boolean; // Will include executable scripts
+  hasReferences: boolean; // Will include reference documentation
+  hasAssets: boolean; // Will include template files/assets
   icon?: string; // Emoji icon
 }
 
@@ -111,6 +124,54 @@ export const DROID_TEMPLATES: DroidSpec[] = [
   },
 ];
 
+export const SKILL_TEMPLATES: SkillSpec[] = [
+  {
+    name: 'api-client',
+    displayName: 'API Client',
+    description: 'Create skills for integrating with specific APIs and web services',
+    category: 'tool-integration',
+    hasScripts: true,
+    hasReferences: true,
+    hasAssets: false,
+  },
+  {
+    name: 'data-processor',
+    displayName: 'Data Processor',
+    description: 'Build skills for specialized data transformation and processing tasks',
+    category: 'workflow',
+    hasScripts: true,
+    hasReferences: false,
+    hasAssets: false,
+  },
+  {
+    name: 'report-generator',
+    displayName: 'Report Generator',
+    description: 'Generate custom reports with templates and formatting',
+    category: 'bundled-resources',
+    hasScripts: false,
+    hasReferences: true,
+    hasAssets: true,
+  },
+  {
+    name: 'workflow-automation',
+    displayName: 'Workflow Automation',
+    description: 'Automate multi-step business processes and workflows',
+    category: 'workflow',
+    hasScripts: true,
+    hasReferences: true,
+    hasAssets: false,
+  },
+  {
+    name: 'domain-expert',
+    displayName: 'Domain Expert',
+    description: 'Package specialized knowledge for specific industries or domains',
+    category: 'domain-expertise',
+    hasScripts: false,
+    hasReferences: true,
+    hasAssets: false,
+  },
+];
+
 export const ACHIEVEMENTS_CONFIG: Record<string, Omit<Achievement, 'id' | 'unlockedAt'>> = {
   FIRST_STEPS: {
     name: 'First Steps',
@@ -136,5 +197,10 @@ export const ACHIEVEMENTS_CONFIG: Record<string, Omit<Achievement, 'id' | 'unloc
     name: 'Quality Guardian',
     icon: '🧪',
     description: 'Create Test Generator droid',
+  },
+  SKILL_MASTER: {
+    name: 'Skill Master',
+    icon: '⚡',
+    description: 'Create your first skill',
   },
 };
