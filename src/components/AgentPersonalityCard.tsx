@@ -20,6 +20,38 @@ const COMMUNICATION_STYLES_MAP: Record<string, string> = {
   sarcastic: 'Sarcastic',
 };
 
+/**
+ * Filter out the "Selected Protocol Droids:" section from customNotes
+ * This section is automatically added to CLAUDE.md but should not be shown in the UI
+ */
+function filterDroidsFromCustomNotes(customNotes?: string): string | undefined {
+  if (!customNotes) return customNotes;
+
+  const lines = customNotes.split('\n');
+  const filtered: string[] = [];
+  let skipDroids = false;
+
+  for (const line of lines) {
+    if (line.includes('Selected Protocol Droids:')) {
+      skipDroids = true;
+      continue;
+    }
+    if (skipDroids) {
+      const trimmed = line.trim();
+      // Stop skipping when we hit non-droid content
+      if (!trimmed.startsWith('- ') && trimmed.length > 0) {
+        skipDroids = false;
+        filtered.push(line);
+      }
+      // Skip droid lines and empty lines within droids section
+      continue;
+    }
+    filtered.push(line);
+  }
+
+  return filtered.join('\n').trim();
+}
+
 export default function AgentPersonalityCard({
   personality,
   agentName,
@@ -164,7 +196,7 @@ export default function AgentPersonalityCard({
       {personality.customNotes && (
         <div className="personality-section">
           <h4 className="section-title">Custom Notes</h4>
-          <p className="personality-intro">{personality.customNotes}</p>
+          <p className="personality-intro">{filterDroidsFromCustomNotes(personality.customNotes)}</p>
         </div>
       )}
 

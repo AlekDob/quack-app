@@ -341,6 +341,13 @@ fn inject_personality_to_claude_md_impl(
 ) -> Result<String> {
     let claude_md_path = project_path.join("CLAUDE.md");
 
+    // DEBUG: Log personality data
+    log::info!("🔍 inject_personality_to_claude_md called");
+    log::info!("🔍 Name: {}", personality.name);
+    log::info!("🔍 Role: {}", personality.role);
+    log::info!("🔍 Skills: {:?}", personality.skills);
+    log::info!("🔍 CustomNotes: {:?}", personality.custom_notes);
+
     // Generate agent header with NEW structure
     let mut agent_header = String::new();
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->\n");
@@ -368,27 +375,98 @@ fn inject_personality_to_claude_md_impl(
     // Communication Style
     agent_header.push_str(&format!("**Communication Style:** {}\n\n", personality.communication_style));
 
-    // Custom Notes
+    // Custom Notes - Filter out droids section
     if let Some(custom_notes) = &personality.custom_notes {
-        if !custom_notes.is_empty() {
-            agent_header.push_str(&format!("**Notes:**\n{}\n\n", custom_notes));
+        let mut filtered_notes = String::new();
+        let lines: Vec<&str> = custom_notes.lines().collect();
+        let mut skip_droids = false;
+
+        for line in lines {
+            if line.contains("Selected Protocol Droids:") {
+                skip_droids = true;
+                continue;
+            }
+            if skip_droids {
+                let trimmed = line.trim();
+                // Stop skipping when we hit non-droid content
+                if !trimmed.starts_with("- ") && !trimmed.is_empty() {
+                    skip_droids = false;
+                } else if trimmed.starts_with("- ") || trimmed.is_empty() {
+                    continue;
+                }
+            }
+            if !skip_droids {
+                if !filtered_notes.is_empty() {
+                    filtered_notes.push('\n');
+                }
+                filtered_notes.push_str(line);
+            }
+        }
+
+        let filtered_notes = filtered_notes.trim();
+        if !filtered_notes.is_empty() {
+            agent_header.push_str(&format!("**Notes:**\n{}\n\n", filtered_notes));
         }
     }
 
-    // 🦆 Protocol Droids section (compact - no lists, just discovery protocol)
-    agent_header.push_str("**Protocol Droids Available:**\n");
-    agent_header.push_str("Specialized subagents that assist with specific tasks. Dynamically loaded when invoked via the Task tool.\n\n");
-    agent_header.push_str("**Project-Specific Protocol Droids:** `.claude/agents/`\n");
-    agent_header.push_str("**Global Protocol Droids:** `~/.claude/agents/`\n\n");
-    agent_header.push_str("Use the Task tool to invoke agents with their subagent_type. Each agent's full description and capabilities are loaded dynamically when needed.\n\n");
-    agent_header.push_str("- **Your role**: Coordinate the implementation, delegate to Protocol Droids for specialized work\n");
-    agent_header.push_str("- **Remember**: You're a PM managing a feature/sprint on a specific branch, not a technical specialist!\n\n");
+    // 🦆 Protocol Droids section - Parse from customNotes
+    let mut droid_paths: Vec<String> = Vec::new();
+    if let Some(custom_notes) = &personality.custom_notes {
+        let lines: Vec<&str> = custom_notes.lines().collect();
+        let mut in_droids_section = false;
 
-    // 🦆 Skills section (compact - no lists, just discovery protocol)
-    agent_header.push_str("**Skills Available:**\n");
-    agent_header.push_str("Specialized knowledge domains that provide expert guidance. Dynamically loaded via the Skill tool.\n\n");
-    agent_header.push_str("**Project-Specific Skills:** `.claude/skills/`\n\n");
-    agent_header.push_str("Use the Skill tool to invoke skills by name. Each skill's documentation and capabilities are loaded dynamically when needed.\n\n");
+        for line in lines {
+            if line.contains("Selected Protocol Droids:") {
+                in_droids_section = true;
+                continue;
+            }
+            if in_droids_section {
+                let trimmed = line.trim();
+                if trimmed.starts_with("- ") {
+                    // Extract path after "- "
+                    let path = trimmed.trim_start_matches("- ").trim();
+                    if !path.is_empty() {
+                        droid_paths.push(path.to_string());
+                    }
+                } else if !trimmed.is_empty() {
+                    // Stop when we hit non-droid content
+                    break;
+                }
+            }
+        }
+    }
+
+    agent_header.push_str("**Available Droids:**\n");
+    agent_header.push_str("Specialized subagents that assist with specific tasks.\n\n");
+
+    if !droid_paths.is_empty() {
+        agent_header.push_str("**Recommended for this task:**\n");
+        for droid_path in &droid_paths {
+            agent_header.push_str(&format!("- {}\n", droid_path));
+        }
+        agent_header.push_str("\n*Use these droids frequently when working on this task.*\n\n");
+    }
+
+    agent_header.push_str("**All Available Droids:**\n");
+    agent_header.push_str("- Project-Specific: `.claude/agents/`\n");
+    agent_header.push_str("- Global: `~/.claude/agents/`\n\n");
+
+    // 🦆 Skills section - Use specific paths from personality.skills
+    agent_header.push_str("**Available Skills:**\n");
+    agent_header.push_str("Specialized knowledge domains that provide expert guidance.\n\n");
+
+    if let Some(skills) = &personality.skills {
+        if !skills.is_empty() {
+            agent_header.push_str("**Recommended for this task:**\n");
+            for skill_path in skills {
+                agent_header.push_str(&format!("- {}\n", skill_path));
+            }
+            agent_header.push_str("\n*Use these skills frequently when working on this task.*\n\n");
+        }
+    }
+
+    agent_header.push_str("**All Available Skills:**\n");
+    agent_header.push_str("- Project-Specific: `.claude/skills/`\n\n");
 
     // 🦆 MCP Servers section (compact)
     agent_header.push_str("**MCP Servers Available:**\n");
@@ -397,33 +475,8 @@ fn inject_personality_to_claude_md_impl(
     agent_header.push_str("**Global MCP Servers:** `~/.mcp.json`\n\n");
 
     // 🦆 Slash Commands section (compact)
-    agent_header.push_str("**Slash Commands Available:**\n");
-    agent_header.push_str("Pre-configured commands for common operations. Located in `.claude/commands/`\n\n");
-
-    // 🦆 Discovery Protocol - THE KEY PART!
-    agent_header.push_str("**📚 Discovery Protocol:**\n\n");
-    agent_header.push_str("Before answering any question, ALWAYS check if there's a relevant resource:\n\n");
-    agent_header.push_str("1. **Check Skills First**: If the question relates to a specific domain (Discord, terminals, design, etc.)\n");
-    agent_header.push_str("   - Scan `.claude/skills/` directory to see available skill folders\n");
-    agent_header.push_str("   - Use the SlashCommand tool to invoke the skill (e.g., `/discord-community-manager`)\n");
-    agent_header.push_str("   - Let the skill provide specialized guidance\n\n");
-    agent_header.push_str("2. **Check Protocol Droids Next**: If the task requires specialized technical work\n");
-    agent_header.push_str("   - Scan `.claude/agents/` directory to see available agents\n");
-    agent_header.push_str("   - Use the Task tool to delegate to the appropriate agent\n");
-    agent_header.push_str("   - Coordinate their work as PM\n\n");
-    agent_header.push_str("3. **Check Slash Commands**: For common operations (commit, review, etc.)\n");
-    agent_header.push_str("   - Scan `.claude/commands/` directory for available commands\n");
-    agent_header.push_str("   - Use SlashCommand tool with appropriate command\n\n");
-    agent_header.push_str("4. **Check MCP Servers**: For external integrations (Supabase, GitHub, etc.)\n");
-    agent_header.push_str("   - Check `.mcp.json` for configured MCP servers\n");
-    agent_header.push_str("   - Use MCP tools when available for the task\n\n");
-    agent_header.push_str("**Examples:**\n");
-    agent_header.push_str("- User asks about Discord → Check `.claude/skills/discord-community-manager/` FIRST\n");
-    agent_header.push_str("- User asks about terminal issues → Check `.claude/skills/xterm-terminal-expert/` FIRST\n");
-    agent_header.push_str("- User wants to commit → Scan `.claude/commands/` for commit command\n");
-    agent_header.push_str("- User wants code review → Use `/code-review` slash command\n");
-    agent_header.push_str("- User needs Git Flow operations → Check `.claude/agents/git-flow-manager.md`\n");
-    agent_header.push_str("- User needs Supabase query → Check `.mcp.json` for Supabase MCP server\n\n");
+    agent_header.push_str("**Slash Commands:**\n");
+    agent_header.push_str("Pre-configured commands located in `.claude/commands/`. Use SlashCommand tool.\n\n");
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 

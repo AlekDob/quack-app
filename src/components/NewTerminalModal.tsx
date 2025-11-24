@@ -120,14 +120,20 @@ function NewTerminalModal({
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [loadingDroids, setLoadingDroids] = useState(false);
 
-  // Reset state when modal opens
+  // Local personality state to track changes across steps
+  const [localPersonality, setLocalPersonality] = useState<Partial<AgentPersonality>>(personality || {});
+
+  // Reset state when modal opens (only depends on 'open', NOT 'personality')
   useEffect(() => {
     if (open) {
       setCurrentStep('context');
       setCompletedSteps([]);
       setAgentMode('select');
+      setLocalPersonality(personality || {}); // Initialize from prop when modal opens
+      setSelectedSkills([]); // Reset selections
+      setSelectedDroids([]);
     }
-  }, [open]);
+  }, [open]); // ✅ Only trigger when modal opens/closes, not when personality changes
 
   // Load data when modal opens
   useEffect(() => {
@@ -373,9 +379,47 @@ function NewTerminalModal({
     onColorChange(agent.color);
     onAvatarChange?.(agent.avatar);
     onWorkingOnChange?.(agent.workingOn || '');
-    onPersonalityChange?.(agent.personality);
+
+    // Filter out droids section from customNotes before showing in edit mode
+    const filteredPersonality = agent.personality ? {
+      ...agent.personality,
+      customNotes: filterDroidsFromCustomNotes(agent.personality.customNotes)
+    } : agent.personality;
+
+    // ✅ Update BOTH parent state AND local state
+    onPersonalityChange?.(filteredPersonality);
+    setLocalPersonality(filteredPersonality || {}); // Update local state immediately
     markAgentAsUsed(agent.id);
     setAgentMode('create');
+  }
+
+  // Helper function to filter out droids section from customNotes
+  function filterDroidsFromCustomNotes(customNotes?: string): string | undefined {
+    if (!customNotes) return customNotes;
+
+    const lines = customNotes.split('\n');
+    const filtered: string[] = [];
+    let skipDroids = false;
+
+    for (const line of lines) {
+      if (line.includes('Selected Protocol Droids:')) {
+        skipDroids = true;
+        continue;
+      }
+      if (skipDroids) {
+        const trimmed = line.trim();
+        // Stop skipping when we hit non-droid content
+        if (!trimmed.startsWith('- ') && trimmed.length > 0) {
+          skipDroids = false;
+          filtered.push(line);
+        }
+        // Skip droid lines and empty lines within droids section
+        continue;
+      }
+      filtered.push(line);
+    }
+
+    return filtered.join('\n').trim();
   }
 
   function handleCreateNewAgent() {
@@ -384,6 +428,20 @@ function NewTerminalModal({
 
   function handleBackToAgentSelection() {
     setAgentMode('select');
+  }
+
+  // ===== Personality Change Handler =====
+
+  function handlePersonalityChangeLocal(newPersonality: Partial<AgentPersonality>) {
+    // Update local state with merge
+    setLocalPersonality(prev => {
+      const merged = { ...prev, ...newPersonality };
+      console.log('🔍 [MODAL] Local personality updated:', JSON.stringify(merged, null, 2));
+      return merged;
+    });
+
+    // Also call parent handler to keep App.tsx in sync
+    onPersonalityChange?.(newPersonality);
   }
 
   // ===== Step Navigation =====
@@ -453,23 +511,51 @@ function NewTerminalModal({
 
   async function handleFinalConfirm() {
     // Update personality with selected skills and droids
-    const updatedPersonality: Partial<AgentPersonality> = {
-      ...personality,
-      skills: selectedSkills.map(id => {
-        const skill = availableSkills.find(s => s.id === id);
-        return skill ? skill.path : id;
-      }),
-      // Store droids in customNotes for now (we can create a dedicated field later)
-      customNotes: [
-        personality?.customNotes || '',
-        '',
+    const skillPaths = selectedSkills.map(id => {
+      const skill = availableSkills.find(s => s.id === id);
+      return skill ? skill.path : id;
+    });
+
+    const droidLines = selectedDroids.map(id => {
+      const droid = availableDroids.find(d => d.id === id);
+      return droid ? `- ${droid.path}` : `- ${id}`;
+    });
+
+    // Build custom notes: only include droids section if droids are selected
+    // Use LOCAL personality state instead of prop
+    let finalCustomNotes = localPersonality?.customNotes || '';
+
+    if (selectedDroids.length > 0) {
+      // Add droids section only if there are selected droids
+      const droidsSection = [
         'Selected Protocol Droids:',
-        ...selectedDroids.map(id => {
-          const droid = availableDroids.find(d => d.id === id);
-          return droid ? `- ${droid.path}` : `- ${id}`;
-        })
-      ].filter(Boolean).join('\n')
+        ...droidLines
+      ].join('\n');
+
+      // Append droids to existing custom notes (if any)
+      if (finalCustomNotes.trim()) {
+        finalCustomNotes = `${finalCustomNotes}\n\n${droidsSection}`;
+      } else {
+        finalCustomNotes = droidsSection;
+      }
+    }
+
+    // Use LOCAL personality state for complete data
+    const updatedPersonality: Partial<AgentPersonality> = {
+      ...localPersonality, // ✅ Use local state instead of prop
+      skills: skillPaths.length > 0 ? skillPaths : undefined, // Only include if skills selected
+      customNotes: finalCustomNotes.trim() || undefined // Only include if not empty
     };
+
+    // DEBUG: Log what we're sending
+    console.log('🔍 [MODAL] handleFinalConfirm called');
+    console.log('🔍 [MODAL] Local personality before merge:', JSON.stringify(localPersonality, null, 2));
+    console.log('🔍 [MODAL] Selected skills:', selectedSkills);
+    console.log('🔍 [MODAL] Skill paths:', skillPaths);
+    console.log('🔍 [MODAL] Selected droids:', selectedDroids);
+    console.log('🔍 [MODAL] Droid lines:', droidLines);
+    console.log('🔍 [MODAL] Final custom notes:', finalCustomNotes);
+    console.log('🔍 [MODAL] Updated personality:', JSON.stringify(updatedPersonality, null, 2));
 
     onPersonalityChange?.(updatedPersonality);
 
@@ -486,8 +572,19 @@ function NewTerminalModal({
       console.warn('Failed to save agent to storage:', err);
     }
 
-    // Create terminal
-    onConfirm();
+    // Create terminal - pass complete agent data with updated personality
+    const completeAgentData: SavedAgent = {
+      id: `agent-${Date.now()}`,
+      name,
+      avatar: avatar || '',
+      color,
+      workingOn,
+      personality: updatedPersonality,
+      usageCount: 0,
+      lastUsed: new Date().toISOString(),
+    };
+
+    onConfirm(completeAgentData);
   }
 
   if (!open) {
@@ -594,11 +691,11 @@ function NewTerminalModal({
             loadingAvatars={loadingAvatars}
             uploadingAvatar={uploadingAvatar}
             uploadError={uploadError}
-            personality={personality || {}}
+            personality={localPersonality} // ✅ Use local state
             onNameChange={onNameChange}
             onColorChange={onColorChange}
             onAvatarChange={onAvatarChange || (() => {})}
-            onPersonalityChange={onPersonalityChange || (() => {})}
+            onPersonalityChange={handlePersonalityChangeLocal} // ✅ Use local handler
             onAvatarUpload={handleAvatarUpload}
             onDeleteCustomAvatar={handleDeleteCustomAvatar}
             fileInputRef={fileInputRef}

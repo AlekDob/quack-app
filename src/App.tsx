@@ -294,7 +294,9 @@ function AppContent() {
       console.log('🔍 handlePersonalityChange called');
       console.log('🔍 Previous state:', JSON.stringify(prev, null, 2));
       console.log('🔍 New personality:', JSON.stringify(newPersonality, null, 2));
-      return newPersonality;
+      const merged = { ...prev, ...newPersonality };
+      console.log('🔍 Merged state:', JSON.stringify(merged, null, 2));
+      return merged;
     });
   }, []);
   const [newTerminalError, setNewTerminalError] = useState<string | null>(null);
@@ -4496,6 +4498,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               skills: agentPersonality.skills || [],
               expressions: agentPersonality.expressions || [],
             };
+
+            // DEBUG: Log what we're sending to Rust
+            console.log('🔍 [FRONTEND] About to save personality:');
+            console.log('🔍 [FRONTEND] Name:', fullPersonality.name);
+            console.log('🔍 [FRONTEND] Role:', fullPersonality.role);
+            console.log('🔍 [FRONTEND] Skills:', JSON.stringify(fullPersonality.skills));
+            console.log('🔍 [FRONTEND] CustomNotes:', fullPersonality.customNotes);
 
             await invoke('save_agent_personality', {
               projectPath: effectivePath,
