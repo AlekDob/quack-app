@@ -461,6 +461,7 @@ pub fn run() {
             fs::delete_custom_avatar,
             fs::get_custom_avatar_path,
             fs::read_custom_avatar_bytes,
+            fs::list_directory_files,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,

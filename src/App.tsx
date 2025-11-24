@@ -6915,8 +6915,6 @@ You have access to all Bash tools to execute git commands like:
         <NewTerminalModal
           open={showNewTerminalModal}
           isEditing={editingTerminal !== null}
-          initialStep={editingTerminal !== null ? 'agent' : 'context'}
-          initialAgentMode={editingTerminal !== null ? 'create' : 'select'}
           name={newTerminalName}
           path={newTerminalPath}
           color={newTerminalColor}
@@ -6939,6 +6937,7 @@ You have access to all Bash tools to execute git commands like:
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
+          onOpenDroidFactory={() => setDroidFactoryOpen(true)}
         />
 
         {/* FilePreviewDrawer overlay DISABLED - now using tab-embedded preview only */}

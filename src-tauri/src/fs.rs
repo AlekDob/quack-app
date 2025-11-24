@@ -662,6 +662,11 @@ pub fn read_custom_avatar_bytes(app: tauri::AppHandle, avatar_id: String) -> Res
     read_custom_avatar_bytes_impl(app, avatar_id).map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+pub fn list_directory_files(path: String, extension: String) -> Result<Vec<String>, String> {
+    list_directory_files_impl(path, extension).map_err(|err| err.to_string())
+}
+
 fn save_custom_avatar_impl(
     app: tauri::AppHandle,
     data_base64: String,
@@ -851,4 +856,44 @@ fn read_custom_avatar_bytes_impl(app: tauri::AppHandle, avatar_id: String) -> Re
         .with_context(|| format!("Cannot read custom avatar file: {:?}", file_path))?;
 
     Ok(bytes)
+}
+
+fn list_directory_files_impl(path: String, extension: String) -> Result<Vec<String>> {
+    let dir_path = PathBuf::from(&path);
+
+    if !dir_path.exists() {
+        // Return empty list if directory doesn't exist (not an error)
+        return Ok(Vec::new());
+    }
+
+    if !dir_path.is_dir() {
+        return Err(anyhow!("Path is not a directory: {:?}", dir_path));
+    }
+
+    let mut files = Vec::new();
+    let ext_lower = extension.to_lowercase();
+
+    for entry in fs::read_dir(&dir_path)
+        .with_context(|| format!("Cannot read directory: {:?}", dir_path))?
+    {
+        let entry = entry?;
+        let entry_path = entry.path();
+
+        // Only include files (not directories)
+        if entry_path.is_file() {
+            // Check if file has the specified extension
+            if let Some(file_ext) = entry_path.extension() {
+                if file_ext.to_string_lossy().to_lowercase() == ext_lower {
+                    if let Some(filename) = entry_path.file_name() {
+                        files.push(filename.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort alphabetically
+    files.sort();
+
+    Ok(files)
 }

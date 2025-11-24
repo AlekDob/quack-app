@@ -1,0 +1,609 @@
+/**
+ * Styles for multi-step agent creation modal
+ */
+
+/* ===== Step Progress Indicator ===== */
+.step-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-indicator {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.step-item.current .step-indicator {
+  background: rgba(255, 107, 53, 0.2);
+  border-color: #FF6B35;
+  box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+}
+
+.step-item.completed .step-indicator {
+  background: rgba(0, 217, 255, 0.2);
+  border-color: #00D9FF;
+}
+
+.step-icon {
+  font-size: 20px;
+  transition: opacity 0.3s ease;
+}
+
+.step-item.completed .step-icon {
+  opacity: 0;
+}
+
+.check-icon {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  stroke: #00D9FF;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.3s ease;
+}
+
+.step-item.completed .check-icon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.step-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.3s ease;
+}
+
+.step-item.current .step-label {
+  color: #FF6B35;
+}
+
+.step-item.completed .step-label {
+  color: #00D9FF;
+}
+
+.step-arrow {
+  width: 16px;
+  height: 16px;
+  stroke: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+}
+
+/* ===== Personality Section ===== */
+.personality-section {
+  margin-top: 32px;
+}
+
+.personality-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.personality-field {
+  margin-bottom: 24px;
+}
+
+.personality-input,
+.personality-textarea {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 15px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  resize: vertical;
+}
+
+.personality-input:focus,
+.personality-textarea:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #FF6B35;
+  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.3);
+}
+
+.personality-input::placeholder,
+.personality-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.personality-textarea {
+  min-height: 120px;
+  line-height: 1.6;
+}
+
+.communication-styles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.communication-style-option {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+}
+
+.communication-style-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.communication-style-option.selected {
+  background: rgba(255, 107, 53, 0.15);
+  border-color: #FF6B35;
+  box-shadow: 0 0 0 1px #FF6B35;
+}
+
+.style-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.style-description {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ===== Intro Message ===== */
+.step-intro-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  background: rgba(0, 217, 255, 0.08);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  border-radius: 10px;
+}
+
+.intro-icon {
+  width: 20px;
+  height: 20px;
+  stroke: #00D9FF;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.intro-text {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.intro-text strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.intro-text code {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Monaco', monospace;
+  font-size: 12px;
+  color: #00D9FF;
+}
+
+/* ===== Config Section (Skills & Droids) ===== */
+.config-section {
+  margin-bottom: 32px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.config-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.config-icon {
+  width: 24px;
+  height: 24px;
+  stroke: #FF6B35;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.config-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.config-section-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 4px 0 0 0;
+}
+
+/* ===== Search Bar ===== */
+.config-search {
+  position: relative;
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.search-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  stroke: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 44px 12px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #00D9FF;
+  box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.3);
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.search-clear {
+  position: absolute;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.search-clear svg {
+  width: 14px;
+  height: 14px;
+  stroke: rgba(255, 255, 255, 0.6);
+}
+
+.config-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.config-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.config-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.config-item input[type="checkbox"] {
+  display: none;
+}
+
+.config-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.config-item input:checked + .config-checkbox {
+  background: #FF6B35;
+  border-color: #FF6B35;
+}
+
+.config-item input:checked + .config-checkbox::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 4px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.config-item-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.config-item:hover .config-item-avatar {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.config-item input:checked ~ .config-item-avatar {
+  border-color: #FF6B35;
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+}
+
+.config-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(0, 217, 255, 0.2);
+  border: 1px solid rgba(0, 217, 255, 0.4);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #00D9FF;
+  letter-spacing: 0.5px;
+}
+
+.config-item-specialization {
+  font-size: 12px;
+  color: #F7931E;
+  font-weight: 500;
+}
+
+.config-item-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.config-item-path {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'Fira Code', 'Monaco', monospace;
+  margin-top: 4px;
+}
+
+.config-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  stroke: rgba(255, 255, 255, 0.2);
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 8px 0;
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+  max-width: 300px;
+}
+
+/* ===== Droid Factory CTA ===== */
+.droid-factory-cta {
+  margin: 32px 0;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(247, 147, 30, 0.1) 100%);
+  border: 2px dashed rgba(255, 107, 53, 0.3);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.droid-factory-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.droid-factory-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 107, 53, 0.4);
+}
+
+.droid-factory-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  max-width: 400px;
+}
+
+/* ===== Selection Summary ===== */
+.selection-summary {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(0, 217, 255, 0.05);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  border-radius: 8px;
+}
+
+.summary-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #00D9FF;
+  margin: 0 0 12px 0;
+}
+
+.summary-section {
+  margin-bottom: 12px;
+}
+
+.summary-section:last-child {
+  margin-bottom: 0;
+}
+
+.summary-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.summary-list li {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .step-progress {
+    gap: 8px;
+  }
+
+  .step-indicator {
+    width: 32px;
+    height: 32px;
+  }
+
+  .step-icon {
+    font-size: 16px;
+  }
+
+  .step-label {
+    font-size: 12px;
+  }
+
+  .communication-styles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .config-section {
+    padding: 16px;
+  }
+}
