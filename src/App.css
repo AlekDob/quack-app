@@ -165,9 +165,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 10, 20, 0.6);
-  backdrop-filter: blur(12px);
+  background: rgba(5, 10, 20, 0.85); /* Increased opacity to compensate for no blur */
+  /* backdrop-filter: blur(12px); */ /* TEMPORARILY DISABLED - Testing flickering fix */
   z-index: 1000;
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .modal-panel {
