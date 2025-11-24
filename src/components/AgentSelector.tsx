@@ -31,6 +31,7 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render after delete
 
   // Get agents based on sort mode
   const agents = useMemo(() => {
@@ -48,7 +49,7 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
       default:
         return getSavedAgents();
     }
-  }, [searchQuery, sortMode]);
+  }, [searchQuery, sortMode, refreshKey]); // Add refreshKey to dependencies
 
   const handleDeleteAgent = async (agentId: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -71,16 +72,21 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
     try {
       const success = deleteAgent(agentId);
       if (success) {
-        // Force re-render by toggling sortMode
-        const currentSort = sortMode;
-        setSortMode('alphabetical');
-        setTimeout(() => setSortMode(currentSort), 0);
+        // Force re-render by incrementing refreshKey - agent disappears immediately (visual feedback)
+        setRefreshKey(prev => prev + 1);
       } else {
-        alert('Failed to delete agent. Please try again.');
+        // Only show dialog on error
+        await ask('Failed to delete agent. Please try again.', {
+          title: 'Quack',
+          kind: 'error',
+        });
       }
     } catch (error) {
       console.error('Error deleting agent:', error);
-      alert('Failed to delete agent. Please try again.');
+      await ask('Failed to delete agent. Please try again.', {
+        title: 'Quack',
+        kind: 'error',
+      });
     } finally {
       setDeletingAgentId(null);
     }
@@ -200,18 +206,18 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
                   <img
                     src={agent.avatar ? getAvatarUrl(agent.avatar) : (
                       window.__TAURI__
-                        ? convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
-                        : '/duck30.jpeg'
+                        ? convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset')
+                        : '/images/ducks/new-avatars/duck15.jpeg'
                     )}
                     alt={agent.name}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      console.error('[AgentSelector] Image failed to load, using fallback duck30.jpeg');
-                      // Always fallback to duck30.jpeg on error
+                      console.error('[AgentSelector] Image failed to load, using fallback duck15.jpeg');
+                      // Always fallback to duck15.jpeg on error
                       if (window.__TAURI__) {
-                        target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset');
+                        target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
                       } else {
-                        target.src = '/duck30.jpeg';
+                        target.src = '/images/ducks/new-avatars/duck15.jpeg';
                       }
                     }}
                   />

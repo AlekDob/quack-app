@@ -154,13 +154,13 @@ function SortableAgent({
     let isMounted = true;
 
     async function loadAvatarUrl() {
-      // If no avatar specified, use duck30.jpeg fallback
+      // If no avatar specified, use duck15.jpeg fallback
       if (!agent.avatar) {
         if (isMounted) {
           if (window.__TAURI__) {
-            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset'));
           } else {
-            setAvatarUrl('/duck30.jpeg');
+            setAvatarUrl('/images/ducks/new-avatars/duck15.jpeg');
           }
         }
         return;
@@ -176,11 +176,11 @@ function SortableAgent({
         } catch (error) {
           console.error('Failed to load custom avatar:', error);
           if (isMounted) {
-            // Fallback to duck30.jpeg if custom avatar fails
+            // Fallback to duck15.jpeg if custom avatar fails
             if (window.__TAURI__) {
-              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset'));
             } else {
-              setAvatarUrl('/duck30.jpeg');
+              setAvatarUrl('/images/ducks/new-avatars/duck15.jpeg');
             }
           }
         }
@@ -427,12 +427,12 @@ function SortableAgent({
               }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                console.error('[RepositoryGroup] Image failed to load, using fallback duck30.jpeg:', avatarUrl)
-                // Always fallback to duck30.jpeg on error
+                console.error('[RepositoryGroup] Image failed to load, using fallback duck15.jpeg:', avatarUrl)
+                // Always fallback to duck15.jpeg on error
                 if (window.__TAURI__) {
-                  target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
+                  target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset')
                 } else {
-                  target.src = '/duck30.jpeg'
+                  target.src = '/images/ducks/new-avatars/duck15.jpeg'
                 }
               }}
             />
@@ -1626,9 +1626,9 @@ export default function RepositoryGroup({
                                     if (!agent.avatar) {
                                       if (isMounted) {
                                         if (window.__TAURI__) {
-                                          setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+                                          setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset'));
                                         } else {
-                                          setAvatarUrl('/duck30.jpeg');
+                                          setAvatarUrl('/images/ducks/new-avatars/duck15.jpeg');
                                         }
                                       }
                                       return;
@@ -1641,9 +1641,9 @@ export default function RepositoryGroup({
                                       } catch (error) {
                                         if (isMounted) {
                                           if (window.__TAURI__) {
-                                            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
+                                            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset'));
                                           } else {
-                                            setAvatarUrl('/duck30.jpeg');
+                                            setAvatarUrl('/images/ducks/new-avatars/duck15.jpeg');
                                           }
                                         }
                                       }
@@ -1668,9 +1668,9 @@ export default function RepositoryGroup({
                                     onError={(e) => {
                                       const target = e.target as HTMLImageElement;
                                       if (window.__TAURI__) {
-                                        target.src = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset')
+                                        target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset')
                                       } else {
-                                        target.src = '/duck30.jpeg'
+                                        target.src = '/images/ducks/new-avatars/duck15.jpeg'
                                       }
                                     }}
                                   />
