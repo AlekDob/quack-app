@@ -178,14 +178,19 @@ export default function SkillViewer({
               height: '56px',
               borderRadius: '8px',
               flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '2rem',
+              overflow: 'hidden',
               background: 'rgba(242, 140, 82, 0.15)',
               border: '1px solid rgba(242, 140, 82, 0.3)',
             }}>
-              ⚡
+              <img
+                src="/images/skills.jpeg"
+                alt="Skill"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
             </div>
 
             <div style={{ flex: 1 }}>

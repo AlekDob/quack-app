@@ -91,17 +91,17 @@ export function getDuckdroidUrl(): string {
 
 /**
  * Get the fallback duck avatar URL (for old avatars that don't exist anymore)
- * @returns Full URL to duck30.jpeg
+ * @returns Full URL to duck15.jpeg
  */
 export function getFallbackDuckUrl(): string {
   let url: string;
   if (window.__TAURI__) {
     // In Tauri v2, use convertFileSrc for proper asset protocol handling
-    url = convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset');
+    url = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
     console.log('[getFallbackDuckUrl] TAURI mode - URL:', url);
   } else {
     // In dev mode, use standard public path
-    url = `/duck30.jpeg`;
+    url = `/images/ducks/new-avatars/duck15.jpeg`;
     console.log('[getFallbackDuckUrl] DEV mode - URL:', url);
   }
   return url;
@@ -143,8 +143,8 @@ export function getAgentAvatar(_agentName: string, avatarFilename?: string): str
     return getAvatarUrl(avatarFilename);
   }
 
-  // Fallback for old avatars that don't exist anymore - use duck30.jpeg
-  console.log('[getAgentAvatar] Old avatar not found, using fallback duck30.jpeg');
+  // Fallback for old avatars that don't exist anymore - use duck15.jpeg
+  console.log('[getAgentAvatar] Old avatar not found, using fallback duck15.jpeg');
   return getFallbackDuckUrl();
 }
 

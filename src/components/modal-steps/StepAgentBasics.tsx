@@ -6,6 +6,7 @@
  * - Personality configuration (role, technical context, communication style, custom notes)
  */
 
+import { useMemo, useEffect } from 'react';
 import { AVAILABLE_AVATARS, getAvatarUrl } from '../../utils/agentAvatars';
 import type { StepAgentBasicsProps } from './types';
 
@@ -38,6 +39,32 @@ export function StepAgentBasics({
   onNext,
   onBack,
 }: StepAgentBasicsProps) {
+  // Randomize avatar order (memoized so it doesn't change on re-renders)
+  const randomizedAvatars = useMemo(() => {
+    const avatars = [...AVAILABLE_AVATARS];
+    // Fisher-Yates shuffle
+    for (let i = avatars.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [avatars[i], avatars[j]] = [avatars[j], avatars[i]];
+    }
+    return avatars;
+  }, []);
+
+  // Auto-select first avatar if none selected
+  useEffect(() => {
+    console.log('[StepAgentBasics] useEffect - avatar:', avatar, 'avatar type:', typeof avatar, 'avatar length:', avatar?.length);
+    console.log('[StepAgentBasics] useEffect - randomizedAvatars[0]:', randomizedAvatars[0]);
+    console.log('[StepAgentBasics] useEffect - condition check:', (!avatar || avatar.trim() === ''));
+
+    if ((!avatar || avatar.trim() === '') && randomizedAvatars.length > 0) {
+      const firstAvatar = randomizedAvatars[0];
+      console.log('[StepAgentBasics] ✅ Auto-selecting first avatar:', firstAvatar);
+      onAvatarChange(firstAvatar);
+    } else {
+      console.log('[StepAgentBasics] ❌ NOT auto-selecting - avatar already set or no avatars available');
+    }
+  }, [randomizedAvatars, avatar, onAvatarChange]); // Include all dependencies
+
   const handlePersonalityFieldChange = (field: string, value: string) => {
     onPersonalityChange({
       ...personality,
@@ -155,8 +182,8 @@ export function StepAgentBasics({
               </button>
             ))}
 
-            {/* Default Avatars */}
-            {AVAILABLE_AVATARS.map((avatarName) => (
+            {/* Default Avatars - Randomized Order */}
+            {randomizedAvatars.map((avatarName) => (
               <button
                 key={avatarName}
                 type="button"

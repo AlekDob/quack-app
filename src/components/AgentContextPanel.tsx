@@ -18,6 +18,19 @@ interface ContextFileStats {
   score: 'good' | 'warning' | 'bad';
 }
 
+interface SkillInfo {
+  name: string;
+  scope: string;
+  description?: string;
+}
+
+interface AgentInfo {
+  name: string;
+  scope: string;
+  description?: string;
+  avatar?: string;
+}
+
 interface AgentContextPanelProps {
   tauriAvailable: boolean;
   activeAgentId?: string | null;
@@ -29,6 +42,8 @@ interface AgentContextPanelProps {
   onOpenFile?: (entry: DirectoryEntry) => void;
   onOpenContextDrawer?: (scope: string) => void;
   onEditAgent?: () => void; // Added: callback to edit agent
+  onSelectSkill?: (skillInfo: SkillInfo) => void; // Added: callback to open skill detail
+  onSelectAgent?: (agentInfo: AgentInfo) => void; // Added: callback to open droid detail
   projectName?: string;
   gitBranch?: string;
   refreshKey?: number; // Added: forces refresh when agent is edited
@@ -45,6 +60,8 @@ export default function AgentContextPanel({
   onOpenFile,
   onOpenContextDrawer,
   onEditAgent, // Added: callback to edit agent
+  onSelectSkill, // Added: callback to open skill detail
+  onSelectAgent, // Added: callback to open droid detail
   projectName,
   gitBranch,
   refreshKey, // Added: forces refresh when agent is edited
@@ -57,6 +74,9 @@ export default function AgentContextPanel({
   const [personalityCollapsed, setPersonalityCollapsed] = useState(false);
   const [globalCollapsed, setGlobalCollapsed] = useState(false);
   const [projectCollapsed, setProjectCollapsed] = useState(false);
+  const [recommendedToolsCollapsed, setRecommendedToolsCollapsed] = useState(false);
+  const [recommendedSkills, setRecommendedSkills] = useState<SkillInfo[]>([]);
+  const [recommendedDroids, setRecommendedDroids] = useState<AgentInfo[]>([]);
 
   useEffect(() => {
     void loadAgentContext();
@@ -146,6 +166,97 @@ export default function AgentContextPanel({
       } catch (error) {
         console.error('Failed to load CLAUDE.md files:', error);
         setContextFiles([]);
+      }
+
+      // Load recommended skills and droids from personality
+      if (activeAgentPersonality) {
+        // Extract skills
+        if (activeAgentPersonality.skills && activeAgentPersonality.skills.length > 0) {
+          try {
+            const skillsInfo: SkillInfo[] = await Promise.all(
+              activeAgentPersonality.skills.map(async (skillPath) => {
+                // Extract skill name from path (e.g., "/path/to/.claude/skills/skill-name/SKILL.md" -> "skill-name")
+                const pathParts = skillPath.split('/');
+                const skillsIndex = pathParts.findIndex(p => p === 'skills' || p === '.skills');
+                const skillName = skillsIndex >= 0 && skillsIndex < pathParts.length - 1
+                  ? pathParts[skillsIndex + 1]
+                  : pathParts[pathParts.length - 2] || 'unknown';
+                const isGlobal = skillPath.includes('/.claude/skills/');
+
+                try {
+                  // Load skill details from backend
+                  const skillsList = await invoke<SkillInfo[]>("list_skills", {
+                    workingDir: activeAgentCwd,
+                  });
+                  const skill = skillsList.find(s => s.name === skillName);
+                  return skill || { name: skillName, scope: isGlobal ? 'global' : 'project' };
+                } catch {
+                  return { name: skillName, scope: isGlobal ? 'global' : 'project' };
+                }
+              })
+            );
+            setRecommendedSkills(skillsInfo.filter(s => s !== null));
+          } catch (error) {
+            console.error('Failed to load recommended skills:', error);
+            setRecommendedSkills([]);
+          }
+        } else {
+          setRecommendedSkills([]);
+        }
+
+        // Extract droids from customNotes
+        const droidPaths: string[] = [];
+        if (activeAgentPersonality.customNotes) {
+          const lines = activeAgentPersonality.customNotes.split('\n');
+          let inDroidsSection = false;
+          for (const line of lines) {
+            if (line.includes('Selected Protocol Droids:')) {
+              inDroidsSection = true;
+              continue;
+            }
+            if (inDroidsSection) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('- ')) {
+                const path = trimmed.substring(2).trim();
+                if (path) droidPaths.push(path);
+              } else if (trimmed.length > 0) {
+                break;
+              }
+            }
+          }
+        }
+
+        if (droidPaths.length > 0) {
+          try {
+            const droidsInfo: AgentInfo[] = await Promise.all(
+              droidPaths.map(async (droidPath) => {
+                // Extract droid name from path (e.g., "/path/to/.claude/agents/droid-name.md" -> "droid-name")
+                const droidName = droidPath.split('/').pop()?.replace('.md', '') || 'unknown';
+                const isGlobal = droidPath.includes('/.claude/agents/');
+
+                try {
+                  // Load droid details from backend
+                  const agentsList = await invoke<AgentInfo[]>("list_agents", {
+                    workingDir: activeAgentCwd,
+                  });
+                  const agent = agentsList.find(a => a.name === droidName);
+                  return agent || { name: droidName, scope: isGlobal ? 'global' : 'project' };
+                } catch {
+                  return { name: droidName, scope: isGlobal ? 'global' : 'project' };
+                }
+              })
+            );
+            setRecommendedDroids(droidsInfo.filter(d => d !== null));
+          } catch (error) {
+            console.error('Failed to load recommended droids:', error);
+            setRecommendedDroids([]);
+          }
+        } else {
+          setRecommendedDroids([]);
+        }
+      } else {
+        setRecommendedSkills([]);
+        setRecommendedDroids([]);
       }
     } finally {
       setLoading(false);
@@ -418,6 +529,113 @@ export default function AgentContextPanel({
           </div>
         )}
       </div>
+
+      {/* Recommended Tools Section */}
+      {(recommendedSkills.length > 0 || recommendedDroids.length > 0) && (
+        <div className="context-section">
+          <div
+            className="context-section-header"
+            onClick={() => setRecommendedToolsCollapsed(!recommendedToolsCollapsed)}
+          >
+            <div className="context-section-title">
+              <svg
+                className="context-section-arrow"
+                style={{
+                  transform: recommendedToolsCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                }}
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+              >
+                <path
+                  d="M3 4.5L6 7.5L9 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                style={{ opacity: 0.6 }}
+              >
+                <path
+                  d="M12 15l-2-2m0 0l-2-2m2 2V7m0 6l2-2M3 12a9 9 0 1118 0 9 9 0 01-18 0z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Recommended Tools</span>
+              <span className="context-count-badge">{recommendedSkills.length + recommendedDroids.length}</span>
+            </div>
+          </div>
+
+          {!recommendedToolsCollapsed && (
+            <div className="context-list">
+              {/* Recommended Skills */}
+              {recommendedSkills.map((skill) => (
+                <div
+                  key={`skill-${skill.name}`}
+                  className="context-item"
+                  onClick={() => onSelectSkill?.(skill)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="context-item-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f8b739" strokeWidth="2">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                  </div>
+                  <div className="context-item-content">
+                    <div className="context-item-name">{skill.name.replace(/-/g, ' ')}</div>
+                    {skill.description && (
+                      <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                        {skill.description}
+                      </div>
+                    )}
+                    <div className="text-xs" style={{ color: '#f8b739', marginTop: '2px' }}>
+                      Skill • {skill.scope}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Recommended Droids */}
+              {recommendedDroids.map((droid) => (
+                <div
+                  key={`droid-${droid.name}`}
+                  className="context-item"
+                  onClick={() => onSelectAgent?.(droid)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="context-item-icon">
+                    {/* Robot head icon */}
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#4ecdc4" strokeWidth="1.5">
+                      <rect x="4" y="6" width="12" height="12" rx="2" />
+                      <circle cx="8" cy="10" r="1.3" fill="#4ecdc4"/>
+                      <circle cx="12" cy="10" r="1.3" fill="#4ecdc4"/>
+                      <line x1="7" y1="13" x2="13" y2="13"/>
+                      <line x1="10" y1="2" x2="10" y2="6"/>
+                      <circle cx="10" cy="2" r="1"/>
+                    </svg>
+                  </div>
+                  <div className="context-item-content">
+                    <div className="context-item-name">{droid.name.replace(/-/g, ' ')}</div>
+                    <div className="text-xs" style={{ color: '#4ecdc4', marginTop: '2px' }}>
+                      Droid • {droid.scope}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Context Files Section - Global */}
       {globalFiles.length > 0 && (

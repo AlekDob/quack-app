@@ -129,6 +129,11 @@ export function StepSkills({
                       onChange={() => onSkillToggle(skill.id)}
                     />
                     <span className="config-checkbox"></span>
+                    <img
+                      src="/images/skills.jpeg"
+                      alt="Skill avatar"
+                      className="config-item-avatar"
+                    />
                     <div className="config-item-content">
                       <span className="config-item-name">
                         {skill.name}

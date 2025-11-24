@@ -143,7 +143,6 @@ export function StepDroids({
                         {droid.isGlobal && <span className="global-badge">GLOBAL</span>}
                       </span>
                       <span className="config-item-specialization">{droid.specialization}</span>
-                      <span className="config-item-description">{droid.description}</span>
                       <span className="config-item-path">{droid.path}</span>
                     </div>
                   </label>

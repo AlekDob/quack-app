@@ -16,6 +16,7 @@ import {
 } from '../utils/agentStorage';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { ask } from '@tauri-apps/plugin-dialog';
 import './AgentSelector.css';
 
 interface AgentSelectorProps {
@@ -56,7 +57,13 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
     const agent = agents.find(a => a.id === agentId);
     if (!agent) return;
 
-    if (!confirm(`Are you sure you want to delete "${agent.name}"? This action cannot be undone.`)) {
+    // Use Tauri's async dialog - wait for user confirmation BEFORE any state changes
+    const confirmed = await ask(`Are you sure you want to delete "${agent.name}"? This action cannot be undone.`, {
+      title: 'Quack',
+      kind: 'warning',
+    });
+
+    if (!confirmed) {
       return;
     }
 

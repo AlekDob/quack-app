@@ -272,7 +272,7 @@ function AppContent() {
   const [newTerminalPath, setNewTerminalPath] = useState("");
   const [newTerminalColor, setNewTerminalColor] = useState<string>(TERMINAL_COLORS[0]);
   const [newTerminalWorkingOn, setNewTerminalWorkingOn] = useState("");
-  const [newTerminalAvatar, setNewTerminalAvatar] = useState("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
+  const [newTerminalAvatar, setNewTerminalAvatar] = useState(""); // Empty to allow auto-selection
   const [newTerminalBranch, setNewTerminalBranch] = useState("");
   const [newTerminalUseWorktree, setNewTerminalUseWorktree] = useState(false);
   const [newTerminalPersonality, setNewTerminalPersonality] = useState<Partial<AgentPersonality>>({
@@ -3888,7 +3888,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalColor(terminal.color);
     setNewTerminalPath(terminal.cwd);
     setNewTerminalWorkingOn(terminal.workingOn || "");
-    setNewTerminalAvatar(terminal.avatar || "68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
+    setNewTerminalAvatar(terminal.avatar || ""); // Use empty string as fallback
     setNewTerminalError(null);
 
     // Load personality from terminal state (already persisted)
@@ -3946,7 +3946,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalColor(activeTerminal.color);
     setNewTerminalPath(activeTerminal.cwd);
     setNewTerminalWorkingOn(activeTerminal.workingOn || "");
-    setNewTerminalAvatar(activeTerminal.avatar || "68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg");
+    setNewTerminalAvatar(activeTerminal.avatar || ""); // Use empty string as fallback
     setNewTerminalError(null);
 
     // Load personality from terminal state
@@ -4191,7 +4191,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalName(getRandomName()); // Random international agent name (140+ names)
     setNewTerminalColor(defaultColor);
     setNewTerminalWorkingOn(""); // Reset working on field
-    setNewTerminalAvatar("68b54025bcf1dfbc9e03e20882688ddcadd28c27.jpeg"); // Reset to first avatar
+    setNewTerminalAvatar(""); // Reset to empty - will auto-select from randomized list
     setNewTerminalBranch(""); // 🔧 FIX: Reset branch to empty string - modal will load current branch
     setNewTerminalUseWorktree(false); // Reset worktree option
     setNewTerminalPersonality({ // Reset personality to default

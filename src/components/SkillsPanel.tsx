@@ -237,13 +237,17 @@ export default function SkillsPanel({
                         <div className="w-full flex items-start gap-3 p-3 transition-all duration-200">
                           {/* Skill Icon */}
                           <div
-                            className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-lg"
+                            className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden"
                             style={{
                               background: "rgba(242, 140, 82, 0.15)",
                               border: "1px solid rgba(242, 140, 82, 0.3)",
                             }}
                           >
-                            ⚡
+                            <img
+                              src="/images/skills.jpeg"
+                              alt="Skill"
+                              className="w-full h-full object-cover"
+                            />
                           </div>
 
                           {/* Skill Info */}
@@ -314,13 +318,17 @@ export default function SkillsPanel({
                         <div className="w-full flex items-start gap-3 p-3 transition-all duration-200">
                           {/* Skill Icon */}
                           <div
-                            className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-lg"
+                            className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden"
                             style={{
                               background: "rgba(242, 140, 82, 0.15)",
                               border: "1px solid rgba(242, 140, 82, 0.3)",
                             }}
                           >
-                            ⚡
+                            <img
+                              src="/images/skills.jpeg"
+                              alt="Skill"
+                              className="w-full h-full object-cover"
+                            />
                           </div>
 
                           {/* Skill Info */}

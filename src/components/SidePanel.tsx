@@ -593,6 +593,8 @@ export default function SidePanel({
               activeAgentPersonality={activeAgentPersonality}
               onOpenFile={onOpenFile}
               onOpenContextDrawer={onOpenContextDrawer}
+              onSelectSkill={onSelectSkill}
+              onSelectAgent={onSelectAgent}
               projectName={projectName}
               gitBranch={gitBranch}
               refreshKey={agentRefreshKey}
