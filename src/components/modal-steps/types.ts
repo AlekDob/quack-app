@@ -6,7 +6,7 @@ import type { AgentPersonality, GitBranch } from '../../types';
 import type { CustomAvatarInfo } from '../../utils/customAvatarStorage';
 
 // Step identifier
-export type ModalStep = 'context' | 'basics' | 'skills' | 'droids';
+export type ModalStep = 'context' | 'basics' | 'skills' | 'droids' | 'triggers';
 
 // Skill metadata loaded from filesystem
 export interface SkillMetadata {
@@ -26,6 +26,58 @@ export interface DroidMetadata {
   path: string;
   isGlobal: boolean;
 }
+
+// Trigger configuration for a skill or droid
+export interface TriggerConfig {
+  id: string;           // skill or droid id
+  type: 'skill' | 'droid';
+  name: string;
+  trigger: string;      // When to use this skill/droid (user-defined)
+  autoInvoke: boolean;  // Should agent invoke proactively without asking?
+}
+
+// Suggested triggers based on skill/droid type
+export const TRIGGER_SUGGESTIONS: Record<string, string[]> = {
+  // Common patterns
+  'default': [
+    'When the user asks about...',
+    'Before making decisions about...',
+    'When working on files related to...',
+    'After completing...',
+  ],
+  // UI/Design related
+  'ui': [
+    'When creating or modifying UI components',
+    'Before making design decisions',
+    'When discussing user experience',
+    'When implementing accessibility features',
+  ],
+  // Code related
+  'code': [
+    'When reviewing or analyzing code',
+    'Before refactoring',
+    'When debugging issues',
+    'When implementing new features',
+  ],
+  // Documentation
+  'docs': [
+    'When writing documentation',
+    'When explaining code or concepts',
+    'Before publishing changes',
+  ],
+  // Testing
+  'test': [
+    'When writing or updating tests',
+    'Before merging code',
+    'When investigating failures',
+  ],
+  // API/Backend
+  'api': [
+    'When working with API endpoints',
+    'When designing data structures',
+    'When handling authentication',
+  ],
+};
 
 // Props for StepProjectContext
 export interface StepProjectContextProps {

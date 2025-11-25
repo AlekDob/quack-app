@@ -409,8 +409,16 @@ fn inject_personality_to_claude_md_impl(
         }
     }
 
-    // 🦆 Protocol Droids section - Parse from customNotes
-    let mut droid_paths: Vec<String> = Vec::new();
+    // 🦆 Protocol Droids section - Parse from customNotes with trigger support
+    // Format: "- path | WHEN: trigger | AUTO-INVOKE"
+    #[derive(Debug)]
+    struct DroidConfig {
+        path: String,
+        trigger: Option<String>,
+        auto_invoke: bool,
+    }
+
+    let mut droid_configs: Vec<DroidConfig> = Vec::new();
     if let Some(custom_notes) = &personality.custom_notes {
         let lines: Vec<&str> = custom_notes.lines().collect();
         let mut in_droids_section = false;
@@ -423,60 +431,120 @@ fn inject_personality_to_claude_md_impl(
             if in_droids_section {
                 let trimmed = line.trim();
                 if trimmed.starts_with("- ") {
-                    // Extract path after "- "
-                    let path = trimmed.trim_start_matches("- ").trim();
+                    // Parse: "- path | WHEN: trigger | AUTO-INVOKE"
+                    let content = trimmed.trim_start_matches("- ").trim();
+                    let parts: Vec<&str> = content.split(" | ").collect();
+
+                    let path = parts.get(0).unwrap_or(&"").to_string();
+                    let mut trigger: Option<String> = None;
+                    let mut auto_invoke = false;
+
+                    for part in &parts[1..] {
+                        if part.starts_with("WHEN:") {
+                            trigger = Some(part.trim_start_matches("WHEN:").trim().to_string());
+                        } else if *part == "AUTO-INVOKE" {
+                            auto_invoke = true;
+                        }
+                    }
+
                     if !path.is_empty() {
-                        droid_paths.push(path.to_string());
+                        droid_configs.push(DroidConfig { path, trigger, auto_invoke });
                     }
                 } else if !trimmed.is_empty() {
-                    // Stop when we hit non-droid content
                     break;
                 }
             }
         }
     }
 
-    agent_header.push_str("**Available Droids:**\n");
-    agent_header.push_str("Specialized subagents that assist with specific tasks.\n\n");
+    // Only show droids section if there are configured droids
+    if !droid_configs.is_empty() {
+        agent_header.push_str("**Droids:**\n");
 
-    if !droid_paths.is_empty() {
-        agent_header.push_str("**Recommended for this task:**\n");
-        for droid_path in &droid_paths {
-            agent_header.push_str(&format!("- {}\n", droid_path));
+        // Add compact proactive rule if any droids have auto-invoke
+        let has_auto_invoke = droid_configs.iter().any(|d| d.auto_invoke);
+        if has_auto_invoke {
+            agent_header.push_str("*Invoke automatically when triggers match. Don't wait for user request.*\n\n");
         }
-        agent_header.push_str("\n*Use these droids frequently when working on this task.*\n\n");
+
+        agent_header.push_str("| Droid | Trigger | Auto |\n");
+        agent_header.push_str("|-------|---------|------|\n");
+
+        for config in &droid_configs {
+            let trigger_text = config.trigger.as_ref()
+                .filter(|t| !t.is_empty())
+                .map(|t| t.as_str())
+                .unwrap_or("-");
+            let auto_text = if config.auto_invoke { "Yes" } else { "-" };
+
+            // Extract just the filename for display (remove .md extension)
+            let display_name = config.path.split('/').last().unwrap_or(&config.path);
+            let display_name = display_name.trim_end_matches(".md");
+            agent_header.push_str(&format!("| {} | {} | {} |\n", display_name, trigger_text, auto_text));
+        }
+        agent_header.push_str("\n");
     }
 
-    agent_header.push_str("**All Available Droids:**\n");
-    agent_header.push_str("- Project-Specific: `.claude/agents/`\n");
-    agent_header.push_str("- Global: `~/.claude/agents/`\n\n");
+    // 🦆 Skills section - Parse with trigger support
+    // Format: "path | WHEN: trigger | AUTO-INVOKE"
+    #[derive(Debug)]
+    struct SkillConfig {
+        path: String,
+        trigger: Option<String>,
+        auto_invoke: bool,
+    }
 
-    // 🦆 Skills section - Use specific paths from personality.skills
-    agent_header.push_str("**Available Skills:**\n");
-    agent_header.push_str("Specialized knowledge domains that provide expert guidance.\n\n");
-
+    let mut skill_configs: Vec<SkillConfig> = Vec::new();
     if let Some(skills) = &personality.skills {
-        if !skills.is_empty() {
-            agent_header.push_str("**Recommended for this task:**\n");
-            for skill_path in skills {
-                agent_header.push_str(&format!("- {}\n", skill_path));
+        for skill_line in skills {
+            // Parse: "path | WHEN: trigger | AUTO-INVOKE"
+            let parts: Vec<&str> = skill_line.split(" | ").collect();
+
+            let path = parts.get(0).unwrap_or(&"").to_string();
+            let mut trigger: Option<String> = None;
+            let mut auto_invoke = false;
+
+            for part in &parts[1..] {
+                if part.starts_with("WHEN:") {
+                    trigger = Some(part.trim_start_matches("WHEN:").trim().to_string());
+                } else if *part == "AUTO-INVOKE" {
+                    auto_invoke = true;
+                }
             }
-            agent_header.push_str("\n*Use these skills frequently when working on this task.*\n\n");
+
+            if !path.is_empty() {
+                skill_configs.push(SkillConfig { path, trigger, auto_invoke });
+            }
         }
     }
 
-    agent_header.push_str("**All Available Skills:**\n");
-    agent_header.push_str("- Project-Specific: `.claude/skills/`\n\n");
+    // Only show skills section if there are configured skills
+    if !skill_configs.is_empty() {
+        agent_header.push_str("**Skills:**\n");
 
-    // 🦆 MCP Servers section (compact)
-    agent_header.push_str("**MCP Servers Available:**\n");
-    agent_header.push_str("Model Context Protocol servers for external integrations. Configured in `.mcp.json`\n\n");
-    agent_header.push_str("**Project MCP Servers:** `.mcp.json` in project root\n");
-    agent_header.push_str("**Global MCP Servers:** `~/.mcp.json`\n\n");
+        // Add compact proactive rule if any skills have auto-invoke
+        let has_skill_auto_invoke = skill_configs.iter().any(|s| s.auto_invoke);
+        if has_skill_auto_invoke {
+            agent_header.push_str("*Consult automatically when triggers match.*\n\n");
+        }
 
-    // 🦆 Slash Commands section (compact)
-    agent_header.push_str("**Slash Commands:**\n");
-    agent_header.push_str("Pre-configured commands located in `.claude/commands/`. Use SlashCommand tool.\n\n");
+        agent_header.push_str("| Skill | Trigger | Auto |\n");
+        agent_header.push_str("|-------|---------|------|\n");
+
+        for config in &skill_configs {
+            let trigger_text = config.trigger.as_ref()
+                .filter(|t| !t.is_empty())
+                .map(|t| t.as_str())
+                .unwrap_or("-");
+            let auto_text = if config.auto_invoke { "Yes" } else { "-" };
+
+            // Extract just the skill name for display (remove SKILL.md, keep folder name)
+            let display_name = config.path.split('/').last().unwrap_or(&config.path);
+            let display_name = display_name.trim_end_matches(".md").trim_end_matches("/SKILL");
+            agent_header.push_str(&format!("| {} | {} | {} |\n", display_name, trigger_text, auto_text));
+        }
+        agent_header.push_str("\n");
+    }
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 

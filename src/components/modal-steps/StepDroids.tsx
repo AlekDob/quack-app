@@ -15,8 +15,7 @@ interface StepDroidsProps {
   onDroidToggle: (droidId: string) => void;
   onOpenDroidFactory: () => void;
   onBack: () => void;
-  onConfirm: () => void;
-  creating: boolean;
+  onNext: () => void;
 }
 
 export function StepDroids({
@@ -26,8 +25,7 @@ export function StepDroids({
   onDroidToggle,
   onOpenDroidFactory,
   onBack,
-  onConfirm,
-  creating,
+  onNext,
 }: StepDroidsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const hasDroids = availableDroids.length > 0;
@@ -200,22 +198,14 @@ export function StepDroids({
       {/* Actions */}
       <div className="modal-actions">
         <button type="button" className="secondary" onClick={onBack}>
-          ← Back
+          Back
         </button>
         <button
           type="button"
           className="primary"
-          onClick={onConfirm}
-          disabled={creating}
+          onClick={onNext}
         >
-          {creating ? (
-            <>
-              <span className="spinner"></span>
-              Creating agent...
-            </>
-          ) : (
-            'Create Agent'
-          )}
+          Continue
         </button>
       </div>
     </>

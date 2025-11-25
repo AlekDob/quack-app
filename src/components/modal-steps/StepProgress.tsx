@@ -10,6 +10,7 @@ const STEPS: Array<{ id: ModalStep; label: string; icon: string }> = [
   { id: 'basics', label: 'Basics', icon: '🎨' },
   { id: 'skills', label: 'Skills', icon: '📚' },
   { id: 'droids', label: 'Droids', icon: '🤖' },
+  { id: 'triggers', label: 'Triggers', icon: '⚡' },
 ];
 
 export function StepProgress({ currentStep, completedSteps }: StepProgressProps) {

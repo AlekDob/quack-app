@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import AgentPersonalityCard from './AgentPersonalityCard';
-import type { AgentPersonality, DirectoryEntry } from '../types';
+import type { AgentPersonality, DirectoryEntry, SkillInfo, AgentInfo } from '../types';
 import './AgentContextPanel.css';
 
 interface ContextFile {
@@ -16,19 +16,6 @@ interface ContextFileStats {
   word_count: number;
   line_count: number;
   score: 'good' | 'warning' | 'bad';
-}
-
-interface SkillInfo {
-  name: string;
-  scope: string;
-  description?: string;
-}
-
-interface AgentInfo {
-  name: string;
-  scope: string;
-  description?: string;
-  avatar?: string;
 }
 
 interface AgentContextPanelProps {
@@ -189,9 +176,19 @@ export default function AgentContextPanel({
                     workingDir: activeAgentCwd,
                   });
                   const skill = skillsList.find(s => s.name === skillName);
-                  return skill || { name: skillName, scope: isGlobal ? 'global' : 'project' };
+                  return skill || {
+                    name: skillName,
+                    description: '',
+                    file_path: skillPath,
+                    scope: isGlobal ? 'global' : 'project'
+                  };
                 } catch {
-                  return { name: skillName, scope: isGlobal ? 'global' : 'project' };
+                  return {
+                    name: skillName,
+                    description: '',
+                    file_path: skillPath,
+                    scope: isGlobal ? 'global' : 'project'
+                  };
                 }
               })
             );
@@ -240,9 +237,23 @@ export default function AgentContextPanel({
                     workingDir: activeAgentCwd,
                   });
                   const agent = agentsList.find(a => a.name === droidName);
-                  return agent || { name: droidName, scope: isGlobal ? 'global' : 'project' };
+                  return agent || {
+                    name: droidName,
+                    description: '',
+                    model: 'claude-sonnet-4-5-20250929',
+                    color: '#4ecdc4',
+                    file_path: droidPath,
+                    scope: isGlobal ? 'global' : 'project'
+                  };
                 } catch {
-                  return { name: droidName, scope: isGlobal ? 'global' : 'project' };
+                  return {
+                    name: droidName,
+                    description: '',
+                    model: 'claude-sonnet-4-5-20250929',
+                    color: '#4ecdc4',
+                    file_path: droidPath,
+                    scope: isGlobal ? 'global' : 'project'
+                  };
                 }
               })
             );

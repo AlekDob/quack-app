@@ -31,7 +31,8 @@ import { StepProjectContext } from './modal-steps/StepProjectContext';
 import { StepAgentBasics } from './modal-steps/StepAgentBasics';
 import { StepSkills } from './modal-steps/StepSkills';
 import { StepDroids } from './modal-steps/StepDroids';
-import type { ModalStep, SkillMetadata, DroidMetadata } from './modal-steps/types';
+import { StepTriggers } from './modal-steps/StepTriggers';
+import type { ModalStep, SkillMetadata, DroidMetadata, TriggerConfig } from './modal-steps/types';
 
 // Styles
 import './modal-steps/ModalSteps.css';
@@ -120,6 +121,9 @@ function NewTerminalModal({
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [loadingDroids, setLoadingDroids] = useState(false);
 
+  // Trigger configurations state
+  const [triggerConfigs, setTriggerConfigs] = useState<TriggerConfig[]>([]);
+
   // Local personality state to track changes across steps
   const [localPersonality, setLocalPersonality] = useState<Partial<AgentPersonality>>(personality || {});
 
@@ -132,6 +136,7 @@ function NewTerminalModal({
       setLocalPersonality(personality || {}); // Initialize from prop when modal opens
       setSelectedSkills([]); // Reset selections
       setSelectedDroids([]);
+      setTriggerConfigs([]); // Reset trigger configs
     }
   }, [open]); // ✅ Only trigger when modal opens/closes, not when personality changes
 
@@ -481,6 +486,15 @@ function NewTerminalModal({
     setCurrentStep('skills');
   }
 
+  function handleDroidsNext() {
+    setCompletedSteps(prev => [...prev, 'droids']);
+    setCurrentStep('triggers');
+  }
+
+  function handleTriggersBack() {
+    setCurrentStep('droids');
+  }
+
   // ===== Skills & Droids =====
 
   function handleSkillToggle(skillId: string) {
@@ -516,9 +530,32 @@ function NewTerminalModal({
       return skill ? skill.path : id;
     });
 
+    // Build trigger-enhanced droid lines with WHEN to use each
     const droidLines = selectedDroids.map(id => {
       const droid = availableDroids.find(d => d.id === id);
-      return droid ? `- ${droid.path}` : `- ${id}`;
+      const triggerConfig = triggerConfigs.find(t => t.id === id && t.type === 'droid');
+      const path = droid ? droid.path : id;
+      const trigger = triggerConfig?.trigger || '';
+      const autoInvoke = triggerConfig?.autoInvoke !== false; // Default true
+
+      if (trigger) {
+        return `- ${path} | WHEN: ${trigger}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
+      }
+      return `- ${path}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
+    });
+
+    // Build trigger-enhanced skill paths with WHEN to use each
+    const skillLines = selectedSkills.map(id => {
+      const skill = availableSkills.find(s => s.id === id);
+      const triggerConfig = triggerConfigs.find(t => t.id === id && t.type === 'skill');
+      const path = skill ? skill.path : id;
+      const trigger = triggerConfig?.trigger || '';
+      const autoInvoke = triggerConfig?.autoInvoke !== false; // Default true
+
+      if (trigger) {
+        return `${path} | WHEN: ${trigger}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
+      }
+      return `${path}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
     });
 
     // Build custom notes: only include droids section if droids are selected
@@ -543,7 +580,7 @@ function NewTerminalModal({
     // Use LOCAL personality state for complete data
     const updatedPersonality: Partial<AgentPersonality> = {
       ...localPersonality, // ✅ Use local state instead of prop
-      skills: skillPaths.length > 0 ? skillPaths : undefined, // Only include if skills selected
+      skills: skillLines.length > 0 ? skillLines : undefined, // Include trigger info with skills
       customNotes: finalCustomNotes.trim() || undefined // Only include if not empty
     };
 
@@ -580,8 +617,9 @@ function NewTerminalModal({
       color,
       workingOn,
       personality: updatedPersonality,
+      createdAt: Date.now(),
+      lastUsed: Date.now(),
       usageCount: 0,
-      lastUsed: new Date().toISOString(),
     };
 
     onConfirm(completeAgentData);
@@ -726,6 +764,20 @@ function NewTerminalModal({
             onDroidToggle={handleDroidToggle}
             onOpenDroidFactory={handleOpenDroidFactory}
             onBack={handleDroidsBack}
+            onNext={handleDroidsNext}
+          />
+        )}
+
+        {/* Step 5: Triggers Configuration */}
+        {currentStep === 'triggers' && (
+          <StepTriggers
+            selectedSkills={selectedSkills}
+            selectedDroids={selectedDroids}
+            availableSkills={availableSkills}
+            availableDroids={availableDroids}
+            triggerConfigs={triggerConfigs}
+            onTriggerChange={setTriggerConfigs}
+            onBack={handleTriggersBack}
             onConfirm={handleFinalConfirm}
             creating={creating}
           />
