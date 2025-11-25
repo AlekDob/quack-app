@@ -112,7 +112,7 @@ If you find existing skills with similar names, descriptions, or purposes, pleas
 - Ask if I want to proceed anyway or use an existing one
 - Only create the new skill after I confirm
 
-Please read the instructions in .claude/skills/skill-creator/SKILL.md to understand how to create skills properly.
+Please read the instructions in public/embedded-skills/skill-creator/SKILL.md to understand how to create skills properly.
 
 Then create a skill with these specifications:
 

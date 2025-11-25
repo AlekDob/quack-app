@@ -158,7 +158,7 @@ export function NewAgentModal({ isOpen, onClose, onSave, existingAgents }: NewAg
                 paddingRight: '2.5rem'
               }}
             >
-              <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
+              <option value="claude-opus-4-5-20251101">claude-opus-4-5-20251101</option>
               <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
               <option value="claude-sonnet-3-5-20241022">claude-sonnet-3-5-20241022</option>
               <option value="claude-haiku-3-5-20241022">claude-haiku-3-5-20241022</option>

@@ -12,6 +12,20 @@ import { readFileSync, existsSync } from 'fs';
 import { extname, join } from 'path';
 import { homedir } from 'os';
 
+/**
+ * Map friendly model names to official API model IDs
+ * Must match mapping in src/services/claudeSDK.ts (frontend)
+ */
+function getModelId(model) {
+  const modelMap = {
+    'haiku': 'claude-haiku-4-5',                 // Haiku 4.5 (latest)
+    'sonnet': 'claude-sonnet-4-5-20250929',      // Sonnet 4.5 (latest)
+    'opus': 'claude-opus-4-5-20251101',          // Opus 4.5 (latest)
+  };
+
+  return modelMap[model] || model; // Return as-is if not in map (allows full model IDs)
+}
+
 // Parse command line arguments
 const args = process.argv.slice(2);
 const config = JSON.parse(args[0] || '{}');
@@ -188,8 +202,11 @@ async function main() {
     }
 
     // Build SDK options
+    const modelId = getModelId(model);
+    console.error(`[DEBUG] Model mapping: "${model}" → "${modelId}"`);
+
     const options = {
-      model,
+      model: modelId,
       // Enable automatic reading of CLAUDE.md and project settings
       settingSources: ['project', 'user', 'local'],
     };

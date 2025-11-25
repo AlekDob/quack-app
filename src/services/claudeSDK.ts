@@ -26,7 +26,7 @@ function getModelId(model: string): string {
   const modelMap: Record<string, string> = {
     'haiku': 'claude-haiku-4-5',                 // Haiku 4.5 (latest)
     'sonnet': 'claude-sonnet-4-5-20250929',      // Sonnet 4.5 (latest)
-    'opus': 'claude-opus-4-1-20250805',          // Opus 4.1 (latest)
+    'opus': 'claude-opus-4-5-20251101',          // Opus 4.5 (latest)
   };
 
   return modelMap[model] || model; // Return as-is if not in map (allows full model IDs)

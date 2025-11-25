@@ -13,7 +13,7 @@ interface ChatSettingsMenuProps {
 }
 
 const modelOptions = [
-  { value: 'opus', label: 'Opus 4.1' },
+  { value: 'opus', label: 'Opus 4.5' },
   { value: 'sonnet', label: 'Sonnet 4.5' },
   { value: 'haiku', label: 'Haiku 4.5' },
 ];

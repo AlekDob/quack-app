@@ -844,7 +844,7 @@ When the user clicks "Compact" or "Clear" buttons:
 
 ### Token Limits
 - **Claude Sonnet 4.5**: 200,000 token context window
-- **Claude Opus 4.1**: 200,000 token context window
+- **Claude Opus 4.5**: 200,000 token context window
 - **Claude Haiku**: 200,000 token context window
 
 ---
@@ -905,7 +905,7 @@ When the user clicks "Compact" or "Clear" buttons:
 ## ❓ FAQ
 
 ### Q: Why 200k tokens?
-**A**: Claude's context window is 200,000 tokens for all current models (Sonnet 4.5, Opus 4.1, Haiku).
+**A**: Claude's context window is 200,000 tokens for all current models (Sonnet 4.5, Opus 4.5, Haiku).
 
 ### Q: Are cache tokens counted toward the limit?
 **A**: Cache read tokens don't count toward input limits, but we track them for visibility. Cache creation tokens DO count.
