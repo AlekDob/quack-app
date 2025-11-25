@@ -1,0 +1,11 @@
+{
+  "title": "Advanced Techniques",
+  "icon": "🎯",
+  "order": 3,
+  "pages": [
+    "agent-architecture",
+    "prompt-engineering",
+    "testing-workflow",
+    "git-integration"
+  ]
+}

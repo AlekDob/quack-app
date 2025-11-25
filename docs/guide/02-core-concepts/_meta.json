@@ -1,0 +1,11 @@
+{
+  "title": "Core Concepts",
+  "icon": "⚙️",
+  "order": 2,
+  "pages": [
+    "what-is-claude-code",
+    "conversation-flow",
+    "prompting-basics",
+    "file-context"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Best Practices",
+  "icon": "✨",
+  "order": 4,
+  "pages": [
+    "project-organization",
+    "cost-optimization",
+    "security-tips"
+  ]
+}

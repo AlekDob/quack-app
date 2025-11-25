@@ -1,0 +1,10 @@
+{
+  "title": "Getting Started",
+  "icon": "🚀",
+  "order": 1,
+  "pages": [
+    "introduction",
+    "installation",
+    "first-steps"
+  ]
+}
