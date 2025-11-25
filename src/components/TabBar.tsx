@@ -1,4 +1,5 @@
-import { memo, useState } from 'react';
+import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import './TabBar.css';
 
@@ -20,6 +21,13 @@ export interface Tab {
   docsPath?: string; // Path to docs page for docs tabs
 }
 
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  tabId: string | null;
+}
+
 interface TabBarProps {
   tabs: Tab[];
   activeTabId: string;
@@ -31,6 +39,101 @@ interface TabBarProps {
 function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: TabBarProps) {
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    tabId: null,
+  });
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+      }
+    };
+
+    if (contextMenu.visible) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [contextMenu.visible]);
+
+  // Handle right-click on tab
+  const handleContextMenu = useCallback((e: React.MouseEvent, tab: Tab) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Don't show context menu for non-closable tabs (like main chat)
+    if (!tab.closable) {
+      return;
+    }
+
+    // Calculate position, ensuring menu stays within viewport
+    const menuWidth = 180; // Approximate menu width
+    const menuHeight = 80; // Approximate menu height
+
+    let x = e.clientX;
+    let y = e.clientY;
+
+    // Check right edge - if menu would go off screen, position it to the left of cursor
+    if (x + menuWidth > window.innerWidth) {
+      x = e.clientX - menuWidth;
+    }
+
+    // Check bottom edge - if menu would go off screen, position it above cursor
+    if (y + menuHeight > window.innerHeight) {
+      y = e.clientY - menuHeight;
+    }
+
+    // Ensure menu doesn't go off left or top edge
+    x = Math.max(8, x);
+    y = Math.max(8, y);
+
+    setContextMenu({
+      visible: true,
+      x,
+      y,
+      tabId: tab.id,
+    });
+  }, []);
+
+  // Close single tab (with agent-terminal protection)
+  const handleCloseThisTab = useCallback(() => {
+    if (!contextMenu.tabId) return;
+
+    const tab = tabs.find((t) => t.id === contextMenu.tabId);
+
+    // NEVER close agent-terminal tabs via context menu
+    if (tab && tab.type !== 'agent-terminal' && tab.closable) {
+      onTabClose(contextMenu.tabId);
+    }
+
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  }, [contextMenu.tabId, tabs, onTabClose]);
+
+  // Close all other tabs (with agent-terminal protection)
+  const handleCloseOtherTabs = useCallback(() => {
+    if (!contextMenu.tabId) return;
+
+    // Close all closable tabs except:
+    // 1. The selected tab (contextMenu.tabId)
+    // 2. agent-terminal tabs (NEVER close these)
+    // 3. Non-closable tabs (like main chat)
+    tabs.forEach((tab) => {
+      if (
+        tab.id !== contextMenu.tabId &&
+        tab.closable &&
+        tab.type !== 'agent-terminal'
+      ) {
+        onTabClose(tab.id);
+      }
+    });
+
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  }, [contextMenu.tabId, tabs, onTabClose]);
 
   const handleTabClick = (tab: Tab) => {
     onTabClick(tab.id);
@@ -118,6 +221,7 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
             draggedTabId === tab.id ? 'dragging' : ''
           } ${dragOverTabId === tab.id ? 'drag-over' : ''}`}
           onClick={() => handleTabClick(tab)}
+          onContextMenu={(e) => handleContextMenu(e, tab)}
           title={tab.filePath || tab.label}
           draggable={tab.type !== 'chat'}
           onDragStart={(e) => handleDragStart(e, tab)}
@@ -172,6 +276,53 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           )}
         </button>
       ))}
+
+      {/* Context Menu - rendered via Portal to avoid overflow issues */}
+      {contextMenu.visible && createPortal(
+        <div
+          ref={contextMenuRef}
+          className="tab-context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          {(() => {
+            const selectedTab = tabs.find((t) => t.id === contextMenu.tabId);
+            const isAgentTerminal = selectedTab?.type === 'agent-terminal';
+
+            return (
+              <>
+                <button
+                  type="button"
+                  className={`tab-context-menu-item ${isAgentTerminal ? 'disabled' : ''}`}
+                  onClick={handleCloseThisTab}
+                  disabled={isAgentTerminal}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Close
+                  {isAgentTerminal && <span className="tab-context-menu-hint">(Terminal protected)</span>}
+                </button>
+                <button
+                  type="button"
+                  className="tab-context-menu-item"
+                  onClick={handleCloseOtherTabs}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    <rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                  </svg>
+                  Close Others
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

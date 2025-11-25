@@ -774,6 +774,10 @@ function AppRefactored() {
           onTerminalClick={() => setShowNewTerminalModal(true)}
           onBrowserClick={() => {}}
           onDroidFactoryClick={() => {}}
+          onGuideClick={() => {
+            // TODO: Implement docs tab in AppRefactored
+            console.log('Guide clicked - docs tab not yet implemented in AppRefactored');
+          }}
           onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
           sidePanelCollapsed={sidePanelCollapsed}
         />
