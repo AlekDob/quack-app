@@ -5,7 +5,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -17,6 +17,7 @@ export interface Tab {
   skillName?: string; // Skill name for skill tabs
   skillScope?: 'global' | 'project'; // Skill scope for skill tabs
   command?: SlashCommand; // Full command object for command tabs
+  docsPath?: string; // Path to docs page for docs tabs
 }
 
 interface TabBarProps {
@@ -148,6 +149,11 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           {tab.type === 'command' && (
             <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
               /
+            </span>
+          )}
+          {tab.type === 'docs' && (
+            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
+              📖
             </span>
           )}
           <span className="tab-label">{tab.label}</span>

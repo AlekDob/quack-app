@@ -11,6 +11,7 @@ interface ActionIconsProps {
   onTerminalClick: () => void;
   onBrowserClick: () => void;
   onDroidFactoryClick: () => void;
+  onGuideClick: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
 }
@@ -24,6 +25,7 @@ function ActionIcons({
   onTerminalClick,
   onBrowserClick,
   onDroidFactoryClick,
+  onGuideClick,
   onToggleSidePanel,
   sidePanelCollapsed,
 }: ActionIconsProps) {
@@ -187,6 +189,44 @@ function ActionIcons({
       >
         <Wrench className="w-4 h-4" />
         <span className="action-icon-tooltip">Droid Factory</span>
+      </button>
+
+      {/* Guide/Documentation Icon */}
+      <button
+        type="button"
+        className="action-icon"
+        onClick={onGuideClick}
+        aria-label="Open Documentation"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M3.5 2C3.22 2 3 2.22 3 2.5V13.5C3 13.78 3.22 14 3.5 14H12.5C12.78 14 13 13.78 13 13.5V5L10 2H3.5Z"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <path
+            d="M10 2V5H13"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <path
+            d="M5.5 8H10.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M5.5 10.5H10.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="action-icon-tooltip">Documentation</span>
       </button>
 
       {/* Side Panel Toggle Icon */}

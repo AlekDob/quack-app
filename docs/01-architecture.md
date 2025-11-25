@@ -399,3 +399,405 @@ While Quack is built on the Claude Agent SDK, it adds several enhancements:
   - `notify` (optional, default `true`): set to `false` to suppress notification/sound for that update
 - Hooks run concurrently; the endpoint is idempotent—only matching terminals are updated. If no terminal ID matches exactly, the event is ignored.
 - Terminal chips indicate `RUNNING` (yellow) vs `READY` (green); when unobserved terminals become idle, they pulse, trigger a desktop notification, and play the duck "quack" sound
+
+## Documentation System
+
+### Overview
+
+Quack includes an integrated **Documentation Center** that provides user guides, best practices, and Claude Code techniques directly within the application. The system is built on React Markdown with custom components and a flexible metadata-driven structure.
+
+### Architecture
+
+#### Components Structure
+
+**Core Components**:
+- **`src/components/docs/DocsViewer.tsx`** - Main container component
+  - Loads documentation structure from `_meta.json` files
+  - Manages navigation state and page loading
+  - Coordinates sidebar and content rendering
+  - Handles initial path routing
+
+- **`src/components/docs/DocsSidebar.tsx`** - Navigation sidebar
+  - Renders collapsible section groups
+  - Highlights current page
+  - Supports keyboard navigation
+  - Toggle button for collapse/expand
+
+- **`src/components/docs/DocsContent.tsx`** - Markdown renderer
+  - Displays markdown content with custom components
+  - Auto-generates Table of Contents (TOC) from headings
+  - Previous/Next page navigation
+  - Smooth scrolling and anchor links
+
+- **`src/components/docs/DocsComponents.tsx`** - Custom markdown components
+  - `Callout` - Info boxes (info, warning, error, tip)
+  - `Steps` - Numbered instruction sequences
+  - `Tabs` - Tabbed content blocks
+  - `Card` - Clickable feature cards
+  - Code blocks with copy button
+
+- **`src/components/docs/DocsViewer.css`** - Styling
+  - Dark theme matching Quack design
+  - Glassmorphism effects
+  - Responsive layout
+  - Typography and spacing
+
+#### Supporting Files
+
+- **`src/hooks/useDocsTab.tsx`** - Hook for managing docs tabs
+  - Keeps App.tsx clean by encapsulating docs logic
+  - Creates docs tabs with initial path
+  - Type checking for docs tabs
+
+- **`src/views/DocsTabView.tsx`** - Wrapper component
+  - Renders docs tabs in tab system
+  - Handles visibility and z-index
+  - Passes initial path to DocsViewer
+
+#### Tab Integration
+
+The documentation system integrates seamlessly with Quack's tab system:
+
+1. **Tab Type**: Added `'docs'` to TabBar types
+2. **Tab Field**: `docsPath?: string` - Relative path to initial page
+3. **Icon**: 📖 (book emoji)
+4. **Access Point**: "Guide" button in TerminalSidebar
+5. **Multiple Instances**: Supports multiple docs tabs with different initial paths
+
+**Example Tab Object**:
+```typescript
+{
+  id: 'docs-1234567890',
+  label: 'Guide',
+  type: 'docs',
+  closable: true,
+  docsPath: 'guide/01-getting-started/introduction'
+}
+```
+
+### Content Structure
+
+Documentation is organized in a hierarchical structure using directories and JSON metadata:
+
+```
+docs/guide/
+├── _meta.json                     # Root configuration
+├── 01-getting-started/
+│   ├── _meta.json                 # Section configuration
+│   ├── introduction.md
+│   ├── installation.md
+│   └── first-steps.md
+├── 02-core-concepts/
+│   ├── _meta.json
+│   └── [markdown files]
+├── 03-advanced-techniques/
+│   ├── _meta.json
+│   └── [markdown files]
+└── 04-best-practices/
+    ├── _meta.json
+    └── [markdown files]
+```
+
+### _meta.json Format
+
+#### Root Meta Configuration
+
+Location: `docs/guide/_meta.json`
+
+```json
+{
+  "title": "Quack Guide",
+  "description": "Complete guide to using Quack and Claude Code",
+  "sections": [
+    "01-getting-started",
+    "02-core-concepts",
+    "03-advanced-techniques",
+    "04-best-practices"
+  ]
+}
+```
+
+**Fields**:
+- `title` - Overall documentation title
+- `description` - Brief description of the documentation
+- `sections` - Array of section directory names (ordered)
+
+#### Section Meta Configuration
+
+Location: `docs/guide/{section}/_meta.json`
+
+```json
+{
+  "title": "Getting Started",
+  "description": "Introduction to Quack",
+  "icon": "🚀",
+  "order": 1,
+  "pages": [
+    "introduction",
+    "installation",
+    "first-steps"
+  ]
+}
+```
+
+**Fields**:
+- `title` - Section display name
+- `description` - Section description (optional)
+- `icon` - Emoji icon for sidebar (optional)
+- `order` - Sort order (lower = first)
+- `pages` - Array of markdown filenames without `.md` extension (ordered)
+
+### File Loading
+
+#### Development Mode
+
+Uses absolute paths from project root:
+
+```typescript
+const absolutePath = `/Users/alekdob/Desktop/Dev/Personal/quack-app/${path}`;
+const content = await invoke<string>('read_file_content', { path: absolutePath });
+```
+
+**Reads**:
+- `_meta.json` files for structure
+- `.md` files for content
+
+**Tauri Command**: `read_file_content` (defined in `src-tauri/src/fs.rs`)
+
+#### Production Mode (TODO)
+
+For production builds, documentation should be bundled with the app:
+
+1. **Bundle docs in resources** via `tauri.conf.json`:
+   ```json
+   "bundle": {
+     "resources": ["docs/guide"]
+   }
+   ```
+
+2. **Resolve bundled paths** using Tauri's resource API:
+   ```typescript
+   import { resolveResource } from '@tauri-apps/api/path';
+   const resourcePath = await resolveResource('docs/guide/_meta.json');
+   ```
+
+3. **Update file loading logic** in DocsViewer to detect environment and use appropriate paths
+
+### Custom Markdown Components
+
+Implemented in `DocsComponents.tsx` and available in all markdown files:
+
+#### 1. Callout
+
+Info boxes with different types:
+
+```markdown
+:::callout{type="info"}
+This is an informational callout with a blue theme.
+:::
+
+:::callout{type="warning"}
+Warning! This action cannot be undone.
+:::
+
+:::callout{type="error"}
+Error: Something went wrong.
+:::
+
+:::callout{type="tip"}
+Pro tip: Use keyboard shortcuts for faster navigation.
+:::
+```
+
+**Types**: `info` (blue), `warning` (yellow), `error` (red), `tip` (green)
+
+#### 2. Steps
+
+Numbered instruction sequences:
+
+```markdown
+:::steps
+1. Open the terminal
+2. Run `npm install`
+3. Start the application with `npm run dev`
+:::
+```
+
+Automatically numbered with visual step indicators.
+
+#### 3. Tabs
+
+Tabbed content blocks for organizing related information:
+
+```markdown
+:::tabs
+### macOS
+Instructions for macOS users...
+
+### Windows
+Instructions for Windows users...
+
+### Linux
+Instructions for Linux users...
+:::
+```
+
+Each `###` heading becomes a tab.
+
+#### 4. Card
+
+Clickable feature cards:
+
+```markdown
+:::card{title="Feature Name" icon="🚀"}
+Brief description of the feature and its benefits.
+:::
+```
+
+**Props**:
+- `title` - Card heading
+- `icon` - Emoji or icon (optional)
+
+#### 5. Code Blocks
+
+Enhanced code blocks with syntax highlighting and copy button:
+
+````markdown
+```typescript
+const example = "Code with copy button";
+```
+````
+
+Features:
+- Syntax highlighting for common languages
+- Copy to clipboard button (top-right)
+- Line numbers (optional, future enhancement)
+
+### Libraries Used
+
+#### React Markdown Ecosystem
+
+- **`react-markdown@10.1.0`** - Core markdown rendering engine
+  - Converts markdown AST to React components
+  - Supports custom component mapping
+  - Handles inline and block-level elements
+
+- **`remark-gfm@4.0.1`** - GitHub Flavored Markdown support
+  - Tables
+  - Task lists
+  - Strikethrough
+  - Autolinks
+
+- **`rehype-raw@7.0.0`** - HTML in markdown
+  - Allows custom HTML elements
+  - Sanitizes dangerous HTML
+  - Preserves custom components
+
+- **`rehype-slug@6.0.0`** - Auto-generate heading IDs
+  - Creates kebab-case IDs from heading text
+  - Enables anchor linking
+  - Ensures unique IDs
+
+- **`rehype-autolink-headings@7.1.0`** - Add anchor links to headings
+  - Inserts clickable anchor icons
+  - Enables "Copy link to heading" functionality
+  - Smooth scrolling to sections
+
+### Features
+
+- ✅ **Sidebar Navigation** - Collapsible sections with icons
+- ✅ **Table of Contents (TOC)** - Auto-generated from headings (H2, H3)
+- ✅ **Previous/Next Navigation** - Contextual page navigation
+- ✅ **Code Blocks with Copy** - One-click code copying
+- ✅ **External Link Icons** - Visual indicator for external links
+- ✅ **Dark Theme** - Matches Quack's dark UI
+- ✅ **Glassmorphism Effects** - Consistent with app design
+- ✅ **Responsive Layout** - Adapts to window size
+- ✅ **i18n-Ready Structure** - Prepared for internationalization (currently English only)
+- ✅ **Markdown Extensions** - Custom components (Callout, Tabs, Steps, Card)
+- ✅ **Anchor Links** - Click headings to copy URL fragment
+- ✅ **Keyboard Navigation** - Navigate sections with keyboard
+
+### App.tsx Integration
+
+The Documentation Center integrates into App.tsx with minimal code (~15 lines):
+
+**Changes Made**:
+
+1. **Import Hook and View**:
+   ```typescript
+   import { useDocsTab } from './hooks/useDocsTab';
+   import DocsTabView from './views/DocsTabView';
+   ```
+
+2. **Initialize Hook**:
+   ```typescript
+   const { openDocsTab, isDocsTab } = useDocsTab();
+   ```
+
+3. **Create Handler**:
+   ```typescript
+   const handleOpenDocsTab = useCallback((path?: string) => {
+     const docsTab = openDocsTab(path);
+     setTabs(prev => [...prev, docsTab]);
+     setActiveTab(docsTab.id);
+   }, [openDocsTab]);
+   ```
+
+4. **Pass Handler to Sidebar**:
+   ```typescript
+   <TerminalSidebar
+     // ... other props
+     onOpenDocs={handleOpenDocsTab}
+   />
+   ```
+
+5. **Render Docs Tabs**:
+   ```typescript
+   {tabs.map(tab => (
+     isDocsTab(tab) ? (
+       <DocsTabView
+         key={tab.id}
+         tab={tab}
+         isActive={activeTab === tab.id}
+       />
+     ) : (
+       // ... other tab types
+     )
+   ))}
+   ```
+
+**Benefits of This Approach**:
+- ✅ Keeps App.tsx focused on orchestration
+- ✅ Logic encapsulated in dedicated hook
+- ✅ Rendering isolated in dedicated view component
+- ✅ Easy to test and maintain
+- ✅ Follows separation of concerns
+
+### Future Enhancements
+
+#### High Priority
+
+- [ ] **Production Path Resolution** - Bundle docs and use `resolveResource()` for production builds
+- [ ] **Full-text Search** - Search across all documentation with highlighting
+- [ ] **Syntax Highlighting** - Add syntax highlighting to code blocks (e.g., Prism.js or highlight.js)
+
+#### Medium Priority
+
+- [ ] **Internationalization (i18n)** - Support for Italian and other languages
+  - Detect user locale
+  - Load localized `_meta.json` files
+  - Fallback to English
+
+- [ ] **Dark/Light Theme Toggle** - User preference for theme
+- [ ] **Copy Link to Heading** - Click heading to copy anchor link
+- [ ] **Sticky TOC** - Keep TOC visible while scrolling
+- [ ] **Search Suggestions** - Autocomplete search with page suggestions
+
+#### Low Priority
+
+- [ ] **Breadcrumb Navigation** - Show current location in hierarchy
+- [ ] **Version Selector** - Support multiple documentation versions
+- [ ] **PDF Export** - Export documentation as PDF
+- [ ] **Offline Mode** - Cache docs for offline access
+- [ ] **Analytics** - Track which pages are most viewed (privacy-preserving)

@@ -31,6 +31,13 @@
 - File explorer & Monaco editor
 - State management (Zustand, Context)
 - MCP servers & plugin system
+- **Documentation System** - Integrated docs center architecture
+
+**Quick Links**:
+- [Documentation System Architecture](01-architecture.md#documentation-system) - Complete docs center architecture
+- [Content Structure](01-architecture.md#content-structure) - How docs are organized
+- [Custom Markdown Components](01-architecture.md#custom-markdown-components) - Markdown extensions
+- [App.tsx Integration](01-architecture.md#apptsx-integration) - How docs integrate with tab system
 
 **When to Update**: Any architectural changes, new major features, system design modifications
 

@@ -52,7 +52,7 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 **Tech Stack:** Tauri 2.8.5, React 19.1.1, TypeScript 5.8.3, Rust 1.77.2, xterm.js 5.5.0, Monaco Editor, Vite 7.1.7
 **AI/SDK:** Claude Agent SDK 0.1.14, Anthropic SDK 0.65.0
 **Testing:** Vitest 4.0.10 (unit & integration tests)
-**Key Features:** Multi-terminal PTY, File explorer, Git integration, AI streaming, Voice recording, Telegram integration, Plugin system, MCP servers
+**Key Features:** Multi-terminal PTY, File explorer, Git integration, AI streaming, Voice recording, Telegram integration, Plugin system, MCP servers, Documentation Center
 
 **📖 Documentation Hub:** All project documentation is in `/docs` - see `docs/README.md` for complete index
 
@@ -127,6 +127,38 @@ describe('Feature Name', () => {
 - 🏗️ Architecture overview: `docs/01-architecture.md`
 - 🐛 Latest bug fixes: `docs/02-bug-fixes/`
 - 🧪 Test results: `docs/03-testing/`
+
+## Documentation Center
+
+**Integrated In-App Guide**: Quack includes a built-in documentation viewer for user guides and best practices.
+
+**Access**:
+- Click "Guide" button in Terminal Sidebar
+- Opens as a new tab with markdown documentation
+- Navigate via sidebar with collapsible sections
+
+**Path**: `docs/guide/` - Structured documentation with `_meta.json` configuration
+**Components**:
+- `DocsViewer.tsx` - Main container, loads structure from _meta.json
+- `DocsSidebar.tsx` - Collapsible navigation with sections
+- `DocsContent.tsx` - Markdown renderer with TOC + prev/next navigation
+- `DocsComponents.tsx` - Custom markdown components (Callout, Tabs, Steps, Card)
+- `DocsViewer.css` - Dark theme with glassmorphism
+
+**Styling**: Dark theme matching Quack design, glassmorphism effects, responsive layout
+
+**Tab Integration**:
+- Type: `'docs'` with `docsPath?: string` field
+- Hook: `useDocsTab()` manages docs tabs
+- View: `DocsTabView.tsx` wrapper component
+- Icon: 📖
+
+**Libraries**:
+- `react-markdown@10.1.0` - Core markdown rendering
+- `remark-gfm@4.0.1` - GitHub Flavored Markdown support
+- `rehype-raw@7.0.0` - HTML in markdown
+- `rehype-slug@6.0.0` - Auto-generate heading IDs
+- `rehype-autolink-headings@7.1.0` - Add anchor links to headings
 
 ##Ui rule
 ⚠️ Non usare emojii 

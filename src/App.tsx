@@ -47,6 +47,8 @@ import AgentViewer from "./components/AgentViewer";
 import SkillViewer from "./components/SkillViewer";
 import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
+import { useDocsTab } from "./hooks/useDocsTab";
+import DocsTabView from "./views/DocsTabView";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
@@ -227,6 +229,9 @@ function AppContent() {
   // AgentChats kept for UI grouping only - NOT linked to terminals!
   const [agentChats, setAgentChats] = useState<AgentChat[]>([]);
   const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
+
+  // Documentation tab management
+  const { openDocsTab } = useDocsTab();
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -5214,6 +5219,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
+  // Handler to open Documentation tab
+  const handleOpenDocsTab = useCallback(() => {
+    const newTab = openDocsTab();
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
+
+    // Auto-close side-panel when opening docs
+    setSidePanelCollapsed(true);
+
+    console.log('🦆 Documentation tab opened:', newTab.id);
+    toast.success('Guide opened! 📖', {
+      description: 'Learn how to use Quack and Claude Code',
+      duration: 2000,
+    });
+  }, [openDocsTab]);
+
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
     updateActiveTab(tabId);
@@ -6602,6 +6623,7 @@ You have access to all Bash tools to execute git commands like:
               onTerminalClick={handleCreateAgentTerminal}
               onBrowserClick={handleOpenBrowserTab}
               onDroidFactoryClick={() => setDroidFactoryOpen(true)}
+              onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
             />
@@ -6792,6 +6814,15 @@ You have access to all Bash tools to execute git commands like:
                       onUseCommand={handleUseCommand}
                     />
                   );
+                }
+                return null;
+              })()}
+
+              {/* Documentation Viewer - shown when docs tab is active */}
+              {activeTabId.startsWith('docs-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'docs') {
+                  return <DocsTabView tab={activeTab} isActive={true} />;
                 }
                 return null;
               })()}
