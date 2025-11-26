@@ -9,6 +9,8 @@ import {
   GrepWidget,
   TodoWriteWidget,
   ExitPlanModeWidget,
+  ToolIcon,
+  getToolColor,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
@@ -287,15 +289,19 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
               );
             }
 
+            const toolColor = getToolColor(content.name || '');
             return (
-              <div key={idx} className="tool-widget unknown-tool-widget">
+              <div key={idx} className="tool-widget unknown-tool-widget" style={{ borderColor: toolColor }}>
                 <div className="tool-widget-header">
-                  <div className="tool-widget-title">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0114.25 15H1.75A1.75 1.75 0 010 13.25V2.75z"/>
-                    </svg>
+                  <div className="tool-widget-title" style={{ color: toolColor }}>
+                    <ToolIcon name={content.name || ''} />
                     <span>Tool: {content.name}</span>
                   </div>
+                  {!toolResult && (
+                    <div className="tool-widget-loading">
+                      <div className="spinner"></div>
+                    </div>
+                  )}
                 </div>
                 <div className="tool-widget-content">
                   <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>

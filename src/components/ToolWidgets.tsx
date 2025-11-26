@@ -21,8 +21,21 @@ function createDiffFromStrings(oldString: string, newString: string, fileName?: 
   return { fileName, lines };
 }
 
+// Get tool color based on tool type
+export const getToolColor = (toolName: string): string => {
+  const name = toolName.toLowerCase();
+  if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
+  if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316'; // orange
+  if (name === 'task') return '#8b5cf6'; // purple
+  if (name === 'bash' || name === 'bashoutput' || name === 'killshell') return '#f59e0b'; // amber
+  if (name === 'read' || name === 'glob' || name === 'grep') return '#3b82f6'; // blue
+  if (name === 'edit' || name === 'write' || name === 'multiedit' || name === 'notebookedit') return '#ec4899'; // pink
+  if (name === 'todowrite') return '#14b8a6'; // teal
+  return '#6b7280'; // gray default
+};
+
 // Icons for different tools
-const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
+export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
   const toolName = name.toLowerCase();
 
   // Determine color based on tool type
