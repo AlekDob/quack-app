@@ -58,18 +58,21 @@ export interface TerminalInfo {
   personality?: Partial<AgentPersonality>; // Agent personality traits
 }
 
-// AgentTerminal: NEW - Terminale integrato XTerm associato ad un agente
-// Separato da TerminalInfo (vecchio sistema) per evitare confusione
-export interface AgentTerminal {
+// ProjectTerminal: Integrated XTerm terminal associated with a project
+// Terminals are now project-scoped, not agent-scoped
+export interface ProjectTerminal {
   id: string;
   name: string;
-  agentId: string;  // ID dell'agente a cui appartiene questo terminale
+  projectPath: string;  // Project directory (working directory)
   color: string;
   cwd: string;
   alive: boolean;
   status?: "idle" | "busy";
   createdAt: number;
 }
+
+// DEPRECATED: Legacy type for backwards compatibility
+export type AgentTerminal = ProjectTerminal;
 
 export type SavedCommandCategory = "dev" | "build" | "test" | "custom";
 

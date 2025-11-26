@@ -1,226 +1,242 @@
-# Quack Agents Architecture
+# Quack Architecture Overview
 
-**Expert skill for understanding how Quack Agents work internally**
+**High-level skill for understanding Quack's architecture and core systems**
 
-## Overview
+## What is Quack?
 
-Quack has a unique agent system where "agents" are actually **terminals with special properties**. This skill explains the complete architecture to avoid confusion.
+Quack is a **multi-agentic desktop application** built with Tauri 2.x that combines:
+- Multiple terminal instances with PTY support
+- AI assistant powered by Claude Agent SDK
+- File explorer, Git integration, and code editing
+- Voice recording, PIP windows, and Telegram integration
+- Marketplace and plugin system
+- MCP (Model Context Protocol) server support
 
-## Key Concept: Agents ARE Terminals
-
-The most important thing to understand:
-
-```
-🦆 AGENTS = TERMINALS with agent-like names and colors
-```
-
-When you see "Agent Casey", "Quack Agent", "Agent Sam" in the sidebar under "ACTIVE AGENTS", these are **NOT** separate AgentChat entities. They are **Terminal instances** that happen to have agent names.
-
-## Architecture Breakdown
-
-### 1. Terminal System (`terminals` state)
-
-```typescript
-const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
-const [activeId, setActiveId] = useState<string | null>(null);
-
-const activeTerminal = useMemo(
-  () => terminals.find((terminal) => terminal.id === activeId) ?? null,
-  [activeId, terminals]
-);
-```
-
-**Each terminal has:**
-- `id`: Unique UUID
-- `label`: Display name (e.g., "Agent Casey", "Quack Agent")
-- `color`: Color badge (e.g., "#f28c52", "#4dd4b3")
-- `cwd`: Current working directory
-- `status`: "busy" or "idle"
-- PTY process backing
-
-### 2. AgentChats (Separate System - NOT Used for Sidebar Agents)
-
-```typescript
-const [agentChats, setAgentChats] = useState<AgentChat[]>([]);
-const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
-```
-
-**AgentChats are for:**
-- Future feature: Multiple chat sessions
-- Workspace organization
-- Currently **NOT** connected to the sidebar agents
-
-**⚠️ IMPORTANT:** The agents in the sidebar are **NOT** AgentChats. They are terminals.
-
-### 3. Active Agent Detection
-
-When you click on an agent in the sidebar (e.g., "Agent Sam"):
-
-```typescript
-// This changes:
-setActiveId(terminal.id);
-
-// Which updates:
-activeTerminal = terminals.find(t => t.id === activeId);
-```
-
-### 4. Tab System Integration
-
-The "Chat" tab in the top bar updates based on `activeTerminal`:
-
-```typescript
-useEffect(() => {
-  setTabs((prevTabs) => {
-    const chatTab = prevTabs.find(t => t.id === 'chat');
-
-    if (activeTerminal) {
-      // Update tab with terminal's label and color
-      chatTab.label = activeTerminal.label;  // "Agent Sam"
-      chatTab.color = activeTerminal.color;  // "#f28c52"
-    } else {
-      chatTab.label = 'Chat';
-      chatTab.color = undefined;
-    }
-
-    return updatedTabs;
-  });
-}, [activeTerminal]);
-```
-
-## How Agent Creation Works
-
-When you click "New" button to create an agent:
-
-1. **NewTerminalModal opens** with agent name input
-2. User enters name like "Agent Casey"
-3. User picks a color (orange, green, etc.)
-4. `handleCreateTerminal` is called
-5. **A new Terminal is created** via Rust backend:
-   ```typescript
-   const id = await invoke<string>("create_terminal", {
-     label: "Agent Casey",
-     color: "#f28c52",
-     cwd: "/path/to/project"
-   });
-   ```
-6. Terminal is added to `terminals` array
-7. Terminal appears in sidebar under "ACTIVE AGENTS"
-
-**Log confirmation:**
-```
-Created terminal "Agent Casey" with cwd="..."
-```
-
-## Sidebar Rendering
-
-The sidebar groups terminals by `cwd` (working directory):
-
-```typescript
-const cwdGroups = useMemo(() => {
-  // Group terminals by their working directory
-  return groupTerminalsByCwd(terminals);
-}, [terminals]);
-```
-
-Each group shows:
-- **Header**: Working directory path (e.g., `~/Personal/quack-app`)
-- **Terminals**: List of terminals in that directory
-  - Color badge (●)
-  - Terminal label ("Agent Casey")
-  - Status indicator (✓ for idle, spinner for busy)
-
-## Chat System Integration
-
-When an agent (terminal) is active:
-
-1. **Chat messages** are associated with that terminal's session
-2. **Claude SDK** uses the terminal's `cwd` as working directory
-3. **Messages history** is stored per-terminal via `chatSessions` state:
-   ```typescript
-   const [chatSessions, setChatSessions] = useState<
-     Map<string, ChatSession>
-   >(new Map());
-   ```
-
-## Common Confusion Points
-
-### ❌ Wrong Understanding
-- "Agents are separate AgentChat entities"
-- "Clicking an agent calls `onSelectAgentChat`"
-- "AgentChats in the sidebar"
-
-### ✅ Correct Understanding
-- "Agents are terminals with agent names"
-- "Clicking an agent changes `activeId` (terminal selection)"
-- "Terminals are grouped in the sidebar"
-
-## Code Locations
-
-### Terminal Management
-- **State**: `App.tsx` line ~300
-- **Creation**: `handleCreateTerminal` in `App.tsx`
-- **Sidebar rendering**: `TerminalSidebar.tsx`
-- **Backend**: `src-tauri/src/terminal.rs`
-
-### Tab System
-- **Tab update logic**: `App.tsx` line ~3640
-- **Tab rendering**: `TabBar.tsx`
-- **Color indicator CSS**: `TabBar.css` (`.tab-color-indicator`)
-
-### Chat Integration
-- **Chat sessions**: `chatSessions` Map in `App.tsx`
-- **Message sending**: `sendMessageForAgent` function
-- **Chat view**: `ChatView.tsx`
-
-## Best Practices for Development
-
-### When Working with Agents:
-
-1. **Always think "terminal"** - Don't confuse with AgentChats
-2. **Use `activeTerminal`** - Not `activeAgentChat` for sidebar agents
-3. **Check `activeId`** - This is what changes when clicking agents
-4. **Terminal label = Agent name** - The label field is the display name
-
-### When Debugging:
-
-```typescript
-// Log current active terminal
-console.log('Active terminal:', activeTerminal);
-
-// Check all terminals
-console.log('All terminals:', terminals);
-
-// Verify active ID
-console.log('Active ID:', activeId);
-```
-
-### When Adding Features:
-
-- ✅ Need to update tab based on agent? → Use `activeTerminal`
-- ✅ Need to show agent color? → Use `activeTerminal.color`
-- ✅ Need agent's working directory? → Use `activeTerminal.cwd`
-- ❌ Don't look for agent in `agentChats` array (they're not there!)
-
-## Future Architecture Notes
-
-The `agentChats` system exists for future features:
-- Multiple concurrent chat sessions
-- Chat history management
-- Workspace-based chat organization
-
-But currently, the **sidebar agents = terminals** system is what's actively used.
-
-## Summary
-
-```
-Sidebar "Agents" → Terminals with agent names
-Active Agent → activeTerminal (currently selected terminal)
-Tab Update → Based on activeTerminal.label and activeTerminal.color
-Chat Messages → Stored per terminal ID in chatSessions Map
-```
-
-**Remember: When you see an "agent" in the sidebar, it's just a terminal with a fancy name! 🦆**
+**Tech Stack**: Tauri 2.8.5, React 19, TypeScript 5.8, Rust 1.77, Vite 7, xterm.js 5.5, Zustand 5
 
 ---
 
-*This skill prevents the "agents vs terminals" confusion that caused the tab update issue.*
+## Core Architecture
+
+### Frontend (React + TypeScript)
+
+```
+src/
+├── App.tsx              # Main orchestrator (3000+ lines)
+├── components/          # 100+ React components
+├── hooks/               # Custom React hooks
+├── stores/              # Zustand state management
+├── services/            # Business logic services
+├── views/               # Tab view components
+└── types/               # TypeScript interfaces
+```
+
+### Backend (Rust + Tauri)
+
+```
+src-tauri/src/
+├── lib.rs               # Tauri app setup, plugins, HTTP hooks
+├── terminal.rs          # PTY management (portable-pty)
+├── git.rs               # Git operations via CLI
+├── fs.rs                # File system access
+├── ai.rs                # AI-related commands
+├── claude_auth.rs       # Claude OAuth authentication
+├── mcp.rs               # MCP server integration
+├── telegram_bot.rs      # Telegram bot integration
+├── license.rs           # License management
+└── [30+ more modules]
+```
+
+### State Management (Zustand)
+
+Quack uses **Zustand stores** for granular state management:
+
+| Store | Purpose |
+|-------|---------|
+| `terminalStore` | Project terminals, activeProjectTerminalId |
+| `chatStore` | AI chat sessions, messages, streaming state |
+| `fileSystemStore` | File explorer state, current directory |
+| `gitStore` | Git status, diffs, staging area |
+| `uiStore` | UI state, modals, drawers, tabs, showTerminalWindow |
+| `settingsStore` | User preferences, configurations |
+
+---
+
+## Key Concept: Agents vs Terminals
+
+**IMPORTANT ARCHITECTURAL CHANGE (Jan 2025):**
+
+```
+Agents (sidebar) = AI chat instances using Claude SDK
+Terminals (TerminalWindow) = Project-scoped CLI terminals
+```
+
+**Agents**:
+- Located in left sidebar
+- AI-powered chat using Claude Agent SDK
+- Each agent has: id, name, color, avatar, personality
+- Clicking an agent shows its chat history
+
+**Terminals**:
+- Located in dedicated TerminalWindow (separate window)
+- Project-scoped (not agent-scoped)
+- Grouped by project path in sidebar
+- Multiple terminals per project
+- Each terminal has: id, name, projectPath, color, status
+
+---
+
+## Main Systems
+
+### 1. Terminal System (Refactored Jan 2025)
+
+- **Type**: `ProjectTerminal` (was `AgentTerminal`)
+- **Scope**: Project-based (via `projectPath`)
+- **Frontend**: xterm.js with FitAddon, WebLinksAddon
+- **Backend**: Rust PTY management via `portable-pty`
+- **Component**: `XTermInstance` (reusable component)
+- **Window**: `TerminalWindow` with sidebar panel
+- **Features**:
+  - Multiple terminals per project
+  - Smart auto-scroll (disables when user scrolls up)
+  - Status detection (busy/idle)
+  - Custom colors and backgrounds
+  - Survives agent switches
+
+### 2. AI Chat System (Claude Agent SDK)
+
+- **SDK**: `@anthropic-ai/claude-agent-sdk` v0.1.14
+- **Hook**: `useClaudeChat.ts` manages streaming and sessions
+- **Features**:
+  - Real-time message streaming
+  - Tool execution (Read, Write, Edit, Bash, etc.)
+  - Permission modes: plan, act, bypass
+  - Session persistence and resume
+  - Cost/usage tracking
+  - Event deduplication
+
+### 3. File System
+
+- **Explorer**: Tree view synchronized with terminal CWD
+- **Preview**: Monaco/CodeMirror editor for file viewing
+- **Backend**: Rust commands for secure file access (5MB limit)
+
+### 4. Git Integration
+
+- **Panel**: Status, diffs, staging, commits, timeline
+- **Backend**: Git CLI operations via Rust
+- **Features**: Branch management, conflict resolution, history
+
+### 5. Tab System
+
+Multi-tab interface supporting:
+- `chat` - AI chat view
+- `terminal` - Terminal view
+- `code` - Code editor
+- `browser` - Internal browser
+- `docs` - Documentation viewer
+- `settings` - Settings panel
+
+### 6. Marketplace & Plugins
+
+- **Marketplace**: Download skills, agents, commands
+- **Plugins**: Extensible plugin architecture
+- **Skills**: `.claude/skills/` directory
+- **Commands**: `.claude/commands/` directory
+- **Agents**: `.claude/agents/` directory
+
+### 7. MCP Integration
+
+Model Context Protocol servers for extended capabilities:
+- Supabase integration
+- PostgreSQL/MySQL databases
+- Playwright for browser automation
+- Custom MCP servers via `.claude/mcps/`
+
+### 8. Telegram Integration
+
+- Remote control via Telegram bot
+- Voice message transcription
+- Command execution
+
+---
+
+## HTTP Hooks Integration
+
+External tools can notify Quack via local HTTP endpoint:
+
+```bash
+curl http://127.0.0.1:6768/terminal/status \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"Claude Code", "status":"busy"}'
+```
+
+Used for:
+- Claude Code session state
+- Factory.ai integration
+- Custom external tools
+
+---
+
+## Development Commands
+
+```bash
+# Frontend
+npm run dev          # Vite dev server
+npm run build        # Production build
+npm test             # Run Vitest tests
+
+# Tauri
+npm run tauri:dev    # Full dev with hot reload
+npm run tauri:build  # Production desktop build
+
+# Rust
+cd src-tauri && cargo check
+cd src-tauri && cargo clippy
+```
+
+---
+
+## Testing
+
+- **Framework**: Vitest 4.x
+- **Tests**: 37+ passing tests
+- **Coverage**: Event deduplication, session management, integration tests
+- **Location**: `src/tests/` and `*.test.ts` colocated files
+
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report
+```
+
+---
+
+## Best Practices
+
+1. **Terminal = Agent**: When working with sidebar agents, use `activeTerminal` state
+2. **Zustand stores**: Use appropriate store for domain-specific state
+3. **Tauri commands**: Backend operations go through `invoke()`
+4. **Testing**: Write Vitest tests for new features
+5. **Documentation**: Update `/docs` for significant changes
+
+---
+
+## Quick Reference
+
+| Need | Solution |
+|------|----------|
+| Project terminals | `useTerminalStore().projectTerminals` |
+| Active project terminal | `useTerminalStore().getActiveProjectTerminal()` |
+| Terminals by project | `useTerminalStore().getProjectTerminalsByPath(path)` |
+| Chat messages | `useChatStore().messages` |
+| File explorer | `useFileSystemStore()` |
+| Git status | `useGitStore().status` |
+| Open terminal window | `useUIStore().toggleWindow('showTerminalWindow')` |
+| UI modals | `useUIStore()` |
+| Settings | `useSettingsStore()` |
+| Send AI message | `useClaudeChat()` hook |
+
+---
+
+*This skill provides a high-level overview of Quack's architecture. For detailed implementation, see the specific component and module files.*

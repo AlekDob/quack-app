@@ -431,12 +431,14 @@ fn update_terminal_impl(
 
 fn spawn_process(app: &AppHandle, id: &str, cwd: &Path) -> Result<TerminalProcess> {
   let pty_system = native_pty_system();
-  // Dimensioni iniziali più generose per evitare wrapping prematuro
-  // Il frontend farà resize appena il terminale viene montato
+  // Dimensioni iniziali conservative per evitare problemi di sync
+  // Il frontend farà resize immediato appena il terminale viene montato
+  // Usando dimensioni piccole (24x80) evitiamo il problema delle righe vuote
+  // durante il caricamento iniziale quando XTerm.js non è ancora pronto
   let pair = pty_system
     .openpty(PtySize {
-      rows: 40,  // Più righe invece di 24
-      cols: 120, // Più colonne invece di 80
+      rows: 24,  // Standard terminal height
+      cols: 80,  // Standard terminal width
       pixel_width: 0,
       pixel_height: 0,
     })

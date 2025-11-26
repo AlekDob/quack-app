@@ -95,6 +95,7 @@ export default defineConfig(({ mode }) => {
           main: resolve(rootDir, 'index.html'),
           preview: resolve(rootDir, 'preview.html'),
           terminal: resolve(rootDir, 'terminal.html'),
+          'terminal-window': resolve(rootDir, 'terminal-window.html'),
           pip: resolve(rootDir, 'pip.html'),
           browser: resolve(rootDir, 'browser.html'),
         },

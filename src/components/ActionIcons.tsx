@@ -110,7 +110,7 @@ function ActionIcons({
         type="button"
         className="action-icon"
         onClick={onTerminalClick}
-        aria-label="New Terminal"
+        aria-label="Open Terminals"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect
@@ -137,7 +137,7 @@ function ActionIcons({
             strokeLinecap="round"
           />
         </svg>
-        <span className="action-icon-tooltip">New Terminal</span>
+        <span className="action-icon-tooltip">Terminals</span>
       </button>
 
       {/* Browser Icon */}

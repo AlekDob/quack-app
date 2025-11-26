@@ -41,7 +41,8 @@ import TelegramSetup from "./components/TelegramSetup";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
-import { AgentTerminalTab } from "./components/AgentTerminalTab";
+import { XTermInstance } from "./components/XTermInstance";
+import { useTerminalWindowManager } from "./hooks/useTerminalWindowManager";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
 import SkillViewer from "./components/SkillViewer";
@@ -49,6 +50,7 @@ import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import { useDocsTab } from "./hooks/useDocsTab";
 import DocsTabView from "./views/DocsTabView";
+import { useUIStore } from "./stores/uiStore";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
@@ -232,6 +234,9 @@ function AppContent() {
 
   // Documentation tab management
   const { openDocsTab } = useDocsTab();
+
+  // Terminal Window manager - opens separate Tauri window for terminals
+  const { openTerminalWindow } = useTerminalWindowManager();
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1712,9 +1717,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId]);
 
-  // Open current session in terminal tab with claude --resume command
+  // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
-    if (!activeId || !tauriAvailable) return;
+    if (!activeId) return;
 
     const sessionId = chatSessionIds.get(activeId);
     if (!sessionId) {
@@ -1723,58 +1728,36 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
-      // Get current agent info
-      const currentAgent = terminals.find((t) => t.id === activeId);
+      // Get current agent info and project path
+      const currentAgent = agentChats.find((a) => a.id === activeId);
       const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || '~';
       const terminalLabel = `Resume ${sessionId.slice(0, 8)}`;
 
-      // Create backend terminal (PTY)
-      const created = await invoke<TerminalInfo>('create_terminal', {
-        label: terminalLabel,
-        color: currentAgent?.color || TERMINAL_COLORS[0],
-        cwd: terminalCwd,
+      // Prepare projects list from agent chats
+      const projects = agentChats.map(agent => ({
+        path: agent.cwd,
+        name: agent.cwd.split('/').pop() || agent.cwd,
+      }));
+      // Remove duplicates by path
+      const uniqueProjects = projects.filter(
+        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+      );
+
+      // Open terminal window with initial command to resume session
+      await openTerminalWindow(uniqueProjects, {
+        projectPath: terminalCwd,
+        command: `claude --resume ${sessionId}`,
+        terminalLabel: terminalLabel,
       });
 
-      // Create AgentTerminal entry (associated with active agent)
-      const newAgentTerminal: AgentTerminal = {
-        id: created.id,
-        name: terminalLabel,
-        agentId: activeId, // Associate with active agent
-        color: currentAgent?.color || TERMINAL_COLORS[0],
-        cwd: terminalCwd,
-        alive: true,
-        createdAt: Date.now(),
-      };
-
-      setAgentTerminals((prev) => [...prev, newAgentTerminal]);
-
-      // Create Tab for this terminal
-      const agentTerminalTab: Tab = {
-        id: `agent-terminal-${created.id}`,
-        label: terminalLabel,
-        type: 'agent-terminal',
-        closable: true,
-        color: currentAgent?.color || TERMINAL_COLORS[0],
-        terminalId: created.id,
-      };
-
-      setTabs((prev) => [...prev, agentTerminalTab]);
-      setActiveTabId(agentTerminalTab.id);
-
-      // Execute claude --resume command in the new terminal
-      await invoke('write_to_terminal', {
-        id: created.id,
-        data: `claude --resume ${sessionId}\n`,
-      });
-
-      toast.success(`Opened session in terminal tab`, {
+      toast.success('Opening session in terminal window', {
         duration: 3000,
       });
     } catch (error) {
       console.error('Failed to open session in terminal:', error);
       toast.error('Failed to open session in terminal');
     }
-  }, [activeId, chatSessionIds, terminals, explorerPath, tauriAvailable]);
+  }, [activeId, chatSessionIds, agentChats, explorerPath, openTerminalWindow]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -4799,71 +4782,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // NO AgentChat handlers needed - terminals are independent!
 
-  // Handler to create a new agent terminal tab
-  const handleCreateAgentTerminal = useCallback(async () => {
-    if (!tauriAvailable || !activeId) {
-      return;
-    }
-
-    try {
-      // Get current agent info from terminals (legacy)
-      const currentAgent = terminals.find(t => t.id === activeId);
-      const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || "~";
-
-      // Generate unique terminal name PER-AGENT
-      const agentTerminalCount = agentTerminals.filter(t => t.agentId === activeId).length;
-      const terminalNumber = agentTerminalCount + 1;
-      const terminalName = `Terminal ${terminalNumber}`;
-
-      // Create backend terminal (PTY)
-      const created = await invoke<TerminalInfo>("create_terminal", {
-        label: terminalName,
-        color: currentAgent?.color || TERMINAL_COLORS[0],
-        cwd: terminalCwd,
-      });
-
-      // Create AgentTerminal entry (NEW STATE - not in terminals!)
-      const newAgentTerminal: AgentTerminal = {
-        id: created.id,
-        name: terminalName,
-        agentId: activeId, // Associate with active agent
-        color: currentAgent?.color || TERMINAL_COLORS[0],
-        cwd: terminalCwd,
-        alive: true,
-        status: "idle",
-        createdAt: Date.now(),
-      };
-
-      setAgentTerminals((prev) => [...prev, newAgentTerminal]);
-
-      // Create agent terminal tab
-      const agentTerminalTab: Tab = {
-        id: `agent-terminal-${created.id}`,
-        label: terminalName,
-        type: 'agent-terminal',
-        closable: true,
-        color: currentAgent?.color || TERMINAL_COLORS[0],
-        terminalId: created.id,
-        // icon removed - rendered directly in TabBar to avoid React serialization issues
-      };
-
-      setTabs((prevTabs) => [...prevTabs, agentTerminalTab]);
-      setActiveTabId(agentTerminalTab.id);
-
-      // Add to tabsByTerminal for the active agent
-      setTabsByTerminal((prev) => {
-        const updated = new Map(prev);
-        const currentTabs = updated.get(activeId) || [];
-        updated.set(activeId, [...currentTabs, agentTerminalTab]);
-        return updated;
-      });
-
-      console.log(`✅ Created agent terminal tab: ${terminalName}`);
-    } catch (error) {
-      console.error("Failed to create agent terminal:", error);
-      toast.error("Failed to create terminal");
-    }
-  }, [tauriAvailable, activeId, terminals, explorerPath, agentTerminals]);
+  // Handler to open terminal window with projects from agents
+  const handleCreateAgentTerminal = useCallback(() => {
+    // NEW BEHAVIOR: Open separate Tauri window for terminals
+    // Pass projects derived from agentChats
+    const projects = agentChats.map(agent => ({
+      path: agent.cwd,
+      name: agent.cwd.split('/').pop() || agent.cwd,
+    }));
+    // Remove duplicates by path
+    const uniqueProjects = projects.filter(
+      (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+    );
+    openTerminalWindow(uniqueProjects);
+  }, [agentChats, openTerminalWindow]);
 
   const handleColorChange = useCallback(
     async (id: string, color: string) => {
@@ -5274,8 +5206,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
 
       // Dispose terminal instance and close backend PTY
-      const { disposeAgentTerminalTab } = await import('./components/AgentTerminalTab');
-      disposeAgentTerminalTab(tab.terminalId);
+      const { disposeXTermInstance } = await import('./components/XTermInstance');
+      disposeXTermInstance(tab.terminalId);
 
       // Remove terminal from agentTerminals list (NEW STATE!)
       setAgentTerminals((prev) => prev.filter(t => t.id !== tab.terminalId));
@@ -5704,7 +5636,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const newAgentTerminal: AgentTerminal = {
           id: created.id,
           name: label,
-          agentId: activeId, // Associate with active agent
+          projectPath: terminalCwd, // Associate with project path
           color: currentAgent?.color || TERMINAL_COLORS[0],
           cwd: terminalCwd,
           alive: true,
@@ -6844,7 +6776,7 @@ You have access to all Bash tools to execute git commands like:
                       if (!agentTerminal) return null;
 
                       return (
-                        <AgentTerminalTab
+                        <XTermInstance
                           key={agentTerminal.id}
                           terminalId={agentTerminal.id}
                           color={agentTerminal.color}
@@ -7324,6 +7256,8 @@ You have access to all Bash tools to execute git commands like:
         onActivateLicense={handleActivateLicense}
         limitType={upgradeLimitType}
       />
+
+      {/* Terminal Window - Now opens as separate Tauri window via useTerminalWindowManager */}
 
       <Toaster position="bottom-right" richColors closeButton />
     </>

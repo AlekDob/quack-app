@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { TerminalInfo, NativeTerminal, AgentTerminal } from '../types';
+import type { TerminalInfo, NativeTerminal, ProjectTerminal } from '../types';
 
 interface TerminalState {
   // State
   terminals: TerminalInfo[];
   activeId: string | null;
   nativeTerminals: NativeTerminal[];
-  agentTerminals: AgentTerminal[];
+  projectTerminals: ProjectTerminal[];
+  activeProjectTerminalId: string | null; // Active terminal in TerminalWindow
 
   // Actions
   setTerminals: (terminals: TerminalInfo[]) => void;
@@ -22,17 +23,20 @@ interface TerminalState {
   removeNativeTerminal: (id: string) => void;
   updateNativeTerminal: (id: string, updates: Partial<NativeTerminal>) => void;
 
-  // Agent terminal actions
-  setAgentTerminals: (terminals: AgentTerminal[]) => void;
-  addAgentTerminal: (terminal: AgentTerminal) => void;
-  removeAgentTerminal: (id: string) => void;
-  updateAgentTerminal: (id: string, updates: Partial<AgentTerminal>) => void;
+  // Project terminal actions (NEW - replaces agentTerminals)
+  setProjectTerminals: (terminals: ProjectTerminal[]) => void;
+  addProjectTerminal: (terminal: ProjectTerminal) => void;
+  removeProjectTerminal: (id: string) => void;
+  updateProjectTerminal: (id: string, updates: Partial<ProjectTerminal>) => void;
+  setActiveProjectTerminalId: (id: string | null) => void;
 
   // Selectors (derived state)
   getTerminalById: (id: string) => TerminalInfo | undefined;
   getActiveTerminal: () => TerminalInfo | null;
   getNativeTerminalById: (id: string) => NativeTerminal | undefined;
-  getAgentTerminalById: (id: string) => AgentTerminal | undefined;
+  getProjectTerminalById: (id: string) => ProjectTerminal | undefined;
+  getActiveProjectTerminal: () => ProjectTerminal | null;
+  getProjectTerminalsByPath: (projectPath: string) => ProjectTerminal[];
 }
 
 export const useTerminalStore = create<TerminalState>()(
@@ -42,7 +46,8 @@ export const useTerminalStore = create<TerminalState>()(
         terminals: [],
         activeId: null,
         nativeTerminals: [],
-        agentTerminals: [],
+        projectTerminals: [],
+        activeProjectTerminalId: null,
 
         setTerminals: (terminals) => set({ terminals }),
 
@@ -80,22 +85,25 @@ export const useTerminalStore = create<TerminalState>()(
           ),
         })),
 
-        // Agent terminal actions
-        setAgentTerminals: (terminals) => set({ agentTerminals: terminals }),
+        // Project terminal actions (NEW - replaces agentTerminals)
+        setProjectTerminals: (terminals) => set({ projectTerminals: terminals }),
 
-        addAgentTerminal: (terminal) => set((state) => ({
-          agentTerminals: [...state.agentTerminals, terminal],
+        addProjectTerminal: (terminal) => set((state) => ({
+          projectTerminals: [...state.projectTerminals, terminal],
         })),
 
-        removeAgentTerminal: (id) => set((state) => ({
-          agentTerminals: state.agentTerminals.filter((t) => t.id !== id),
+        removeProjectTerminal: (id) => set((state) => ({
+          projectTerminals: state.projectTerminals.filter((t) => t.id !== id),
+          activeProjectTerminalId: state.activeProjectTerminalId === id ? null : state.activeProjectTerminalId,
         })),
 
-        updateAgentTerminal: (id, updates) => set((state) => ({
-          agentTerminals: state.agentTerminals.map((t) =>
+        updateProjectTerminal: (id, updates) => set((state) => ({
+          projectTerminals: state.projectTerminals.map((t) =>
             t.id === id ? { ...t, ...updates } : t
           ),
         })),
+
+        setActiveProjectTerminalId: (id) => set({ activeProjectTerminalId: id }),
 
         // Selectors
         getTerminalById: (id) => {
@@ -113,9 +121,19 @@ export const useTerminalStore = create<TerminalState>()(
           return state.nativeTerminals.find((t) => t.id === id);
         },
 
-        getAgentTerminalById: (id) => {
+        getProjectTerminalById: (id) => {
           const state = get();
-          return state.agentTerminals.find((t) => t.id === id);
+          return state.projectTerminals.find((t) => t.id === id);
+        },
+
+        getActiveProjectTerminal: () => {
+          const state = get();
+          return state.projectTerminals.find((t) => t.id === state.activeProjectTerminalId) ?? null;
+        },
+
+        getProjectTerminalsByPath: (projectPath) => {
+          const state = get();
+          return state.projectTerminals.filter((t) => t.projectPath === projectPath);
         },
       }),
       {
@@ -127,6 +145,14 @@ export const useTerminalStore = create<TerminalState>()(
             label: t.label,
             cwd: t.cwd,
             color: t.color,
+          })),
+          projectTerminals: state.projectTerminals.map(t => ({
+            id: t.id,
+            name: t.name,
+            projectPath: t.projectPath,
+            cwd: t.cwd,
+            color: t.color,
+            createdAt: t.createdAt,
           })),
         }),
       }

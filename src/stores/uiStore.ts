@@ -22,6 +22,9 @@ interface UIState {
   showQuackAgencyDrawer: boolean;
   sidePanelCollapsed: boolean;
 
+  // Windows
+  showTerminalWindow: boolean;
+
   // Tabs
   tabs: Tab[];
   activeTabId: string;
@@ -42,6 +45,11 @@ interface UIState {
   closeDrawer: (drawer: keyof UIState) => void;
   toggleDrawer: (drawer: keyof UIState) => void;
   closeAllDrawers: () => void;
+
+  // Actions - Windows
+  openWindow: (window: keyof UIState) => void;
+  closeWindow: (window: keyof UIState) => void;
+  toggleWindow: (window: keyof UIState) => void;
 
   // Actions - Side Panel
   toggleSidePanel: () => void;
@@ -87,6 +95,10 @@ const drawerKeys = [
   'showQuackAgencyDrawer',
 ];
 
+const windowKeys = [
+  'showTerminalWindow',
+];
+
 export const useUIStore = create<UIState>()(
   devtools(
     persist(
@@ -109,6 +121,9 @@ export const useUIStore = create<UIState>()(
         showPreviewDrawer: false,
         showQuackAgencyDrawer: false,
         sidePanelCollapsed: false,
+
+        // Windows
+        showTerminalWindow: false,
 
         // Tabs
         tabs: [{ id: 'chat', label: 'Chat', type: 'chat', closable: false }],
@@ -164,6 +179,25 @@ export const useUIStore = create<UIState>()(
             (updates as any)[drawer] = false;
           });
           set(updates);
+        },
+
+        // Window actions
+        openWindow: (window) => {
+          if (windowKeys.includes(window)) {
+            set({ [window]: true });
+          }
+        },
+
+        closeWindow: (window) => {
+          if (windowKeys.includes(window)) {
+            set({ [window]: false });
+          }
+        },
+
+        toggleWindow: (window) => {
+          if (windowKeys.includes(window)) {
+            set((state) => ({ [window]: !state[window as keyof UIState] }));
+          }
         },
 
         // Side panel actions

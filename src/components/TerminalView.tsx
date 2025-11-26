@@ -390,8 +390,25 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     const element = document.createElement('div')
     element.className = 'terminal-instance'
     viewMapRef.current.set(id, { element, mounted: false })
+
+    // CRITICAL FIX: Schedule aggressive resize right after terminal creation
+    // This ensures PTY dimensions sync with XTerm.js as soon as possible
+    // to prevent the "empty lines" bug when typing in claude code
+    setTimeout(() => {
+      if (!mountedRef.current) return
+      try {
+        // If terminal is already attached and has a container
+        if (viewMapRef.current.get(id)?.mounted) {
+          fitAddon.fit()
+          void reportResize(id, terminal)
+        }
+      } catch (error) {
+        console.warn('Early terminal fit failed (expected for new terminals):', error)
+      }
+    }, 50)
+
     return terminal
-  }, [onUserInput, getScrollState, isNearBottom])
+  }, [onUserInput, getScrollState, isNearBottom, reportResize])
 
   const attachTerminal = useCallback(
     (id: string | null) => {
@@ -490,6 +507,33 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
             }
           })
         })
+      })
+
+      // CRITICAL FIX: Additional aggressive resizes for apps like Claude Code
+      // that use complex readline prompts. The PTY must receive correct dimensions
+      // AFTER the terminal is fully rendered and visible.
+      const aggressiveResizeDelays = [100, 250, 500, 1000, 2000]
+      aggressiveResizeDelays.forEach(delay => {
+        setTimeout(() => {
+          // Safety: check if unmounted
+          if (!mountedRef.current) return
+
+          // Verify all refs and DOM elements still exist
+          const fit = fitMapRef.current.get(id)
+          const term = terminalMapRef.current.get(id)
+          if (!fit || !term || !containerRef.current) return
+          if (!document.body.contains(containerRef.current)) return
+
+          const entry = viewMapRef.current.get(id)
+          if (!entry || !entry.element || !document.body.contains(entry.element)) return
+
+          try {
+            fit.fit()
+            void reportResize(id, term)
+          } catch {
+            // Silently ignore - terminal may have been closed
+          }
+        }, delay)
       })
     },
     [ensureTerminal, reportResize, tauriAvailable, terminals],
@@ -618,6 +662,32 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     let lastRows = 0
     let lastCols = 0
     let observer: ResizeObserver | null = null
+    let initialResizeDone = false
+
+    const doFit = () => {
+      const active = activeRef.current
+      if (!active) return
+
+      const fitAddon = fitMapRef.current.get(active)
+      const terminal = terminalMapRef.current.get(active)
+
+      if (!fitAddon || !terminal || !containerRef.current) return
+      if (!document.body.contains(containerRef.current)) return
+
+      try {
+        fitAddon.fit()
+
+        const currentRows = terminal.rows
+        const currentCols = terminal.cols
+        if (currentRows !== lastRows || currentCols !== lastCols) {
+          lastRows = currentRows
+          lastCols = currentCols
+          void reportResize(active, terminal)
+        }
+      } catch (error) {
+        console.warn('Error during terminal resize:', error)
+      }
+    }
 
     const handleResize = () => {
       const active = activeRef.current
@@ -644,7 +714,22 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         return
       }
 
-      // Debounce resize operations
+      // For initial resize, do it immediately without debounce
+      // This is critical for new windows where dimensions aren't stable initially
+      if (!initialResizeDone) {
+        initialResizeDone = true
+        requestAnimationFrame(() => {
+          if (!mountedRef.current) return
+          doFit()
+          // Also schedule a second fit after a short delay to catch any late layout changes
+          setTimeout(() => {
+            if (mountedRef.current) doFit()
+          }, 100)
+        })
+        return
+      }
+
+      // Debounce subsequent resize operations (reduced from 200ms to 50ms)
       if (resizeTimeout) {
         clearTimeout(resizeTimeout)
       }
@@ -661,29 +746,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         requestAnimationFrame(() => {
           // Safety: check if unmounted
           if (!mountedRef.current) return
-
-          // Final validity check
-          if (!fitAddon || !terminal || !containerRef.current) {
-            return
-          }
-
-          try {
-            fitAddon.fit()
-
-            // Report resize only if rows/cols changed
-            const currentRows = terminal.rows
-            const currentCols = terminal.cols
-            if (currentRows !== lastRows || currentCols !== lastCols) {
-              lastRows = currentRows
-              lastCols = currentCols
-              void reportResize(active, terminal)
-            }
-          } catch (error) {
-            // Catch any errors during fit to prevent crash
-            console.warn('Error during terminal resize:', error)
-          }
+          doFit()
         })
-      }, 200)
+      }, 50)
     }
 
     observer = new ResizeObserver((entries) => {

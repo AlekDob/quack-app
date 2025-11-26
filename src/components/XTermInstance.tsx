@@ -14,13 +14,13 @@ const terminalInstances = new Map<string, {
   unlistenExit: () => void;
 }>();
 
-interface AgentTerminalTabProps {
+interface XTermInstanceProps {
   terminalId: string;
   color: string;
-  isActive: boolean; // NEW: Tells us if this terminal is currently visible
+  isActive: boolean; // Tells us if this terminal is currently visible
 }
 
-export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalTabProps) {
+export function XTermInstance({ terminalId, color, isActive }: XTermInstanceProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
   const resizeTimeoutRef = useRef<number | null>(null);
@@ -34,17 +34,17 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
 
     const initTerminal = async () => {
       try {
-        console.log(`🦆 [AgentTerminalTab] Initializing terminal: ${terminalId}`);
+        console.log(`🦆 [XTermInstance] Initializing terminal: ${terminalId}`);
 
         const instance = terminalInstances.get(terminalId);
 
         if (!instance) {
           // Create new xterm instance
-          console.log(`🦆 [AgentTerminalTab] Creating new xterm instance: ${terminalId}`);
+          console.log(`🦆 [XTermInstance] Creating new xterm instance: ${terminalId}`);
           await createXtermInstance(terminalId, terminalRef.current!, color);
           initializedRef.current = true;
         } else {
-          console.log(`🦆 [AgentTerminalTab] Terminal already exists: ${terminalId}, re-attaching to new DOM element`);
+          console.log(`🦆 [XTermInstance] Terminal already exists: ${terminalId}, re-attaching to new DOM element`);
           initializedRef.current = true;
 
           // Re-attach the xterm element to the new container
@@ -54,7 +54,7 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
             terminalRef.current.innerHTML = '';
             // Append the existing xterm element (with its canvas and content)
             terminalRef.current.appendChild(instance.xterm.element);
-            console.log(`🦆 [AgentTerminalTab] XTerm element re-attached to new container: ${terminalId}`);
+            console.log(`🦆 [XTermInstance] XTerm element re-attached to new container: ${terminalId}`);
 
             // Fit if active (using double RAF to ensure DOM is ready)
             if (isActive) {
@@ -69,9 +69,9 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
                       // Sync dimensions with PTY backend
                       invoke('resize_terminal', { id: terminalId, cols, rows }).catch(console.error);
 
-                      console.log(`🦆 [AgentTerminalTab] Re-attached terminal fitted: ${terminalId} - ${cols}x${rows}`);
+                      console.log(`🦆 [XTermInstance] Re-attached terminal fitted: ${terminalId} - ${cols}x${rows}`);
                     } catch (error) {
-                      console.error(`🦆 [AgentTerminalTab] Failed to fit after re-attach:`, error);
+                      console.error(`🦆 [XTermInstance] Failed to fit after re-attach:`, error);
                     }
                   });
                 });
@@ -80,7 +80,7 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
           }
         }
       } catch (error) {
-        console.error(`🦆 [AgentTerminalTab] Failed to initialize terminal:`, error);
+        console.error(`🦆 [XTermInstance] Failed to initialize terminal:`, error);
       }
     };
 
@@ -115,12 +115,12 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
             // Force refresh the entire viewport to redraw everything
             instance.xterm.refresh(0, instance.xterm.rows - 1);
 
-            console.log(`🦆 [AgentTerminalTab] Terminal fitted on activation: ${terminalId} - Container: ${Math.floor(rect.width)}x${Math.floor(rect.height)}, Terminal: ${newCols} cols x ${newRows} rows`);
+            console.log(`🦆 [XTermInstance] Terminal fitted on activation: ${terminalId} - Container: ${Math.floor(rect.width)}x${Math.floor(rect.height)}, Terminal: ${newCols} cols x ${newRows} rows`);
           } catch (error) {
-            console.error(`🦆 [AgentTerminalTab] Failed to fit terminal:`, error);
+            console.error(`🦆 [XTermInstance] Failed to fit terminal:`, error);
           }
         } else {
-          console.warn(`🦆 [AgentTerminalTab] Container has zero dimensions, retrying...`);
+          console.warn(`🦆 [XTermInstance] Container has zero dimensions, retrying...`);
           // Retry after another frame
           rafId2 = requestAnimationFrame(fitTerminal);
         }
@@ -174,13 +174,13 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
                   invoke('resize_terminal', { id: terminalId, cols, rows }).catch(console.error);
 
                   lastFitTimeRef.current = Date.now();
-                  console.log(`🦆 [AgentTerminalTab] Terminal refitted on window resize: ${terminalId} - Container: ${Math.floor(rect.width)}x${Math.floor(rect.height)}, Terminal: ${cols} cols x ${rows} rows`);
+                  console.log(`🦆 [XTermInstance] Terminal refitted on window resize: ${terminalId} - Container: ${Math.floor(rect.width)}x${Math.floor(rect.height)}, Terminal: ${cols} cols x ${rows} rows`);
                 } catch (error) {
                   console.error('Failed to fit terminal on resize:', error);
                 }
               });
             } else {
-              console.log(`🦆 [AgentTerminalTab] Skipping fit (too soon): ${terminalId}, ${timeSinceLastFit}ms since last fit`);
+              console.log(`🦆 [XTermInstance] Skipping fit (too soon): ${terminalId}, ${timeSinceLastFit}ms since last fit`);
             }
           }
         }
@@ -225,7 +225,7 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
     // Initial fit using RAF to ensure container has dimensions
     requestAnimationFrame(() => {
       const rect = container.getBoundingClientRect();
-      console.log(`🦆 [AgentTerminalTab] Initial container size: ${Math.floor(rect.width)}x${Math.floor(rect.height)}`);
+      console.log(`🦆 [XTermInstance] Initial container size: ${Math.floor(rect.width)}x${Math.floor(rect.height)}`);
       if (rect.width > 0 && rect.height > 0) {
         try {
           fitAddon.fit();
@@ -234,9 +234,9 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
           // Sync dimensions with PTY backend
           invoke('resize_terminal', { id: termId, cols, rows }).catch(console.error);
 
-          console.log(`🦆 [AgentTerminalTab] Initial fit result: ${cols} cols x ${rows} rows`);
+          console.log(`🦆 [XTermInstance] Initial fit result: ${cols} cols x ${rows} rows`);
         } catch (error) {
-          console.error(`🦆 [AgentTerminalTab] Initial fit failed:`, error);
+          console.error(`🦆 [XTermInstance] Initial fit failed:`, error);
         }
       }
     });
@@ -286,12 +286,12 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
       unlistenExit,
     });
 
-    console.log(`🦆 [AgentTerminalTab] XTerm instance created and stored: ${termId}`);
+    console.log(`🦆 [XTermInstance] XTerm instance created and stored: ${termId}`);
   }
 
   return (
     <div
-      className="agent-terminal-tab"
+      className="xterm-instance"
       style={{
         position: 'absolute',
         top: 0,
@@ -306,7 +306,7 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
     >
       <div
         ref={terminalRef}
-        className="agent-terminal-container"
+        className="xterm-container"
         style={{
           width: '100%',
           height: '100%',
@@ -319,10 +319,10 @@ export function AgentTerminalTab({ terminalId, color, isActive }: AgentTerminalT
 }
 
 // Export function to completely destroy a terminal (called when closing tab)
-export function disposeAgentTerminalTab(terminalId: string) {
+export function disposeXTermInstance(terminalId: string) {
   const instance = terminalInstances.get(terminalId);
   if (instance) {
-    console.log(`🦆 [AgentTerminalTab] Disposing terminal completely: ${terminalId}`);
+    console.log(`🦆 [XTermInstance] Disposing terminal completely: ${terminalId}`);
     // Cleanup listeners
     instance.unlisten();
     instance.unlistenExit();
