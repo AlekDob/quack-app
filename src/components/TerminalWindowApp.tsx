@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import TerminalView from './TerminalView';
-import type { TerminalInfo, ProjectTerminal } from '../types';
+import { TerminalMain } from './terminal/TerminalMain';
+import type { ProjectTerminal } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
 import './TerminalWindowApp.css';
 
@@ -16,17 +16,11 @@ export function TerminalWindowApp() {
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const terminalMainRef = useRef<HTMLDivElement>(null);
-
-  // Trigger XTerm.js resize which will sync with PTY
-  const triggerResize = useCallback(() => {
-    window.dispatchEvent(new Event('resize'));
-  }, []);
 
   // Create new terminal for a project
   const handleCreateTerminal = useCallback(async (projectPath: string) => {
     try {
-      const result = await invoke<TerminalInfo>('create_terminal', {
+      const result = await invoke<{ id: string; label: string; color: string; cwd: string; alive: boolean }>('create_terminal', {
         label: `Terminal ${terminals.length + 1}`,
         color: '#4dd4b3',
         cwd: projectPath,
@@ -54,64 +48,23 @@ export function TerminalWindowApp() {
         return next;
       });
 
-      // TerminalView's ResizeObserver will handle the resize automatically
-      // Just trigger one resize after a short delay to ensure DOM is ready
-      setTimeout(triggerResize, 100);
-
     } catch (error) {
       console.error('Failed to create terminal:', error);
     }
-  }, [terminals.length, triggerResize]);
+  }, [terminals.length]);
 
   // Wait for terminal to be fully ready before executing command
-  // Uses a simple but effective approach: wait for container dimensions + multiple resize triggers
-  const waitForTerminalReady = useCallback((timeout: number = 3000): Promise<void> => {
+  const waitForTerminalReady = useCallback((timeout: number = 1000): Promise<void> => {
     return new Promise((resolve) => {
-      const startTime = Date.now();
-
-      const waitAndResize = () => {
-        // Timeout safety
-        if (Date.now() - startTime > timeout) {
-          console.log(`[TerminalWindowApp] Terminal ready timeout after ${timeout}ms`);
-          resolve();
-          return;
-        }
-
-        const container = terminalMainRef.current;
-        if (!container) {
-          setTimeout(waitAndResize, 100);
-          return;
-        }
-
-        const rect = container.getBoundingClientRect();
-
-        // Wait until container has valid dimensions
-        if (rect.width > 100 && rect.height > 100) {
-          console.log(`[TerminalWindowApp] Container ready: ${rect.width}x${rect.height}`);
-
-          // Trigger a final resize event and wait for it to propagate
-          triggerResize();
-
-          // Give XTerm time to process the resize
-          setTimeout(() => {
-            triggerResize();
-            setTimeout(resolve, 200);
-          }, 300);
-          return;
-        }
-
-        setTimeout(waitAndResize, 100);
-      };
-
-      // Start waiting after initial delay for DOM to settle
-      setTimeout(waitAndResize, 300);
+      // Simple timeout - new TerminalMain handles resize automatically
+      setTimeout(resolve, timeout);
     });
-  }, [triggerResize]);
+  }, []);
 
   // Create terminal with initial command execution
   const handleCreateTerminalWithCommand = useCallback(async (initialCommand: InitialCommand) => {
     try {
-      const result = await invoke<TerminalInfo>('create_terminal', {
+      const result = await invoke<{ id: string; label: string; color: string; cwd: string; alive: boolean }>('create_terminal', {
         label: initialCommand.terminalLabel || `Terminal ${terminals.length + 1}`,
         color: '#4dd4b3',
         cwd: initialCommand.projectPath,
@@ -200,64 +153,6 @@ export function TerminalWindowApp() {
 
     return groups;
   }, [terminals]);
-
-  // Get terminal info for TerminalView
-  const terminalInfos: TerminalInfo[] = terminals.map(t => ({
-    id: t.id,
-    label: t.name,
-    color: t.color,
-    cwd: t.cwd,
-    alive: t.alive,
-    status: t.status,
-  }));
-
-  // Force terminal resize after container has actual dimensions
-  // This fixes XTerm rendering issues where dimensions aren't calculated correctly
-  useEffect(() => {
-    if (!activeTerminalId || !terminalMainRef.current) return;
-
-    const container = terminalMainRef.current;
-    let observer: ResizeObserver | null = null;
-    let hasValidDimensions = false;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-
-    // Check if container has valid dimensions
-    const checkAndResize = () => {
-      const rect = container.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        if (!hasValidDimensions) {
-          hasValidDimensions = true;
-          // Container now has dimensions - trigger resize
-          window.dispatchEvent(new Event('resize'));
-        }
-      }
-    };
-
-    // Use ResizeObserver to detect when container gets real dimensions
-    observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-        checkAndResize();
-      }
-    });
-    observer.observe(container);
-
-    // Also check immediately and with delays as fallback
-    checkAndResize();
-
-    // Progressive delays to ensure DOM is fully settled
-    [100, 250, 500, 1000].forEach(delay => {
-      const timer = setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, delay);
-      timers.push(timer);
-    });
-
-    return () => {
-      observer?.disconnect();
-      timers.forEach(t => clearTimeout(t));
-    };
-  }, [activeTerminalId]);
 
   // Parse projects from URL params on mount and handle initial command
   useEffect(() => {
@@ -404,25 +299,11 @@ export function TerminalWindowApp() {
         </div>
 
         {/* Main terminal area */}
-        <div className="terminal-main" ref={terminalMainRef}>
-          {terminals.length === 0 ? (
-            <div className="terminal-empty">
-              <div className="terminal-empty-icon">&gt;_</div>
-              <p>No terminals yet</p>
-              <p className="terminal-empty-hint">
-                Select a project and click + to create a terminal
-              </p>
-            </div>
-          ) : (
-            <TerminalView
-              activeId={activeTerminalId}
-              terminals={terminalInfos}
-              onUserInput={() => {}}
-              onOutput={() => {}}
-              onUpdateRecentCommands={() => {}}
-            />
-          )}
-        </div>
+        <TerminalMain
+          terminals={terminals}
+          activeTerminalId={activeTerminalId}
+          themeName="tokyo-night"
+        />
       </div>
     </div>
   );

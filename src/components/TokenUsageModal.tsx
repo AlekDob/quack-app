@@ -22,7 +22,49 @@ interface TokenUsageModalProps {
   onShowAnalytics?: () => void;
   // Max Plan tracking (optional)
   maxPlanStats?: MaxPlanStats;
+  // Model name (optional)
+  model?: string;
 }
+
+// Format tokens as K (e.g., 55500 -> "55.5k")
+const formatTokensK = (tokens: number): string => {
+  if (tokens >= 1000) {
+    return `${(tokens / 1000).toFixed(1)}k`;
+  }
+  return tokens.toString();
+};
+
+// Breakdown calculation with fixed proportions
+interface ContextBreakdown {
+  messages: number;
+  contextItems: number;
+  mcpTools: number;
+  memory: number;
+  system: number;
+}
+
+const calculateBreakdown = (inputTokens: number): ContextBreakdown => {
+  // Fixed values based on typical usage
+  const SYSTEM_TOKENS = 17900;
+  const MEMORY_TOKENS = 5900;
+  const MCP_TOOLS_BASE = 2700;
+
+  // Dynamic tokens = input - fixed overhead
+  const fixedOverhead = SYSTEM_TOKENS + MEMORY_TOKENS + MCP_TOOLS_BASE;
+  const dynamicTokens = Math.max(0, inputTokens - fixedOverhead);
+
+  // Split dynamic: 60% messages, 40% context items
+  const messagesTokens = Math.round(dynamicTokens * 0.6);
+  const contextItemsTokens = Math.round(dynamicTokens * 0.4);
+
+  return {
+    messages: messagesTokens,
+    contextItems: contextItemsTokens,
+    mcpTools: MCP_TOOLS_BASE,
+    memory: MEMORY_TOKENS,
+    system: SYSTEM_TOKENS,
+  };
+};
 
 export default function TokenUsageModal({
   inputTokens,
@@ -37,12 +79,16 @@ export default function TokenUsageModal({
   onClear,
   onShowAnalytics,
   maxPlanStats,
+  model = 'Opus 4.5',
 }: TokenUsageModalProps) {
   const totalTokens = inputTokens + outputTokens;
   const remainingTokens = maxTokens - totalTokens;
 
   // INVERTED: Stamina percentage (100% = fresh, 0% = exhausted)
   const staminaPercentage = Math.max(0, 100 - percentage);
+
+  // Calculate context breakdown
+  const breakdown = calculateBreakdown(inputTokens);
 
   const formatTokens = (tokens: number) => {
     return tokens.toLocaleString();
@@ -81,87 +127,98 @@ export default function TokenUsageModal({
 
   return (
     <div className="token-modal-overlay" onClick={onClose}>
-      <div className="token-modal fallout-style" onClick={(e) => e.stopPropagation()}>
+      <div className="token-modal fallout-style context-receipt" onClick={(e) => e.stopPropagation()}>
         <div className="token-modal-header fallout-header">
-          <h3>🦆 DUCK STAMINA STATUS</h3>
-          <button className="token-modal-close" onClick={onClose}>✕</button>
+          <h3>CONTEXT RECEIPT</h3>
+          <button className="token-modal-close" onClick={onClose}>X</button>
         </div>
 
         <div className="token-modal-content fallout-content">
-          {/* Fallout-style Duck Stamina Display */}
-          <div className="fallout-stamina-display">
-            {/* Duck Image */}
-            <div className="fallout-duck-container">
-              <img
-                src="/images/stamina.png"
-                alt="Duck Stamina"
-                className="fallout-duck-image"
-              />
-              <div className="fallout-duck-status-badge" style={{ backgroundColor: status.color }}>
-                {status.emoji} {status.label}
+          {/* Two-column layout: Duck + Breakdown */}
+          <div className="context-receipt-main">
+            {/* Left Column: Duck + Model + Progress */}
+            <div className="context-receipt-left">
+              {/* Duck Image */}
+              <div className="fallout-duck-container">
+                <img
+                  src="/images/stamina.png"
+                  alt="Duck Stamina"
+                  className="fallout-duck-image"
+                />
+                <div className="fallout-duck-status-badge" style={{ backgroundColor: status.color }}>
+                  {status.label}
+                </div>
+              </div>
+
+              {/* Model Name */}
+              <div className="context-model-name">
+                <span className="context-model-label">MODEL</span>
+                <span className="context-model-value">{model}</span>
+              </div>
+
+              {/* Context Used Progress */}
+              <div className="context-usage-section">
+                <div className="fallout-progress-bar-container">
+                  <div className="fallout-progress-bar">
+                    <div
+                      className="fallout-progress-fill"
+                      style={{
+                        width: `${percentage}%`,
+                        backgroundColor: status.color,
+                      }}
+                    />
+                  </div>
+                  <div className="fallout-progress-segments">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="fallout-segment" />
+                    ))}
+                  </div>
+                </div>
+                <div className="context-usage-stats">
+                  <span className="context-usage-percentage">{Math.round(percentage)}%</span>
+                  <span className="context-usage-tokens">{formatTokensK(inputTokens)} / {formatTokensK(maxTokens)}</span>
+                </div>
               </div>
             </div>
 
-            {/* Stamina Bar (Fallout-style) */}
-            <div className="fallout-stamina-section">
-              <div className="fallout-stat-label">
-                <span className="fallout-stat-name">STAMINA</span>
-                <span className="fallout-stat-value">{Math.round(staminaPercentage)}%</span>
-              </div>
-              <div className="fallout-progress-bar-container">
-                <div className="fallout-progress-bar">
-                  <div
-                    className="fallout-progress-fill"
-                    style={{
-                      width: `${staminaPercentage}%`,
-                      backgroundColor: status.color,
-                    }}
-                  />
+            {/* Right Column: Breakdown */}
+            <div className="context-receipt-right">
+              <div className="context-breakdown-title">BREAKDOWN</div>
+              <div className="context-breakdown-list">
+                <div className="context-breakdown-row">
+                  <span className="context-breakdown-label">Messages</span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.messages)}</span>
                 </div>
-                <div className="fallout-progress-segments">
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <div key={i} className="fallout-segment" />
-                  ))}
+                <div className="context-breakdown-row">
+                  <span className="context-breakdown-label">Context Items</span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.contextItems)}</span>
+                </div>
+                <div className="context-breakdown-row">
+                  <span className="context-breakdown-label">MCP Tools</span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.mcpTools)}</span>
+                </div>
+                <div className="context-breakdown-row">
+                  <span className="context-breakdown-label">Memory</span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.memory)}</span>
+                </div>
+                <div className="context-breakdown-row">
+                  <span className="context-breakdown-label">System</span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.system)}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Token Breakdown */}
-          <div className="token-breakdown">
-            <div className="token-breakdown-item">
-              <span className="token-breakdown-label">Total Used</span>
-              <span className="token-breakdown-value">{formatTokens(totalTokens)}</span>
+          {/* Total/Free Summary */}
+          <div className="context-summary">
+            <div className="context-summary-row">
+              <span className="context-summary-label">TOTAL</span>
+              <span className="context-summary-value">{formatTokensK(inputTokens)}</span>
             </div>
-            <div className="token-breakdown-item">
-              <span className="token-breakdown-label">Remaining</span>
-              <span className="token-breakdown-value">{formatTokens(remainingTokens)}</span>
+            <div className="context-summary-row free">
+              <span className="context-summary-label">FREE</span>
+              <span className="context-summary-value">{formatTokensK(remainingTokens)}</span>
             </div>
-            <div className="token-breakdown-item">
-              <span className="token-breakdown-label">Input Tokens</span>
-              <span className="token-breakdown-value">{formatTokens(inputTokens)}</span>
-            </div>
-            <div className="token-breakdown-item">
-              <span className="token-breakdown-label">Output Tokens</span>
-              <span className="token-breakdown-value">{formatTokens(outputTokens)}</span>
-            </div>
-            {(cacheCreationTokens > 0 || cacheReadTokens > 0) && (
-              <>
-                <div className="token-breakdown-divider" />
-                {cacheCreationTokens > 0 && (
-                  <div className="token-breakdown-item">
-                    <span className="token-breakdown-label">Cache Creation</span>
-                    <span className="token-breakdown-value">{formatTokens(cacheCreationTokens)}</span>
-                  </div>
-                )}
-                {cacheReadTokens > 0 && (
-                  <div className="token-breakdown-item">
-                    <span className="token-breakdown-label">Cache Read</span>
-                    <span className="token-breakdown-value">{formatTokens(cacheReadTokens)}</span>
-                  </div>
-                )}
-              </>
-            )}
           </div>
 
           {/* Max Plan Status (if available) */}

@@ -4,7 +4,7 @@ import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useUIStore } from '../stores/uiStore';
 import { TerminalSidebarPanel } from './TerminalSidebarPanel';
-import { XTermInstance } from './XTermInstance';
+import { TerminalMain } from './terminal/TerminalMain';
 import type { ProjectTerminal } from '../types';
 import './TerminalWindow.css';
 
@@ -113,24 +113,11 @@ export function TerminalWindow({ visible }: TerminalWindowProps) {
           />
 
           <div className="terminal-window-main">
-            {projectTerminals.length === 0 ? (
-              <div className="terminal-empty-state">
-                <div className="terminal-empty-icon">&gt;_</div>
-                <p>No terminals yet</p>
-                <p className="terminal-empty-hint">
-                  Create a terminal by clicking the + button
-                </p>
-              </div>
-            ) : (
-              projectTerminals.map(terminal => (
-                <XTermInstance
-                  key={terminal.id}
-                  terminalId={terminal.id}
-                  color={terminal.color}
-                  isActive={terminal.id === activeId}
-                />
-              ))
-            )}
+            <TerminalMain
+              terminals={projectTerminals}
+              activeTerminalId={activeId}
+              themeName="tokyo-night"
+            />
           </div>
         </div>
       </div>
