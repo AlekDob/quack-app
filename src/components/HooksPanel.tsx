@@ -1,0 +1,635 @@
+import { useState } from 'react';
+import type { HookConfig, HookType, HookTemplate } from "../types";
+
+/**
+ * Hooks Panel - Manage Claude Agent SDK hooks
+ * Shows templates and active hooks with toggle/edit/delete functionality
+ */
+
+interface HooksPanelProps {
+  hooks: HookConfig[];
+  loading: boolean;
+  error: string | null;
+  workingDir?: string;
+  onRefresh?: () => void;
+  onSaveHook?: (hook: HookConfig) => Promise<void>;
+  onDeleteHook?: (hookId: string, scope: string) => Promise<void>;
+  onToggleHook?: (hookId: string, enabled: boolean) => Promise<void>;
+}
+
+// SVG Icons for templates
+const TemplateIcons = {
+  logFile: (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 4h12v12H4z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 8h6M7 11h4" strokeLinecap="round" />
+    </svg>
+  ),
+  blockSensitive: (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="5" y="8" width="10" height="8" rx="1" />
+      <path d="M7 8V6a3 3 0 016 0v2" />
+    </svg>
+  ),
+  webhook: (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="10" cy="10" r="3" />
+      <path d="M10 3v4M10 13v4M3 10h4M13 10h4" />
+    </svg>
+  ),
+  empty: (
+    <svg viewBox="0 0 20 20" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.2">
+      <path d="M10 3v7" strokeLinecap="round" />
+      <path d="M10 10c0 2.5-2 4-4 4s-4-1.5-4-4" strokeLinecap="round" />
+      <circle cx="10" cy="3" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+};
+
+// Predefined hook templates
+const HOOK_TEMPLATES: (HookTemplate & { svgIcon: JSX.Element })[] = [
+  {
+    id: 'template-log-file',
+    name: 'Log to File',
+    type: 'PostToolUse',
+    matcher: '*',
+    commandTemplate: 'echo "$(date): Tool $TOOL_NAME executed" >> ~/.quack/hooks.log',
+    description: 'Log every tool execution to a file for auditing',
+    icon: 'logFile',
+    svgIcon: TemplateIcons.logFile,
+  },
+  {
+    id: 'template-block-sensitive',
+    name: 'Block Sensitive Files',
+    type: 'PreToolUse',
+    matcher: 'Write',
+    commandTemplate: 'node -e "const f=\'$FILE_PATH\'; if(f.includes(\'.env\')||f.includes(\'secret\')||f.includes(\'credential\')){process.exit(1)}"',
+    description: 'Prevent writing to .env, secrets, and credential files',
+    icon: 'blockSensitive',
+    svgIcon: TemplateIcons.blockSensitive,
+  },
+  {
+    id: 'template-webhook',
+    name: 'Generic Webhook',
+    type: 'PostToolUse',
+    matcher: '*',
+    commandTemplate: 'curl -X POST $WEBHOOK_URL -H "Content-Type: application/json" -d \'{"tool":"$TOOL_NAME","timestamp":"$(date)"}\'',
+    description: 'Send POST request to a webhook URL on tool execution',
+    icon: 'webhook',
+    svgIcon: TemplateIcons.webhook,
+    variables: [
+      { name: 'WEBHOOK_URL', description: 'Webhook endpoint URL', required: true }
+    ],
+  },
+];
+
+// Hook type colors
+const HOOK_TYPE_COLORS: Record<HookType, string> = {
+  'PreToolUse': '#f59e0b',
+  'PostToolUse': '#10b981',
+  'Notification': '#3b82f6',
+  'Stop': '#ef4444',
+  'SubagentStop': '#8b5cf6',
+};
+
+export default function HooksPanel({
+  hooks,
+  loading,
+  error,
+  workingDir,
+  onRefresh,
+  onSaveHook,
+  onDeleteHook,
+  onToggleHook,
+}: HooksPanelProps) {
+  const [templatesExpanded, setTemplatesExpanded] = useState(true);
+  const [activeExpanded, setActiveExpanded] = useState(true);
+  const [editingHook, setEditingHook] = useState<HookConfig | null>(null);
+  const [creatingFromTemplate, setCreatingFromTemplate] = useState<(HookTemplate & { svgIcon: JSX.Element }) | null>(null);
+
+  // Group hooks by scope
+  const projectHooks = hooks.filter(h => h.scope === 'project');
+  const globalHooks = hooks.filter(h => h.scope === 'global');
+
+  const handleTemplateClick = (template: HookTemplate & { svgIcon: JSX.Element }) => {
+    const newHook: HookConfig = {
+      id: '',
+      name: template.name,
+      type: template.type,
+      matcher: template.matcher,
+      command: template.commandTemplate,
+      enabled: true,
+      scope: workingDir ? 'project' : 'global',
+      description: template.description,
+    };
+    setCreatingFromTemplate(template);
+    setEditingHook(newHook);
+  };
+
+  const handleSaveHook = async () => {
+    if (!editingHook || !onSaveHook) return;
+    try {
+      await onSaveHook(editingHook);
+      setEditingHook(null);
+      setCreatingFromTemplate(null);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to save hook:', err);
+    }
+  };
+
+  const handleDeleteHook = async (hook: HookConfig) => {
+    if (!onDeleteHook) return;
+    if (!confirm(`Delete hook "${hook.name}"?`)) return;
+    try {
+      await onDeleteHook(hook.id, hook.scope);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to delete hook:', err);
+    }
+  };
+
+  const handleToggleHook = async (hook: HookConfig) => {
+    if (!onToggleHook) return;
+    try {
+      await onToggleHook(hook.id, !hook.enabled);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to toggle hook:', err);
+    }
+  };
+
+  const renderHookCard = (hook: HookConfig) => (
+    <div
+      key={hook.id}
+      className="p-3 rounded-lg mb-2 transition-all duration-200"
+      style={{
+        background: hook.enabled ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+        border: `1px solid ${hook.enabled ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)'}`,
+        opacity: hook.enabled ? 1 : 0.6,
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          {/* Toggle */}
+          <button
+            type="button"
+            onClick={() => handleToggleHook(hook)}
+            className="w-8 h-4 rounded-full relative transition-colors duration-200"
+            style={{
+              background: hook.enabled ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <span
+              className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-200"
+              style={{
+                left: hook.enabled ? '16px' : '2px',
+              }}
+            />
+          </button>
+          {/* Name */}
+          <span className="text-sm font-medium text-white/90">{hook.name}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {/* Edit */}
+          <button
+            type="button"
+            onClick={() => setEditingHook(hook)}
+            className="p-1.5 rounded hover:bg-white/10 text-white/50 hover:text-white/90 transition-colors"
+            title="Edit"
+          >
+            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+          </button>
+          {/* Delete */}
+          <button
+            type="button"
+            onClick={() => handleDeleteHook(hook)}
+            className="p-1.5 rounded hover:bg-red-500/20 text-white/50 hover:text-red-400 transition-colors"
+            title="Delete"
+          >
+            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {/* Type badge + matcher */}
+      <div className="flex items-center gap-2 text-xs">
+        <span
+          className="px-2 py-0.5 rounded-full font-medium"
+          style={{
+            background: `${HOOK_TYPE_COLORS[hook.type]}20`,
+            color: HOOK_TYPE_COLORS[hook.type],
+          }}
+        >
+          {hook.type}
+        </span>
+        <span className="text-white/40">-</span>
+        <code className="px-1.5 py-0.5 rounded bg-white/5 text-white/60 font-mono">
+          {hook.matcher}
+        </code>
+        <span
+          className="ml-auto px-1.5 py-0.5 rounded text-[10px] uppercase font-medium"
+          style={{
+            background: hook.scope === 'project' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+            color: hook.scope === 'project' ? '#60a5fa' : '#a78bfa',
+          }}
+        >
+          {hook.scope}
+        </span>
+      </div>
+      {hook.description && (
+        <p className="mt-2 text-xs text-white/40">{hook.description}</p>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="agents-panel">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b"
+        style={{
+          borderColor: "rgba(255, 255, 255, 0.1)",
+        }}
+      >
+        <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
+          Hooks
+        </h3>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
+            style={{
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "rgba(255, 255, 255, 0.9)",
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+            }}
+          >
+            {loading ? "..." : "Refresh"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditingHook({
+              id: '',
+              name: 'New Hook',
+              type: 'PostToolUse',
+              matcher: '*',
+              command: '',
+              enabled: true,
+              scope: workingDir ? 'project' : 'global',
+            })}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
+            style={{
+              background: "#f28c52",
+              color: "#000",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#f9a470";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#f28c52";
+            }}
+          >
+            + Add
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {loading && (
+          <div
+            className="flex items-center justify-center py-8 text-sm"
+            style={{ color: "rgba(255, 255, 255, 0.6)" }}
+          >
+            Loading hooks...
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4">
+            <div
+              className="p-3 rounded-lg text-sm"
+              style={{
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                color: "#EF4444",
+              }}
+            >
+              <p className="font-medium mb-1">Error loading hooks</p>
+              <p className="text-xs opacity-80">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="p-4">
+            {/* Templates Section */}
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={() => setTemplatesExpanded(!templatesExpanded)}
+                className="flex items-center gap-2 w-full text-left mb-3"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  width="12"
+                  height="12"
+                  fill="currentColor"
+                  className="text-white/40 transition-transform"
+                  style={{
+                    transform: templatesExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
+                >
+                  <path d="M6 4l8 6-8 6V4z" />
+                </svg>
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                  Templates
+                </span>
+              </button>
+
+              {templatesExpanded && (
+                <div className="space-y-2">
+                  {HOOK_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => handleTemplateClick(template)}
+                      className="w-full p-3 rounded-lg text-left transition-all duration-200 group"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-white/70">{template.svgIcon}</span>
+                        <span className="text-sm font-medium text-white/90">{template.name}</span>
+                        <span
+                          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-auto"
+                          style={{
+                            background: `${HOOK_TYPE_COLORS[template.type]}20`,
+                            color: HOOK_TYPE_COLORS[template.type],
+                          }}
+                        >
+                          {template.type}
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/40">{template.description}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Active Hooks Section */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setActiveExpanded(!activeExpanded)}
+                className="flex items-center gap-2 w-full text-left mb-3"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  width="12"
+                  height="12"
+                  fill="currentColor"
+                  className="text-white/40 transition-transform"
+                  style={{
+                    transform: activeExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
+                >
+                  <path d="M6 4l8 6-8 6V4z" />
+                </svg>
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                  Active Hooks
+                </span>
+                {hooks.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/10 text-white/60">
+                    {hooks.filter(h => h.enabled).length}/{hooks.length}
+                  </span>
+                )}
+              </button>
+
+              {activeExpanded && (
+                <>
+                  {hooks.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-white/20 mb-3 flex justify-center">
+                        {TemplateIcons.empty}
+                      </div>
+                      <p className="text-sm text-white/60 mb-2">No hooks configured</p>
+                      <p className="text-xs text-white/40">
+                        Click a template above or use the + Add button
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Project hooks */}
+                      {projectHooks.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-400/60 mb-2">
+                            Project
+                          </p>
+                          {projectHooks.map(renderHookCard)}
+                        </div>
+                      )}
+                      {/* Global hooks */}
+                      {globalHooks.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-400/60 mb-2">
+                            Global
+                          </p>
+                          {globalHooks.map(renderHookCard)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {editingHook && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+          onClick={() => setEditingHook(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl p-6"
+            style={{
+              background: 'linear-gradient(145deg, rgba(30, 30, 35, 0.98), rgba(20, 20, 25, 0.98))',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-white mb-4">
+              {editingHook.id ? 'Edit Hook' : 'Create Hook'}
+              {creatingFromTemplate && (
+                <span className="text-sm font-normal text-white/50 ml-2">
+                  from {creatingFromTemplate.name}
+                </span>
+              )}
+            </h3>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editingHook.name}
+                  onChange={(e) => setEditingHook({ ...editingHook, name: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  placeholder="My Hook"
+                />
+              </div>
+
+              {/* Type */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Type</label>
+                <select
+                  value={editingHook.type}
+                  onChange={(e) => setEditingHook({ ...editingHook, type: e.target.value as HookType })}
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                >
+                  <option value="PreToolUse">PreToolUse</option>
+                  <option value="PostToolUse">PostToolUse</option>
+                  <option value="Notification">Notification</option>
+                  <option value="Stop">Stop</option>
+                  <option value="SubagentStop">SubagentStop</option>
+                </select>
+              </div>
+
+              {/* Matcher */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">
+                  Matcher <span className="text-white/30">(tool name or * for all)</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingHook.matcher}
+                  onChange={(e) => setEditingHook({ ...editingHook, matcher: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white font-mono bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  placeholder="Write, Read, Bash, *"
+                />
+              </div>
+
+              {/* Command */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Command</label>
+                <textarea
+                  value={editingHook.command}
+                  onChange={(e) => setEditingHook({ ...editingHook, command: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white font-mono bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50 resize-none"
+                  placeholder='echo "Hook executed"'
+                />
+              </div>
+
+              {/* Scope */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">Scope</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingHook({ ...editingHook, scope: 'project' })}
+                    disabled={!workingDir}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      editingHook.scope === 'project'
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                        : 'bg-white/5 text-white/50 border-white/10'
+                    } border disabled:opacity-50`}
+                  >
+                    Project
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingHook({ ...editingHook, scope: 'global' })}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      editingHook.scope === 'global'
+                        ? 'bg-purple-500/20 text-purple-400 border-purple-500/50'
+                        : 'bg-white/5 text-white/50 border-white/10'
+                    } border`}
+                  >
+                    Global
+                  </button>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">
+                  Description <span className="text-white/30">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingHook.description || ''}
+                  onChange={(e) => setEditingHook({ ...editingHook, description: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  placeholder="What this hook does..."
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingHook(null);
+                  setCreatingFromTemplate(null);
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 hover:text-white/90 hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveHook}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                style={{
+                  background: '#f28c52',
+                  color: '#000',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f9a470';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f28c52';
+                }}
+              >
+                {editingHook.id ? 'Save Changes' : 'Create Hook'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

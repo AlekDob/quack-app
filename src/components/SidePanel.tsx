@@ -3,13 +3,14 @@ import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
 import SkillsPanel from "./SkillsPanel";
 import MCPPanel from "./MCPPanel";
+import HooksPanel from "./HooksPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import AgentContextPanel from "./AgentContextPanel";
 import TerminalView from "./TerminalView";
 import TerminalToolBar from "./TerminalToolBar";
 import UsagePanel from "./UsagePanel";
 import { SessionsPanel } from "./SessionsPanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality } from "../types";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality, HookConfig } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
@@ -18,7 +19,7 @@ import type { SlashCommand } from "../hooks/useSlashCommands";
  * Note: Marketplace is now a drawer (not a tab)
  */
 
-type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "commands" | "sessions" | "terminal" | "usage";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "sessions" | "terminal" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -263,6 +264,40 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  hooks: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      {/* Hook/anchor shape */}
+      <path
+        d="M10 3v7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10 10c0 2.5-2 4-4 4s-4-1.5-4-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="10"
+        cy="3"
+        r="1.5"
+        fill="currentColor"
+      />
+      {/* Connection dots */}
+      <circle cx="15" cy="7" r="1.5" fill="currentColor" />
+      <circle cx="17" cy="11" r="1.5" fill="currentColor" />
+      <path
+        d="M10 6l5 1M10 8l7 3"
+        stroke="currentColor"
+        strokeWidth="1"
+        strokeLinecap="round"
+        strokeDasharray="2 1"
+      />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -350,6 +385,15 @@ interface SidePanelProps {
   onSelectSession?: (session: SessionInfo) => void;
   sessionsRefreshKey?: number;
 
+  // Hooks props
+  hooks?: HookConfig[];
+  loadingHooks?: boolean;
+  hooksError?: string | null;
+  onRefreshHooks?: () => void;
+  onSaveHook?: (hook: HookConfig) => Promise<void>;
+  onDeleteHook?: (hookId: string, scope: string) => Promise<void>;
+  onToggleHook?: (hookId: string, enabled: boolean) => Promise<void>;
+
   // Collapse props
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -433,6 +477,15 @@ export default function SidePanel({
   onSelectSession,
   sessionsRefreshKey,
 
+  // Hooks
+  hooks = [],
+  loadingHooks = false,
+  hooksError = null,
+  onRefreshHooks,
+  onSaveHook,
+  onDeleteHook,
+  onToggleHook,
+
   // Collapse
   isCollapsed = false,
   onToggleCollapse,
@@ -451,6 +504,12 @@ export default function SidePanel({
       onRefreshSkills();
     }
   }, [activeTab, onRefreshSkills]);
+
+  useEffect(() => {
+    if (activeTab === "hooks" && onRefreshHooks) {
+      onRefreshHooks();
+    }
+  }, [activeTab, onRefreshHooks]);
 
   // Tab configuration
   const tabs = [
@@ -482,6 +541,13 @@ export default function SidePanel({
       id: "mcp" as TabId,
       label: "MCP Servers",
       icon: icons.mcp,
+    },
+    {
+      id: "hooks" as TabId,
+      label: "Hooks",
+      icon: icons.hooks,
+      badge: hooks.filter(h => h.enabled).length,
+      hasContent: hooks.length > 0,
     },
     {
       id: "commands" as TabId,
@@ -653,6 +719,21 @@ export default function SidePanel({
         {activeTab === "mcp" && (
           <div className="side-panel-pane">
             <MCPPanel workingDir={workingDir} />
+          </div>
+        )}
+
+        {activeTab === "hooks" && (
+          <div className="side-panel-pane">
+            <HooksPanel
+              hooks={hooks}
+              loading={loadingHooks}
+              error={hooksError}
+              workingDir={workingDir}
+              onRefresh={onRefreshHooks}
+              onSaveHook={onSaveHook}
+              onDeleteHook={onDeleteHook}
+              onToggleHook={onToggleHook}
+            />
           </div>
         )}
 

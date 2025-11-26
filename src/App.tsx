@@ -122,6 +122,7 @@ import type {
   AgentPersonality,
   SessionInfo,
   SavedAgent,
+  HookConfig,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
 
@@ -1813,6 +1814,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [skillsDirectoryExists, setSkillsDirectoryExists] = useState<boolean>(true);
 
+  // Hooks state
+  const [hooks, setHooks] = useState<HookConfig[]>([]);
+  const [loadingHooks, setLoadingHooks] = useState(false);
+  const [hooksError, setHooksError] = useState<string | null>(null);
+
   // Context drawer state
   const [showContextDrawer, setShowContextDrawer] = useState(false);
   const [contextScope, setContextScope] = useState<string | null>(null);
@@ -3098,6 +3104,71 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       toast.error(`Failed to open skill: ${message}`);
     }
   }, [tauriAvailable, tabs]);
+
+  // Hooks handlers
+  const loadHooks = useCallback(async () => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    setLoadingHooks(true);
+    setHooksError(null);
+
+    try {
+      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      const hooksList = await invoke<HookConfig[]>("list_hooks", {
+        workingDir,
+      });
+      setHooks(hooksList);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setHooksError(message);
+      setHooks([]);
+    } finally {
+      setLoadingHooks(false);
+    }
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+
+  const handleSaveHook = useCallback(async (hook: HookConfig) => {
+    if (!tauriAvailable) {
+      throw new Error('Tauri not available');
+    }
+
+    const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+    await invoke<HookConfig>("save_hook", {
+      workingDir,
+      hook,
+    });
+    toast.success(`Hook "${hook.name}" saved`);
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+
+  const handleDeleteHook = useCallback(async (hookId: string, scope: string) => {
+    if (!tauriAvailable) {
+      throw new Error('Tauri not available');
+    }
+
+    const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+    await invoke("delete_hook", {
+      workingDir,
+      hookId,
+      scope,
+    });
+    toast.success('Hook deleted');
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
+
+  const handleToggleHook = useCallback(async (hookId: string, enabled: boolean) => {
+    if (!tauriAvailable) {
+      throw new Error('Tauri not available');
+    }
+
+    const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+    await invoke("toggle_hook", {
+      workingDir,
+      hookId,
+      enabled,
+    });
+    // No toast here - toggle is fast and visual feedback is immediate
+  }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
   // Marketplace refresh handler - refreshes all panels when resources are installed
   const handleMarketplaceRefresh = useCallback(async () => {
@@ -6866,6 +6937,14 @@ You have access to all Bash tools to execute git commands like:
           skillsDirectoryExists={skillsDirectoryExists}
           onSelectSkill={handleSelectSkill}
           onRefreshSkills={loadSkills}
+          // Hooks props
+          hooks={hooks}
+          loadingHooks={loadingHooks}
+          hooksError={hooksError}
+          onRefreshHooks={loadHooks}
+          onSaveHook={handleSaveHook}
+          onDeleteHook={handleDeleteHook}
+          onToggleHook={handleToggleHook}
           // Commands props
           onUseCommand={handleUseCommand}
           onViewCommand={handleViewCommand}

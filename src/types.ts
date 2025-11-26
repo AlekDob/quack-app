@@ -904,3 +904,70 @@ export interface MarketplaceFilters {
   sortBy?: 'popular' | 'recent' | 'name' | 'rating';
   showFavoritesOnly?: boolean;
 }
+
+// ==========================================
+// Hooks Types (Claude Agent SDK Hooks)
+// ==========================================
+
+/**
+ * Available hook event types from Claude Agent SDK
+ */
+export type HookType = 'PreToolUse' | 'PostToolUse' | 'Notification' | 'Stop' | 'SubagentStop';
+
+/**
+ * Scope of the hook - project-level or global
+ */
+export type HookScope = 'project' | 'global';
+
+/**
+ * Hook configuration stored in .claude/settings.json
+ */
+export interface HookConfig {
+  id: string;
+  name: string;
+  type: HookType;
+  matcher: string;      // Tool name to match (e.g., "Write", "Read", "*" for all)
+  command: string;      // Shell command to execute
+  enabled: boolean;
+  scope: HookScope;
+  description?: string;
+}
+
+/**
+ * Template for creating hooks from predefined patterns
+ */
+export interface HookTemplate {
+  id: string;
+  name: string;
+  type: HookType;
+  matcher: string;
+  commandTemplate: string;  // May include placeholders like $WEBHOOK_URL
+  description: string;
+  icon: string;
+  variables?: HookTemplateVariable[];
+}
+
+/**
+ * Variable that can be configured when using a template
+ */
+export interface HookTemplateVariable {
+  name: string;           // e.g., "WEBHOOK_URL"
+  label: string;          // Display label
+  placeholder?: string;
+  required: boolean;
+  type: 'text' | 'url' | 'path';
+}
+
+/**
+ * Event emitted when a hook is triggered during execution
+ */
+export interface HookExecutionEvent {
+  hookId: string;
+  hookName: string;
+  hookType: HookType;
+  toolName?: string;
+  timestamp: number;
+  success: boolean;
+  output?: string;
+  error?: string;
+}

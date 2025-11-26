@@ -20,6 +20,7 @@ mod deep_link;
 mod deep_link_commands;
 mod fs;
 mod git;
+mod hooks; // 🪝 Claude Agent SDK hooks management
 mod keychain; // 🔐 Secure keychain management for API keys
 mod license; // 💰 License management for Pro features
 mod mcp;
@@ -553,6 +554,11 @@ pub fn run() {
             mcp::stop_mcp_server,
             mcp::restart_mcp_server,
             mcp::get_mcp_server_status,
+            // 🪝 Hooks management commands
+            hooks::list_hooks,
+            hooks::save_hook,
+            hooks::delete_hook,
+            hooks::toggle_hook,
             plugins::list_available_plugins,
             plugins::list_installed_plugins,
             plugins::install_plugin,
