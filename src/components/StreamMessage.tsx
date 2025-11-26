@@ -14,7 +14,7 @@ import {
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
-import { TaskAgentAvatar } from './TaskAgentAvatar';
+import { TaskWidget } from './TaskWidget';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent} from '../types';
@@ -271,21 +271,16 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
               const subagentType = input.subagent_type;
               const description = input.description || 'Running task';
 
+              console.log('🤖 [StreamMessage] RENDERING Task widget for droid:', subagentType);
+
               return (
-                <div key={idx} className="tool-widget task-widget">
-                  <div className="tool-widget-header">
-                    <div className="tool-widget-title">
-                      <TaskAgentAvatar subagentType={subagentType} />
-                      <span>Droid: <strong>{subagentType.replace(/-/g, ' ')}</strong></span>
-                    </div>
-                    <span className="tool-widget-meta">{description}</span>
-                    {!toolResult && (
-                      <div className="tool-widget-loading">
-                        <div className="spinner"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <TaskWidget
+                  key={idx}
+                  subagentType={subagentType}
+                  description={description}
+                  isLoading={!toolResult}
+                  workingDirectory={workingDirectory}
+                />
               );
             }
 
@@ -325,39 +320,27 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
   // Agent event - subagent start/stop
   if (message.type === 'agent') {
     const agentEvent = message as any;
+    const agentType = agentEvent.agent_type || agentEvent.agent_name || 'subagent';
 
     if (agentEvent.action === 'start') {
       return (
-        <div className="stream-message subagent-message">
-          <div className="tool-widget task-widget">
-            <div className="tool-widget-header">
-              <div className="tool-widget-title">
-                <TaskAgentAvatar subagentType={agentEvent.agent_type || agentEvent.agent_name || 'subagent'} />
-                <span>Droid: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
-              </div>
-              <span className="tool-widget-meta">Starting...</span>
-              <div className="tool-widget-loading">
-                <div className="spinner"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TaskWidget
+          subagentType={agentType}
+          description="Starting..."
+          isLoading={true}
+          workingDirectory={workingDirectory}
+        />
       );
     }
 
     if (agentEvent.action === 'stop') {
       return (
-        <div className="stream-message subagent-message">
-          <div className="tool-widget task-widget">
-            <div className="tool-widget-header">
-              <div className="tool-widget-title">
-                <TaskAgentAvatar subagentType={agentEvent.agent_type || agentEvent.agent_name || 'subagent'} />
-                <span>Droid: <strong>{agentEvent.agent_name || agentEvent.agent_type || 'Unknown'}</strong></span>
-              </div>
-              <span className="tool-widget-meta" style={{ color: '#00D9FF' }}>Completed</span>
-            </div>
-          </div>
-        </div>
+        <TaskWidget
+          subagentType={agentType}
+          description="Completed"
+          isLoading={false}
+          workingDirectory={workingDirectory}
+        />
       );
     }
   }

@@ -17,6 +17,7 @@ interface MessageListProps {
   agentAvatar?: string;
   projectName?: string;
   gitBranch?: string;
+  workingDirectory?: string;
 }
 
 // Message height cache for virtualization
@@ -39,6 +40,7 @@ const MessageRow = memo(({
     agentAvatar?: string;
     projectName?: string;
     gitBranch?: string;
+    workingDirectory?: string;
     lastUserMessageIndex: number;
   }
 }) => {
@@ -50,6 +52,7 @@ const MessageRow = memo(({
     agentAvatar,
     projectName,
     gitBranch,
+    workingDirectory,
     lastUserMessageIndex
   } = data;
 
@@ -78,6 +81,7 @@ const MessageRow = memo(({
         projectName={projectName}
         gitBranch={gitBranch}
         isLastUserMessage={index === lastUserMessageIndex}
+        workingDirectory={workingDirectory}
       />
     </div>
   );
@@ -92,7 +96,8 @@ function MessageListVirtualized({
   agentName,
   agentAvatar,
   projectName,
-  gitBranch
+  gitBranch,
+  workingDirectory
 }: MessageListProps) {
   const listRef = useRef<VariableSizeList>(null);
   const outerRef = useRef<HTMLElement>(null);
@@ -286,6 +291,7 @@ function MessageListVirtualized({
     agentAvatar,
     projectName,
     gitBranch,
+    workingDirectory,
     lastUserMessageIndex
   };
 

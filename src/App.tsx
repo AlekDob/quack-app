@@ -29,7 +29,8 @@ import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
 // import { NativeTerminalPanel } from "./components/NativeTerminalPanel"; // Unused - commented out
 import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
-import { TitleBar } from "./components/TitleBar";
+// TitleBar removed - using native macOS decorations
+// import { TitleBar } from "./components/TitleBar";
 import UnifiedSettings from "./components/settings/UnifiedSettings";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
@@ -893,6 +894,12 @@ function AppContent() {
   // 🦆 FIX: Listen for Claude SDK streaming events from backend
   // CRITICAL: Maintain persistent listeners for ALL active agents, not just the active one
   // This prevents stream interruption when switching between agents during streaming
+
+  // 🦆 RACE CONDITION FIX: Only track agent IDs, not full chatSessions
+  // This prevents rapid listener teardown/setup during streaming which causes
+  // "listeners[eventId].handlerId" errors from Tauri's event system
+  const activeAgentIdsKey = Array.from(chatSessions.keys()).sort().join(',');
+
   useEffect(() => {
     if (!tauriAvailable) return;
 
@@ -900,7 +907,7 @@ function AppContent() {
     const listenersMap = new Map<string, () => void>();
 
     // Get all agent IDs that have chat sessions
-    const activeAgentIds = Array.from(chatSessions.keys());
+    const activeAgentIds = activeAgentIdsKey.split(',').filter(Boolean);
 
     // console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds); // Performance: Disabled logging
 
@@ -1102,7 +1109,7 @@ function AppContent() {
       });
       listenersMap.clear();
     };
-  }, [tauriAvailable, chatSessions]); // 🦆 Now depends on chatSessions, not activeId!
+  }, [tauriAvailable, activeAgentIdsKey]); // 🦆 RACE FIX: Only re-setup when agent IDs change, not on every message update!
 
   // 🦆 SESSION PERSISTENCE: Show "Continuing conversation" message when switching to agent with saved session
   useEffect(() => {
@@ -6543,7 +6550,7 @@ You have access to all Bash tools to execute git commands like:
 
   return (
     <>
-      <TitleBar />
+      {/* Drag region removed - now using data-tauri-drag-region on sidebar-header only */}
 
       {/* 🔐 Claude Auth Banner - Fixed at bottom when CLI not available */}
       {claudeCliAvailable === false && !claudeAuthBannerDismissed && (

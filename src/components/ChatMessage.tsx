@@ -48,9 +48,10 @@ interface ChatMessageProps {
   projectName?: string;
   gitBranch?: string;
   isLastUserMessage?: boolean;
+  workingDirectory?: string;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -504,6 +505,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                     onFilePathClick={onFilePathClick}
                     agentName={agentName}
                     agentAvatar={agentAvatar}
+                    workingDirectory={workingDirectory}
                   />
                 );
               });

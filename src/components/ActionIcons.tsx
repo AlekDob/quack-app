@@ -33,10 +33,10 @@ function ActionIcons({
   const projectName = projectPath ? projectPath.split('/').filter(Boolean).pop() : '';
 
   return (
-    <div className="action-icons">
-      {/* Project Name */}
+    <div className="action-icons" data-tauri-drag-region>
+      {/* Project Name - draggable area */}
       {projectName && (
-        <span className="project-name">{projectName}</span>
+        <span className="project-name" data-tauri-drag-region>{projectName}</span>
       )}
       {/* Git Icon */}
       <button

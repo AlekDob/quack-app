@@ -359,3 +359,42 @@
   color: rgba(255, 255, 255, 0.6);
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
 }
+
+/* Task Widget - Subagent/Droid Invocation */
+/* Colors are applied via inline styles from agent config */
+.task-widget {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.task-widget .tool-widget-header {
+  padding: 10px 14px;
+}
+
+.task-widget .tool-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.task-widget .tool-widget-title strong {
+  text-transform: capitalize;
+}
+
+.task-widget .tool-widget-meta {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-left: auto;
+}
+
+/* Subagent message container */
+.subagent-message {
+  margin-left: 20px;
+  border-left: 2px solid rgba(139, 92, 246, 0.3);
+  padding-left: 12px;
+}

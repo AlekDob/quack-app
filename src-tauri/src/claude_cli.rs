@@ -1117,7 +1117,24 @@ pub async fn send_message_via_sdk_streaming(
 
                 // Emit event to frontend immediately
                 let event_name = format!("claude-event:{}", agent_id);
-                let _ = app.emit(&event_name, &event);
+
+                // Debug: Log before emitting to verify Task events are sent
+                if let ClaudeEvent::Assistant { message, .. } = &event {
+                    for block in &message.content {
+                        if let ContentBlock::ToolUse { name, .. } = block {
+                            if name.to_lowercase() == "task" {
+                                log::info!("[SDK] 🚀 EMITTING Task tool event to frontend: {}", event_name);
+                            }
+                        }
+                    }
+                }
+
+                match app.emit(&event_name, &event) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!("[SDK] ❌ EMIT FAILED: {:?}", e);
+                    }
+                }
 
                 // Check if this is the final result
                 if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = &event {

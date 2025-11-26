@@ -10,6 +10,14 @@
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   justify-content: flex-start;
+  /* Enable window dragging on empty areas */
+  -webkit-app-region: drag;
+}
+
+/* Exclude buttons from drag region so they remain clickable */
+.action-icons button,
+.action-icons .action-icon {
+  -webkit-app-region: no-drag;
 }
 
 .project-name {

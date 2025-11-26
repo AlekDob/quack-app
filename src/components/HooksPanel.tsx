@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { HookConfig, HookType, HookTemplate } from "../types";
 
 /**
@@ -47,7 +47,7 @@ const TemplateIcons = {
 };
 
 // Predefined hook templates
-const HOOK_TEMPLATES: (HookTemplate & { svgIcon: JSX.Element })[] = [
+const HOOK_TEMPLATES: (HookTemplate & { svgIcon: React.ReactNode })[] = [
   {
     id: 'template-log-file',
     name: 'Log to File',
@@ -78,7 +78,7 @@ const HOOK_TEMPLATES: (HookTemplate & { svgIcon: JSX.Element })[] = [
     icon: 'webhook',
     svgIcon: TemplateIcons.webhook,
     variables: [
-      { name: 'WEBHOOK_URL', description: 'Webhook endpoint URL', required: true }
+      { name: 'WEBHOOK_URL', label: 'Webhook endpoint URL', required: true, type: 'url' }
     ],
   },
 ];
@@ -105,13 +105,13 @@ export default function HooksPanel({
   const [templatesExpanded, setTemplatesExpanded] = useState(true);
   const [activeExpanded, setActiveExpanded] = useState(true);
   const [editingHook, setEditingHook] = useState<HookConfig | null>(null);
-  const [creatingFromTemplate, setCreatingFromTemplate] = useState<(HookTemplate & { svgIcon: JSX.Element }) | null>(null);
+  const [creatingFromTemplate, setCreatingFromTemplate] = useState<(HookTemplate & { svgIcon: React.ReactNode }) | null>(null);
 
   // Group hooks by scope
   const projectHooks = hooks.filter(h => h.scope === 'project');
   const globalHooks = hooks.filter(h => h.scope === 'global');
 
-  const handleTemplateClick = (template: HookTemplate & { svgIcon: JSX.Element }) => {
+  const handleTemplateClick = (template: HookTemplate & { svgIcon: React.ReactNode }) => {
     const newHook: HookConfig = {
       id: '',
       name: template.name,

@@ -31,7 +31,7 @@ export interface UseTerminalOptions {
 
 export interface UseTerminalReturn {
   /** Ref to attach to terminal container div */
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   /** XTerm instance (null until initialized) */
   terminal: XTerm | null;
   /** Manually trigger resize */

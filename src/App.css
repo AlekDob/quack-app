@@ -2,17 +2,28 @@
   display: grid;
   grid-template-columns: 850px minmax(0, 1fr) 340px;
   grid-template-rows: auto 1fr;
-  height: calc(100vh - 40px);
-  margin-top: 40px;
+  height: 100vh;
   overflow: visible; /* ← Changed from hidden to visible for toggle button */
   background: transparent;
   color: #eef0f5;
   position: relative;
-  /* macOS rounded corners support */
-  border-radius: 10px;
+  /* macOS rounded corners are handled by native window decorations */
   -webkit-app-region: no-drag;
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ============================================
+   TITLEBAR OVERLAY STYLE (Warp-like)
+   ============================================
+   With titleBarStyle: "Overlay", content goes under traffic lights.
+   We need a draggable titlebar zone at the top.
+*/
+
+/*
+ * DRAG REGION REMOVED - using data-tauri-drag-region on specific elements instead.
+ * The invisible overlay was blocking clicks on buttons.
+ * Now dragging works from sidebar-header and empty areas with data-tauri-drag-region.
+ */
 
 .app-shell.side-panel-collapsed {
   grid-template-columns: 850px minmax(0, 1fr) 0px; /* ← 0px, toggle button is fixed */
@@ -944,7 +955,8 @@ button.directory-chooser:hover {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.85rem 1rem;
-  min-height: 56px;
+  padding-top: 0.5rem; /* Compact - traffic lights float over content */
+  min-height: auto;
   border-bottom: 1px solid rgba(65, 75, 95, 0.35);
   /* Subtle gradient for depth */
   background: linear-gradient(
@@ -8010,6 +8022,18 @@ button.directory-chooser:hover {
 .sidebar-settings-button:hover {
   background: rgba(249, 115, 22, 0.15);
   color: #f97316;
+}
+
+/* Dev mode styling - red accent */
+.sidebar-settings-button.dev-mode {
+  background: rgba(239, 68, 68, 0.15);
+  border-top-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.sidebar-settings-button.dev-mode:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
 }
 
 .sidebar-settings-content {

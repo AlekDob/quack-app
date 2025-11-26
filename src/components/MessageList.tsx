@@ -14,9 +14,10 @@ interface MessageListProps {
   agentAvatar?: string;
   projectName?: string;
   gitBranch?: string;
+  workingDirectory?: string;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -197,6 +198,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
             projectName={projectName}
             gitBranch={gitBranch}
             isLastUserMessage={index === lastUserMessageIndex}
+            workingDirectory={workingDirectory}
           />
         ))}
         {loading && <SkeletonMessage />}

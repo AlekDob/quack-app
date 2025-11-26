@@ -600,10 +600,10 @@ export default function TerminalSidebar({
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-header-top">
-          <span className="sidebar-title">Quack Agents</span>
-          <div style={{ display: 'flex', gap: '6px' }}>
+      <div className="sidebar-header" data-tauri-drag-region>
+        <div className="sidebar-header-top" data-tauri-drag-region>
+          {/* Title removed to avoid conflict with macOS traffic lights */}
+          <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
             {/* PiP Mode Button */}
             {onTogglePip && (
               <button
@@ -819,7 +819,7 @@ export default function TerminalSidebar({
       {onOpenSettings && (
         <button
           type="button"
-          className="sidebar-settings-button"
+          className={`sidebar-settings-button ${import.meta.env.DEV ? 'dev-mode' : ''}`}
           onClick={onOpenSettings}
         >
           <div className="sidebar-settings-content">
@@ -831,7 +831,10 @@ export default function TerminalSidebar({
               <span className="sidebar-settings-label">Settings</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="sidebar-settings-version">{appVersion}</span>
+              <span className="sidebar-settings-version">
+                {appVersion}
+                {import.meta.env.DEV && <span style={{ marginLeft: '4px', color: '#ef4444', fontWeight: 600 }}>DEV</span>}
+              </span>
               {updateAvailable && latestRelease && (
                 <span
                   style={{
