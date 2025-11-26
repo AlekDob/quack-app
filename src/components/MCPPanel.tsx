@@ -317,6 +317,53 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
 
         {!loading && !error && servers.length > 0 && (
           <div className="p-3 space-y-4">
+            {/* Project Servers Section */}
+            {servers.filter((s) => s.scope === "project").length > 0 && (
+              <div>
+                <div
+                  className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
+                  style={{
+                    color: "rgba(255, 255, 255, 0.7)",
+                    background: "rgba(255, 255, 255, 0.05)",
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-2"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Project Servers
+                  <span
+                    className="ml-2 text-xs opacity-60"
+                    style={{ fontWeight: "normal" }}
+                  >
+                    (from .mcp.json)
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {servers
+                    .filter((s) => s.scope === "project")
+                    .map((server) => (
+                      <MCPServerCard
+                        key={server.id}
+                        server={server}
+                        onEdit={handleEditServer}
+                        onDelete={handleDeleteServer}
+                        onTestConnection={handleTestConnection}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
             {/* Global Servers Section */}
             {servers.filter((s) => s.scope === "global").length > 0 && (
               <div>
@@ -353,53 +400,6 @@ export default function MCPPanel({ workingDir, onRefresh }: MCPPanelProps) {
                 <div className="space-y-2">
                   {servers
                     .filter((s) => s.scope === "global")
-                    .map((server) => (
-                      <MCPServerCard
-                        key={server.id}
-                        server={server}
-                        onEdit={handleEditServer}
-                        onDelete={handleDeleteServer}
-                        onTestConnection={handleTestConnection}
-                      />
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Project Servers Section */}
-            {servers.filter((s) => s.scope === "project").length > 0 && (
-              <div>
-                <div
-                  className="flex items-center text-xs font-semibold mb-2 px-2 py-1.5 rounded"
-                  style={{
-                    color: "rgba(255, 255, 255, 0.7)",
-                    background: "rgba(255, 255, 255, 0.05)",
-                  }}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mr-2"
-                  >
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                  </svg>
-                  Project Servers
-                  <span
-                    className="ml-2 text-xs opacity-60"
-                    style={{ fontWeight: "normal" }}
-                  >
-                    (from .mcp.json)
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {servers
-                    .filter((s) => s.scope === "project")
                     .map((server) => (
                       <MCPServerCard
                         key={server.id}

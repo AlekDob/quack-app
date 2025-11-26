@@ -648,6 +648,94 @@ export default function AgentContextPanel({
         </div>
       )}
 
+      {/* Context Files Section - Project */}
+      {projectFiles.length > 0 && (
+        <div className="context-section">
+          <div
+            className="context-section-header"
+            onClick={() => setProjectCollapsed(!projectCollapsed)}
+          >
+            <div className="context-section-title">
+              <svg
+                className="context-section-arrow"
+                style={{
+                  transform: projectCollapsed
+                    ? 'rotate(-90deg)'
+                    : 'rotate(0deg)',
+                }}
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+              >
+                <path
+                  d="M3 4.5L6 7.5L9 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                style={{ opacity: 0.6 }}
+              >
+                <path
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Project Context</span>
+              <span className="context-count-badge">{projectFiles.length}</span>
+              {renderStatsBadge(projectStats)}
+            </div>
+          </div>
+
+          {!projectCollapsed && (
+            <div className="context-list">
+              {projectFiles.map((file) => (
+                <div
+                  key={`${file.scope}-${file.name}`}
+                  className="context-item"
+                  onClick={() => handleFileClick(file)}
+                  style={{
+                    opacity: file.exists ? 1 : 0.5,
+                    cursor: file.exists ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  <div className="context-item-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                  </div>
+                  <div className="context-item-content">
+                    <div className="context-item-name">{file.name}</div>
+                    {!file.exists && (
+                      <div
+                        className="text-xs"
+                        style={{ color: 'rgba(255, 255, 255, 0.4)' }}
+                      >
+                        File not found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Context Files Section - Global */}
       {globalFiles.length > 0 && (
         <div className="context-section">
@@ -704,94 +792,6 @@ export default function AgentContextPanel({
           {!globalCollapsed && (
             <div className="context-list">
               {globalFiles.map((file) => (
-                <div
-                  key={`${file.scope}-${file.name}`}
-                  className="context-item"
-                  onClick={() => handleFileClick(file)}
-                  style={{
-                    opacity: file.exists ? 1 : 0.5,
-                    cursor: file.exists ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <div className="context-item-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                      <line x1="16" y1="13" x2="8" y2="13"/>
-                      <line x1="16" y1="17" x2="8" y2="17"/>
-                      <polyline points="10 9 9 9 8 9"/>
-                    </svg>
-                  </div>
-                  <div className="context-item-content">
-                    <div className="context-item-name">{file.name}</div>
-                    {!file.exists && (
-                      <div
-                        className="text-xs"
-                        style={{ color: 'rgba(255, 255, 255, 0.4)' }}
-                      >
-                        File not found
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Context Files Section - Project */}
-      {projectFiles.length > 0 && (
-        <div className="context-section">
-          <div
-            className="context-section-header"
-            onClick={() => setProjectCollapsed(!projectCollapsed)}
-          >
-            <div className="context-section-title">
-              <svg
-                className="context-section-arrow"
-                style={{
-                  transform: projectCollapsed
-                    ? 'rotate(-90deg)'
-                    : 'rotate(0deg)',
-                }}
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-              >
-                <path
-                  d="M3 4.5L6 7.5L9 4.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                style={{ opacity: 0.6 }}
-              >
-                <path
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span>Project Context</span>
-              <span className="context-count-badge">{projectFiles.length}</span>
-              {renderStatsBadge(projectStats)}
-            </div>
-          </div>
-
-          {!projectCollapsed && (
-            <div className="context-list">
-              {projectFiles.map((file) => (
                 <div
                   key={`${file.scope}-${file.name}`}
                   className="context-item"

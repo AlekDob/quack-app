@@ -246,29 +246,27 @@ export default function AgentsPanel({
 
         {!loading && !error && filteredAgents.length > 0 && (
           <div className="p-3 space-y-4">
-            {/* Global Agents Section */}
-            {filteredAgents.filter((a) => a.scope === "global").length > 0 && (
+            {/* Project Agents Section */}
+            {filteredAgents.filter((a) => a.scope === "project").length > 0 && (
               <div>
                 <button
                   type="button"
-                  onClick={() => setGlobalExpanded(!globalExpanded)}
+                  onClick={() => setProjectExpanded(!projectExpanded)}
                   className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 >
-                  <span className={`transition-transform ${globalExpanded ? 'rotate-90' : ''}`}>▶</span>
+                  <span className={`transition-transform ${projectExpanded ? 'rotate-90' : ''}`}>▶</span>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                   </svg>
-                  <span>Global Droids</span>
-                  <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "global").length}</span>
+                  <span>Project Droids</span>
+                  <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "project").length}</span>
                 </button>
-                {globalExpanded && (
+                {projectExpanded && (
                 <div className="space-y-2">
-                  {sortAgents(filteredAgents.filter((a) => a.scope === "global"))
+                  {sortAgents(filteredAgents.filter((a) => a.scope === "project"))
                     .map((agent) => (
                       <div
-                        key={`global-${agent.name}`}
+                        key={`project-${agent.name}`}
                         className="rounded-lg border transition-all duration-200"
                         style={{
                           background: "rgba(12, 16, 24, 0.6)",
@@ -390,27 +388,29 @@ export default function AgentsPanel({
               </div>
             )}
 
-            {/* Project Agents Section */}
-            {filteredAgents.filter((a) => a.scope === "project").length > 0 && (
+            {/* Global Agents Section */}
+            {filteredAgents.filter((a) => a.scope === "global").length > 0 && (
               <div>
                 <button
                   type="button"
-                  onClick={() => setProjectExpanded(!projectExpanded)}
+                  onClick={() => setGlobalExpanded(!globalExpanded)}
                   className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 >
-                  <span className={`transition-transform ${projectExpanded ? 'rotate-90' : ''}`}>▶</span>
+                  <span className={`transition-transform ${globalExpanded ? 'rotate-90' : ''}`}>▶</span>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 12h20" />
                   </svg>
-                  <span>Project Droids</span>
-                  <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "project").length}</span>
+                  <span>Global Droids</span>
+                  <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "global").length}</span>
                 </button>
-                {projectExpanded && (
+                {globalExpanded && (
                 <div className="space-y-2">
-                  {sortAgents(filteredAgents.filter((a) => a.scope === "project"))
+                  {sortAgents(filteredAgents.filter((a) => a.scope === "global"))
                     .map((agent) => (
                       <div
-                        key={`project-${agent.name}`}
+                        key={`global-${agent.name}`}
                         className="rounded-lg border transition-all duration-200"
                         style={{
                           background: "rgba(12, 16, 24, 0.6)",
