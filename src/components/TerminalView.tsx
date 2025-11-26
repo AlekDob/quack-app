@@ -257,6 +257,9 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     writeTimeoutRef.current.set(id, timeout)
   }, [flushWriteBuffer])
 
+  // Track the last reported dimensions to avoid redundant/wrong resizes
+  const lastReportedDimensionsRef = useRef(new Map<string, { rows: number; cols: number }>())
+
   const reportResize = useCallback(async (id: string, terminal: Terminal) => {
     if (!tauriAvailable) {
       return
@@ -265,7 +268,31 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       return
     }
 
+    // CRITICAL FIX: Ignore default dimensions (24x80) that XTerm returns before mounting
+    // These are almost certainly wrong and would cause Claude Code to think the terminal is tiny
+    if (terminal.rows === 24 && terminal.cols <= 80) {
+      console.log(`[TerminalView] IGNORING default dimensions (24x80) for ${id}`)
+      return
+    }
+
+    // Also ignore very small dimensions that are likely invalid
+    if (terminal.rows < 10 || terminal.cols < 40) {
+      console.log(`[TerminalView] IGNORING too-small dimensions (${terminal.rows}x${terminal.cols}) for ${id}`)
+      return
+    }
+
+    // Check if dimensions have actually changed from last report
+    const lastDims = lastReportedDimensionsRef.current.get(id)
+    if (lastDims && lastDims.rows === terminal.rows && lastDims.cols === terminal.cols) {
+      // Same dimensions, skip redundant resize
+      return
+    }
+
+    // Store new dimensions
+    lastReportedDimensionsRef.current.set(id, { rows: terminal.rows, cols: terminal.cols })
+
     try {
+      console.log(`[TerminalView] resize_terminal(${id}, rows=${terminal.rows}, cols=${terminal.cols})`)
       await invoke('resize_terminal', {
         id,
         rows: terminal.rows,
@@ -391,24 +418,11 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     element.className = 'terminal-instance'
     viewMapRef.current.set(id, { element, mounted: false })
 
-    // CRITICAL FIX: Schedule aggressive resize right after terminal creation
-    // This ensures PTY dimensions sync with XTerm.js as soon as possible
-    // to prevent the "empty lines" bug when typing in claude code
-    setTimeout(() => {
-      if (!mountedRef.current) return
-      try {
-        // If terminal is already attached and has a container
-        if (viewMapRef.current.get(id)?.mounted) {
-          fitAddon.fit()
-          void reportResize(id, terminal)
-        }
-      } catch (error) {
-        console.warn('Early terminal fit failed (expected for new terminals):', error)
-      }
-    }, 50)
+    // NOTE: Do NOT resize here - terminal is not mounted yet and will return wrong dimensions (24x80)
+    // The resize will happen in attachTerminal when the terminal is properly mounted
 
     return terminal
-  }, [onUserInput, getScrollState, isNearBottom, reportResize])
+  }, [onUserInput, getScrollState, isNearBottom])
 
   const attachTerminal = useCallback(
     (id: string | null) => {
@@ -466,74 +480,19 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         console.warn('Error focusing terminal:', error)
       }
 
-      // Eager resize: fit IMMEDIATAMENTE per evitare wrapping sbagliato
-      // Poi ri-fit dopo stabilizzazione DOM per precisione
-      try {
-        // Verify container still exists before fit
-        if (containerRef.current && document.body.contains(containerRef.current)) {
-          fitAddon?.fit()
-          void reportResize(id, terminal)
-        }
-      } catch (error) {
-        console.warn('Error during eager terminal fit:', error)
-      }
-
-      // Aspetta che il DOM sia completamente renderizzato per fit finale
-      // Usa triple requestAnimationFrame per garantire che il layout sia stabile
+      // SIMPLIFIED: Single resize after terminal is attached
+      // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
-        // Safety: check if unmounted
         if (!mountedRef.current) return
+        if (!fitAddon || !terminal || !containerRef.current) return
+        if (!document.body.contains(containerRef.current)) return
 
-        requestAnimationFrame(() => {
-          // Safety: check if unmounted
-          if (!mountedRef.current) return
-
-          requestAnimationFrame(() => {
-            // Safety: check if unmounted
-            if (!mountedRef.current) return
-
-            // Verify all refs and DOM elements still exist
-            if (!fitAddon || !terminal || !containerRef.current) return
-            if (!document.body.contains(containerRef.current)) return
-
-            const viewEntry = viewMapRef.current.get(id)
-            if (!viewEntry || !viewEntry.element || !document.body.contains(viewEntry.element)) return
-
-            try {
-              fitAddon.fit()
-              void reportResize(id, terminal)
-            } catch (error) {
-              console.warn('Error during final terminal fit:', error)
-            }
-          })
-        })
-      })
-
-      // CRITICAL FIX: Additional aggressive resizes for apps like Claude Code
-      // that use complex readline prompts. The PTY must receive correct dimensions
-      // AFTER the terminal is fully rendered and visible.
-      const aggressiveResizeDelays = [100, 250, 500, 1000, 2000]
-      aggressiveResizeDelays.forEach(delay => {
-        setTimeout(() => {
-          // Safety: check if unmounted
-          if (!mountedRef.current) return
-
-          // Verify all refs and DOM elements still exist
-          const fit = fitMapRef.current.get(id)
-          const term = terminalMapRef.current.get(id)
-          if (!fit || !term || !containerRef.current) return
-          if (!document.body.contains(containerRef.current)) return
-
-          const entry = viewMapRef.current.get(id)
-          if (!entry || !entry.element || !document.body.contains(entry.element)) return
-
-          try {
-            fit.fit()
-            void reportResize(id, term)
-          } catch {
-            // Silently ignore - terminal may have been closed
-          }
-        }, delay)
+        try {
+          fitAddon.fit()
+          void reportResize(id, terminal)
+        } catch (error) {
+          console.warn('Error during terminal fit:', error)
+        }
       })
     },
     [ensureTerminal, reportResize, tauriAvailable, terminals],
@@ -664,6 +623,23 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
     let observer: ResizeObserver | null = null
     let initialResizeDone = false
 
+    // CRITICAL FIX: Use proposeDimensions() + resize() instead of fit()
+    // This workaround fixes XTerm.js bug where fit() doesn't calculate dimensions correctly
+    const doManualFitResize = (fit: FitAddon, term: Terminal): boolean => {
+      try {
+        const dims = fit.proposeDimensions()
+        if (dims && dims.cols && dims.rows && !isNaN(dims.cols) && !isNaN(dims.rows)) {
+          const cols = Math.max(dims.cols, 40)
+          const rows = Math.max(dims.rows, 10)
+          term.resize(cols, rows)
+          return true
+        }
+      } catch {
+        // Ignore
+      }
+      return false
+    }
+
     const doFit = () => {
       const active = activeRef.current
       if (!active) return
@@ -675,7 +651,10 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
       if (!document.body.contains(containerRef.current)) return
 
       try {
-        fitAddon.fit()
+        // Use manual fit for better accuracy
+        if (!doManualFitResize(fitAddon, terminal)) {
+          fitAddon.fit() // Fallback
+        }
 
         const currentRows = terminal.rows
         const currentCols = terminal.cols

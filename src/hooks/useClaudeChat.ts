@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { ChatAttachment, ChatMessage, ClaudeEvent } from '../types';
+import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, EffortLevel } from '../types';
 import { streamClaudeMessage, abortSessionStream } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
 import debugLogger from '../services/debugLogger';
@@ -14,6 +14,9 @@ export interface ChatSendOptions {
   permissionMode?: PermissionMode;
   workingDirectory?: string;
   onComplete?: () => void; // Callback when chat completes successfully
+  // New SDK 0.1.54+ features
+  outputFormat?: StructuredOutputFormat; // Structured outputs (beta) - guarantees JSON schema compliance
+  effort?: EffortLevel; // Effort parameter - controls quality vs speed/cost tradeoff
 }
 
 export interface UseClaudeChatOptions {
@@ -120,6 +123,9 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
         workingDirectory: options?.workingDirectory,
         signal: abortControllerRef.current?.signal, // Pass abort signal
         streamId, // Pass unique stream ID for this chat
+        // New SDK 0.1.54+ features
+        outputFormat: options?.outputFormat, // Structured outputs (beta)
+        effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
       });
 
       const events: ClaudeEvent[] = [];

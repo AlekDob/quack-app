@@ -2,6 +2,8 @@ import { memo, useState, useEffect, useRef } from 'react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
+import ThinkingBlock from './ThinkingBlock';
+import MessageSettingsBadges from './MessageSettingsBadges';
 import { AgentMentionChip } from './AgentMentionChip';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
@@ -373,6 +375,10 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
               minute: '2-digit'
             })}
           </span>
+          {/* Show settings badges for assistant messages (SDK 0.1.54+) */}
+          {!isUser && message.settings && (
+            <MessageSettingsBadges settings={message.settings} />
+          )}
           {isLastUserMessage && isUser && (
             <div className="sticky-message-actions">
               <button
@@ -412,6 +418,10 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
             </div>
           )}
         </div>
+        {/* Show thinking block if present (SDK 0.1.54+ extended thinking) */}
+        {!isUser && message.thinkingContent && (
+          <ThinkingBlock content={message.thinkingContent} />
+        )}
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">

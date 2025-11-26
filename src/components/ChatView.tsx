@@ -11,6 +11,7 @@ import type {
   ThinkingMode,
   PermissionMode,
 } from '../hooks/useClaudeChat';
+import type { EffortLevel } from '../types';
 import './ChatView.css';
 
 export interface LineChange {
@@ -58,6 +59,8 @@ interface ChatViewProps {
   onThinkingModeChange?: (mode: ThinkingMode) => void;
   permissionMode?: PermissionMode;
   onPermissionModeChange?: (mode: PermissionMode) => void;
+  effort?: EffortLevel;
+  onEffortChange?: (effort: EffortLevel) => void;
   // Streaming control
   onAbortStream?: () => void;
   lastPrompt?: string;
@@ -115,6 +118,8 @@ export default function ChatView({
   onThinkingModeChange,
   permissionMode = 'bypass',
   onPermissionModeChange,
+  effort = 'medium',
+  onEffortChange,
   // Streaming control
   onAbortStream,
   lastPrompt,
@@ -165,6 +170,7 @@ export default function ChatView({
           model,
           thinkingMode,
           permissionMode,
+          effort,
         });
         return;
       } catch (error) {
@@ -179,6 +185,7 @@ export default function ChatView({
       model,
       thinkingMode,
       permissionMode,
+      effort,
     });
   };
 
@@ -385,9 +392,11 @@ export default function ChatView({
             model={model}
             thinkingMode={thinkingMode}
             permissionMode={permissionMode}
+            effort={effort}
             onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku')}
             onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
             onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
+            onEffortChange={(e) => onEffortChange?.(e)}
             disabled={isLoading}
           />
           <TokenUsageIndicator

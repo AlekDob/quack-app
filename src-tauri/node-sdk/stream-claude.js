@@ -39,7 +39,8 @@ const {
   sessionId,
   agents,
   attachments, // Array of file paths for images/attachments
-  outputFormat, // Structured outputs configuration
+  outputFormat, // Structured outputs configuration (beta)
+  effort, // Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
 } = config;
 
 // Emit event via stdout
@@ -252,10 +253,17 @@ async function main() {
       console.error(`[DEBUG] Using ${agents.length} agent(s)`);
     }
 
-    // Add structured outputs if provided
+    // Add structured outputs if provided (beta feature)
     if (outputFormat) {
       options.outputFormat = outputFormat;
       console.error(`[DEBUG] Using structured outputs with schema:`, JSON.stringify(outputFormat, null, 2));
+    }
+
+    // Add effort parameter if provided (SDK 0.1.54+)
+    // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high'
+    if (effort) {
+      options.effort = effort;
+      console.error(`[DEBUG] Using effort level: ${effort}`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
@@ -276,6 +284,22 @@ async function main() {
           console.error(`[DEBUG] Available slash commands:`, event.slash_commands);
         }
       }
+
+      // Log agent/subagent events for debugging
+      if (event.type === 'agent') {
+        console.error(`[DEBUG] 🤖 Subagent event:`, JSON.stringify(event, null, 2));
+      }
+
+      // Log Task tool invocations (subagent delegation)
+      if (event.type === 'assistant' && event.message?.content) {
+        const taskTools = event.message.content.filter(
+          (block) => block.type === 'tool_use' && block.name?.toLowerCase() === 'task'
+        );
+        if (taskTools.length > 0) {
+          console.error(`[DEBUG] 🎯 Task tool invocation detected:`, JSON.stringify(taskTools, null, 2));
+        }
+      }
+
       emitEvent(event);
     }
 

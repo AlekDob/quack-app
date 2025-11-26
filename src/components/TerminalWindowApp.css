@@ -247,6 +247,7 @@
 .terminal-main .xterm {
   height: 100% !important;
   width: 100% !important;
+  padding: 8px !important;
 }
 
 .terminal-main .xterm-viewport {
@@ -255,6 +256,11 @@
 
 .terminal-main .xterm-screen {
   height: 100% !important;
+}
+
+/* Fix for line-height issues with Claude Code and other TUI apps */
+.terminal-main .xterm-rows {
+  line-height: normal !important;
 }
 
 .terminal-empty {

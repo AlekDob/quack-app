@@ -1,7 +1,7 @@
 // TEMPORARY: Commented out to fix build - Claude SDK should run only in backend
 // import { query } from '@anthropic-ai/claude-agent-sdk';
 import { invoke } from '@tauri-apps/api/core';
-import type { ClaudeEvent, MCPServer } from '../types';
+import type { ClaudeEvent, MCPServer, StructuredOutputFormat, EffortLevel } from '../types';
 
 export interface ClaudeSDKOptions {
   model?: 'opus' | 'sonnet' | 'haiku';
@@ -17,6 +17,9 @@ export interface ClaudeSDKOptions {
   signal?: AbortSignal; // AbortSignal to cancel the stream
   timeout?: number; // Timeout in milliseconds (default: 5 minutes)
   streamId?: string; // Unique identifier for this stream (for logging/debugging)
+  // New SDK 0.1.54+ features
+  outputFormat?: StructuredOutputFormat; // Structured outputs (beta) - guarantees JSON schema compliance
+  effort?: EffortLevel; // Effort parameter - controls quality vs speed/cost tradeoff
 }
 
 /**
@@ -466,6 +469,18 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
 
   const eventType = event.type.toLowerCase();
 
+  // Debug: Log all incoming events
+  if (eventType === 'assistant' && event.message?.content) {
+    const toolUses = event.message.content.filter((c: any) => c.type === 'tool_use');
+    if (toolUses.length > 0) {
+      console.log('🔧 [claudeSDK] Assistant event with tool_use:', toolUses.map((t: any) => ({
+        name: t.name,
+        hasInput: !!t.input,
+        subagent_type: t.input?.subagent_type,
+      })));
+    }
+  }
+
   // System event
   if (eventType === 'system') {
     const tools = event.tools || event.availableTools || [];
@@ -545,6 +560,13 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
                   input: block.input,
                 };
               }
+              // Handle thinking blocks (SDK 0.1.54+ extended thinking)
+              if (block.type === 'thinking') {
+                return {
+                  type: 'thinking',
+                  thinking: block.thinking || block.text || '',
+                };
+              }
               return block;
             })
           : [],
@@ -590,6 +612,21 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
         : undefined,
     };
   }
+
+  // Agent event (subagent start/stop) - SDK 0.1.54+
+  if (eventType === 'agent') {
+    console.log('🤖 [Subagent Event] Received agent event:', event);
+    return {
+      type: 'agent',
+      action: event.action || (event.subtype === 'start' ? 'start' : 'stop'),
+      agent_name: event.agent_name || event.agentName || event.name,
+      agent_type: event.agent_type || event.agentType || event.subagent_type,
+      session_id: event.session_id || event.sessionId,
+    };
+  }
+
+  // Log unhandled event types for debugging
+  console.log('⚠️ [SDK Event] Unhandled event type:', eventType, event);
 
   return null;
 }

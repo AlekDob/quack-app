@@ -45,6 +45,20 @@ pub enum ClaudeEvent {
         #[serde(flatten)]
         extra: serde_json::Value,
     },
+    // Agent event (subagent start/stop) - SDK 0.1.54+
+    Agent {
+        action: Option<String>,
+        agent_name: Option<String>,
+        agent_type: Option<String>,
+        session_id: Option<String>,
+        #[serde(flatten)]
+        extra: serde_json::Value,
+    },
+    // Complete event (stream finished)
+    Complete {
+        #[serde(flatten)]
+        extra: serde_json::Value,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,9 +77,14 @@ pub enum ContentBlock {
     },
     #[serde(rename = "tool_use")]
     ToolUse {
-        id: String,
+        #[serde(default)]
+        id: Option<String>, // Made optional for robustness
         name: String,
         input: serde_json::Value,
+    },
+    // Thinking block (SDK 0.1.54+ extended thinking)
+    Thinking {
+        thinking: String,
     },
     #[serde(untagged)]
     Other(serde_json::Value),
@@ -102,8 +121,10 @@ pub struct ClaudeCliRequest {
     pub cwd: Option<String>,
     // ✅ Session ID for conversation continuity (resume support)
     pub session_id: Option<String>,
-    // ✅ Structured outputs support
+    // ✅ Structured outputs support (beta)
     pub output_format: Option<serde_json::Value>,
+    // ✅ Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
+    pub effort: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -746,6 +767,7 @@ pub async fn send_message_via_sdk_streaming(
         attachments,
         session_id, // ✅ Extract session_id for use in session management
         output_format, // ✅ Extract output_format for structured outputs
+        effort, // ✅ Extract effort parameter (SDK 0.1.54+)
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -829,6 +851,13 @@ pub async fn send_message_via_sdk_streaming(
     if let Some(output_fmt) = output_format {
         config["outputFormat"] = output_fmt;
         log::info!("[SDK DEBUG] Adding outputFormat to config for structured outputs");
+    }
+
+    // Add effort parameter if provided (SDK 0.1.54+)
+    // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high'
+    if let Some(effort_level) = effort {
+        config["effort"] = serde_json::Value::String(effort_level.clone());
+        log::info!("[SDK DEBUG] Adding effort parameter to config: {}", effort_level);
     }
 
     let config_str = config.to_string();
@@ -1043,25 +1072,73 @@ pub async fn send_message_via_sdk_streaming(
     // Stream stdout events in real-time (foreground task)
     while let Ok(Some(line)) = stdout_reader.next_line().await {
         // Parse JSON event
-        if let Ok(event) = serde_json::from_str::<ClaudeEvent>(&line) {
-            // Capture and save session ID from system init event
-            if let ClaudeEvent::System { session_id, .. } = &event {
-                log::info!("[SDK] Captured session ID for agent {}: {}", agent_id, session_id);
-                session_state.set_session(agent_id.clone(), session_id.clone());
+        match serde_json::from_str::<ClaudeEvent>(&line) {
+            Ok(event) => {
+                // Log event type for debugging
+                match &event {
+                    ClaudeEvent::System { session_id, .. } => {
+                        log::info!("[SDK] Captured session ID for agent {}: {}", agent_id, session_id);
+                        session_state.set_session(agent_id.clone(), session_id.clone());
+                    }
+                    ClaudeEvent::Assistant { message, .. } => {
+                        // Log content blocks for debugging Task tool detection
+                        log::info!("[SDK] 📝 Assistant event with {} content blocks", message.content.len());
+                        for (idx, block) in message.content.iter().enumerate() {
+                            match block {
+                                ContentBlock::Text { text } => {
+                                    log::info!("[SDK]   Block {}: Text ({}...)", idx, &text[..std::cmp::min(50, text.len())]);
+                                }
+                                ContentBlock::ToolUse { name, input, .. } => {
+                                    // Check for Task tool specifically
+                                    if name.to_lowercase() == "task" {
+                                        log::info!("[SDK]   Block {}: 🎯 Task TOOL_USE - subagent: {:?}", idx, input.get("subagent_type"));
+                                    } else {
+                                        log::info!("[SDK]   Block {}: ToolUse({})", idx, name);
+                                    }
+                                }
+                                ContentBlock::Thinking { thinking } => {
+                                    log::info!("[SDK]   Block {}: Thinking ({}...)", idx, &thinking[..std::cmp::min(50, thinking.len())]);
+                                }
+                                ContentBlock::Other(val) => {
+                                    log::info!("[SDK]   Block {}: Other - type={:?}", idx, val.get("type"));
+                                }
+                            }
+                        }
+                    }
+                    ClaudeEvent::Agent { action, agent_name, agent_type, .. } => {
+                        log::info!("[SDK] 🤖 Agent event: action={:?}, name={:?}, type={:?}",
+                            action, agent_name, agent_type);
+                    }
+                    ClaudeEvent::Complete { .. } => {
+                        log::info!("[SDK] ✅ Stream complete event received");
+                    }
+                    _ => {}
+                }
+
+                // Emit event to frontend immediately
+                let event_name = format!("claude-event:{}", agent_id);
+                let _ = app.emit(&event_name, &event);
+
+                // Check if this is the final result
+                if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = &event {
+                    final_result = Some(ClaudeCliResponse {
+                        result: result.clone(),
+                        session_id: session_id.clone(),
+                        total_cost_usd: *total_cost_usd,
+                        usage: usage.clone(),
+                    });
+                }
             }
-
-            // Emit event to frontend immediately
-            let event_name = format!("claude-event:{}", agent_id);
-            let _ = app.emit(&event_name, &event);
-
-            // Check if this is the final result
-            if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = &event {
-                final_result = Some(ClaudeCliResponse {
-                    result: result.clone(),
-                    session_id: session_id.clone(),
-                    total_cost_usd: *total_cost_usd,
-                    usage: usage.clone(),
-                });
+            Err(e) => {
+                // Try to parse as raw JSON to forward unknown events
+                if let Ok(raw_value) = serde_json::from_str::<serde_json::Value>(&line) {
+                    log::warn!("[SDK] ⚠️ Unknown event type, forwarding raw: {:?}", raw_value.get("type"));
+                    // Emit raw JSON event to frontend
+                    let event_name = format!("claude-event:{}", agent_id);
+                    let _ = app.emit(&event_name, &raw_value);
+                } else {
+                    log::error!("[SDK] ❌ Failed to parse event: {} - Line: {}", e, &line[..std::cmp::min(200, line.len())]);
+                }
             }
         }
     }

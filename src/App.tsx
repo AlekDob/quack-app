@@ -82,6 +82,8 @@ import {
   loadAgentChatsFromStorage,
 } from "./services/agentChatStorage";
 import { getDuckdroidUrl } from "./utils/agentAvatars";
+import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
+import type { DroidMetadata } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
 // import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
 import {
@@ -270,6 +272,9 @@ function AppContent() {
     Record<string, DirectoryEntry[]>
   >({});
   const [explorerRoot, setExplorerRoot] = useState<string | null>(null);
+
+  // Available droids for @mention invocation (loaded from .claude/agents directories)
+  const [availableDroids, setAvailableDroids] = useState<DroidMetadata[]>([]);
   const [loadingExplorer, setLoadingExplorer] = useState(false);
   const [explorerError, setExplorerError] = useState<string | null>(null);
   const [refreshExplorerTrigger, setRefreshExplorerTrigger] = useState(0);
@@ -622,6 +627,26 @@ function AppContent() {
         });
     }
   }, [tauriAvailable]);
+
+  // Load available droids for @mention invocation when working directory changes
+  useEffect(() => {
+    const workingDir = activeTerminal?.cwd || explorerPath;
+    if (!workingDir) {
+      setAvailableDroids([]);
+      return;
+    }
+
+    console.log('[Droids] Loading available droids for:', workingDir);
+    loadAvailableDroids(workingDir)
+      .then((droids) => {
+        console.log('[Droids] Loaded', droids.length, 'droids:', droids.map(d => d.name));
+        setAvailableDroids(droids);
+      })
+      .catch((err) => {
+        console.error('[Droids] Failed to load droids:', err);
+        setAvailableDroids([]);
+      });
+  }, [activeTerminal?.cwd, explorerPath]);
 
   // Update project context when active terminal changes
   useEffect(() => {
@@ -1247,7 +1272,7 @@ function AppContent() {
       return newMap;
     });
 
-    // Create assistant message placeholder
+    // Create assistant message placeholder with settings metadata (SDK 0.1.54+)
     const assistantMessageId = `msg-${Date.now()}-assistant`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
@@ -1257,6 +1282,12 @@ function AppContent() {
       // Timestamp will be updated to Date.now() when first response arrives (see event listener)
       timestamp: 0,
       status: 'streaming',
+      // Store settings used for this message (for UI display)
+      settings: {
+        model: (options?.model || 'sonnet') as 'opus' | 'sonnet' | 'haiku',
+        effort: options?.effort || 'medium',
+        thinkingMode: options?.thinkingMode || 'auto',
+      },
     };
 
     // Clear previous response text for this agent (new conversation turn)
@@ -1309,15 +1340,20 @@ function AppContent() {
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             attachments: attachments.map(a => a.path),
-            agents: activeAgent ? [{
-              name: activeAgent.name,
-              description: activeAgent.description,
-              model: activeAgent.model,
-              filePath: activeAgent.file_path,
-            }] : undefined,
+            // Pass all available droids for @mention invocation
+            // The SDK will recognize @droid-name syntax and delegate to the appropriate agent
+            agents: availableDroids.length > 0 ? availableDroids.map(droid => ({
+              name: droid.id.replace('global-', ''), // Use ID as name for @mention matching
+              description: droid.description,
+              model: 'sonnet', // Default model for droids
+              filePath: droid.path,
+            })) : undefined,
             cwd: workingDir,
             // ✅ CRITICAL FIX: Pass saved session ID to backend for conversation continuity
             sessionId: chatSessionIds.get(activeId),
+            // ✅ New SDK 0.1.54+ features
+            outputFormat: options?.outputFormat, // Structured outputs (beta)
+            effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
           },
         }),
         abortPromise,
@@ -1480,7 +1516,7 @@ function AppContent() {
 
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
     }
-  }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath]);
+  }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids]);
 
   // Abort streaming for specific agent - aborts ALL active streams for this agent
   const abortStreamForAgent = useCallback(() => {
@@ -1965,6 +2001,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         model: 'sonnet',
         thinkingMode: 'auto',
         permissionMode: 'bypass',
+        effort: 'medium', // SDK 0.1.54+ - Default balanced effort
       };
     }
 
@@ -1974,6 +2011,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return {
         ...existing,
         model: normalizeModelName(existing.model),
+        effort: existing.effort || 'medium', // Ensure default if not set
       };
     }
 
@@ -1983,6 +2021,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       model: 'sonnet',
       thinkingMode: 'auto',
       permissionMode: 'bypass',
+      effort: 'medium', // SDK 0.1.54+ - Default balanced effort
     };
 
     setAgentChatSettings((prev) => {
@@ -2004,6 +2043,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         model: 'sonnet',
         thinkingMode: 'auto',
         permissionMode: 'bypass',
+        effort: 'medium', // SDK 0.1.54+ - Default balanced effort
       };
 
       // Auto-switch model based on permission mode if permission mode is being changed
@@ -6602,6 +6642,8 @@ You have access to all Bash tools to execute git commands like:
               onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
               permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
               onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
+              effort={currentSettings.effort || 'medium'}
+              onEffortChange={(effort) => updateAgentSettings({ effort })}
               // Streaming control
               onAbortStream={abortStreamForAgent}
               lastPrompt={getLastPromptForAgent()}

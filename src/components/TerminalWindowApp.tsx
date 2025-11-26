@@ -18,33 +18,9 @@ export function TerminalWindowApp() {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const terminalMainRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to force PTY resize based on container dimensions
-  const forcePtyResize = useCallback(async (terminalId: string) => {
-    const container = terminalMainRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-
-    // Calculate terminal dimensions based on container size
-    // Using standard monospace font metrics: ~9px width, ~17px height per character
-    const charWidth = 9;
-    const charHeight = 17;
-    const cols = Math.floor(rect.width / charWidth);
-    const rows = Math.floor(rect.height / charHeight);
-
-    if (cols > 0 && rows > 0) {
-      try {
-        await invoke('resize_terminal', {
-          id: terminalId,
-          rows: rows,
-          cols: cols,
-        });
-        console.log(`[TerminalWindow] Forced PTY resize to ${rows}x${cols}`);
-      } catch (error) {
-        console.warn('Failed to force PTY resize:', error);
-      }
-    }
+  // Trigger XTerm.js resize which will sync with PTY
+  const triggerResize = useCallback(() => {
+    window.dispatchEvent(new Event('resize'));
   }, []);
 
   // Create new terminal for a project
@@ -78,29 +54,59 @@ export function TerminalWindowApp() {
         return next;
       });
 
-      // STEP 1: Trigger window resize events to let XTerm.js fit
-      const resizeDelays = [50, 100, 200, 350, 500];
-      resizeDelays.forEach(delay => {
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-        }, delay);
-      });
-
-      // STEP 2: Force direct PTY resize after container is stable
-      setTimeout(() => {
-        forcePtyResize(result.id);
-      }, 600);
-
-      // STEP 3: Another resize after everything settles
-      setTimeout(() => {
-        forcePtyResize(result.id);
-        window.dispatchEvent(new Event('resize'));
-      }, 1000);
+      // TerminalView's ResizeObserver will handle the resize automatically
+      // Just trigger one resize after a short delay to ensure DOM is ready
+      setTimeout(triggerResize, 100);
 
     } catch (error) {
       console.error('Failed to create terminal:', error);
     }
-  }, [terminals.length, forcePtyResize]);
+  }, [terminals.length, triggerResize]);
+
+  // Wait for terminal to be fully ready before executing command
+  // Uses a simple but effective approach: wait for container dimensions + multiple resize triggers
+  const waitForTerminalReady = useCallback((timeout: number = 3000): Promise<void> => {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+
+      const waitAndResize = () => {
+        // Timeout safety
+        if (Date.now() - startTime > timeout) {
+          console.log(`[TerminalWindowApp] Terminal ready timeout after ${timeout}ms`);
+          resolve();
+          return;
+        }
+
+        const container = terminalMainRef.current;
+        if (!container) {
+          setTimeout(waitAndResize, 100);
+          return;
+        }
+
+        const rect = container.getBoundingClientRect();
+
+        // Wait until container has valid dimensions
+        if (rect.width > 100 && rect.height > 100) {
+          console.log(`[TerminalWindowApp] Container ready: ${rect.width}x${rect.height}`);
+
+          // Trigger a final resize event and wait for it to propagate
+          triggerResize();
+
+          // Give XTerm time to process the resize
+          setTimeout(() => {
+            triggerResize();
+            setTimeout(resolve, 200);
+          }, 300);
+          return;
+        }
+
+        setTimeout(waitAndResize, 100);
+      };
+
+      // Start waiting after initial delay for DOM to settle
+      setTimeout(waitAndResize, 300);
+    });
+  }, [triggerResize]);
 
   // Create terminal with initial command execution
   const handleCreateTerminalWithCommand = useCallback(async (initialCommand: InitialCommand) => {
@@ -133,43 +139,26 @@ export function TerminalWindowApp() {
         return next;
       });
 
-      // STEP 1: Trigger window resize events to let XTerm.js fit
-      const resizeDelays = [50, 100, 200, 350, 500];
-      resizeDelays.forEach(delay => {
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-        }, delay);
-      });
+      // CRITICAL: Wait for terminal to be fully ready BEFORE executing command
+      // This fixes the empty lines bug in Claude Code
+      console.log(`[TerminalWindowApp] Waiting for terminal to be ready...`);
+      await waitForTerminalReady();
+      console.log(`[TerminalWindowApp] Terminal ready, executing command: ${initialCommand.command}`);
 
-      // STEP 2: Force direct PTY resize after container is stable
-      setTimeout(() => {
-        forcePtyResize(result.id);
-      }, 600);
-
-      // STEP 3: Execute command AFTER PTY is resized
-      setTimeout(async () => {
-        try {
-          await invoke('write_to_terminal', {
-            id: result.id,
-            data: `${initialCommand.command}\n`,
-          });
-
-          // STEP 4: Force another resize AFTER command starts
-          // This ensures Claude Code gets the correct SIGWINCH
-          setTimeout(() => {
-            forcePtyResize(result.id);
-            window.dispatchEvent(new Event('resize'));
-          }, 500);
-
-        } catch (error) {
-          console.error('Failed to execute initial command:', error);
-        }
-      }, 800);
+      // Execute command now that terminal is ready
+      try {
+        await invoke('write_to_terminal', {
+          id: result.id,
+          data: `${initialCommand.command}\n`,
+        });
+      } catch (error) {
+        console.error('Failed to execute initial command:', error);
+      }
 
     } catch (error) {
       console.error('Failed to create terminal with command:', error);
     }
-  }, [terminals.length, forcePtyResize]);
+  }, [terminals.length, waitForTerminalReady]);
 
   // Close terminal
   const handleCloseTerminal = useCallback(async (terminalId: string) => {
@@ -426,7 +415,7 @@ export function TerminalWindowApp() {
             </div>
           ) : (
             <TerminalView
-              activeId={activeTerminalId || ''}
+              activeId={activeTerminalId}
               terminals={terminalInfos}
               onUserInput={() => {}}
               onOutput={() => {}}

@@ -82,6 +82,7 @@ const DEFAULT_AGENT_SETTINGS: AgentChatSettings = {
   model: 'sonnet',
   thinkingMode: 'standard',
   permissionMode: 'act',
+  effort: 'medium', // SDK 0.1.54+ - Default balanced effort
 };
 
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {

@@ -1,12 +1,9 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Laura**, and you're the **Feature Coordinator**.
+Your name is **Agent Mei**, and you're the **Feature Coordinator**.
 
 **Communication Style:** friendly
-
-**Notes:**
-Mi aiuti a implementare nuove feaure e progetti in Quack. Pensando soprattutto all’user experience degli utenti, alla sostenibilità del progetto e mantieni il codice leggeto. Non usi emojii.
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -15,7 +12,7 @@ Mi aiuti a implementare nuove feaure e progetti in Quack. Pensando soprattutto a
 Quack is a multi-agentic Tauri desktop app with integrated terminals, file explorer, Git, AI assistant, voice recording, PIP windows, marketplace, and MCP servers - powered by Claude Agent SDK.
 
 **Tech Stack:** Tauri 2.8.5, React 19.1.1, TypeScript 5.8.3, Rust 1.77.2, xterm.js 5.5.0, Monaco Editor, Vite 7.1.7
-**AI/SDK:** Claude Agent SDK 0.1.14, Anthropic SDK 0.65.0
+**AI/SDK:** Claude Agent SDK 0.1.54, Anthropic SDK 0.71.0
 **Testing:** Vitest 4.0.10 (unit & integration tests)
 **Key Features:** Multi-terminal PTY, File explorer, Git integration, AI streaming, Voice recording, Telegram integration, Plugin system, MCP servers, Documentation Center
 

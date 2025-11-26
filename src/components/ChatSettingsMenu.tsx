@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ThinkingMode, PermissionMode } from '../hooks/useClaudeChat';
+import type { EffortLevel } from '../types';
 import './ChatSettingsMenu.css';
 
 interface ChatSettingsMenuProps {
   model: string;
   thinkingMode: ThinkingMode;
   permissionMode: PermissionMode;
+  effort: EffortLevel;
   onModelChange: (model: string) => void;
   onThinkingModeChange: (mode: ThinkingMode) => void;
   onPermissionModeChange: (mode: PermissionMode) => void;
+  onEffortChange: (effort: EffortLevel) => void;
   disabled?: boolean;
 }
 
@@ -31,13 +34,21 @@ const permissionModeOptions = [
   { value: 'bypass' as PermissionMode, label: '⬢ Bypass · No confirmations' },
 ];
 
+const effortOptions = [
+  { value: 'low' as EffortLevel, label: 'Fast · Quick responses, lower cost', icon: '>' },
+  { value: 'medium' as EffortLevel, label: 'Balanced · Default quality', icon: '>>' },
+  { value: 'high' as EffortLevel, label: 'Quality · Thorough responses', icon: '>>>' },
+];
+
 export default function ChatSettingsMenu({
   model,
   thinkingMode,
   permissionMode,
+  effort,
   onModelChange,
   onThinkingModeChange,
   onPermissionModeChange,
+  onEffortChange,
   disabled,
 }: ChatSettingsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -99,6 +110,20 @@ export default function ChatSettingsMenu({
     return colors[permissionMode] || '#ffffff';
   };
 
+  const getEffortLabel = () => {
+    const option = effortOptions.find(opt => opt.value === effort);
+    return option?.icon ?? '>>';
+  };
+
+  const getEffortColor = () => {
+    const colors: Record<EffortLevel, string> = {
+      low: '#22c55e',     // Green - fast/cheap
+      medium: '#eab308',  // Yellow - balanced
+      high: '#a855f7',    // Purple - quality
+    };
+    return colors[effort] || '#eab308';
+  };
+
   return (
     <div className="chat-settings-menu">
       <button
@@ -116,7 +141,8 @@ export default function ChatSettingsMenu({
         </svg>
         <span className="chat-settings-summary">
           {getModelLabel()} · {getThinkingLabel()} ·
-          <span style={{ color: getPermissionColor(), fontWeight: 600 }}> {getPermissionLabel()}</span>
+          <span style={{ color: getPermissionColor(), fontWeight: 600 }}> {getPermissionLabel()}</span> ·
+          <span style={{ color: getEffortColor(), fontWeight: 600 }}> {getEffortLabel()}</span>
         </span>
       </button>
 
@@ -167,6 +193,23 @@ export default function ChatSettingsMenu({
                 {permissionModeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="chat-settings-section">
+            <label className="chat-settings-label">
+              <span className="chat-settings-label-text">Effort</span>
+              <select
+                value={effort}
+                onChange={(e) => onEffortChange(e.target.value as EffortLevel)}
+                className="chat-settings-select"
+              >
+                {effortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.icon} {option.label}
                   </option>
                 ))}
               </select>

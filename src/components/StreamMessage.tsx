@@ -11,6 +11,7 @@ import {
   ExitPlanModeWidget,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
+import ThinkingBlock from './ThinkingBlock';
 import { TaskAgentAvatar } from './TaskAgentAvatar';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
@@ -111,9 +112,32 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
       return null;
     }
 
+    // Debug: Log all content blocks for this message (expanded)
+    msg.content.forEach((c: any, idx: number) => {
+      console.log(`🔍 [StreamMessage] Content block ${idx}:`, {
+        type: c.type,
+        name: c.name,
+        text: c.text?.substring(0, 50),
+        hasInput: !!c.input,
+        inputKeys: c.input ? Object.keys(c.input) : [],
+        subagent_type: c.input?.subagent_type,
+      });
+    });
+
     return (
       <div className="stream-message assistant-message">
         {msg.content.map((content: any, idx: number) => {
+          // Thinking block content (SDK 0.1.54+ extended thinking)
+          if (content.type === 'thinking' && content.thinking) {
+            return (
+              <ThinkingBlock
+                key={idx}
+                content={content.thinking}
+                defaultExpanded={false}
+              />
+            );
+          }
+
           // Text content
           if (content.type === 'text' && content.text) {
             return (
@@ -141,6 +165,17 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
             const input = content.input;
             const toolId = content.id;
             const toolResult = toolResults.get(toolId);
+
+            // Debug logging for Task tool
+            if (toolName === 'task') {
+              console.log('🎯 [StreamMessage] Task tool detected!', {
+                toolName,
+                hasSubagentType: !!input?.subagent_type,
+                subagentType: input?.subagent_type,
+                description: input?.description,
+                fullInput: input,
+              });
+            }
 
             // Edit tool
             if (toolName === 'edit' && input?.file_path) {

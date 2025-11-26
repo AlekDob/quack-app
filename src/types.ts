@@ -371,6 +371,14 @@ export interface ChatAttachment {
   previewUrl?: string;
 }
 
+// Settings metadata stored with each assistant message for UI display
+export interface MessageSettingsMetadata {
+  model?: 'opus' | 'sonnet' | 'haiku';
+  effort?: EffortLevel;
+  thinkingMode?: string; // 'auto' | 'think' | 'hard' | 'harder' | 'ultra'
+  hasThinkingBlocks?: boolean; // True if response contained thinking blocks
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -383,6 +391,8 @@ export interface ChatMessage {
   attachments?: ChatAttachment[];
   events?: ClaudeEvent[]; // Claude CLI events for streaming visualization
   metadata?: Record<string, unknown>; // Additional metadata for special messages
+  settings?: MessageSettingsMetadata; // Settings used for this message (SDK 0.1.54+)
+  thinkingContent?: string; // Extracted thinking block content for display
 }
 
 export interface ChatSession {
@@ -418,6 +428,29 @@ export interface StreamChunk {
   toolCall?: ChatToolCall;
 }
 
+// Structured Outputs types (Claude API beta feature)
+// Guarantees JSON schema compliance in Claude responses
+export interface StructuredOutputSchema {
+  type: 'object' | 'array' | 'string' | 'number' | 'boolean';
+  properties?: Record<string, StructuredOutputSchema>;
+  items?: StructuredOutputSchema;
+  required?: string[];
+  description?: string;
+  enum?: string[];
+  minimum?: number;
+  maximum?: number;
+  minItems?: number;
+  maxItems?: number;
+}
+
+export interface StructuredOutputFormat {
+  type: 'json_schema';
+  schema: StructuredOutputSchema;
+}
+
+// Effort parameter for controlling response quality vs speed/cost tradeoff
+export type EffortLevel = 'low' | 'medium' | 'high';
+
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
   type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop';
@@ -433,8 +466,9 @@ export interface ClaudeSystemEvent extends ClaudeEventBase {
 }
 
 export interface ClaudeContentBlock {
-  type: 'text' | 'tool_use';
+  type: 'text' | 'tool_use' | 'thinking';
   text?: string;
+  thinking?: string; // Content of thinking block when type is 'thinking'
   id?: string;
   name?: string;
   input?: Record<string, unknown>;
@@ -605,6 +639,7 @@ export interface AgentChatSettings {
   model: string; // Selected model (e.g., 'sonnet', 'opus')
   thinkingMode: string; // Thinking mode setting
   permissionMode: string; // Permission mode ('plan', 'act', 'bypass')
+  effort?: EffortLevel; // SDK 0.1.54+ - Controls quality vs speed/cost tradeoff
 }
 
 // MCP (Model Context Protocol) Server types

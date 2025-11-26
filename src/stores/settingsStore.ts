@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
+import type { EffortLevel } from '../types';
 
 interface ClaudeSettings {
   apiKey: string | null;
@@ -7,6 +8,7 @@ interface ClaudeSettings {
   permissionMode: 'plan' | 'act' | 'bypass';
   maxTokens: number;
   temperature: number;
+  effort: EffortLevel; // SDK 0.1.54+ - Controls quality vs speed/cost tradeoff
 }
 
 interface TerminalSettings {
@@ -40,6 +42,7 @@ interface SettingsState {
   setClaudeApiKey: (key: string | null) => void;
   setClaudeModel: (model: string) => void;
   setClaudePermissionMode: (mode: 'plan' | 'act' | 'bypass') => void;
+  setClaudeEffort: (effort: EffortLevel) => void;
   updateClaudeSettings: (settings: Partial<ClaudeSettings>) => void;
 
   // Actions - Terminal
@@ -81,10 +84,11 @@ const defaultGeneralSettings: GeneralSettings = {
 
 const defaultClaudeSettings: ClaudeSettings = {
   apiKey: null,
-  model: 'claude-3-opus-20240229',
+  model: 'sonnet', // Use friendly names: 'sonnet' | 'opus' | 'haiku' (mapped in claudeSDK.ts)
   permissionMode: 'act',
   maxTokens: 4096,
   temperature: 0.7,
+  effort: 'medium', // SDK 0.1.54+ - Default balanced effort
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -107,6 +111,10 @@ export const useSettingsStore = create<SettingsState>()(
 
         setClaudePermissionMode: (mode) => set((state) => ({
           claude: { ...state.claude, permissionMode: mode },
+        })),
+
+        setClaudeEffort: (effort) => set((state) => ({
+          claude: { ...state.claude, effort },
         })),
 
         updateClaudeSettings: (settings) => set((state) => ({
