@@ -12,6 +12,7 @@ interface StepDroidsProps {
   availableDroids: DroidMetadata[];
   selectedDroids: string[];
   loadingDroids: boolean;
+  missingDroids?: string[]; // Droids saved but not available in current project
   onDroidToggle: (droidId: string) => void;
   onOpenDroidFactory: () => void;
   onBack: () => void;
@@ -22,6 +23,7 @@ export function StepDroids({
   availableDroids,
   selectedDroids,
   loadingDroids,
+  missingDroids = [],
   onDroidToggle,
   onOpenDroidFactory,
   onBack,
@@ -58,6 +60,25 @@ export function StepDroids({
           <strong>Pre-select droids to enable task delegation.</strong> These specialized sub-agents help with complex workflows, but you can always invoke any available droid in chat.
         </p>
       </div>
+
+      {/* Missing Droids Warning */}
+      {missingDroids.length > 0 && (
+        <div className="missing-items-warning">
+          <svg className="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <div className="warning-content">
+            <strong>{missingDroids.length} droid(s) not available in this project:</strong>
+            <ul className="missing-items-list">
+              {missingDroids.map((name, index) => (
+                <li key={index}>{name}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Droids Selector */}
       <div className="config-section">

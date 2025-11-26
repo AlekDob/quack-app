@@ -12,6 +12,7 @@ interface StepSkillsProps {
   availableSkills: SkillMetadata[];
   selectedSkills: string[];
   loadingSkills: boolean;
+  missingSkills?: string[]; // Skills saved but not available in current project
   onSkillToggle: (skillId: string) => void;
   onOpenDroidFactory: () => void;
   onBack: () => void;
@@ -22,6 +23,7 @@ export function StepSkills({
   availableSkills,
   selectedSkills,
   loadingSkills,
+  missingSkills = [],
   onSkillToggle,
   onOpenDroidFactory,
   onBack,
@@ -57,6 +59,25 @@ export function StepSkills({
           <strong>Pre-select skills to guide your agent.</strong> This helps automate common tasks, but you can always invoke any skill directly in chat using <code>/skill-name</code>.
         </p>
       </div>
+
+      {/* Missing Skills Warning */}
+      {missingSkills.length > 0 && (
+        <div className="missing-items-warning">
+          <svg className="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <div className="warning-content">
+            <strong>{missingSkills.length} skill(s) not available in this project:</strong>
+            <ul className="missing-items-list">
+              {missingSkills.map((name, index) => (
+                <li key={index}>{name}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Skills Selector */}
       <div className="config-section">

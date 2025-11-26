@@ -24,6 +24,8 @@ export function StepProjectContext({
   onGitInit,
   onNext,
   onCancel,
+  isUsing = false,
+  onUseConfirm,
 }: StepProjectContextProps) {
   // Branch mode state (existing vs new)
   const [branchMode, setBranchMode] = useState<'existing' | 'new'>('existing');
@@ -222,10 +224,10 @@ export function StepProjectContext({
         <button
           type="button"
           className="primary"
-          onClick={onNext}
+          onClick={isUsing ? onUseConfirm : onNext}
           disabled={!path.trim()}
         >
-          Continue →
+          {isUsing ? 'Use' : 'Continue →'}
         </button>
       </div>
     </>

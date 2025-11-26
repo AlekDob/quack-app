@@ -513,6 +513,10 @@ function AppContent() {
   // 🦆 SESSION PERSISTENCE: Track which agents have already shown the resume message (to prevent duplicates)
   const resumeMessageShownRef = useRef<Set<string>>(new Set());
 
+  // 🦆 RACE CONDITION FIX: Track active event listeners to ensure they're ready before invoke()
+  // This prevents the bug where events are emitted before the listener is set up
+  const activeListenersRef = useRef<Map<string, () => void>>(new Map());
+
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
@@ -903,23 +907,33 @@ function AppContent() {
   useEffect(() => {
     if (!tauriAvailable) return;
 
-    // Track all active listeners (Map of agentId -> unlisten function)
-    const listenersMap = new Map<string, () => void>();
-
     // Get all agent IDs that have chat sessions
     const activeAgentIds = activeAgentIdsKey.split(',').filter(Boolean);
 
-    // console.log('[Multi-Listener] Setting up listeners for agents:', activeAgentIds); // Performance: Disabled logging
+    // Track which listeners we're setting up in THIS effect run
+    const newlyCreatedListeners = new Set<string>();
 
-    // Setup listener for each active agent
+    // Setup listener for each active agent (only if not already active)
     const setupPromises = activeAgentIds.map(async (agentId) => {
+      // 🦆 RACE FIX: Skip if listener already exists (created by ensureListenerReady)
+      if (activeListenersRef.current.has(agentId)) {
+        console.log(`[Multi-Listener] Listener already exists for agent: ${agentId}`);
+        return;
+      }
+
       const eventName = `claude-event:${agentId}`;
 
       try {
         const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
           const claudeEvent = event.payload;
 
-          // console.log(`[Multi-Listener] Event received for agent ${agentId}:`, claudeEvent.type); // Performance: Disabled logging
+          // 🦆 DEBUG: Log received events to verify multi-listener is working
+          const evt = claudeEvent as any;
+          console.log(`🎯 [Multi-Listener] Event received for ${agentId}:`, {
+            type: claudeEvent.type,
+            hasMessage: !!evt.message,
+            contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
+          });
 
           // Update chat session with incoming events
           setChatSessions((prev) => {
@@ -1084,7 +1098,9 @@ function AppContent() {
           }
         });
 
-        listenersMap.set(agentId, unlisten);
+        // 🦆 RACE FIX: Store in shared ref instead of local map
+        activeListenersRef.current.set(agentId, unlisten);
+        newlyCreatedListeners.add(agentId);
         console.log(`[Multi-Listener] Listener registered for agent: ${agentId}`);
       } catch (error) {
         console.error(`[Multi-Listener] Failed to setup listener for ${agentId}:`, error);
@@ -1096,20 +1112,77 @@ function AppContent() {
       console.error('[Multi-Listener] Error setting up listeners:', error);
     });
 
-    // Cleanup ALL listeners when component unmounts or chatSessions change
+    // 🦆 RACE CONDITION FIX: Do NOT remove listeners in cleanup!
+    // The old logic removed listeners based on the CAPTURED activeAgentIdsKey,
+    // which caused a race condition when ensureListenerReady created a listener
+    // for a new agent BEFORE this useEffect re-ran.
+    //
+    // Listeners should persist for the lifetime of the app.
+    // They will be cleaned up only when:
+    // 1. The app unmounts (window closes)
+    // 2. The agent is explicitly removed via removeAgentChat()
     return () => {
-      console.log('[Multi-Listener] Cleaning up listeners for:', Array.from(listenersMap.keys()));
-      listenersMap.forEach((unlisten, agentId) => {
-        try {
-          unlisten();
-          console.log(`[Multi-Listener] Listener removed for agent: ${agentId}`);
-        } catch (error) {
-          console.error(`[Multi-Listener] Error removing listener for ${agentId}:`, error);
-        }
-      });
-      listenersMap.clear();
+      // Only log, don't remove - let listeners persist
+      console.log('[Multi-Listener] Effect cleanup - listeners preserved:',
+        Array.from(activeListenersRef.current.keys())
+      );
     };
   }, [tauriAvailable, activeAgentIdsKey]); // 🦆 RACE FIX: Only re-setup when agent IDs change, not on every message update!
+
+  // 🦆 PRE-WARM LISTENER: Setup listener when agent is selected (before first message)
+  // This reuses the same listener setup logic as multi-listener but triggers on activeId change
+  // instead of waiting for chatSessions to update
+  useEffect(() => {
+    if (!tauriAvailable || !activeId) return;
+
+    // If listener already exists, nothing to do
+    if (activeListenersRef.current.has(activeId)) {
+      console.log(`[Pre-warm] Listener already exists for activeId: ${activeId}`);
+      return;
+    }
+
+    // Setup listener for the active agent NOW (before any message is sent)
+    // Using the same pattern as multi-listener to avoid code duplication
+    const eventName = `claude-event:${activeId}`;
+    console.log(`[Pre-warm] Setting up listener for activeId: ${activeId}`);
+
+    // NOTE: Event handling is duplicated here from multi-listener.
+    // TODO: Refactor to use useClaudeEventListener hook for centralized event handling
+    // For now, we reuse the same event handler pattern.
+
+    listen<ClaudeEvent>(eventName, (event) => {
+      const claudeEvent = event.payload;
+      console.log(`🎯 [Pre-warm] Event received for ${activeId}:`, { type: claudeEvent.type });
+
+      // Update chat sessions - same logic as multi-listener
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(activeId) ?? [];
+        const lastMsg = agentMessages[agentMessages.length - 1];
+
+        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+          const updatedMessages = [...agentMessages];
+          const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
+                                           claudeEvent.message?.content &&
+                                           claudeEvent.message.content.length > 0 &&
+                                           lastMsg.timestamp === 0;
+
+          updatedMessages[updatedMessages.length - 1] = {
+            ...lastMsg,
+            events: [...(lastMsg.events || []), claudeEvent],
+            timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
+          };
+          newSessions.set(activeId, updatedMessages);
+        }
+        return newSessions;
+      });
+    }).then((unlisten) => {
+      activeListenersRef.current.set(activeId, unlisten);
+      console.log(`[Pre-warm] Listener ready for activeId: ${activeId}`);
+    }).catch((error) => {
+      console.error(`[Pre-warm] Failed for ${activeId}:`, error);
+    });
+  }, [tauriAvailable, activeId]);
 
   // 🦆 SESSION PERSISTENCE: Show "Continuing conversation" message when switching to agent with saved session
   useEffect(() => {
@@ -1148,6 +1221,141 @@ function AppContent() {
     console.log(`[Session Persistence] Showed resume message for agent ${activeId} with session ${savedSessionId}`);
   }, [activeId, chatSessionIds]);
 
+  // 🦆 RACE CONDITION FIX: Helper function to ensure listener is ready for an agent
+  // This prevents events being emitted before the listener is set up
+  const ensureListenerReady = useCallback(async (agentId: string) => {
+    // If listener already exists, we're good
+    if (activeListenersRef.current.has(agentId)) {
+      console.log(`[Listener] Already active for agent: ${agentId}`);
+      return;
+    }
+
+    // Set up a new listener for this agent
+    const eventName = `claude-event:${agentId}`;
+    console.log(`[Listener] Setting up listener for agent: ${agentId}`);
+
+    try {
+      const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
+        const claudeEvent = event.payload;
+
+        // 🦆 DEBUG: Log received events to verify listener is working
+        const evt = claudeEvent as any;
+        console.log(`🎯 [ensureListenerReady] Event received for ${agentId}:`, {
+          type: claudeEvent.type,
+          hasMessage: !!evt.message,
+          contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
+        });
+
+        // Update chat session with incoming events
+        setChatSessions((prev) => {
+          const newSessions = new Map(prev);
+          const agentMessages = newSessions.get(agentId) ?? [];
+          const lastMsg = agentMessages[agentMessages.length - 1];
+
+          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+            const updatedMessages = [...agentMessages];
+
+            // Update timestamp when assistant STARTS responding
+            const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
+                                             claudeEvent.message?.content &&
+                                             claudeEvent.message.content.length > 0 &&
+                                             lastMsg.timestamp === 0;
+
+            updatedMessages[updatedMessages.length - 1] = {
+              ...lastMsg,
+              events: [...(lastMsg.events || []), claudeEvent],
+              timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
+            };
+            newSessions.set(agentId, updatedMessages);
+
+            // Extract text content for Telegram notifications
+            if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
+              let textContent = '';
+              claudeEvent.message.content.forEach((content) => {
+                if (content.type === 'text' && content.text) {
+                  textContent += content.text;
+                }
+              });
+
+              if (textContent) {
+                const existingText = lastAgentResponseRef.current.get(agentId) || '';
+                lastAgentResponseRef.current.set(agentId, existingText + textContent);
+              }
+            }
+          }
+
+          return newSessions;
+        });
+
+        // Track tokens from result events
+        if (claudeEvent.type === 'result' && claudeEvent.usage) {
+          const usage = claudeEvent.usage;
+
+          setChatTokensMap((prev) => {
+            const newMap = new Map(prev);
+            const currentTokens = newMap.get(agentId) || {
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheCreationTokens: 0,
+              cacheReadTokens: 0,
+            };
+
+            const updatedTokens = {
+              inputTokens: currentTokens.inputTokens + usage.input_tokens,
+              outputTokens: currentTokens.outputTokens + usage.output_tokens,
+              cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
+              cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+            };
+
+            newMap.set(agentId, updatedTokens);
+            return newMap;
+          });
+        }
+
+        // Handle completion event
+        if (claudeEvent.type === 'result') {
+          // Trigger FileExplorer refresh if files were modified
+          setChatSessions((prev) => {
+            const agentMessages = prev.get(agentId) ?? [];
+            const lastMsg = agentMessages[agentMessages.length - 1];
+
+            if (lastMsg && lastMsg.events) {
+              let hasFileModifications = false;
+
+              lastMsg.events.forEach((evt) => {
+                if (evt.type === 'assistant' && evt.message?.content) {
+                  evt.message.content.forEach((content) => {
+                    if (content.type === 'tool_use') {
+                      const toolName = content.name?.toLowerCase();
+                      const input = content.input as any;
+
+                      if ((toolName === 'write' && input?.file_path) ||
+                          (toolName === 'edit' && input?.file_path)) {
+                        hasFileModifications = true;
+                      }
+                    }
+                  });
+                }
+              });
+
+              if (hasFileModifications) {
+                setRefreshExplorerTrigger(prev => prev + 1);
+              }
+            }
+
+            return prev;
+          });
+        }
+      });
+
+      // Store the unlisten function
+      activeListenersRef.current.set(agentId, unlisten);
+      console.log(`[Listener] Ready for agent: ${agentId}`);
+    } catch (error) {
+      console.error(`[Listener] Failed to setup for ${agentId}:`, error);
+    }
+  }, []);
+
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !activeId) return;
@@ -1156,6 +1364,19 @@ function AppContent() {
     if (!sendMessageForAgentRef.current) {
       sendMessageForAgentRef.current = sendMessageForAgent;
     }
+
+    // 🦆 RACE CONDITION FIX: Ensure listener is ready BEFORE calling invoke
+    // Note: The real fix was removing the cleanup logic that was removing listeners
+    // prematurely. Now listeners persist until the agent is explicitly deleted.
+    await ensureListenerReady(activeId);
+
+    // 🦆 CRITICAL: Wait for Tauri to fully register the listener internally
+    // The listen() promise resolves immediately, but Tauri's internal event routing
+    // may not be ready yet. This delay ensures events don't get lost.
+    // Without this, the first Task event can be emitted before the listener catches it.
+    console.log(`[sendMessage] Listener ready for ${activeId}, waiting for Tauri registration...`);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    console.log(`[sendMessage] Tauri registration delay complete for ${activeId}`);
 
     // Generate unique message ID for this stream
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1524,7 +1745,7 @@ function AppContent() {
 
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
     }
-  }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids]);
+  }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady]);
 
   // Abort streaming for specific agent - aborts ALL active streams for this agent
   const abortStreamForAgent = useCallback(() => {
@@ -3317,14 +3538,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
 
   // Load Quack Agency agents on startup
-  // Load Agents on startup only (not on every terminal switch!)
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
       return;
     }
     void loadAgents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadAgents to prevent re-load on every switch
+  }, [tauriAvailable, hasBootstrapped]); // Initial load on startup
+
+  // 🦆 FIX: Reload agents when project/working directory changes
+  // This ensures @mention dropdown shows correct droids for the current project
+  const currentWorkingDir = activeTerminal?.cwd ?? explorerPath;
+  useEffect(() => {
+    if (!tauriAvailable || !hasBootstrapped || !currentWorkingDir) {
+      return;
+    }
+    console.log('[Agents] Reloading agents for new working directory:', currentWorkingDir);
+    void loadAgents();
+  }, [currentWorkingDir, tauriAvailable, hasBootstrapped, loadAgents]);
 
   // Load Skills on startup only (not on every terminal switch!)
   useEffect(() => {
@@ -6595,6 +6826,19 @@ You have access to all Bash tools to execute git commands like:
             setActiveAgentChatId(chatId);
           }}
           onDeleteAgentChat={(chatId) => {
+            // 🦆 Clean up listener for this agent
+            const unlisten = activeListenersRef.current.get(chatId);
+            if (unlisten) {
+              unlisten();
+              activeListenersRef.current.delete(chatId);
+              console.log(`[onDeleteAgentChat] Cleaned up listener for agent: ${chatId}`);
+            }
+            // Remove from chatSessions map
+            setChatSessions(prev => {
+              const newSessions = new Map(prev);
+              newSessions.delete(chatId);
+              return newSessions;
+            });
             setAgentChats(prev => prev.filter(chat => chat.id !== chatId));
             if (activeAgentChatId === chatId) {
               setActiveAgentChatId(null);

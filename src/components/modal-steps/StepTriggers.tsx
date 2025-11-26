@@ -18,6 +18,7 @@ interface StepTriggersProps {
   onBack: () => void;
   onConfirm: () => void;
   creating: boolean;
+  isEditing?: boolean;
 }
 
 // Helper to detect trigger category from name/description
@@ -89,6 +90,7 @@ export function StepTriggers({
   onBack,
   onConfirm,
   creating,
+  isEditing = false,
 }: StepTriggersProps) {
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
@@ -190,10 +192,10 @@ export function StepTriggers({
             {creating ? (
               <>
                 <span className="spinner"></span>
-                Creating agent...
+                {isEditing ? 'Saving agent...' : 'Creating agent...'}
               </>
             ) : (
-              'Create Agent (No Triggers)'
+              isEditing ? 'Save Agent (No Triggers)' : 'Create Agent (No Triggers)'
             )}
           </button>
         </div>
@@ -357,10 +359,10 @@ export function StepTriggers({
           {creating ? (
             <>
               <span className="spinner"></span>
-              Creating agent...
+              {isEditing ? 'Saving agent...' : 'Creating agent...'}
             </>
           ) : (
-            'Create Agent'
+            isEditing ? 'Save Agent' : 'Create Agent'
           )}
         </button>
       </div>

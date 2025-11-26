@@ -95,6 +95,9 @@ export interface StepProjectContextProps {
   onGitInit: () => Promise<void>;
   onNext: () => void;
   onCancel: () => void;
+  // "Use" flow props
+  isUsing?: boolean;
+  onUseConfirm?: () => void;
 }
 
 // Props for StepAgentBasics
@@ -140,4 +143,5 @@ export interface StepAgentConfigProps {
 export interface StepProgressProps {
   currentStep: ModalStep;
   completedSteps: ModalStep[];
+  isEditing?: boolean; // Hide Step 1 (Project) when editing
 }

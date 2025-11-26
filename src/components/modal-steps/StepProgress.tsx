@@ -13,12 +13,17 @@ const STEPS: Array<{ id: ModalStep; label: string; icon: string }> = [
   { id: 'triggers', label: 'Triggers', icon: '⚡' },
 ];
 
-export function StepProgress({ currentStep, completedSteps }: StepProgressProps) {
-  const currentIndex = STEPS.findIndex(s => s.id === currentStep);
+export function StepProgress({ currentStep, completedSteps, isEditing }: StepProgressProps) {
+  // Filter out Step 1 (context) when editing
+  const stepsToShow = isEditing
+    ? STEPS.filter(s => s.id !== 'context')
+    : STEPS;
+
+  const currentIndex = stepsToShow.findIndex(s => s.id === currentStep);
 
   return (
     <div className="step-progress">
-      {STEPS.map((step, index) => {
+      {stepsToShow.map((step, index) => {
         const isCompleted = completedSteps.includes(step.id);
         const isCurrent = step.id === currentStep;
         const isPending = index > currentIndex;
@@ -37,7 +42,7 @@ export function StepProgress({ currentStep, completedSteps }: StepProgressProps)
               )}
             </div>
             <span className="step-label">{step.label}</span>
-            {index < STEPS.length - 1 && (
+            {index < stepsToShow.length - 1 && (
               <svg className="step-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"></polyline>
               </svg>
