@@ -1,0 +1,3 @@
+[submodule "docs/guide"]
+	path = docs/guide
+	url = https://github.com/AlekDob/quack-docs.git
