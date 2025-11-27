@@ -23,7 +23,7 @@ export default function DocsTabView({ tab, isActive }: DocsTabViewProps) {
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        height: '100%',
       }}
     >
       <DocsViewer initialPath={tab.docsPath} />

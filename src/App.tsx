@@ -347,6 +347,7 @@ function AppContent() {
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(false);
 
   // Tab system state
   const [tabs, setTabs] = useState<Tab[]>([
@@ -6877,7 +6878,7 @@ You have access to all Bash tools to execute git commands like:
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
         <section className="terminal-pane">
           {terminals.length === 0 ? (
-            /* Image background when no agents */
+            /* Empty state when no agents - show image or guide */
             <div
               style={{
                 width: '100%',
@@ -6886,16 +6887,125 @@ You have access to all Bash tools to execute git commands like:
                 overflow: 'hidden',
               }}
             >
-              <img
-                src="/images/quack-agent.jpeg"
-                alt="Quack Agent"
-                style={{
+              {/* Guide Viewer - shown when emptyStateShowGuide is true */}
+              {emptyStateShowGuide ? (
+                <div style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                }}
-              />
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: 'var(--bg-primary, #121216)',
+                }}>
+                  {/* Header with back button */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'rgba(18, 18, 22, 0.95)',
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setEmptyStateShowGuide(false)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 12H5"/>
+                        <path d="M12 19l-7-7 7-7"/>
+                      </svg>
+                      Back
+                    </button>
+                    <span style={{ color: '#f28c52', fontWeight: 600, fontSize: '14px' }}>
+                      Quack Guide
+                    </span>
+                  </div>
+                  {/* Docs content */}
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <DocsTabView
+                      tab={{ id: 'empty-state-docs', type: 'docs', label: 'Guide', closable: false }}
+                      isActive={true}
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Image background when no agents with Open Guide button */
+                <>
+                  <img
+                    src="/images/quack-agent.jpeg"
+                    alt="Quack Agent"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center',
+                    }}
+                  />
+                  {/* Open Guide Button - positioned top right */}
+                  <button
+                    type="button"
+                    onClick={() => setEmptyStateShowGuide(true)}
+                    style={{
+                      position: 'absolute',
+                      top: '24px',
+                      right: '24px',
+                      padding: '12px 24px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      border: '1px solid rgba(242, 140, 82, 0.4)',
+                      background: 'rgba(18, 18, 22, 0.85)',
+                      backdropFilter: 'blur(12px)',
+                      color: '#f28c52',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(242, 140, 82, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.6)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(242, 140, 82, 0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(18, 18, 22, 0.85)';
+                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    </svg>
+                    Open Guide
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             /* Chat area when agents are active */
