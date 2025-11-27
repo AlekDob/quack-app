@@ -287,11 +287,20 @@
 }
 
 .docs-h3 {
-  margin: 0.875rem 0 0.4rem 0;
+  margin: 2rem 0 0.5rem 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.875rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.25;
+}
+
+/* Remove border from first h3 after h2 */
+.docs-h2 + .docs-h3 {
+  margin-top: 1.25rem;
+  padding-top: 0;
+  border-top: none;
 }
 
 .docs-p {
@@ -445,11 +454,12 @@
   line-height: 1.4;
 }
 
-/* Horizontal Rule */
+/* Horizontal Rule - Section Separator */
 .docs-hr {
-  margin: 2rem 0;
+  margin: 3rem 0;
+  padding: 0;
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* Callouts */
