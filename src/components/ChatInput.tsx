@@ -1269,7 +1269,10 @@ export default function ChatInput({
               key={command.name}
               type="button"
               className={`agent-autocomplete-item ${selectedCommandIndex === index ? 'selected' : ''}`}
-              onClick={() => selectCommand(command)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectCommand(command);
+              }}
               onMouseEnter={() => setSelectedCommandIndex(index)}
             >
               <div className="agent-autocomplete-badge command-badge">
@@ -1314,7 +1317,10 @@ export default function ChatInput({
                   key={agent.name}
                   type="button"
                   className={`agent-autocomplete-item ${selectedAgentIndex === index ? 'selected' : ''}`}
-                  onClick={() => selectAgent(agent)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectAgent(agent);
+                  }}
                   onMouseEnter={() => setSelectedAgentIndex(index)}
                 >
                   <div
@@ -1354,7 +1360,10 @@ export default function ChatInput({
                     key={file.path}
                     type="button"
                     className={`agent-autocomplete-item file-item ${selectedAgentIndex === globalIndex ? 'selected' : ''}`}
-                    onClick={() => selectFile(file)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectFile(file);
+                    }}
                     onMouseEnter={() => setSelectedAgentIndex(globalIndex)}
                   >
                     <div className="agent-autocomplete-badge file-badge">

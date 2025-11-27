@@ -451,6 +451,22 @@ export interface StructuredOutputFormat {
 // Effort parameter for controlling response quality vs speed/cost tradeoff
 export type EffortLevel = 'low' | 'medium' | 'high';
 
+// Thinking mode for controlling reasoning depth
+export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
+
+// Mode preset configuration for Bypass/Plan modes
+export interface ModePreset {
+  model: 'opus' | 'sonnet' | 'haiku';
+  thinkingMode: ThinkingMode;
+  effort: EffortLevel;
+}
+
+// Agent mode presets stored in settings
+export interface AgentModePresets {
+  bypass: ModePreset;
+  plan: ModePreset;
+}
+
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
   type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop';

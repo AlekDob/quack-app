@@ -52,6 +52,7 @@ import BrowserManager from "./components/BrowserManager";
 import { useDocsTab } from "./hooks/useDocsTab";
 import DocsTabView from "./views/DocsTabView";
 import { useUIStore } from "./stores/uiStore";
+import { useSettingsStore } from "./stores/settingsStore";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
@@ -2280,16 +2281,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         effort: 'medium', // SDK 0.1.54+ - Default balanced effort
       };
 
-      // Auto-switch model based on permission mode if permission mode is being changed
+      // Auto-switch settings based on permission mode using presets from settings
       let finalUpdates = { ...updates };
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
-        // When switching to plan mode → use opus
-        if (updates.permissionMode === 'plan') {
-          finalUpdates.model = 'opus';
-        }
-        // When switching to bypass mode → use sonnet
-        else if (updates.permissionMode === 'bypass') {
-          finalUpdates.model = 'sonnet';
+        const presets = useSettingsStore.getState().agentModePresets;
+        const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
+        if (preset) {
+          finalUpdates.model = preset.model;
+          finalUpdates.thinkingMode = preset.thinkingMode;
+          finalUpdates.effort = preset.effort;
         }
       }
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { EffortLevel } from '../types';
+import type { EffortLevel, ModePreset, AgentModePresets } from '../types';
 
 interface ClaudeSettings {
   apiKey: string | null;
@@ -37,6 +37,7 @@ interface SettingsState {
   claude: ClaudeSettings;
   terminal: TerminalSettings;
   general: GeneralSettings;
+  agentModePresets: AgentModePresets;
 
   // Actions - Claude
   setClaudeApiKey: (key: string | null) => void;
@@ -59,6 +60,10 @@ interface SettingsState {
   resetAllSettings: () => void;
   exportSettings: () => string;
   importSettings: (json: string) => boolean;
+
+  // Actions - Agent Mode Presets
+  updateModePreset: (mode: 'bypass' | 'plan', preset: Partial<ModePreset>) => void;
+  resetModePresets: () => void;
 }
 
 const defaultTerminalSettings: TerminalSettings = {
@@ -91,6 +96,20 @@ const defaultClaudeSettings: ClaudeSettings = {
   effort: 'medium', // SDK 0.1.54+ - Default balanced effort
 };
 
+// Anthropic recommended defaults for agent modes
+const defaultAgentModePresets: AgentModePresets = {
+  bypass: {
+    model: 'sonnet',
+    thinkingMode: 'auto',
+    effort: 'medium',
+  },
+  plan: {
+    model: 'opus',
+    thinkingMode: 'auto',
+    effort: 'medium',
+  },
+};
+
 export const useSettingsStore = create<SettingsState>()(
   devtools(
     persist(
@@ -99,6 +118,7 @@ export const useSettingsStore = create<SettingsState>()(
         claude: defaultClaudeSettings,
         terminal: defaultTerminalSettings,
         general: defaultGeneralSettings,
+        agentModePresets: defaultAgentModePresets,
 
         // Claude actions
         setClaudeApiKey: (key) => set((state) => ({
@@ -182,6 +202,18 @@ export const useSettingsStore = create<SettingsState>()(
             return false;
           }
         },
+
+        // Agent Mode Presets actions
+        updateModePreset: (mode, preset) => set((state) => ({
+          agentModePresets: {
+            ...state.agentModePresets,
+            [mode]: { ...state.agentModePresets[mode], ...preset },
+          },
+        })),
+
+        resetModePresets: () => set({
+          agentModePresets: defaultAgentModePresets,
+        }),
       }),
       {
         name: 'settings-storage',
@@ -190,6 +222,7 @@ export const useSettingsStore = create<SettingsState>()(
           claude: state.claude,
           terminal: state.terminal,
           general: state.general,
+          agentModePresets: state.agentModePresets,
         }),
       }
     ),

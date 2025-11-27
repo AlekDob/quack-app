@@ -523,6 +523,11 @@ export default function SidePanel({
       icon: icons.folder,
     },
     {
+      id: "commands" as TabId,
+      label: "Commands",
+      icon: icons.commands,
+    },
+    {
       id: "agents" as TabId,
       label: "Droids",
       icon: icons.agents,
@@ -547,11 +552,6 @@ export default function SidePanel({
       icon: icons.hooks,
       badge: hooks.filter(h => h.enabled).length,
       hasContent: hooks.length > 0,
-    },
-    {
-      id: "commands" as TabId,
-      label: "Commands",
-      icon: icons.commands,
     },
     {
       id: "sessions" as TabId,

@@ -3,6 +3,7 @@ import SettingsIcon from './SettingsIcon';
 export type SettingsCategory =
   | 'general'
   | 'ai-assistant'
+  | 'agent-modes'
   | 'license'
   | 'notifications'
   | 'appearance'
@@ -23,6 +24,7 @@ interface SettingsSidebarProps {
 const categories: CategoryItem[] = [
   { id: 'general', label: 'General' },
   { id: 'ai-assistant', label: 'AI Assistant' },
+  { id: 'agent-modes', label: 'Agent Modes' },
   { id: 'license', label: 'License' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'appearance', label: 'Appearance' },
