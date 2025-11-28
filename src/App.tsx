@@ -2231,13 +2231,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   const getCurrentAgentSettings = useCallback((): AgentChatSettings => {
     if (!activeId) {
-      // Default settings when no agent is active
+      // Default settings when no agent is active - use presets from settings
+      const presets = useSettingsStore.getState().agentModePresets;
+      const bypassPreset = presets.bypass;
+
       return {
         inputDraft: '',
-        model: 'sonnet',
-        thinkingMode: 'auto',
+        model: bypassPreset?.model || 'sonnet',
+        thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
-        effort: 'medium', // SDK 0.1.54+ - Default balanced effort
+        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
       };
     }
 
@@ -2251,13 +2254,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       };
     }
 
-    // Initialize default settings for new agent
+    // Initialize default settings for new agent using presets from settings
+    const presets = useSettingsStore.getState().agentModePresets;
+    const bypassPreset = presets.bypass;
+
     const defaultSettings: AgentChatSettings = {
       inputDraft: '',
-      model: 'sonnet',
-      thinkingMode: 'auto',
+      model: bypassPreset?.model || 'sonnet',
+      thinkingMode: bypassPreset?.thinkingMode || 'auto',
       permissionMode: 'bypass',
-      effort: 'medium', // SDK 0.1.54+ - Default balanced effort
+      effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
     };
 
     setAgentChatSettings((prev) => {
@@ -2274,18 +2280,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     setAgentChatSettings((prev) => {
       const newMap = new Map(prev);
+
+      // Get presets for fallback defaults
+      const presets = useSettingsStore.getState().agentModePresets;
+      const bypassPreset = presets.bypass;
+
       const current = newMap.get(activeId) ?? {
         inputDraft: '',
-        model: 'sonnet',
-        thinkingMode: 'auto',
+        model: bypassPreset?.model || 'sonnet',
+        thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
-        effort: 'medium', // SDK 0.1.54+ - Default balanced effort
+        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
       };
 
       // Auto-switch settings based on permission mode using presets from settings
       let finalUpdates = { ...updates };
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
-        const presets = useSettingsStore.getState().agentModePresets;
         const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
         if (preset) {
           finalUpdates.model = preset.model;
