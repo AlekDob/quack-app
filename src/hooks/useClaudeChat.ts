@@ -3,6 +3,14 @@ import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, 
 import { streamClaudeMessage, abortSessionStream } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
 import debugLogger from '../services/debugLogger';
+import {
+  calculateTokenBudget,
+  performSoftReset,
+  downloadConversationExport,
+  shouldBlockMessage,
+  getRecommendedAction,
+  type TokenBudgetStatus,
+} from '../services/conversationRecovery';
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
@@ -17,6 +25,10 @@ export interface ChatSendOptions {
   // New SDK 0.1.54+ features
   outputFormat?: StructuredOutputFormat; // Structured outputs (beta) - guarantees JSON schema compliance
   effort?: EffortLevel; // Effort parameter - controls quality vs speed/cost tradeoff
+  // Token overflow prevention callbacks
+  onTokenWarning?: (status: TokenBudgetStatus) => void; // Called when token usage is high
+  onTokenBlocked?: (reason: string) => void; // Called when message is blocked due to token limit
+  bypassTokenCheck?: boolean; // Skip token check (use with caution)
 }
 
 export interface UseClaudeChatOptions {
@@ -67,11 +79,55 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     return true;
   }, []);
 
+  // Get current token budget status
+  const getTokenBudgetStatus = useCallback((model: 'opus' | 'sonnet' | 'haiku' = 'opus'): TokenBudgetStatus => {
+    return calculateTokenBudget(
+      sessionTokens.inputTokens,
+      sessionTokens.outputTokens,
+      model
+    );
+  }, [sessionTokens]);
+
   // Send message to Claude using the SDK with streaming
   const sendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
 
-    // CRITICAL: Check if conversation is getting too long (warn at ~20 messages)
+    const model = options?.model || 'sonnet';
+
+    // 🛡️ TOKEN OVERFLOW PREVENTION
+    // Check token budget BEFORE sending the message
+    if (!options?.bypassTokenCheck) {
+      const tokenStatus = calculateTokenBudget(
+        sessionTokens.inputTokens,
+        sessionTokens.outputTokens,
+        model
+      );
+
+      console.log(`[useClaudeChat] Token budget check: ${tokenStatus.percentage.toFixed(1)}% used (${tokenStatus.level})`);
+
+      // BLOCK: Token limit exceeded - cannot send
+      if (!tokenStatus.canSendMessage) {
+        console.error('[useClaudeChat] ❌ MESSAGE BLOCKED - Token limit exceeded!');
+        setError(tokenStatus.message);
+
+        if (options?.onTokenBlocked) {
+          options.onTokenBlocked(tokenStatus.message);
+        }
+
+        return; // Don't send the message
+      }
+
+      // WARNING: High token usage - notify but allow
+      if (tokenStatus.level === 'critical' || tokenStatus.level === 'danger') {
+        console.warn(`[useClaudeChat] ⚠️ High token usage: ${tokenStatus.percentage.toFixed(1)}%`);
+
+        if (options?.onTokenWarning) {
+          options.onTokenWarning(tokenStatus);
+        }
+      }
+    }
+
+    // Legacy check (kept for backwards compatibility)
     if (messages.length > 20) {
       console.warn('[useClaudeChat] ⚠️ Conversation is getting long. Consider using /compact or clearing conversation.');
     }
@@ -497,6 +553,46 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     console.log('[useClaudeChat] Historical messages loaded successfully');
   }, []);
 
+  // 🛡️ RECOVERY: Perform local soft reset (when SDK /compact fails)
+  const localSoftReset = useCallback((keepCount: number = 10) => {
+    console.log('[useClaudeChat] Performing local soft reset, keeping last', keepCount, 'messages');
+
+    const newMessages = performSoftReset(messages, keepCount);
+    setMessages(newMessages);
+
+    // Reset token count (will be recalculated on next message)
+    // Note: This is an approximation - actual tokens will be re-counted by SDK
+    setSessionTokens({
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+    });
+
+    console.log('[useClaudeChat] Local soft reset complete. Messages:', newMessages.length);
+  }, [messages]);
+
+  // 🛡️ RECOVERY: Export conversation before clearing
+  const exportConversation = useCallback((filename?: string) => {
+    console.log('[useClaudeChat] Exporting conversation...');
+
+    downloadConversationExport(messages, filename, {
+      sessionId: claudeSessionId.current,
+      model: 'opus', // TODO: Get from context
+    });
+
+    console.log('[useClaudeChat] Conversation exported');
+  }, [messages]);
+
+  // 🛡️ RECOVERY: Get recommended action based on current token usage
+  const getRecoveryRecommendation = useCallback((model: 'opus' | 'sonnet' | 'haiku' = 'opus') => {
+    return getRecommendedAction(
+      sessionTokens.inputTokens,
+      sessionTokens.outputTokens,
+      model
+    );
+  }, [sessionTokens]);
+
   return {
     messages,
     isLoading,
@@ -512,5 +608,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     loadHistoricalMessages,
     saveMessagesToStorage,
     sessionId: claudeSessionId.current, // Expose current session ID for persistence
+    // 🛡️ Token overflow prevention
+    getTokenBudgetStatus,
+    localSoftReset,
+    exportConversation,
+    getRecoveryRecommendation,
   };
 }

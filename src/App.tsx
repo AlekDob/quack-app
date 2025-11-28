@@ -536,6 +536,51 @@ function AppContent() {
   // Session ID tracking per agent - for resuming sessions in terminal
   const [chatSessionIds, setChatSessionIds] = useState<Map<string, string>>(new Map());
 
+  // 🦆 STAMINA FIX: Centralized token tracking helper to avoid code duplication
+  // This function is called from all event listeners (Multi-Listener, Pre-warm, ensureListenerReady)
+  const handleTokenUpdate = useCallback((agentId: string, usage: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }) => {
+    setChatTokensMap((prev) => {
+      const newMap = new Map(prev);
+      const currentTokens = newMap.get(agentId) || {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+      };
+
+      const updatedTokens = {
+        inputTokens: currentTokens.inputTokens + usage.input_tokens,
+        outputTokens: currentTokens.outputTokens + usage.output_tokens,
+        cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
+        cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+      };
+
+      newMap.set(agentId, updatedTokens);
+
+      const total = updatedTokens.inputTokens + updatedTokens.outputTokens +
+                   updatedTokens.cacheCreationTokens + updatedTokens.cacheReadTokens;
+      console.log(`[Token Tracking] 🦆 Accumulated tokens for agent ${agentId}: ${total} total`, updatedTokens);
+
+      // 🦆 STAMINA PRESERVATION: Update agentChats with new token counts for persistence
+      setAgentChats((prevChats) => {
+        return prevChats.map((agent) => {
+          if (agent.id === agentId) {
+            return {
+              ...agent,
+              inputTokens: updatedTokens.inputTokens,
+              outputTokens: updatedTokens.outputTokens,
+              cacheCreationTokens: updatedTokens.cacheCreationTokens,
+              cacheReadTokens: updatedTokens.cacheReadTokens,
+            };
+          }
+          return agent;
+        });
+      });
+
+      return newMap;
+    });
+  }, []);
+
   // Track usage from Claude Agent SDK response
   const trackUsage = useCallback((
     agentId: string,
@@ -982,55 +1027,12 @@ function AppContent() {
             return newSessions;
           });
 
-          // Track tokens from result events - ACCUMULATE each turn's usage
+          // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
           // Note: result.usage contains tokens for the SINGLE turn, not cumulative session total
-          // We must manually accumulate across all turns to get total session usage
+          // The helper function accumulates across all turns to get total session usage
           if (claudeEvent.type === 'result' && claudeEvent.usage) {
-            const usage = claudeEvent.usage;
-
-            // TEMPORARILY DISABLED: Max Plan tracking
-            // incrementMessageCount();
-
-            setChatTokensMap((prev) => {
-              const newMap = new Map(prev);
-              const currentTokens = newMap.get(agentId) || {
-                inputTokens: 0,
-                outputTokens: 0,
-                cacheCreationTokens: 0,
-                cacheReadTokens: 0,
-              };
-
-              const updatedTokens = {
-                inputTokens: currentTokens.inputTokens + usage.input_tokens,
-                outputTokens: currentTokens.outputTokens + usage.output_tokens,
-                cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
-                cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
-              };
-
-              newMap.set(agentId, updatedTokens);
-
-              const total = updatedTokens.inputTokens + updatedTokens.outputTokens +
-                           updatedTokens.cacheCreationTokens + updatedTokens.cacheReadTokens;
-              console.log(`[Token Tracking] Accumulated tokens for agent ${agentId}: ${total} total`, updatedTokens);
-
-              // 🦆 STAMINA PRESERVATION: Update agentChats with new token counts
-              setAgentChats((prev) => {
-                return prev.map((agent) => {
-                  if (agent.id === agentId) {
-                    return {
-                      ...agent,
-                      inputTokens: updatedTokens.inputTokens,
-                      outputTokens: updatedTokens.outputTokens,
-                      cacheCreationTokens: updatedTokens.cacheCreationTokens,
-                      cacheReadTokens: updatedTokens.cacheReadTokens,
-                    };
-                  }
-                  return agent;
-                });
-              });
-
-              return newMap;
-            });
+            console.log(`[Multi-Listener] 🦆 Token update for ${agentId}:`, claudeEvent.usage);
+            handleTokenUpdate(agentId, claudeEvent.usage);
           }
 
           // Auto-refresh FileExplorer when files are created/modified
@@ -1178,6 +1180,12 @@ function AppContent() {
         }
         return newSessions;
       });
+
+      // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
+      if (claudeEvent.type === 'result' && claudeEvent.usage) {
+        console.log(`[Pre-warm] 🦆 Token update for ${activeId}:`, claudeEvent.usage);
+        handleTokenUpdate(activeId, claudeEvent.usage);
+      }
     }).then((unlisten) => {
       activeListenersRef.current.set(activeId, unlisten);
       console.log(`[Pre-warm] Listener ready for activeId: ${activeId}`);
@@ -1289,29 +1297,10 @@ function AppContent() {
           return newSessions;
         });
 
-        // Track tokens from result events
+        // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
         if (claudeEvent.type === 'result' && claudeEvent.usage) {
-          const usage = claudeEvent.usage;
-
-          setChatTokensMap((prev) => {
-            const newMap = new Map(prev);
-            const currentTokens = newMap.get(agentId) || {
-              inputTokens: 0,
-              outputTokens: 0,
-              cacheCreationTokens: 0,
-              cacheReadTokens: 0,
-            };
-
-            const updatedTokens = {
-              inputTokens: currentTokens.inputTokens + usage.input_tokens,
-              outputTokens: currentTokens.outputTokens + usage.output_tokens,
-              cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
-              cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
-            };
-
-            newMap.set(agentId, updatedTokens);
-            return newMap;
-          });
+          console.log(`[ensureListenerReady] 🦆 Token update for ${agentId}:`, claudeEvent.usage);
+          handleTokenUpdate(agentId, claudeEvent.usage);
         }
 
         // Handle completion event

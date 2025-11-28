@@ -1,0 +1,209 @@
+/**
+ * TokenWarningBanner Styles
+ *
+ * Progressive warning banner for token usage
+ */
+
+.token-warning-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  animation: slideIn 0.3s ease-out;
+  gap: 16px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Warning levels */
+.token-warning-banner.info {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.token-warning-banner.warning {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.token-warning-banner.danger {
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+}
+
+.token-warning-banner.critical {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  animation: slideIn 0.3s ease-out, pulse 2s infinite;
+}
+
+.token-warning-banner.blocked {
+  background: rgba(239, 68, 68, 0.25);
+  border: 2px solid rgba(239, 68, 68, 0.7);
+}
+
+.token-warning-banner.recovery {
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+/* Content area */
+.token-warning-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.token-warning-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.token-warning-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.token-warning-text strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.9rem;
+}
+
+.token-warning-text p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.token-usage-detail {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+/* Action buttons */
+.token-warning-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.token-action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Button variants */
+.token-action-btn.compact {
+  background: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.token-action-btn.compact:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+.token-action-btn.compact.primary {
+  background: #3b82f6;
+  color: white;
+  border: none;
+}
+
+.token-action-btn.compact.primary:hover {
+  background: #2563eb;
+}
+
+.token-action-btn.clear {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.token-action-btn.clear:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
+
+.token-action-btn.clear.primary {
+  background: #ef4444;
+  color: white;
+  border: none;
+}
+
+.token-action-btn.clear.primary:hover {
+  background: #dc2626;
+}
+
+.token-action-btn.export {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.token-action-btn.export:hover {
+  background: rgba(16, 185, 129, 0.4);
+}
+
+.token-action-btn.local-reset {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.token-action-btn.local-reset:hover {
+  background: rgba(139, 92, 246, 0.4);
+}
+
+.token-action-btn.dismiss {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.token-action-btn.dismiss:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .token-warning-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .token-warning-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+}

@@ -207,6 +207,52 @@
   transform: translateY(-1px);
 }
 
+/* Export button */
+.token-action-btn.export {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.token-action-btn.export:hover {
+  background: rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Soft Reset button */
+.token-action-btn.soft-reset {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.token-action-btn.soft-reset:hover {
+  background: rgba(139, 92, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Recovery mode suggestion styling */
+.token-suggestion.recovery {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.4);
+  animation: pulseRecovery 2s infinite;
+}
+
+@keyframes pulseRecovery {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0);
+  }
+}
+
+/* Blocked state styling */
+.token-suggestion.blocked {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 .token-info {
   display: flex;
   gap: 8px;
@@ -725,4 +771,53 @@
 .context-summary-row.free .context-summary-value {
   color: rgba(255, 255, 255, 0.7);
   text-shadow: none;
+}
+
+/* ============================================ */
+/* CONTEXT BREAKDOWN CACHE STYLES */
+/* ============================================ */
+
+/* Indicator for real cache data */
+.context-breakdown-source {
+  color: #4dd4b3;
+  font-weight: 700;
+  margin-left: 4px;
+  font-size: 14px;
+}
+
+/* Cache stats section */
+.context-breakdown-cache {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(77, 212, 179, 0.2);
+}
+
+.context-breakdown-row.cache-row {
+  opacity: 0.7;
+}
+
+.context-breakdown-row.cache-row .context-breakdown-label {
+  font-size: 11px;
+  color: rgba(77, 212, 179, 0.8);
+}
+
+.context-breakdown-row.cache-row .context-breakdown-value {
+  font-size: 12px;
+  color: rgba(77, 212, 179, 0.9);
+}
+
+/* Note about data source */
+.context-breakdown-note {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.context-breakdown-note.success {
+  color: rgba(77, 212, 179, 0.8);
+  background: rgba(77, 212, 179, 0.05);
 }

@@ -24,6 +24,10 @@ interface TokenUsageModalProps {
   maxPlanStats?: MaxPlanStats;
   // Model name (optional)
   model?: string;
+  // Recovery options (for when compact fails)
+  onExport?: () => void;
+  onLocalReset?: () => void;
+  compactFailed?: boolean;
 }
 
 // Format tokens as K (e.g., 55500 -> "55.5k")
@@ -34,36 +38,84 @@ const formatTokensK = (tokens: number): string => {
   return tokens.toString();
 };
 
-// Breakdown calculation with fixed proportions
+// Breakdown calculation using REAL cache data from SDK
+// cache_creation_input_tokens = overhead created at first message (system + MCP + memory)
+// cache_read_input_tokens = overhead read from cache on subsequent messages
 interface ContextBreakdown {
-  messages: number;
-  contextItems: number;
-  mcpTools: number;
-  memory: number;
-  system: number;
+  messages: number;        // Actual message tokens (input + output - cached overhead)
+  overhead: number;        // Real overhead from cache (system + MCP + memory)
+  overheadSource: 'cache' | 'estimated';  // Whether overhead is from real cache data
 }
 
-const calculateBreakdown = (inputTokens: number): ContextBreakdown => {
-  // Fixed values based on typical usage
-  const SYSTEM_TOKENS = 17900;
-  const MEMORY_TOKENS = 5900;
-  const MCP_TOOLS_BASE = 2700;
+// Estimated overhead costs (fallback when no cache data available)
+// These are used only before the first message establishes the cache
+const ESTIMATED_OVERHEAD = {
+  system: 17900,   // System prompt, CLAUDE.md, instructions
+  memory: 5900,    // Memory MCP context
+  mcpTools: 2700,  // MCP tool definitions
+  get total() { return this.system + this.memory + this.mcpTools; }
+};
 
-  // Dynamic tokens = input - fixed overhead
-  const fixedOverhead = SYSTEM_TOKENS + MEMORY_TOKENS + MCP_TOOLS_BASE;
-  const dynamicTokens = Math.max(0, inputTokens - fixedOverhead);
+/**
+ * Calculate context breakdown using real cache data from SDK
+ *
+ * The SDK reports:
+ * - cache_creation_input_tokens: tokens used to CREATE cache (first message) - this IS the overhead
+ * - cache_read_input_tokens: tokens READ from cache (subsequent messages) - confirms cached overhead
+ *
+ * Logic:
+ * 1. If we have cacheCreationTokens > 0: overhead = cacheCreationTokens (real data!)
+ * 2. If we have cacheReadTokens > 0 but no creation: overhead = cacheReadTokens (real data!)
+ * 3. Fallback: use estimated overhead values
+ */
+const calculateBreakdown = (
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreationTokens: number,
+  cacheReadTokens: number
+): ContextBreakdown => {
+  // Determine real overhead from cache data
+  // Priority: cacheCreationTokens > cacheReadTokens > estimated
+  let overhead: number;
+  let overheadSource: 'cache' | 'estimated';
 
-  // Split dynamic: 60% messages, 40% context items
-  const messagesTokens = Math.round(dynamicTokens * 0.6);
-  const contextItemsTokens = Math.round(dynamicTokens * 0.4);
+  if (cacheCreationTokens > 0) {
+    // Best case: we have real cache creation data
+    overhead = cacheCreationTokens;
+    overheadSource = 'cache';
+  } else if (cacheReadTokens > 0) {
+    // Second best: we have cache read data (from resumed session)
+    overhead = cacheReadTokens;
+    overheadSource = 'cache';
+  } else {
+    // Fallback: no cache data yet, use estimates
+    overhead = ESTIMATED_OVERHEAD.total;
+    overheadSource = 'estimated';
+  }
+
+  // Messages = actual user input/output tokens
+  // Note: inputTokens from SDK already EXCLUDES cached overhead when cache is active
+  const messagesTokens = inputTokens + outputTokens;
 
   return {
     messages: messagesTokens,
-    contextItems: contextItemsTokens,
-    mcpTools: MCP_TOOLS_BASE,
-    memory: MEMORY_TOKENS,
-    system: SYSTEM_TOKENS,
+    overhead,
+    overheadSource,
   };
+};
+
+/**
+ * Calculate total context usage including overhead
+ * This is what actually counts against the 200k limit
+ */
+const calculateTotalContextUsage = (
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreationTokens: number,
+  cacheReadTokens: number
+): number => {
+  const breakdown = calculateBreakdown(inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens);
+  return breakdown.messages + breakdown.overhead;
 };
 
 export default function TokenUsageModal({
@@ -80,21 +132,42 @@ export default function TokenUsageModal({
   onShowAnalytics,
   maxPlanStats,
   model = 'Opus 4.5',
+  onExport,
+  onLocalReset,
+  compactFailed = false,
 }: TokenUsageModalProps) {
-  const totalTokens = inputTokens + outputTokens;
-  const remainingTokens = maxTokens - totalTokens;
+  // Calculate context breakdown using REAL cache data from SDK
+  const breakdown = calculateBreakdown(inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens);
+
+  // Total context usage = messages + overhead (from real cache data or estimated)
+  const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens);
+
+  // Remaining tokens = max - total context usage
+  const remainingTokens = Math.max(0, maxTokens - totalContextUsage);
 
   // INVERTED: Stamina percentage (100% = fresh, 0% = exhausted)
   const staminaPercentage = Math.max(0, 100 - percentage);
-
-  // Calculate context breakdown
-  const breakdown = calculateBreakdown(inputTokens);
 
   const formatTokens = (tokens: number) => {
     return tokens.toLocaleString();
   };
 
   const getSuggestion = () => {
+    // Recovery mode: compact failed
+    if (compactFailed) {
+      return {
+        title: '🔧 Recovery Mode',
+        message: 'Compact failed because the conversation is too long. Use recovery options below.',
+        action: 'recovery',
+      };
+    }
+    if (percentage >= 100) {
+      return {
+        title: '🚫 Blocked: Token Limit Exceeded',
+        message: 'Cannot send new messages. Export your conversation, then clear to continue.',
+        action: 'blocked',
+      };
+    }
     if (percentage >= 90) {
       return {
         title: '🚨 Critical: Action Required',
@@ -176,7 +249,7 @@ export default function TokenUsageModal({
                 </div>
                 <div className="context-usage-stats">
                   <span className="context-usage-percentage">{Math.round(percentage)}%</span>
-                  <span className="context-usage-tokens">{formatTokensK(inputTokens)} / {formatTokensK(maxTokens)}</span>
+                  <span className="context-usage-tokens">{formatTokensK(totalContextUsage)} / {formatTokensK(maxTokens)}</span>
                 </div>
               </div>
             </div>
@@ -190,22 +263,42 @@ export default function TokenUsageModal({
                   <span className="context-breakdown-value">{formatTokensK(breakdown.messages)}</span>
                 </div>
                 <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">Context Items</span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.contextItems)}</span>
+                  <span className="context-breakdown-label">
+                    Overhead
+                    {breakdown.overheadSource === 'cache' && (
+                      <span className="context-breakdown-source" title="Real data from SDK cache">*</span>
+                    )}
+                  </span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.overhead)}</span>
                 </div>
-                <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">MCP Tools</span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.mcpTools)}</span>
-                </div>
-                <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">Memory</span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.memory)}</span>
-                </div>
-                <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">System</span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.system)}</span>
-                </div>
+                {/* Show cache stats if available */}
+                {(cacheCreationTokens > 0 || cacheReadTokens > 0) && (
+                  <div className="context-breakdown-cache">
+                    {cacheCreationTokens > 0 && (
+                      <div className="context-breakdown-row cache-row">
+                        <span className="context-breakdown-label">Cache Created</span>
+                        <span className="context-breakdown-value">{formatTokensK(cacheCreationTokens)}</span>
+                      </div>
+                    )}
+                    {cacheReadTokens > 0 && (
+                      <div className="context-breakdown-row cache-row">
+                        <span className="context-breakdown-label">Cache Read</span>
+                        <span className="context-breakdown-value">{formatTokensK(cacheReadTokens)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+              {breakdown.overheadSource === 'estimated' && (
+                <div className="context-breakdown-note">
+                  * Overhead estimated - send a message to get real data
+                </div>
+              )}
+              {breakdown.overheadSource === 'cache' && (
+                <div className="context-breakdown-note success">
+                  * Overhead from real SDK cache data
+                </div>
+              )}
             </div>
           </div>
 
@@ -213,7 +306,7 @@ export default function TokenUsageModal({
           <div className="context-summary">
             <div className="context-summary-row">
               <span className="context-summary-label">TOTAL</span>
-              <span className="context-summary-value">{formatTokensK(inputTokens)}</span>
+              <span className="context-summary-value">{formatTokensK(totalContextUsage)}</span>
             </div>
             <div className="context-summary-row free">
               <span className="context-summary-label">FREE</span>
@@ -312,11 +405,40 @@ export default function TokenUsageModal({
           )}
 
           {/* Suggestion Card */}
-          <div className={`token-suggestion ${status.level}`}>
+          <div className={`token-suggestion ${status.level} ${compactFailed ? 'recovery' : ''}`}>
             <div className="token-suggestion-title">{suggestion.title}</div>
             <div className="token-suggestion-message">{suggestion.message}</div>
             {suggestion.action && (
               <div className="token-suggestion-actions">
+                {/* Recovery mode actions */}
+                {(suggestion.action === 'recovery' || suggestion.action === 'blocked') && (
+                  <>
+                    {onExport && (
+                      <button className="token-action-btn export" onClick={() => {
+                        onExport();
+                      }}>
+                        Export
+                      </button>
+                    )}
+                    {onLocalReset && suggestion.action === 'recovery' && (
+                      <button className="token-action-btn soft-reset" onClick={() => {
+                        onLocalReset();
+                        onClose();
+                      }}>
+                        Soft Reset
+                      </button>
+                    )}
+                    {onClear && (
+                      <button className="token-action-btn danger" onClick={() => {
+                        onClear();
+                        onClose();
+                      }}>
+                        Clear All
+                      </button>
+                    )}
+                  </>
+                )}
+                {/* Standard actions */}
                 {suggestion.action === 'compact' && onCompact && (
                   <button className="token-action-btn primary" onClick={() => {
                     onCompact();

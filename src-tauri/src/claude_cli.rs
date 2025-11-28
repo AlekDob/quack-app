@@ -125,6 +125,8 @@ pub struct ClaudeCliRequest {
     pub output_format: Option<serde_json::Value>,
     // ✅ Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
     pub effort: Option<String>,
+    // ✅ Setting sources control (to prevent "Prompt is too long" errors)
+    pub setting_sources: Option<Vec<String>>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -768,6 +770,7 @@ pub async fn send_message_via_sdk_streaming(
         session_id, // ✅ Extract session_id for use in session management
         output_format, // ✅ Extract output_format for structured outputs
         effort, // ✅ Extract effort parameter (SDK 0.1.54+)
+        setting_sources, // ✅ Extract setting_sources to control prompt length
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -858,6 +861,19 @@ pub async fn send_message_via_sdk_streaming(
     if let Some(effort_level) = effort {
         config["effort"] = serde_json::Value::String(effort_level.clone());
         log::info!("[SDK DEBUG] Adding effort parameter to config: {}", effort_level);
+    }
+
+    // Add settingSources if provided (to control prompt length)
+    // Default (if not provided): ['project'] only
+    // To disable all automatic loading: pass empty array []
+    // Full context: ['project', 'user', 'local']
+    if let Some(sources) = setting_sources {
+        config["settingSources"] = serde_json::Value::Array(
+            sources.iter().map(|s| serde_json::Value::String(s.clone())).collect()
+        );
+        log::info!("[SDK DEBUG] Adding settingSources to config: {:?}", sources);
+    } else {
+        log::info!("[SDK DEBUG] Using default settingSources: ['project']");
     }
 
     let config_str = config.to_string();

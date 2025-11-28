@@ -53,14 +53,28 @@ function TokenUsageIndicator({
   const clearHistory = () => {};
   const exportHistory = () => '';
 
-  // Calculate totals
-  const totalTokens = inputTokens + outputTokens;
+  // Calculate overhead using REAL cache data from SDK
+  // Priority: cacheCreationTokens > cacheReadTokens > estimated
+  const ESTIMATED_OVERHEAD = 26500; // Fallback: system (17.9k) + memory (5.9k) + mcpTools (2.7k)
 
-  // Progressive multiplier: starts at 1x, gradually increases to 2x as tokens are consumed
-  // This makes stamina drain faster as you use more tokens (more realistic)
-  const multiplier = 1 + (totalTokens / maxTokens); // 1x → 2x progression
-  const effectiveTokens = totalTokens * multiplier;
-  const usagePercentage = (effectiveTokens / maxTokens) * 100;
+  let overhead: number;
+  if (cacheCreationTokens > 0) {
+    // Best case: we have real cache creation data
+    overhead = cacheCreationTokens;
+  } else if (cacheReadTokens > 0) {
+    // Second best: we have cache read data (from resumed session)
+    overhead = cacheReadTokens;
+  } else {
+    // Fallback: no cache data yet, use estimates
+    overhead = ESTIMATED_OVERHEAD;
+  }
+
+  // Total context = messages + overhead (from real cache or estimated)
+  const messageTokens = inputTokens + outputTokens;
+  const totalContextUsage = messageTokens + overhead;
+
+  // Calculate usage percentage based on total context (not just messages)
+  const usagePercentage = (totalContextUsage / maxTokens) * 100;
 
   // INVERTED: Stamina starts at 100% and decreases as tokens are used
   const staminaPercentage = Math.max(0, 100 - usagePercentage);

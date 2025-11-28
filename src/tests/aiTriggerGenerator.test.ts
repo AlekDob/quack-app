@@ -164,7 +164,7 @@ describe('AI Trigger Generator', () => {
     });
 
     it('should handle missing category with default', () => {
-      const options = {
+      const options: { name: string; description: string; category?: string } = {
         name: 'General Helper',
         description: 'Helps with various tasks',
       };
