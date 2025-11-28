@@ -29,7 +29,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://api.anthropic.com https://api.openai.com https://api.telegram.org https://api.github.com https://gumroad.com https://*.gumroad.com ws://localhost:* ws://127.0.0.1:*; media-src 'self' data: blob:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;"
+      "csp": "default-src 'self' ipc: tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https: blob: tauri:; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' ipc: tauri: http://localhost:* http://127.0.0.1:* https://api.anthropic.com https://api.openai.com https://api.telegram.org https://api.github.com https://gumroad.com https://*.gumroad.com https://cdn.jsdelivr.net ws://localhost:* ws://127.0.0.1:*; media-src 'self' data: blob:; worker-src 'self' blob: https://cdn.jsdelivr.net; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
     }
   },
   "plugins": {

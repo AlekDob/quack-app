@@ -1,9 +1,17 @@
 import { useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
-import Editor, { type OnMount } from '@monaco-editor/react';
+import Editor, { type OnMount, loader } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { useMonacoTheme, QUACK_THEME_NAME } from '../hooks/useMonacoTheme';
 import { useMonacoDiff, type LineChange, type DiffInfo } from '../hooks/useMonacoDiff';
 import './CodeEditorMonaco.css';
+
+// Configure Monaco to load from CDN (works in both dev and Tauri production)
+// This avoids issues with local workers in Tauri's tauri:// protocol
+loader.config({
+  paths: {
+    vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.55.0/min/vs'
+  }
+});
 
 export interface SearchOptions {
   caseSensitive: boolean;

@@ -21,6 +21,10 @@ export default defineConfig(({ mode }) => {
   const isTauriDebug = !!process.env.TAURI_DEBUG
 
   return {
+    // CRITICAL: Use relative paths for Tauri production builds
+    // Without this, assets use absolute paths (/assets/) which don't work in tauri://localhost/
+    base: './',
+
     // Fix for Vite 7 crypto.hash error
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
@@ -72,7 +76,9 @@ export default defineConfig(({ mode }) => {
         : ['safari15', 'chrome105'],
 
       // Minification settings
-      minify: isProduction && !isTauriDebug ? 'terser' : false,
+      // IMPORTANT: Use esbuild instead of terser for React 19 compatibility
+      // Terser can incorrectly remove React internals like useLayoutEffect
+      minify: isProduction && !isTauriDebug ? 'esbuild' : false,
 
       // Source maps
       sourcemap: isTauriDebug ? 'inline' : false,
@@ -115,6 +121,12 @@ export default defineConfig(({ mode }) => {
         output: {
           // Manual chunking strategy for optimal code splitting
           manualChunks: (id) => {
+            // Monaco Editor - Large library (~2MB), needs separate chunk to avoid React initialization issues
+            // CRITICAL: Must be checked BEFORE vendor chunk to ensure proper isolation
+            if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
+              return 'monaco-editor';
+            }
+
             // XTerm - Terminal library (~150KB)
             if (id.includes('@xterm/xterm') || id.includes('xterm')) {
               return 'xterm';
@@ -183,6 +195,11 @@ export default defineConfig(({ mode }) => {
               return 'terminal-components';
             }
 
+            // DND Kit - needs to be in same chunk as React
+            if (id.includes('@dnd-kit')) {
+              return 'react-vendor';
+            }
+
             // Everything else from node_modules
             if (id.includes('node_modules')) {
               return 'vendor';
@@ -198,9 +215,11 @@ export default defineConfig(({ mode }) => {
           compact: isProduction,
         },
 
-        // Tree-shaking options
+        // Tree-shaking options - be careful not to remove React internals
         treeshake: isProduction ? {
-          moduleSideEffects: false,
+          // IMPORTANT: Keep moduleSideEffects true for React to work properly
+          // Setting to false was removing useLayoutEffect and other React internals
+          moduleSideEffects: true,
           propertyReadSideEffects: false,
           tryCatchDeoptimization: false,
         } : false,

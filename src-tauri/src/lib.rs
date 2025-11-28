@@ -226,11 +226,19 @@ pub fn run() {
                     .accelerator("Cmd+Shift+I")
                     .build(app)?;
 
+                // DevTools option (for debugging production builds)
+                let open_devtools_id = "open_devtools";
+                let open_devtools = tauri::menu::MenuItemBuilder::with_id(open_devtools_id, "Open DevTools")
+                    .accelerator("Cmd+Option+D")
+                    .build(app)?;
+
                 let quack_menu = SubmenuBuilder::new(app, "Quack")
                     .item(&toggle_perf)
                     .separator()
                     .item(&ai_settings)
                     .item(&watch_intro)
+                    .separator()
+                    .item(&open_devtools)
                     .separator()
                     .quit()
                     .build()?;
@@ -276,6 +284,12 @@ pub fn run() {
                                 log::error!("Failed to emit watch-intro event: {}", e);
                             }
                         });
+                    } else if event.id() == open_devtools_id {
+                        // Open DevTools for debugging
+                        if let Some(window) = app.get_webview_window("main") {
+                            window.open_devtools();
+                            log::info!("DevTools opened");
+                        }
                     }
                 });
             }

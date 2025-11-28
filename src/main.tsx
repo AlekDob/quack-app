@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import './config/monaco-environment' // Configure Monaco workers BEFORE anything else
+// REMOVED: monaco-environment import was causing React initialization issues in production builds
+// Monaco configuration is now handled lazily in CodeEditorMonaco component
 import { initTestModeInterception } from './utils/tauriInvokeWrapper' // Test mode interception
 import './index.css'
 // TEMPORARY: Switch between App.tsx and AppRefactored.tsx for testing
