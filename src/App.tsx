@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
 import { useClaudeCliAvailability } from "./contexts/TestModeContext";
 import { getTestModeStoreName } from "./utils/testModeStorage";
+import { getCurrentVersion } from "./utils/version";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
@@ -203,6 +204,7 @@ function AppContent() {
   const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
   const ducksPatternBackgroundImage = new URL("../images/backgrounds/ducks-pattern.png", import.meta.url).href;
   const duckPattern3BackgroundImage = new URL("../images/backgrounds/duck-pattern3.png", import.meta.url).href;
+  const quackAgentBackgroundImage = new URL("../images/backgrounds/quack-agent.jpeg", import.meta.url).href;
 
   const [tauriAvailable] = useState(
     () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -241,7 +243,7 @@ function AppContent() {
   const { openDocsTab } = useDocsTab();
 
   // Terminal Window manager - opens separate Tauri window for terminals
-  const { openTerminalWindow } = useTerminalWindowManager();
+  const { openTerminalWindow, isOpen: terminalWindowOpen } = useTerminalWindowManager();
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -329,6 +331,12 @@ function AppContent() {
   const [videoEnded, setVideoEnded] = useState(false);
   const [splashFadingOut, setSplashFadingOut] = useState(false);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
+  const [introVersion, setIntroVersion] = useState('');
+
+  // Fetch app version for intro screen
+  useEffect(() => {
+    getCurrentVersion().then(version => setIntroVersion(`v${version}`));
+  }, []);
   const [previewFile, setPreviewFile] = useState<{
     name: string;
     path: string;
@@ -452,7 +460,7 @@ function AppContent() {
   const [claudeCliAvailable, setClaudeCliAvailable] = useState<boolean | null>(null);
   const [claudeAuthBannerExpanded, setClaudeAuthBannerExpanded] = useState(true);
   const [claudeAuthBannerDismissed, setClaudeAuthBannerDismissed] = useState(false);
-  const [currentBackground, setCurrentBackground] = useState("duck.png");
+  const [currentBackground, setCurrentBackground] = useState("quack-agent.jpeg");
 
   // Check Claude CLI availability on mount (with test mode support)
   const claudeCliAvailabilityHook = useClaudeCliAvailability();
@@ -2463,6 +2471,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       introReplayTimeoutRef.current = null;
     }
 
+    // Clear any previous audio ref (no longer using separate MP3, video has its own audio)
     if (introAudioRef.current) {
       introAudioRef.current.pause();
       introAudioRef.current.currentTime = 0;
@@ -2471,23 +2480,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     setIntroReplayActive(true);
 
-    const audio = new Audio(introAudio);
-    audio.volume = 0.5;
-    audio.play().catch((error) => {
-      console.warn("Unable to play intro audio:", error);
-    });
-    introAudioRef.current = audio;
-
+    // Video audio plays directly from the video element (not separate MP3)
+    // The timeout closes the replay overlay after the duration
     introReplayTimeoutRef.current = setTimeout(() => {
       setIntroReplayActive(false);
-      if (introAudioRef.current) {
-        introAudioRef.current.pause();
-        introAudioRef.current.currentTime = 0;
-        introAudioRef.current = null;
-      }
       introReplayTimeoutRef.current = null;
     }, INTRO_REPLAY_DURATION_MS);
-  }, [introAudio]);
+  }, []);
 
   useEffect(() => {
     if (!tauriAvailable) {
@@ -3618,6 +3617,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         'duck.png': duckBackgroundImage,
         'ducks-pattern.png': ducksPatternBackgroundImage,
         'duck-pattern3.png': duckPattern3BackgroundImage,
+        'quack-agent.jpeg': quackAgentBackgroundImage,
       };
 
       const imagePath = imageMap[backgroundName] || `/images/backgrounds/${backgroundName}`;
@@ -6715,86 +6715,163 @@ You have access to all Bash tools to execute git commands like:
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#000',
+        background: '#191B44',
+        overflow: 'hidden',
         zIndex: 9999,
         opacity: splashFadingOut ? 0 : 1,
         transition: 'opacity 0.8s ease-out',
         pointerEvents: splashFadingOut ? 'none' : 'auto',
       }}>
-        {/* Video background */}
-        <video
-          autoPlay
-          muted
-          playsInline
-          onEnded={() => {
-            // When video ends, mark it as ended and start fade out
-            setVideoEnded(true);
-            setSplashFadingOut(true);
-            // After fade animation completes, hide splash completely
-            setTimeout(() => {
-              setBooting(false);
-              setSplashFadingOut(false);
-              if (!hasBootstrapped) {
-                setHasBootstrapped(true);
-              }
-            }, 800); // Match transition duration
-          }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center',
-          }}
-        >
-          <source src="/video/introquack.mp4" type="video/mp4" />
-        </video>
+        {/* Light rays and glow effects */}
+        <style>{`
+          @keyframes introRaysRotate {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+          }
+          @keyframes introGlowPulse {
+            0%, 100% {
+              opacity: 0.4;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.7;
+              transform: scale(1.1);
+            }
+          }
+          @keyframes introVideoGlow {
+            0%, 100% {
+              box-shadow: 0 0 40px rgba(25, 27, 68, 0.8), 0 0 80px rgba(77, 100, 180, 0.3), 0 0 120px rgba(77, 100, 180, 0.2);
+            }
+            50% {
+              box-shadow: 0 0 60px rgba(25, 27, 68, 0.9), 0 0 100px rgba(77, 100, 180, 0.4), 0 0 150px rgba(77, 100, 180, 0.3);
+            }
+          }
+        `}</style>
 
-        {/* Dark overlay (30% opacity) */}
+        {/* Light rays background */}
         <div style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          zIndex: 1,
+          top: '50%',
+          left: '50%',
+          width: '200%',
+          height: '200%',
+          background: `conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            rgba(77, 100, 180, 0.1) 10deg,
+            transparent 20deg,
+            transparent 30deg,
+            rgba(100, 120, 200, 0.08) 40deg,
+            transparent 50deg,
+            transparent 60deg,
+            rgba(77, 100, 180, 0.1) 70deg,
+            transparent 80deg,
+            transparent 90deg,
+            rgba(100, 120, 200, 0.08) 100deg,
+            transparent 110deg,
+            transparent 120deg,
+            rgba(77, 100, 180, 0.1) 130deg,
+            transparent 140deg,
+            transparent 150deg,
+            rgba(100, 120, 200, 0.08) 160deg,
+            transparent 170deg,
+            transparent 180deg,
+            rgba(77, 100, 180, 0.1) 190deg,
+            transparent 200deg,
+            transparent 210deg,
+            rgba(100, 120, 200, 0.08) 220deg,
+            transparent 230deg,
+            transparent 240deg,
+            rgba(77, 100, 180, 0.1) 250deg,
+            transparent 260deg,
+            transparent 270deg,
+            rgba(100, 120, 200, 0.08) 280deg,
+            transparent 290deg,
+            transparent 300deg,
+            rgba(77, 100, 180, 0.1) 310deg,
+            transparent 320deg,
+            transparent 330deg,
+            rgba(100, 120, 200, 0.08) 340deg,
+            transparent 350deg,
+            transparent 360deg
+          )`,
+          animation: 'introRaysRotate 60s linear infinite',
+          pointerEvents: 'none',
         }} />
 
-        {/* "QUACK" text with colorful glow and fade-in animation */}
-        <h1 style={{
-          position: 'relative',
-          zIndex: 2,
-          fontSize: '120px',
-          fontWeight: '900',
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-          color: '#fff',
-          margin: 0,
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-          textShadow: `
-            0 0 20px rgba(242, 140, 82, 0.8),
-            0 0 40px rgba(242, 140, 82, 0.6),
-            0 0 60px rgba(77, 212, 179, 0.5),
-            0 0 80px rgba(77, 212, 179, 0.3)
-          `,
-          animation: 'quackFadeIn 1s ease-out forwards',
-        }}>
-          QUACK
-        </h1>
+        {/* Radial glow around center */}
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '60vw',
+          height: '60vh',
+          background: 'radial-gradient(ellipse at center, rgba(77, 100, 180, 0.2) 0%, rgba(25, 27, 68, 0.3) 40%, transparent 70%)',
+          animation: 'introGlowPulse 4s ease-in-out infinite',
+          pointerEvents: 'none',
+        }} />
 
-        {/* Fade-in animation keyframes */}
+        {/* Video container with soft glow */}
+        <div style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px',
+        }}>
+          <div style={{
+            width: '30vh',
+            height: '30vh',
+            overflow: 'hidden',
+            animation: 'introVideoGlow 3s ease-in-out infinite',
+          }}>
+            <video
+              autoPlay
+              playsInline
+              onEnded={() => {
+                setVideoEnded(true);
+                setSplashFadingOut(true);
+                setTimeout(() => {
+                  setBooting(false);
+                  setSplashFadingOut(false);
+                  if (!hasBootstrapped) {
+                    setHasBootstrapped(true);
+                  }
+                }, 800);
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center',
+              }}
+            >
+            <source src="/video/introquackapp.mp4" type="video/mp4" />
+            </video>
+          </div>
+          {/* Version with glow effect */}
+          <div style={{
+            color: 'rgba(255, 255, 255, 0.7)',
+            fontSize: '13px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            letterSpacing: '1px',
+            textShadow: '0 0 10px rgba(77, 100, 180, 0.8), 0 0 20px rgba(77, 100, 180, 0.5), 0 0 30px rgba(77, 100, 180, 0.3)',
+            animation: 'versionGlow 2s ease-in-out infinite',
+          }}>
+            {introVersion}
+          </div>
+        </div>
         <style>{`
-          @keyframes quackFadeIn {
-            from {
-              opacity: 0;
-              transform: scale(0.9);
+          @keyframes versionGlow {
+            0%, 100% {
+              opacity: 0.7;
+              text-shadow: 0 0 10px rgba(77, 100, 180, 0.8), 0 0 20px rgba(77, 100, 180, 0.5), 0 0 30px rgba(77, 100, 180, 0.3);
             }
-            to {
+            50% {
               opacity: 1;
-              transform: scale(1);
+              text-shadow: 0 0 15px rgba(77, 100, 180, 1), 0 0 30px rgba(77, 100, 180, 0.7), 0 0 45px rgba(77, 100, 180, 0.4);
             }
           }
         `}</style>
@@ -7052,6 +7129,7 @@ You have access to all Bash tools to execute git commands like:
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
+              terminalWindowOpen={terminalWindowOpen}
             />
 
             {/* Tab Bar - VSCode style */}
@@ -7675,75 +7753,141 @@ You have access to all Bash tools to execute git commands like:
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#000',
+            background: '#191B44',
+            overflow: 'hidden',
             zIndex: 9999,
           }}
         >
-          {/* Video background */}
-          <video
-            autoPlay
-            muted
-            playsInline
-            loop
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center',
-            }}
-          >
-            <source src="/video/introquack.mp4" type="video/mp4" />
-          </video>
-
-          {/* Dark overlay (30% opacity) */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
-            zIndex: 1,
-          }} />
-
-          {/* "QUACK" text with colorful glow and fade-in animation */}
-          <h1 style={{
-            position: 'relative',
-            zIndex: 2,
-            fontSize: '120px',
-            fontWeight: '900',
-            fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-            color: '#fff',
-            margin: 0,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            textShadow: `
-              0 0 20px rgba(242, 140, 82, 0.8),
-              0 0 40px rgba(242, 140, 82, 0.6),
-              0 0 60px rgba(77, 212, 179, 0.5),
-              0 0 80px rgba(77, 212, 179, 0.3)
-            `,
-            animation: 'quackFadeIn 1s ease-out forwards',
-          }}>
-            QUACK
-          </h1>
-
-          {/* Fade-in animation keyframes */}
+          {/* Light rays and glow effects */}
           <style>{`
-            @keyframes quackFadeIn {
-              from {
-                opacity: 0;
-                transform: scale(0.9);
-              }
-              to {
-                opacity: 1;
+            @keyframes replayRaysRotate {
+              0% { transform: translate(-50%, -50%) rotate(0deg); }
+              100% { transform: translate(-50%, -50%) rotate(360deg); }
+            }
+            @keyframes replayGlowPulse {
+              0%, 100% {
+                opacity: 0.4;
                 transform: scale(1);
+              }
+              50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+              }
+            }
+            @keyframes replayVideoGlow {
+              0%, 100% {
+                box-shadow: 0 0 40px rgba(25, 27, 68, 0.8), 0 0 80px rgba(77, 100, 180, 0.3), 0 0 120px rgba(77, 100, 180, 0.2);
+              }
+              50% {
+                box-shadow: 0 0 60px rgba(25, 27, 68, 0.9), 0 0 100px rgba(77, 100, 180, 0.4), 0 0 150px rgba(77, 100, 180, 0.3);
               }
             }
           `}</style>
+
+          {/* Light rays background */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: '200%',
+            height: '200%',
+            background: `conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              rgba(77, 100, 180, 0.1) 10deg,
+              transparent 20deg,
+              transparent 30deg,
+              rgba(100, 120, 200, 0.08) 40deg,
+              transparent 50deg,
+              transparent 60deg,
+              rgba(77, 100, 180, 0.1) 70deg,
+              transparent 80deg,
+              transparent 90deg,
+              rgba(100, 120, 200, 0.08) 100deg,
+              transparent 110deg,
+              transparent 120deg,
+              rgba(77, 100, 180, 0.1) 130deg,
+              transparent 140deg,
+              transparent 150deg,
+              rgba(100, 120, 200, 0.08) 160deg,
+              transparent 170deg,
+              transparent 180deg,
+              rgba(77, 100, 180, 0.1) 190deg,
+              transparent 200deg,
+              transparent 210deg,
+              rgba(100, 120, 200, 0.08) 220deg,
+              transparent 230deg,
+              transparent 240deg,
+              rgba(77, 100, 180, 0.1) 250deg,
+              transparent 260deg,
+              transparent 270deg,
+              rgba(100, 120, 200, 0.08) 280deg,
+              transparent 290deg,
+              transparent 300deg,
+              rgba(77, 100, 180, 0.1) 310deg,
+              transparent 320deg,
+              transparent 330deg,
+              rgba(100, 120, 200, 0.08) 340deg,
+              transparent 350deg,
+              transparent 360deg
+            )`,
+            animation: 'replayRaysRotate 60s linear infinite',
+            pointerEvents: 'none',
+          }} />
+
+          {/* Radial glow around center */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '60vw',
+            height: '60vh',
+            background: 'radial-gradient(ellipse at center, rgba(77, 100, 180, 0.2) 0%, rgba(25, 27, 68, 0.3) 40%, transparent 70%)',
+            animation: 'replayGlowPulse 4s ease-in-out infinite',
+            pointerEvents: 'none',
+          }} />
+
+          {/* Video container with soft glow */}
+          <div style={{
+            position: 'relative',
+            zIndex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '20px',
+          }}>
+            <div style={{
+              width: '30vh',
+              height: '30vh',
+              overflow: 'hidden',
+              animation: 'replayVideoGlow 3s ease-in-out infinite',
+            }}>
+              <video
+                autoPlay
+                playsInline
+                loop
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                }}
+              >
+                <source src="/video/introquackapp.mp4" type="video/mp4" />
+              </video>
+            </div>
+            {/* Version with glow effect */}
+            <div style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '13px',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              letterSpacing: '1px',
+              textShadow: '0 0 10px rgba(77, 100, 180, 0.8), 0 0 20px rgba(77, 100, 180, 0.5), 0 0 30px rgba(77, 100, 180, 0.3)',
+            }}>
+              {introVersion}
+            </div>
+          </div>
         </div>
       )}
 

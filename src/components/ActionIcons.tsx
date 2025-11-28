@@ -14,6 +14,7 @@ interface ActionIconsProps {
   onGuideClick: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
+  terminalWindowOpen?: boolean;
 }
 
 function ActionIcons({
@@ -28,6 +29,7 @@ function ActionIcons({
   onGuideClick,
   onToggleSidePanel,
   sidePanelCollapsed,
+  terminalWindowOpen = false,
 }: ActionIconsProps) {
   // Extract project name from path
   const projectName = projectPath ? projectPath.split('/').filter(Boolean).pop() : '';
@@ -108,9 +110,10 @@ function ActionIcons({
       {/* Terminal Icon */}
       <button
         type="button"
-        className="action-icon"
+        className={`action-icon ${terminalWindowOpen ? 'active' : ''}`}
         onClick={onTerminalClick}
         aria-label="Open Terminals"
+        data-tooltip={terminalWindowOpen ? "Terminals (Open)" : "Terminals"}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect
