@@ -191,30 +191,6 @@
   text-overflow: ellipsis;
 }
 
-.terminal-close-btn {
-  width: 18px;
-  height: 18px;
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  opacity: 0;
-  transition: all 0.15s ease;
-}
-
-.terminal-item:hover .terminal-close-btn {
-  opacity: 1;
-}
-
-.terminal-close-btn:hover {
-  background: rgba(255, 100, 100, 0.2);
-  color: #ff6464;
-}
 
 /* Main Terminal Area */
 .terminal-main {
@@ -288,4 +264,162 @@
 .terminal-empty-hint {
   font-size: 12px;
   opacity: 0.7;
+}
+
+/* Terminal Name Input */
+.terminal-name-input {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(77, 212, 179, 0.4);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+  transition: all 0.15s ease;
+}
+
+.terminal-name-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(77, 212, 179, 0.6);
+  box-shadow: 0 0 0 2px rgba(77, 212, 179, 0.15);
+}
+
+/* Terminal Edit Button */
+.terminal-edit-btn {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.terminal-item:hover .terminal-edit-btn {
+  opacity: 1;
+}
+
+.terminal-edit-btn:hover {
+  background: rgba(77, 212, 179, 0.2);
+  color: #4dd4b3;
+}
+
+/* Improved Close Button */
+.terminal-close-btn {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.terminal-item:hover .terminal-close-btn {
+  opacity: 1;
+}
+
+.terminal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Context Menu */
+.terminal-context-menu {
+  background: rgba(30, 30, 30, 0.98);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 140px;
+  animation: contextMenuFadeIn 0.12s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.terminal-context-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+  user-select: none;
+}
+
+.terminal-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.terminal-context-menu-item.danger {
+  color: #ef4444;
+}
+
+.terminal-context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.terminal-context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 8px;
+}
+
+/* Color Picker */
+.terminal-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.terminal-color-option {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.terminal-color-option:hover {
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.terminal-color-option.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }

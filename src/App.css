@@ -10898,3 +10898,34 @@ button.directory-chooser:hover {
     transform: scale(1.1);
   }
 }
+
+/* Agent Card - Responding Animation */
+@keyframes quackBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Active conversation border glow */
+.agent-card--active {
+  border: 2px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15) !important;
+}
+
+.agent-card--responding {
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}

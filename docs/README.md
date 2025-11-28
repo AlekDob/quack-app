@@ -88,6 +88,7 @@
 - **`TEST_RESULTS.md`** - Latest test suite results (37/37 passing ✅)
 - **`VERIFICATION_GUIDE.md`** - Manual testing procedures
 - **`TEST_MODE.md`** - Test mode setup & usage
+- **`PROJECT_TERMINAL_RENAME_TESTS.md`** - Terminal rename functionality tests (27 tests ✅)
 
 ### Test Commands
 ```bash
@@ -112,7 +113,8 @@ npm run test:coverage # Coverage report
 - ✅ Agent chat storage (13 tests)
 - ✅ MCP auto-start (22 tests)
 - ✅ MCP process lifecycle (18 tests)
-- **Total**: 156 tests, all passing
+- ✅ Project terminal rename (27 tests)
+- **Total**: 183 tests, all passing
 
 ---
 
@@ -401,11 +403,11 @@ find docs/ -mtime -7 -name "*.md"
 
 ## 📊 Documentation Health
 
-**Last Updated**: 2025-11-26
-**Total Docs**: 36+ files
-**Test Coverage**: 156 tests passing ✅
+**Last Updated**: 2025-11-28
+**Total Docs**: 37+ files
+**Test Coverage**: 183 tests passing ✅
 **Active Categories**: 7 (merged MCP docs into features)
-**Latest Addition**: Claude SDK 0.1.54 integration guide
+**Latest Addition**: Project terminal rename tests (27 tests)
 **Optimization Tasks**: 21 identified (1 completed, 20 pending)
 **Deprecated Docs**: 8 (in archive)
 

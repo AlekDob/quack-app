@@ -139,6 +139,7 @@ function SortableAgent({
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [showQuackTooltip, setShowQuackTooltip] = useState(false);
   // 🦆 Force re-render every minute to update relative time
   const [tick, setTick] = useState(0);
 
@@ -148,6 +149,8 @@ function SortableAgent({
     }, 60000); // Update every 60 seconds (1 minute)
     return () => clearInterval(interval);
   }, []);
+
+  // NOTE: Quack tooltip logic moved AFTER showNotificationBadge is calculated (see below)
 
   // 🎨 Load avatar URL from agent.avatar
   useEffect(() => {
@@ -290,6 +293,31 @@ function SortableAgent({
     return lastAssistantTimestamp > lastReadTimestamp;
   }, [isActive, isDormant, lastAssistantTimestamp, lastReadTimestamp]);
 
+  // Determine if conversation is active (not dormant)
+  const hasActiveConversation = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
+  const isBusy = agent.status === 'busy';
+
+  // Quack tooltip: show periodically when there are UNREAD messages (like WhatsApp notification)
+  useEffect(() => {
+    // Only show tooltip when there's a notification badge (unread message)
+    if (!showNotificationBadge) {
+      setShowQuackTooltip(false);
+      return;
+    }
+
+    // Show tooltip every 5 seconds for 2 seconds
+    const showInterval = setInterval(() => {
+      setShowQuackTooltip(true);
+      setTimeout(() => setShowQuackTooltip(false), 2000);
+    }, 5000);
+
+    // Show immediately on first unread
+    setShowQuackTooltip(true);
+    setTimeout(() => setShowQuackTooltip(false), 2000);
+
+    return () => clearInterval(showInterval);
+  }, [showNotificationBadge]);
+
   // Memoize metro station style - DYNAMIC based on notification state (MUST be after showNotificationBadge)
   const metroStationStyle = useMemo(() => ({
     width: '10px',
@@ -394,12 +422,19 @@ function SortableAgent({
           background: agentCardBg,
           borderRadius: '6px',
           cursor: 'pointer',
-          transition: 'background 0.2s ease',
+          transition: 'background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease',
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
           minHeight: '48px',
+          // Add white border for active conversations
+          border: hasActiveConversation
+            ? '2px solid rgba(255, 255, 255, 0.6)'
+            : '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: hasActiveConversation
+            ? '0 0 12px rgba(255, 255, 255, 0.15)'
+            : undefined,
         }}
       >
         {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
@@ -455,6 +490,42 @@ function SortableAgent({
             </div>
           )}
         </div>
+
+        {/* Unread message indicator with Quack tooltip (WhatsApp-style) */}
+        {showNotificationBadge && (
+          <div style={{ position: 'relative', marginLeft: '-4px', marginRight: '4px' }}>
+            <span
+              style={{
+                fontSize: '18px',
+                animation: 'quackBounce 1s ease-in-out infinite',
+              }}
+            >
+              💬
+            </span>
+            {showQuackTooltip && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-28px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  color: '#1a1a2e',
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                  animation: 'tooltipFadeIn 0.3s ease-out',
+                  zIndex: 100,
+                }}
+              >
+                Quack quack...
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex w-full items-center justify-between">
           <div className="flex w-full items-center gap-2 flex-1">
@@ -1464,6 +1535,13 @@ export default function RepositoryGroup({
                       const isActive = agent.id === activeId;
                       const isHovered = agent.id === hoveredAgentId;
 
+                      // State for worktree tooltip (using inline hook)
+                      const [showQuackTooltipWorktree, setShowQuackTooltipWorktree] = useState(false);
+
+                      // Quack tooltip: show periodically when there are UNREAD messages (like WhatsApp notification)
+                      // NOTE: This useEffect must be AFTER showNotificationBadge is calculated below
+                      // We move the actual useEffect logic below after showNotificationBadge is defined
+
                       // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
                       const isDormant = (() => {
                         if (!chatSessions) return false;
@@ -1508,8 +1586,33 @@ export default function RepositoryGroup({
                       const lastReadTimestamp = lastReadTimestamps?.get(agent.id) || 0;
                       const showNotificationBadge = !isActive && !isDormant && (lastAssistantTimestamp > lastReadTimestamp);
 
+                      // Quack tooltip: show periodically when there are UNREAD messages (like WhatsApp notification)
+                      useEffect(() => {
+                        // Only show tooltip when there's a notification badge (unread message)
+                        if (!showNotificationBadge) {
+                          setShowQuackTooltipWorktree(false);
+                          return;
+                        }
+
+                        // Show tooltip every 5 seconds for 2 seconds
+                        const showInterval = setInterval(() => {
+                          setShowQuackTooltipWorktree(true);
+                          setTimeout(() => setShowQuackTooltipWorktree(false), 2000);
+                        }, 5000);
+
+                        // Show immediately on first unread
+                        setShowQuackTooltipWorktree(true);
+                        setTimeout(() => setShowQuackTooltipWorktree(false), 2000);
+
+                        return () => clearInterval(showInterval);
+                      }, [showNotificationBadge]);
+
                       const relativeTime = getRelativeTimeString(lastAssistantTimestamp);
                       const timestampOpacity = relativeTime ? getTimestampOpacity(relativeTime.minutes) : 0.4;
+
+                      // Determine if conversation is active and if agent is busy (worktree)
+                      const hasActiveConversationWorktree = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
+                      const isBusyWorktree = agent.status === 'busy';
 
                       return (
                         <div
@@ -1593,12 +1696,19 @@ export default function RepositoryGroup({
                                 : 'transparent',
                               borderRadius: '6px',
                               cursor: 'pointer',
-                              transition: 'background 0.2s ease',
+                              transition: 'background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease',
                               position: 'relative',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '12px',
                               minHeight: '48px',
+                              // Add white border for active conversations
+                              border: hasActiveConversationWorktree
+                                ? '2px solid rgba(255, 255, 255, 0.6)'
+                                : '1px solid rgba(255, 255, 255, 0.1)',
+                              boxShadow: hasActiveConversationWorktree
+                                ? '0 0 12px rgba(255, 255, 255, 0.15)'
+                                : undefined,
                             }}
                           >
                             {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
@@ -1693,6 +1803,42 @@ export default function RepositoryGroup({
                                 );
                               })()}
                             </div>
+
+                            {/* Unread message indicator with Quack tooltip (WhatsApp-style) - worktree */}
+                            {showNotificationBadge && (
+                              <div style={{ position: 'relative', marginLeft: '-4px', marginRight: '4px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '18px',
+                                    animation: 'quackBounce 1s ease-in-out infinite',
+                                  }}
+                                >
+                                  💬
+                                </span>
+                                {showQuackTooltipWorktree && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-28px',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      background: 'rgba(255, 255, 255, 0.95)',
+                                      color: '#1a1a2e',
+                                      padding: '4px 10px',
+                                      borderRadius: '12px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      whiteSpace: 'nowrap',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                                      animation: 'tooltipFadeIn 0.3s ease-out',
+                                      zIndex: 100,
+                                    }}
+                                  >
+                                    Quack quack...
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             <div className="flex w-full items-center justify-between">
                               <div className="flex w-full items-center gap-2 flex-1">

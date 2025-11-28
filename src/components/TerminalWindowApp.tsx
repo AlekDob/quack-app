@@ -1,10 +1,34 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
 import type { ProjectTerminal } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
 import './TerminalWindowApp.css';
+
+const MAX_NAME_LENGTH = 50;
+const CONTEXT_MENU_WIDTH = 150;
+const CONTEXT_MENU_HEIGHT = 140;
+
+const TERMINAL_COLORS = [
+  '#4dd4b3', // Teal (default)
+  '#ef4444', // Red
+  '#f59e0b', // Orange
+  '#eab308', // Yellow
+  '#22c55e', // Green
+  '#3b82f6', // Blue
+  '#8b5cf6', // Purple
+  '#ec4899', // Pink
+  '#6b7280', // Gray
+];
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  terminalId: string | null;
+}
 
 /**
  * TerminalWindowApp - Standalone window for managing project terminals
@@ -16,6 +40,20 @@ export function TerminalWindowApp() {
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  // Context menu and editing state
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    terminalId: null,
+  });
+  const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // Create new terminal for a project
   const handleCreateTerminal = useCallback(async (projectPath: string) => {
@@ -142,6 +180,147 @@ export function TerminalWindowApp() {
     });
   };
 
+  // Update terminal name
+  const updateTerminalName = useCallback((terminalId: string, newName: string) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === terminalId ? { ...t, name: newName } : t
+    ));
+  }, []);
+
+  // Update terminal color
+  const updateTerminalColor = useCallback((terminalId: string, newColor: string) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === terminalId ? { ...t, color: newColor } : t
+    ));
+  }, []);
+
+  // Context menu handlers
+  const handleContextMenu = useCallback((e: React.MouseEvent, terminalId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const x = Math.min(Math.max(0, e.clientX), window.innerWidth - CONTEXT_MENU_WIDTH);
+    const y = Math.min(Math.max(0, e.clientY), window.innerHeight - CONTEXT_MENU_HEIGHT);
+
+    setContextMenu({ visible: true, x, y, terminalId });
+    setShowColorPicker(false);
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ visible: false, x: 0, y: 0, terminalId: null });
+    setShowColorPicker(false);
+  }, []);
+
+  // Start editing terminal name
+  const startEditing = useCallback((terminalId: string) => {
+    const terminal = terminals.find(t => t.id === terminalId);
+    if (terminal) {
+      setEditName(terminal.name);
+      setEditingTerminalId(terminalId);
+      closeContextMenu();
+    }
+  }, [terminals, closeContextMenu]);
+
+  // Save edited name
+  const saveEditedName = useCallback(() => {
+    if (!editingTerminalId) return;
+
+    const trimmedName = editName.trim();
+    if (trimmedName && trimmedName.length <= MAX_NAME_LENGTH) {
+      updateTerminalName(editingTerminalId, trimmedName);
+    }
+    setEditingTerminalId(null);
+    setEditName('');
+  }, [editingTerminalId, editName, updateTerminalName]);
+
+  // Cancel editing
+  const cancelEditing = useCallback(() => {
+    setEditingTerminalId(null);
+    setEditName('');
+  }, []);
+
+  // Handle double click to rename
+  const handleDoubleClick = useCallback((e: React.MouseEvent, terminalId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startEditing(terminalId);
+  }, [startEditing]);
+
+  // Handle color change
+  const handleColorChange = useCallback((color: string) => {
+    if (contextMenu.terminalId) {
+      updateTerminalColor(contextMenu.terminalId, color);
+      closeContextMenu();
+    }
+  }, [contextMenu.terminalId, updateTerminalColor, closeContextMenu]);
+
+  // Handle key down in edit input
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveEditedName();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEditing();
+    }
+  }, [saveEditedName, cancelEditing]);
+
+  // Auto-focus input when editing starts
+  useEffect(() => {
+    if (editingTerminalId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingTerminalId]);
+
+  // Click outside to close context menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        contextMenu.visible &&
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(e.target as Node)
+      ) {
+        closeContextMenu();
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeContextMenu();
+      }
+    };
+
+    if (contextMenu.visible) {
+      document.addEventListener('mousedown', handleClickOutside, true);
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside, true);
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [contextMenu.visible, closeContextMenu]);
+
+  // Click outside to save edit
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        editingTerminalId &&
+        editInputRef.current &&
+        !editInputRef.current.contains(e.target as Node)
+      ) {
+        saveEditedName();
+      }
+    };
+
+    if (editingTerminalId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [editingTerminalId, saveEditedName]);
+
   // Group terminals by project
   const terminalsByProject = useMemo(() => {
     const groups = new Map<string, ProjectTerminal[]>();
@@ -265,24 +444,61 @@ export function TerminalWindowApp() {
                         <div
                           key={terminal.id}
                           className={`terminal-item ${activeTerminalId === terminal.id ? 'active' : ''}`}
-                          onClick={() => setActiveTerminalId(terminal.id)}
+                          onClick={() => editingTerminalId !== terminal.id && setActiveTerminalId(terminal.id)}
+                          onDoubleClick={(e) => handleDoubleClick(e, terminal.id)}
+                          onContextMenu={(e) => handleContextMenu(e, terminal.id)}
                         >
                           <div
                             className="terminal-indicator"
                             style={{ backgroundColor: terminal.color }}
                           />
-                          <span className="terminal-name">{terminal.name}</span>
-                          <button
-                            type="button"
-                            className="terminal-close-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCloseTerminal(terminal.id);
-                            }}
-                            title="Close terminal"
-                          >
-                            x
-                          </button>
+                          {editingTerminalId === terminal.id ? (
+                            <input
+                              ref={editInputRef}
+                              type="text"
+                              className="terminal-name-input"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              onKeyDown={handleEditKeyDown}
+                              onClick={(e) => e.stopPropagation()}
+                              maxLength={MAX_NAME_LENGTH}
+                              aria-label="Terminal name"
+                            />
+                          ) : (
+                            <span className="terminal-name">{terminal.name}</span>
+                          )}
+                          {editingTerminalId !== terminal.id && (
+                            <>
+                              <button
+                                type="button"
+                                className="terminal-edit-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditing(terminal.id);
+                                }}
+                                title="Rename terminal"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="terminal-close-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseTerminal(terminal.id);
+                                }}
+                                title="Close terminal"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="18" y1="6" x2="6" y2="18" />
+                                  <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
                         </div>
                       ))}
                       {(terminalsByProject.get(project.path) || []).length === 0 && (
@@ -305,6 +521,71 @@ export function TerminalWindowApp() {
           themeName="tokyo-night"
         />
       </div>
+
+      {/* Context Menu - rendered via portal */}
+      {createPortal(
+        contextMenu.visible && (
+          <div
+            ref={contextMenuRef}
+            className="terminal-context-menu"
+            role="menu"
+            style={{
+              position: 'fixed',
+              top: `${contextMenu.y}px`,
+              left: `${contextMenu.x}px`,
+              zIndex: 99999,
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div
+              className="terminal-context-menu-item"
+              role="menuitem"
+              onClick={() => contextMenu.terminalId && startEditing(contextMenu.terminalId)}
+            >
+              Rename
+            </div>
+            <div
+              className="terminal-context-menu-item"
+              role="menuitem"
+              onClick={() => setShowColorPicker(!showColorPicker)}
+            >
+              Change Color
+            </div>
+            {showColorPicker && (
+              <div className="terminal-color-picker">
+                {TERMINAL_COLORS.map((color) => {
+                  const currentTerminal = terminals.find(t => t.id === contextMenu.terminalId);
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`terminal-color-option ${color === currentTerminal?.color ? 'active' : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => handleColorChange(color)}
+                      title={color}
+                      aria-label={`Select color ${color}`}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            <div className="terminal-context-menu-divider" />
+            <div
+              className="terminal-context-menu-item danger"
+              role="menuitem"
+              onClick={() => {
+                if (contextMenu.terminalId) {
+                  handleCloseTerminal(contextMenu.terminalId);
+                }
+                closeContextMenu();
+              }}
+            >
+              Close Terminal
+            </div>
+          </div>
+        ),
+        document.body
+      )}
     </div>
   );
 }

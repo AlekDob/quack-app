@@ -133,62 +133,167 @@ const DEFAULT_MODEL: &str = "sonnet";
 const MAX_ATTACHMENTS: usize = 6;
 const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
 
+/// Minimum supported Node.js version (major)
+const MIN_NODE_VERSION: u32 = 18;
+
+/// Get home directory robustly (works even when $HOME is not set)
+/// This is important for apps launched from Finder which don't inherit shell environment
+fn get_home_dir() -> Option<PathBuf> {
+    // Try $HOME first (fastest)
+    if let Ok(home) = std::env::var("HOME") {
+        if !home.is_empty() {
+            return Some(PathBuf::from(home));
+        }
+    }
+
+    // Fallback: Use platform-specific method
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, use NSHomeDirectory equivalent via getpwuid
+        use std::ffi::CStr;
+        unsafe {
+            let uid = libc::getuid();
+            let pwd = libc::getpwuid(uid);
+            if !pwd.is_null() {
+                let home = CStr::from_ptr((*pwd).pw_dir);
+                if let Ok(home_str) = home.to_str() {
+                    return Some(PathBuf::from(home_str));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Parse Node.js version from `node --version` output (e.g., "v22.8.0" -> 22)
+fn parse_node_major_version(version_str: &str) -> Option<u32> {
+    let trimmed = version_str.trim().trim_start_matches('v');
+    trimmed.split('.').next()?.parse().ok()
+}
+
+/// Check if Node.js version is compatible (>= MIN_NODE_VERSION)
+fn is_node_version_compatible(node_path: &Path) -> bool {
+    if let Ok(output) = std::process::Command::new(node_path)
+        .arg("--version")
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(version_str) = String::from_utf8(output.stdout) {
+                if let Some(major) = parse_node_major_version(&version_str) {
+                    let compatible = major >= MIN_NODE_VERSION;
+                    log::info!("[Node.js] Version check: {} (major: {}, compatible: {})",
+                        version_str.trim(), major, compatible);
+                    return compatible;
+                }
+            }
+        }
+    }
+    // If we can't determine version, assume compatible
+    log::warn!("[Node.js] Could not determine version for {:?}, assuming compatible", node_path);
+    true
+}
+
 /// Find system Node.js executable (fallback when sidecar is not available)
-/// This searches common Node.js installation paths
+/// This searches common Node.js installation paths with robust home directory detection
 fn find_system_node_executable() -> Option<PathBuf> {
     log::info!("[Node.js] Searching for system Node.js installation...");
 
-    // Try standard PATH first (fastest, works for dev mode)
-    if let Ok(output) = std::process::Command::new("which").arg("node").output() {
+    // Get home directory robustly (works even when launched from Finder)
+    let home_dir = get_home_dir();
+    log::info!("[Node.js] Home directory: {:?}", home_dir);
+
+    // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
+    // Volta respects the toolchain and version management even from Finder
+    if let Ok(output) = std::process::Command::new("volta")
+        .args(["which", "node"])
+        .output()
+    {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
                 let path = PathBuf::from(path_str.trim());
-                if path.exists() {
-                    log::info!("[Node.js] Found via PATH: {:?}", path);
+                if path.exists() && is_node_version_compatible(&path) {
+                    log::info!("[Node.js] ✅ Found via Volta: {:?}", path);
                     return Some(path);
                 }
             }
         }
     }
 
-    // Common installation paths (macOS/Linux)
+    // 🎯 PRIORITY 2: Check Volta directory directly (for Finder launch)
+    if let Some(ref home) = home_dir {
+        let volta_node = home.join(".volta/bin/node");
+        if volta_node.exists() && is_node_version_compatible(&volta_node) {
+            log::info!("[Node.js] ✅ Found Volta Node.js at: {:?}", volta_node);
+            return Some(volta_node);
+        }
+    }
+
+    // 🎯 PRIORITY 3: Try standard PATH (works for dev mode and Terminal launch)
+    if let Ok(output) = std::process::Command::new("which").arg("node").output() {
+        if output.status.success() {
+            if let Ok(path_str) = String::from_utf8(output.stdout) {
+                let path = PathBuf::from(path_str.trim());
+                if path.exists() && is_node_version_compatible(&path) {
+                    log::info!("[Node.js] ✅ Found via PATH: {:?}", path);
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    // 🎯 PRIORITY 4: Common installation paths (macOS/Linux)
     let common_paths = vec![
-        "/usr/local/bin/node",           // Homebrew default
-        "/opt/homebrew/bin/node",        // Homebrew ARM Mac
+        "/opt/homebrew/bin/node",        // Homebrew ARM Mac (most common now)
+        "/usr/local/bin/node",           // Homebrew Intel Mac
         "/usr/bin/node",                 // System package managers
         "/opt/local/bin/node",           // MacPorts
     ];
 
-    for path_str in common_paths {
+    for path_str in &common_paths {
         let path = PathBuf::from(path_str);
-        if path.exists() {
-            log::info!("[Node.js] Found at common path: {:?}", path);
+        if path.exists() && is_node_version_compatible(&path) {
+            log::info!("[Node.js] ✅ Found at common path: {:?}", path);
             return Some(path);
         }
     }
 
-    // Check NVM installations (~/.nvm/versions/node/*/bin/node)
-    if let Some(home) = std::env::var("HOME").ok() {
-        let nvm_dir = PathBuf::from(&home).join(".nvm/versions/node");
+    // 🎯 PRIORITY 5: Check NVM installations (~/.nvm/versions/node/*/bin/node)
+    // Important: This works even when NVM is not initialized (Finder launch)
+    if let Some(ref home) = home_dir {
+        let nvm_dir = home.join(".nvm/versions/node");
 
         if nvm_dir.exists() {
+            log::info!("[Node.js] Found NVM directory, scanning versions...");
             if let Ok(entries) = fs::read_dir(&nvm_dir) {
-                // Get all version directories and sort to get latest first
+                // Get all version directories
                 let mut versions: Vec<_> = entries
                     .filter_map(|e| e.ok())
                     .filter(|e| e.path().is_dir())
                     .collect();
 
-                // Sort by modification time (latest first)
-                versions.sort_by_key(|e| std::cmp::Reverse(
-                    e.metadata().ok().and_then(|m| m.modified().ok())
-                ));
+                // Sort by version number (extract from dir name like "v20.18.0")
+                versions.sort_by(|a, b| {
+                    let a_ver = a.file_name().to_string_lossy()
+                        .trim_start_matches('v')
+                        .split('.')
+                        .next()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    let b_ver = b.file_name().to_string_lossy()
+                        .trim_start_matches('v')
+                        .split('.')
+                        .next()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    b_ver.cmp(&a_ver) // Descending order (latest first)
+                });
 
-                // Try each version, latest first
+                // Try each version, latest first, but only compatible ones
                 for entry in versions {
                     let node_path = entry.path().join("bin/node");
-                    if node_path.exists() {
-                        log::info!("[Node.js] Found NVM version: {:?}", node_path);
+                    if node_path.exists() && is_node_version_compatible(&node_path) {
+                        log::info!("[Node.js] ✅ Found NVM version: {:?}", node_path);
                         return Some(node_path);
                     }
                 }
@@ -197,19 +302,21 @@ fn find_system_node_executable() -> Option<PathBuf> {
 
         // Check user-specific paths
         let user_paths = vec![
-            PathBuf::from(&home).join(".local/bin/node"),
-            PathBuf::from(&home).join("bin/node"),
+            home.join(".local/bin/node"),
+            home.join("bin/node"),
         ];
 
         for path in user_paths {
-            if path.exists() {
-                log::info!("[Node.js] Found in user directory: {:?}", path);
+            if path.exists() && is_node_version_compatible(&path) {
+                log::info!("[Node.js] ✅ Found in user directory: {:?}", path);
                 return Some(path);
             }
         }
     }
 
-    log::warn!("[Node.js] System Node.js executable not found in any common location");
+    log::warn!("[Node.js] ❌ System Node.js executable not found in any common location");
+    log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, user directories");
+    log::warn!("[Node.js] Minimum required version: Node.js {}", MIN_NODE_VERSION);
     None
 }
 
@@ -981,6 +1088,9 @@ pub async fn send_message_via_sdk_streaming(
 
     log::info!("[SDK] Using Node.js at: {:?}", node_path);
 
+    // Determine if we're using the bundled sidecar or system Node.js
+    let using_sidecar = node_path.to_string_lossy().contains("node-sidecar");
+
     // Create the command with the resolved Node.js path
     let mut command = Command::new(&node_path);
     command
@@ -989,6 +1099,40 @@ pub async fn send_message_via_sdk_streaming(
         .current_dir(node_sdk_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // ✅ ENVIRONMENT ISOLATION: When using bundled sidecar, remove NVM/Volta variables
+    // that could interfere with the bundled Node.js runtime
+    if using_sidecar {
+        log::info!("[SDK] 🔒 Using bundled sidecar - isolating NVM/Volta environment variables");
+
+        // Remove NVM-specific variables that could cause conflicts
+        command.env_remove("NVM_DIR");
+        command.env_remove("NVM_BIN");
+        command.env_remove("NVM_INC");
+        command.env_remove("NVM_CD_FLAGS");
+        command.env_remove("NVM_RC_VERSION");
+
+        // Remove Volta-specific variables
+        command.env_remove("VOLTA_HOME");
+
+        // Remove Node.js module resolution variables that could interfere
+        command.env_remove("NODE_PATH");
+
+        // Set a clean PATH that doesn't include NVM/Volta bin directories
+        if let Ok(current_path) = std::env::var("PATH") {
+            let clean_path: Vec<&str> = current_path
+                .split(':')
+                .filter(|p| {
+                    !p.contains(".nvm/") &&
+                    !p.contains(".volta/") &&
+                    !p.contains("nvm/versions/")
+                })
+                .collect();
+            let new_path = clean_path.join(":");
+            log::info!("[SDK] 🧹 Cleaned PATH (removed NVM/Volta): {} entries", clean_path.len());
+            command.env("PATH", new_path);
+        }
+    }
 
     // ✅ Try to read Claude Code credentials and pass to Node.js SDK (optional)
     // The SDK can also use ANTHROPIC_API_KEY from environment if already set

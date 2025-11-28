@@ -193,6 +193,7 @@ dependencies = [
  "image",
  "keyring",
  "lazy_static",
+ "libc",
  "log",
  "objc",
  "once_cell",

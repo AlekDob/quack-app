@@ -39,6 +39,24 @@
   font-weight: 500;
 }
 
+.terminal-item-name-input {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.terminal-item-name-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 .terminal-item-status {
   width: 12px;
   height: 12px;
@@ -79,4 +97,90 @@
 
 .terminal-item-close:hover {
   color: #ef4444;
+}
+
+/* Context Menu Styles */
+.terminal-context-menu {
+  position: fixed;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+  min-width: 120px;
+  animation: contextMenuFadeIn 0.1s ease;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.terminal-context-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.terminal-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.terminal-context-menu-item.danger {
+  color: #ef4444;
+}
+
+.terminal-context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.terminal-context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 8px;
+}
+
+/* Color Picker */
+.terminal-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  margin: 4px;
+}
+
+.terminal-color-option {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.terminal-color-option:hover {
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.terminal-color-option.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }
