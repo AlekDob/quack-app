@@ -206,13 +206,25 @@
 
 .diff-line-number {
   display: inline-block;
-  min-width: 50px;
+  min-width: 40px;
   text-align: right;
-  padding-right: 16px;
+  padding-right: 8px;
   color: rgba(255, 255, 255, 0.3);
   user-select: none;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+/* Two-column line numbers: old (left) and new (right) */
+.diff-line-old {
+  color: rgba(239, 68, 68, 0.5);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  margin-right: 4px;
+}
+
+.diff-line-new {
+  color: rgba(34, 197, 94, 0.5);
+  margin-right: 8px;
 }
 
 .diff-line-content {

@@ -60,7 +60,7 @@ import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
 import { useDroidFactory } from "./hooks/useDroidFactory";
 import { isPro, canCreateTerminal } from "./config/features";
-import type { DiffInfo } from "./components/CodeEditorCodeMirror";
+import type { DiffInfo } from "./components/CodeEditorMonaco";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
@@ -5397,23 +5397,30 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           });
 
           if (!diffContent || diffContent.trim() === '') {
-            // If no diff, file might be untracked or not in git
-            // Fall back to showing entire file as new
-            const content = await invoke<string>('read_file_content', {
-              path: filePath,
-              rootPath
+            // No diff available - file might have been committed already
+            // Show informative message instead of treating as new file
+            setDiffLoading(false);
+            setShowDiffDrawer(false);
+            toast.info('No changes to show', {
+              description: 'This file has no pending changes. It may have been committed already.',
+              duration: 3000,
             });
-            const lines = content.split('\n');
-            diffContent = `diff --git a/${filePath} b/${filePath}\n`;
-            diffContent += `new file\n`;
-            diffContent += `--- /dev/null\n`;
-            diffContent += `+++ b/${filePath}\n`;
-            diffContent += `@@ -0,0 +1,${lines.length} @@\n`;
-            diffContent += lines.map(line => `+${line}`).join('\n');
+            return;
           }
         } catch (err) {
           console.error('[handleDiffClick] Failed to get git diff:', err);
-          throw new Error(`Failed to get diff: ${err instanceof Error ? err.message : String(err)}`);
+          // Check if this is a "file already committed" scenario
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          if (errorMsg.includes('no changes') || errorMsg.includes('not modified')) {
+            setDiffLoading(false);
+            setShowDiffDrawer(false);
+            toast.info('No changes to show', {
+              description: 'This file has no pending changes. It may have been committed already.',
+              duration: 3000,
+            });
+            return;
+          }
+          throw new Error(`Failed to get diff: ${errorMsg}`);
         }
       } else if (status === 'deleted') {
         // File deleted: Show previous content as removed lines
@@ -5459,11 +5466,27 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       });
     } catch (err) {
       console.error('[handleDiffClick] Error loading diff:', err);
-      setDiffError(err instanceof Error ? err.message : String(err));
+      const errorMsg = err instanceof Error ? err.message : String(err);
+
+      // Check for common scenarios where diff isn't available
+      if (errorMsg.includes('no changes') ||
+          errorMsg.includes('not modified') ||
+          errorMsg.includes('does not exist') ||
+          errorMsg.includes('fatal: bad revision')) {
+        setDiffLoading(false);
+        setShowDiffDrawer(false);
+        toast.info('No changes to show', {
+          description: 'This file has no pending changes. It may have been committed already.',
+          duration: 3000,
+        });
+        return;
+      }
+
+      setDiffError(errorMsg);
       setDiffLoading(false);
 
       toast.error('Failed to load diff', {
-        description: err instanceof Error ? err.message : String(err),
+        description: errorMsg,
         duration: 3000,
       });
     }

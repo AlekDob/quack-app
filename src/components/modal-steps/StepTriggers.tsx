@@ -1,12 +1,22 @@
 /**
  * Step 5: Triggers Configuration
  * - Configure WHEN to use each selected skill/droid
- * - User defines triggers with suggestions
+ * - User defines triggers with concrete pattern-based suggestions
+ * - AI-powered trigger generation via OpenAI
  * - Toggle auto-invoke for proactive behavior
+ * - Quality indicator shows trigger specificity
  */
 
-import { useState, useMemo } from 'react';
-import type { TriggerConfig, SkillMetadata, DroidMetadata, TRIGGER_SUGGESTIONS } from './types';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import type { TriggerConfig, SkillMetadata, DroidMetadata } from './types';
+import {
+  detectCategory,
+  calculateTriggerQuality,
+  generateSmartTrigger,
+  TRIGGER_SUGGESTIONS,
+  EXAMPLE_TRIGGERS,
+} from '../../lib/triggerQuality';
+import { useAITriggerGenerator } from '../../hooks/useAITriggerGenerator';
 
 interface StepTriggersProps {
   selectedSkills: string[];
@@ -21,65 +31,6 @@ interface StepTriggersProps {
   isEditing?: boolean;
 }
 
-// Helper to detect trigger category from name/description
-function detectCategory(name: string, description: string): string {
-  const text = `${name} ${description}`.toLowerCase();
-
-  if (text.includes('ui') || text.includes('design') || text.includes('style') || text.includes('ux')) {
-    return 'ui';
-  }
-  if (text.includes('test') || text.includes('spec') || text.includes('coverage')) {
-    return 'test';
-  }
-  if (text.includes('doc') || text.includes('readme') || text.includes('comment')) {
-    return 'docs';
-  }
-  if (text.includes('api') || text.includes('backend') || text.includes('endpoint') || text.includes('database')) {
-    return 'api';
-  }
-  if (text.includes('code') || text.includes('review') || text.includes('refactor') || text.includes('debug')) {
-    return 'code';
-  }
-  return 'default';
-}
-
-// Trigger suggestions based on category
-const SUGGESTIONS: Record<string, string[]> = {
-  'default': [
-    'When the user asks about...',
-    'Before making decisions about...',
-    'When working on files related to...',
-    'After completing...',
-  ],
-  'ui': [
-    'When creating or modifying UI components',
-    'Before making design decisions',
-    'When discussing user experience',
-    'When implementing accessibility features',
-  ],
-  'code': [
-    'When reviewing or analyzing code',
-    'Before refactoring',
-    'When debugging issues',
-    'When implementing new features',
-  ],
-  'docs': [
-    'When writing documentation',
-    'When explaining code or concepts',
-    'Before publishing changes',
-  ],
-  'test': [
-    'When writing or updating tests',
-    'Before merging code',
-    'When investigating failures',
-  ],
-  'api': [
-    'When working with API endpoints',
-    'When designing data structures',
-    'When handling authentication',
-  ],
-};
-
 export function StepTriggers({
   selectedSkills,
   selectedDroids,
@@ -93,6 +44,24 @@ export function StepTriggers({
   isEditing = false,
 }: StepTriggersProps) {
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [generatingItemId, setGeneratingItemId] = useState<string | null>(null);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+
+  // Ref to track if component is mounted (prevent memory leaks)
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount - reset to true on mount, false on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    console.log('[StepTriggers] Component mounted, isMountedRef set to true');
+    return () => {
+      console.log('[StepTriggers] Component unmounting, setting isMountedRef to false');
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // AI Trigger Generator hook
+  const { generateTrigger: generateAITrigger, isGenerating, isAvailable: isAIAvailable } = useAITriggerGenerator();
 
   // Build list of items to configure
   const itemsToConfig = useMemo(() => {
@@ -161,6 +130,79 @@ export function StepTriggers({
     updateConfig(id, type, name, { trigger: newTrigger });
   };
 
+  // Generate smart trigger using AI (with fallback to pattern-based)
+  const handleGenerateTrigger = async (item: { id: string; type: 'skill' | 'droid'; name: string; description: string; category: string }) => {
+    const itemKey = `${item.type}-${item.id}`;
+    console.log(`[StepTriggers] Starting generation for ${item.name}, key: ${itemKey}`);
+    setGeneratingItemId(itemKey);
+
+    try {
+      console.log(`[StepTriggers] Calling generateAITrigger...`);
+      const result = await generateAITrigger({
+        name: item.name,
+        description: item.description,
+        category: item.category,
+      });
+      console.log(`[StepTriggers] Got result:`, result);
+      console.log(`[StepTriggers] isMountedRef.current:`, isMountedRef.current);
+
+      // Always try to update - the parent callback should handle it
+      console.log(`[StepTriggers] Updating config with trigger: "${result.trigger}"`);
+      updateConfig(item.id, item.type, item.name, { trigger: result.trigger });
+      console.log(`[StepTriggers] Config updated successfully`);
+
+      if (result.isAIGenerated) {
+        console.log(`[StepTriggers] AI generated trigger for ${item.name} using ${result.model}`);
+      } else {
+        console.log(`[StepTriggers] Fallback pattern-based trigger for ${item.name}`);
+      }
+    } catch (err) {
+      console.error('[StepTriggers] Error generating trigger:', err);
+      // Fallback to pattern-based
+      const smartTrigger = generateSmartTrigger(item.name, item.description, item.category);
+      updateConfig(item.id, item.type, item.name, { trigger: smartTrigger });
+    } finally {
+      // Always reset generating state
+      console.log(`[StepTriggers] Resetting generatingItemId to null`);
+      setGeneratingItemId(null);
+    }
+  };
+
+  // Generate all triggers using AI
+  const handleGenerateAllTriggers = async () => {
+    setIsGeneratingAll(true);
+
+    for (const item of itemsToConfig) {
+      // Stop if component unmounted
+      if (!isMountedRef.current) return;
+
+      const existing = getConfig(item.id, item.type, item.name);
+      // Only generate if no trigger exists
+      if (!existing.trigger.trim()) {
+        try {
+          const result = await generateAITrigger({
+            name: item.name,
+            description: item.description,
+            category: item.category,
+          });
+          // Check if still mounted before updating
+          if (!isMountedRef.current) return;
+          updateConfig(item.id, item.type, item.name, { trigger: result.trigger, autoInvoke: true });
+        } catch {
+          // Check if still mounted before updating
+          if (!isMountedRef.current) return;
+          // Fallback to pattern-based
+          const smartTrigger = generateSmartTrigger(item.name, item.description, item.category);
+          updateConfig(item.id, item.type, item.name, { trigger: smartTrigger, autoInvoke: true });
+        }
+      }
+    }
+
+    if (isMountedRef.current) {
+      setIsGeneratingAll(false);
+    }
+  };
+
   // Count configured triggers
   const configuredCount = triggerConfigs.filter(c => c.trigger.trim()).length;
   const totalCount = itemsToConfig.length;
@@ -211,7 +253,7 @@ export function StepTriggers({
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
         </svg>
         <p className="intro-text">
-          <strong>Define WHEN to use each skill/droid.</strong> This teaches your agent to invoke them proactively without waiting for your request. Use suggestions or write custom triggers.
+          <strong>Define WHEN to use each skill/droid.</strong> Be specific: use file patterns (*.test.ts), folder paths (/components), or keywords. The more concrete your trigger, the better your agent will understand when to act.
         </p>
       </div>
 
@@ -231,8 +273,10 @@ export function StepTriggers({
         {itemsToConfig.map(item => {
           const config = getConfig(item.id, item.type, item.name);
           const isExpanded = expandedItem === `${item.type}-${item.id}`;
-          const suggestions = SUGGESTIONS[item.category] || SUGGESTIONS['default'];
+          const suggestions = TRIGGER_SUGGESTIONS[item.category] || TRIGGER_SUGGESTIONS['default'];
           const hasTrigger = config.trigger.trim().length > 0;
+          const quality = hasTrigger ? calculateTriggerQuality(config.trigger) : null;
+          const exampleTrigger = EXAMPLE_TRIGGERS[item.category] || EXAMPLE_TRIGGERS['default'];
 
           return (
             <div
@@ -249,10 +293,12 @@ export function StepTriggers({
                     {item.type === 'skill' ? 'SKILL' : 'DROID'}
                   </span>
                   <span className="trigger-name">{item.name}</span>
-                  {hasTrigger && (
-                    <svg className="configured-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M20 6L9 17l-5-5"></path>
-                    </svg>
+                  {quality && (
+                    <span className={`trigger-quality-badge quality-${quality.level}`}>
+                      {quality.level === 'weak' && '!'}
+                      {quality.level === 'moderate' && '~'}
+                      {quality.level === 'strong' && '✓'}
+                    </span>
                   )}
                 </div>
                 <div className="trigger-controls">
@@ -282,21 +328,75 @@ export function StepTriggers({
                 <div className="trigger-content">
                   <p className="trigger-description">{item.description}</p>
 
-                  {/* Trigger Input */}
+                  {/* Trigger Input with Quality Indicator */}
                   <div className="trigger-input-wrapper">
-                    <label className="trigger-input-label">When to use:</label>
+                    <div className="trigger-input-header">
+                      <label className="trigger-input-label">When to use:</label>
+                      {isAIAvailable ? (
+                        <button
+                          type="button"
+                          className={`generate-trigger-btn ai-enabled ${generatingItemId === `${item.type}-${item.id}` ? 'generating' : ''}`}
+                          onClick={() => handleGenerateTrigger(item)}
+                          disabled={generatingItemId !== null || isGeneratingAll}
+                          title="Generate AI-powered trigger using OpenAI"
+                        >
+                          {generatingItemId === `${item.type}-${item.id}` ? (
+                            <>
+                              <span className="btn-spinner"></span>
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                <path d="M2 17l10 5 10-5"></path>
+                                <path d="M2 12l10 5 10-5"></path>
+                              </svg>
+                              AI Generate
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="generate-trigger-btn pattern-only"
+                          onClick={() => handleGenerateTrigger(item)}
+                          disabled={generatingItemId !== null || isGeneratingAll}
+                          title="Generate pattern-based trigger (add OpenAI key in Settings for AI generation)"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                          </svg>
+                          Auto Generate
+                        </button>
+                      )}
+                    </div>
                     <textarea
-                      className="trigger-input"
-                      placeholder="e.g., When working on UI components, before making design decisions..."
+                      className={`trigger-input ${quality ? `quality-${quality.level}` : ''}`}
+                      placeholder="e.g., When editing files in /components folder that contain React hooks..."
                       value={config.trigger}
                       onChange={(e) => updateConfig(item.id, item.type, item.name, { trigger: e.target.value })}
-                      rows={2}
+                      rows={3}
                     />
+                    {quality && (
+                      <div className={`trigger-quality-indicator quality-${quality.level}`}>
+                        <div className="quality-bar">
+                          <div className="quality-fill" style={{ width: `${Math.min(quality.score, 100)}%` }} />
+                        </div>
+                        <span className="quality-message">{quality.message}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Example */}
+                  <div className="trigger-example">
+                    <span className="example-label">Example:</span>
+                    <code className="example-text">{exampleTrigger}</code>
                   </div>
 
                   {/* Suggestions */}
                   <div className="trigger-suggestions">
-                    <span className="suggestions-label">Suggestions:</span>
+                    <span className="suggestions-label">Quick patterns:</span>
                     <div className="suggestions-chips">
                       {suggestions.map((suggestion, idx) => (
                         <button
@@ -319,6 +419,52 @@ export function StepTriggers({
 
       {/* Quick Actions */}
       <div className="triggers-quick-actions">
+        {isAIAvailable ? (
+          <button
+            type="button"
+            className={`quick-action ai-action primary ${isGeneratingAll ? 'generating' : ''}`}
+            onClick={handleGenerateAllTriggers}
+            disabled={isGeneratingAll || generatingItemId !== null}
+          >
+            {isGeneratingAll ? (
+              <>
+                <span className="btn-spinner"></span>
+                Generating with AI...
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                AI Generate All Empty
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`quick-action ${isGeneratingAll ? 'generating' : ''}`}
+            onClick={handleGenerateAllTriggers}
+            disabled={isGeneratingAll || generatingItemId !== null}
+            title="Add OpenAI key in Settings for AI-powered generation"
+          >
+            {isGeneratingAll ? (
+              <>
+                <span className="btn-spinner"></span>
+                Generating...
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                </svg>
+                Auto Generate All Empty
+              </>
+            )}
+          </button>
+        )}
         <button
           type="button"
           className="quick-action"

@@ -1,15 +1,15 @@
 import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef, lazy, Suspense, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import type { DiffInfo } from "./CodeEditorCodeMirror";
+import type { DiffInfo, LineChange } from "./CodeEditorMonaco";
 import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
 import SearchToolbar, { type SearchOptions } from "./SearchToolbar";
-import type { CodeEditorRef, LineChange } from "./CodeEditorCodeMirror";
+import type { CodeEditorRef } from "./CodeEditorMonaco";
 
-// Lazy load CodeMirror editor (lighter than Monaco, works better with Tauri)
-const CodeEditor = lazy(() => import("./CodeEditorCodeMirror"));
+// Lazy load Monaco editor (better diff support, minimap, VS Code-like experience)
+const CodeEditor = lazy(() => import("./CodeEditorMonaco"));
 
 interface FilePreviewDrawerProps {
   open: boolean;
