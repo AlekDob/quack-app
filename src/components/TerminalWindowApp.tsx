@@ -403,7 +403,8 @@ export function TerminalWindowApp() {
         {/* Sidebar with projects */}
         <div className="terminal-sidebar">
           <div className="terminal-sidebar-header">
-            <span>PROJECTS</span>
+            <span>TERMINALS</span>
+            <div className="terminal-sidebar-drag-region" data-tauri-drag-region />
           </div>
 
           <div className="terminal-sidebar-content">

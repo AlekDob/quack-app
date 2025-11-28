@@ -40,8 +40,8 @@
 }
 
 .terminal-sidebar-header {
-  height: 32px;
-  padding: 0 12px;
+  height: 35px;
+  padding: 0px 0 0 80px; /* Left padding for macOS traffic lights */
   display: flex;
   align-items: center;
   font-size: 11px;
@@ -49,6 +49,17 @@
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.5px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.terminal-sidebar-drag-region {
+  flex: 1;
+  height: 100%;
+  cursor: grab;
+  -webkit-app-region: drag;
+}
+
+.terminal-sidebar-drag-region:active {
+  cursor: grabbing;
 }
 
 .terminal-sidebar-content {
