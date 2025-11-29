@@ -5,7 +5,10 @@
   background: #1a1a1a;
   color: #fff;
   overflow: hidden;
+  position: relative;
 }
+
+/* White line fix handled globally in index.css body::before */
 
 .terminal-window-header {
   display: none; /* Hidden - not needed */

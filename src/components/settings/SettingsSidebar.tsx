@@ -2,6 +2,7 @@ import SettingsIcon from './SettingsIcon';
 
 export type SettingsCategory =
   | 'general'
+  | 'claude-code'
   | 'ai-assistant'
   | 'agent-modes'
   | 'license'
@@ -23,6 +24,7 @@ interface SettingsSidebarProps {
 
 const categories: CategoryItem[] = [
   { id: 'general', label: 'General' },
+  { id: 'claude-code', label: 'Claude Code' },
   { id: 'ai-assistant', label: 'AI Assistant' },
   { id: 'agent-modes', label: 'Agent Modes' },
   { id: 'license', label: 'License' },

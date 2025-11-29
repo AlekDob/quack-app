@@ -44,7 +44,7 @@ body,
 }
 
 #root {
-  background-color: #000000; /* Black background for clean splash screen */
+  /* Background managed by body element */
 }
 
 body {

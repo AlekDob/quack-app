@@ -205,6 +205,14 @@ function AppContent() {
   const ducksPatternBackgroundImage = new URL("../images/backgrounds/ducks-pattern.png", import.meta.url).href;
   const duckPattern3BackgroundImage = new URL("../images/backgrounds/duck-pattern3.png", import.meta.url).href;
   const quackAgentBackgroundImage = new URL("../images/backgrounds/quack-agent.jpeg", import.meta.url).href;
+  const hackerBackgroundImage = new URL("../images/backgrounds/hacker.png", import.meta.url).href;
+  const duckBusinessBackgroundImage = new URL("../images/backgrounds/duckbusiness.png", import.meta.url).href;
+  const duckMotoBackgroundImage = new URL("../images/backgrounds/duckmoto.png", import.meta.url).href;
+  const duckPoolBackgroundImage = new URL("../images/backgrounds/duckpool.png", import.meta.url).href;
+  const duckReadBackgroundImage = new URL("../images/backgrounds/duckread.png", import.meta.url).href;
+  const gtaDuckBackgroundImage = new URL("../images/backgrounds/gtaduck.png", import.meta.url).href;
+  const jazzDuckBackgroundImage = new URL("../images/backgrounds/jazzduck.png", import.meta.url).href;
+  const cyberpunkDuckBackgroundImage = new URL("../images/backgrounds/e00b8faae79c45741ad8ff0060614a1ddd03bcea.png", import.meta.url).href;
 
   const [tauriAvailable] = useState(
     () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -3591,25 +3599,49 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Helper to apply background (image or gradient)
   const applyBackground = useCallback((backgroundName: string) => {
+    // Handle transparent background (default)
+    if (backgroundName === 'transparent') {
+      document.body.style.backgroundImage = 'none';
+      document.body.style.backgroundColor = 'transparent';
+      document.body.style.backgroundRepeat = '';
+      document.body.style.backgroundPosition = '';
+      document.body.style.backgroundSize = '';
+      return;
+    }
+
     // Check if it's a gradient
     if (backgroundName.startsWith('gradient-')) {
-      // Map gradient names to actual CSS gradients - MUCH more colorful!
+      // Map gradient names to actual CSS gradients
       const gradientMap: Record<string, string> = {
-        'gradient-black-plain': 'linear-gradient(#000000, #000000)',
-        'gradient-dark-gray-plain': 'linear-gradient(#0D1118, #0D1118)',
-        'gradient-orange-dark': 'linear-gradient(135deg, #1a0f0a 0%, #3d2415 25%, #5a3a25 50%, #3d2415 75%, #1a0f0a 100%)',
-        'gradient-blue-dark': 'linear-gradient(135deg, #0a0f1a 0%, #15243d 25%, #20355a 50%, #15243d 75%, #0a0f1a 100%)',
-        'gradient-green-dark': 'linear-gradient(135deg, #0a1a0f 0%, #15392d 25%, #20564a 50%, #15392d 75%, #0a1a0f 100%)',
-        'gradient-purple-dark': 'linear-gradient(135deg, #160a1a 0%, #2d1539 25%, #4a2056 50%, #2d1539 75%, #160a1a 100%)',
-        'gradient-red-dark': 'linear-gradient(135deg, #1a0a0a 0%, #3d1515 25%, #5a2020 50%, #3d1515 75%, #1a0a0a 100%)',
-        'gradient-teal-dark': 'linear-gradient(135deg, #0a1a1a 0%, #153d3d 25%, #205a5a 50%, #153d3d 75%, #0a1a1a 100%)',
-        'gradient-amber-dark': 'linear-gradient(135deg, #1a150a 0%, #3d3015 25%, #5a4a20 50%, #3d3015 75%, #1a150a 100%)',
+        // Solid colors
+        'gradient-black-plain': '#000000',
+        'gradient-dark-gray-plain': '#0D1118',
+        'gradient-midnight': '#0f1115',
+        // Gradients
+        'gradient-orange-dark': 'linear-gradient(135deg, #1a0f0a 0%, #3d2415 50%, #1a0f0a 100%)',
+        'gradient-blue-dark': 'linear-gradient(135deg, #0a0f1a 0%, #15243d 50%, #0a0f1a 100%)',
+        'gradient-green-dark': 'linear-gradient(135deg, #0a1a0f 0%, #15392d 50%, #0a1a0f 100%)',
+        'gradient-purple-dark': 'linear-gradient(135deg, #160a1a 0%, #2d1539 50%, #160a1a 100%)',
+        'gradient-red-dark': 'linear-gradient(135deg, #1a0a0a 0%, #3d1515 50%, #1a0a0a 100%)',
+        'gradient-teal-dark': 'linear-gradient(135deg, #0a1a1a 0%, #153d3d 50%, #0a1a1a 100%)',
+        'gradient-amber-dark': 'linear-gradient(135deg, #1a150a 0%, #3d3015 50%, #1a150a 100%)',
+        'gradient-neon': 'linear-gradient(135deg, #0a0a1a 0%, #1a0a2d 25%, #2d0a3d 50%, #1a0a2d 75%, #0a0a1a 100%)',
+        'gradient-cosmic': 'linear-gradient(180deg, #0f0f23 0%, #1a1a3e 50%, #0f0f23 100%)',
       };
 
       const gradient = gradientMap[backgroundName];
       if (gradient) {
-        document.body.style.backgroundImage = gradient;
+        if (gradient.startsWith('linear-gradient') || gradient.startsWith('radial-gradient')) {
+          document.body.style.backgroundImage = gradient;
+          document.body.style.backgroundColor = 'transparent';
+        } else {
+          // Solid color
+          document.body.style.backgroundImage = 'none';
+          document.body.style.backgroundColor = gradient;
+        }
         document.body.style.backgroundSize = '';
+        document.body.style.backgroundRepeat = '';
+        document.body.style.backgroundPosition = '';
       }
     } else {
       // It's an image file - use pre-loaded URLs from component scope
@@ -3618,10 +3650,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         'ducks-pattern.png': ducksPatternBackgroundImage,
         'duck-pattern3.png': duckPattern3BackgroundImage,
         'quack-agent.jpeg': quackAgentBackgroundImage,
+        'hacker.png': hackerBackgroundImage,
+        'duckbusiness.png': duckBusinessBackgroundImage,
+        'duckmoto.png': duckMotoBackgroundImage,
+        'duckpool.png': duckPoolBackgroundImage,
+        'duckread.png': duckReadBackgroundImage,
+        'gtaduck.png': gtaDuckBackgroundImage,
+        'jazzduck.png': jazzDuckBackgroundImage,
+        'e00b8faae79c45741ad8ff0060614a1ddd03bcea.png': cyberpunkDuckBackgroundImage,
       };
 
       const imagePath = imageMap[backgroundName] || `/images/backgrounds/${backgroundName}`;
       document.body.style.backgroundImage = `url('${imagePath}')`;
+      document.body.style.backgroundColor = 'transparent';
 
       // Apply repeat-y and center position only for duck-pattern3.png
       if (backgroundName === 'duck-pattern3.png') {
@@ -7117,7 +7158,19 @@ You have access to all Bash tools to execute git commands like:
               onUsageClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                  await handleCreateTerminalWithCommand("Claude Plan Usage", "claude /usage", cwd);
+                  // Open in Terminal Window (separate Tauri window) instead of tab
+                  const projects = agentChats.map(agent => ({
+                    path: agent.cwd,
+                    name: agent.cwd.split('/').pop() || agent.cwd,
+                  }));
+                  const uniqueProjects = projects.filter(
+                    (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+                  );
+                  await openTerminalWindow(uniqueProjects, {
+                    projectPath: cwd,
+                    command: 'claude /usage',
+                    terminalLabel: 'Claude Plan Usage',
+                  });
                 } catch (error) {
                   console.error("Failed to open claude usage:", error);
                 }

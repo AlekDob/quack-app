@@ -12,18 +12,7 @@
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Cover the white line at top from macOS titleBarStyle: Overlay */
-.app-shell::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: #0f1115;
-  z-index: 99999;
-  pointer-events: none;
-}
+/* White line fix moved to index.css body::before for earlier loading */
 
 /* ============================================
    TITLEBAR OVERLAY STYLE (Warp-like)

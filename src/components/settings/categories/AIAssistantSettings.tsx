@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { TokenStats } from '../../../types';
-import ClaudeAuthSettings from '../../ClaudeAuthSettings';
-import AuthDebugPanel from '../../AuthDebugPanel';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSInput from '../controls/IOSInput';
@@ -13,11 +10,8 @@ export default function AIAssistantSettings() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const [stats, setStats] = useState<TokenStats | null>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
 
   useEffect(() => {
-    loadStats();
     loadSavedSettings();
   }, []);
 
@@ -33,18 +27,6 @@ export default function AIAssistantSettings() {
       setModel(savedModel as typeof model);
     } catch (err) {
       console.error('Failed to load saved AI settings:', err);
-    }
-  };
-
-  const loadStats = async () => {
-    setLoadingStats(true);
-    try {
-      const tokenStats = await invoke<TokenStats>('get_token_usage_stats');
-      setStats(tokenStats);
-    } catch (err) {
-      console.error('Failed to load stats:', err);
-    } finally {
-      setLoadingStats(false);
     }
   };
 
@@ -84,20 +66,6 @@ export default function AIAssistantSettings() {
     } finally {
       setTesting(false);
     }
-  };
-
-  const formatCost = (cost: number) => {
-    return `$${cost.toFixed(4)}`;
-  };
-
-  const formatTokens = (tokens: number) => {
-    if (tokens >= 1000000) {
-      return `${(tokens / 1000000).toFixed(2)}M`;
-    }
-    if (tokens >= 1000) {
-      return `${(tokens / 1000).toFixed(1)}K`;
-    }
-    return tokens.toString();
   };
 
   return (
@@ -196,21 +164,6 @@ export default function AIAssistantSettings() {
             </div>
           </label>
         </div>
-      </div>
-
-      {/* Claude Authentication */}
-      <SectionHeader title="Claude Integration" />
-      <div className="settings-group">
-        <ClaudeAuthSettings />
-      </div>
-
-      {/* Debug Panel */}
-      <SectionHeader
-        title="Authentication Debug"
-        description="Diagnostic information for troubleshooting authentication issues"
-      />
-      <div className="settings-group">
-        <AuthDebugPanel />
       </div>
     </div>
   );

@@ -71,6 +71,7 @@ export function useTerminalWindowManager() {
         focus: true,
         titleBarStyle: 'overlay',
         hiddenTitle: true,
+        transparent: true,
       });
 
       // Wait for window creation

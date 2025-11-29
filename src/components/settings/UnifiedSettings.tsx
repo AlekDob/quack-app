@@ -3,6 +3,7 @@ import SettingsSidebar from './SettingsSidebar';
 import type { SettingsCategory } from './SettingsSidebar';
 import SettingsContent from './SettingsContent';
 import GeneralSettings from './categories/GeneralSettings';
+import ClaudeCodeSettings from './categories/ClaudeCodeSettings';
 import AIAssistantSettings from './categories/AIAssistantSettings';
 import AgentModesSettings from './categories/AgentModesSettings';
 import LicenseSettings from './categories/LicenseSettings';
@@ -40,6 +41,8 @@ export default function UnifiedSettings({
     switch (activeCategory) {
       case 'general':
         return <GeneralSettings />;
+      case 'claude-code':
+        return <ClaudeCodeSettings />;
       case 'ai-assistant':
         return <AIAssistantSettings />;
       case 'agent-modes':
