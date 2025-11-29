@@ -16,6 +16,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { Toaster, toast } from "sonner";
 import "sonner/dist/styles.css";
 import "./sonner-custom.css";
+import { saveSessionBackup } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
@@ -1597,6 +1598,9 @@ function AppContent() {
       return newSessions;
     });
 
+    // Get session ID before try block (so it's accessible in catch)
+    let verifiedSessionId = chatSessionIds.get(activeId);
+
     try {
       // Build context from agent's conversation history
       const agentHistory = chatConversationHistoryRef.current.get(activeId) ?? [];
@@ -1621,6 +1625,16 @@ function AppContent() {
           reject(new Error('Aborted'));
         });
       });
+
+      // Verify session exists before passing it to backend
+      if (verifiedSessionId) {
+        try {
+          await invoke('verify_session_exists', { sessionId: verifiedSessionId });
+        } catch {
+          // Session doesn't exist, start fresh
+          verifiedSessionId = undefined;
+        }
+      }
 
       // Race between invoke and abort
       const response = await Promise.race([
@@ -1647,7 +1661,7 @@ function AppContent() {
             })) : undefined,
             cwd: workingDir,
             // ✅ CRITICAL FIX: Pass saved session ID to backend for conversation continuity
-            sessionId: chatSessionIds.get(activeId),
+            sessionId: verifiedSessionId,
             // ✅ New SDK 0.1.54+ features
             outputFormat: options?.outputFormat, // Structured outputs (beta)
             effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
@@ -1758,6 +1772,11 @@ function AppContent() {
             : typeof err === 'string'
               ? err
               : 'Unknown error';
+
+        // Lightweight backup on error
+        if (verifiedSessionId) {
+          saveSessionBackup(verifiedSessionId, chatSessions.get(activeId) ?? []);
+        }
 
         // Update message with error
         setChatSessions((prev) => {
@@ -6972,11 +6991,26 @@ You have access to all Bash tools to execute git commands like:
           alignItems: 'center',
           gap: '20px',
         }}>
+          {/* Quack Title with glow effect */}
           <div style={{
-            width: '30vh',
-            height: '30vh',
+            fontSize: '72px',
+            fontWeight: 'bold',
+            color: '#ffffff',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            letterSpacing: '4px',
+            textShadow: '0 0 20px rgba(77, 100, 180, 1), 0 0 40px rgba(77, 100, 180, 0.8), 0 0 60px rgba(77, 100, 180, 0.6), 0 0 80px rgba(77, 100, 180, 0.4)',
+            animation: 'quackTitleGlow 3s ease-in-out infinite',
+          }}>
+            Quack
+          </div>
+
+          <div style={{
+            width: '40vh',
+            height: '40vh',
             overflow: 'hidden',
+            borderRadius: '50%',
             animation: 'introVideoGlow 3s ease-in-out infinite',
+            boxShadow: '0 0 30px rgba(77, 100, 180, 0.5), 0 0 60px rgba(77, 100, 180, 0.3)',
           }}>
             <video
               autoPlay
@@ -6999,7 +7033,7 @@ You have access to all Bash tools to execute git commands like:
                 objectPosition: 'center',
               }}
             >
-            <source src="/video/introquackapp.mp4" type="video/mp4" />
+            <source src="/video/introquackappdef.mp4" type="video/mp4" />
             </video>
           </div>
           {/* Version with glow effect */}
@@ -7015,6 +7049,16 @@ You have access to all Bash tools to execute git commands like:
           </div>
         </div>
         <style>{`
+          @keyframes quackTitleGlow {
+            0%, 100% {
+              opacity: 0.9;
+              text-shadow: 0 0 20px rgba(77, 100, 180, 1), 0 0 40px rgba(77, 100, 180, 0.8), 0 0 60px rgba(77, 100, 180, 0.6), 0 0 80px rgba(77, 100, 180, 0.4);
+            }
+            50% {
+              opacity: 1;
+              text-shadow: 0 0 30px rgba(77, 100, 180, 1), 0 0 60px rgba(77, 100, 180, 0.9), 0 0 90px rgba(77, 100, 180, 0.7), 0 0 120px rgba(77, 100, 180, 0.5);
+            }
+          }
           @keyframes versionGlow {
             0%, 100% {
               opacity: 0.7;
@@ -8020,11 +8064,26 @@ You have access to all Bash tools to execute git commands like:
             alignItems: 'center',
             gap: '20px',
           }}>
+            {/* Quack Title with glow effect */}
             <div style={{
-              width: '30vh',
-              height: '30vh',
+              fontSize: '72px',
+              fontWeight: 'bold',
+              color: '#ffffff',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              letterSpacing: '4px',
+              textShadow: '0 0 20px rgba(77, 100, 180, 1), 0 0 40px rgba(77, 100, 180, 0.8), 0 0 60px rgba(77, 100, 180, 0.6), 0 0 80px rgba(77, 100, 180, 0.4)',
+              animation: 'quackTitleGlow 3s ease-in-out infinite',
+            }}>
+              Quack
+            </div>
+
+            <div style={{
+              width: '40vh',
+              height: '40vh',
               overflow: 'hidden',
+              borderRadius: '50%',
               animation: 'replayVideoGlow 3s ease-in-out infinite',
+              boxShadow: '0 0 30px rgba(77, 100, 180, 0.5), 0 0 60px rgba(77, 100, 180, 0.3)',
             }}>
               <video
                 autoPlay
@@ -8037,7 +8096,7 @@ You have access to all Bash tools to execute git commands like:
                   objectPosition: 'center',
                 }}
               >
-                <source src="/video/introquackapp.mp4" type="video/mp4" />
+                <source src="/video/introquackappdef.mp4" type="video/mp4" />
               </video>
             </div>
             {/* Version with glow effect */}
