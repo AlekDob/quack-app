@@ -231,6 +231,7 @@
 - **Real-time Streaming**: Messages stream in real-time with smooth rendering
 - **Tool Usage Display**: Visual widgets show tool calls (Read, Write, Edit, Bash, Grep, Glob, etc.)
 - **Session Persistence**: Sessions can be resumed using session IDs
+- **Agent Reset**: True fresh start via UUID regeneration (see [Agent Reset Mechanism](./05-features/agent-reset-mechanism.md))
 - **Permission Control**: Three permission modes (plan/act/bypass) for different trust levels
 - **Working Directory Binding**: AI can operate in context of specific terminal's working directory
 - **Cost Tracking**: Real-time cost tracking with USD amounts and token usage

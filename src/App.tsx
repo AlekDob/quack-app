@@ -4478,67 +4478,104 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [tauriAvailable]);
 
   const handleResetTerminal = useCallback(async (terminal: TerminalInfo) => {
-    // ✅ CRITICAL FIX: Get session ID BEFORE clearing state
-    const sessionId = chatSessionIds.get(terminal.id);
+    // 🦆 NEW APPROACH: Generate a completely NEW agent ID to ensure fresh SDK session
+    // This is the cleanest way to avoid Claude SDK context compaction issues
+    // The SDK associates sessions with agentId, so a new ID = completely fresh context
 
-    // ✅ Reset agent session in backend (Rust) - deletes session file AND clears internal state
+    const oldId = terminal.id;
+    const newId = crypto.randomUUID();
+    const sessionId = chatSessionIds.get(oldId);
+
+    console.log(`🔄 [Reset Agent] Starting reset for "${terminal.label}"`);
+    console.log(`  Old ID: ${oldId}`);
+    console.log(`  New ID: ${newId}`);
+    console.log(`  Old Session: ${sessionId || 'none'}`);
+
+    // 1. Abort any active stream for the old agent
+    if (sessionId) {
+      try {
+        const { abortSessionStream } = await import('./services/claudeSDK');
+        abortSessionStream(sessionId);
+        console.log(`✅ Aborted active stream for old session: ${sessionId}`);
+      } catch (error) {
+        console.warn('Failed to abort stream:', error);
+      }
+    }
+
+    // 2. Clean up old session in backend (optional - the file can stay as history)
     if (sessionId && tauriAvailable) {
       try {
         await invoke('reset_agent_session', {
-          agentId: terminal.id,
+          agentId: oldId,
           sessionId
         });
-        console.log(`✅ Backend session reset complete for agent ${terminal.id}`);
+        console.log(`✅ Backend cleanup complete for old agent ${oldId}`);
       } catch (error) {
         console.error('Failed to reset backend session:', error);
-        // Continue with frontend cleanup even if backend reset fails
+        // Continue anyway - old session file staying is not critical
       }
     }
 
-    // Clear chat session for this terminal
+    // 3. Update terminal with NEW ID while preserving all other properties
+    setTerminals((prev) =>
+      prev.map((t) =>
+        t.id === oldId
+          ? {
+              ...t,
+              id: newId,
+              // Reset session-related fields to ensure fresh start
+              sessionId: undefined,
+            }
+          : t
+      )
+    );
+
+    // 4. Clear old state mappings (they used oldId as key)
     setChatSessions((prev) => {
       const newMap = new Map(prev);
-      newMap.delete(terminal.id);
+      newMap.delete(oldId);
+      // Don't set anything for newId - let it start fresh
       return newMap;
     });
 
-    // Remove session ID from frontend state
     setChatSessionIds((prev) => {
-      // Remove usage sessions for this session ID
-      if (sessionId) {
-        setUsageSessions((prevSessions) =>
-          prevSessions.filter(s => s.session_id !== sessionId)
-        );
-      }
-
-      // Remove session ID mapping
       const newMap = new Map(prev);
-      newMap.delete(terminal.id);
+      newMap.delete(oldId);
+      // Don't set anything for newId - SDK will create new session on first message
       return newMap;
     });
 
-    // Reset token tracking for this agent (stamina back to 100%)
     setChatTokensMap((prev) => {
       const newMap = new Map(prev);
-      newMap.delete(terminal.id);
+      newMap.delete(oldId);
+      // Don't set anything for newId - stamina starts at 100%
       return newMap;
     });
 
-    // 🦆 NEW: Clear resume message flag so it doesn't show again for fresh session
-    resumeMessageShownRef.current.delete(terminal.id);
-
-    // 🦆 NEW: Abort any active stream for this agent to ensure clean slate
-    // Use sessionId if available (what claudeSDK tracks), otherwise use agentId as fallback
-    const streamKeyToAbort = sessionId || terminal.id;
-    try {
-      const { abortSessionStream } = await import('./services/claudeSDK');
-      abortSessionStream(streamKeyToAbort);
-      console.log(`✅ Aborted active stream for agent ${terminal.id} (session: ${streamKeyToAbort})`);
-    } catch (error) {
-      console.warn('Failed to abort stream:', error);
+    // 5. Clean up usage sessions for old session
+    if (sessionId) {
+      setUsageSessions((prevSessions) =>
+        prevSessions.filter(s => s.session_id !== sessionId)
+      );
     }
 
-    toast.success(`Agent reset: ${terminal.label} - Stamina restored to 100%! 🦆`);
+    // 6. Clear resume message flag for both old and new IDs
+    resumeMessageShownRef.current.delete(oldId);
+    resumeMessageShownRef.current.delete(newId);
+
+    // 7. Update active terminal ID if this was the active one
+    setActiveId((prevActiveId) =>
+      prevActiveId === oldId ? newId : prevActiveId
+    );
+
+    // 8. Update agentChats to remove old ID and not carry over any state
+    setAgentChats((prev) =>
+      prev.filter((chat) => chat.id !== oldId)
+      // Don't add newId - let it be created fresh on first interaction
+    );
+
+    console.log(`✅ [Reset Agent] Complete! "${terminal.label}" now has fresh ID: ${newId}`);
+    toast.success(`Agent reset: ${terminal.label} - Fresh context, stamina 100%! 🦆`);
   }, [chatSessionIds, tauriAvailable]);
 
   const handleReorderTerminals = useCallback((reorderedIds: string[]) => {
