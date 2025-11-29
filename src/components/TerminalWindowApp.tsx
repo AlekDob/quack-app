@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
+import { useTerminalStore } from '../stores/terminalStore';
 import type { ProjectTerminal } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
 import './TerminalWindowApp.css';
@@ -36,10 +37,19 @@ interface ContextMenuState {
  */
 export function TerminalWindowApp() {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [terminals, setTerminals] = useState<ProjectTerminal[]>([]);
-  const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  // Use Zustand store for terminals persistence (survives agent reset)
+  const {
+    projectTerminals: terminals,
+    activeProjectTerminalId: activeTerminalId,
+    addProjectTerminal,
+    removeProjectTerminal,
+    updateProjectTerminal,
+    setActiveProjectTerminalId: setActiveTerminalId,
+    getProjectTerminalsByPath,
+  } = useTerminalStore();
 
   // Context menu and editing state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -58,8 +68,11 @@ export function TerminalWindowApp() {
   // Create new terminal for a project
   const handleCreateTerminal = useCallback(async (projectPath: string) => {
     try {
+      // Count existing terminals for this project
+      const existingCount = getProjectTerminalsByPath(projectPath).length;
+
       const result = await invoke<{ id: string; label: string; color: string; cwd: string; alive: boolean }>('create_terminal', {
-        label: `Terminal ${terminals.length + 1}`,
+        label: `Terminal ${existingCount + 1}`,
         color: '#4dd4b3',
         cwd: projectPath,
       });
@@ -75,7 +88,8 @@ export function TerminalWindowApp() {
         createdAt: Date.now(),
       };
 
-      setTerminals(prev => [...prev, newTerminal]);
+      // Add to Zustand store (persisted)
+      addProjectTerminal(newTerminal);
       setActiveTerminalId(result.id);
       setSelectedProject(projectPath);
 
@@ -89,7 +103,7 @@ export function TerminalWindowApp() {
     } catch (error) {
       console.error('Failed to create terminal:', error);
     }
-  }, [terminals.length]);
+  }, [addProjectTerminal, setActiveTerminalId, getProjectTerminalsByPath]);
 
   // Wait for terminal to be fully ready before executing command
   const waitForTerminalReady = useCallback((timeout: number = 1000): Promise<void> => {
@@ -102,8 +116,11 @@ export function TerminalWindowApp() {
   // Create terminal with initial command execution
   const handleCreateTerminalWithCommand = useCallback(async (initialCommand: InitialCommand) => {
     try {
+      // Count existing terminals for this project
+      const existingCount = getProjectTerminalsByPath(initialCommand.projectPath).length;
+
       const result = await invoke<{ id: string; label: string; color: string; cwd: string; alive: boolean }>('create_terminal', {
-        label: initialCommand.terminalLabel || `Terminal ${terminals.length + 1}`,
+        label: initialCommand.terminalLabel || `Terminal ${existingCount + 1}`,
         color: '#4dd4b3',
         cwd: initialCommand.projectPath,
       });
@@ -119,7 +136,8 @@ export function TerminalWindowApp() {
         createdAt: Date.now(),
       };
 
-      setTerminals(prev => [...prev, newTerminal]);
+      // Add to Zustand store (persisted)
+      addProjectTerminal(newTerminal);
       setActiveTerminalId(result.id);
       setSelectedProject(initialCommand.projectPath);
 
@@ -149,13 +167,15 @@ export function TerminalWindowApp() {
     } catch (error) {
       console.error('Failed to create terminal with command:', error);
     }
-  }, [terminals.length, waitForTerminalReady]);
+  }, [addProjectTerminal, setActiveTerminalId, getProjectTerminalsByPath, waitForTerminalReady]);
 
   // Close terminal
   const handleCloseTerminal = useCallback(async (terminalId: string) => {
     try {
       await invoke('close_terminal', { id: terminalId });
-      setTerminals(prev => prev.filter(t => t.id !== terminalId));
+
+      // Remove from Zustand store (persisted)
+      removeProjectTerminal(terminalId);
 
       // Select another terminal if closing active one
       if (activeTerminalId === terminalId) {
@@ -165,7 +185,7 @@ export function TerminalWindowApp() {
     } catch (error) {
       console.error('Failed to close terminal:', error);
     }
-  }, [activeTerminalId, terminals]);
+  }, [activeTerminalId, terminals, removeProjectTerminal, setActiveTerminalId]);
 
   // Toggle project expansion
   const toggleProject = (projectPath: string) => {
@@ -182,17 +202,15 @@ export function TerminalWindowApp() {
 
   // Update terminal name
   const updateTerminalName = useCallback((terminalId: string, newName: string) => {
-    setTerminals(prev => prev.map(t =>
-      t.id === terminalId ? { ...t, name: newName } : t
-    ));
-  }, []);
+    // Update in Zustand store (persisted)
+    updateProjectTerminal(terminalId, { name: newName });
+  }, [updateProjectTerminal]);
 
   // Update terminal color
   const updateTerminalColor = useCallback((terminalId: string, newColor: string) => {
-    setTerminals(prev => prev.map(t =>
-      t.id === terminalId ? { ...t, color: newColor } : t
-    ));
-  }, []);
+    // Update in Zustand store (persisted)
+    updateProjectTerminal(terminalId, { color: newColor });
+  }, [updateProjectTerminal]);
 
   // Context menu handlers
   const handleContextMenu = useCallback((e: React.MouseEvent, terminalId: string) => {
@@ -332,6 +350,32 @@ export function TerminalWindowApp() {
 
     return groups;
   }, [terminals]);
+
+  // Verify and cleanup stale terminals on mount
+  // Terminals persist in Zustand, but PTY sessions die when app restarts
+  useEffect(() => {
+    const verifyTerminals = async () => {
+      for (const terminal of terminals) {
+        try {
+          // Try to check if PTY session is still alive
+          const status = await invoke<{ alive: boolean }>('get_terminal_status', { id: terminal.id });
+          if (!status.alive) {
+            console.log(`[TerminalWindowApp] Terminal ${terminal.id} PTY is dead, removing...`);
+            removeProjectTerminal(terminal.id);
+          }
+        } catch {
+          // Terminal doesn't exist in backend, remove from store
+          console.log(`[TerminalWindowApp] Terminal ${terminal.id} not found in backend, removing...`);
+          removeProjectTerminal(terminal.id);
+        }
+      }
+    };
+
+    // Run verification after a short delay to let Rust backend initialize
+    const timer = setTimeout(verifyTerminals, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Parse projects from URL params on mount and handle initial command
   useEffect(() => {
