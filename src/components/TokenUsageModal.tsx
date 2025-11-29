@@ -7,8 +7,10 @@ interface TokenUsageModalProps {
   outputTokens: number;
   cacheCreationTokens: number;
   cacheReadTokens: number;
+  totalCost?: number; // total_cost_usd from Claude SDK (authoritative)
   maxTokens: number;
   percentage: number;
+  overhead?: number; // Dynamic overhead calculated from project files (default: 38000)
   status: {
     level: string;
     color: string;
@@ -38,72 +40,68 @@ const formatTokensK = (tokens: number): string => {
   return tokens.toString();
 };
 
+// Format cost in USD (e.g., 0.0234 -> "$0.0234")
+const formatCostUsd = (cost: number): string => {
+  if (cost === 0) return '$0.00';
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  if (cost < 1) return `$${cost.toFixed(3)}`;
+  return `$${cost.toFixed(2)}`;
+};
+
 // Breakdown calculation
 // IMPORTANT: The SDK's cache_creation_input_tokens and cache_read_input_tokens
 // include ALL tokens being cached (system + tools + memory + previous messages),
 // NOT just the overhead. So we CANNOT use them as a proxy for overhead.
 //
-// The correct approach is to use FIXED estimates based on Claude CLI /context output:
-// - System prompt: ~4.2k tokens
-// - System tools: ~17.5k tokens
-// - MCP tools: ~5.8k tokens
-// - Memory files: ~10.5k tokens
-// - Total overhead: ~38k tokens
+// The overhead is now calculated dynamically per-project based on:
+// - CLAUDE.md files (global + project)
+// - MCP servers installed (.mcp.json)
+// - Base system overhead (system prompt + tools + memory)
 interface ContextBreakdown {
   messages: number;        // Actual message tokens (input + output)
-  overhead: number;        // Fixed overhead estimate (system + MCP + memory + tools)
+  overhead: number;        // Overhead (dynamic or default ~38k)
+  autoCompact: number;     // Auto-compact cost reserve (45k)
 }
 
-// Fixed overhead costs based on typical Claude Code /context output
-// These values are consistent across sessions
-const FIXED_OVERHEAD = {
-  systemPrompt: 4200,    // System prompt, instructions
-  systemTools: 17500,    // Built-in tool definitions (read, write, bash, etc.)
-  mcpTools: 5800,        // MCP tool definitions
-  memoryFiles: 10500,    // Memory MCP context, CLAUDE.md, project context
-  get total() { return this.systemPrompt + this.systemTools + this.mcpTools + this.memoryFiles; }
-};
+// Default overhead estimate based on Claude CLI /context output (~38k tokens)
+const DEFAULT_OVERHEAD = 38000;
+
+// Auto-compact cost: estimated tokens used when auto-compact triggers at 45k free
+const AUTO_COMPACT_COST = 45000;
 
 /**
  * Calculate context breakdown
  *
- * We use FIXED overhead estimates because the SDK's cache tokens include
- * previous messages, not just overhead. The overhead is relatively constant
- * across sessions for the same project configuration.
- *
  * Messages = inputTokens + outputTokens (accumulated from the session)
- * Overhead = fixed ~38k (system + tools + MCP + memory)
+ * Overhead = dynamic (from project files) or default ~38k
+ * Auto-Compact = reserve for auto-compact operation (45k)
  */
 const calculateBreakdown = (
   inputTokens: number,
   outputTokens: number,
-  _cacheCreationTokens: number,  // Not used - includes messages, not just overhead
-  _cacheReadTokens: number       // Not used - includes messages, not just overhead
+  overhead: number = DEFAULT_OVERHEAD
 ): ContextBreakdown => {
   // Messages = actual user input/output tokens from the session
   const messagesTokens = inputTokens + outputTokens;
 
-  // Overhead = fixed estimate based on Claude CLI /context output
-  const overhead = FIXED_OVERHEAD.total;
-
   return {
     messages: messagesTokens,
     overhead,
+    autoCompact: AUTO_COMPACT_COST,
   };
 };
 
 /**
- * Calculate total context usage including overhead
+ * Calculate total context usage including overhead and auto-compact reserve
  * This is what actually counts against the 200k limit
  */
 const calculateTotalContextUsage = (
   inputTokens: number,
   outputTokens: number,
-  cacheCreationTokens: number,
-  cacheReadTokens: number
+  overhead: number = DEFAULT_OVERHEAD
 ): number => {
-  const breakdown = calculateBreakdown(inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens);
-  return breakdown.messages + breakdown.overhead;
+  const breakdown = calculateBreakdown(inputTokens, outputTokens, overhead);
+  return breakdown.messages + breakdown.overhead + breakdown.autoCompact;
 };
 
 export default function TokenUsageModal({
@@ -111,8 +109,10 @@ export default function TokenUsageModal({
   outputTokens,
   cacheCreationTokens,
   cacheReadTokens,
+  totalCost = 0,
   maxTokens,
   percentage,
+  overhead = DEFAULT_OVERHEAD,
   status,
   onClose,
   onCompact,
@@ -124,13 +124,13 @@ export default function TokenUsageModal({
   onLocalReset,
   compactFailed = false,
 }: TokenUsageModalProps) {
-  // Calculate context breakdown using REAL cache data from SDK
-  const breakdown = calculateBreakdown(inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens);
+  // Calculate context breakdown using dynamic overhead
+  const breakdown = calculateBreakdown(inputTokens, outputTokens, overhead);
 
-  // Total context usage = messages + overhead (from real cache data or estimated)
-  const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens);
+  // Total context usage = messages + overhead + auto-compact reserve
+  const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens, overhead);
 
-  // Remaining tokens = max - total context usage
+  // Remaining tokens = max - total context usage (auto-compact already included)
   const remainingTokens = Math.max(0, maxTokens - totalContextUsage);
 
   // INVERTED: Stamina percentage (100% = fresh, 0% = exhausted)
@@ -253,18 +253,27 @@ export default function TokenUsageModal({
                 <div className="context-breakdown-row">
                   <span className="context-breakdown-label">
                     Overhead
-                    <span className="context-breakdown-source" title="Fixed estimate based on Claude CLI /context">*</span>
+                    <span className="context-breakdown-source" title="System + tools + CLAUDE.md + MCP servers">*</span>
                   </span>
                   <span className="context-breakdown-value">{formatTokensK(breakdown.overhead)}</span>
                 </div>
+                <div className="context-breakdown-row">
+                  <span className="context-breakdown-label">
+                    Auto-Compact
+                    <span className="context-breakdown-source" title="Reserved tokens for auto-compact operation">**</span>
+                  </span>
+                  <span className="context-breakdown-value">{formatTokensK(breakdown.autoCompact)}</span>
+                </div>
               </div>
               <div className="context-breakdown-note">
-                * Overhead: system prompt + tools + MCP + memory (~38k)
+                * Overhead: system + tools + CLAUDE.md + MCP servers
+                <br />
+                ** Auto-Compact: reserved for conversation compaction
               </div>
             </div>
           </div>
 
-          {/* Total/Free Summary */}
+          {/* Total/Free/Cost Summary */}
           <div className="context-summary">
             <div className="context-summary-row">
               <span className="context-summary-label">TOTAL</span>
@@ -274,6 +283,12 @@ export default function TokenUsageModal({
               <span className="context-summary-label">FREE</span>
               <span className="context-summary-value">{formatTokensK(remainingTokens)}</span>
             </div>
+            {totalCost > 0 && (
+              <div className="context-summary-row cost">
+                <span className="context-summary-label">COST</span>
+                <span className="context-summary-value">{formatCostUsd(totalCost)}</span>
+              </div>
+            )}
           </div>
 
           {/* Max Plan Status (if available) */}

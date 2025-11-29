@@ -11,7 +11,9 @@ interface TokenUsageIndicatorProps {
   outputTokens: number;
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
+  totalCost?: number; // total_cost_usd from Claude SDK (authoritative)
   maxTokens?: number; // Default: 200000
+  overhead?: number; // Dynamic overhead calculated from project files (default: 38000)
   onCompact?: () => void;
   onClear?: () => void;
 }
@@ -25,12 +27,20 @@ interface DuckStatus {
   message: string;
 }
 
+// Default overhead estimate based on Claude CLI /context output (~38k tokens)
+const DEFAULT_OVERHEAD = 38000;
+
+// Auto-compact cost: estimated tokens used when auto-compact triggers
+const AUTO_COMPACT_COST = 45000;
+
 function TokenUsageIndicator({
   inputTokens,
   outputTokens,
   cacheCreationTokens = 0,
   cacheReadTokens = 0,
+  totalCost = 0,
   maxTokens = 200000,
+  overhead = DEFAULT_OVERHEAD,
   onCompact,
   onClear,
 }: TokenUsageIndicatorProps) {
@@ -53,24 +63,23 @@ function TokenUsageIndicator({
   const clearHistory = () => {};
   const exportHistory = () => '';
 
-  // Fixed overhead estimate based on Claude CLI /context output
-  // The SDK's cache tokens include messages, NOT just overhead, so we use fixed estimates
-  // - System prompt: ~4.2k tokens
-  // - System tools: ~17.5k tokens
-  // - MCP tools: ~5.8k tokens
-  // - Memory files: ~10.5k tokens
-  // Total: ~38k tokens
-  const FIXED_OVERHEAD = 38000;
-
-  // Total context = messages + fixed overhead
+  // Total context = messages + overhead (dynamic or default)
+  // The overhead is calculated per-project based on CLAUDE.md files and MCP servers
   const messageTokens = inputTokens + outputTokens;
-  const totalContextUsage = messageTokens + FIXED_OVERHEAD;
+  const totalContextUsage = messageTokens + overhead;
 
   // Calculate usage percentage based on total context (not just messages)
   const usagePercentage = (totalContextUsage / maxTokens) * 100;
 
-  // INVERTED: Stamina starts at 100% and decreases as tokens are used
-  const staminaPercentage = Math.max(0, 100 - usagePercentage);
+  // NEW STAMINA LOGIC: Based on FREE tokens (usable space)
+  // maxUsableTokens = space available for messages (excluding overhead + auto-compact)
+  const maxUsableTokens = maxTokens - overhead - AUTO_COMPACT_COST;
+  const remainingUsableTokens = Math.max(0, maxUsableTokens - messageTokens);
+
+  // Stamina = percentage of usable space remaining
+  // Fresh agent (0 messages): 100%
+  // Fully used (maxUsableTokens messages): 0%
+  const staminaPercentage = Math.max(0, Math.min(100, (remainingUsableTokens / maxUsableTokens) * 100));
 
   // Debug logging (disabled for performance)
   // console.log('[TokenUsageIndicator] Debug:', {
@@ -193,8 +202,10 @@ function TokenUsageIndicator({
           outputTokens={outputTokens}
           cacheCreationTokens={cacheCreationTokens}
           cacheReadTokens={cacheReadTokens}
+          totalCost={totalCost}
           maxTokens={maxTokens}
           percentage={usagePercentage}
+          overhead={overhead}
           status={status}
           onClose={() => setShowModal(false)}
           onCompact={onCompact}
@@ -218,11 +229,13 @@ function TokenUsageIndicator({
 
 // Export with memo to prevent unnecessary re-renders
 export default memo(TokenUsageIndicator, (prevProps, nextProps) => {
-  // Only re-render if token counts actually changed
+  // Only re-render if token counts, cost, or overhead actually changed
   return (
     prevProps.inputTokens === nextProps.inputTokens &&
     prevProps.outputTokens === nextProps.outputTokens &&
     prevProps.cacheCreationTokens === nextProps.cacheCreationTokens &&
-    prevProps.cacheReadTokens === nextProps.cacheReadTokens
+    prevProps.cacheReadTokens === nextProps.cacheReadTokens &&
+    prevProps.totalCost === nextProps.totalCost &&
+    prevProps.overhead === nextProps.overhead
   );
 });

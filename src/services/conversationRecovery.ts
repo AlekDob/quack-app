@@ -381,3 +381,107 @@ export function wouldExceedLimit(
   const status = calculateTokenBudget(futureInputTokens, futureOutputTokens, model);
   return !status.canSendMessage;
 }
+
+/**
+ * Project-specific overhead calculation result
+ */
+export interface ProjectOverhead {
+  /** Base system overhead (system prompt, tools) - fixed */
+  baseSystem: number;
+  /** Tokens from global CLAUDE.md (~/.claude/CLAUDE.md) */
+  globalClaudeMd: number;
+  /** Tokens from project CLAUDE.md ({cwd}/CLAUDE.md) */
+  projectClaudeMd: number;
+  /** Tokens from MCP server definitions */
+  mcpServers: number;
+  /** Base memory overhead */
+  memoryBase: number;
+  /** Total calculated overhead */
+  total: number;
+  /** Number of MCP servers detected */
+  mcpServerCount: number;
+  /** Source of the calculation */
+  source: 'calculated' | 'fallback';
+}
+
+// Base overhead constants (from Claude CLI /context analysis)
+const BASE_OVERHEAD = {
+  systemPrompt: 4200,    // System prompt and instructions
+  systemTools: 17500,    // Built-in tool definitions
+  memoryBase: 8300,      // Memory MCP baseline
+  mcpPerServer: 1500,    // ~1.5k tokens per MCP server
+};
+
+/**
+ * Calculate project-specific overhead based on actual files
+ *
+ * This function reads CLAUDE.md files and .mcp.json to calculate
+ * a more accurate overhead for the specific project.
+ *
+ * Performance: ~5-10ms (file reads are fast)
+ *
+ * @param cwd - Current working directory (project path)
+ * @param homePath - User home directory path
+ * @param readFile - Function to read file content (Tauri invoke)
+ * @returns ProjectOverhead with detailed breakdown
+ */
+export async function calculateProjectOverhead(
+  cwd: string,
+  homePath: string,
+  readFile: (path: string) => Promise<string>
+): Promise<ProjectOverhead> {
+  try {
+    // Parallel file reads for better performance
+    const [globalClaudeMdContent, projectClaudeMdContent, mcpConfigContent] = await Promise.all([
+      readFile(`${homePath}/.claude/CLAUDE.md`).catch(() => ''),
+      readFile(`${cwd}/CLAUDE.md`).catch(() => ''),
+      readFile(`${cwd}/.mcp.json`).catch(() => '{}'),
+    ]);
+
+    // Calculate tokens from CLAUDE.md files (~4 chars = 1 token)
+    const globalClaudeMdTokens = estimateTokens(globalClaudeMdContent);
+    const projectClaudeMdTokens = estimateTokens(projectClaudeMdContent);
+
+    // Parse MCP config and count servers
+    let mcpServerCount = 0;
+    try {
+      const mcpConfig = JSON.parse(mcpConfigContent);
+      mcpServerCount = Object.keys(mcpConfig.mcpServers || {}).length;
+    } catch {
+      // Invalid JSON, assume no MCP servers
+      mcpServerCount = 0;
+    }
+
+    // Calculate MCP overhead
+    const mcpTokens = mcpServerCount * BASE_OVERHEAD.mcpPerServer;
+
+    // Calculate total
+    const baseSystem = BASE_OVERHEAD.systemPrompt + BASE_OVERHEAD.systemTools;
+    const total = baseSystem + globalClaudeMdTokens + projectClaudeMdTokens + mcpTokens + BASE_OVERHEAD.memoryBase;
+
+    return {
+      baseSystem,
+      globalClaudeMd: globalClaudeMdTokens,
+      projectClaudeMd: projectClaudeMdTokens,
+      mcpServers: mcpTokens,
+      memoryBase: BASE_OVERHEAD.memoryBase,
+      total,
+      mcpServerCount,
+      source: 'calculated',
+    };
+  } catch (error) {
+    // Fallback to estimated overhead if calculation fails
+    console.warn('Failed to calculate project overhead, using fallback:', error);
+    return {
+      baseSystem: BASE_OVERHEAD.systemPrompt + BASE_OVERHEAD.systemTools,
+      globalClaudeMd: 2200,  // Default estimate
+      projectClaudeMd: 0,
+      mcpServers: BASE_OVERHEAD.mcpPerServer * 2, // Assume 2 servers
+      memoryBase: BASE_OVERHEAD.memoryBase,
+      total: ESTIMATED_OVERHEAD.total,
+      mcpServerCount: 2,
+      source: 'fallback',
+    };
+  }
+}
+

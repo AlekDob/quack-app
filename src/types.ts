@@ -36,6 +36,7 @@ export interface AgentChat {
   outputTokens?: number;
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
+  totalCost?: number; // total_cost_usd from Claude SDK (authoritative)
 }
 
 export interface TerminalInfo {

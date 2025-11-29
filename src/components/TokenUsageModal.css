@@ -773,6 +773,16 @@
   text-shadow: none;
 }
 
+/* Cost row styling */
+.context-summary-row.cost {
+  text-align: center;
+}
+
+.context-summary-row.cost .context-summary-value {
+  color: #f7931e;
+  text-shadow: 0 0 8px rgba(247, 147, 30, 0.5);
+}
+
 /* ============================================ */
 /* CONTEXT BREAKDOWN CACHE STYLES */
 /* ============================================ */

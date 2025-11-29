@@ -84,6 +84,7 @@ import {
   saveAgentChatsToStorage,
   loadAgentChatsFromStorage,
 } from "./services/agentChatStorage";
+import { calculateProjectOverhead } from "./services/conversationRecovery";
 import { getDuckdroidUrl } from "./utils/agentAvatars";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import type { DroidMetadata } from "./components/modal-steps/types";
@@ -547,14 +548,24 @@ function AppContent() {
     outputTokens: number;
     cacheCreationTokens: number;
     cacheReadTokens: number;
+    totalCost: number; // total_cost_usd from Claude SDK result message
+    overhead?: number; // Dynamic overhead calculated from project files
   }>>(new Map());
+
+  // Project overhead cache - maps cwd to calculated overhead
+  // Calculated once per project when agent is activated
+  const [projectOverheadCache, setProjectOverheadCache] = useState<Map<string, number>>(new Map());
 
   // Session ID tracking per agent - for resuming sessions in terminal
   const [chatSessionIds, setChatSessionIds] = useState<Map<string, string>>(new Map());
 
   // 🦆 STAMINA FIX: Centralized token tracking helper to avoid code duplication
   // This function is called from all event listeners (Multi-Listener, Pre-warm, ensureListenerReady)
-  const handleTokenUpdate = useCallback((agentId: string, usage: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }) => {
+  const handleTokenUpdate = useCallback((
+    agentId: string,
+    usage: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number },
+    totalCostUsd?: number // total_cost_usd from result message (authoritative)
+  ) => {
     setChatTokensMap((prev) => {
       const newMap = new Map(prev);
       const currentTokens = newMap.get(agentId) || {
@@ -562,6 +573,7 @@ function AppContent() {
         outputTokens: 0,
         cacheCreationTokens: 0,
         cacheReadTokens: 0,
+        totalCost: 0,
       };
 
       const updatedTokens = {
@@ -569,13 +581,15 @@ function AppContent() {
         outputTokens: currentTokens.outputTokens + usage.output_tokens,
         cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
         cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+        // total_cost_usd is cumulative from SDK, so we just set it (not add)
+        totalCost: totalCostUsd ?? currentTokens.totalCost,
       };
 
       newMap.set(agentId, updatedTokens);
 
       const total = updatedTokens.inputTokens + updatedTokens.outputTokens +
                    updatedTokens.cacheCreationTokens + updatedTokens.cacheReadTokens;
-      console.log(`[Token Tracking] 🦆 Accumulated tokens for agent ${agentId}: ${total} total`, updatedTokens);
+      console.log(`[Token Tracking] 🦆 Accumulated tokens for agent ${agentId}: ${total} total, cost: $${updatedTokens.totalCost.toFixed(4)}`, updatedTokens);
 
       // 🦆 STAMINA PRESERVATION: Update agentChats with new token counts for persistence
       setAgentChats((prevChats) => {
@@ -716,6 +730,50 @@ function AppContent() {
         setAvailableDroids([]);
       });
   }, [activeTerminal?.cwd, explorerPath]);
+
+  // Calculate project overhead when working directory changes
+  // This is a lightweight operation (~5-10ms) that reads CLAUDE.md files and .mcp.json
+  useEffect(() => {
+    const workingDir = activeTerminal?.cwd || explorerPath;
+    if (!workingDir || !tauriAvailable) {
+      return;
+    }
+
+    // Skip if already calculated for this directory
+    if (projectOverheadCache.has(workingDir)) {
+      return;
+    }
+
+    console.log('[Overhead] Calculating project overhead for:', workingDir);
+
+    // Helper to read file content via Tauri
+    const readFileContent = async (path: string): Promise<string> => {
+      try {
+        return await invoke<string>('read_file_content', { path });
+      } catch {
+        return '';
+      }
+    };
+
+    // Get home directory and calculate overhead
+    (async () => {
+      try {
+        const homePath = await invoke<string>('get_home_directory');
+        const overhead = await calculateProjectOverhead(workingDir, homePath, readFileContent);
+
+        console.log('[Overhead] Calculated overhead for', workingDir, ':', overhead);
+
+        setProjectOverheadCache(prev => {
+          const newMap = new Map(prev);
+          newMap.set(workingDir, overhead.total);
+          return newMap;
+        });
+      } catch (err) {
+        console.error('[Overhead] Failed to calculate overhead:', err);
+        // Keep default overhead (38k) if calculation fails
+      }
+    })();
+  }, [activeTerminal?.cwd, explorerPath, tauriAvailable, projectOverheadCache]);
 
   // Update project context when active terminal changes
   useEffect(() => {
@@ -1046,9 +1104,10 @@ function AppContent() {
           // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
           // Note: result.usage contains tokens for the SINGLE turn, not cumulative session total
           // The helper function accumulates across all turns to get total session usage
+          // total_cost_usd is cumulative and authoritative from SDK
           if (claudeEvent.type === 'result' && claudeEvent.usage) {
-            console.log(`[Multi-Listener] 🦆 Token update for ${agentId}:`, claudeEvent.usage);
-            handleTokenUpdate(agentId, claudeEvent.usage);
+            console.log(`[Multi-Listener] 🦆 Token update for ${agentId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
+            handleTokenUpdate(agentId, claudeEvent.usage, claudeEvent.total_cost_usd);
           }
 
           // Auto-refresh FileExplorer when files are created/modified
@@ -1198,9 +1257,10 @@ function AppContent() {
       });
 
       // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
+      // total_cost_usd is cumulative and authoritative from SDK
       if (claudeEvent.type === 'result' && claudeEvent.usage) {
-        console.log(`[Pre-warm] 🦆 Token update for ${activeId}:`, claudeEvent.usage);
-        handleTokenUpdate(activeId, claudeEvent.usage);
+        console.log(`[Pre-warm] 🦆 Token update for ${activeId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
+        handleTokenUpdate(activeId, claudeEvent.usage, claudeEvent.total_cost_usd);
       }
     }).then((unlisten) => {
       activeListenersRef.current.set(activeId, unlisten);
@@ -1314,9 +1374,10 @@ function AppContent() {
         });
 
         // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
+        // total_cost_usd is cumulative and authoritative from SDK
         if (claudeEvent.type === 'result' && claudeEvent.usage) {
-          console.log(`[ensureListenerReady] 🦆 Token update for ${agentId}:`, claudeEvent.usage);
-          handleTokenUpdate(agentId, claudeEvent.usage);
+          console.log(`[ensureListenerReady] 🦆 Token update for ${agentId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
+          handleTokenUpdate(agentId, claudeEvent.usage, claudeEvent.total_cost_usd);
         }
 
         // Handle completion event
@@ -1896,6 +1957,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           outputTokens: reducedOutputTokens,
           cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
           cacheReadTokens: currentTokens?.cacheReadTokens || 0,
+          totalCost: currentTokens?.totalCost || 0, // Preserve cost through compaction
         });
         return newMap;
       });
@@ -2079,18 +2141,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [activeId, chatLoadingMap]);
 
   const currentAgentTokens = useMemo(() => {
-    return activeId ? (chatTokensMap.get(activeId) ?? {
+    const tokens = activeId ? (chatTokensMap.get(activeId) ?? {
       inputTokens: 0,
       outputTokens: 0,
       cacheCreationTokens: 0,
       cacheReadTokens: 0,
+      totalCost: 0,
     }) : {
       inputTokens: 0,
       outputTokens: 0,
       cacheCreationTokens: 0,
       cacheReadTokens: 0,
+      totalCost: 0,
     };
-  }, [activeId, chatTokensMap]);
+    // Get project overhead from cache based on current cwd
+    const cwd = activeTerminal?.cwd || explorerPath || '';
+    const overhead = cwd ? projectOverheadCache.get(cwd) : undefined;
+    return { ...tokens, overhead };
+  }, [activeId, chatTokensMap, activeTerminal?.cwd, explorerPath, projectOverheadCache]);
 
   const selectedGitEntry = useMemo(() => {
     if (!gitSummary || !selectedGitPath) {
@@ -4044,6 +4112,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               outputTokens: number;
               cacheCreationTokens: number;
               cacheReadTokens: number;
+              totalCost: number;
             }>();
             const initialSessionIds = new Map<string, string>();
 
@@ -4055,6 +4124,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
                   outputTokens: agent.outputTokens ?? 0,
                   cacheCreationTokens: agent.cacheCreationTokens ?? 0,
                   cacheReadTokens: agent.cacheReadTokens ?? 0,
+                  totalCost: agent.totalCost ?? 0, // Restore cost on app restart
                 });
               }
 
@@ -4100,6 +4170,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               outputTokens: number;
               cacheCreationTokens: number;
               cacheReadTokens: number;
+              totalCost: number;
             }>();
             const initialSessionIds = new Map<string, string>();
 
@@ -4111,6 +4182,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
                   outputTokens: agent.outputTokens ?? 0,
                   cacheCreationTokens: agent.cacheCreationTokens ?? 0,
                   cacheReadTokens: agent.cacheReadTokens ?? 0,
+                  totalCost: agent.totalCost ?? 0, // Restore cost on app restart
                 });
               }
 
@@ -6616,6 +6688,7 @@ You have access to all Bash tools to execute git commands like:
           outputTokens: sessionDetails.usage.output_tokens,
           cacheCreationTokens: sessionDetails.usage.cache_creation_input_tokens,
           cacheReadTokens: sessionDetails.usage.cache_read_input_tokens,
+          totalCost: sessionDetails.total_cost ?? 0, // Restore cost from session
         });
         return updated;
       });

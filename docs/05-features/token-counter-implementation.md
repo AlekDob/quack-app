@@ -1028,6 +1028,215 @@ If you have a significantly different configuration, you can adjust the `FIXED_O
 
 ---
 
-*Last updated: 2025-01-27*
-*Author: Jack, Quack Agency CEO 🦆*
-*Version: 1.1*
+## Dynamic Overhead Calculation (2025-01-27)
+
+### The Enhancement
+
+Building on the fixed overhead fix, we now calculate overhead **dynamically per project** based on actual files:
+
+1. **CLAUDE.md files** - Global (`~/.claude/CLAUDE.md`) and project (`{cwd}/CLAUDE.md`)
+2. **MCP servers** - Counted from `.mcp.json` in project root
+3. **Base overhead** - System prompt + tools + memory (fixed)
+
+### Implementation
+
+**Files Modified:**
+
+1. **`src/services/conversationRecovery.ts`** - New `calculateProjectOverhead()` function:
+   ```typescript
+   export async function calculateProjectOverhead(
+     cwd: string,
+     homePath: string,
+     readFile: (path: string) => Promise<string>
+   ): Promise<ProjectOverhead> {
+     // Reads CLAUDE.md files and .mcp.json
+     // Converts characters to tokens (~4 chars = 1 token)
+     // Returns breakdown with total overhead
+   }
+   ```
+
+2. **`src/App.tsx`** - Added `projectOverheadCache` state and calculation effect:
+   ```typescript
+   // Cache overhead per project directory
+   const [projectOverheadCache, setProjectOverheadCache] = useState<Map<string, number>>(new Map());
+
+   // Calculate on directory change (~5-10ms)
+   useEffect(() => {
+     // Read files via Tauri invoke
+     // Cache result for performance
+   }, [activeTerminal?.cwd, explorerPath]);
+   ```
+
+3. **`src/components/TokenUsageIndicator.tsx`** - Accepts `overhead` prop
+4. **`src/components/TokenUsageModal.tsx`** - Accepts `overhead` prop
+5. **`src/components/ChatView.tsx`** - Passes `overhead` in `sessionTokens`
+
+### Overhead Breakdown
+
+```typescript
+interface ProjectOverhead {
+  baseSystem: number;      // ~21,700 (system + tools - fixed)
+  globalClaudeMd: number;  // Calculated from ~/.claude/CLAUDE.md
+  projectClaudeMd: number; // Calculated from {cwd}/CLAUDE.md
+  mcpServers: number;      // ~1,500 per MCP server
+  memoryBase: number;      // ~8,300 (memory baseline)
+  total: number;
+}
+```
+
+### Performance
+
+- **Calculation time**: ~5-10ms per project
+- **Caching**: Results cached per directory, calculated once
+- **File reads**: Parallel reads for CLAUDE.md files and .mcp.json
+- **Fallback**: Uses default 38k if calculation fails
+
+### Character to Token Conversion
+
+```typescript
+// ~4 characters = 1 token (empirical for English/code)
+export function estimateTokens(textOrLength: string | number): number {
+  const length = typeof textOrLength === 'string' ? textOrLength.length : textOrLength;
+  return Math.ceil(length / 4);
+}
+```
+
+### Example Overhead Values
+
+| Configuration | Estimated Overhead |
+|---------------|-------------------|
+| Minimal (no CLAUDE.md, no MCP) | ~30k |
+| Standard (CLAUDE.md, 2 MCP servers) | ~38k |
+| Heavy (large CLAUDE.md, 5+ MCP servers) | ~45k+ |
+
+### Note
+
+The overhead calculation runs when:
+- Agent is activated
+- Working directory changes
+- Result is cached for subsequent accesses
+
+If no overhead is calculated (new session, no directory), the default 38k is used.
+
+---
+
+## Auto-Compact Cost Reserve (2025-01-29)
+
+### The Enhancement
+
+The FREE tokens display now accounts for the **auto-compact cost** by reserving 45k tokens from the available space.
+
+### Why 45k?
+
+When the conversation reaches the auto-compact threshold (when FREE would reach ~45k), the system triggers a compaction that:
+1. Uses Haiku model to generate a summary (~5-10k tokens)
+2. Sends the summary request (~45k tokens consumed in total)
+3. Replaces old messages with the summary
+
+### Implementation
+
+**Constant Added:**
+```typescript
+// Auto-compact cost: estimated tokens used when auto-compact triggers at 45k free
+const AUTO_COMPACT_COST = 45000;
+```
+
+**Calculation Updated:**
+```typescript
+// Before: remainingTokens = max - totalContextUsage
+// After:  remainingTokens = max - totalContextUsage - AUTO_COMPACT_COST
+
+const remainingTokens = Math.max(0, maxTokens - totalContextUsage - AUTO_COMPACT_COST);
+```
+
+### Visual Impact
+
+**Before:**
+```
+BREAKDOWN:
+  Messages:  254
+  Overhead:  36.1k
+
+TOTAL: 36.3k
+FREE:  163.7k  (200k - 36.3k = 163.7k)
+```
+
+**After:**
+```
+BREAKDOWN:
+  Messages:     254
+  Overhead:     36.1k  *
+  Auto-Compact: 45.0k  **
+
+TOTAL: 81.3k  (254 + 36.1k + 45k)
+FREE:  118.7k (200k - 81.3k = 118.7k)
+```
+
+### Rationale
+
+By subtracting the auto-compact cost from FREE, users get a more accurate representation of **truly usable tokens** before needing intervention. This prevents the system from triggering auto-compact when there aren't enough tokens left to perform the operation safely.
+
+### Files Modified
+
+- `src/components/TokenUsageModal.tsx`:
+  - Added `AUTO_COMPACT_COST` constant (45000)
+  - Updated `ContextBreakdown` interface to include `autoCompact` field
+  - Updated `calculateBreakdown()` to include auto-compact in breakdown
+  - Updated `calculateTotalContextUsage()` to include auto-compact in total
+  - Updated UI BREAKDOWN section to show Auto-Compact as separate line item
+  - Added explanatory note for Auto-Compact reserve
+
+- `src/components/TokenUsageIndicator.tsx`:
+  - Added `AUTO_COMPACT_COST` constant (45000)
+  - **Changed stamina calculation** to be based on FREE tokens instead of TOTAL
+  - Fresh agents now start at 100% stamina
+  - Stamina decreases proportionally as messages are sent
+  - Stamina reaches 0% when all usable space is consumed
+
+---
+
+## Stamina Calculation Update (2025-01-29)
+
+### The Problem
+
+With the previous logic, stamina was calculated as:
+```typescript
+staminaPercentage = 100 - (totalContextUsage / maxTokens * 100)
+```
+
+This caused fresh agents to start with **~60% stamina** instead of 100%, because:
+- TOTAL = Messages (0) + Overhead (36.4k) + Auto-Compact (45k) = **81.4k**
+- Stamina = 100 - (81.4k / 200k * 100) = **59%**
+
+### The Solution
+
+Stamina is now based on **FREE tokens** (usable space):
+
+```typescript
+const maxUsableTokens = maxTokens - overhead - AUTO_COMPACT_COST; // ~118.6k
+const remainingUsableTokens = maxUsableTokens - messageTokens;
+const staminaPercentage = (remainingUsableTokens / maxUsableTokens) * 100;
+```
+
+### Results
+
+| Scenario | Messages | Overhead | Auto-Compact | FREE | Stamina |
+|----------|----------|----------|--------------|------|---------|
+| Fresh agent | 0 | 36.4k | 45k | 118.6k | **100%** ✅ |
+| Light use | 30k | 36.4k | 45k | 88.6k | **75%** |
+| Medium use | 60k | 36.4k | 45k | 58.6k | **49%** |
+| Heavy use | 100k | 36.4k | 45k | 18.6k | **16%** |
+| Exhausted | 118.6k | 36.4k | 45k | 0 | **0%** ✅ |
+
+### Benefits
+
+1. ✅ **Intuitive**: Fresh agents always start at 100%
+2. ✅ **Proportional**: Stamina decreases linearly with message usage
+3. ✅ **Accurate**: Shows real usable space, not arbitrary percentages
+4. ✅ **Consistent**: Same logic for all agents regardless of overhead
+
+---
+
+*Last updated: 2025-01-29*
+*Author: Jack, Quack Agency CEO & Laura, Feature Coordinator & Agent Magnus & Agent Lisa*
+*Version: 1.4*

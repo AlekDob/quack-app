@@ -74,6 +74,8 @@ interface ChatViewProps {
     outputTokens: number;
     cacheCreationTokens: number;
     cacheReadTokens: number;
+    totalCost: number; // total_cost_usd from Claude SDK (authoritative)
+    overhead?: number; // Dynamic overhead calculated from project files
   };
   // OpenAI API key for Whisper
   openaiApiKey?: string;
@@ -128,7 +130,7 @@ export default function ChatView({
   onCompactConversation,
   onOpenSessionInTerminal,
   // Token usage tracking
-  sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 },
+  sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalCost: 0 },
   // OpenAI API key for Whisper
   openaiApiKey,
   // Open Prompt Engineer
@@ -404,6 +406,8 @@ export default function ChatView({
             outputTokens={sessionTokens.outputTokens}
             cacheCreationTokens={sessionTokens.cacheCreationTokens}
             cacheReadTokens={sessionTokens.cacheReadTokens}
+            totalCost={sessionTokens.totalCost}
+            overhead={sessionTokens.overhead}
             onCompact={onCompactConversation}
             onClear={onClearConversation}
           />
