@@ -968,6 +968,66 @@ The design follows Quack's existing UI patterns and integrates seamlessly with t
 
 ---
 
-*Last updated: 2025-01-25*
+## 🔧 Overhead Calculation Fix (2025-01-27)
+
+### The Problem
+
+The original implementation used `cache_creation_input_tokens` from the Claude SDK as a proxy for "overhead" (system prompt, tools, MCP, memory). This was **incorrect** because:
+
+- `cache_creation_input_tokens` includes **ALL tokens being cached** - system + tools + memory + **previous conversation messages**
+- This value grows with every message, not just the overhead
+- It caused the "Overhead" display to show values like 76k+ instead of the actual ~38k
+
+### The Fix
+
+We now use **fixed overhead estimates** based on typical Claude CLI `/context` output:
+
+```typescript
+const FIXED_OVERHEAD = {
+  systemPrompt: 4200,    // System prompt, instructions
+  systemTools: 17500,    // Built-in tool definitions (read, write, bash, etc.)
+  mcpTools: 5800,        // MCP tool definitions
+  memoryFiles: 10500,    // Memory MCP context, CLAUDE.md, project context
+  get total() { return this.systemPrompt + this.systemTools + this.mcpTools + this.memoryFiles; }
+};
+// Total: ~38k tokens
+```
+
+### Why Fixed Values?
+
+The Claude SDK **does not provide** a direct breakdown like `/context` does. The only way to get accurate overhead values would be to:
+
+1. Parse the first message's system prompt (not available via SDK)
+2. Count tool definitions (not exposed)
+3. Measure MCP context (not exposed)
+
+Using fixed estimates based on real `/context` output is the most reliable approach:
+
+**Claude CLI `/context` shows:**
+```
+System prompt: 4.2k tokens (2.1%)
+System tools: 17.5k tokens (8.8%)
+MCP tools: 5.8k tokens (2.9%)
+Memory files: 10.5k tokens (5.3%)
+Messages: 606 tokens (0.3%)
+```
+
+### Files Modified
+
+- `src/components/TokenUsageModal.tsx` - Uses `FIXED_OVERHEAD` constant
+- `src/components/TokenUsageIndicator.tsx` - Uses `FIXED_OVERHEAD = 38000`
+
+### Note
+
+The overhead may vary slightly based on:
+- Number of MCP servers connected
+- Size of CLAUDE.md files
+- Number of skills/agents configured
+
+If you have a significantly different configuration, you can adjust the `FIXED_OVERHEAD` values. Check your actual overhead using `claude /context` in CLI.
+
+---
+
+*Last updated: 2025-01-27*
 *Author: Jack, Quack Agency CEO 🦆*
-*Version: 1.0*
+*Version: 1.1*

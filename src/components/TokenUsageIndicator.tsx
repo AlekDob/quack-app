@@ -53,25 +53,18 @@ function TokenUsageIndicator({
   const clearHistory = () => {};
   const exportHistory = () => '';
 
-  // Calculate overhead using REAL cache data from SDK
-  // Priority: cacheCreationTokens > cacheReadTokens > estimated
-  const ESTIMATED_OVERHEAD = 26500; // Fallback: system (17.9k) + memory (5.9k) + mcpTools (2.7k)
+  // Fixed overhead estimate based on Claude CLI /context output
+  // The SDK's cache tokens include messages, NOT just overhead, so we use fixed estimates
+  // - System prompt: ~4.2k tokens
+  // - System tools: ~17.5k tokens
+  // - MCP tools: ~5.8k tokens
+  // - Memory files: ~10.5k tokens
+  // Total: ~38k tokens
+  const FIXED_OVERHEAD = 38000;
 
-  let overhead: number;
-  if (cacheCreationTokens > 0) {
-    // Best case: we have real cache creation data
-    overhead = cacheCreationTokens;
-  } else if (cacheReadTokens > 0) {
-    // Second best: we have cache read data (from resumed session)
-    overhead = cacheReadTokens;
-  } else {
-    // Fallback: no cache data yet, use estimates
-    overhead = ESTIMATED_OVERHEAD;
-  }
-
-  // Total context = messages + overhead (from real cache or estimated)
+  // Total context = messages + fixed overhead
   const messageTokens = inputTokens + outputTokens;
-  const totalContextUsage = messageTokens + overhead;
+  const totalContextUsage = messageTokens + FIXED_OVERHEAD;
 
   // Calculate usage percentage based on total context (not just messages)
   const usagePercentage = (totalContextUsage / maxTokens) * 100;

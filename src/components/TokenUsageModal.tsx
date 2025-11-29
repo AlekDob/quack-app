@@ -38,69 +38,57 @@ const formatTokensK = (tokens: number): string => {
   return tokens.toString();
 };
 
-// Breakdown calculation using REAL cache data from SDK
-// cache_creation_input_tokens = overhead created at first message (system + MCP + memory)
-// cache_read_input_tokens = overhead read from cache on subsequent messages
+// Breakdown calculation
+// IMPORTANT: The SDK's cache_creation_input_tokens and cache_read_input_tokens
+// include ALL tokens being cached (system + tools + memory + previous messages),
+// NOT just the overhead. So we CANNOT use them as a proxy for overhead.
+//
+// The correct approach is to use FIXED estimates based on Claude CLI /context output:
+// - System prompt: ~4.2k tokens
+// - System tools: ~17.5k tokens
+// - MCP tools: ~5.8k tokens
+// - Memory files: ~10.5k tokens
+// - Total overhead: ~38k tokens
 interface ContextBreakdown {
-  messages: number;        // Actual message tokens (input + output - cached overhead)
-  overhead: number;        // Real overhead from cache (system + MCP + memory)
-  overheadSource: 'cache' | 'estimated';  // Whether overhead is from real cache data
+  messages: number;        // Actual message tokens (input + output)
+  overhead: number;        // Fixed overhead estimate (system + MCP + memory + tools)
 }
 
-// Estimated overhead costs (fallback when no cache data available)
-// These are used only before the first message establishes the cache
-const ESTIMATED_OVERHEAD = {
-  system: 17900,   // System prompt, CLAUDE.md, instructions
-  memory: 5900,    // Memory MCP context
-  mcpTools: 2700,  // MCP tool definitions
-  get total() { return this.system + this.memory + this.mcpTools; }
+// Fixed overhead costs based on typical Claude Code /context output
+// These values are consistent across sessions
+const FIXED_OVERHEAD = {
+  systemPrompt: 4200,    // System prompt, instructions
+  systemTools: 17500,    // Built-in tool definitions (read, write, bash, etc.)
+  mcpTools: 5800,        // MCP tool definitions
+  memoryFiles: 10500,    // Memory MCP context, CLAUDE.md, project context
+  get total() { return this.systemPrompt + this.systemTools + this.mcpTools + this.memoryFiles; }
 };
 
 /**
- * Calculate context breakdown using real cache data from SDK
+ * Calculate context breakdown
  *
- * The SDK reports:
- * - cache_creation_input_tokens: tokens used to CREATE cache (first message) - this IS the overhead
- * - cache_read_input_tokens: tokens READ from cache (subsequent messages) - confirms cached overhead
+ * We use FIXED overhead estimates because the SDK's cache tokens include
+ * previous messages, not just overhead. The overhead is relatively constant
+ * across sessions for the same project configuration.
  *
- * Logic:
- * 1. If we have cacheCreationTokens > 0: overhead = cacheCreationTokens (real data!)
- * 2. If we have cacheReadTokens > 0 but no creation: overhead = cacheReadTokens (real data!)
- * 3. Fallback: use estimated overhead values
+ * Messages = inputTokens + outputTokens (accumulated from the session)
+ * Overhead = fixed ~38k (system + tools + MCP + memory)
  */
 const calculateBreakdown = (
   inputTokens: number,
   outputTokens: number,
-  cacheCreationTokens: number,
-  cacheReadTokens: number
+  _cacheCreationTokens: number,  // Not used - includes messages, not just overhead
+  _cacheReadTokens: number       // Not used - includes messages, not just overhead
 ): ContextBreakdown => {
-  // Determine real overhead from cache data
-  // Priority: cacheCreationTokens > cacheReadTokens > estimated
-  let overhead: number;
-  let overheadSource: 'cache' | 'estimated';
-
-  if (cacheCreationTokens > 0) {
-    // Best case: we have real cache creation data
-    overhead = cacheCreationTokens;
-    overheadSource = 'cache';
-  } else if (cacheReadTokens > 0) {
-    // Second best: we have cache read data (from resumed session)
-    overhead = cacheReadTokens;
-    overheadSource = 'cache';
-  } else {
-    // Fallback: no cache data yet, use estimates
-    overhead = ESTIMATED_OVERHEAD.total;
-    overheadSource = 'estimated';
-  }
-
-  // Messages = actual user input/output tokens
-  // Note: inputTokens from SDK already EXCLUDES cached overhead when cache is active
+  // Messages = actual user input/output tokens from the session
   const messagesTokens = inputTokens + outputTokens;
+
+  // Overhead = fixed estimate based on Claude CLI /context output
+  const overhead = FIXED_OVERHEAD.total;
 
   return {
     messages: messagesTokens,
     overhead,
-    overheadSource,
   };
 };
 
@@ -265,40 +253,14 @@ export default function TokenUsageModal({
                 <div className="context-breakdown-row">
                   <span className="context-breakdown-label">
                     Overhead
-                    {breakdown.overheadSource === 'cache' && (
-                      <span className="context-breakdown-source" title="Real data from SDK cache">*</span>
-                    )}
+                    <span className="context-breakdown-source" title="Fixed estimate based on Claude CLI /context">*</span>
                   </span>
                   <span className="context-breakdown-value">{formatTokensK(breakdown.overhead)}</span>
                 </div>
-                {/* Show cache stats if available */}
-                {(cacheCreationTokens > 0 || cacheReadTokens > 0) && (
-                  <div className="context-breakdown-cache">
-                    {cacheCreationTokens > 0 && (
-                      <div className="context-breakdown-row cache-row">
-                        <span className="context-breakdown-label">Cache Created</span>
-                        <span className="context-breakdown-value">{formatTokensK(cacheCreationTokens)}</span>
-                      </div>
-                    )}
-                    {cacheReadTokens > 0 && (
-                      <div className="context-breakdown-row cache-row">
-                        <span className="context-breakdown-label">Cache Read</span>
-                        <span className="context-breakdown-value">{formatTokensK(cacheReadTokens)}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-              {breakdown.overheadSource === 'estimated' && (
-                <div className="context-breakdown-note">
-                  * Overhead estimated - send a message to get real data
-                </div>
-              )}
-              {breakdown.overheadSource === 'cache' && (
-                <div className="context-breakdown-note success">
-                  * Overhead from real SDK cache data
-                </div>
-              )}
+              <div className="context-breakdown-note">
+                * Overhead: system prompt + tools + MCP + memory (~38k)
+              </div>
             </div>
           </div>
 
