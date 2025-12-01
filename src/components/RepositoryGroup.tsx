@@ -297,10 +297,11 @@ function SortableAgent({
   const hasActiveConversation = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
   const isBusy = agent.status === 'busy';
 
-  // Quack tooltip: show periodically when there are UNREAD messages (like WhatsApp notification)
+  // Quack tooltip: show periodically when there are UNREAD messages AND agent is NOT busy
+  // This ensures the tooltip only appears when the agent has finished responding
   useEffect(() => {
-    // Only show tooltip when there's a notification badge (unread message)
-    if (!showNotificationBadge) {
+    // Only show tooltip when there's a notification badge AND agent is NOT busy (finished responding)
+    if (!showNotificationBadge || isBusy) {
       setShowQuackTooltip(false);
       return;
     }
@@ -316,7 +317,7 @@ function SortableAgent({
     setTimeout(() => setShowQuackTooltip(false), 2000);
 
     return () => clearInterval(showInterval);
-  }, [showNotificationBadge]);
+  }, [showNotificationBadge, isBusy]);
 
   // Memoize metro station style - DYNAMIC based on notification state (MUST be after showNotificationBadge)
   const metroStationStyle = useMemo(() => ({
@@ -1586,10 +1587,11 @@ export default function RepositoryGroup({
                       const lastReadTimestamp = lastReadTimestamps?.get(agent.id) || 0;
                       const showNotificationBadge = !isActive && !isDormant && (lastAssistantTimestamp > lastReadTimestamp);
 
-                      // Quack tooltip: show periodically when there are UNREAD messages (like WhatsApp notification)
+                      // Quack tooltip: show periodically when there are UNREAD messages AND agent is NOT busy
+                      // This ensures the tooltip only appears when the agent has finished responding
                       useEffect(() => {
-                        // Only show tooltip when there's a notification badge (unread message)
-                        if (!showNotificationBadge) {
+                        // Only show tooltip when there's a notification badge AND agent is NOT busy (finished responding)
+                        if (!showNotificationBadge || isBusyWorktree) {
                           setShowQuackTooltipWorktree(false);
                           return;
                         }
@@ -1605,7 +1607,7 @@ export default function RepositoryGroup({
                         setTimeout(() => setShowQuackTooltipWorktree(false), 2000);
 
                         return () => clearInterval(showInterval);
-                      }, [showNotificationBadge]);
+                      }, [showNotificationBadge, isBusyWorktree]);
 
                       const relativeTime = getRelativeTimeString(lastAssistantTimestamp);
                       const timestampOpacity = relativeTime ? getTimestampOpacity(relativeTime.minutes) : 0.4;

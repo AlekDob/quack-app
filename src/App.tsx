@@ -339,6 +339,7 @@ function AppContent() {
   });
   const [_booting, setBooting] = useState(true);
   const [videoEnded, setVideoEnded] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const [splashFadingOut, setSplashFadingOut] = useState(false);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [introVersion, setIntroVersion] = useState('');
@@ -7045,10 +7046,14 @@ You have access to all Bash tools to execute git commands like:
             borderRadius: '50%',
             animation: 'introVideoGlow 3s ease-in-out infinite',
             boxShadow: '0 0 30px rgba(77, 100, 180, 0.5), 0 0 60px rgba(77, 100, 180, 0.3)',
+            opacity: videoReady ? 1 : 0,
+            transition: 'opacity 0.5s ease-in-out',
           }}>
             <video
               autoPlay
               playsInline
+              preload="auto"
+              onCanPlay={() => setVideoReady(true)}
               onEnded={() => {
                 setVideoEnded(true);
                 setSplashFadingOut(true);
@@ -7371,6 +7376,26 @@ You have access to all Bash tools to execute git commands like:
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
               terminalWindowOpen={terminalWindowOpen}
+              isAuthenticated={claudeCliAvailable !== false}
+              onLoginClick={async () => {
+                try {
+                  const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
+                  const projects = agentChats.map(agent => ({
+                    path: agent.cwd,
+                    name: agent.cwd.split('/').pop() || agent.cwd,
+                  }));
+                  const uniqueProjects = projects.filter(
+                    (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+                  );
+                  await openTerminalWindow(uniqueProjects, {
+                    projectPath: cwd,
+                    command: 'claude /login',
+                    terminalLabel: 'Claude Login',
+                  });
+                } catch (error) {
+                  console.error("Failed to open claude login:", error);
+                }
+              }}
             />
 
             {/* Tab Bar - VSCode style */}
@@ -8123,6 +8148,7 @@ You have access to all Bash tools to execute git commands like:
                 autoPlay
                 playsInline
                 loop
+                preload="auto"
                 style={{
                   width: '100%',
                   height: '100%',

@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { TerminalInfo, NativeTerminal, ProjectTerminal } from '../types';
 
+// Manual project info for Terminal Window
+export interface ManualProject {
+  path: string;
+  name: string;
+}
+
 interface TerminalState {
   // State
   terminals: TerminalInfo[];
@@ -9,6 +15,7 @@ interface TerminalState {
   nativeTerminals: NativeTerminal[];
   projectTerminals: ProjectTerminal[];
   activeProjectTerminalId: string | null; // Active terminal in TerminalWindow
+  manualProjects: ManualProject[]; // Manually added projects in Terminal Window
 
   // Actions
   setTerminals: (terminals: TerminalInfo[]) => void;
@@ -30,6 +37,11 @@ interface TerminalState {
   updateProjectTerminal: (id: string, updates: Partial<ProjectTerminal>) => void;
   setActiveProjectTerminalId: (id: string | null) => void;
 
+  // Manual projects actions
+  addManualProject: (project: ManualProject) => void;
+  removeManualProject: (path: string) => void;
+  setManualProjects: (projects: ManualProject[]) => void;
+
   // Selectors (derived state)
   getTerminalById: (id: string) => TerminalInfo | undefined;
   getActiveTerminal: () => TerminalInfo | null;
@@ -48,6 +60,7 @@ export const useTerminalStore = create<TerminalState>()(
         nativeTerminals: [],
         projectTerminals: [],
         activeProjectTerminalId: null,
+        manualProjects: [],
 
         setTerminals: (terminals) => set({ terminals }),
 
@@ -105,6 +118,21 @@ export const useTerminalStore = create<TerminalState>()(
 
         setActiveProjectTerminalId: (id) => set({ activeProjectTerminalId: id }),
 
+        // Manual projects actions
+        addManualProject: (project) => set((state) => {
+          // Don't add duplicates
+          if (state.manualProjects.some(p => p.path === project.path)) {
+            return state;
+          }
+          return { manualProjects: [...state.manualProjects, project] };
+        }),
+
+        removeManualProject: (path) => set((state) => ({
+          manualProjects: state.manualProjects.filter(p => p.path !== path),
+        })),
+
+        setManualProjects: (projects) => set({ manualProjects: projects }),
+
         // Selectors
         getTerminalById: (id) => {
           const state = get();
@@ -154,6 +182,8 @@ export const useTerminalStore = create<TerminalState>()(
             color: t.color,
             createdAt: t.createdAt,
           })),
+          // Persist manual projects
+          manualProjects: state.manualProjects,
         }),
       }
     )

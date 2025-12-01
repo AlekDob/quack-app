@@ -18,8 +18,9 @@ set -e
 
 # Configuration
 PROJECT_ROOT="/Users/alekdob/Desktop/Dev/Personal/quack-app"
-APP_PATH="$PROJECT_ROOT/src-tauri/target/release/bundle/macos/Quack.app"
-DMG_PATH="$PROJECT_ROOT/src-tauri/target/release/bundle/macos/Quack.dmg"
+# Universal build path (arm64 + x86_64)
+APP_PATH="$PROJECT_ROOT/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.app"
+DMG_PATH="$PROJECT_ROOT/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.dmg"
 SIGNING_IDENTITY="Developer ID Application: ALEKSANDAR DOBROHOTOV (FC38UVV3V3)"
 ENTITLEMENTS="$PROJECT_ROOT/src-tauri/Entitlements.plist"
 KEYCHAIN_PROFILE="QuackNotarization"
@@ -43,9 +44,9 @@ echo -e "${NC}"
 
 cd "$PROJECT_ROOT"
 
-# ==== STEP 1: Build ====
-echo -e "${YELLOW}[1/6] Building app with Tauri...${NC}"
-npm run tauri:build
+# ==== STEP 1: Build (Universal Binary) ====
+echo -e "${YELLOW}[1/6] Building universal app with Tauri (arm64 + x86_64)...${NC}"
+npm run tauri build -- --target universal-apple-darwin
 
 if [ ! -d "$APP_PATH" ]; then
     echo -e "${RED}ERROR: Build failed - Quack.app not found${NC}"

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen, emitTo } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
@@ -29,6 +30,7 @@ interface ContextMenuState {
   x: number;
   y: number;
   terminalId: string | null;
+  projectPath: string | null; // For project context menu
 }
 
 /**
@@ -41,7 +43,7 @@ export function TerminalWindowApp() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
-  // Use Zustand store for terminals persistence (survives agent reset)
+  // Use Zustand store for terminals AND manual projects persistence
   const {
     projectTerminals: terminals,
     activeProjectTerminalId: activeTerminalId,
@@ -50,6 +52,10 @@ export function TerminalWindowApp() {
     updateProjectTerminal,
     setActiveProjectTerminalId: setActiveTerminalId,
     getProjectTerminalsByPath,
+    // Manual projects (persisted)
+    manualProjects,
+    addManualProject,
+    removeManualProject,
   } = useTerminalStore();
 
   // Context menu and editing state
@@ -58,6 +64,7 @@ export function TerminalWindowApp() {
     x: 0,
     y: 0,
     terminalId: null,
+    projectPath: null,
   });
   const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -221,14 +228,45 @@ export function TerminalWindowApp() {
     const x = Math.min(Math.max(0, e.clientX), window.innerWidth - CONTEXT_MENU_WIDTH);
     const y = Math.min(Math.max(0, e.clientY), window.innerHeight - CONTEXT_MENU_HEIGHT);
 
-    setContextMenu({ visible: true, x, y, terminalId });
+    setContextMenu({ visible: true, x, y, terminalId, projectPath: null });
     setShowColorPicker(false);
   }, []);
 
-  const closeContextMenu = useCallback(() => {
-    setContextMenu({ visible: false, x: 0, y: 0, terminalId: null });
+  // Context menu for projects
+  const handleProjectContextMenu = useCallback((e: React.MouseEvent, projectPath: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const x = Math.min(Math.max(0, e.clientX), window.innerWidth - CONTEXT_MENU_WIDTH);
+    const y = Math.min(Math.max(0, e.clientY), window.innerHeight - CONTEXT_MENU_HEIGHT);
+
+    setContextMenu({ visible: true, x, y, terminalId: null, projectPath });
     setShowColorPicker(false);
   }, []);
+
+  // Close context menu - defined before handlers that use it
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ visible: false, x: 0, y: 0, terminalId: null, projectPath: null });
+    setShowColorPicker(false);
+  }, []);
+
+  // Remove project (closes all terminals and removes from list)
+  const handleRemoveProject = useCallback((projectPath: string) => {
+    // Close all terminals for this project
+    const projectTerminals = getProjectTerminalsByPath(projectPath);
+    projectTerminals.forEach(terminal => {
+      invoke('close_terminal', { id: terminal.id }).catch(console.error);
+      removeProjectTerminal(terminal.id);
+    });
+
+    // Remove from manual projects if it's there
+    removeManualProject(projectPath);
+
+    // Also remove from URL projects (local state)
+    setUrlProjects(prev => prev.filter(p => p.path !== projectPath));
+
+    closeContextMenu();
+  }, [getProjectTerminalsByPath, removeProjectTerminal, removeManualProject, closeContextMenu]);
 
   // Start editing terminal name
   const startEditing = useCallback((terminalId: string) => {
@@ -352,9 +390,7 @@ export function TerminalWindowApp() {
     return groups;
   }, [terminals]);
 
-  // Combine URL projects (from agentChats) with projects that have terminals
-  // URL projects = source of truth for which projects to show
-  // Terminal projects = additional projects that have active terminals
+  // Combine URL projects, manual projects (persisted), and projects that have terminals
   const allProjects = useMemo((): ProjectInfo[] => {
     const projectMap = new Map<string, ProjectInfo>();
 
@@ -363,7 +399,14 @@ export function TerminalWindowApp() {
       projectMap.set(project.path, project);
     });
 
-    // Then add projects that have terminals (in case they weren't in URL)
+    // Then add manual projects (persisted in Zustand store)
+    manualProjects.forEach(project => {
+      if (!projectMap.has(project.path)) {
+        projectMap.set(project.path, project);
+      }
+    });
+
+    // Then add projects that have terminals (in case they weren't in URL or manual)
     terminals.forEach(terminal => {
       if (!projectMap.has(terminal.projectPath)) {
         const pathParts = terminal.projectPath.split('/');
@@ -379,17 +422,20 @@ export function TerminalWindowApp() {
     return Array.from(projectMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  }, [urlProjects, terminals]);
+  }, [urlProjects, manualProjects, terminals]);
 
-  // Auto-expand projects when terminals are added
+  // Auto-expand projects when terminals are added or manual projects loaded
   useEffect(() => {
-    const projectPaths = new Set(terminals.map(t => t.projectPath));
+    const projectPaths = new Set([
+      ...terminals.map(t => t.projectPath),
+      ...manualProjects.map(p => p.path),
+    ]);
     setExpandedProjects(prev => {
       const next = new Set(prev);
       projectPaths.forEach(path => next.add(path));
       return next;
     });
-  }, [terminals]);
+  }, [terminals, manualProjects]);
 
   // Verify and cleanup stale terminals on mount
   // Terminals persist in Zustand, but PTY sessions die when app restarts
@@ -482,16 +528,36 @@ export function TerminalWindowApp() {
     };
   }, [handleCreateTerminalWithCommand]);
 
-  // Manual sync: Request projects from main window
-  const handleSyncProjects = useCallback(async () => {
+  // Manually add a project folder (persisted in Zustand store)
+  const handleAddProjectFolder = useCallback(async () => {
     try {
-      // Emit to main window requesting a sync
-      await emitTo('main', 'terminal-window-request-sync', {});
-      console.log('[TerminalWindowApp] Sync requested from main window');
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: 'Select Project Folder',
+      });
+
+      if (selected && typeof selected === 'string') {
+        const pathParts = selected.split('/');
+        const projectName = pathParts[pathParts.length - 1] || 'Unknown';
+
+        // Add to Zustand store (persisted)
+        addManualProject({ path: selected, name: projectName });
+
+        // Expand the new project
+        setExpandedProjects(prev => {
+          const next = new Set(prev);
+          next.add(selected);
+          return next;
+        });
+
+        setSelectedProject(selected);
+        console.log('[TerminalWindowApp] Added project folder (persisted):', selected);
+      }
     } catch (error) {
-      console.error('Failed to request sync:', error);
+      console.error('Failed to add project folder:', error);
     }
-  }, []);
+  }, [addManualProject]);
 
   return (
     <div className="terminal-window-app">
@@ -503,22 +569,19 @@ export function TerminalWindowApp() {
       <div className="terminal-window-body">
         {/* Sidebar with projects */}
         <div className="terminal-sidebar">
-          <div className="terminal-sidebar-header">
-            <span>TERMINALS</span>
+          <div className="terminal-sidebar-header" data-tauri-drag-region>
+            <span className="terminal-sidebar-title" data-tauri-drag-region>TERMINALS</span>
             <button
               type="button"
-              className="terminal-sync-btn"
-              onClick={handleSyncProjects}
-              title="Sync projects from main window"
+              className="terminal-add-project-btn"
+              onClick={handleAddProjectFolder}
+              title="Add project folder"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                <path d="M16 16h5v5" />
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
               </svg>
             </button>
-            <div className="terminal-sidebar-drag-region" data-tauri-drag-region />
           </div>
 
           <div className="terminal-sidebar-content">
@@ -536,6 +599,7 @@ export function TerminalWindowApp() {
                       toggleProject(project.path);
                       setSelectedProject(project.path);
                     }}
+                    onContextMenu={(e) => handleProjectContextMenu(e, project.path)}
                   >
                     <span className={`project-chevron ${expandedProjects.has(project.path) ? 'expanded' : ''}`}>
                       &rsaquo;
@@ -653,51 +717,68 @@ export function TerminalWindowApp() {
             }}
             onContextMenu={(e) => e.preventDefault()}
           >
-            <div
-              className="terminal-context-menu-item"
-              role="menuitem"
-              onClick={() => contextMenu.terminalId && startEditing(contextMenu.terminalId)}
-            >
-              Rename
-            </div>
-            <div
-              className="terminal-context-menu-item"
-              role="menuitem"
-              onClick={() => setShowColorPicker(!showColorPicker)}
-            >
-              Change Color
-            </div>
-            {showColorPicker && (
-              <div className="terminal-color-picker">
-                {TERMINAL_COLORS.map((color) => {
-                  const currentTerminal = terminals.find(t => t.id === contextMenu.terminalId);
-                  return (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`terminal-color-option ${color === currentTerminal?.color ? 'active' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => handleColorChange(color)}
-                      title={color}
-                      aria-label={`Select color ${color}`}
-                    />
-                  );
-                })}
-              </div>
+            {/* Project context menu */}
+            {contextMenu.projectPath && (
+              <>
+                <div
+                  className="terminal-context-menu-item danger"
+                  role="menuitem"
+                  onClick={() => contextMenu.projectPath && handleRemoveProject(contextMenu.projectPath)}
+                >
+                  Remove Project
+                </div>
+              </>
             )}
-            <div className="terminal-context-menu-divider" />
-            <div
-              className="terminal-context-menu-item danger"
-              role="menuitem"
-              onClick={() => {
-                if (contextMenu.terminalId) {
-                  handleCloseTerminal(contextMenu.terminalId);
-                }
-                closeContextMenu();
-              }}
-            >
-              Close Terminal
-            </div>
+            {/* Terminal context menu */}
+            {contextMenu.terminalId && (
+              <>
+                <div
+                  className="terminal-context-menu-item"
+                  role="menuitem"
+                  onClick={() => contextMenu.terminalId && startEditing(contextMenu.terminalId)}
+                >
+                  Rename
+                </div>
+                <div
+                  className="terminal-context-menu-item"
+                  role="menuitem"
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                >
+                  Change Color
+                </div>
+                {showColorPicker && (
+                  <div className="terminal-color-picker">
+                    {TERMINAL_COLORS.map((color) => {
+                      const currentTerminal = terminals.find(t => t.id === contextMenu.terminalId);
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          className={`terminal-color-option ${color === currentTerminal?.color ? 'active' : ''}`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => handleColorChange(color)}
+                          title={color}
+                          aria-label={`Select color ${color}`}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="terminal-context-menu-divider" />
+                <div
+                  className="terminal-context-menu-item danger"
+                  role="menuitem"
+                  onClick={() => {
+                    if (contextMenu.terminalId) {
+                      handleCloseTerminal(contextMenu.terminalId);
+                    }
+                    closeContextMenu();
+                  }}
+                >
+                  Close Terminal
+                </div>
+              </>
+            )}
           </div>
         ),
         document.body

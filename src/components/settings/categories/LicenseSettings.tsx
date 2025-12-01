@@ -185,8 +185,8 @@ export default function LicenseSettings() {
               <button
                 className="license-purchase-button"
                 onClick={() => {
-                  // Open Lemon Squeezy checkout in browser
-                  open('https://quackbuild.lemonsqueezy.com/checkout/buy/69111d6b-9f87-4eeb-a1d6-202980eaa47f');
+                  // Open Gumroad checkout in browser
+                  open('https://alekdob.gumroad.com/l/tsvgt?wanted=true');
                 }}
               >
                 <span className="license-purchase-icon">👑</span>

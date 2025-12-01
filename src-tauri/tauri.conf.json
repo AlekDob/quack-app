@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "🦆 Quack",
         "width": 1400,
         "height": 800,
@@ -56,9 +57,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "externalBin": [
-      "binaries/node-sidecar"
     ],
     "resources": [
       "../images",

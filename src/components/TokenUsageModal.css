@@ -783,6 +783,13 @@
   text-shadow: 0 0 8px rgba(247, 147, 30, 0.5);
 }
 
+.context-summary-note {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  margin-top: 2px;
+}
+
 /* ============================================ */
 /* CONTEXT BREAKDOWN CACHE STYLES */
 /* ============================================ */

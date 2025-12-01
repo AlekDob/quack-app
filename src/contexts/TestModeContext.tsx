@@ -117,7 +117,24 @@ export const useTestMode = () => {
   return context;
 };
 
+interface AuthDebugInfo {
+  anthropicApiKey: boolean;
+  claudeCodeUseBedrock: boolean;
+  claudeCodeUseVertex: boolean;
+  nodeVersion: string;
+  platform: string;
+  cliAvailable: boolean;
+  cliPath: string | null;
+  cliVersion: string | null;
+  credentialsPath: string | null;
+  credentialsExists: boolean;
+  credentialsValid: boolean;
+  sdkVersion: string;
+  lastError: string | null;
+}
+
 // Helper hook for Claude CLI availability that respects test mode
+// Returns true if EITHER CLI is available OR credentials are valid
 export const useClaudeCliAvailability = () => {
   const { isTestMode, isAuthenticated } = useTestMode();
   const [claudeCliAvailable, setClaudeCliAvailable] = useState<boolean | null>(null);
@@ -132,12 +149,22 @@ export const useClaudeCliAvailability = () => {
           return;
         }
 
-        // Normal mode - real check
-        const available = await invoke<boolean>('check_claude_cli_available');
-        setClaudeCliAvailable(available);
+        // Normal mode - check BOTH CLI and credentials
+        // If either is available, consider auth as OK
+        const debugInfo = await invoke<AuthDebugInfo>('get_auth_debug_info');
+        const isAuthAvailable = debugInfo.cliAvailable || debugInfo.credentialsValid;
+        setClaudeCliAvailable(isAuthAvailable);
+
+        console.log(`🔐 Auth check: CLI=${debugInfo.cliAvailable}, Credentials=${debugInfo.credentialsValid}, Result=${isAuthAvailable}`);
       } catch (error) {
         console.error('Failed to check Claude CLI availability:', error);
-        setClaudeCliAvailable(false);
+        // Fallback to simple CLI check if debug info fails
+        try {
+          const available = await invoke<boolean>('check_claude_cli_available');
+          setClaudeCliAvailable(available);
+        } catch {
+          setClaudeCliAvailable(false);
+        }
       }
     };
 

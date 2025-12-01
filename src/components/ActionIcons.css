@@ -124,3 +124,42 @@
   visibility: visible !important;
   transition-delay: 0ms !important; /* INSTANT - NO DELAY */
 }
+
+/* Auth Status Icon - Authenticated (green) */
+.action-icon.auth-status-ok {
+  color: #4dd4b3;
+  cursor: default;
+}
+
+.action-icon.auth-status-ok:hover {
+  background: rgba(77, 212, 179, 0.1);
+  color: #4dd4b3;
+}
+
+.action-icon.auth-status-ok:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* Auth Status Icon - Not Authenticated (orange/red pulsing) */
+.action-icon.auth-status-required {
+  color: #f28c52;
+  animation: auth-pulse 2s ease-in-out infinite;
+}
+
+.action-icon.auth-status-required:hover {
+  background: rgba(242, 140, 82, 0.2);
+  color: #ff6b35;
+  animation: none;
+}
+
+@keyframes auth-pulse {
+  0%, 100% {
+    color: #f28c52;
+    transform: scale(1);
+  }
+  50% {
+    color: #ff6b35;
+    transform: scale(1.05);
+  }
+}

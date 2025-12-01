@@ -287,6 +287,7 @@ export default function TokenUsageModal({
               <div className="context-summary-row cost">
                 <span className="context-summary-label">COST</span>
                 <span className="context-summary-value">{formatCostUsd(totalCost)}</span>
+                <span className="context-summary-note">(API users only)</span>
               </div>
             )}
           </div>

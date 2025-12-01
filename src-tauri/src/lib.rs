@@ -461,6 +461,7 @@ pub fn run() {
             context::get_claude_md_stats,
             fs::list_directory,
             fs::get_home_directory,
+            fs::get_current_username,
             fs::read_file_content,
             fs::write_file_content,
             fs::create_directory,

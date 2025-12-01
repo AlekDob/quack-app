@@ -15,6 +15,9 @@ interface ActionIconsProps {
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
+  // Authentication status
+  isAuthenticated?: boolean;
+  onLoginClick?: () => void;
 }
 
 function ActionIcons({
@@ -30,6 +33,8 @@ function ActionIcons({
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
+  isAuthenticated = true,
+  onLoginClick,
 }: ActionIconsProps) {
   // Extract project name from path
   const projectName = projectPath ? projectPath.split('/').filter(Boolean).pop() : '';
@@ -85,6 +90,50 @@ function ActionIcons({
           <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
         <span className="action-icon-tooltip">Cost & Usage</span>
+      </button>
+
+      {/* Auth Status Icon */}
+      <button
+        type="button"
+        className={`action-icon ${isAuthenticated ? 'auth-status-ok' : 'auth-status-required'}`}
+        onClick={isAuthenticated ? undefined : onLoginClick}
+        disabled={isAuthenticated}
+        aria-label={isAuthenticated ? "Authenticated" : "Login required - Click to authenticate"}
+        style={{ cursor: isAuthenticated ? 'default' : 'pointer' }}
+      >
+        {isAuthenticated ? (
+          // Checkmark/shield icon when authenticated
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M12 2L4 5V11C4 16.5 7.8 21.7 12 23C16.2 21.7 20 16.5 20 11V5L12 2Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+            />
+            <path
+              d="M9 12L11 14L15 10"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          // Key/lock icon when not authenticated
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="15" r="4" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            <path
+              d="M11 12L18 5M16 5H18V7M15 8L17 10"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+        <span className="action-icon-tooltip">
+          {isAuthenticated ? "Authenticated" : "Click to Login"}
+        </span>
       </button>
 
       {/* Telegram Icon */}

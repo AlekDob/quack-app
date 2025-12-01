@@ -55,6 +55,24 @@ pub fn get_home_directory() -> Result<String, String> {
     get_home().map_err(|err| err.to_string())
 }
 
+/// Get the current macOS username from home directory path
+/// Returns username like "alekdob" from "/Users/alekdob"
+#[tauri::command]
+pub fn get_current_username() -> Result<String, String> {
+    get_username_impl().map_err(|err| err.to_string())
+}
+
+fn get_username_impl() -> Result<String> {
+    let home = get_home()?;
+    let path = PathBuf::from(&home);
+
+    // Extract username from path: /Users/<username> -> username
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow!("Could not extract username from home path"))
+}
+
 #[tauri::command]
 pub fn read_file_content(path: String) -> Result<String, String> {
     read_file_impl(path).map_err(|err| err.to_string())
