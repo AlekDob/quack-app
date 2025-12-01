@@ -78,6 +78,43 @@
   font-size: 13px;
 }
 
+.terminal-sidebar-empty p {
+  margin: 0 0 8px 0;
+}
+
+.terminal-sidebar-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.4;
+}
+
+/* Sync Button */
+.terminal-sync-btn {
+  width: 24px;
+  height: 24px;
+  background: rgba(77, 212, 179, 0.1);
+  border: 1px solid rgba(77, 212, 179, 0.3);
+  color: #4dd4b3;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.terminal-sync-btn:hover {
+  background: rgba(77, 212, 179, 0.2);
+  border-color: rgba(77, 212, 179, 0.5);
+  transform: rotate(180deg);
+}
+
+.terminal-sync-btn:active {
+  transform: rotate(360deg);
+}
+
 /* Project Group */
 .project-group {
   margin-bottom: 4px;

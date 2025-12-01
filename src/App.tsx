@@ -253,7 +253,7 @@ function AppContent() {
   const { openDocsTab } = useDocsTab();
 
   // Terminal Window manager - opens separate Tauri window for terminals
-  const { openTerminalWindow, isOpen: terminalWindowOpen } = useTerminalWindowManager();
+  const { openTerminalWindow, updateProjects: updateTerminalWindowProjects, isOpen: terminalWindowOpen } = useTerminalWindowManager();
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -5314,6 +5314,40 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
     openTerminalWindow(uniqueProjects);
   }, [agentChats, openTerminalWindow]);
+
+  // Sync terminal window projects when agentChats change
+  // updateTerminalWindowProjects now handles the window lookup internally
+  useEffect(() => {
+    const projects = agentChats.map(agent => ({
+      path: agent.cwd,
+      name: agent.cwd.split('/').pop() || agent.cwd,
+    }));
+    // Remove duplicates by path
+    const uniqueProjects = projects.filter(
+      (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+    );
+    // This will only emit if the window exists
+    updateTerminalWindowProjects(uniqueProjects);
+  }, [agentChats, updateTerminalWindowProjects]);
+
+  // Listen for sync request from terminal window (manual sync button)
+  useEffect(() => {
+    const unlistenPromise = listen('terminal-window-request-sync', () => {
+      console.log('[App] Received sync request from terminal window');
+      const projects = agentChats.map(agent => ({
+        path: agent.cwd,
+        name: agent.cwd.split('/').pop() || agent.cwd,
+      }));
+      const uniqueProjects = projects.filter(
+        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+      );
+      updateTerminalWindowProjects(uniqueProjects);
+    });
+
+    return () => {
+      unlistenPromise.then(unlisten => unlisten());
+    };
+  }, [agentChats, updateTerminalWindowProjects]);
 
   const handleColorChange = useCallback(
     async (id: string, color: string) => {

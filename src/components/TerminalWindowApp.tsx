@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { listen, emitTo } from '@tauri-apps/api/event';
 import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
@@ -33,10 +33,11 @@ interface ContextMenuState {
 
 /**
  * TerminalWindowApp - Standalone window for managing project terminals
- * Receives projects list via URL params from main window
+ * Projects come from main window (via URL params) + terminals in Zustand store
  */
 export function TerminalWindowApp() {
-  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  // Projects passed from main window (agentChats)
+  const [urlProjects, setUrlProjects] = useState<ProjectInfo[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
@@ -351,6 +352,45 @@ export function TerminalWindowApp() {
     return groups;
   }, [terminals]);
 
+  // Combine URL projects (from agentChats) with projects that have terminals
+  // URL projects = source of truth for which projects to show
+  // Terminal projects = additional projects that have active terminals
+  const allProjects = useMemo((): ProjectInfo[] => {
+    const projectMap = new Map<string, ProjectInfo>();
+
+    // First add projects from URL (main window's agentChats)
+    urlProjects.forEach(project => {
+      projectMap.set(project.path, project);
+    });
+
+    // Then add projects that have terminals (in case they weren't in URL)
+    terminals.forEach(terminal => {
+      if (!projectMap.has(terminal.projectPath)) {
+        const pathParts = terminal.projectPath.split('/');
+        const projectName = pathParts[pathParts.length - 1] || 'Unknown';
+        projectMap.set(terminal.projectPath, {
+          path: terminal.projectPath,
+          name: projectName,
+        });
+      }
+    });
+
+    // Sort by project name for consistent ordering
+    return Array.from(projectMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }, [urlProjects, terminals]);
+
+  // Auto-expand projects when terminals are added
+  useEffect(() => {
+    const projectPaths = new Set(terminals.map(t => t.projectPath));
+    setExpandedProjects(prev => {
+      const next = new Set(prev);
+      projectPaths.forEach(path => next.add(path));
+      return next;
+    });
+  }, [terminals]);
+
   // Verify and cleanup stale terminals on mount
   // Terminals persist in Zustand, but PTY sessions die when app restarts
   useEffect(() => {
@@ -377,7 +417,7 @@ export function TerminalWindowApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Parse projects from URL params on mount and handle initial command
+  // Parse projects and initial command from URL params on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectsParam = params.get('projects');
@@ -386,38 +426,44 @@ export function TerminalWindowApp() {
     if (projectsParam) {
       try {
         const parsed = JSON.parse(decodeURIComponent(projectsParam)) as ProjectInfo[];
-        setProjects(parsed);
+        setUrlProjects(parsed);
         // Expand all projects by default
         setExpandedProjects(new Set(parsed.map(p => p.path)));
         // Select first project
         if (parsed.length > 0) {
           setSelectedProject(parsed[0].path);
         }
-
-        // Handle initial command if provided
-        if (initialCommandParam) {
-          try {
-            const initialCommand = JSON.parse(decodeURIComponent(initialCommandParam)) as InitialCommand;
-            // Execute command after a delay to ensure everything is initialized
-            setTimeout(() => {
-              handleCreateTerminalWithCommand(initialCommand);
-            }, 100);
-          } catch (error) {
-            console.error('Failed to parse initial command:', error);
-          }
-        }
       } catch (error) {
         console.error('Failed to parse projects:', error);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount - handleCreateTerminalWithCommand is stable
 
-  // Listen for projects update from main window
+    if (initialCommandParam) {
+      try {
+        const initialCommand = JSON.parse(decodeURIComponent(initialCommandParam)) as InitialCommand;
+        // Execute command after a delay to ensure everything is initialized
+        setTimeout(() => {
+          handleCreateTerminalWithCommand(initialCommand);
+        }, 100);
+      } catch (error) {
+        console.error('Failed to parse initial command:', error);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Listen for projects update from main window (when agents change)
   useEffect(() => {
+    console.log('[TerminalWindowApp] Setting up projects update listener');
     const unlistenPromise = listen<ProjectInfo[]>('terminal-window-projects-update', (event) => {
-      setProjects(event.payload);
-      setExpandedProjects(new Set(event.payload.map(p => p.path)));
+      console.log('[TerminalWindowApp] Received projects update:', event.payload.length, 'projects', event.payload.map(p => p.name));
+      setUrlProjects(event.payload);
+      // Expand new projects
+      setExpandedProjects(prev => {
+        const next = new Set(prev);
+        event.payload.forEach(p => next.add(p.path));
+        return next;
+      });
     });
 
     return () => {
@@ -436,6 +482,17 @@ export function TerminalWindowApp() {
     };
   }, [handleCreateTerminalWithCommand]);
 
+  // Manual sync: Request projects from main window
+  const handleSyncProjects = useCallback(async () => {
+    try {
+      // Emit to main window requesting a sync
+      await emitTo('main', 'terminal-window-request-sync', {});
+      console.log('[TerminalWindowApp] Sync requested from main window');
+    } catch (error) {
+      console.error('Failed to request sync:', error);
+    }
+  }, []);
+
   return (
     <div className="terminal-window-app">
       {/* Header with drag region */}
@@ -448,16 +505,30 @@ export function TerminalWindowApp() {
         <div className="terminal-sidebar">
           <div className="terminal-sidebar-header">
             <span>TERMINALS</span>
+            <button
+              type="button"
+              className="terminal-sync-btn"
+              onClick={handleSyncProjects}
+              title="Sync projects from main window"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+              </svg>
+            </button>
             <div className="terminal-sidebar-drag-region" data-tauri-drag-region />
           </div>
 
           <div className="terminal-sidebar-content">
-            {projects.length === 0 ? (
+            {allProjects.length === 0 ? (
               <div className="terminal-sidebar-empty">
-                <p>No projects open</p>
+                <p>No projects yet</p>
+                <p className="terminal-sidebar-hint">Create an agent in the main window to get started</p>
               </div>
             ) : (
-              projects.map(project => (
+              allProjects.map(project => (
                 <div key={project.path} className="project-group">
                   <div
                     className={`project-header ${selectedProject === project.path ? 'selected' : ''}`}

@@ -1,6 +1,31 @@
 import { useState } from 'react';
 import type { DocsSection, DocsPage } from './DocsViewer';
 
+// Map icon names to emoji (fallback for string-based icons)
+const iconMap: Record<string, string> = {
+  rocket: '🚀',
+  star: '⭐',
+  book: '📖',
+  code: '💻',
+  gear: '⚙️',
+  lightbulb: '💡',
+  target: '🎯',
+  tools: '🛠️',
+  zap: '⚡',
+  folder: '📁',
+  check: '✅',
+  warning: '⚠️',
+};
+
+// Convert icon string to emoji (or return as-is if already emoji)
+const getIconEmoji = (icon: string | undefined): string => {
+  if (!icon) return '📄';
+  // If it's already an emoji (starts with non-ASCII), return as-is
+  if (icon.charCodeAt(0) > 127) return icon;
+  // Otherwise look up in map
+  return iconMap[icon.toLowerCase()] || '📄';
+};
+
 interface DocsSidebarProps {
   sections: DocsSection[];
   currentPage: DocsPage | null;
@@ -83,7 +108,7 @@ export default function DocsSidebar({
               className="docs-nav-section-header"
               onClick={() => toggleSection(section.slug)}
             >
-              <span className="docs-nav-section-icon">{section.icon}</span>
+              <span className="docs-nav-section-icon">{getIconEmoji(section.icon)}</span>
               <span className="docs-nav-section-title">{section.title}</span>
               <svg
                 className={`docs-nav-section-arrow ${

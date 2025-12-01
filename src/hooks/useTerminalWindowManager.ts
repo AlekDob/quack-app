@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { emitTo } from '@tauri-apps/api/event';
 
 export interface ProjectInfo {
   path: string;
@@ -40,10 +41,16 @@ export function useTerminalWindowManager() {
         // Focus existing window
         await existingWindow.setFocus();
         setIsOpen(true);
+        setWindowInstance(existingWindow); // Keep reference in sync
+
+        // Always send updated projects when focusing existing window
+        // Use emitTo to send event TO the terminal window (not FROM it)
+        await emitTo(TERMINAL_WINDOW_LABEL, 'terminal-window-projects-update', projects);
+        console.log('[TerminalWindowManager] Sent projects update to existing window:', projects.length, 'projects');
 
         // If there's an initial command, emit event to create terminal with command
         if (initialCommand) {
-          await existingWindow.emit('terminal-window-execute-command', initialCommand);
+          await emitTo(TERMINAL_WINDOW_LABEL, 'terminal-window-execute-command', initialCommand);
         }
         return;
       }
@@ -108,16 +115,23 @@ export function useTerminalWindowManager() {
 
   /**
    * Update projects list in the terminal window
+   * Uses emitTo to send event directly to the terminal window
    */
   const updateProjects = useCallback(async (projects: ProjectInfo[]) => {
-    if (windowInstance) {
-      try {
-        await windowInstance.emit('terminal-window-projects-update', projects);
-      } catch (error) {
-        console.error('Failed to update projects:', error);
+    try {
+      // Check if window exists first
+      const allWindows = await WebviewWindow.getAll();
+      const terminalWindow = allWindows.find(w => w.label === TERMINAL_WINDOW_LABEL);
+
+      if (terminalWindow) {
+        // Use emitTo to send event TO the terminal window
+        await emitTo(TERMINAL_WINDOW_LABEL, 'terminal-window-projects-update', projects);
+        console.log('[TerminalWindowManager] Projects updated via emitTo:', projects.length, 'projects', projects.map(p => p.name));
       }
+    } catch (error) {
+      console.error('Failed to update projects:', error);
     }
-  }, [windowInstance]);
+  }, []);
 
   return {
     isOpen,
