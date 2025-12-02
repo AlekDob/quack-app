@@ -41,7 +41,63 @@ const {
   attachments, // Array of file paths for images/attachments
   outputFormat, // Structured outputs configuration (beta)
   effort, // Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
+  mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
 } = config;
+
+/**
+ * Load MCP servers from .mcp.json file in the working directory
+ * Returns: { [serverName]: { command, args, env } } or undefined
+ */
+function loadMCPServersFromFile(workingDir) {
+  const mcpJsonPath = join(workingDir || process.cwd(), '.mcp.json');
+
+  console.error(`[MCP] Looking for .mcp.json at: ${mcpJsonPath}`);
+
+  if (!existsSync(mcpJsonPath)) {
+    console.error(`[MCP] .mcp.json not found at ${mcpJsonPath}`);
+    return undefined;
+  }
+
+  try {
+    const mcpConfig = JSON.parse(readFileSync(mcpJsonPath, 'utf8'));
+
+    if (!mcpConfig.mcpServers || typeof mcpConfig.mcpServers !== 'object') {
+      console.error(`[MCP] .mcp.json found but no mcpServers configured`);
+      return undefined;
+    }
+
+    const servers = {};
+    const serverNames = Object.keys(mcpConfig.mcpServers);
+
+    console.error(`[MCP] Found ${serverNames.length} MCP servers in .mcp.json:`);
+
+    for (const [name, config] of Object.entries(mcpConfig.mcpServers)) {
+      // Handle different transport types
+      if (config.type === 'sse' || config.type === 'http') {
+        // SSE/HTTP transport
+        servers[name] = {
+          type: config.type,
+          url: config.url,
+          headers: config.headers,
+        };
+        console.error(`  - ${name} (${config.type}): ${config.url}`);
+      } else {
+        // stdio transport (default)
+        servers[name] = {
+          command: config.command,
+          args: config.args || [],
+          env: config.env,
+        };
+        console.error(`  - ${name} (stdio): ${config.command} ${(config.args || []).join(' ')}`);
+      }
+    }
+
+    return Object.keys(servers).length > 0 ? servers : undefined;
+  } catch (error) {
+    console.error(`[MCP] Error reading .mcp.json: ${error.message}`);
+    return undefined;
+  }
+}
 
 // Emit event via stdout
 function emitEvent(event) {
@@ -264,6 +320,20 @@ async function main() {
     if (effort) {
       options.effort = effort;
       console.error(`[DEBUG] Using effort level: ${effort}`);
+    }
+
+    // Load MCP servers: priority is passed config > .mcp.json file
+    let resolvedMcpServers = mcpServers;
+    if (!resolvedMcpServers && cwd) {
+      console.error(`[MCP] No mcpServers in config, loading from .mcp.json...`);
+      resolvedMcpServers = loadMCPServersFromFile(cwd);
+    }
+
+    if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
+      options.mcpServers = resolvedMcpServers;
+      console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length} MCP servers:`, Object.keys(resolvedMcpServers).join(', '));
+    } else {
+      console.error(`[MCP] No MCP servers configured - using SDK defaults only`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

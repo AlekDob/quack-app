@@ -44,6 +44,7 @@ interface SortableRepositoryGroupProps {
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
   onGitOperation: (operation: string, terminal: TerminalInfo) => void;
   onOpenGitPanel?: () => void;
+  onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number;
 }
 
@@ -156,9 +157,10 @@ interface TerminalSidebarProps {
   onReset: (terminal: TerminalInfo) => void;
   onToggleGroup: (cwd: string) => void;
   onReorder: (reorderedIds: string[]) => void;
-  onOpenSettings?: () => void; // NEW: Open settings panel
-  onOpenGitPanel?: () => void; // NEW: Open Git Panel drawer
-  gitRefreshTrigger?: number; // NEW: Trigger to refresh git status after commit
+  onOpenSettings?: () => void; // Open settings panel
+  onOpenGitPanel?: () => void; // Open Git Panel drawer
+  onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
+  gitRefreshTrigger?: number; // Trigger to refresh git status after commit
 }
 
 export default function TerminalSidebar({
@@ -194,6 +196,7 @@ export default function TerminalSidebar({
   onReorder: _onReorder,
   onOpenSettings,
   onOpenGitPanel,
+  onOpenTerminalWindow,
   gitRefreshTrigger,
 }: TerminalSidebarProps) {
   void _onColorChange;
@@ -722,6 +725,7 @@ export default function TerminalSidebar({
                     onContextMenu={handleContextMenu}
                     onGitOperation={handleGitOperation}
                     onOpenGitPanel={onOpenGitPanel}
+                    onOpenTerminalWindow={onOpenTerminalWindow}
                     gitRefreshTrigger={gitRefreshTrigger}
                   />
                 );

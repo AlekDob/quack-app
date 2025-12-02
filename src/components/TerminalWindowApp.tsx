@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { open as openDialog, confirm } from '@tauri-apps/plugin-dialog';
 import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
@@ -156,20 +157,24 @@ export function TerminalWindowApp() {
         return next;
       });
 
-      // CRITICAL: Wait for terminal to be fully ready BEFORE executing command
-      // This fixes the empty lines bug in Claude Code
-      console.log(`[TerminalWindowApp] Waiting for terminal to be ready...`);
-      await waitForTerminalReady();
-      console.log(`[TerminalWindowApp] Terminal ready, executing command: ${initialCommand.command}`);
+      // Only execute command if it's not empty
+      // (empty command is used to just create a terminal without running anything)
+      if (initialCommand.command && initialCommand.command.trim() !== '') {
+        // CRITICAL: Wait for terminal to be fully ready BEFORE executing command
+        // This fixes the empty lines bug in Claude Code
+        console.log(`[TerminalWindowApp] Waiting for terminal to be ready...`);
+        await waitForTerminalReady();
+        console.log(`[TerminalWindowApp] Terminal ready, executing command: ${initialCommand.command}`);
 
-      // Execute command now that terminal is ready
-      try {
-        await invoke('write_to_terminal', {
-          id: result.id,
-          data: `${initialCommand.command}\n`,
-        });
-      } catch (error) {
-        console.error('Failed to execute initial command:', error);
+        // Execute command now that terminal is ready
+        try {
+          await invoke('write_to_terminal', {
+            id: result.id,
+            data: `${initialCommand.command}\n`,
+          });
+        } catch (error) {
+          console.error('Failed to execute initial command:', error);
+        }
       }
 
     } catch (error) {
@@ -527,6 +532,33 @@ export function TerminalWindowApp() {
       unlistenPromise.then(unlisten => unlisten());
     };
   }, [handleCreateTerminalWithCommand]);
+
+  // Intercept window close and show confirmation dialog
+  useEffect(() => {
+    const currentWindow = getCurrentWindow();
+
+    const unlistenPromise = currentWindow.onCloseRequested(async (event) => {
+      // Only show confirmation if there are active terminals
+      if (terminals.length > 0) {
+        const confirmed = await confirm(
+          'Are you sure you want to close? All terminal sessions will be terminated.',
+          {
+            title: 'Close Terminals',
+            kind: 'warning',
+          }
+        );
+
+        if (!confirmed) {
+          // Prevent the window from closing
+          event.preventDefault();
+        }
+      }
+    });
+
+    return () => {
+      unlistenPromise.then(unlisten => unlisten());
+    };
+  }, [terminals.length]);
 
   // Manually add a project folder (persisted in Zustand store)
   const handleAddProjectFolder = useCallback(async () => {

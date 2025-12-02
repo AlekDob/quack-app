@@ -107,157 +107,159 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
         </div>
       </div>
 
-      {isExpanded && (
+      <div className={`edit-summary-bar-content-wrapper ${isExpanded ? 'expanded' : ''}`}>
         <div className="edit-summary-bar-content">
-          {/* NEW FILES Section */}
-          {hasNewFiles && (
-            <div className="edit-summary-bar-section">
-              <div className="edit-summary-bar-section-title">New Files</div>
-              <div className="edit-summary-bar-files">
-                {newFiles.map((edit, index) => {
-                  const fileName = edit.filePath.split('/').pop() || edit.filePath;
-                  const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
+          <div className="edit-summary-bar-content-inner">
+            {/* NEW FILES Section */}
+            {hasNewFiles && (
+              <div className="edit-summary-bar-section">
+                <div className="edit-summary-bar-section-title">New Files</div>
+                <div className="edit-summary-bar-files">
+                  {newFiles.map((edit, index) => {
+                    const fileName = edit.filePath.split('/').pop() || edit.filePath;
+                    const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
 
-                  return (
-                    <div
-                      key={index}
-                      className="edit-summary-bar-file"
-                    >
-                      <div className="edit-summary-bar-file-info">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                          <polyline points="13 2 13 9 20 9" />
-                        </svg>
-                        <span className="edit-summary-bar-file-name">{fileName}</span>
-                        <FileStatusBadge status="created" />
-                        {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                    return (
+                      <div
+                        key={index}
+                        className="edit-summary-bar-file"
+                      >
+                        <div className="edit-summary-bar-file-info">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                            <polyline points="13 2 13 9 20 9" />
+                          </svg>
+                          <span className="edit-summary-bar-file-name">{fileName}</span>
+                          <FileStatusBadge status="created" />
+                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                        </div>
+                        <div className="edit-summary-bar-file-actions">
+                          <FileDiffButton
+                            filePath={edit.filePath}
+                            onDiffClick={(path) => handleDiffClick(path, 'created')}
+                          />
+                          <button
+                            className="edit-summary-bar-open-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFileClick(edit.filePath, edit.lineChanges);
+                            }}
+                            title="Open file"
+                          >
+                            Open
+                          </button>
+                        </div>
                       </div>
-                      <div className="edit-summary-bar-file-actions">
-                        <FileDiffButton
-                          filePath={edit.filePath}
-                          onDiffClick={(path) => handleDiffClick(path, 'created')}
-                        />
-                        <button
-                          className="edit-summary-bar-open-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleFileClick(edit.filePath, edit.lineChanges);
-                          }}
-                          title="Open file"
-                        >
-                          Open
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* MODIFIED FILES Section */}
-          {hasModifiedFiles && (
-            <div className="edit-summary-bar-section">
-              <div className="edit-summary-bar-section-title">Modified</div>
-              <div className="edit-summary-bar-files">
-                {modifiedFiles.map((edit, index) => {
-                  const fileName = edit.filePath.split('/').pop() || edit.filePath;
-                  const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
+            {/* MODIFIED FILES Section */}
+            {hasModifiedFiles && (
+              <div className="edit-summary-bar-section">
+                <div className="edit-summary-bar-section-title">Modified</div>
+                <div className="edit-summary-bar-files">
+                  {modifiedFiles.map((edit, index) => {
+                    const fileName = edit.filePath.split('/').pop() || edit.filePath;
+                    const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
 
-                  return (
-                    <div
-                      key={index}
-                      className="edit-summary-bar-file"
-                    >
-                      <div className="edit-summary-bar-file-info">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                          <polyline points="13 2 13 9 20 9" />
-                        </svg>
-                        <span className="edit-summary-bar-file-name">{fileName}</span>
-                        <FileStatusBadge status="modified" />
-                        {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                    return (
+                      <div
+                        key={index}
+                        className="edit-summary-bar-file"
+                      >
+                        <div className="edit-summary-bar-file-info">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                            <polyline points="13 2 13 9 20 9" />
+                          </svg>
+                          <span className="edit-summary-bar-file-name">{fileName}</span>
+                          <FileStatusBadge status="modified" />
+                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                        </div>
+                        <div className="edit-summary-bar-file-actions">
+                          <span className="edit-summary-bar-file-count">
+                            {edit.editCount} {edit.editCount === 1 ? 'edit' : 'edits'}
+                          </span>
+                          <FileDiffButton
+                            filePath={edit.filePath}
+                            onDiffClick={(path) => handleDiffClick(path, 'modified')}
+                          />
+                          <button
+                            className="edit-summary-bar-open-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFileClick(edit.filePath, edit.lineChanges);
+                            }}
+                            title="Open file"
+                          >
+                            Open
+                          </button>
+                        </div>
                       </div>
-                      <div className="edit-summary-bar-file-actions">
-                        <span className="edit-summary-bar-file-count">
-                          {edit.editCount} {edit.editCount === 1 ? 'edit' : 'edits'}
-                        </span>
-                        <FileDiffButton
-                          filePath={edit.filePath}
-                          onDiffClick={(path) => handleDiffClick(path, 'modified')}
-                        />
-                        <button
-                          className="edit-summary-bar-open-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleFileClick(edit.filePath, edit.lineChanges);
-                          }}
-                          title="Open file"
-                        >
-                          Open
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* DELETED FILES Section */}
-          {hasDeletes && (
-            <div className="edit-summary-bar-section edit-summary-bar-section-delete">
-              <div className="edit-summary-bar-section-title">Deleted</div>
-              <div className="edit-summary-bar-files">
-                {deletes.map((deleted, index) => {
-                  const fileName = deleted.filePath.split('/').pop() || deleted.filePath;
-                  const dirPath = deleted.filePath.substring(0, deleted.filePath.lastIndexOf('/'));
+            {/* DELETED FILES Section */}
+            {hasDeletes && (
+              <div className="edit-summary-bar-section edit-summary-bar-section-delete">
+                <div className="edit-summary-bar-section-title">Deleted</div>
+                <div className="edit-summary-bar-files">
+                  {deletes.map((deleted, index) => {
+                    const fileName = deleted.filePath.split('/').pop() || deleted.filePath;
+                    const dirPath = deleted.filePath.substring(0, deleted.filePath.lastIndexOf('/'));
 
-                  return (
-                    <div
-                      key={index}
-                      className="edit-summary-bar-file edit-summary-bar-file-deleted"
-                    >
-                      <div className="edit-summary-bar-file-info">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        </svg>
-                        <span className="edit-summary-bar-file-name">{fileName}</span>
-                        <FileStatusBadge status="deleted" />
-                        {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                    return (
+                      <div
+                        key={index}
+                        className="edit-summary-bar-file edit-summary-bar-file-deleted"
+                      >
+                        <div className="edit-summary-bar-file-info">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                          <span className="edit-summary-bar-file-name">{fileName}</span>
+                          <FileStatusBadge status="deleted" />
+                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                        </div>
+                        <div className="edit-summary-bar-file-actions">
+                          <FileDiffButton
+                            filePath={deleted.filePath}
+                            onDiffClick={(path) => handleDiffClick(path, 'deleted')}
+                          />
+                        </div>
                       </div>
-                      <div className="edit-summary-bar-file-actions">
-                        <FileDiffButton
-                          filePath={deleted.filePath}
-                          onDiffClick={(path) => handleDiffClick(path, 'deleted')}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {(hasNewFiles || hasModifiedFiles) && (
-            <div className="edit-summary-bar-footer">
-              <button
-                className="edit-summary-bar-open-all-btn"
-                onClick={handleOpenAll}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                </svg>
-                Open All Modified Files
-              </button>
-            </div>
-          )}
+            {(hasNewFiles || hasModifiedFiles) && (
+              <div className="edit-summary-bar-footer">
+                <button
+                  className="edit-summary-bar-open-all-btn"
+                  onClick={handleOpenAll}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  Open All Modified Files
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

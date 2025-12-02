@@ -108,3 +108,28 @@
 /* Remove all complex animations and effects */
 /* No pulsing, no glowing, no complex gradients */
 /* Just clean, minimal, metro-style design */
+
+/* Repository Action Buttons - Unified Style */
+.repo-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.15s ease;
+}
+
+.repo-action-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.repo-action-btn:active {
+  transform: scale(0.95);
+}

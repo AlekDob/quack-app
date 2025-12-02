@@ -6366,6 +6366,60 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [explorerRoot, handleOpenFilePreview]
   );
 
+  // Handler to open .mcp.json file in Monaco editor
+  const handleOpenMcpConfig = useCallback(
+    (repoPath: string) => {
+      // Construct the full path to .mcp.json
+      const mcpFilePath = `${repoPath}/.mcp.json`;
+      const fileName = '.mcp.json';
+
+      // Create a fake DirectoryEntry to open the file
+      const fakeEntry: DirectoryEntry = {
+        name: fileName,
+        path: mcpFilePath,
+        is_dir: false,
+        is_symlink: false,
+      };
+
+      // Use handleOpenFilePreview to open the file
+      void handleOpenFilePreview(fakeEntry);
+    },
+    [handleOpenFilePreview]
+  );
+
+  // Handler to open Terminal Window for a specific repository
+  const handleOpenTerminalWindowForRepo = useCallback(
+    async (repoPath: string, repoName: string) => {
+      try {
+        // Get all existing projects from agentChats (same pattern as Terminals button)
+        const projects = agentChats.map(agent => ({
+          path: agent.cwd,
+          name: agent.cwd.split('/').pop() || agent.cwd,
+        }));
+
+        // Add the clicked project if not already in list
+        const clickedProject = { name: repoName, path: repoPath };
+        const allProjects = [...projects, clickedProject];
+
+        // Remove duplicates by path
+        const uniqueProjects = allProjects.filter(
+          (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+        );
+
+        // Open terminal window with all projects and create a terminal in the clicked project
+        await openTerminalWindow(uniqueProjects, {
+          projectPath: repoPath,
+          command: '', // Empty command just opens a new terminal
+          terminalLabel: `Terminal - ${repoName}`,
+        });
+      } catch (error) {
+        console.error('Failed to open terminal window:', error);
+        toast.error('Failed to open terminal window');
+      }
+    },
+    [agentChats, openTerminalWindow]
+  );
+
   const handleStageEntry = useCallback(
     async (entry: GitStatusEntry) => {
       if (!tauriAvailable) {
@@ -6923,8 +6977,6 @@ You have access to all Bash tools to execute git commands like:
         background: '#191B44',
         overflow: 'hidden',
         zIndex: 9999,
-        opacity: splashFadingOut ? 0 : 1,
-        transition: 'opacity 0.8s ease-out',
         pointerEvents: splashFadingOut ? 'none' : 'auto',
       }}>
         {/* Light rays and glow effects */}
@@ -7205,6 +7257,7 @@ You have access to all Bash tools to execute git commands like:
           onReorder={handleReorderTerminals}
           onOpenSettings={() => setShowSettings(true)}
           onOpenGitPanel={() => setShowGitDrawer(true)}
+          onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           gitRefreshTrigger={gitRefreshTrigger}
         />
 
@@ -7730,6 +7783,8 @@ You have access to all Bash tools to execute git commands like:
           // Collapse props
           isCollapsed={sidePanelCollapsed}
           onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
+          // MCP props
+          onOpenMcpConfig={handleOpenMcpConfig}
         />
 
         <NewTerminalModal
@@ -8209,3 +8264,4 @@ function App() {
 }
 
 export default App;
+

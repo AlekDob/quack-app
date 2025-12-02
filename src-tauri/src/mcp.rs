@@ -231,7 +231,26 @@ fn read_global_mcp_config(working_dir: Option<&String>) -> Result<MCPConfigFile,
     })
 }
 
-/// Read and parse .mcp.json file
+/// Flexible MCP server config for parsing .mcp.json (type field is optional, defaults to stdio)
+#[derive(Debug, Clone, Deserialize)]
+struct FlexibleMCPServerConfig {
+    #[serde(rename = "type", default)]
+    server_type: Option<String>,
+    command: Option<String>,
+    args: Option<Vec<String>>,
+    url: Option<String>,
+    headers: Option<HashMap<String, String>>,
+    method: Option<String>,
+    env: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct FlexibleMCPConfigFile {
+    #[serde(rename = "mcpServers")]
+    mcp_servers: HashMap<String, FlexibleMCPServerConfig>,
+}
+
+/// Read and parse .mcp.json file (with flexible type detection)
 fn read_mcp_config(path: &PathBuf) -> Result<MCPConfigFile, String> {
     log::info!("📂 [MCP DEBUG] Attempting to read MCP config from: {}", path.display());
 
@@ -248,14 +267,52 @@ fn read_mcp_config(path: &PathBuf) -> Result<MCPConfigFile, String> {
 
     log::info!("📄 [MCP DEBUG] File content length: {} bytes", content.len());
 
-    let config: MCPConfigFile = serde_json::from_str(&content)
+    // Parse with flexible structure first
+    let flexible_config: FlexibleMCPConfigFile = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse .mcp.json: {}", e))?;
 
-    log::info!("🎯 [MCP DEBUG] Loaded {} MCP servers from .mcp.json:", config.mcp_servers.len());
-    for (server_id, _) in &config.mcp_servers {
-        log::info!("  - {}", server_id);
+    // Convert to proper MCPConfigFile with type inference
+    let mut mcp_servers = HashMap::new();
+
+    for (id, flex_config) in flexible_config.mcp_servers {
+        let server_type = flex_config.server_type.as_deref().unwrap_or("stdio");
+
+        let config = match server_type {
+            "http" => {
+                let url = flex_config.url.ok_or_else(|| format!("Server '{}': URL required for HTTP transport", id))?;
+                MCPServerConfig::Http {
+                    url,
+                    headers: flex_config.headers,
+                    method: flex_config.method,
+                    env: flex_config.env,
+                }
+            }
+            "sse" => {
+                let url = flex_config.url.ok_or_else(|| format!("Server '{}': URL required for SSE transport", id))?;
+                MCPServerConfig::Sse {
+                    url,
+                    headers: flex_config.headers,
+                    env: flex_config.env,
+                }
+            }
+            _ => {
+                // Default to stdio (most common)
+                let command = flex_config.command.ok_or_else(|| format!("Server '{}': command required for stdio transport", id))?;
+                let args = flex_config.args.unwrap_or_default();
+                MCPServerConfig::Stdio {
+                    command,
+                    args,
+                    env: flex_config.env,
+                }
+            }
+        };
+
+        log::info!("  - {} (type: {})", id, server_type);
+        mcp_servers.insert(id, config);
     }
-    Ok(config)
+
+    log::info!("🎯 [MCP DEBUG] Loaded {} MCP servers from .mcp.json", mcp_servers.len());
+    Ok(MCPConfigFile { mcp_servers })
 }
 
 /// Write MCP config to .mcp.json file
@@ -471,7 +528,7 @@ async fn start_mcp_server(
     Ok(())
 }
 
-/// List all MCP servers from ~/.claude.json ONLY
+/// List all MCP servers from both .mcp.json (project) and ~/.claude.json (global)
 /// Automatically starts enabled stdio servers
 #[tauri::command]
 pub async fn list_mcp_servers(
@@ -484,12 +541,33 @@ pub async fn list_mcp_servers(
 
     let mut all_servers = Vec::new();
 
-    // Read ONLY from ~/.claude.json (project-specific section)
-    log::info!("📖 [MCP DEBUG] Reading MCP config from ~/.claude.json ONLY");
+    // 1. First, read from .mcp.json in the project directory (highest priority)
+    log::info!("📖 [MCP DEBUG] Step 1: Reading from .mcp.json in project directory");
+    if let Some(ref dir) = working_dir {
+        let mcp_json_path = get_mcp_config_path(&app, Some(dir.clone()))?;
+        if let Ok(project_config) = read_mcp_config(&mcp_json_path) {
+            let servers = config_to_servers(project_config, "project");
+            log::info!("✅ [MCP DEBUG] Loaded {} servers from .mcp.json", servers.len());
+            all_servers.extend(servers);
+        } else {
+            log::warn!("⚠️ [MCP DEBUG] Failed to read .mcp.json");
+        }
+    }
+
+    // 2. Then, read from ~/.claude.json (for servers not in .mcp.json)
+    log::info!("📖 [MCP DEBUG] Step 2: Reading from ~/.claude.json");
     if let Ok(global_config) = read_global_mcp_config(working_dir.as_ref()) {
-        let servers = config_to_servers(global_config, "project");
-        log::info!("✅ [MCP DEBUG] Loaded {} servers from ~/.claude.json", servers.len());
-        all_servers.extend(servers);
+        let global_servers = config_to_servers(global_config, "global");
+        log::info!("✅ [MCP DEBUG] Loaded {} servers from ~/.claude.json", global_servers.len());
+
+        // Only add servers that aren't already loaded from .mcp.json
+        for server in global_servers {
+            if !all_servers.iter().any(|s| s.id == server.id) {
+                all_servers.push(server);
+            } else {
+                log::info!("ℹ️ [MCP DEBUG] Skipping '{}' from ~/.claude.json (already in .mcp.json)", server.id);
+            }
+        }
     } else {
         log::warn!("⚠️ [MCP DEBUG] Failed to read ~/.claude.json");
     }
@@ -612,82 +690,122 @@ pub async fn get_mcp_server(
     Ok(None)
 }
 
-/// Save or update an MCP server to ~/.claude.json
+/// Save or update an MCP server to .mcp.json (project) or ~/.claude.json (global)
 #[tauri::command]
 pub async fn save_mcp_server(
-    _app: AppHandle,
+    app: AppHandle,
     server: MCPServer,
     working_dir: Option<String>,
 ) -> Result<(), String> {
-    log::info!("💾 [MCP SAVE] Saving MCP server '{}' to ~/.claude.json", server.id);
-
-    // Get working directory (use current dir if not provided)
-    let work_dir = if let Some(dir) = working_dir {
-        if !dir.is_empty() {
-            dir
-        } else {
-            std::env::current_dir()
-                .map_err(|e| format!("Failed to get current directory: {}", e))?
-                .to_str()
-                .ok_or("Failed to convert path to string")?
-                .to_string()
-        }
-    } else {
-        std::env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?
-            .to_str()
-            .ok_or("Failed to convert path to string")?
-            .to_string()
-    };
-
-    // Read existing MCP servers from ~/.claude.json
-    let mut existing_servers = if let Ok(global_config) = read_global_mcp_config(Some(&work_dir)) {
-        global_config.mcp_servers
-    } else {
-        HashMap::new()
-    };
+    log::info!("💾 [MCP SAVE] Saving MCP server '{}' (scope: {})", server.id, server.scope);
 
     // Create server config from MCPServer
     let server_config = match server.transport.as_str() {
         "stdio" => MCPServerConfig::Stdio {
-            command: server.command.ok_or("Command required for stdio transport")?,
-            args: server.args.ok_or("Args required for stdio transport")?,
-            env: server.env,
+            command: server.command.clone().ok_or("Command required for stdio transport")?,
+            args: server.args.clone().ok_or("Args required for stdio transport")?,
+            env: server.env.clone(),
         },
         "http" => MCPServerConfig::Http {
-            url: server.url.ok_or("URL required for HTTP transport")?,
-            headers: server.headers,
-            method: server.method,
-            env: server.env,
+            url: server.url.clone().ok_or("URL required for HTTP transport")?,
+            headers: server.headers.clone(),
+            method: server.method.clone(),
+            env: server.env.clone(),
         },
         "sse" => MCPServerConfig::Sse {
-            url: server.url.ok_or("URL required for SSE transport")?,
-            headers: server.headers,
-            env: server.env,
+            url: server.url.clone().ok_or("URL required for SSE transport")?,
+            headers: server.headers.clone(),
+            env: server.env.clone(),
         },
         _ => return Err(format!("Unknown transport type: {}", server.transport)),
     };
 
-    // Insert or update the server
-    existing_servers.insert(server.id.clone(), server_config);
+    // Determine where to save based on scope (default to project)
+    let scope = if server.scope.is_empty() { "project" } else { &server.scope };
 
-    // Write back to ~/.claude.json
-    write_global_mcp_config(&work_dir, existing_servers)?;
+    if scope == "project" {
+        // Save to .mcp.json in project directory
+        let mcp_json_path = get_mcp_config_path(&app, working_dir.clone())?;
+        log::info!("💾 [MCP SAVE] Writing to .mcp.json at: {}", mcp_json_path.display());
 
-    log::info!("✅ [MCP SAVE] Successfully saved MCP server '{}' to ~/.claude.json", server.id);
+        // Read existing config or create new one
+        let mut existing_config = read_mcp_config(&mcp_json_path)?;
+
+        // Insert or update the server
+        existing_config.mcp_servers.insert(server.id.clone(), server_config);
+
+        // Write back to .mcp.json
+        write_mcp_config(&mcp_json_path, &existing_config)?;
+
+        log::info!("✅ [MCP SAVE] Successfully saved MCP server '{}' to .mcp.json", server.id);
+    } else {
+        // Save to ~/.claude.json (global scope)
+        let work_dir = if let Some(dir) = working_dir {
+            if !dir.is_empty() {
+                dir
+            } else {
+                std::env::current_dir()
+                    .map_err(|e| format!("Failed to get current directory: {}", e))?
+                    .to_str()
+                    .ok_or("Failed to convert path to string")?
+                    .to_string()
+            }
+        } else {
+            std::env::current_dir()
+                .map_err(|e| format!("Failed to get current directory: {}", e))?
+                .to_str()
+                .ok_or("Failed to convert path to string")?
+                .to_string()
+        };
+
+        // Read existing MCP servers from ~/.claude.json
+        let mut existing_servers = if let Ok(global_config) = read_global_mcp_config(Some(&work_dir)) {
+            global_config.mcp_servers
+        } else {
+            HashMap::new()
+        };
+
+        // Insert or update the server
+        existing_servers.insert(server.id.clone(), server_config);
+
+        // Write back to ~/.claude.json
+        write_global_mcp_config(&work_dir, existing_servers)?;
+
+        log::info!("✅ [MCP SAVE] Successfully saved MCP server '{}' to ~/.claude.json", server.id);
+    }
+
     Ok(())
 }
 
-/// Delete an MCP server from ~/.claude.json
+/// Delete an MCP server from .mcp.json (project) or ~/.claude.json (global)
+/// First tries to find and remove from .mcp.json, falls back to ~/.claude.json
 #[tauri::command]
 pub async fn delete_mcp_server(
-    _app: AppHandle,
+    app: AppHandle,
     server_id: String,
     working_dir: Option<String>,
 ) -> Result<(), String> {
-    log::info!("🗑️ [MCP DELETE] Deleting MCP server '{}' from ~/.claude.json", server_id);
+    log::info!("🗑️ [MCP DELETE] Deleting MCP server '{}'", server_id);
 
-    // Get working directory (use current dir if not provided)
+    // Try to delete from .mcp.json first (project scope)
+    let mcp_json_path = get_mcp_config_path(&app, working_dir.clone())?;
+    log::info!("🔍 [MCP DELETE] Looking for server in .mcp.json at: {}", mcp_json_path.display());
+
+    if mcp_json_path.exists() {
+        let mut project_config = read_mcp_config(&mcp_json_path)?;
+
+        if project_config.mcp_servers.contains_key(&server_id) {
+            // Found in .mcp.json - remove it
+            project_config.mcp_servers.remove(&server_id);
+            write_mcp_config(&mcp_json_path, &project_config)?;
+            log::info!("✅ [MCP DELETE] Successfully deleted MCP server '{}' from .mcp.json", server_id);
+            return Ok(());
+        }
+    }
+
+    // Not found in .mcp.json, try ~/.claude.json (global scope)
+    log::info!("🔍 [MCP DELETE] Server not in .mcp.json, checking ~/.claude.json");
+
     let work_dir = if let Some(dir) = working_dir {
         if !dir.is_empty() {
             dir
@@ -710,12 +828,12 @@ pub async fn delete_mcp_server(
     let mut existing_servers = if let Ok(global_config) = read_global_mcp_config(Some(&work_dir)) {
         global_config.mcp_servers
     } else {
-        return Err("No MCP servers found in ~/.claude.json".to_string());
+        return Err(format!("MCP server '{}' not found in .mcp.json or ~/.claude.json", server_id));
     };
 
     // Remove the server
     if existing_servers.remove(&server_id).is_none() {
-        return Err(format!("MCP server '{}' not found in ~/.claude.json", server_id));
+        return Err(format!("MCP server '{}' not found in .mcp.json or ~/.claude.json", server_id));
     }
 
     // Write back to ~/.claude.json

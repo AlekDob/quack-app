@@ -396,6 +396,9 @@ interface SidePanelProps {
   // Collapse props
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+
+  // MCP props
+  onOpenMcpConfig?: (filePath: string) => void; // NEW: Open .mcp.json in editor
 }
 
 export default function SidePanel({
@@ -488,6 +491,9 @@ export default function SidePanel({
   // Collapse
   isCollapsed = false,
   onToggleCollapse,
+
+  // MCP
+  onOpenMcpConfig,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("agent-context");
 
@@ -717,7 +723,7 @@ export default function SidePanel({
 
         {activeTab === "mcp" && (
           <div className="side-panel-pane">
-            <MCPPanel workingDir={workingDir} />
+            <MCPPanel workingDir={workingDir} onOpenMcpConfig={onOpenMcpConfig} />
           </div>
         )}
 

@@ -1,7 +1,7 @@
 import { type MouseEvent, useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { Store } from '@tauri-apps/plugin-store';
+import { toast } from 'sonner';
 import {
   DndContext,
   closestCenter,
@@ -39,8 +39,9 @@ interface RepositoryGroupProps {
   onSelect: (terminal: TerminalInfo) => void;
   onClose: (id: string) => void;
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
-  onOpenGitPanel?: () => void; // NEW: Function to open Git Panel drawer
-  gitRefreshTrigger?: number; // NEW: Trigger to refresh git status after commit
+  onOpenGitPanel?: () => void; // Function to open Git Panel drawer
+  onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
+  gitRefreshTrigger?: number; // Trigger to refresh git status after commit
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -861,6 +862,7 @@ export default function RepositoryGroup({
   onClose,
   onContextMenu,
   onOpenGitPanel,
+  onOpenTerminalWindow,
   gitRefreshTrigger,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
@@ -1290,13 +1292,87 @@ export default function RepositoryGroup({
             </span>
           </div>
 
-          {/* Reveal in Finder button */}
-          <div onClick={(e) => e.stopPropagation()}>
-            <RevealInFinderButton
-              path={repoPath}
-              iconOnly={true}
-              className="opacity-60 hover:opacity-100 transition-opacity"
-            />
+          {/* Action buttons - consistent style */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }} onClick={(e) => e.stopPropagation()}>
+            {/* Copy Path button */}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(repoPath);
+                  toast.success('Path copied');
+                } catch (err) {
+                  console.error('Failed to copy path:', err);
+                  toast.error('Failed to copy path');
+                }
+              }}
+              title="Copy path to clipboard"
+              className="repo-action-btn"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+            {/* Open Terminal Window button */}
+            {onOpenTerminalWindow && (
+              <button
+                type="button"
+                onClick={() => onOpenTerminalWindow(repoPath, repoName)}
+                title="Open in Terminal Window"
+                className="repo-action-btn"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="4 17 10 11 4 5" />
+                  <line x1="12" y1="19" x2="20" y2="19" />
+                </svg>
+              </button>
+            )}
+            {/* Reveal in Finder button */}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await invoke('reveal_in_finder', { path: repoPath });
+                } catch (err) {
+                  console.error('Failed to reveal in Finder:', err);
+                  toast.error(`Failed to reveal in Finder: ${err}`);
+                }
+              }}
+              title="Reveal in Finder"
+              className="repo-action-btn"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1587,6 +1663,11 @@ export default function RepositoryGroup({
                       const lastReadTimestamp = lastReadTimestamps?.get(agent.id) || 0;
                       const showNotificationBadge = !isActive && !isDormant && (lastAssistantTimestamp > lastReadTimestamp);
 
+                      // Determine if conversation is active and if agent is busy (worktree)
+                      // NOTE: isBusyWorktree must be declared BEFORE useEffect that uses it
+                      const hasActiveConversationWorktree = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
+                      const isBusyWorktree = agent.status === 'busy';
+
                       // Quack tooltip: show periodically when there are UNREAD messages AND agent is NOT busy
                       // This ensures the tooltip only appears when the agent has finished responding
                       useEffect(() => {
@@ -1611,10 +1692,6 @@ export default function RepositoryGroup({
 
                       const relativeTime = getRelativeTimeString(lastAssistantTimestamp);
                       const timestampOpacity = relativeTime ? getTimestampOpacity(relativeTime.minutes) : 0.4;
-
-                      // Determine if conversation is active and if agent is busy (worktree)
-                      const hasActiveConversationWorktree = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
-                      const isBusyWorktree = agent.status === 'busy';
 
                       return (
                         <div

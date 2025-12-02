@@ -81,7 +81,6 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  animation: introReplayFade 5s ease forwards;
   z-index: 9999;
   pointer-events: none;
   overflow: hidden;
@@ -105,20 +104,6 @@
   }
 }
 
-@keyframes introReplayFade {
-  0% {
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
 
 .app-fallback {
   display: flex;
