@@ -988,3 +988,45 @@ export interface HookExecutionEvent {
   output?: string;
   error?: string;
 }
+
+// ==========================================
+// Prompt Snippets Types
+// ==========================================
+
+/**
+ * A prompt snippet that can be triggered by a tag
+ * Supports dynamic variables like {date}, {clipboard}, {time}
+ */
+export interface Snippet {
+  id: string;
+  name: string;
+  content: string;
+  tag: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Dynamic variable that can be used in snippets
+ */
+export type SnippetVariable =
+  | '{date}'        // Current date (YYYY-MM-DD)
+  | '{time}'        // Current time (HH:MM)
+  | '{datetime}'    // Current date and time
+  | '{clipboard}'   // Clipboard content
+  | '{selection}'   // Selected text (if any)
+  | '{cursor}'      // Cursor position marker
+  | '{project}'     // Current project name
+  | '{branch}'      // Current git branch
+  | '{file}'        // Current file path (if in editor)
+  | '{username}'    // System username
+  | string;         // Custom variable
+
+/**
+ * Snippet form data for create/edit
+ */
+export interface SnippetFormData {
+  name: string;
+  content: string;
+  tag: string;
+}

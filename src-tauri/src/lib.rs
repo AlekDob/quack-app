@@ -35,6 +35,7 @@ mod reveal;
 mod sessions;
 mod skills;
 mod slash_commands;
+mod snippets; // Prompt snippets for quick text expansion
 mod telegram_bot;
 mod telegram_central;
 mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security)
@@ -608,7 +609,17 @@ pub fn run() {
             license::validate_license,
             license::revalidate_license,
             license::deactivate_license,
-            license::get_license_devices
+            license::get_license_devices,
+            // Prompt snippets commands
+            snippets::list_snippets,
+            snippets::get_snippet,
+            snippets::get_snippet_by_tag,
+            snippets::create_snippet,
+            snippets::update_snippet,
+            snippets::delete_snippet,
+            snippets::search_snippets,
+            snippets::import_snippets,
+            snippets::export_snippets
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

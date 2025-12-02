@@ -15,7 +15,9 @@ import type { ChatAttachment, AgentInfo, SearchResult } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
 import { useMicRecorder } from '../hooks/useMicRecorder';
+import { useSnippets, getCursorPosition, removeCursorMarker } from '../hooks/useSnippets';
 import VoiceRecordingModal from './VoiceRecordingModal';
+import { SnippetModal } from './SnippetModal';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
@@ -107,6 +109,9 @@ export default function ChatInput({
   // Load slash commands
   const { commands: commandsResponse } = useSlashCommands(basePath || '');
 
+  // Snippets hook for tag expansion
+  const { snippets, detectTag, expandVariables } = useSnippets();
+
   // Flatten commands for autocomplete (builtin + custom)
   const commands = useMemo(() => {
     return [...commandsResponse.builtin, ...commandsResponse.custom];
@@ -166,6 +171,10 @@ export default function ChatInput({
 
   // Voice recording state
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+
+  // Snippet popover state
+  const [showSnippetPopover, setShowSnippetPopover] = useState(false);
+  const snippetButtonRef = useRef<HTMLButtonElement>(null);
 
   // XML tag auto-complete state
   const [xmlTagPair, setXmlTagPair] = useState<{ start: number; end: number; tagName: string } | null>(null);
@@ -935,6 +944,83 @@ export default function ChatInput({
     stopListening();
   }, [stopListening]);
 
+  // Snippet insertion handler
+  const handleInsertSnippet = useCallback((content: string, cursorOffset?: number) => {
+    if (!textareaRef.current) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const beforeCursor = input.substring(0, cursorPos);
+    const afterCursor = input.substring(cursorPos);
+
+    // Add space before if needed
+    const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+    const prefix = needsSpaceBefore ? ' ' : '';
+    const newInput = beforeCursor + prefix + content + afterCursor;
+
+    setInput(newInput);
+
+    // Position cursor
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const basePos = beforeCursor.length + prefix.length;
+        const newCursorPos = cursorOffset !== undefined ? basePos + cursorOffset : basePos + content.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [input, setInput]);
+
+  // Snippet tag expansion on Tab key
+  const handleSnippetExpand = useCallback(async (): Promise<boolean> => {
+    if (!textareaRef.current || snippets.length === 0) return false;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const detected = detectTag(input, cursorPos);
+
+    if (!detected) return false;
+
+    // Find matching snippet
+    const matchingSnippet = snippets.find(
+      s => s.tag.toLowerCase() === detected.tag.toLowerCase()
+    );
+
+    if (!matchingSnippet) return false;
+
+    // Expand the snippet
+    try {
+      let content = await expandVariables(matchingSnippet.content);
+
+      // Handle {cursor} marker
+      const cursorMarkerPos = getCursorPosition(content);
+      if (cursorMarkerPos !== -1) {
+        content = removeCursorMarker(content);
+      }
+
+      // Replace the tag with snippet content
+      const beforeTag = input.substring(0, detected.startIndex);
+      const afterTag = input.substring(detected.endIndex);
+      const newInput = beforeTag + content + afterTag;
+
+      setInput(newInput);
+
+      // Position cursor
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newCursorPos = cursorMarkerPos !== -1
+            ? detected.startIndex + cursorMarkerPos
+            : detected.startIndex + content.length;
+          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 0);
+
+      return true;
+    } catch (err) {
+      console.error('Failed to expand snippet:', err);
+      return false;
+    }
+  }, [input, snippets, detectTag, expandVariables, setInput]);
+
   // Drag & drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     console.log('[DragEnter] Event triggered!', e.dataTransfer.types);
@@ -1239,6 +1325,31 @@ export default function ChatInput({
         setFileSearchResults([]);
         return;
       }
+    }
+
+    // Tab for snippet expansion (when not in autocomplete mode)
+    if (e.key === 'Tab' && !e.shiftKey) {
+      // Check synchronously if there's a matching snippet tag
+      if (textareaRef.current && snippets.length > 0) {
+        const cursorPos = textareaRef.current.selectionStart;
+        const detected = detectTag(input, cursorPos);
+
+        if (detected) {
+          // Check if any snippet matches the tag
+          const matchingSnippet = snippets.find(
+            s => s.tag.toLowerCase() === detected.tag.toLowerCase()
+          );
+
+          if (matchingSnippet) {
+            // Prevent default Tab behavior SYNCHRONOUSLY before async expansion
+            e.preventDefault();
+            // Then do the async expansion
+            void handleSnippetExpand();
+            return;
+          }
+        }
+      }
+      // Note: If no snippet matched, Tab will work normally (don't prevent default)
     }
 
     // Normal behavior when autocomplete is not active
@@ -1548,8 +1659,26 @@ export default function ChatInput({
             </svg>
           </button>
           {/* Focus-only helper icons - at end so they wrap to top with wrap-reverse */}
-          {isFocused && (
+          {/* Keep visible when snippet popover is open to prevent it from unmounting */}
+          {(isFocused || showSnippetPopover) && (
             <div className="focus-helper-icon-wrapper">
+              {/* Snippet button - opens modal */}
+              <button
+                type="button"
+                className="chat-input-action-btn focus-helper-icon"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setShowSnippetPopover(!showSnippetPopover);
+                }}
+                disabled={disabled}
+                data-tooltip="Prompt Snippets"
+                aria-label="Prompt Snippets"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M4 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4z"/>
+                  <path d="M5 5h6v1H5zM5 7.5h4v1H5zM5 10h5v1H5z"/>
+                </svg>
+              </button>
               <button
                 type="button"
                 className="chat-input-action-btn focus-helper-icon"
@@ -1678,6 +1807,13 @@ export default function ChatInput({
         error={speechError ? speechError.message : null}
         onClose={handleVoiceClose}
         onStop={handleVoiceStop}
+      />
+
+      {/* Snippet Modal */}
+      <SnippetModal
+        isOpen={showSnippetPopover}
+        onClose={() => setShowSnippetPopover(false)}
+        onInsertSnippet={handleInsertSnippet}
       />
     </div>
   );

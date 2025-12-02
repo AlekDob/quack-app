@@ -440,7 +440,17 @@
   display: flex;
   gap: 4px;
   animation: focusHelpersSlideIn 0.2s ease-out;
+  overflow: visible;
 }
+
+/* Snippet button wrapper */
+.snippet-button-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: visible;
+}
+/* Note: Snippet popover now uses fixed positioning set via inline styles */
 
 .focus-helper-icon {
   background: rgba(139, 92, 246, 0.12) !important;
