@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quack</title>
+    <!-- Prevent white flash on initial load - matches splash screen color -->
+    <style>
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background-color: #191B44;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

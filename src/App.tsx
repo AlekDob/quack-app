@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import posthog from "posthog-js";
 import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
 import { useClaudeCliAvailability } from "./contexts/TestModeContext";
 import { getTestModeStoreName } from "./utils/testModeStorage";
@@ -1571,6 +1572,18 @@ function AppContent() {
       return newMap;
     });
 
+    // Track chat message sent to PostHog
+    const messageStartTime = performance.now();
+    posthog.capture('ai_message_sent', {
+      agent_id: activeId,
+      agent_name: activeAgent?.name || 'unknown',
+      has_attachments: attachments.length > 0,
+      attachments_count: attachments.length,
+      model: options?.model || 'sonnet',
+      thinking_mode: options?.thinkingMode || 'auto',
+      message_length: content.length,
+    });
+
     // Create assistant message placeholder with settings metadata (SDK 0.1.54+)
     const assistantMessageId = `msg-${Date.now()}-assistant`;
     const assistantMessage: ChatMessage = {
@@ -1738,13 +1751,35 @@ function AppContent() {
       const agentCwd = activeTerminal?.cwd || explorerPath || '';
       notifyAgentReadyRef.current({ id: activeId, label: agentLabel, cwd: agentCwd });
 
+      // Track successful AI response to PostHog
+      const responseTime = Math.round(performance.now() - messageStartTime);
+      posthog.capture('ai_response_received', {
+        agent_id: activeId,
+        agent_name: agentLabel,
+        response_time_ms: responseTime,
+        response_length: response.result?.length || 0,
+        model: options?.model || 'sonnet',
+        session_id: response.session_id,
+        total_cost_usd: response.total_cost_usd,
+      });
+
       // Keep active agent persistent - don't reset after sending
       // The agent stays active until explicitly cleared by the user
     } catch (err) {
       console.error('Error calling Claude SDK:', err);
 
+      // Track error to PostHog
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const wasAborted = abortController.signal.aborted;
+      posthog.capture('ai_error', {
+        agent_id: activeId,
+        error_type: wasAborted ? 'user_aborted' : 'stream_error',
+        error_message: errorMsg.substring(0, 200),
+        model: options?.model || 'sonnet',
+      });
+
       // Check if this was an abort
-      if (abortController.signal.aborted) {
+      if (wasAborted) {
         console.log('[sendMessageForAgent] Stream was aborted by user');
 
         // Update message with aborted status
@@ -5066,6 +5101,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     newTerminalWorkingOn,
     newTerminalAvatar,
     newTerminalPersonality,
+    newTerminalBranch,      // FIX: Add branch to dependencies
+    newTerminalUseWorktree, // FIX: Add useWorktree to dependencies
     tauriAvailable,
   ]);
 

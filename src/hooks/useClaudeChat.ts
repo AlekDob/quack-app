@@ -3,6 +3,7 @@ import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, 
 import { streamClaudeMessage, abortSessionStream } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
 import debugLogger from '../services/debugLogger';
+import posthog from 'posthog-js';
 import {
   calculateTokenBudget,
   performSoftReset,
@@ -151,6 +152,16 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+
+    // Track chat message sent
+    const messageStartTime = performance.now();
+    posthog.capture('ai_message_sent', {
+      has_attachments: attachments.length > 0,
+      attachments_count: attachments.length,
+      model: options?.model || 'sonnet',
+      thinking_mode: options?.thinkingMode || 'auto',
+      message_length: content.length,
+    });
 
     // Create assistant message placeholder
     const assistantMessageId = `msg-${Date.now()}-assistant`;
@@ -333,6 +344,15 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             )
           );
 
+          // Track successful AI response
+          const responseTime = Math.round(performance.now() - messageStartTime);
+          posthog.capture('ai_response_received', {
+            response_time_ms: responseTime,
+            response_length: assistantContent.length,
+            events_count: events.length,
+            model: options?.model || 'sonnet',
+          });
+
           // 🆕 Trigger mobile notification
           try {
             await invoke('send_ai_completion_notification', {
@@ -354,8 +374,18 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     } catch (err) {
       console.error('[useClaudeChat] Error streaming message:', err);
 
+      // Track error
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const wasAborted = abortControllerRef.current?.signal.aborted;
+
+      posthog.capture('ai_error', {
+        error_type: wasAborted ? 'user_aborted' : 'stream_error',
+        error_message: errorMessage.substring(0, 200),
+        model: options?.model || 'sonnet',
+      });
+
       // Check if this was an abort
-      if (abortControllerRef.current?.signal.aborted) {
+      if (wasAborted) {
         console.log('[useClaudeChat] Stream was aborted by user');
 
         // Update message with aborted status

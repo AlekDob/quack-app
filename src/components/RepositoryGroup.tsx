@@ -247,6 +247,13 @@ function SortableAgent({
     return result;
   }, [chatSessions, agent.id, agent.label]);
 
+  // Check if chat is empty (no messages) - same logic as TerminalActivityBar
+  const isChatEmpty = useMemo(() => {
+    if (!chatSessions) return true;
+    const messages = chatSessions.get(agent.id);
+    return !messages || messages.length === 0;
+  }, [chatSessions, agent.id]);
+
   // Check if agent is waiting for response (has unread messages)
   const hasUnreadMessages = useMemo(() => {
     if (!chatSessions || isActive) return false;
@@ -424,19 +431,22 @@ function SortableAgent({
           background: agentCardBg,
           borderRadius: '6px',
           cursor: 'pointer',
-          transition: 'background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease',
+          transition: 'background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
           minHeight: '48px',
-          // Add white border for active conversations
-          border: hasActiveConversation
+          // Add white border only when selected (in focus)
+          border: isActive
             ? '2px solid rgba(255, 255, 255, 0.6)'
             : '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: hasActiveConversation
+          boxShadow: isActive
             ? '0 0 12px rgba(255, 255, 255, 0.15)'
             : undefined,
+          // Reduce opacity for dormant/empty agents (matches sleep icon in TerminalActivityBar)
+          // But always full opacity when selected (isActive)
+          opacity: isActive ? 1 : (isChatEmpty || isDormant) ? 0.70 : 1,
         }}
       >
         {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
@@ -1619,6 +1629,13 @@ export default function RepositoryGroup({
                       // NOTE: This useEffect must be AFTER showNotificationBadge is calculated below
                       // We move the actual useEffect logic below after showNotificationBadge is defined
 
+                      // Check if chat is empty (no messages) - same logic as TerminalActivityBar
+                      const isChatEmpty = (() => {
+                        if (!chatSessions) return true;
+                        const messages = chatSessions.get(agent.id);
+                        return !messages || messages.length === 0;
+                      })();
+
                       // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
                       const isDormant = (() => {
                         if (!chatSessions) return false;
@@ -1775,19 +1792,22 @@ export default function RepositoryGroup({
                                 : 'transparent',
                               borderRadius: '6px',
                               cursor: 'pointer',
-                              transition: 'background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease',
+                              transition: 'background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
                               position: 'relative',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '12px',
                               minHeight: '48px',
-                              // Add white border for active conversations
-                              border: hasActiveConversationWorktree
+                              // Add white border only when selected (in focus)
+                              border: isActive
                                 ? '2px solid rgba(255, 255, 255, 0.6)'
                                 : '1px solid rgba(255, 255, 255, 0.1)',
-                              boxShadow: hasActiveConversationWorktree
+                              boxShadow: isActive
                                 ? '0 0 12px rgba(255, 255, 255, 0.15)'
                                 : undefined,
+                              // Reduce opacity for dormant/empty agents (matches sleep icon in TerminalActivityBar)
+                              // But always full opacity when selected (isActive)
+                              opacity: isActive ? 1 : (isChatEmpty || isDormant) ? 0.65 : 1,
                             }}
                           >
                             {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}

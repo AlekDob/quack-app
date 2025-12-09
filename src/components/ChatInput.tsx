@@ -293,10 +293,86 @@ export default function ChatInput({
     });
   }, [commands, showCommandAutocomplete, commandFilter]);
 
+  // Auto-expand snippet when user types a matching tag followed by space
+  const tryAutoExpandSnippet = useCallback(async (text: string, cursorPos: number) => {
+    if (snippets.length === 0 || cursorPos < 2) return null;
+
+    // Check if the character just typed is a space (trigger for expansion)
+    const justTypedSpace = text[cursorPos - 1] === ' ';
+    if (!justTypedSpace) return null;
+
+    // Get the word before the space
+    const textBeforeSpace = text.substring(0, cursorPos - 1);
+    let wordStart = textBeforeSpace.length;
+    for (let i = textBeforeSpace.length - 1; i >= 0; i--) {
+      const char = textBeforeSpace[i];
+      if (/[\s\n]/.test(char)) {
+        wordStart = i + 1;
+        break;
+      }
+      if (i === 0) {
+        wordStart = 0;
+      }
+    }
+
+    const potentialTag = textBeforeSpace.substring(wordStart);
+    if (!potentialTag) return null;
+
+    // Check if this matches a snippet tag
+    const matchingSnippet = snippets.find(
+      s => s.tag.toLowerCase() === potentialTag.toLowerCase()
+    );
+
+    if (!matchingSnippet) return null;
+
+    // Found a matching snippet - expand it
+    try {
+      let content = await expandVariables(matchingSnippet.content);
+
+      // Handle {cursor} marker
+      const cursorMarkerPos = getCursorPosition(content);
+      if (cursorMarkerPos !== -1) {
+        content = removeCursorMarker(content);
+      }
+
+      // Replace the tag (and the space) with snippet content
+      const beforeTag = text.substring(0, wordStart);
+      const afterTag = text.substring(cursorPos); // cursorPos is after the space
+      const newInput = beforeTag + content + afterTag;
+
+      // Return the new input and cursor position
+      return {
+        newInput,
+        newCursorPos: cursorMarkerPos !== -1
+          ? wordStart + cursorMarkerPos
+          : wordStart + content.length
+      };
+    } catch (err) {
+      console.error('Failed to auto-expand snippet:', err);
+      return null;
+    }
+  }, [snippets, expandVariables]);
+
   // Handle input change and detect @ mentions and / commands
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart;
+
+    // First, try auto-expand snippet (async)
+    void (async () => {
+      const expanded = await tryAutoExpandSnippet(newValue, cursorPos);
+      if (expanded) {
+        setInput(expanded.newInput);
+        // Position cursor after expansion
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.setSelectionRange(expanded.newCursorPos, expanded.newCursorPos);
+          }
+        }, 0);
+        return;
+      }
+    })();
 
     setInput(newValue);
 
@@ -358,7 +434,7 @@ export default function ChatInput({
     // No valid @ mention or / command found
     setShowAgentAutocomplete(false);
     setShowCommandAutocomplete(false);
-  }, [agents, commands, setInput]);
+  }, [agents, commands, setInput, tryAutoExpandSnippet]);
 
   // Select an agent from autocomplete
   const selectAgent = useCallback((agent: AgentInfo) => {

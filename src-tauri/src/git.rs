@@ -563,13 +563,22 @@ fn git_list_branches_impl(root_path: Option<String>) -> Result<Vec<GitBranch>> {
     let mut branches = Vec::new();
 
     for line in output.lines() {
-        let line = line.trim();
         if line.is_empty() {
             continue;
         }
 
+        // Check if this is the current branch (starts with '* ')
         let is_current = line.starts_with('*');
-        let line = if is_current { &line[2..] } else { &line[2..] };
+
+        // FIX: Correctly handle branch name extraction
+        // Output format: "* main     abc123 [origin/main] message" for current branch
+        //                "  feat/xyz abc123 [origin/feat/xyz] message" for other branches
+        // The prefix is always 2 characters: "* " for current, "  " for others
+        let line = if is_current {
+            &line[2..] // Remove "* " prefix
+        } else {
+            line.trim_start() // Remove leading spaces for non-current branches
+        };
 
         // Parse branch name (first word)
         let parts: Vec<&str> = line.split_whitespace().collect();

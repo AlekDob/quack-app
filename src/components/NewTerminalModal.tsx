@@ -382,12 +382,21 @@ function NewTerminalModal({
       setAvailableBranches(branches);
       setIsGitRepository(true);
 
-      if (branches.length > 0 && !branch && onBranchChange) {
+      // FIX: Always set the current branch when loading a new repository
+      // This ensures the branch is correctly set when:
+      // 1. First time opening modal (branch is empty)
+      // 2. Using an existing agent on a different project (branch was from previous repo)
+      // 3. Changing directory within the modal
+      if (branches.length > 0 && onBranchChange) {
         const currentBranch = branches.find(b => b.isCurrent);
-        if (currentBranch) {
-          onBranchChange(currentBranch.name);
-        } else {
-          onBranchChange(branches[0].name);
+        // Only auto-set if branch is empty OR if current branch value doesn't exist in this repo
+        const branchExistsInRepo = branch && branches.some(b => b.name === branch);
+        if (!branch || !branchExistsInRepo) {
+          if (currentBranch) {
+            onBranchChange(currentBranch.name);
+          } else {
+            onBranchChange(branches[0].name);
+          }
         }
       }
     } catch (err) {

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { TerminalInfo, NativeTerminal, ProjectTerminal } from '../types';
+import posthog from 'posthog-js';
 
 // Manual project info for Terminal Window
 export interface ManualProject {
@@ -64,9 +65,18 @@ export const useTerminalStore = create<TerminalState>()(
 
         setTerminals: (terminals) => set({ terminals }),
 
-        addTerminal: (terminal) => set((state) => ({
-          terminals: [...state.terminals, terminal],
-        })),
+        addTerminal: (terminal) => {
+          // Track terminal creation
+          posthog.capture('terminal_created', {
+            type: 'native',
+            terminal_id: terminal.id,
+            has_custom_label: !!terminal.label,
+          });
+
+          return set((state) => ({
+            terminals: [...state.terminals, terminal],
+          }));
+        },
 
         removeTerminal: (id) => set((state) => ({
           terminals: state.terminals.filter((t) => t.id !== id),
@@ -84,9 +94,18 @@ export const useTerminalStore = create<TerminalState>()(
         // Native terminal actions
         setNativeTerminals: (terminals) => set({ nativeTerminals: terminals }),
 
-        addNativeTerminal: (terminal) => set((state) => ({
-          nativeTerminals: [...state.nativeTerminals, terminal],
-        })),
+        addNativeTerminal: (terminal) => {
+          // Track native terminal creation
+          posthog.capture('terminal_created', {
+            type: 'native_pty',
+            terminal_id: terminal.id,
+            shell: terminal.shell || 'default',
+          });
+
+          return set((state) => ({
+            nativeTerminals: [...state.nativeTerminals, terminal],
+          }));
+        },
 
         removeNativeTerminal: (id) => set((state) => ({
           nativeTerminals: state.nativeTerminals.filter((t) => t.id !== id),
@@ -101,9 +120,18 @@ export const useTerminalStore = create<TerminalState>()(
         // Project terminal actions (NEW - replaces agentTerminals)
         setProjectTerminals: (terminals) => set({ projectTerminals: terminals }),
 
-        addProjectTerminal: (terminal) => set((state) => ({
-          projectTerminals: [...state.projectTerminals, terminal],
-        })),
+        addProjectTerminal: (terminal) => {
+          // Track agent/project terminal creation
+          posthog.capture('terminal_created', {
+            type: 'claude_agent',
+            terminal_id: terminal.id,
+            terminal_name: terminal.name,
+          });
+
+          return set((state) => ({
+            projectTerminals: [...state.projectTerminals, terminal],
+          }));
+        },
 
         removeProjectTerminal: (id) => set((state) => ({
           projectTerminals: state.projectTerminals.filter((t) => t.id !== id),

@@ -144,7 +144,10 @@ export function StepProjectContext({
             <div className="git-branch-input-wrapper">
               <select
                 value={branch}
-                onChange={(e) => onBranchChange(e.target.value)}
+                onChange={(e) => {
+                  console.log('🔍 [StepProjectContext] Branch selected:', e.target.value, 'Previous:', branch);
+                  onBranchChange(e.target.value);
+                }}
                 disabled={loadingBranches}
                 className="git-branch-select"
               >

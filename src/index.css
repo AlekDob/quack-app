@@ -32,7 +32,7 @@
 }
 
 html {
-  background-color: #000000; /* Black background for clean splash screen */
+  background-color: #191B44; /* Matches splash screen color - prevents white flash */
 }
 
 html,
@@ -48,7 +48,7 @@ body,
 }
 
 body {
-  background-color: #000000; /* Black background for clean splash screen */
+  background-color: #191B44; /* Matches splash screen color - prevents white flash */
   /* Background image set dynamically by App.tsx */
   background-size: cover;
   background-position: center;
