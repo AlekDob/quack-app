@@ -135,7 +135,8 @@ npm run test:coverage # Coverage report
 ## ✨ Features (`05-features/`)
 
 ### Implemented Features
-- **`CLAUDE_SDK_054.md`** ✅ **NEW!** - Claude Agent SDK 0.1.54 features (effort, thinking, droids)
+- **`background-tasks.md`** ✅ **NEW!** - Background task system (non-blocking command/agent execution)
+- **`CLAUDE_SDK_054.md`** ✅ - Claude Agent SDK 0.1.54 features (effort, thinking, droids)
 - **`MCP_CONFIGURATION.md`** ✅ - Model Context Protocol setup & configuration guide
 - **`MCP_DYNAMIC_LOADING.md`** - Dynamic MCP server loading
 - **`MCP_TEMPLATE_IMPLEMENTATION.md`** - MCP template system

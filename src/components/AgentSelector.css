@@ -337,6 +337,18 @@
   border-color: rgba(59, 130, 246, 0.6);
 }
 
+/* Background Button - Purple theme */
+.agent-card-background-btn {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: rgba(139, 92, 246, 1);
+}
+
+.agent-card-background-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(124, 58, 237, 0.25) 100%);
+  border-color: rgba(139, 92, 246, 0.6);
+}
+
 /* Delete Button - Red theme */
 .agent-card-delete-btn {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%);

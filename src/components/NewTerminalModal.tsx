@@ -892,6 +892,7 @@ function NewTerminalModal({
             onUseAgent={handleUseAgent}
             onEditAgent={handleEditAgent}
             onCreateNew={handleCreateNewAgent}
+            basePath={path}
           />
 
           <div className="modal-actions">

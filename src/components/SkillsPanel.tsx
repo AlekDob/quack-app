@@ -34,44 +34,29 @@ export default function SkillsPanel({
   );
 
   return (
-    <div className="agents-panel">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{
-          borderColor: "rgba(255, 255, 255, 0.1)",
-        }}
-      >
-        <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
-          Skills
-        </h3>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
-          style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "rgba(255, 255, 255, 0.9)",
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-          }}
-        >
-          {loading ? "..." : "↻ Refresh"}
-        </button>
+      <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-white">Skills</h3>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh"
+          >
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Search */}
       {skills.length > 0 && (
-        <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}>
-          <div className="relative flex-1">
+        <div className="px-4 pb-3">
+          <div className="relative">
             <input
               type="text"
               value={searchQuery}
@@ -210,63 +195,32 @@ export default function SkillsPanel({
                   <span className="ml-auto text-xs text-white/40">{filteredSkills.filter((s) => s.scope === "project").length}</span>
                 </button>
                 {projectExpanded && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {filteredSkills
                     .filter((s) => s.scope === "project")
                     .map((skill) => (
                       <div
                         key={skill.name}
-                        className="rounded-lg border transition-all duration-200 cursor-pointer"
-                        style={{
-                          background: "rgba(12, 16, 24, 0.6)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                        }}
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
                         onClick={() => onSelectSkill(skill)}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "rgba(242, 140, 82, 0.08)";
-                          e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.2)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "rgba(12, 16, 24, 0.6)";
-                          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                        }}
                       >
-                        {/* Skill card */}
-                        <div className="w-full flex items-start gap-3 p-3 transition-all duration-200">
-                          {/* Skill Icon */}
-                          <div
-                            className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden"
-                            style={{
-                              background: "rgba(242, 140, 82, 0.15)",
-                              border: "1px solid rgba(242, 140, 82, 0.3)",
-                            }}
-                          >
-                            <img
-                              src="/images/skills.jpeg"
-                              alt="Skill"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                        {/* Lightning Icon */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(248, 183, 57, 0.15)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f8b739" strokeWidth="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                          </svg>
+                        </div>
 
-                          {/* Skill Info */}
-                          <div className="flex-1 min-w-0 flex flex-col gap-1">
-                            {/* Skill Name */}
-                            <div
-                              className="text-sm font-medium text-left"
-                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                            >
-                              {skill.name.replace(/-/g, " ")}
-                            </div>
-
-                            {/* Description */}
-                            <div
-                              className="text-xs truncate"
-                              style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                            >
-                              {skill.description.substring(0, 60)}
-                              {skill.description.length > 60 ? "..." : ""}
-                            </div>
+                        {/* Skill Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white/90 truncate">
+                            {skill.name.replace(/-/g, " ")}
                           </div>
+                          {skill.description && (
+                            <div className="text-xs text-white/50 truncate">
+                              {skill.description}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -293,63 +247,32 @@ export default function SkillsPanel({
                   <span className="ml-auto text-xs text-white/40">{filteredSkills.filter((s) => s.scope === "global").length}</span>
                 </button>
                 {globalExpanded && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {filteredSkills
                     .filter((s) => s.scope === "global")
                     .map((skill) => (
                       <div
                         key={skill.name}
-                        className="rounded-lg border transition-all duration-200 cursor-pointer"
-                        style={{
-                          background: "rgba(12, 16, 24, 0.6)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                        }}
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
                         onClick={() => onSelectSkill(skill)}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "rgba(242, 140, 82, 0.08)";
-                          e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.2)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "rgba(12, 16, 24, 0.6)";
-                          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                        }}
                       >
-                        {/* Skill card */}
-                        <div className="w-full flex items-start gap-3 p-3 transition-all duration-200">
-                          {/* Skill Icon */}
-                          <div
-                            className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden"
-                            style={{
-                              background: "rgba(242, 140, 82, 0.15)",
-                              border: "1px solid rgba(242, 140, 82, 0.3)",
-                            }}
-                          >
-                            <img
-                              src="/images/skills.jpeg"
-                              alt="Skill"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                        {/* Lightning Icon */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(248, 183, 57, 0.15)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f8b739" strokeWidth="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                          </svg>
+                        </div>
 
-                          {/* Skill Info */}
-                          <div className="flex-1 min-w-0 flex flex-col gap-1">
-                            {/* Skill Name */}
-                            <div
-                              className="text-sm font-medium text-left"
-                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                            >
-                              {skill.name.replace(/-/g, " ")}
-                            </div>
-
-                            {/* Description */}
-                            <div
-                              className="text-xs truncate"
-                              style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                            >
-                              {skill.description.substring(0, 60)}
-                              {skill.description.length > 60 ? "..." : ""}
-                            </div>
+                        {/* Skill Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white/90 truncate">
+                            {skill.name.replace(/-/g, " ")}
                           </div>
+                          {skill.description && (
+                            <div className="text-xs text-white/50 truncate">
+                              {skill.description}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

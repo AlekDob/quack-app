@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
-import type { ChatMessage, AgentInfo } from '../types';
+import { useBackgroundAgentStore } from '../stores/backgroundAgentStore';
+import type { ChatMessage, AgentInfo, BackgroundTaskType, BackgroundTaskPriority } from '../types';
 import type {
   ChatSendOptions,
   ThinkingMode,
@@ -155,6 +157,61 @@ export default function ChatView({
     if (slashCommandMatch) {
       const [, commandName, commandArgs] = slashCommandMatch;
       console.log('[ChatView] Detected slash command:', commandName, 'with args:', commandArgs);
+
+      // INTERCEPT /background command - create background task instead of sending message
+      if (commandName === 'background') {
+        if (!commandArgs || !commandArgs.trim()) {
+          toast.error('Usage: /background <command> or /background @agent <prompt>');
+          return;
+        }
+
+        const args = commandArgs.trim();
+        const { createTask } = useBackgroundAgentStore.getState();
+
+        // Check if it's an agent invocation: @agentname prompt
+        const agentMatch = args.match(/^@(\w+)\s+(.+)$/s);
+
+        if (agentMatch) {
+          // Agent task: /background @code-reviewer Review this code
+          const [, agentName, prompt] = agentMatch;
+          createTask({
+            name: `Agent: ${agentName}`,
+            type: 'agent' as BackgroundTaskType,
+            priority: 'medium' as BackgroundTaskPriority,
+            agentId: agentName,
+            prompt: prompt,
+            workingDirectory: basePath || process.cwd(),
+          });
+          toast.success(`Background task created: Agent ${agentName}`);
+        } else {
+          // Shell command task: /background npm run build
+          // Determine task type from command
+          // NOTE: 'watch' type requires watchPatterns, so we only use it for explicit watch commands
+          // Dev servers (like tauri:dev, vite dev) should be 'build' type
+          let taskType: BackgroundTaskType = 'custom';
+          if (args.includes('build') || args.includes('compile') || args.includes('dev')) {
+            taskType = 'build';
+          } else if (args.includes('test') || args.includes('vitest') || args.includes('jest')) {
+            taskType = 'test';
+          } else if (args.includes('watch')) {
+            // Only use 'watch' type if command explicitly contains 'watch'
+            // This still won't work without watchPatterns, so treat as 'custom' for now
+            taskType = 'custom';
+          } else if (args.includes('lint') || args.includes('analyze') || args.includes('audit')) {
+            taskType = 'analysis';
+          }
+
+          createTask({
+            name: args.length > 40 ? args.substring(0, 40) + '...' : args,
+            type: taskType,
+            priority: 'medium' as BackgroundTaskPriority,
+            command: args,
+            workingDirectory: basePath || process.cwd(),
+          });
+          toast.success(`Background task created: ${args.length > 30 ? args.substring(0, 30) + '...' : args}`);
+        }
+        return; // Don't send as normal message
+      }
 
       try {
         // Try to expand the command via backend

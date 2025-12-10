@@ -44,7 +44,7 @@ body,
 }
 
 #root {
-  /* Background managed by body element */
+  background-color: transparent;
 }
 
 body {

@@ -46,7 +46,8 @@ cd "$PROJECT_ROOT"
 
 # ==== STEP 1: Build (Universal Binary) ====
 echo -e "${YELLOW}[1/6] Building universal app with Tauri (arm64 + x86_64)...${NC}"
-npm run tauri build -- --target universal-apple-darwin
+# Note: Using --bundles app to skip Tauri's DMG creation (we create our own DMG later)
+npm run tauri build -- --target universal-apple-darwin --bundles app
 
 if [ ! -d "$APP_PATH" ]; then
     echo -e "${RED}ERROR: Build failed - Quack.app not found${NC}"

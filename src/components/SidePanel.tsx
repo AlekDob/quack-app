@@ -5,6 +5,10 @@ import SkillsPanel from "./SkillsPanel";
 import MCPPanel from "./MCPPanel";
 import HooksPanel from "./HooksPanel";
 import { CommandsPanel } from "./CommandsPanel";
+import { RulesPanel } from "./RulesPanel";
+import { useRules } from "../hooks/useRules";
+import { useSlashCommands } from "../hooks/useSlashCommands";
+import { useMCPServers } from "../hooks/useMCPServers";
 import AgentContextPanel from "./AgentContextPanel";
 import TerminalToolBar from "./TerminalToolBar";
 import UsagePanel from "./UsagePanel";
@@ -18,7 +22,7 @@ import type { SlashCommand } from "../hooks/useSlashCommands";
  * Note: Marketplace is now a drawer (not a tab)
  */
 
-type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "sessions" | "terminal" | "usage";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "rules" | "sessions" | "terminal" | "usage";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -297,6 +301,42 @@ const icons: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  rules: (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      {/* Document with lines */}
+      <path
+        d="M4 3h8l4 4v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 3v4h4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Check marks for rules */}
+      <path
+        d="M5 10l1.5 1.5L9 9"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 14l1.5 1.5L9 13"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -497,6 +537,18 @@ export default function SidePanel({
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("agent-context");
 
+  // Load rules for badge counter
+  const { rules } = useRules(rootPath || '');
+  const rulesCount = rules.project.length + rules.global.length;
+
+  // Load commands for badge counter
+  const { commands } = useSlashCommands(rootPath || '');
+  const commandsCount = commands.custom.length;
+
+  // Load MCP servers for badge counter
+  const { servers: mcpServers } = useMCPServers(workingDir);
+  const mcpCount = mcpServers.length;
+
   // Auto-refresh agents and skills when their tabs are opened
   useEffect(() => {
     if (activeTab === "agents" && onRefreshAgents) {
@@ -529,9 +581,18 @@ export default function SidePanel({
       icon: icons.folder,
     },
     {
+      id: "rules" as TabId,
+      label: "Rules",
+      icon: icons.rules,
+      badge: rulesCount,
+      hasContent: rulesCount > 0,
+    },
+    {
       id: "commands" as TabId,
       label: "Commands",
       icon: icons.commands,
+      badge: commandsCount,
+      hasContent: commandsCount > 0,
     },
     {
       id: "agents" as TabId,
@@ -551,6 +612,8 @@ export default function SidePanel({
       id: "mcp" as TabId,
       label: "MCP Servers",
       icon: icons.mcp,
+      badge: mcpCount,
+      hasContent: mcpCount > 0,
     },
     {
       id: "hooks" as TabId,
@@ -749,6 +812,12 @@ export default function SidePanel({
               onUseCommand={onUseCommand}
               onViewCommand={onViewCommand}
             />
+          </div>
+        )}
+
+        {activeTab === "rules" && (
+          <div className="side-panel-pane">
+            <RulesPanel basePath={rootPath || ''} />
           </div>
         )}
 

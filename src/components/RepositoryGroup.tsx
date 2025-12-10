@@ -220,32 +220,15 @@ function SortableAgent({
     willChange: isDragging ? 'transform' : 'auto',
   }), [transform, isDragging, transition]);
 
-  // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
+  // Check if agent is dormant (no user interaction yet)
   const isDormant = useMemo(() => {
-    if (!chatSessions) {
-      console.log(`[${agent.label}] 💤 isDormant=false (no chatSessions)`)
-      return false;
-    }
+    if (!chatSessions) return true;
     const messages = chatSessions.get(agent.id);
-    if (!messages || messages.length === 0) {
-      console.log(`[${agent.label}] 💤 isDormant=false (no messages)`)
-      return false;
-    }
-
-    // Check if agent has any user messages (actual interaction)
+    if (!messages || messages.length === 0) return true;
+    // Dormant if no user messages (no actual interaction)
     const hasUserMessage = messages.some(msg => msg.role === 'user');
-    // Check if agent has any real assistant responses (not just "Previous conversation detected")
-    const hasAssistantResponse = messages.some(msg =>
-      msg.role === 'assistant' &&
-      !msg.content?.includes('Previous conversation detected') &&
-      !msg.content?.includes('**Previous conversation detected**')
-    );
-
-    const result = !hasUserMessage && !hasAssistantResponse
-    console.log(`[${agent.label}] 💤 isDormant=${result} (hasUserMessage=${hasUserMessage}, hasAssistantResponse=${hasAssistantResponse})`)
-
-    return result;
-  }, [chatSessions, agent.id, agent.label]);
+    return !hasUserMessage;
+  }, [chatSessions, agent.id]);
 
   // Check if chat is empty (no messages) - same logic as TerminalActivityBar
   const isChatEmpty = useMemo(() => {
@@ -1636,22 +1619,14 @@ export default function RepositoryGroup({
                         return !messages || messages.length === 0;
                       })();
 
-                      // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
+                      // Check if agent is dormant (no user interaction yet)
                       const isDormant = (() => {
-                        if (!chatSessions) return false;
+                        if (!chatSessions) return true;
                         const messages = chatSessions.get(agent.id);
-                        if (!messages || messages.length === 0) return false;
-
-                        // Check if agent has any user messages (actual interaction)
+                        if (!messages || messages.length === 0) return true;
+                        // Dormant if no user messages
                         const hasUserMessage = messages.some(msg => msg.role === 'user');
-                        // Check if agent has any real assistant responses (not just "Previous conversation detected")
-                        const hasAssistantResponse = messages.some(msg =>
-                          msg.role === 'assistant' &&
-                          !msg.content?.includes('Previous conversation detected') &&
-                          !msg.content?.includes('**Previous conversation detected**')
-                        );
-
-                        return !hasUserMessage && !hasAssistantResponse;
+                        return !hasUserMessage;
                       })();
 
                       // Check if agent has unread messages

@@ -162,149 +162,107 @@ export default function HooksPanel({
   const renderHookCard = (hook: HookConfig) => (
     <div
       key={hook.id}
-      className="p-3 rounded-lg mb-2 transition-all duration-200"
-      style={{
-        background: hook.enabled ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)',
-        border: `1px solid ${hook.enabled ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)'}`,
-        opacity: hook.enabled ? 1 : 0.6,
-      }}
+      className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+      style={{ opacity: hook.enabled ? 1 : 0.5 }}
+      onClick={() => setEditingHook(hook)}
     >
-      <div className="flex items-center justify-between mb-2">
+      {/* Icon with toggle color */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${HOOK_TYPE_COLORS[hook.type]}15` }}>
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke={HOOK_TYPE_COLORS[hook.type]} strokeWidth="1.5">
+          <path d="M10 3v7" strokeLinecap="round" />
+          <path d="M10 10c0 2.5-2 4-4 4s-4-1.5-4-4" strokeLinecap="round" />
+          <circle cx="10" cy="3" r="1.5" fill={HOOK_TYPE_COLORS[hook.type]} stroke="none" />
+        </svg>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          {/* Toggle */}
-          <button
-            type="button"
-            onClick={() => handleToggleHook(hook)}
-            className="w-8 h-4 rounded-full relative transition-colors duration-200"
+          <span className="text-sm font-medium text-white/90 truncate">{hook.name}</span>
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] font-medium"
             style={{
-              background: hook.enabled ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+              background: `${HOOK_TYPE_COLORS[hook.type]}15`,
+              color: HOOK_TYPE_COLORS[hook.type],
             }}
           >
+            {hook.type}
+          </span>
+          <code className="px-1.5 py-0.5 rounded bg-white/5 text-white/50 text-[10px] font-mono">
+            {hook.matcher}
+          </code>
+        </div>
+        {hook.description && (
+          <p className="text-xs text-white/50 mt-0.5 truncate">{hook.description}</p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Toggle */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); handleToggleHook(hook); }}
+          className="p-1.5 rounded hover:bg-white/10 transition-colors"
+          title={hook.enabled ? 'Disable' : 'Enable'}
+        >
+          <div
+            className="w-6 h-3 rounded-full relative transition-colors duration-200"
+            style={{ background: hook.enabled ? '#10b981' : 'rgba(255, 255, 255, 0.2)' }}
+          >
             <span
-              className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-200"
-              style={{
-                left: hook.enabled ? '16px' : '2px',
-              }}
+              className="absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all duration-200"
+              style={{ left: hook.enabled ? '14px' : '2px' }}
             />
-          </button>
-          {/* Name */}
-          <span className="text-sm font-medium text-white/90">{hook.name}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {/* Edit */}
-          <button
-            type="button"
-            onClick={() => setEditingHook(hook)}
-            className="p-1.5 rounded hover:bg-white/10 text-white/50 hover:text-white/90 transition-colors"
-            title="Edit"
-          >
-            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
-              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-            </svg>
-          </button>
-          {/* Delete */}
-          <button
-            type="button"
-            onClick={() => handleDeleteHook(hook)}
-            className="p-1.5 rounded hover:bg-red-500/20 text-white/50 hover:text-red-400 transition-colors"
-            title="Delete"
-          >
-            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
-              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      {/* Type badge + matcher */}
-      <div className="flex items-center gap-2 text-xs">
-        <span
-          className="px-2 py-0.5 rounded-full font-medium"
-          style={{
-            background: `${HOOK_TYPE_COLORS[hook.type]}20`,
-            color: HOOK_TYPE_COLORS[hook.type],
-          }}
+          </div>
+        </button>
+        {/* Delete */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); handleDeleteHook(hook); }}
+          className="p-1.5 rounded hover:bg-white/10 text-white/50 hover:text-red-400 transition-colors text-xs"
+          title="Delete"
         >
-          {hook.type}
-        </span>
-        <span className="text-white/40">-</span>
-        <code className="px-1.5 py-0.5 rounded bg-white/5 text-white/60 font-mono">
-          {hook.matcher}
-        </code>
-        <span
-          className="ml-auto px-1.5 py-0.5 rounded text-[10px] uppercase font-medium"
-          style={{
-            background: hook.scope === 'project' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(168, 85, 247, 0.15)',
-            color: hook.scope === 'project' ? '#60a5fa' : '#a78bfa',
-          }}
-        >
-          {hook.scope}
-        </span>
+          Delete
+        </button>
       </div>
-      {hook.description && (
-        <p className="mt-2 text-xs text-white/40">{hook.description}</p>
-      )}
     </div>
   );
 
   return (
-    <div className="agents-panel">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{
-          borderColor: "rgba(255, 255, 255, 0.1)",
-        }}
-      >
-        <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
-          Hooks
-        </h3>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={loading}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
-            style={{
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              color: "rgba(255, 255, 255, 0.9)",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-            }}
-          >
-            {loading ? "..." : "Refresh"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditingHook({
-              id: '',
-              name: 'New Hook',
-              type: 'PostToolUse',
-              matcher: '*',
-              command: '',
-              enabled: true,
-              scope: workingDir ? 'project' : 'global',
-            })}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
-            style={{
-              background: "#f28c52",
-              color: "#000",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#f9a470";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#f28c52";
-            }}
-          >
-            + Add
-          </button>
+      <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white">Hooks</h3>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingHook({
+                id: '',
+                name: 'New Hook',
+                type: 'PostToolUse',
+                matcher: '*',
+                command: '',
+                enabled: true,
+                scope: workingDir ? 'project' : 'global',
+              })}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200"
+            >
+              + New Hook
+            </button>
+          </div>
         </div>
       </div>
 
@@ -362,40 +320,34 @@ export default function HooksPanel({
               </button>
 
               {templatesExpanded && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {HOOK_TEMPLATES.map((template) => (
                     <button
                       key={template.id}
                       type="button"
                       onClick={() => handleTemplateClick(template)}
-                      className="w-full p-3 rounded-lg text-left transition-all duration-200 group"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-                        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                      }}
+                      className="w-full flex items-start gap-3 p-3 rounded-lg text-left hover:bg-white/5 transition-all duration-200"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-white/70">{template.svgIcon}</span>
-                        <span className="text-sm font-medium text-white/90">{template.name}</span>
-                        <span
-                          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-auto"
-                          style={{
-                            background: `${HOOK_TYPE_COLORS[template.type]}20`,
-                            color: HOOK_TYPE_COLORS[template.type],
-                          }}
-                        >
-                          {template.type}
-                        </span>
+                      {/* Icon */}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${HOOK_TYPE_COLORS[template.type]}20` }}>
+                        <span style={{ color: HOOK_TYPE_COLORS[template.type] }}>{template.svgIcon}</span>
                       </div>
-                      <p className="text-xs text-white/40">{template.description}</p>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-white/90">{template.name}</span>
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style={{
+                              background: `${HOOK_TYPE_COLORS[template.type]}15`,
+                              color: HOOK_TYPE_COLORS[template.type],
+                            }}
+                          >
+                            {template.type}
+                          </span>
+                        </div>
+                        <p className="text-xs text-white/50 mt-0.5 truncate">{template.description}</p>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -444,24 +396,24 @@ export default function HooksPanel({
                       </p>
                     </div>
                   ) : (
-                    <div>
+                    <div className="space-y-1">
                       {/* Project hooks */}
                       {projectHooks.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-400/60 mb-2">
+                        <>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40 px-3 py-1">
                             Project
                           </p>
                           {projectHooks.map(renderHookCard)}
-                        </div>
+                        </>
                       )}
                       {/* Global hooks */}
                       {globalHooks.length > 0 && (
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-400/60 mb-2">
+                        <>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40 px-3 py-1 mt-2">
                             Global
                           </p>
                           {globalHooks.map(renderHookCard)}
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -612,17 +564,7 @@ export default function HooksPanel({
               <button
                 type="button"
                 onClick={handleSaveHook}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                style={{
-                  background: '#f28c52',
-                  color: '#000',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f9a470';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f28c52';
-                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white transition-all"
               >
                 {editingHook.id ? 'Save Changes' : 'Create Hook'}
               </button>

@@ -42,6 +42,8 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
+import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
+import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
@@ -135,6 +137,7 @@ import { getRandomName } from "./utils/agentNames";
 import "./App.css";
 import "./components/MetroStyle.css";
 import "./components/DrawerAnimations.css";
+import "./components/BackgroundTasks.css";
 
 const INTRO_REPLAY_DURATION_MS = 5000;
 
@@ -241,6 +244,9 @@ function AppContent() {
     setDroidFactoryOpen,
     userStats,
   } = useDroidFactory();
+
+  // Background Agents initialization
+  useBackgroundAgentInit();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();
@@ -462,6 +468,7 @@ function AppContent() {
 
   // Background state
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
+  const [showBackgroundTasksDrawer, setShowBackgroundTasksDrawer] = useState(false);
 
   // 💰 License and upgrade modals state
   const [showLicenseModal, setShowLicenseModal] = useState(false);
@@ -532,8 +539,8 @@ function AppContent() {
   // Track stream count for UI display (Map of agentId -> count)
   // const [activeStreamCounts, setActiveStreamCounts] = useState<Map<string, number>>(new Map());
 
-  // 🦆 SESSION PERSISTENCE: Track which agents have already shown the resume message (to prevent duplicates)
-  const resumeMessageShownRef = useRef<Set<string>>(new Set());
+  // 🦆 SESSION PERSISTENCE: REMOVED - No longer showing resume messages
+  // Users can resume via Sessions panel instead
 
   // 🦆 RACE CONDITION FIX: Track active event listeners to ensure they're ready before invoke()
   // This prevents the bug where events are emitted before the listener is set up
@@ -849,17 +856,9 @@ function AppContent() {
         const chatMessages = chatSessions.get(terminal.id) ?? [];
         const lastMessage = chatMessages[chatMessages.length - 1];
 
-        // Check if agent is dormant (ONLY has "Previous conversation detected" assistant message, no user messages)
-        // An agent is dormant if:
-        // 1. It has no user messages (no actual interaction yet)
-        // 2. AND it has no real assistant responses (only "Previous conversation detected")
+        // Check if agent is dormant (no user interaction yet)
         const hasUserMessage = chatMessages.some(msg => msg.role === 'user');
-        const hasAssistantResponse = chatMessages.some(msg =>
-          msg.role === 'assistant' &&
-          !msg.content?.includes('Previous conversation detected') &&
-          !msg.content?.includes('**Previous conversation detected**')
-        );
-        const isDormant = chatMessages.length > 0 && !hasUserMessage && !hasAssistantResponse;
+        const isDormant = chatMessages.length === 0 || !hasUserMessage;
 
         const isWaitingForResponse =
           !isLoading && // Not currently loading
@@ -874,7 +873,6 @@ function AppContent() {
             isLoading,
             messagesCount: chatMessages.length,
             hasUserMessage,
-            hasAssistantResponse,
             isDormant,
             lastMessageRole: lastMessage?.role,
             lastMessageStatus: lastMessage?.status,
@@ -1273,42 +1271,9 @@ function AppContent() {
     });
   }, [tauriAvailable, activeId]);
 
-  // 🦆 SESSION PERSISTENCE: Show "Continuing conversation" message when switching to agent with saved session
-  useEffect(() => {
-    if (!activeId) return;
-
-    // Check if we've already shown the message for this agent
-    if (resumeMessageShownRef.current.has(activeId)) return;
-
-    // Check if this agent has a saved session ID
-    const savedSessionId = chatSessionIds.get(activeId);
-    if (!savedSessionId) return;
-
-    // Check if chat is empty (no messages yet)
-    const currentMessages = chatSessions.get(activeId) ?? [];
-    if (currentMessages.length > 0) return; // Already has messages, don't show the banner
-
-    // Show "Continuing conversation" message
-    const resumeMessage: ChatMessage = {
-      id: `msg-system-resume-${Date.now()}`,
-      role: 'assistant',
-      content: `📜 **Previous conversation detected**\n\nSession ID: \`${savedSessionId}\`\n\nThis agent has an active session. The conversation history is preserved and will continue from where you left off.\n\n💡 Right-click the agent and select "Reset Agent" to start fresh.`,
-      timestamp: Date.now(),
-      status: 'complete',
-      metadata: { sessionId: savedSessionId, isResumeMessage: true }, // Add metadata for click handling
-    };
-
-    setChatSessions((prev) => {
-      const newSessions = new Map(prev);
-      newSessions.set(activeId, [resumeMessage]);
-      return newSessions;
-    });
-
-    // Mark this agent as having shown the resume message
-    resumeMessageShownRef.current.add(activeId);
-
-    console.log(`[Session Persistence] Showed resume message for agent ${activeId} with session ${savedSessionId}`);
-  }, [activeId, chatSessionIds]);
+  // 🦆 SESSION PERSISTENCE: REMOVED - Agents always start fresh
+  // Users can resume sessions via Sessions panel -> "Resume Session" button
+  // This simplifies UX and avoids confusion about session continuity
 
   // 🦆 RACE CONDITION FIX: Helper function to ensure listener is ready for an agent
   // This prevents events being emitted before the listener is set up
@@ -1612,9 +1577,6 @@ function AppContent() {
       return newSessions;
     });
 
-    // Get session ID before try block (so it's accessible in catch)
-    let verifiedSessionId = chatSessionIds.get(activeId);
-
     try {
       // Build context from agent's conversation history
       const agentHistory = chatConversationHistoryRef.current.get(activeId) ?? [];
@@ -1640,16 +1602,8 @@ function AppContent() {
         });
       });
 
-      // Verify session exists before passing it to backend
-      if (verifiedSessionId) {
-        try {
-          await invoke('verify_session_exists', { sessionId: verifiedSessionId });
-        } catch {
-          // Session doesn't exist, start fresh
-          verifiedSessionId = undefined;
-        }
-      }
-
+      // 🦆 SIMPLIFIED: Always start fresh conversation
+      // Users can resume sessions via Sessions panel -> "Resume Session" button
       // Race between invoke and abort
       const response = await Promise.race([
         invoke<{
@@ -1674,8 +1628,9 @@ function AppContent() {
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
-            // ✅ CRITICAL FIX: Pass saved session ID to backend for conversation continuity
-            sessionId: verifiedSessionId,
+            // 🦆 SIMPLIFIED: No sessionId = always new conversation
+            // Users can resume via Sessions panel instead
+            sessionId: undefined,
             // ✅ New SDK 0.1.54+ features
             outputFormat: options?.outputFormat, // Structured outputs (beta)
             effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
@@ -1808,11 +1763,6 @@ function AppContent() {
             : typeof err === 'string'
               ? err
               : 'Unknown error';
-
-        // Lightweight backup on error
-        if (verifiedSessionId) {
-          saveSessionBackup(verifiedSessionId, chatSessions.get(activeId) ?? []);
-        }
 
         // Update message with error
         setChatSessions((prev) => {
@@ -2078,9 +2028,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         newMap.delete(activeId);
         return newMap;
       });
-
-      // Clear resume message flag so it can show again if a new session is created
-      resumeMessageShownRef.current.delete(activeId);
 
       // 🦆 STAMINA PRESERVATION: Reset token counts and session ID in agentChats
       setAgentChats((prev) => {
@@ -4686,16 +4633,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       );
     }
 
-    // 6. Clear resume message flag for both old and new IDs
-    resumeMessageShownRef.current.delete(oldId);
-    resumeMessageShownRef.current.delete(newId);
-
-    // 7. Update active terminal ID if this was the active one
+    // 6. Update active terminal ID if this was the active one
     setActiveId((prevActiveId) =>
       prevActiveId === oldId ? newId : prevActiveId
     );
 
-    // 8. Update agentChats to remove old ID and not carry over any state
+    // 7. Update agentChats to remove old ID and not carry over any state
     setAgentChats((prev) =>
       prev.filter((chat) => chat.id !== oldId)
       // Don't add newId - let it be created fresh on first interaction
@@ -7295,6 +7238,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenSettings={() => setShowSettings(true)}
           onOpenGitPanel={() => setShowGitDrawer(true)}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
+          onOpenBackgroundTasks={() => setShowBackgroundTasksDrawer(true)}
           gitRefreshTrigger={gitRefreshTrigger}
         />
 
@@ -8096,6 +8040,11 @@ You have access to all Bash tools to execute git commands like:
           onClose={() => setDroidFactoryOpen(false)}
           onSendMessage={sendMessageForAgent}
           userStats={userStats}
+        />
+
+        <BackgroundTasksDrawer
+          open={showBackgroundTasksDrawer}
+          onClose={() => setShowBackgroundTasksDrawer(false)}
         />
       </div>
 

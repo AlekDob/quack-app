@@ -32,6 +32,7 @@ mod preferences;
 mod preview;
 mod proxy;
 mod reveal;
+mod rules; // 📜 Claude Code rules management (.claude/rules/)
 mod sessions;
 mod skills;
 mod slash_commands;
@@ -40,6 +41,7 @@ mod telegram_bot;
 mod telegram_central;
 mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security)
 mod terminal;
+mod background_tasks; // 🚀 Background tasks for async agent execution
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -151,6 +153,7 @@ pub fn run() {
         .manage(SessionState::new()) // Register global session state
         .manage(license::LicenseState::default()) // Register license state
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
+        .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -561,6 +564,11 @@ pub fn run() {
             slash_commands::update_slash_command,
             slash_commands::delete_slash_command,
             slash_commands::expand_slash_command,
+            // 📜 Rules management commands
+            rules::list_rules,
+            rules::create_rule,
+            rules::update_rule,
+            rules::delete_rule,
             mcp::list_mcp_servers,
             mcp::get_mcp_server,
             mcp::save_mcp_server,
@@ -619,7 +627,14 @@ pub fn run() {
             snippets::delete_snippet,
             snippets::search_snippets,
             snippets::import_snippets,
-            snippets::export_snippets
+            snippets::export_snippets,
+            // Background tasks commands
+            background_tasks::execute_background_agent,
+            background_tasks::execute_background_command,
+            background_tasks::start_background_watcher,
+            background_tasks::pause_background_task,
+            background_tasks::resume_background_task,
+            background_tasks::cancel_background_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

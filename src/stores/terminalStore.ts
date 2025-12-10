@@ -99,7 +99,7 @@ export const useTerminalStore = create<TerminalState>()(
           posthog.capture('terminal_created', {
             type: 'native_pty',
             terminal_id: terminal.id,
-            shell: terminal.shell || 'default',
+            app: terminal.app || 'Terminal',
           });
 
           return set((state) => ({

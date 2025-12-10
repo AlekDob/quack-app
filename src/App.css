@@ -2281,9 +2281,7 @@ button.directory-chooser:hover {
   height: 100%;
   min-height: 0;
   overflow: visible;
-  background: rgba(24, 26, 33, 0.4);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  /* background removed for consistency with other panels */
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   grid-column: 3;
   grid-row: 1 / 3;

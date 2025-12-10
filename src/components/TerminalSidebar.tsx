@@ -25,6 +25,7 @@ import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
+import BackgroundTasksSidebarButton from "./BackgroundTasksSidebarButton";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult } from "../types";
 
 // Sortable Repository Group wrapper
@@ -160,6 +161,7 @@ interface TerminalSidebarProps {
   onOpenSettings?: () => void; // Open settings panel
   onOpenGitPanel?: () => void; // Open Git Panel drawer
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
+  onOpenBackgroundTasks?: () => void; // Open Background Tasks drawer
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
 }
 
@@ -197,6 +199,7 @@ export default function TerminalSidebar({
   onOpenSettings,
   onOpenGitPanel,
   onOpenTerminalWindow,
+  onOpenBackgroundTasks,
   gitRefreshTrigger,
 }: TerminalSidebarProps) {
   void _onColorChange;
@@ -817,6 +820,11 @@ export default function TerminalSidebar({
           onReset={() => onReset(contextMenu.terminal)}
           onCloseTerminal={() => onClose(contextMenu.terminal.id)}
         />
+      )}
+
+      {/* Background Tasks Button */}
+      {onOpenBackgroundTasks && (
+        <BackgroundTasksSidebarButton onClick={onOpenBackgroundTasks} />
       )}
 
       {/* Settings Button */}

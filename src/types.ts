@@ -1030,3 +1030,271 @@ export interface SnippetFormData {
   content: string;
   tag: string;
 }
+
+// ==========================================
+// Background Agents Types (SDK 0.1.62+)
+// ==========================================
+
+/**
+ * Priority levels for background tasks
+ * Higher priority tasks are executed first in the queue
+ */
+export type BackgroundTaskPriority = 'high' | 'medium' | 'low';
+
+/**
+ * Status of a background task
+ */
+export type BackgroundTaskStatus =
+  | 'queued'      // Waiting in queue
+  | 'running'     // Currently executing
+  | 'paused'      // Manually paused by user
+  | 'completed'   // Successfully completed
+  | 'failed'      // Failed with error
+  | 'cancelled';  // Cancelled by user
+
+/**
+ * Type of background task
+ */
+export type BackgroundTaskType =
+  | 'agent'       // Droid/Agent execution
+  | 'build'       // Build process (npm build, cargo build, etc.)
+  | 'test'        // Test execution
+  | 'analysis'    // Code analysis (security, lint, etc.)
+  | 'watch'       // File watcher/monitor
+  | 'custom';     // Custom user-defined task
+
+/**
+ * A single log entry from a background task
+ */
+export interface BackgroundTaskLogEntry {
+  id: string;
+  timestamp: number;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  source?: string; // Tool name or process that generated the log
+}
+
+/**
+ * Progress information for a background task
+ */
+export interface BackgroundTaskProgress {
+  current: number;      // Current progress value
+  total: number;        // Total expected value
+  percentage: number;   // Calculated percentage (0-100)
+  stage?: string;       // Current stage description
+}
+
+/**
+ * Result of a completed background task
+ */
+export interface BackgroundTaskResult {
+  success: boolean;
+  output?: string;          // Final output/result text
+  error?: string;           // Error message if failed
+  artifacts?: string[];     // Generated files or outputs
+  duration_ms: number;      // Total execution time
+  usage?: UsageStats;       // Token usage if agent-based
+  cost_usd?: number;        // Cost if agent-based
+}
+
+/**
+ * Configuration for a background task
+ */
+export interface BackgroundTaskConfig {
+  type: BackgroundTaskType;
+  priority: BackgroundTaskPriority;
+  name: string;
+  description?: string;
+
+  // Agent-specific config
+  agentId?: string;           // Droid ID if type is 'agent'
+  prompt?: string;            // Prompt for agent
+  model?: 'opus' | 'sonnet' | 'haiku';
+  workingDirectory?: string;
+
+  // Build/Test specific config
+  command?: string;           // Shell command to run
+  args?: string[];            // Command arguments
+  env?: Record<string, string>; // Environment variables
+
+  // Watch specific config
+  watchPatterns?: string[];   // Glob patterns to watch
+  debounceMs?: number;        // Debounce time for file changes
+
+  // Behavior config
+  autoRetry?: boolean;        // Auto retry on failure
+  maxRetries?: number;        // Max retry attempts
+  timeout_ms?: number;        // Timeout in milliseconds
+  showLogsInRealtime?: boolean; // Show logs as they come
+  notifyOnComplete?: boolean;   // Show notification when done
+}
+
+/**
+ * A background task instance
+ */
+export interface BackgroundTask {
+  id: string;
+  config: BackgroundTaskConfig;
+  status: BackgroundTaskStatus;
+
+  // Timing
+  createdAt: number;
+  startedAt?: number;
+  completedAt?: number;
+  pausedAt?: number;
+
+  // Progress tracking
+  progress?: BackgroundTaskProgress;
+
+  // Logs (kept in memory, can be limited)
+  logs: BackgroundTaskLogEntry[];
+  logsVisible: boolean;       // User preference for showing logs
+
+  // Session info (for agent tasks)
+  sessionId?: string;
+
+  // Result (when completed)
+  result?: BackgroundTaskResult;
+
+  // Retry tracking
+  retryCount: number;
+
+  // Queue position (when queued)
+  queuePosition?: number;
+
+  // Dependencies (tasks that must complete first)
+  dependsOn?: string[];       // Task IDs this task depends on
+
+  // Chat integration
+  chatId?: string;            // AgentChat ID to post results to
+  resultMessageId?: string;   // ID of the chat message with results
+}
+
+/**
+ * Queue statistics for the background task system
+ */
+export interface BackgroundTaskQueueStats {
+  totalTasks: number;
+  queued: number;
+  running: number;
+  paused: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+}
+
+/**
+ * State of the background agent system
+ */
+export interface BackgroundAgentState {
+  tasks: BackgroundTask[];
+  queueStats: BackgroundTaskQueueStats;
+  maxConcurrent: number;      // Max concurrent running tasks
+  isPaused: boolean;          // Global pause for the queue
+  lastUpdated: number;
+}
+
+/**
+ * Event emitted when a background task changes state
+ */
+export interface BackgroundTaskEvent {
+  type: 'created' | 'started' | 'progress' | 'log' | 'paused' | 'resumed' | 'completed' | 'failed' | 'cancelled';
+  taskId: string;
+  timestamp: number;
+  data?: {
+    progress?: BackgroundTaskProgress;
+    log?: BackgroundTaskLogEntry;
+    result?: BackgroundTaskResult;
+    error?: string;
+  };
+}
+
+/**
+ * Filters for viewing background tasks
+ */
+export interface BackgroundTaskFilters {
+  status?: BackgroundTaskStatus[];
+  type?: BackgroundTaskType[];
+  priority?: BackgroundTaskPriority[];
+  searchQuery?: string;
+  showCompleted?: boolean;
+  sortBy?: 'created' | 'priority' | 'status' | 'name';
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * Watch trigger configuration (for file monitoring)
+ */
+export interface WatchTrigger {
+  id: string;
+  name: string;
+  patterns: string[];         // Glob patterns to watch
+  excludePatterns?: string[]; // Patterns to exclude
+  action: BackgroundTaskConfig; // Task to run when triggered
+  debounceMs: number;
+  enabled: boolean;
+  lastTriggered?: number;
+}
+
+/**
+ * Auto-trigger rule for droids
+ */
+export interface DroidAutoTrigger {
+  droidId: string;
+  triggerOn: 'file_change' | 'git_commit' | 'build_complete' | 'test_fail' | 'manual';
+  patterns?: string[];        // File patterns for file_change trigger
+  enabled: boolean;
+  priority: BackgroundTaskPriority;
+}
+
+// ==========================================
+// Rules Types (.claude/rules/ management)
+// ==========================================
+
+/**
+ * Scope of the rule - project-level or global (user)
+ */
+export type RuleScope = 'project' | 'global';
+
+/**
+ * YAML frontmatter parsed from rule markdown files
+ */
+export interface RuleFrontmatter {
+  description?: string;
+  globs?: string[];      // Path patterns for scoped rules
+  alwaysApply?: boolean; // If true, always apply regardless of path
+}
+
+/**
+ * A Claude Code rule definition
+ */
+export interface Rule {
+  id: string;
+  name: string;           // Filename without extension
+  content: string;        // Full markdown content including frontmatter
+  filePath: string;       // Full path to the rule file
+  scope: RuleScope;
+  frontmatter?: RuleFrontmatter;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Response from listing rules
+ */
+export interface RulesResponse {
+  project: Rule[];
+  global: Rule[];
+}
+
+/**
+ * Parameters for creating a new rule
+ */
+export interface CreateRuleParams {
+  name: string;
+  content: string;
+  scope: RuleScope;
+  description?: string;
+  globs?: string[];
+  alwaysApply?: boolean;
+}

@@ -124,32 +124,15 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
     return !messages || messages.length === 0
   }, [chatSessions, terminal.id])
 
-  // Check if agent is dormant (ONLY has "Previous conversation detected", no user interaction)
+  // Check if agent is dormant (no user interaction yet)
   const isDormant = useMemo(() => {
-    if (!chatSessions) {
-      console.log(`[${terminal.label}] 💤 isDormant=false (no chatSessions)`)
-      return false
-    }
+    if (!chatSessions) return true
     const messages = chatSessions.get(terminal.id)
-    if (!messages || messages.length === 0) {
-      console.log(`[${terminal.label}] 💤 isDormant=false (no messages)`)
-      return false
-    }
-
-    // Check if agent has any user messages (actual interaction)
-    const hasUserMessage = messages.some(msg => msg.role === 'user');
-    // Check if agent has any real assistant responses (not just "Previous conversation detected")
-    const hasAssistantResponse = messages.some(msg =>
-      msg.role === 'assistant' &&
-      !msg.content?.includes('Previous conversation detected') &&
-      !msg.content?.includes('**Previous conversation detected**')
-    );
-
-    const result = !hasUserMessage && !hasAssistantResponse
-    console.log(`[${terminal.label}] 💤 isDormant=${result} (hasUserMessage=${hasUserMessage}, hasAssistantResponse=${hasAssistantResponse})`)
-
-    return result
-  }, [chatSessions, terminal.id, terminal.label])
+    if (!messages || messages.length === 0) return true
+    // Dormant if no user messages
+    const hasUserMessage = messages.some(msg => msg.role === 'user')
+    return !hasUserMessage
+  }, [chatSessions, terminal.id])
 
   // Debug: Log when waitingForResponse changes (AFTER isDormant is defined)
   useEffect(() => {
@@ -168,7 +151,7 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
       return false
     }
 
-    // If agent is dormant (only "Previous conversation detected"), no unread messages
+    // If agent is dormant (no user interaction), no unread messages
     if (isDormant) {
       console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (dormant)`)
       return false
@@ -201,7 +184,7 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
     if (isBusy) return '⚡'
     // 🚨 CRITICAL: Check isDormant BEFORE isWaitingForResponse!
     // Dormant agents should NEVER show 💬 even if waitingForResponse is true
-    if (isChatEmpty || isDormant) return '💤' // Empty chat or dormant (only "Previous conversation detected")
+    if (isChatEmpty || isDormant) return '💤' // Empty chat or dormant (no user interaction)
     // NO badge when agent is active (regardless of dormancy or unread messages)
     if (isActive) return ''
     // Now check isWaitingForResponse (only for non-dormant agents)

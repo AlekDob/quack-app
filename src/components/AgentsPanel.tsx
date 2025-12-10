@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
 import { NewAgentModal } from "./NewAgentModal";
-import { AgentAvatar } from "./AgentAvatar";
 
 /**
  * Agents Panel - Inline list view of agents
@@ -72,78 +71,61 @@ export default function AgentsPanel({
   };
 
   return (
-    <div className="agents-panel">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{
-          borderColor: "rgba(255, 255, 255, 0.1)",
-        }}
-      >
-        <div>
-          <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
-            Droids
-          </h3>
-          <p className="text-xs" style={{ color: "rgba(255, 255, 255, 0.5)", marginTop: "2px" }}>
-            Sub Agents
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
-          style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "rgba(255, 255, 255, 0.9)",
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-          }}
-        >
-          {loading ? "..." : "↻ Refresh"}
-        </button>
-      </div>
-
-      {/* Search and New Agent Button */}
-      {agents.length > 0 && (
-        <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}>
-          <div className="flex items-center gap-2 mb-0">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search droids..."
-                className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
-              />
-              <svg
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+      <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Droids</h3>
+            <p className="text-xs text-white/50 mt-0.5">Sub Agents</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-            </div>
+            </button>
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="px-3 py-2 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200 whitespace-nowrap"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200"
             >
               + New Droid
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      {agents.length > 0 && (
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search droids..."
+              className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+            />
+            <svg
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
           </div>
         </div>
       )}
@@ -262,125 +244,49 @@ export default function AgentsPanel({
                   <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "project").length}</span>
                 </button>
                 {projectExpanded && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {sortAgents(filteredAgents.filter((a) => a.scope === "project"))
                     .map((agent) => (
                       <div
                         key={`project-${agent.name}`}
-                        className="rounded-lg border transition-all duration-200"
-                        style={{
-                          background: "rgba(12, 16, 24, 0.6)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                        }}
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                        onClick={() => onSelectAgent(agent)}
                       >
-                        {/* Agent card with avatar on left, content in middle, Use button on right */}
-                        <div
-                          className="w-full flex items-start gap-3 p-3 transition-all duration-200 cursor-pointer"
-                          onClick={() => onSelectAgent(agent)}
-                          onMouseEnter={(e) => {
-                            const parent = e.currentTarget.parentElement;
-                            if (parent) {
-                              parent.style.background = "rgba(242, 140, 82, 0.08)";
-                              parent.style.borderColor = "rgba(242, 140, 82, 0.2)";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            const parent = e.currentTarget.parentElement;
-                            if (parent) {
-                              parent.style.background = "rgba(12, 16, 24, 0.6)";
-                              parent.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                            }
-                          }}
-                        >
-                          {/* Smaller Agent Avatar - 40px (w-10 h-10) with less rounded corners */}
-                          <div
-                            className="w-10 h-10 flex-shrink-0 overflow-hidden flex items-center justify-center"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.05)",
-                              border: `1px solid ${agent.color}`,
-                              boxShadow: `0 0 8px ${agent.color}40`,
-                              borderRadius: "6px",
-                            }}
-                          >
-                            <AgentAvatar
-                              agentName={agent.name}
-                              avatarFilename={agent.avatar}
-                              alt={agent.name}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                              }}
-                            />
-                          </div>
-
-                          {/* Agent Info - 4 lines */}
-                          <div className="flex-1 min-w-0 flex flex-col gap-1">
-                            {/* Line 1: Model tag */}
-                            <div
-                              className="px-1.5 py-0.5 rounded text-[10px] font-mono self-start"
-                              style={{
-                                background: "rgba(242, 140, 82, 0.1)",
-                                color: "#f28c52",
-                              }}
-                            >
-                              {agent.model}
-                            </div>
-
-                            {/* Line 2: Agent Name */}
-                            <div
-                              className="text-sm font-medium text-left"
-                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                            >
-                              {agent.name.replace(/-/g, " ")}
-                            </div>
-
-                            {/* Line 2.5: Working On (if exists) */}
-                            {agent.workingOn && (
-                              <div
-                                className="text-[10px] italic truncate"
-                                style={{ color: "rgba(255, 255, 255, 0.4)" }}
-                              >
-                                {agent.workingOn}
-                              </div>
-                            )}
-
-                            {/* Line 3: Description */}
-                            <div
-                              className="text-xs truncate"
-                              style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                            >
-                              {agent.description.substring(0, 45)}
-                              {agent.description.length > 45 ? "..." : ""}
-                            </div>
-                          </div>
-
-                          {/* Smaller "Use" button on right */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onUseAgent(agent);
-                            }}
-                            className="px-2.5 py-1.5 rounded text-xs font-medium flex-shrink-0 self-start transition-all duration-200"
-                            style={{
-                              background: "rgba(242, 140, 82, 0.1)",
-                              border: "1px solid rgba(242, 140, 82, 0.3)",
-                              color: "#f28c52",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
-                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
-                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
-                            }}
-                          >
-                            Use
-                          </button>
+                        {/* Robot Icon */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(78, 205, 196, 0.15)" }}>
+                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#4ecdc4" strokeWidth="1.5">
+                            <rect x="4" y="6" width="12" height="12" rx="2" />
+                            <circle cx="8" cy="10" r="1.3" fill="#4ecdc4"/>
+                            <circle cx="12" cy="10" r="1.3" fill="#4ecdc4"/>
+                            <line x1="7" y1="13" x2="13" y2="13"/>
+                            <line x1="10" y1="2" x2="10" y2="6"/>
+                            <circle cx="10" cy="2" r="1"/>
+                          </svg>
                         </div>
+
+                        {/* Agent Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white/90 truncate">
+                            {agent.name.replace(/-/g, " ")}
+                          </div>
+                          {agent.description && (
+                            <div className="text-xs text-white/50 truncate">
+                              {agent.description}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Use button on hover */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUseAgent(agent);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
+                        >
+                          Use
+                        </button>
                       </div>
                     ))}
                 </div>
@@ -406,125 +312,49 @@ export default function AgentsPanel({
                   <span className="ml-auto text-xs text-white/40">{filteredAgents.filter((a) => a.scope === "global").length}</span>
                 </button>
                 {globalExpanded && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {sortAgents(filteredAgents.filter((a) => a.scope === "global"))
                     .map((agent) => (
                       <div
                         key={`global-${agent.name}`}
-                        className="rounded-lg border transition-all duration-200"
-                        style={{
-                          background: "rgba(12, 16, 24, 0.6)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                        }}
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                        onClick={() => onSelectAgent(agent)}
                       >
-                        {/* Agent card with avatar on left, content in middle, Use button on right */}
-                        <div
-                          className="w-full flex items-start gap-3 p-3 transition-all duration-200 cursor-pointer"
-                          onClick={() => onSelectAgent(agent)}
-                          onMouseEnter={(e) => {
-                            const parent = e.currentTarget.parentElement;
-                            if (parent) {
-                              parent.style.background = "rgba(242, 140, 82, 0.08)";
-                              parent.style.borderColor = "rgba(242, 140, 82, 0.2)";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            const parent = e.currentTarget.parentElement;
-                            if (parent) {
-                              parent.style.background = "rgba(12, 16, 24, 0.6)";
-                              parent.style.borderColor = "rgba(255, 255, 255, 0.08)";
-                            }
-                          }}
-                        >
-                          {/* Smaller Agent Avatar - 40px (w-10 h-10) with less rounded corners */}
-                          <div
-                            className="w-10 h-10 flex-shrink-0 overflow-hidden flex items-center justify-center"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.05)",
-                              border: `1px solid ${agent.color}`,
-                              boxShadow: `0 0 8px ${agent.color}40`,
-                              borderRadius: "6px",
-                            }}
-                          >
-                            <AgentAvatar
-                              agentName={agent.name}
-                              avatarFilename={agent.avatar}
-                              alt={agent.name}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                              }}
-                            />
-                          </div>
-
-                          {/* Agent Info - 4 lines */}
-                          <div className="flex-1 min-w-0 flex flex-col gap-1">
-                            {/* Line 1: Model tag */}
-                            <div
-                              className="px-1.5 py-0.5 rounded text-[10px] font-mono self-start"
-                              style={{
-                                background: "rgba(242, 140, 82, 0.1)",
-                                color: "#f28c52",
-                              }}
-                            >
-                              {agent.model}
-                            </div>
-
-                            {/* Line 2: Agent Name */}
-                            <div
-                              className="text-sm font-medium text-left"
-                              style={{ color: "rgba(255, 255, 255, 0.9)" }}
-                            >
-                              {agent.name.replace(/-/g, " ")}
-                            </div>
-
-                            {/* Line 2.5: Working On (if exists) */}
-                            {agent.workingOn && (
-                              <div
-                                className="text-[10px] italic truncate"
-                                style={{ color: "rgba(255, 255, 255, 0.4)" }}
-                              >
-                                {agent.workingOn}
-                              </div>
-                            )}
-
-                            {/* Line 3: Description */}
-                            <div
-                              className="text-xs truncate"
-                              style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                            >
-                              {agent.description.substring(0, 45)}
-                              {agent.description.length > 45 ? "..." : ""}
-                            </div>
-                          </div>
-
-                          {/* Smaller "Use" button on right */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onUseAgent(agent);
-                            }}
-                            className="px-2.5 py-1.5 rounded text-xs font-medium flex-shrink-0 self-start transition-all duration-200"
-                            style={{
-                              background: "rgba(242, 140, 82, 0.1)",
-                              border: "1px solid rgba(242, 140, 82, 0.3)",
-                              color: "#f28c52",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
-                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
-                              e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
-                            }}
-                          >
-                            Use
-                          </button>
+                        {/* Robot Icon */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(78, 205, 196, 0.15)" }}>
+                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#4ecdc4" strokeWidth="1.5">
+                            <rect x="4" y="6" width="12" height="12" rx="2" />
+                            <circle cx="8" cy="10" r="1.3" fill="#4ecdc4"/>
+                            <circle cx="12" cy="10" r="1.3" fill="#4ecdc4"/>
+                            <line x1="7" y1="13" x2="13" y2="13"/>
+                            <line x1="10" y1="2" x2="10" y2="6"/>
+                            <circle cx="10" cy="2" r="1"/>
+                          </svg>
                         </div>
+
+                        {/* Agent Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white/90 truncate">
+                            {agent.name.replace(/-/g, " ")}
+                          </div>
+                          {agent.description && (
+                            <div className="text-xs text-white/50 truncate">
+                              {agent.description}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Use button on hover */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUseAgent(agent);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
+                        >
+                          Use
+                        </button>
                       </div>
                     ))}
                 </div>
