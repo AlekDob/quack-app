@@ -266,6 +266,27 @@ async function main() {
       model: modelId,
       // Enable automatic reading of CLAUDE.md and project settings
       settingSources: ['project', 'user', 'local'],
+      // Enable Skills + all standard tools for full SDK capabilities
+      // Skills require explicit "Skill" in allowedTools to be loaded and invoked
+      // See: https://platform.claude.com/docs/en/agent-sdk/skills
+      allowedTools: [
+        'Skill',        // Required to enable Skills from .claude/skills/
+        'Task',         // Subagents
+        'Read',
+        'Write',
+        'Edit',
+        'Bash',
+        'Glob',
+        'Grep',
+        'WebFetch',
+        'WebSearch',
+        'TodoWrite',
+        'NotebookEdit',
+        'SlashCommand',
+        'BashOutput',
+        'KillShell',
+        'ExitPlanMode',
+      ],
     };
 
     // Only add permissionMode if explicitly provided (not undefined)

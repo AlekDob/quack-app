@@ -82,3 +82,22 @@ export interface StepProgressProps {
   completedSteps: ModalStep[];
   isEditing?: boolean; // Hide Step 1 (Project) when editing
 }
+
+// Skill metadata for agent configuration
+export interface SkillMetadata {
+  id: string;
+  name: string;
+  description: string;
+  path: string;
+  isGlobal: boolean;
+}
+
+// Droid metadata for agent configuration
+export interface DroidMetadata {
+  id: string;
+  name: string;
+  description: string;
+  specialization: string;
+  path: string;
+  isGlobal: boolean;
+}

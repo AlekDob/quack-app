@@ -264,6 +264,24 @@ export async function* streamClaudeMessage(
       permissionMode: sdkPermissionMode,
       // Enable automatic reading of CLAUDE.md, slash commands, and project settings
       settingSources: ['project', 'user', 'local'],
+      // 🎯 Enable Skills + all standard tools for full SDK capabilities
+      // Skills require explicit "Skill" in allowedTools to be loaded and invoked
+      // See: https://platform.claude.com/docs/en/agent-sdk/skills
+      allowedTools: [
+        'Skill',        // 🔑 Required to enable Skills from .claude/skills/
+        'Task',         // Subagents
+        'Read',
+        'Write',
+        'Edit',
+        'Bash',
+        'Glob',
+        'Grep',
+        'WebFetch',
+        'WebSearch',
+        'TodoWrite',
+        'NotebookEdit',
+        'SlashCommand',
+      ],
     };
 
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - sdkOptions.model AFTER assignment:`, sdkOptions.model);
@@ -291,10 +309,6 @@ export async function* streamClaudeMessage(
     } else {
       console.log('⚠️ [MCP DEBUG] NO MCP servers passed to SDK - SDK will only have default tools');
     }
-
-    // 🦆 FIX: DO NOT hardcode allowedTools - let SDK load all tools from user's MCP servers
-    // This allows each user to load their own MCP servers from .mcp.json without code changes
-    // If you need to restrict tools, users can configure it in their .claude/settings.json
 
     // TEMPORARY: Throw error instead of calling SDK directly
     // TODO: Refactor to use Tauri backend (stream-claude.js) instead
