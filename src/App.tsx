@@ -4812,6 +4812,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             rules: agentPersonality.rules || undefined,
             communicationStyle: agentPersonality.communicationStyle || 'friendly',
             customNotes: agentPersonality.customNotes || undefined,
+            // Claude Code rules (new simplified flow)
+            selectedRules: agentPersonality.selectedRules || undefined,
             // Legacy fields (kept for backwards compatibility)
             intro: agentPersonality.intro || '',
             personality: agentPersonality.personality || '',
@@ -4975,6 +4977,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               rules: agentPersonality.rules || undefined,
               communicationStyle: agentPersonality.communicationStyle || 'friendly',
               customNotes: agentPersonality.customNotes || undefined,
+              // Claude Code rules (new simplified flow)
+              selectedRules: agentPersonality.selectedRules || undefined,
               // Legacy fields (kept for backwards compatibility)
               intro: agentPersonality.intro || '',
               personality: agentPersonality.personality || '',
@@ -4989,6 +4993,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             console.log('🔍 [FRONTEND] Name:', fullPersonality.name);
             console.log('🔍 [FRONTEND] Role:', fullPersonality.role);
             console.log('🔍 [FRONTEND] Skills:', JSON.stringify(fullPersonality.skills));
+            console.log('🔍 [FRONTEND] SelectedRules:', JSON.stringify(fullPersonality.selectedRules));
             console.log('🔍 [FRONTEND] CustomNotes:', fullPersonality.customNotes);
 
             await invoke('save_agent_personality', {
@@ -7503,6 +7508,13 @@ You have access to all Bash tools to execute git commands like:
                   handleUpdateWorkingOn(activeTerminal.id, value);
                 }
               }}
+              // Agent Rules - automatically loaded from personality
+              selectedRules={activeTerminal?.personality?.selectedRules}
+              onEditRules={activeTerminal ? () => {
+                // Open the edit modal with the current terminal
+                setEditingTerminal(activeTerminal);
+                setShowNewTerminalModal(true);
+              } : undefined}
             />
               )}
 

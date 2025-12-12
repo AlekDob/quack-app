@@ -6,7 +6,9 @@ import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
+import AgentRulesBanner from './AgentRulesBanner';
 import { useBackgroundAgentStore } from '../stores/backgroundAgentStore';
+import { useAgentRules } from '../hooks/useAgentRules';
 import type { ChatMessage, AgentInfo, BackgroundTaskType, BackgroundTaskPriority } from '../types';
 import type {
   ChatSendOptions,
@@ -92,6 +94,9 @@ interface ChatViewProps {
   // Working on field
   workingOn?: string;
   onWorkingOnChange?: (value: string) => void;
+  // Agent Rules - automatically loaded from personality
+  selectedRules?: string[];
+  onEditRules?: () => void;
 }
 
 export default function ChatView({
@@ -146,7 +151,12 @@ export default function ChatView({
   // Working on field
   workingOn,
   onWorkingOnChange,
+  // Agent Rules
+  selectedRules,
+  onEditRules,
 }: ChatViewProps) {
+  // Load active rules using the hook (automatic, zero config)
+  const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
 
@@ -421,6 +431,13 @@ export default function ChatView({
 
   return (
     <div className="chat-view">
+      {/* Agent Rules Banner - shown when rules are active */}
+      {hasRules && (
+        <AgentRulesBanner
+          rules={activeRules}
+          onEditRules={onEditRules}
+        />
+      )}
       <MessageList
         messages={messages}
         loading={isLoading}

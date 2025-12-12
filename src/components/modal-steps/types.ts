@@ -1,83 +1,13 @@
 /**
  * Shared types for multi-step agent creation modal
+ * Simplified flow: context → basics → rules
  */
 
-import type { AgentPersonality, GitBranch } from '../../types';
+import type { AgentPersonality, GitBranch, Rule, RuleScope } from '../../types';
 import type { CustomAvatarInfo } from '../../utils/customAvatarStorage';
 
-// Step identifier
-export type ModalStep = 'context' | 'basics' | 'skills' | 'droids' | 'triggers';
-
-// Skill metadata loaded from filesystem
-export interface SkillMetadata {
-  id: string;
-  name: string;
-  description: string;
-  path: string;
-  isGlobal: boolean;
-}
-
-// Droid metadata loaded from filesystem
-export interface DroidMetadata {
-  id: string;
-  name: string;
-  description: string;
-  specialization: string;
-  path: string;
-  isGlobal: boolean;
-}
-
-// Trigger configuration for a skill or droid
-export interface TriggerConfig {
-  id: string;           // skill or droid id
-  type: 'skill' | 'droid';
-  name: string;
-  trigger: string;      // When to use this skill/droid (user-defined)
-  autoInvoke: boolean;  // Should agent invoke proactively without asking?
-}
-
-// Suggested triggers based on skill/droid type
-export const TRIGGER_SUGGESTIONS: Record<string, string[]> = {
-  // Common patterns
-  'default': [
-    'When the user asks about...',
-    'Before making decisions about...',
-    'When working on files related to...',
-    'After completing...',
-  ],
-  // UI/Design related
-  'ui': [
-    'When creating or modifying UI components',
-    'Before making design decisions',
-    'When discussing user experience',
-    'When implementing accessibility features',
-  ],
-  // Code related
-  'code': [
-    'When reviewing or analyzing code',
-    'Before refactoring',
-    'When debugging issues',
-    'When implementing new features',
-  ],
-  // Documentation
-  'docs': [
-    'When writing documentation',
-    'When explaining code or concepts',
-    'Before publishing changes',
-  ],
-  // Testing
-  'test': [
-    'When writing or updating tests',
-    'Before merging code',
-    'When investigating failures',
-  ],
-  // API/Backend
-  'api': [
-    'When working with API endpoints',
-    'When designing data structures',
-    'When handling authentication',
-  ],
-};
+// Step identifier - simplified to 3 steps
+export type ModalStep = 'context' | 'basics' | 'rules';
 
 // Props for StepProjectContext
 export interface StepProjectContextProps {
@@ -123,17 +53,24 @@ export interface StepAgentBasicsProps {
   onBack: () => void;
 }
 
-// Props for StepAgentConfig
-export interface StepAgentConfigProps {
-  availableSkills: SkillMetadata[];
-  availableDroids: DroidMetadata[];
-  selectedSkills: string[];
-  selectedDroids: string[];
-  loadingSkills: boolean;
-  loadingDroids: boolean;
-  onSkillToggle: (skillId: string) => void;
-  onDroidToggle: (droidId: string) => void;
-  onOpenDroidFactory: () => void;
+// Props for StepRules - new simplified step
+export interface StepRulesProps {
+  availableRules: {
+    project: Rule[];
+    global: Rule[];
+  };
+  selectedRules: string[]; // Array of rule file paths
+  loadingRules: boolean;
+  missingRules?: string[]; // Rules saved but not available
+  onRuleToggle: (rulePath: string) => void;
+  onCreateRule?: (
+    name: string,
+    content: string,
+    scope: RuleScope,
+    description?: string,
+    globs?: string[],
+    alwaysApply?: boolean
+  ) => Promise<void>;
   onBack: () => void;
   onConfirm: () => void;
   creating: boolean;

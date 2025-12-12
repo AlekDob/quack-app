@@ -20,6 +20,10 @@ pub struct AgentPersonality {
     #[serde(rename = "customNotes", skip_serializing_if = "Option::is_none")]
     pub custom_notes: Option<String>, // Additional free-form notes
 
+    // Selected Claude Code rules (file paths from .claude/rules/)
+    #[serde(rename = "selectedRules", skip_serializing_if = "Option::is_none")]
+    pub selected_rules: Option<Vec<String>>, // Array of rule file paths to follow
+
     // Legacy fields (kept for backwards compatibility)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub personality: Option<String>,
@@ -49,6 +53,7 @@ impl Default for AgentPersonality {
             ]),
             communication_style: "friendly".to_string(),
             custom_notes: Some("Experienced PM specializing in feature delivery and team coordination. Works on specific branches and delegates to specialists.".to_string()),
+            selected_rules: None, // No pre-selected rules by default
             // Legacy fields (backwards compatibility)
             personality: Some("You coordinate feature development and sprint planning. You work on specific branches and invoke Protocol Droids when you need specialized expertise.".to_string()),
             quirks: Some("You always respond with frequent 'quack quack' expressions and focus on coordinating work rather than doing it yourself.".to_string()),
@@ -346,6 +351,7 @@ fn inject_personality_to_claude_md_impl(
     log::info!("🔍 Name: {}", personality.name);
     log::info!("🔍 Role: {}", personality.role);
     log::info!("🔍 Skills: {:?}", personality.skills);
+    log::info!("🔍 SelectedRules: {:?}", personality.selected_rules);
     log::info!("🔍 CustomNotes: {:?}", personality.custom_notes);
 
     // Generate agent header with NEW structure
@@ -409,141 +415,34 @@ fn inject_personality_to_claude_md_impl(
         }
     }
 
-    // 🦆 Protocol Droids section - Parse from customNotes with trigger support
-    // Format: "- path | WHEN: trigger | AUTO-INVOKE"
-    #[derive(Debug)]
-    struct DroidConfig {
-        path: String,
-        trigger: Option<String>,
-        auto_invoke: bool,
-    }
+    // 📋 Selected Rules section - Display rules the agent should follow
+    // Rules are stored as file paths from .claude/rules/
+    if let Some(selected_rules) = &personality.selected_rules {
+        if !selected_rules.is_empty() {
+            agent_header.push_str("**Selected Rules:**\n");
+            agent_header.push_str("*IMPORTANT: Follow these rules strictly. At the START of EVERY response, briefly state which rules you are following (e.g., \"Following rules: X, Y, Z\").*\n\n");
 
-    let mut droid_configs: Vec<DroidConfig> = Vec::new();
-    if let Some(custom_notes) = &personality.custom_notes {
-        let lines: Vec<&str> = custom_notes.lines().collect();
-        let mut in_droids_section = false;
+            agent_header.push_str("| Rule | Path | Scope |\n");
+            agent_header.push_str("|------|------|-------|\n");
 
-        for line in lines {
-            if line.contains("Selected Protocol Droids:") {
-                in_droids_section = true;
-                continue;
+            for rule_path in selected_rules {
+                // Extract rule name from path (e.g., "typescript-conventions.md" from full path)
+                let display_name = rule_path.split('/').last().unwrap_or(rule_path);
+                let display_name = display_name.trim_end_matches(".md");
+
+                // Determine scope from path
+                let scope = if rule_path.contains(".claude/rules/") {
+                    "project"
+                } else if rule_path.contains("/.claude/rules/") {
+                    "global"
+                } else {
+                    "unknown"
+                };
+
+                agent_header.push_str(&format!("| {} | `{}` | {} |\n", display_name, rule_path, scope));
             }
-            if in_droids_section {
-                let trimmed = line.trim();
-                if trimmed.starts_with("- ") {
-                    // Parse: "- path | WHEN: trigger | AUTO-INVOKE"
-                    let content = trimmed.trim_start_matches("- ").trim();
-                    let parts: Vec<&str> = content.split(" | ").collect();
-
-                    let path = parts.get(0).unwrap_or(&"").to_string();
-                    let mut trigger: Option<String> = None;
-                    let mut auto_invoke = false;
-
-                    for part in &parts[1..] {
-                        if part.starts_with("WHEN:") {
-                            trigger = Some(part.trim_start_matches("WHEN:").trim().to_string());
-                        } else if *part == "AUTO-INVOKE" {
-                            auto_invoke = true;
-                        }
-                    }
-
-                    if !path.is_empty() {
-                        droid_configs.push(DroidConfig { path, trigger, auto_invoke });
-                    }
-                } else if !trimmed.is_empty() {
-                    break;
-                }
-            }
+            agent_header.push_str("\n");
         }
-    }
-
-    // Only show droids section if there are configured droids
-    if !droid_configs.is_empty() {
-        agent_header.push_str("**Droids:**\n");
-
-        // Add compact proactive rule if any droids have auto-invoke
-        let has_auto_invoke = droid_configs.iter().any(|d| d.auto_invoke);
-        if has_auto_invoke {
-            agent_header.push_str("*Invoke automatically when triggers match. Don't wait for user request.*\n\n");
-        }
-
-        agent_header.push_str("| Droid | Trigger | Auto |\n");
-        agent_header.push_str("|-------|---------|------|\n");
-
-        for config in &droid_configs {
-            let trigger_text = config.trigger.as_ref()
-                .filter(|t| !t.is_empty())
-                .map(|t| t.as_str())
-                .unwrap_or("-");
-            let auto_text = if config.auto_invoke { "Yes" } else { "-" };
-
-            // Extract just the filename for display (remove .md extension)
-            let display_name = config.path.split('/').last().unwrap_or(&config.path);
-            let display_name = display_name.trim_end_matches(".md");
-            agent_header.push_str(&format!("| {} | {} | {} |\n", display_name, trigger_text, auto_text));
-        }
-        agent_header.push_str("\n");
-    }
-
-    // 🦆 Skills section - Parse with trigger support
-    // Format: "path | WHEN: trigger | AUTO-INVOKE"
-    #[derive(Debug)]
-    struct SkillConfig {
-        path: String,
-        trigger: Option<String>,
-        auto_invoke: bool,
-    }
-
-    let mut skill_configs: Vec<SkillConfig> = Vec::new();
-    if let Some(skills) = &personality.skills {
-        for skill_line in skills {
-            // Parse: "path | WHEN: trigger | AUTO-INVOKE"
-            let parts: Vec<&str> = skill_line.split(" | ").collect();
-
-            let path = parts.get(0).unwrap_or(&"").to_string();
-            let mut trigger: Option<String> = None;
-            let mut auto_invoke = false;
-
-            for part in &parts[1..] {
-                if part.starts_with("WHEN:") {
-                    trigger = Some(part.trim_start_matches("WHEN:").trim().to_string());
-                } else if *part == "AUTO-INVOKE" {
-                    auto_invoke = true;
-                }
-            }
-
-            if !path.is_empty() {
-                skill_configs.push(SkillConfig { path, trigger, auto_invoke });
-            }
-        }
-    }
-
-    // Only show skills section if there are configured skills
-    if !skill_configs.is_empty() {
-        agent_header.push_str("**Skills:**\n");
-
-        // Add compact proactive rule if any skills have auto-invoke
-        let has_skill_auto_invoke = skill_configs.iter().any(|s| s.auto_invoke);
-        if has_skill_auto_invoke {
-            agent_header.push_str("*Consult automatically when triggers match.*\n\n");
-        }
-
-        agent_header.push_str("| Skill | Trigger | Auto |\n");
-        agent_header.push_str("|-------|---------|------|\n");
-
-        for config in &skill_configs {
-            let trigger_text = config.trigger.as_ref()
-                .filter(|t| !t.is_empty())
-                .map(|t| t.as_str())
-                .unwrap_or("-");
-            let auto_text = if config.auto_invoke { "Yes" } else { "-" };
-
-            // Extract just the skill name for display (remove SKILL.md, keep folder name)
-            let display_name = config.path.split('/').last().unwrap_or(&config.path);
-            let display_name = display_name.trim_end_matches(".md").trim_end_matches("/SKILL");
-            agent_header.push_str(&format!("| {} | {} | {} |\n", display_name, trigger_text, auto_text));
-        }
-        agent_header.push_str("\n");
     }
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");

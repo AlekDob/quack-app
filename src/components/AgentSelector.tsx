@@ -6,7 +6,6 @@
  */
 
 import { useState, useMemo } from 'react';
-import { toast } from 'sonner';
 import type { SavedAgent } from '../types';
 import {
   getSavedAgents,
@@ -18,42 +17,21 @@ import {
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { useBackgroundAgentStore } from '../stores/backgroundAgentStore';
 import './AgentSelector.css';
 
 interface AgentSelectorProps {
   onUseAgent: (agent: SavedAgent) => void;
   onEditAgent: (agent: SavedAgent) => void;
   onCreateNew: () => void;
-  basePath?: string;
 }
 
 type SortMode = 'recent' | 'frequent' | 'alphabetical';
 
-export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew, basePath }: AgentSelectorProps) {
+export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Force re-render after delete
-  const { createTask } = useBackgroundAgentStore();
-
-  // Handle running agent in background
-  const handleRunInBackground = (agent: SavedAgent, event: React.MouseEvent) => {
-    event.stopPropagation();
-    event.preventDefault();
-
-    // Create a background task for this agent
-    createTask({
-      name: `Agent: ${agent.name}`,
-      type: 'agent',
-      priority: 'medium',
-      agentId: agent.id,
-      prompt: agent.personality?.role || `Run agent ${agent.name}`,
-      workingDirectory: basePath || process.cwd(),
-    });
-
-    toast.success(`Background task created: ${agent.name}`);
-  };
 
   // Get agents based on sort mode
   const agents = useMemo(() => {
@@ -296,20 +274,6 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew, ba
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                   </svg>
                   Edit
-                </button>
-                <button
-                  type="button"
-                  className="agent-card-action-btn agent-card-background-btn"
-                  onClick={(e) => handleRunInBackground(agent, e)}
-                  disabled={deletingAgentId === agent.id}
-                  title="Run in background"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                    <line x1="8" y1="21" x2="16" y2="21"></line>
-                    <line x1="12" y1="17" x2="12" y2="21"></line>
-                  </svg>
-                  BG
                 </button>
                 <button
                   type="button"

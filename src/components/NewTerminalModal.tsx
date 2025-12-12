@@ -1,38 +1,35 @@
 /**
- * New Terminal Modal - REFACTORED with 4-Step Process
+ * New Terminal Modal - SIMPLIFIED with 3-Step Process
  *
  * Step 1: Project Context (Directory + Git Branch)
  * Step 2: Agent Basics (Name, Color, Avatar, Personality)
- * Step 3: Skills Selection (Knowledge domains)
- * Step 4: Droids Selection (Sub-agents for delegation)
+ * Step 3: Rules Selection (Claude Code rules to follow)
  *
- * This version uses modular step components for better maintainability.
+ * This version uses modular step components and the new Rules system.
  */
 
 import { useState, useEffect, useRef } from 'react';
-import type { AgentPersonality, GitBranch, SavedAgent } from '../types';
+import type { AgentPersonality, GitBranch, SavedAgent, RuleScope } from '../types';
 import AgentSelector from './AgentSelector';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  uploadCustomAvatar,
   listCustomAvatars,
   deleteCustomAvatar,
   getCustomAvatarUrl,
   validateAvatarFile,
   revokeAvatarUrl,
+  uploadCustomAvatar,
   type CustomAvatarInfo
 } from '../utils/customAvatarStorage';
 import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
-import { loadAvailableSkills, loadAvailableDroids } from '../utils/skillsAndDroidsLoader';
+import { useRules } from '../hooks/useRules';
 
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
 import { StepProjectContext } from './modal-steps/StepProjectContext';
 import { StepAgentBasics } from './modal-steps/StepAgentBasics';
-import { StepSkills } from './modal-steps/StepSkills';
-import { StepDroids } from './modal-steps/StepDroids';
-import { StepTriggers } from './modal-steps/StepTriggers';
-import type { ModalStep, SkillMetadata, DroidMetadata, TriggerConfig } from './modal-steps/types';
+import { StepRules } from './modal-steps/StepRules';
+import type { ModalStep } from './modal-steps/types';
 
 // Styles
 import './modal-steps/ModalSteps.css';
@@ -116,21 +113,12 @@ function NewTerminalModal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Skills & Droids state
-  const [availableSkills, setAvailableSkills] = useState<SkillMetadata[]>([]);
-  const [availableDroids, setAvailableDroids] = useState<DroidMetadata[]>([]);
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedDroids, setSelectedDroids] = useState<string[]>([]);
-  const [loadingSkills, setLoadingSkills] = useState(false);
-  const [loadingDroids, setLoadingDroids] = useState(false);
-  // Track skills/droids that were saved but don't exist in current project
-  const [missingSkills, setMissingSkills] = useState<string[]>([]);
-  const [missingDroids, setMissingDroids] = useState<string[]>([]);
+  // Rules state - using the useRules hook
+  const { rules, loading: loadingRules, createRule, loadRules } = useRules(path);
+  const [selectedRules, setSelectedRules] = useState<string[]>([]);
+  const [missingRules, setMissingRules] = useState<string[]>([]);
 
-  // Trigger configurations state
-  const [triggerConfigs, setTriggerConfigs] = useState<TriggerConfig[]>([]);
-
-  // Store editing agent data to restore skills/droids after loading
+  // Store editing agent data to restore rules after loading
   const [editingAgentData, setEditingAgentData] = useState<SavedAgent | null>(null);
 
   // Local personality state to track changes across steps
@@ -173,11 +161,8 @@ function NewTerminalModal({
       setCompletedSteps([]);
       setUsingAgentData(null);
       setLocalPersonality(personality || {});
-      setSelectedSkills([]);
-      setSelectedDroids([]);
-      setTriggerConfigs([]);
-      setMissingSkills([]);
-      setMissingDroids([]);
+      setSelectedRules([]);
+      setMissingRules([]);
     }
 
     // Reset the ref when modal closes
@@ -196,106 +181,40 @@ function NewTerminalModal({
     }
   }, [open, path]);
 
-  // Load skills and droids when reaching skills step
+  // Restore rules selections when editing and data is loaded
   useEffect(() => {
-    if (currentStep === 'skills' && path) {
-      loadSkillsAndDroids();
-    }
-  }, [currentStep, path]);
-
-  // Restore skills/droids selections when editing and data is loaded
-  useEffect(() => {
-    if (!editingAgentData || loadingSkills || loadingDroids) return;
-    if (availableSkills.length === 0 && availableDroids.length === 0) return;
+    if (!editingAgentData || loadingRules) return;
 
     const personality = editingAgentData.personality;
-    if (!personality) return;
-
-    // Parse saved skills and restore selections
-    const restoredSkills: string[] = [];
-    const restoredTriggers: TriggerConfig[] = [];
-    const notFoundSkills: string[] = []; // Track missing skills
-
-    if (personality.skills && Array.isArray(personality.skills)) {
-      for (const skillLine of personality.skills) {
-        const parsed = parseSkillOrDroidLine(skillLine);
-        if (!parsed) continue;
-
-        // Find matching skill by path
-        const matchedSkill = availableSkills.find(s =>
-          s.path === parsed.path || s.path.endsWith(parsed.path) || parsed.path.endsWith(s.path)
-        );
-
-        if (matchedSkill) {
-          restoredSkills.push(matchedSkill.id);
-          if (parsed.trigger || !parsed.autoInvoke) {
-            restoredTriggers.push({
-              id: matchedSkill.id,
-              type: 'skill',
-              name: matchedSkill.name,
-              trigger: parsed.trigger,
-              autoInvoke: parsed.autoInvoke
-            });
-          }
-        } else {
-          // Skill not found in current project - extract readable name from path
-          const skillName = parsed.path.split('/').pop()?.replace('.md', '') || parsed.path;
-          notFoundSkills.push(skillName);
-        }
-      }
+    if (!personality?.selectedRules) {
+      setEditingAgentData(null);
+      return;
     }
 
-    // Parse saved droids from customNotes
-    const restoredDroids: string[] = [];
-    const notFoundDroids: string[] = []; // Track missing droids
-    const originalCustomNotes = editingAgentData.personality?.customNotes || '';
-    const droidLines = extractDroidLinesFromCustomNotes(originalCustomNotes);
+    const allRules = [...rules.project, ...rules.global];
+    const restoredRules: string[] = [];
+    const notFoundRules: string[] = [];
 
-    for (const droidLine of droidLines) {
-      const parsed = parseSkillOrDroidLine(droidLine.replace(/^-\s*/, ''));
-      if (!parsed) continue;
-
-      // Find matching droid by path
-      const matchedDroid = availableDroids.find(d =>
-        d.path === parsed.path || d.path.endsWith(parsed.path) || parsed.path.endsWith(d.path)
+    for (const rulePath of personality.selectedRules) {
+      const matchedRule = allRules.find(r =>
+        r.filePath === rulePath || r.filePath.endsWith(rulePath) || rulePath.endsWith(r.filePath)
       );
 
-      if (matchedDroid) {
-        restoredDroids.push(matchedDroid.id);
-        if (parsed.trigger || !parsed.autoInvoke) {
-          restoredTriggers.push({
-            id: matchedDroid.id,
-            type: 'droid',
-            name: matchedDroid.name,
-            trigger: parsed.trigger,
-            autoInvoke: parsed.autoInvoke
-          });
-        }
+      if (matchedRule) {
+        restoredRules.push(matchedRule.filePath);
       } else {
-        // Droid not found in current project - extract readable name from path
-        const droidName = parsed.path.split('/').pop()?.replace('.md', '') || parsed.path;
-        notFoundDroids.push(droidName);
+        notFoundRules.push(rulePath);
       }
     }
 
-    // Apply restored selections
-    if (restoredSkills.length > 0) {
-      setSelectedSkills(restoredSkills);
+    if (restoredRules.length > 0) {
+      setSelectedRules(restoredRules);
     }
-    if (restoredDroids.length > 0) {
-      setSelectedDroids(restoredDroids);
-    }
-    if (restoredTriggers.length > 0) {
-      setTriggerConfigs(restoredTriggers);
-    }
-
-    // Set missing items for warning display
-    setMissingSkills(notFoundSkills);
-    setMissingDroids(notFoundDroids);
+    setMissingRules(notFoundRules);
 
     // Clear editing data after restore to prevent re-running
     setEditingAgentData(null);
-  }, [editingAgentData, availableSkills, availableDroids, loadingSkills, loadingDroids]);
+  }, [editingAgentData, rules, loadingRules]);
 
   // Cleanup blob URLs on unmount
   useEffect(() => {
@@ -405,30 +324,6 @@ function NewTerminalModal({
       setIsGitRepository(false);
     } finally {
       setLoadingBranches(false);
-    }
-  }
-
-  async function loadSkillsAndDroids() {
-    // Load skills
-    setLoadingSkills(true);
-    try {
-      const skills = await loadAvailableSkills(path);
-      setAvailableSkills(skills);
-    } catch (err) {
-      console.error('Failed to load skills:', err);
-    } finally {
-      setLoadingSkills(false);
-    }
-
-    // Load droids
-    setLoadingDroids(true);
-    try {
-      const droids = await loadAvailableDroids(path);
-      setAvailableDroids(droids);
-    } catch (err) {
-      console.error('Failed to load droids:', err);
-    } finally {
-      setLoadingDroids(false);
     }
   }
 
@@ -553,106 +448,18 @@ function NewTerminalModal({
     onAvatarChange?.(agent.avatar);
     onWorkingOnChange?.(agent.workingOn || '');
 
-    // Filter out droids section from customNotes before showing in edit mode
-    const filteredPersonality = agent.personality ? {
-      ...agent.personality,
-      customNotes: filterDroidsFromCustomNotes(agent.personality.customNotes)
-    } : agent.personality;
-
-    // ✅ Update BOTH parent state AND local state
-    onPersonalityChange?.(filteredPersonality);
-    setLocalPersonality(filteredPersonality || {}); // Update local state immediately
+    // Update BOTH parent state AND local state
+    onPersonalityChange?.(agent.personality || {});
+    setLocalPersonality(agent.personality || {});
     markAgentAsUsed(agent.id);
 
-    // Store original agent data to restore skills/droids after loading
+    // Store original agent data to restore rules after loading
     setEditingAgentData(agent);
 
     // Skip Step 1 when editing - go directly to Basics
     setIsEditingAgent(true);
     setCurrentStep('basics');
     setAgentMode('create');
-  }
-
-  // Helper function to filter out droids section from customNotes
-  function filterDroidsFromCustomNotes(customNotes?: string): string | undefined {
-    if (!customNotes) return customNotes;
-
-    const lines = customNotes.split('\n');
-    const filtered: string[] = [];
-    let skipDroids = false;
-
-    for (const line of lines) {
-      if (line.includes('Selected Protocol Droids:')) {
-        skipDroids = true;
-        continue;
-      }
-      if (skipDroids) {
-        const trimmed = line.trim();
-        // Stop skipping when we hit non-droid content
-        if (!trimmed.startsWith('- ') && trimmed.length > 0) {
-          skipDroids = false;
-          filtered.push(line);
-        }
-        // Skip droid lines and empty lines within droids section
-        continue;
-      }
-      filtered.push(line);
-    }
-
-    return filtered.join('\n').trim();
-  }
-
-  // Helper to parse skill/droid line format: "path | WHEN: trigger | AUTO-INVOKE"
-  function parseSkillOrDroidLine(line: string): { path: string; trigger: string; autoInvoke: boolean } | null {
-    if (!line || !line.trim()) return null;
-
-    const parts = line.split('|').map(p => p.trim());
-    const path = parts[0];
-    let trigger = '';
-    let autoInvoke = true; // Default to true
-
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i];
-      if (part.startsWith('WHEN:')) {
-        trigger = part.replace('WHEN:', '').trim();
-      } else if (part === 'AUTO-INVOKE') {
-        autoInvoke = true;
-      }
-    }
-
-    // If AUTO-INVOKE is not present in the line, it means it was disabled
-    if (parts.length > 1 && !line.includes('AUTO-INVOKE')) {
-      autoInvoke = false;
-    }
-
-    return { path, trigger, autoInvoke };
-  }
-
-  // Helper to extract droid lines from customNotes
-  function extractDroidLinesFromCustomNotes(customNotes: string): string[] {
-    if (!customNotes) return [];
-
-    const lines = customNotes.split('\n');
-    const droidLines: string[] = [];
-    let inDroidsSection = false;
-
-    for (const line of lines) {
-      if (line.includes('Selected Protocol Droids:')) {
-        inDroidsSection = true;
-        continue;
-      }
-      if (inDroidsSection) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('- ')) {
-          droidLines.push(trimmed);
-        } else if (trimmed.length > 0 && !trimmed.startsWith('- ')) {
-          // End of droids section
-          break;
-        }
-      }
-    }
-
-    return droidLines;
   }
 
   function handleCreateNewAgent() {
@@ -694,7 +501,7 @@ function NewTerminalModal({
       return;
     }
     setCompletedSteps(prev => [...prev, 'basics']);
-    setCurrentStep('skills');
+    setCurrentStep('rules');
   }
 
   function handleBasicsBack() {
@@ -708,126 +515,52 @@ function NewTerminalModal({
     }
   }
 
-  function handleSkillsNext() {
-    setCompletedSteps(prev => [...prev, 'skills']);
-    setCurrentStep('droids');
-  }
-
-  function handleSkillsBack() {
+  function handleRulesBack() {
     setCurrentStep('basics');
   }
 
-  function handleDroidsBack() {
-    setCurrentStep('skills');
-  }
+  // ===== Rules Selection =====
 
-  function handleDroidsNext() {
-    setCompletedSteps(prev => [...prev, 'droids']);
-    setCurrentStep('triggers');
-  }
-
-  function handleTriggersBack() {
-    setCurrentStep('droids');
-  }
-
-  // ===== Skills & Droids =====
-
-  function handleSkillToggle(skillId: string) {
-    setSelectedSkills(prev =>
-      prev.includes(skillId)
-        ? prev.filter(id => id !== skillId)
-        : [...prev, skillId]
+  function handleRuleToggle(rulePath: string) {
+    setSelectedRules(prev =>
+      prev.includes(rulePath)
+        ? prev.filter(p => p !== rulePath)
+        : [...prev, rulePath]
     );
   }
 
-  function handleDroidToggle(droidId: string) {
-    setSelectedDroids(prev =>
-      prev.includes(droidId)
-        ? prev.filter(id => id !== droidId)
-        : [...prev, droidId]
-    );
-  }
-
-  function handleOpenDroidFactory() {
-    if (onOpenDroidFactory) {
-      onOpenDroidFactory();
-    } else {
-      alert('Droid Factory is not available. Please configure it in your app.');
-    }
+  // Create a new rule and auto-select it
+  async function handleCreateRule(
+    name: string,
+    content: string,
+    scope: RuleScope,
+    description?: string,
+    globs?: string[],
+    alwaysApply?: boolean
+  ) {
+    await createRule(name, content, scope, description, globs, alwaysApply);
+    // After creation, find the new rule and select it
+    // The rules will be reloaded by the hook automatically
+    // We'll select it by path in the next render
+    const expectedPath = scope === 'project'
+      ? `${path}/.claude/rules/${name}.md`
+      : `~/.claude/rules/${name}.md`;
+    setSelectedRules(prev => [...prev, expectedPath]);
   }
 
   // ===== Final Confirmation =====
 
   async function handleFinalConfirm() {
-    // Update personality with selected skills and droids
-    const skillPaths = selectedSkills.map(id => {
-      const skill = availableSkills.find(s => s.id === id);
-      return skill ? skill.path : id;
-    });
-
-    // Build trigger-enhanced droid lines with WHEN to use each
-    const droidLines = selectedDroids.map(id => {
-      const droid = availableDroids.find(d => d.id === id);
-      const triggerConfig = triggerConfigs.find(t => t.id === id && t.type === 'droid');
-      const path = droid ? droid.path : id;
-      const trigger = triggerConfig?.trigger || '';
-      const autoInvoke = triggerConfig?.autoInvoke !== false; // Default true
-
-      if (trigger) {
-        return `- ${path} | WHEN: ${trigger}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
-      }
-      return `- ${path}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
-    });
-
-    // Build trigger-enhanced skill paths with WHEN to use each
-    const skillLines = selectedSkills.map(id => {
-      const skill = availableSkills.find(s => s.id === id);
-      const triggerConfig = triggerConfigs.find(t => t.id === id && t.type === 'skill');
-      const path = skill ? skill.path : id;
-      const trigger = triggerConfig?.trigger || '';
-      const autoInvoke = triggerConfig?.autoInvoke !== false; // Default true
-
-      if (trigger) {
-        return `${path} | WHEN: ${trigger}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
-      }
-      return `${path}${autoInvoke ? ' | AUTO-INVOKE' : ''}`;
-    });
-
-    // Build custom notes: only include droids section if droids are selected
-    // Use LOCAL personality state instead of prop
-    let finalCustomNotes = localPersonality?.customNotes || '';
-
-    if (selectedDroids.length > 0) {
-      // Add droids section only if there are selected droids
-      const droidsSection = [
-        'Selected Protocol Droids:',
-        ...droidLines
-      ].join('\n');
-
-      // Append droids to existing custom notes (if any)
-      if (finalCustomNotes.trim()) {
-        finalCustomNotes = `${finalCustomNotes}\n\n${droidsSection}`;
-      } else {
-        finalCustomNotes = droidsSection;
-      }
-    }
-
-    // Use LOCAL personality state for complete data
+    // Build updated personality with selected rules
     const updatedPersonality: Partial<AgentPersonality> = {
-      ...localPersonality, // ✅ Use local state instead of prop
-      skills: skillLines.length > 0 ? skillLines : undefined, // Include trigger info with skills
-      customNotes: finalCustomNotes.trim() || undefined // Only include if not empty
+      ...localPersonality,
+      selectedRules: selectedRules.length > 0 ? selectedRules : undefined,
     };
 
     // DEBUG: Log what we're sending
-    console.log('🔍 [MODAL] handleFinalConfirm called');
-    console.log('🔍 [MODAL] Local personality before merge:', JSON.stringify(localPersonality, null, 2));
-    console.log('🔍 [MODAL] Selected skills:', selectedSkills);
-    console.log('🔍 [MODAL] Skill paths:', skillPaths);
-    console.log('🔍 [MODAL] Selected droids:', selectedDroids);
-    console.log('🔍 [MODAL] Droid lines:', droidLines);
-    console.log('🔍 [MODAL] Final custom notes:', finalCustomNotes);
-    console.log('🔍 [MODAL] Updated personality:', JSON.stringify(updatedPersonality, null, 2));
+    console.log('[MODAL] handleFinalConfirm called');
+    console.log('[MODAL] Selected rules:', selectedRules);
+    console.log('[MODAL] Updated personality:', JSON.stringify(updatedPersonality, null, 2));
 
     onPersonalityChange?.(updatedPersonality);
 
@@ -892,7 +625,6 @@ function NewTerminalModal({
             onUseAgent={handleUseAgent}
             onEditAgent={handleEditAgent}
             onCreateNew={handleCreateNewAgent}
-            basePath={path}
           />
 
           <div className="modal-actions">
@@ -984,47 +716,18 @@ function NewTerminalModal({
           />
         )}
 
-        {/* Step 3: Skills Selection */}
-        {currentStep === 'skills' && (
-          <StepSkills
-            availableSkills={availableSkills}
-            selectedSkills={selectedSkills}
-            loadingSkills={loadingSkills}
-            missingSkills={missingSkills}
-            onSkillToggle={handleSkillToggle}
-            onOpenDroidFactory={handleOpenDroidFactory}
-            onBack={handleSkillsBack}
-            onNext={handleSkillsNext}
-          />
-        )}
-
-        {/* Step 4: Droids Selection */}
-        {currentStep === 'droids' && (
-          <StepDroids
-            availableDroids={availableDroids}
-            selectedDroids={selectedDroids}
-            loadingDroids={loadingDroids}
-            missingDroids={missingDroids}
-            onDroidToggle={handleDroidToggle}
-            onOpenDroidFactory={handleOpenDroidFactory}
-            onBack={handleDroidsBack}
-            onNext={handleDroidsNext}
-          />
-        )}
-
-        {/* Step 5: Triggers Configuration */}
-        {currentStep === 'triggers' && (
-          <StepTriggers
-            selectedSkills={selectedSkills}
-            selectedDroids={selectedDroids}
-            availableSkills={availableSkills}
-            availableDroids={availableDroids}
-            triggerConfigs={triggerConfigs}
-            onTriggerChange={setTriggerConfigs}
-            onBack={handleTriggersBack}
+        {/* Step 3: Rules Selection */}
+        {currentStep === 'rules' && (
+          <StepRules
+            availableRules={rules}
+            selectedRules={selectedRules}
+            loadingRules={loadingRules}
+            missingRules={missingRules}
+            onRuleToggle={handleRuleToggle}
+            onCreateRule={handleCreateRule}
+            onBack={handleRulesBack}
             onConfirm={handleFinalConfirm}
             creating={creating}
-            isEditing={isEditingAgent}
           />
         )}
 

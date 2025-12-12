@@ -155,13 +155,13 @@ pub async fn execute_background_agent(
     );
 
     // Build the Claude CLI command
-    // Using claude CLI with streaming disabled for background execution
+    // Using claude CLI with -p/--print for non-interactive background execution
     let mut cmd = Command::new("claude");
-    cmd.arg("--model")
+    cmd.arg("--print") // Non-interactive mode: print response and exit
+        .arg("--model")
         .arg(&model)
         .arg("--output-format")
         .arg("json")
-        .arg("--no-interactive")
         .arg(&prompt);
 
     if let Some(ref cwd) = working_directory {

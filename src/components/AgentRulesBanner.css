@@ -1,0 +1,247 @@
+/**
+ * AgentRulesBanner Styles
+ *
+ * Collapsible banner showing active rules in chat stream.
+ * Matches Quack's glassmorphism design system.
+ */
+
+/* Badge mode (compact) */
+.agent-rules-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+  color: #a78bfa;
+}
+
+.agent-rules-badge .rules-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.agent-rules-badge .rules-count {
+  font-weight: 600;
+}
+
+/* Full banner mode - ultra compact, no border-radius */
+.agent-rules-banner {
+  background: rgba(30, 30, 40, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0; /* No rounded corners */
+  margin: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.agent-rules-banner:hover {
+  background: rgba(30, 30, 40, 0.95);
+}
+
+.agent-rules-banner.expanded {
+  background: rgba(30, 30, 40, 0.95);
+}
+
+/* Header button - ultra compact */
+.rules-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 12px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.rules-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rules-header-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rules-icon {
+  width: 12px;
+  height: 12px;
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.rules-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: #b0b0b0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rules-count-badge {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  padding: 0px 4px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.rules-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rules-preview {
+  font-size: 10px;
+  color: #777;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron-icon {
+  width: 12px;
+  height: 12px;
+  color: #555;
+  transition: transform 0.2s ease;
+}
+
+.chevron-icon.rotated {
+  transform: rotate(180deg);
+}
+
+/* Expanded content - ultra compact */
+.rules-content {
+  padding: 0 10px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Rules list - ultra compact */
+.rules-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rule-item {
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rule-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rule-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: #e5e5e5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.always-badge {
+  font-size: 7px;
+  font-weight: 700;
+  padding: 1px 3px;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border-radius: 2px;
+  letter-spacing: 0.3px;
+}
+
+.rule-description {
+  font-size: 10px;
+  color: #777;
+  line-height: 1.2;
+}
+
+.rule-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.rule-scope {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.rule-scope.project {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.rule-scope.global {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.rule-globs {
+  font-size: 9px;
+  color: #666;
+}
+
+/* Edit button - ultra compact */
+.edit-rules-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin-top: 4px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 3px;
+  color: #a78bfa;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-rules-btn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.edit-rules-btn svg {
+  width: 10px;
+  height: 10px;
+}

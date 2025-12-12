@@ -280,6 +280,9 @@ export interface AgentPersonality {
   communicationStyle: string; // How the agent communicates (friendly, professional, etc.)
   customNotes?: string; // Additional free-form notes
 
+  // Selected Claude Code rules (file paths from .claude/rules/)
+  selectedRules?: string[]; // Array of rule file paths to follow
+
   // Legacy fields (kept for backwards compatibility during migration)
   personality?: string;
   quirks?: string;

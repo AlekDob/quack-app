@@ -636,6 +636,24 @@
   white-space: pre-wrap;
 }
 
+/* Log expand button for truncated messages */
+.log-expand-btn {
+  display: inline;
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-left: 4px;
+  font-family: inherit;
+}
+
+.log-expand-btn:hover {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
 /* Logs footer */
 .logs-footer {
   display: flex;

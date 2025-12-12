@@ -5,12 +5,11 @@
 
 import type { StepProgressProps, ModalStep } from './types';
 
+// Simplified 3-step flow: context → basics → rules
 const STEPS: Array<{ id: ModalStep; label: string; icon: string }> = [
   { id: 'context', label: 'Project', icon: '📁' },
   { id: 'basics', label: 'Basics', icon: '🎨' },
-  { id: 'skills', label: 'Skills', icon: '📚' },
-  { id: 'droids', label: 'Droids', icon: '🤖' },
-  { id: 'triggers', label: 'Triggers', icon: '⚡' },
+  { id: 'rules', label: 'Rules', icon: '📋' },
 ];
 
 export function StepProgress({ currentStep, completedSteps, isEditing }: StepProgressProps) {

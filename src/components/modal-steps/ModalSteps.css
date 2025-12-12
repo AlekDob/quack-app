@@ -1225,3 +1225,129 @@
   border-color: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.75);
 }
+
+/* ===== Rules Sections ===== */
+.rules-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rules-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rules-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.2s ease;
+}
+
+.rules-section-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.section-chevron {
+  width: 16px;
+  height: 16px;
+  stroke: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.section-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section-count {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: rgba(0, 217, 255, 0.15);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #00D9FF;
+}
+
+.rules-section .config-items-list {
+  padding: 0 14px 14px;
+}
+
+/* Always Apply Badge */
+.always-apply-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(255, 193, 7, 0.2);
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #FFC107;
+  letter-spacing: 0.5px;
+}
+
+/* Config item globs */
+.config-item-globs {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Create Rule Button */
+.create-rule-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  margin-top: 16px;
+  background: rgba(255, 107, 53, 0.08);
+  border: 2px dashed rgba(255, 107, 53, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.create-rule-cta:hover {
+  background: rgba(255, 107, 53, 0.12);
+  border-color: rgba(255, 107, 53, 0.5);
+}
+
+.create-rule-cta svg {
+  width: 18px;
+  height: 18px;
+  stroke: #FF6B35;
+}
+
+.create-rule-cta span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #FF6B35;
+}
+
+/* Summary list missing item */
+.summary-list li.missing {
+  background: rgba(255, 82, 82, 0.15);
+  color: #FF5252;
+  text-decoration: line-through;
+}

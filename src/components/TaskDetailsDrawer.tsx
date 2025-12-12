@@ -647,8 +647,26 @@ export default function TaskDetailsDrawer({
   );
 }
 
-// Log entry component with ANSI parsing
+// Maximum characters to show per log message (prevent freeze on huge JSON)
+const MAX_LOG_MESSAGE_LENGTH = 500;
+
+// Truncate long messages with expand option
+function truncateMessage(message: string): { text: string; truncated: boolean } {
+  const stripped = stripAnsi(message);
+  if (stripped.length <= MAX_LOG_MESSAGE_LENGTH) {
+    return { text: message, truncated: false };
+  }
+  // Find a good break point (end of word or JSON key)
+  const truncated = stripped.slice(0, MAX_LOG_MESSAGE_LENGTH);
+  const lastSpace = truncated.lastIndexOf(' ');
+  const breakPoint = lastSpace > MAX_LOG_MESSAGE_LENGTH - 50 ? lastSpace : MAX_LOG_MESSAGE_LENGTH;
+  return { text: stripped.slice(0, breakPoint), truncated: true };
+}
+
+// Log entry component with ANSI parsing and truncation
 function LogEntry({ log }: { log: BackgroundTaskLogEntry }) {
+  const [expanded, setExpanded] = useState(false);
+
   const levelColors: Record<string, string> = {
     debug: '#6b7280',
     info: '#3b82f6',
@@ -657,6 +675,15 @@ function LogEntry({ log }: { log: BackgroundTaskLogEntry }) {
     success: '#10b981',
   };
 
+  const { text, truncated } = useMemo(() => {
+    if (expanded) {
+      return { text: stripAnsi(log.message), truncated: false };
+    }
+    return truncateMessage(log.message);
+  }, [log.message, expanded]);
+
+  // Use plain text instead of dangerouslySetInnerHTML for performance
+  // ANSI parsing is expensive on large strings
   return (
     <div className={`log-entry ${log.level}`} style={{ borderLeftColor: levelColors[log.level] || levelColors.info }}>
       <span className="log-time">{formatLogTime(log.timestamp)}</span>
@@ -664,10 +691,27 @@ function LogEntry({ log }: { log: BackgroundTaskLogEntry }) {
         {log.level.toUpperCase()}
       </span>
       {log.source && <span className="log-source">[{log.source}]</span>}
-      <span
-        className="log-message"
-        dangerouslySetInnerHTML={{ __html: ansiToHtml(log.message) }}
-      />
+      <span className="log-message">
+        {text}
+        {truncated && (
+          <button
+            type="button"
+            className="log-expand-btn"
+            onClick={() => setExpanded(true)}
+          >
+            ... [Show more]
+          </button>
+        )}
+        {expanded && log.message.length > MAX_LOG_MESSAGE_LENGTH && (
+          <button
+            type="button"
+            className="log-expand-btn"
+            onClick={() => setExpanded(false)}
+          >
+            [Show less]
+          </button>
+        )}
+      </span>
     </div>
   );
 }
