@@ -229,6 +229,8 @@ pub fn delete_slash_command(_app: AppHandle, base_path: String, name: String) ->
 }
 
 /// Expand a slash command by reading its content and replacing placeholders
+/// The expanded content is wrapped in <command-context> tags to give the AI
+/// full context about how to execute the command.
 #[tauri::command]
 pub fn expand_slash_command(
     _app: AppHandle,
@@ -264,26 +266,50 @@ pub fn expand_slash_command(
         return Err(format!("Command '{}' not found", command_name));
     };
 
-    // Read command content
-    let content = fs::read_to_string(&command_file)
+    // Read command content (the full file including frontmatter)
+    let full_content = fs::read_to_string(&command_file)
         .map_err(|e| format!("Failed to read command file: {}", e))?;
 
-    // Parse frontmatter to get the body
-    let (_, _, _, body) = parse_frontmatter(&content);
+    // Parse frontmatter to get description and body
+    let (_, description, _, body) = parse_frontmatter(&full_content);
+    let cmd_description = description.unwrap_or_else(|| "Custom command".to_string());
 
     // Replace $ARGUMENTS placeholder with actual arguments
     let expanded = body.replace("$ARGUMENTS", &args);
 
     // Replace numbered placeholders $1, $2, etc. with space-separated arguments
     let args_vec: Vec<&str> = args.split_whitespace().collect();
-    let mut final_content = expanded.clone();
+    let mut expanded_body = expanded.clone();
 
     for (i, arg) in args_vec.iter().enumerate() {
         let placeholder = format!("${}", i + 1);
-        final_content = final_content.replace(&placeholder, arg);
+        expanded_body = expanded_body.replace(&placeholder, arg);
     }
 
-    log::info!("🦆 Expanded command content ({} chars)", final_content.len());
+    // Wrap in command-context tags so the AI knows this is a command definition
+    // that it should execute according to the instructions
+    let final_content = format!(
+        r#"<command-context name="{}" description="{}">
+The user invoked the /{} command. Follow the instructions below to execute it.
+
+---
+
+{}
+
+</command-context>
+
+User's command: /{} {}
+
+Execute the command according to the instructions in <command-context> above."#,
+        command_name,
+        cmd_description,
+        command_name,
+        expanded_body,
+        command_name,
+        args
+    );
+
+    log::info!("🦆 Expanded command with context ({} chars)", final_content.len());
 
     Ok(final_content)
 }

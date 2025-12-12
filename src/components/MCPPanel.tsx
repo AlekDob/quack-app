@@ -288,14 +288,14 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
                     <button
                       type="button"
                       onClick={() => onOpenMcpConfig(workingDir)}
-                      className="px-2 py-1 text-xs font-medium rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 transition-colors duration-200"
+                      className="px-2 py-1 text-[10px] font-medium rounded hover:bg-white/10 text-white/50 hover:text-white/70 transition-colors duration-200"
                       title="Edit .mcp.json"
                     >
                       Edit JSON
                     </button>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {servers
                     .filter((s) => s.scope === "project")
                     .map((server) => (
@@ -323,7 +323,7 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
                   <span>Global Servers</span>
                   <span className="text-xs text-white/40">{servers.filter((s) => s.scope === "global").length}</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {servers
                     .filter((s) => s.scope === "global")
                     .map((server) => (

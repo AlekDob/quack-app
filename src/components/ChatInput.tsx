@@ -281,15 +281,14 @@ export default function ChatInput({
     };
   }, [showAgentAutocomplete, agentFilter, basePath]);
 
-  // Filter commands based on current / command
+  // Filter commands based on current / command (only match command name, not description)
   const filteredCommands = useMemo(() => {
     if (!commands || !showCommandAutocomplete) return [];
 
     const filter = commandFilter.toLowerCase();
     return commands.filter(command => {
       const name = command.name.toLowerCase();
-      const description = command.description.toLowerCase();
-      return name.includes(filter) || description.includes(filter);
+      return name.includes(filter);
     });
   }, [commands, showCommandAutocomplete, commandFilter]);
 

@@ -141,6 +141,73 @@ export function useSlashCommands(basePath: string) {
     return allCommands.find(cmd => cmd.name === name);
   }, [commands]);
 
+  /**
+   * Expand slash commands in a message by injecting their content as context.
+   * When a message contains /command-name, this function:
+   * 1. Detects all /command-name patterns at the start of lines
+   * 2. Loads the command definition from .claude/commands/
+   * 3. Injects the command content as <command-context> before the message
+   *
+   * This ensures the AI knows HOW to execute each command.
+   */
+  const expandCommandsInMessage = useCallback((message: string): {
+    expandedMessage: string;
+    commandsFound: string[];
+    hasCommands: boolean;
+  } => {
+    const allCommands = [...commands.builtin, ...commands.custom];
+
+    // Regex to find /command-name at the start of a line or message
+    // Matches: /command-name (optionally followed by space and arguments)
+    const commandPattern = /^\/([a-zA-Z][a-zA-Z0-9_-]*)/gm;
+
+    const commandsFound: string[] = [];
+    const commandContexts: string[] = [];
+
+    let match;
+    while ((match = commandPattern.exec(message)) !== null) {
+      const commandName = match[1];
+
+      // Skip if already processed
+      if (commandsFound.includes(commandName)) continue;
+
+      // Find the command definition
+      const command = allCommands.find(cmd => cmd.name === commandName);
+
+      if (command && command.content) {
+        commandsFound.push(commandName);
+
+        // Build context block with command definition
+        commandContexts.push(
+          `<command-context name="${commandName}" description="${command.description}">`,
+          command.content,
+          `</command-context>`
+        );
+      }
+    }
+
+    // If no commands found, return original message
+    if (commandsFound.length === 0) {
+      return {
+        expandedMessage: message,
+        commandsFound: [],
+        hasCommands: false
+      };
+    }
+
+    // Build expanded message with context injected before the original message
+    const contextBlock = commandContexts.join('\n\n');
+    const expandedMessage = `${contextBlock}\n\n---\n\n${message}`;
+
+    console.log(`[useSlashCommands] Expanded ${commandsFound.length} command(s):`, commandsFound);
+
+    return {
+      expandedMessage,
+      commandsFound,
+      hasCommands: true
+    };
+  }, [commands]);
+
   // Load commands on mount and when basePath changes
   useEffect(() => {
     loadCommands();
@@ -155,6 +222,7 @@ export function useSlashCommands(basePath: string) {
     updateCommand,
     deleteCommand,
     searchCommands,
-    getCommand
+    getCommand,
+    expandCommandsInMessage
   };
 }

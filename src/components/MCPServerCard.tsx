@@ -83,162 +83,75 @@ export default function MCPServerCard({
 
   return (
     <div
-      className="rounded-lg border transition-all duration-200"
-      style={{
-        background: "rgba(12, 16, 24, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.08)",
-        opacity: server.enabled ? 1 : 0.5,
-      }}
+      className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+      style={{ opacity: server.enabled ? 1 : 0.5 }}
+      onClick={() => onEdit(server)}
     >
-      {/* Main content */}
-      <div className="p-3">
-        <div className="flex items-start gap-3">
-          {/* Type icon */}
-          <div
-            className="w-8 h-8 rounded flex-shrink-0 flex items-center justify-center text-lg"
-            style={{
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-            }}
-          >
-            {typeIcon}
-          </div>
-
-          {/* Server info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="text-sm font-medium truncate"
-                style={{ color: "rgba(255, 255, 255, 0.9)" }}
-              >
-                {server.name}
-              </span>
-              {/* Status indicator */}
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: statusConfig.color,
-                    boxShadow: `0 0 4px ${statusConfig.color}40`
-                  }}
-                />
-                <span
-                  className="text-xs"
-                  style={{ color: statusConfig.color }}
-                >
-                  {statusConfig.label}
-                </span>
-              </div>
-            </div>
-
-            {/* Command/URL */}
-            <div
-              className="text-xs font-mono truncate mb-2"
-              style={{ color: "rgba(255, 255, 255, 0.5)" }}
-            >
-              {server.transport === "stdio" && server.command && server.args && (
-                <>{server.command} {server.args.join(" ")}</>
-              )}
-              {(server.transport === "http" || server.transport === "sse") && server.url && (
-                <>{server.transport.toUpperCase()}: {server.url}</>
-              )}
-            </div>
-
-            {/* Error message */}
-            {server.error && (
-              <div
-                className="text-xs p-2 rounded mb-2"
-                style={{
-                  background: "rgba(239, 68, 68, 0.1)",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  color: "#EF4444",
-                }}
-              >
-                {server.error}
-              </div>
-            )}
-
-            {/* Environment variables count */}
-            {server.env && Object.keys(server.env).length > 0 && (
-              <div
-                className="text-xs"
-                style={{ color: "rgba(255, 255, 255, 0.4)" }}
-              >
-                {Object.keys(server.env).length} environment{" "}
-                {Object.keys(server.env).length === 1
-                  ? "variable"
-                  : "variables"}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Type icon */}
+      <div
+        className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
+        style={{ background: `${statusConfig.color}15` }}
+      >
+        <span style={{ color: statusConfig.color }}>{typeIcon}</span>
       </div>
 
-      {/* Actions */}
-      <div
-        className="px-3 pb-3 flex items-center gap-2"
-        style={{
-          borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-          paddingTop: "0.75rem",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => onEdit(server)}
-          className="flex-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
-          style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "rgba(255, 255, 255, 0.9)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-          }}
-        >
-          Edit
-        </button>
+      {/* Server info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-white/90 truncate">
+            {server.name}
+          </span>
+          {/* Status indicator */}
+          <div className="flex items-center gap-1">
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: statusConfig.color }}
+            />
+            <span className="text-[10px]" style={{ color: statusConfig.color }}>
+              {statusConfig.label}
+            </span>
+          </div>
+        </div>
 
+        {/* Command/URL */}
+        <div className="text-xs font-mono text-white/50 truncate mt-0.5">
+          {server.transport === "stdio" && server.command && server.args && (
+            <>{server.command} {server.args.join(" ")}</>
+          )}
+          {(server.transport === "http" || server.transport === "sse") && server.url && (
+            <>{server.transport.toUpperCase()}: {server.url}</>
+          )}
+        </div>
+
+        {/* Environment variables count */}
+        {server.env && Object.keys(server.env).length > 0 && (
+          <div className="text-[10px] text-white/40 mt-0.5">
+            {Object.keys(server.env).length} environment{" "}
+            {Object.keys(server.env).length === 1 ? "variable" : "variables"}
+          </div>
+        )}
+
+        {/* Error message */}
+        {server.error && (
+          <div className="text-[10px] text-red-400 mt-1 truncate">
+            {server.error}
+          </div>
+        )}
+      </div>
+
+      {/* Actions - show on hover */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"
-          onClick={() => onTestConnection(server)}
-          className="flex-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
-          style={{
-            background: "rgba(242, 140, 82, 0.1)",
-            border: "1px solid rgba(242, 140, 82, 0.3)",
-            color: "#f28c52",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
-            e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
-            e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
-          }}
+          onClick={(e) => { e.stopPropagation(); onTestConnection(server); }}
+          className="px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
         >
           Test
         </button>
-
         <button
           type="button"
-          onClick={() => onDelete(server.id)}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
-          style={{
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-            color: "#EF4444",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)";
-            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.5)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)";
-            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
-          }}
+          onClick={(e) => { e.stopPropagation(); onDelete(server.id); }}
+          className="px-2 py-1 rounded text-xs font-medium transition-all duration-200 hover:bg-white/10 text-white/50 hover:text-red-400"
         >
           Delete
         </button>
