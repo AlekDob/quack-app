@@ -1443,7 +1443,7 @@ button.directory-chooser:hover {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.3rem;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -1504,27 +1504,24 @@ button.directory-chooser:hover {
 
 /* Animazioni universali per tutti i drawer - gestite con transition CSS */
 
-.terminal-name {
+.terminal-details .terminal-name {
   font-size: 0.8rem;
   font-weight: 450;
   color: #f3f7ff;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.3;
+  line-height: 1.2;
   display: flex;
   align-items: center;
   gap: 6px;
+  margin: 0 0 2px 0;
+  padding: 0;
 }
 
-.terminal-working-on {
-  font-size: 0.65rem;
+.terminal-details .role-mission {
+  font-size: 0.7rem;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.4);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.2;
-  margin-top: -0.2rem;
-  text-align: left;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.3;
+  display: block;
 }
 
 .terminal-status {

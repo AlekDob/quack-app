@@ -2,6 +2,7 @@ import { useEffect, useState, memo, useMemo } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { TerminalInfo, ChatMessage } from '../types'
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage'
+import Tooltip from './Tooltip'
 
 // Helper function to get avatar image URL (works in both dev and production)
 function getAvatarUrl(avatarName: string): string {
@@ -215,10 +216,10 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
             </span>
           )}
         </span>
-        {terminal.workingOn && (
-          <span className="terminal-working-on">
-            {terminal.workingOn}
-          </span>
+        {terminal.personality?.role && (
+          <Tooltip content={terminal.workingOn ? `Working on: ${terminal.workingOn}` : null} position="bottom" show={!!terminal.workingOn}>
+            <span className="role-mission">{terminal.personality.role}</span>
+          </Tooltip>
         )}
         {isBusy && (
           <div className="terminal-progress-bar">
@@ -241,6 +242,7 @@ export default memo(TerminalActivityBar, (prevProps, nextProps) => {
     prevProps.terminal.color === nextProps.terminal.color &&
     prevProps.terminal.workingOn === nextProps.terminal.workingOn &&
     prevProps.terminal.waitingForResponse === nextProps.terminal.waitingForResponse &&
+    prevProps.terminal.personality?.role === nextProps.terminal.personality?.role &&
     prevProps.hideBranch === nextProps.hideBranch &&
     prevProps.chatSessions === nextProps.chatSessions &&
     prevProps.isActive === nextProps.isActive
