@@ -292,19 +292,15 @@ export default function ChatInput({
     });
   }, [commands, showCommandAutocomplete, commandFilter]);
 
-  // Auto-expand snippet when user types a matching tag followed by space
+  // Auto-expand snippet when user types an exact matching tag
   const tryAutoExpandSnippet = useCallback(async (text: string, cursorPos: number) => {
-    if (snippets.length === 0 || cursorPos < 2) return null;
+    if (snippets.length === 0 || cursorPos < 1) return null;
 
-    // Check if the character just typed is a space (trigger for expansion)
-    const justTypedSpace = text[cursorPos - 1] === ' ';
-    if (!justTypedSpace) return null;
-
-    // Get the word before the space
-    const textBeforeSpace = text.substring(0, cursorPos - 1);
-    let wordStart = textBeforeSpace.length;
-    for (let i = textBeforeSpace.length - 1; i >= 0; i--) {
-      const char = textBeforeSpace[i];
+    // Get the current word being typed (up to cursor)
+    const textBeforeCursor = text.substring(0, cursorPos);
+    let wordStart = textBeforeCursor.length;
+    for (let i = textBeforeCursor.length - 1; i >= 0; i--) {
+      const char = textBeforeCursor[i];
       if (/[\s\n]/.test(char)) {
         wordStart = i + 1;
         break;
@@ -314,17 +310,17 @@ export default function ChatInput({
       }
     }
 
-    const potentialTag = textBeforeSpace.substring(wordStart);
+    const potentialTag = textBeforeCursor.substring(wordStart);
     if (!potentialTag) return null;
 
-    // Check if this matches a snippet tag
+    // Check if this EXACTLY matches a snippet tag (case insensitive)
     const matchingSnippet = snippets.find(
       s => s.tag.toLowerCase() === potentialTag.toLowerCase()
     );
 
     if (!matchingSnippet) return null;
 
-    // Found a matching snippet - expand it
+    // Found a matching snippet - expand it immediately
     try {
       let content = await expandVariables(matchingSnippet.content);
 
@@ -334,9 +330,9 @@ export default function ChatInput({
         content = removeCursorMarker(content);
       }
 
-      // Replace the tag (and the space) with snippet content
+      // Replace the tag with snippet content (no space needed)
       const beforeTag = text.substring(0, wordStart);
-      const afterTag = text.substring(cursorPos); // cursorPos is after the space
+      const afterTag = text.substring(cursorPos);
       const newInput = beforeTag + content + afterTag;
 
       // Return the new input and cursor position

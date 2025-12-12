@@ -316,13 +316,13 @@ export function SnippetModal({
                       >
                         <div className="snippet-item-header">
                           <span className="snippet-item-name">{snippet.name}</span>
-                          <span className="snippet-item-tag">{snippet.tag}</span>
                         </div>
                         <div className="snippet-item-preview">
-                          {snippet.content.length > 80
-                            ? snippet.content.substring(0, 80) + '...'
+                          {snippet.content.length > 120
+                            ? snippet.content.substring(0, 120) + '...'
                             : snippet.content}
                         </div>
+                        <div className="snippet-item-tag">{snippet.tag}</div>
                       </button>
                       <div className="snippet-item-actions">
                         <button
