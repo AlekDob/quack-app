@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import AgentPersonalityCard from './AgentPersonalityCard';
-import type { AgentPersonality, DirectoryEntry, SkillInfo, AgentInfo } from '../types';
+import type { AgentPersonality, DirectoryEntry, Rule } from '../types';
 import './AgentContextPanel.css';
 
 interface ContextFile {
@@ -25,15 +25,14 @@ interface AgentContextPanelProps {
   activeAgentAvatar?: string | null;
   activeAgentWorkingOn?: string | null;
   activeAgentCwd?: string | null;
-  activeAgentPersonality?: Partial<AgentPersonality> | null; // Added: personality from terminal state
+  activeAgentPersonality?: Partial<AgentPersonality> | null;
   onOpenFile?: (entry: DirectoryEntry) => void;
   onOpenContextDrawer?: (scope: string) => void;
-  onEditAgent?: () => void; // Added: callback to edit agent
-  onSelectSkill?: (skillInfo: SkillInfo) => void; // Added: callback to open skill detail
-  onSelectAgent?: (agentInfo: AgentInfo) => void; // Added: callback to open droid detail
+  onEditAgent?: () => void;
+  onOpenRulesTab?: () => void; // Navigate to Rules tab in SidePanel
   projectName?: string;
   gitBranch?: string;
-  refreshKey?: number; // Added: forces refresh when agent is edited
+  refreshKey?: number;
 }
 
 export default function AgentContextPanel({
@@ -43,15 +42,14 @@ export default function AgentContextPanel({
   activeAgentAvatar,
   activeAgentWorkingOn,
   activeAgentCwd,
-  activeAgentPersonality, // Added: personality from terminal state
+  activeAgentPersonality,
   onOpenFile,
   onOpenContextDrawer,
-  onEditAgent, // Added: callback to edit agent
-  onSelectSkill, // Added: callback to open skill detail
-  onSelectAgent, // Added: callback to open droid detail
+  onEditAgent,
+  onOpenRulesTab,
   projectName,
   gitBranch,
-  refreshKey, // Added: forces refresh when agent is edited
+  refreshKey,
 }: AgentContextPanelProps) {
   const [personality, setPersonality] = useState<AgentPersonality | null>(null);
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
@@ -61,13 +59,12 @@ export default function AgentContextPanel({
   const [personalityCollapsed, setPersonalityCollapsed] = useState(false);
   const [globalCollapsed, setGlobalCollapsed] = useState(false);
   const [projectCollapsed, setProjectCollapsed] = useState(false);
-  const [recommendedToolsCollapsed, setRecommendedToolsCollapsed] = useState(false);
-  const [recommendedSkills, setRecommendedSkills] = useState<SkillInfo[]>([]);
-  const [recommendedDroids, setRecommendedDroids] = useState<AgentInfo[]>([]);
+  const [agentRulesCollapsed, setAgentRulesCollapsed] = useState(false);
+  const [agentRules, setAgentRules] = useState<Rule[]>([]);
 
   useEffect(() => {
     void loadAgentContext();
-  }, [tauriAvailable, activeAgentId, refreshKey]); // Added refreshKey to trigger reload when agent is edited
+  }, [tauriAvailable, activeAgentId, refreshKey, activeAgentPersonality]); // Include personality to reload when rules change
 
   const loadAgentContext = async () => {
     if (!tauriAvailable) {
@@ -155,119 +152,41 @@ export default function AgentContextPanel({
         setContextFiles([]);
       }
 
-      // Load recommended skills and droids from personality
-      if (activeAgentPersonality) {
-        // Extract skills
-        if (activeAgentPersonality.skills && activeAgentPersonality.skills.length > 0) {
-          try {
-            const skillsInfo: SkillInfo[] = await Promise.all(
-              activeAgentPersonality.skills.map(async (skillPath) => {
-                // Extract skill name from path (e.g., "/path/to/.claude/skills/skill-name/SKILL.md" -> "skill-name")
-                const pathParts = skillPath.split('/');
-                const skillsIndex = pathParts.findIndex(p => p === 'skills' || p === '.skills');
-                const skillName = skillsIndex >= 0 && skillsIndex < pathParts.length - 1
-                  ? pathParts[skillsIndex + 1]
-                  : pathParts[pathParts.length - 2] || 'unknown';
-                const isGlobal = skillPath.includes('/.claude/skills/');
+      // Load agent rules from selectedRules in personality
+      console.log('[AgentContextPanel] Loading rules, selectedRules:', activeAgentPersonality?.selectedRules);
+      if (activeAgentPersonality?.selectedRules && activeAgentPersonality.selectedRules.length > 0) {
+        try {
+          // Load all available rules
+          const rulesResponse = await invoke<{ project: Rule[]; global: Rule[] }>('list_rules', {
+            basePath: activeAgentCwd,
+          });
+          const allRules = [...rulesResponse.project, ...rulesResponse.global];
+          console.log('[AgentContextPanel] All available rules:', allRules.map(r => r.filePath));
 
-                try {
-                  // Load skill details from backend
-                  const skillsList = await invoke<SkillInfo[]>("list_skills", {
-                    workingDir: activeAgentCwd,
-                  });
-                  const skill = skillsList.find(s => s.name === skillName);
-                  return skill || {
-                    name: skillName,
-                    description: '',
-                    file_path: skillPath,
-                    scope: isGlobal ? 'global' : 'project'
-                  };
-                } catch {
-                  return {
-                    name: skillName,
-                    description: '',
-                    file_path: skillPath,
-                    scope: isGlobal ? 'global' : 'project'
-                  };
-                }
-              })
+          // Match selected rules by path
+          const matchedRules: Rule[] = [];
+          for (const rulePath of activeAgentPersonality.selectedRules) {
+            const matchedRule = allRules.find(r =>
+              r.filePath === rulePath ||
+              r.filePath.endsWith(rulePath) ||
+              rulePath.endsWith(r.filePath)
             );
-            setRecommendedSkills(skillsInfo.filter(s => s !== null));
-          } catch (error) {
-            console.error('Failed to load recommended skills:', error);
-            setRecommendedSkills([]);
-          }
-        } else {
-          setRecommendedSkills([]);
-        }
-
-        // Extract droids from customNotes
-        const droidPaths: string[] = [];
-        if (activeAgentPersonality.customNotes) {
-          const lines = activeAgentPersonality.customNotes.split('\n');
-          let inDroidsSection = false;
-          for (const line of lines) {
-            if (line.includes('Selected Protocol Droids:')) {
-              inDroidsSection = true;
-              continue;
-            }
-            if (inDroidsSection) {
-              const trimmed = line.trim();
-              if (trimmed.startsWith('- ')) {
-                const path = trimmed.substring(2).trim();
-                if (path) droidPaths.push(path);
-              } else if (trimmed.length > 0) {
-                break;
-              }
+            if (matchedRule) {
+              matchedRules.push(matchedRule);
+              console.log('[AgentContextPanel] Matched rule:', rulePath, '->', matchedRule.name);
+            } else {
+              console.log('[AgentContextPanel] No match for rule:', rulePath);
             }
           }
-        }
-
-        if (droidPaths.length > 0) {
-          try {
-            const droidsInfo: AgentInfo[] = await Promise.all(
-              droidPaths.map(async (droidPath) => {
-                // Extract droid name from path (e.g., "/path/to/.claude/agents/droid-name.md" -> "droid-name")
-                const droidName = droidPath.split('/').pop()?.replace('.md', '') || 'unknown';
-                const isGlobal = droidPath.includes('/.claude/agents/');
-
-                try {
-                  // Load droid details from backend
-                  const agentsList = await invoke<AgentInfo[]>("list_agents", {
-                    workingDir: activeAgentCwd,
-                  });
-                  const agent = agentsList.find(a => a.name === droidName);
-                  return agent || {
-                    name: droidName,
-                    description: '',
-                    model: 'claude-sonnet-4-5-20250929',
-                    color: '#4ecdc4',
-                    file_path: droidPath,
-                    scope: isGlobal ? 'global' : 'project'
-                  };
-                } catch {
-                  return {
-                    name: droidName,
-                    description: '',
-                    model: 'claude-sonnet-4-5-20250929',
-                    color: '#4ecdc4',
-                    file_path: droidPath,
-                    scope: isGlobal ? 'global' : 'project'
-                  };
-                }
-              })
-            );
-            setRecommendedDroids(droidsInfo.filter(d => d !== null));
-          } catch (error) {
-            console.error('Failed to load recommended droids:', error);
-            setRecommendedDroids([]);
-          }
-        } else {
-          setRecommendedDroids([]);
+          console.log('[AgentContextPanel] Final matched rules:', matchedRules.length);
+          setAgentRules(matchedRules);
+        } catch (error) {
+          console.error('Failed to load agent rules:', error);
+          setAgentRules([]);
         }
       } else {
-        setRecommendedSkills([]);
-        setRecommendedDroids([]);
+        console.log('[AgentContextPanel] No selectedRules in personality');
+        setAgentRules([]);
       }
     } finally {
       setLoading(false);
@@ -541,112 +460,136 @@ export default function AgentContextPanel({
         )}
       </div>
 
-      {/* Recommended Tools Section */}
-      {(recommendedSkills.length > 0 || recommendedDroids.length > 0) && (
-        <div className="context-section">
-          <div
-            className="context-section-header"
-            onClick={() => setRecommendedToolsCollapsed(!recommendedToolsCollapsed)}
-          >
-            <div className="context-section-title">
-              <svg
-                className="context-section-arrow"
-                style={{
-                  transform: recommendedToolsCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-                }}
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-              >
-                <path
-                  d="M3 4.5L6 7.5L9 4.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                style={{ opacity: 0.6 }}
-              >
-                <path
-                  d="M12 15l-2-2m0 0l-2-2m2 2V7m0 6l2-2M3 12a9 9 0 1118 0 9 9 0 01-18 0z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span>Recommended Tools</span>
-              <span className="context-count-badge">{recommendedSkills.length + recommendedDroids.length}</span>
-            </div>
+      {/* Agent Rules Section */}
+      <div className="context-section">
+        <div
+          className="context-section-header"
+          onClick={() => setAgentRulesCollapsed(!agentRulesCollapsed)}
+        >
+          <div className="context-section-title">
+            <svg
+              className="context-section-arrow"
+              style={{
+                transform: agentRulesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+              }}
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+            >
+              <path
+                d="M3 4.5L6 7.5L9 4.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              style={{ opacity: 0.6 }}
+            >
+              <path
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Agent Rules</span>
+            {agentRules.length > 0 && (
+              <span className="context-count-badge">{agentRules.length}</span>
+            )}
           </div>
+        </div>
 
-          {!recommendedToolsCollapsed && (
-            <div className="context-list">
-              {/* Recommended Skills */}
-              {recommendedSkills.map((skill) => (
+        {!agentRulesCollapsed && (
+          <div className="context-list">
+            {agentRules.length > 0 ? (
+              agentRules.map((rule) => (
                 <div
-                  key={`skill-${skill.name}`}
+                  key={rule.filePath}
                   className="context-item"
-                  onClick={() => onSelectSkill?.(skill)}
+                  onClick={() => {
+                    if (onOpenFile) {
+                      const entry: DirectoryEntry = {
+                        name: rule.name + '.md',
+                        path: rule.filePath,
+                        is_dir: false,
+                        is_symlink: false,
+                      };
+                      onOpenFile(entry);
+                    }
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="context-item-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f8b739" strokeWidth="2">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
                     </svg>
                   </div>
                   <div className="context-item-content">
-                    <div className="context-item-name">{skill.name.replace(/-/g, ' ')}</div>
-                    {skill.description && (
+                    <div className="context-item-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{rule.name.replace(/-/g, ' ')}</span>
+                      {rule.frontmatter?.alwaysApply && (
+                        <span
+                          style={{
+                            fontSize: '0.6rem',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            color: '#22c55e',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Always
+                        </span>
+                      )}
+                    </div>
+                    {rule.frontmatter?.description && (
                       <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-                        {skill.description}
+                        {rule.frontmatter.description}
                       </div>
                     )}
-                    <div className="text-xs" style={{ color: '#f8b739', marginTop: '2px' }}>
-                      Skill • {skill.scope}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Recommended Droids */}
-              {recommendedDroids.map((droid) => (
-                <div
-                  key={`droid-${droid.name}`}
-                  className="context-item"
-                  onClick={() => onSelectAgent?.(droid)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="context-item-icon">
-                    {/* Robot head icon */}
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#4ecdc4" strokeWidth="1.5">
-                      <rect x="4" y="6" width="12" height="12" rx="2" />
-                      <circle cx="8" cy="10" r="1.3" fill="#4ecdc4"/>
-                      <circle cx="12" cy="10" r="1.3" fill="#4ecdc4"/>
-                      <line x1="7" y1="13" x2="13" y2="13"/>
-                      <line x1="10" y1="2" x2="10" y2="6"/>
-                      <circle cx="10" cy="2" r="1"/>
-                    </svg>
-                  </div>
-                  <div className="context-item-content">
-                    <div className="context-item-name">{droid.name.replace(/-/g, ' ')}</div>
                     <div className="text-xs" style={{ color: '#4ecdc4', marginTop: '2px' }}>
-                      Droid • {droid.scope}
+                      {rule.scope === 'project' ? 'Project' : 'Global'}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              ))
+            ) : (
+              <div className="context-empty-rules">
+                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', marginBottom: '8px' }}>
+                  No rules assigned
+                </p>
+                {onOpenRulesTab && (
+                  <button
+                    className="add-rules-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenRulesTab();
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Add Rules
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Context Files Section - Project */}
       {projectFiles.length > 0 && (

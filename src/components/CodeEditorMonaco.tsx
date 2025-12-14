@@ -1,16 +1,48 @@
 import { useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Editor, { type OnMount, loader } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
-import { useMonacoTheme, QUACK_THEME_NAME } from '../hooks/useMonacoTheme';
+import * as monaco from 'monaco-editor';
+import { QUACK_THEME_NAME, defineQuackTheme } from '../hooks/useMonacoTheme';
 import { useMonacoDiff, type LineChange, type DiffInfo } from '../hooks/useMonacoDiff';
 import './CodeEditorMonaco.css';
 
-// Configure Monaco to load from CDN (works in both dev and Tauri production)
-// This avoids issues with local workers in Tauri's tauri:// protocol
-loader.config({
-  paths: {
-    vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.55.0/min/vs'
-  }
+// Import Monaco setup - this configures workers using Vite's native bundling
+// CRITICAL: This import MUST happen before any Editor component renders
+// It sets up self.MonacoEnvironment.getWorker for syntax highlighting to work
+import '../lib/monacoSetup';
+
+// Configure @monaco-editor/react to use local Monaco instance from node_modules
+// instead of loading from CDN. This ensures:
+// 1. Workers are bundled by Vite and served from same origin
+// 2. No CORS issues in Tauri production builds
+// 3. Syntax highlighting works correctly
+// See: https://github.com/suren-atoyan/monaco-react#use-monaco-editor-as-an-npm-package
+loader.config({ monaco });
+
+// Pre-initialize Monaco and define theme BEFORE any editor renders
+// This prevents the "black editor" issue in production builds
+let monacoInitialized = false;
+let monacoInitPromise: Promise<typeof import('monaco-editor')> | null = null;
+
+async function initializeMonaco(): Promise<typeof import('monaco-editor')> {
+  if (monacoInitPromise) return monacoInitPromise;
+
+  monacoInitPromise = loader.init().then((monaco) => {
+    if (!monacoInitialized) {
+      defineQuackTheme(monaco);
+      monaco.editor.setTheme(QUACK_THEME_NAME);
+      monacoInitialized = true;
+      console.log('[Monaco] Theme initialized successfully');
+    }
+    return monaco;
+  });
+
+  return monacoInitPromise;
+}
+
+// Start initialization immediately when module loads
+initializeMonaco().catch(err => {
+  console.error('[Monaco] Failed to initialize:', err);
 });
 
 export interface SearchOptions {
@@ -105,18 +137,19 @@ const CodeEditorMonaco = forwardRef<CodeEditorRef, CodeEditorMonacoProps>(({
   const currentMatchIndexRef = useRef(0);
   const lineChangesRef = useRef<LineChange[]>([]);
 
-  const { defineTheme } = useMonacoTheme();
   const { applyDecorations, clearDecorations, navigateToChange, diffInfoToLineChanges } = useMonacoDiff();
 
   const detectedLanguage = language || getLanguageFromFilename(filename);
 
   // Handle editor mount
+  // Note: Theme is pre-initialized via initializeMonaco() at module load
+  // This ensures syntax highlighting works in production builds
   const handleEditorDidMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Define and apply custom theme
-    defineTheme(monaco);
+    // Ensure theme is applied (might be needed if editor loads before init completes)
+    defineQuackTheme(monaco);
     monaco.editor.setTheme(QUACK_THEME_NAME);
 
     // Add save keybinding
@@ -132,7 +165,7 @@ const CodeEditorMonaco = forwardRef<CodeEditorRef, CodeEditorMonacoProps>(({
       lineChangesRef.current = changes;
       applyDecorations(editor, changes);
     }
-  }, [defineTheme, onSave, lineChanges, diffInfo, applyDecorations, diffInfoToLineChanges]);
+  }, [onSave, lineChanges, diffInfo, applyDecorations, diffInfoToLineChanges]);
 
   // Handle content changes
   const handleChange = useCallback((value: string | undefined) => {

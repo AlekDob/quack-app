@@ -10,13 +10,13 @@ license: Complete terms in LICENSE.txt
 
 Quack follows a **minimal modern design philosophy** focused on professionalism and clarity:
 - **Orange accent color** (#f28c52) as the brand signature
-- **Clean SVG icons only** - no emoji
+- **SVG icons preferred**, with selective emoji for specific UI contexts
 - **Smooth animations** with cubic-bezier easing
 - **Consistent drawer patterns** with backdrop blur
 - **General Sans** typography for modern feel
 - **Dark theme** optimized for long coding sessions
 
-**Keywords**: design system, UI components, drawers, panels, orange accent, Quack branding, minimal SVG icons, professional
+**Keywords**: design system, UI components, drawers, panels, orange accent, Quack branding, icons, professional
 
 ---
 
@@ -26,24 +26,29 @@ Quack follows a **minimal modern design philosophy** focused on professionalism 
 
 Quack is a professional development tool that prioritizes clarity and function over decoration.
 
-❌ **NEVER USE EMOJI**
-- No emoji in UI components
-- No emoji in empty states
-- No emoji for status indicators
-- No emoji anywhere in the application interface
+**ICON USAGE POLICY**
 
-✅ **ALWAYS USE SVG ICONS**
-- All visual indicators must be SVG
-- Clean, minimal icon style
-- Consistent stroke width (typically 1.5-2px)
-- Use `currentColor` for theme adaptation
-- Icons should be simple and recognizable
+SVG icons are the **primary choice** for most UI elements, but emoji are acceptable in specific contexts:
 
-**Philosophy**: Clean SVG icons provide professionalism, precision, and scalability. Emoji creates visual noise and inconsistency.
+**Use SVG Icons For:**
+- Navigation elements (arrows, chevrons, menu)
+- Action buttons (edit, delete, copy, close)
+- Status indicators in lists and tables
+- Empty states (large decorative icons)
+- Toolbar and header icons
+
+**Emoji Allowed For:**
+- Category badges and labels (e.g., `⭐ Featured`, `🤖 AI`, `📊 Analytics`)
+- Quick action hints and tips (e.g., `💡 Tip:`, `⚠️ Warning:`)
+- Status messages in modals (e.g., `✅ All Good`, `🔧 Recovery Mode`)
+- Feature tags in setup wizards
+- Tab icons for special views (e.g., `📖` for docs)
+
+**Philosophy**: SVG icons provide precision and scalability for core UI elements. Emoji add warmth and quick recognition for labels, categories, and status messages where visual personality enhances UX.
 
 ### 2. **SVG Icon Style Guide**
 
-All icons must follow this minimal, consistent style:
+For SVG icons, follow this minimal, consistent style:
 
 **Size Standards**:
 - Small icons: 16x16px (toolbar buttons, inline indicators)
@@ -116,6 +121,12 @@ All icons must follow this minimal, consistent style:
 --background-primary: #0f1115;                    /* Main app background */
 --background-surface: rgba(18, 20, 27, 0.97);    /* Drawer/panel background */
 --background-elevated: rgba(20, 22, 28, 0.98);   /* Modal/dropdown background */
+--splash-background: #191B44;                     /* Splash screen / loading */
+
+/* Solid surface colors (for opaque backgrounds) */
+--surface-solid: #1a1a1a;                        /* Solid dark surface */
+--surface-dropdown: #252525;                      /* Dropdown menus */
+--surface-deep: #0d0d0d;                         /* Deep black (code blocks) */
 
 /* Text colors */
 --text-primary: #e7ebf3;                         /* Main text */
@@ -143,18 +154,30 @@ Terminal accent colors used throughout the app:
 ### Semantic Colors
 
 ```css
-/* Success (using teal from terminal palette) */
-#4dd4b3  /* Primary success */
-#10b981  /* Alternative green (used in git) */
+/* Success - Multiple greens used contextually */
+#4dd4b3  /* Teal success (terminal palette, buttons) */
+#22c55e  /* Tailwind green-500 (tabs, progress, badges) */
+#10b981  /* Emerald (git indicators) */
+#16a34a  /* Darker green (progress bar gradients) */
 
 /* Info/Links */
 #7cc4ff  /* Primary link blue */
 #a0d7ff  /* Link hover */
 #3b82f6  /* Info blue (used in badges) */
 
-/* Warning/Error */
+/* Warning */
+#f59e0b  /* Amber (warnings, retry actions) */
+#fbbf24  /* Lighter amber */
+
+/* Error */
 #ef4444  /* Error red */
 #dc2626  /* Darker error */
+#fca5a5  /* Light red (error text on dark bg) */
+
+/* Agent/Special */
+#a78bfa  /* Purple (agent badges) */
+#818cf8  /* Indigo (pause actions) */
+#8b5cf6  /* Violet (agent indicators) */
 ```
 
 ### Background Gradients
@@ -383,6 +406,53 @@ function ComponentDrawer({ open, onClose }: ComponentDrawerProps) {
 ```
 
 **Key Principle**: Drawers are controlled via CSS classes, not React conditional rendering. This enables smooth open/close animations.
+
+### Alternative Drawer Pattern (Keyframe Animation)
+
+Some drawers use a simpler keyframe-based animation pattern. This is acceptable for drawers that don't require complex visibility transitions:
+
+```css
+/* Overlay with fade-in */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Drawer with slide-in animation */
+.drawer-panel {
+  width: min(900px, 90vw);
+  height: 100vh;
+  background: #1a1a1a;  /* Solid background alternative */
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.25s ease;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+```
+
+**When to use each pattern:**
+- **CSS Visibility Pattern** (TelegramSetup): For drawers that need to stay in DOM, complex state management, or precise animation control
+- **Keyframe Pattern** (TaskDetailsDrawer): For simpler overlays, modals that mount/unmount, or quick implementations
+
+**Reference implementations:**
+- CSS Visibility: `TelegramSetup.tsx`, `SavedCommandsDrawer.tsx`, `PreviewDrawer.tsx`
+- Keyframe Animation: `TaskDetailsDrawer.tsx`, `SessionDetailsDrawer.tsx`
 
 ---
 
@@ -688,25 +758,26 @@ border-color: rgba(244, 175, 142, 0.4);
 
 ## Best Practices
 
-### DO ✅
+### DO
 
-- **Use SVG icons only**: All visual indicators must be clean, minimal SVG
+- **Use SVG icons for core UI**: Navigation, actions, toolbars, empty states
+- **Use emoji for labels/badges**: Categories, tips, status messages, feature tags
 - **Apply orange accent consistently**: Primary actions, brand moments, hover states
 - **Use General Sans typography**: Modern, professional, excellent readability
-- **Always render drawer containers**: Control visibility with CSS classes, not React conditionals
-- **Apply backdrop-filter: blur(8px)**: Creates premium glassmorphism effect
+- **Choose appropriate drawer pattern**: CSS visibility for complex, keyframes for simple
+- **Apply backdrop-filter: blur()**: 8px for drawers, 4px for lighter overlays
 - **Use cubic-bezier for panels**: Smooth, professional animation timing
 - **Maintain consistent spacing**: 8px grid system for predictable layouts
-- **Use semantic color names**: Success (teal), warning (red), info (blue)
-- **Keep icons minimal**: Simple shapes, consistent stroke width (1.5-2px)
+- **Use semantic color names**: Success (green/teal), warning (amber), error (red), info (blue)
+- **Keep SVG icons minimal**: Simple shapes, consistent stroke width (1.5-2px)
 
-### DON'T ❌
+### DON'T
 
-- **Never use emoji**: No emoji anywhere in the UI - this is critical
+- **Don't use emoji for core UI elements**: Buttons, navigation, action icons
 - **Don't use inconsistent orange tones**: Stick to #f28c52 family
 - **Don't apply heavy animations**: Keep transitions smooth and subtle
 - **Don't forget hover states**: Every interactive element needs feedback
-- **Don't use solid backgrounds**: Prefer subtle transparency (0.97, 0.98)
+- **Don't mix drawer patterns randomly**: Be consistent within feature areas
 - **Don't use complex icons**: Keep SVG icons simple and recognizable
 - **Don't use harsh borders**: Keep opacity low (0.08, 0.12, 0.32)
 - **Don't forget disabled states**: Reduce opacity to 0.5 for disabled elements
@@ -774,20 +845,30 @@ button:focus-visible {
 
 When creating new UI components:
 
-1. ✅ Use orange (#f28c52) for primary actions and brand moments
-2. ✅ Follow drawer pattern for panels (always render, CSS-controlled visibility)
-3. ✅ Apply General Sans typography with appropriate weights
-4. ✅ **Use SVG icons only - NEVER emoji**
-5. ✅ Implement smooth animations (0.3s cubic-bezier for panels, 0.2s ease for interactions)
-6. ✅ Add backdrop-filter: blur(8px) for overlays
-7. ✅ Include hover states with subtle transform and shadow
-8. ✅ Apply consistent border radius (6-12px range)
-9. ✅ Use semantic spacing (8px grid system)
-10. ✅ Keep icons minimal (stroke-based, 1.5-2px width)
-11. ✅ Test keyboard navigation and screen reader support
+1. Use orange (#f28c52) for primary actions and brand moments
+2. Choose appropriate drawer pattern (CSS visibility OR keyframe animation)
+3. Apply General Sans typography with appropriate weights
+4. Use SVG icons for core UI, emoji for labels/badges/tips
+5. Implement smooth animations (0.3s cubic-bezier for panels, 0.2s ease for interactions)
+6. Add backdrop-filter: blur() for overlays (8px standard, 4px light)
+7. Include hover states with subtle transform and shadow
+8. Apply consistent border radius (6-12px range)
+9. Use semantic spacing (8px grid system)
+10. Keep SVG icons minimal (stroke-based, 1.5-2px width)
+11. Test keyboard navigation and screen reader support
+12. Use appropriate success color (#22c55e for Tailwind contexts, #4dd4b3 for teal accents)
 
 ---
 
-*Quack Design System v2.0 - Documented from Real Implementation*
-*Last Update: January 2025*
+*Quack Design System v2.1 - Updated from Real Implementation*
+*Last Update: December 2025*
 *Based on Quack App codebase analysis*
+
+## Changelog
+
+### v2.1 (December 2025)
+- **Icon Policy**: Updated to allow emoji in specific contexts (labels, badges, tips, status messages)
+- **Colors**: Added solid surface colors (#1a1a1a, #252525), splash background (#191B44), expanded semantic colors
+- **Drawer Patterns**: Documented alternative keyframe animation pattern alongside CSS visibility pattern
+- **Success Colors**: Documented multiple green variants (#22c55e Tailwind, #4dd4b3 teal, #10b981 emerald)
+- **Best Practices**: Updated to reflect actual codebase patterns
