@@ -209,6 +209,15 @@ pub fn close_terminal(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn terminal_exists(id: String) -> bool {
+  let registry = match REGISTRY.lock() {
+    Ok(r) => r,
+    Err(_) => return false,
+  };
+  registry.sessions.contains_key(&id)
+}
+
+#[tauri::command]
 pub fn set_terminal_color(id: String, color: String) -> Result<TerminalInfo, String> {
   set_terminal_color_impl(&id, color).map_err(|err| err.to_string())
 }

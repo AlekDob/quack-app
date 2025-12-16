@@ -21,6 +21,7 @@ export function StepRules({
   onBack,
   onConfirm,
   creating,
+  isEditing = false,
 }: StepRulesProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -312,7 +313,9 @@ export function StepRules({
           onClick={onConfirm}
           disabled={creating}
         >
-          {creating ? 'Creating...' : 'Create Agent'}
+          {creating
+            ? (isEditing ? 'Saving...' : 'Creating...')
+            : (isEditing ? 'Save Agent' : 'Create Agent')}
         </button>
       </div>
 

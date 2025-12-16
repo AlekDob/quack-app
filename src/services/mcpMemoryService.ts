@@ -5,10 +5,13 @@
  * knowledge graph entities. This provides semantic memory capabilities
  * powered by the official @modelcontextprotocol/server-memory.
  *
+ * Now with direct write support via Tauri commands - no AI required!
+ *
  * @module services/mcpMemoryService
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 
 /**
  * Raw entity from memory.jsonl file
@@ -391,3 +394,138 @@ export class MCPMemoryService {
 
 // Export singleton instance
 export const mcpMemoryService = MCPMemoryService.getInstance();
+
+// ============================================
+// Direct Write Operations (via Tauri)
+// ============================================
+
+/**
+ * Input for creating a new MCP memory entity
+ */
+export interface CreateMCPEntityInput {
+  name: string;
+  entityType: string;
+  observations: string[];
+}
+
+/**
+ * Create a new entity in MCP memory
+ * Writes directly to memory.jsonl via Tauri command
+ *
+ * @param input - Entity data to create
+ * @returns The created entity
+ */
+export async function createMCPEntity(
+  input: CreateMCPEntityInput
+): Promise<MCPEntity | null> {
+  try {
+    const entity = await invoke<MCPEntity>("write_mcp_memory_entity", {
+      entity: input,
+    });
+
+    console.log("[MCPMemoryService] Entity created:", entity.name);
+
+    // Refresh cache after write
+    await mcpMemoryService.refreshFromFile();
+
+    return entity;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to create entity:", error);
+    toast.error("Failed to create memory");
+    return null;
+  }
+}
+
+/**
+ * Delete an entity from MCP memory by name
+ *
+ * @param name - Entity name to delete
+ * @returns true if deleted, false if not found
+ */
+export async function deleteMCPEntity(name: string): Promise<boolean> {
+  try {
+    const deleted = await invoke<boolean>("delete_mcp_memory_entity", { name });
+
+    if (deleted) {
+      console.log("[MCPMemoryService] Entity deleted:", name);
+      // Refresh cache after delete
+      await mcpMemoryService.refreshFromFile();
+    } else {
+      console.warn("[MCPMemoryService] Entity not found:", name);
+    }
+
+    return deleted;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to delete entity:", error);
+    toast.error("Failed to delete memory");
+    return false;
+  }
+}
+
+/**
+ * Add observations to an existing MCP entity
+ *
+ * @param name - Entity name
+ * @param observations - New observations to add
+ * @returns true if updated, false if entity not found
+ */
+export async function addMCPObservations(
+  name: string,
+  observations: string[]
+): Promise<boolean> {
+  try {
+    const updated = await invoke<boolean>("add_mcp_memory_observations", {
+      name,
+      observations,
+    });
+
+    if (updated) {
+      console.log("[MCPMemoryService] Observations added to:", name);
+      // Refresh cache after update
+      await mcpMemoryService.refreshFromFile();
+    } else {
+      console.warn("[MCPMemoryService] Entity not found:", name);
+    }
+
+    return updated;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to add observations:", error);
+    toast.error("Failed to update memory");
+    return false;
+  }
+}
+
+/**
+ * Helper: Generate a unique entity name from content
+ * Converts content to a valid entity name format
+ */
+export function generateEntityName(content: string): string {
+  // Take first 50 chars, convert to lowercase, replace spaces with underscores
+  const base = content
+    .slice(0, 50)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+
+  // Add timestamp for uniqueness
+  const timestamp = Date.now().toString(36);
+
+  return `${base}_${timestamp}`;
+}
+
+/**
+ * Helper: Map category to MCP entity type
+ */
+export function categoryToEntityType(category: string): string {
+  const typeMap: Record<string, string> = {
+    preference: "preference",
+    fact: "fact",
+    decision: "decision",
+    pattern: "pattern",
+    mistake: "mistake",
+    context: "context",
+  };
+
+  return typeMap[category.toLowerCase()] || "fact";
+}

@@ -1031,3 +1031,180 @@ fn read_mcp_memory_file_impl() -> Result<MCPKnowledgeGraph> {
 
     Ok(MCPKnowledgeGraph { entities, relations })
 }
+
+/// Input for creating a new MCP memory entity
+#[derive(Deserialize, Debug)]
+pub struct CreateMCPEntityInput {
+    pub name: String,
+    #[serde(rename = "entityType")]
+    pub entity_type: String,
+    pub observations: Vec<String>,
+}
+
+/// Write a new entity to MCP memory.jsonl file
+#[tauri::command]
+pub fn write_mcp_memory_entity(entity: CreateMCPEntityInput) -> Result<MCPMemoryEntity, String> {
+    write_mcp_memory_entity_impl(entity).map_err(|err| err.to_string())
+}
+
+fn write_mcp_memory_entity_impl(input: CreateMCPEntityInput) -> Result<MCPMemoryEntity> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found in NPX cache. Make sure the MCP memory server has been used at least once."))?;
+
+    let file_path = PathBuf::from(&memory_path);
+
+    // Create the entity struct
+    let entity = MCPMemoryEntity {
+        entity_type_marker: "entity".to_string(),
+        name: input.name,
+        entity_type: input.entity_type,
+        observations: input.observations,
+    };
+
+    // Serialize to JSON
+    let json_line = serde_json::to_string(&entity)
+        .with_context(|| "Failed to serialize entity to JSON")?;
+
+    // Check if file exists and doesn't end with newline
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    // First, ensure file ends with newline if it exists and has content
+    if file_path.exists() {
+        let mut check_file = fs::File::open(&file_path)
+            .with_context(|| format!("Cannot open MCP memory file: {:?}", file_path))?;
+
+        let file_len = check_file.metadata()?.len();
+        if file_len > 0 {
+            check_file.seek(SeekFrom::End(-1))?;
+            let mut last_byte = [0u8; 1];
+            check_file.read_exact(&mut last_byte)?;
+
+            // If file doesn't end with newline, add one before our content
+            if last_byte[0] != b'\n' {
+                let mut append_file = fs::OpenOptions::new()
+                    .append(true)
+                    .open(&file_path)?;
+                writeln!(append_file)?; // Add missing newline
+            }
+        }
+    }
+
+    // Append entity to file with newline
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+        .with_context(|| format!("Cannot open MCP memory file for writing: {:?}", file_path))?;
+
+    writeln!(file, "{}", json_line)
+        .with_context(|| format!("Cannot write to MCP memory file: {:?}", file_path))?;
+
+    Ok(entity)
+}
+
+/// Delete an entity from MCP memory.jsonl file by name
+#[tauri::command]
+pub fn delete_mcp_memory_entity(name: String) -> Result<bool, String> {
+    delete_mcp_memory_entity_impl(name).map_err(|err| err.to_string())
+}
+
+fn delete_mcp_memory_entity_impl(name: String) -> Result<bool> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found in NPX cache"))?;
+
+    let file_path = PathBuf::from(&memory_path);
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Cannot read MCP memory file: {:?}", file_path))?;
+
+    let mut new_lines: Vec<String> = Vec::new();
+    let mut deleted = false;
+
+    // Filter out the entity and its relations
+    for line in content.lines() {
+        let line_trimmed = line.trim();
+        if line_trimmed.is_empty() {
+            continue;
+        }
+
+        // Check if this is the entity to delete
+        if let Ok(entity) = serde_json::from_str::<MCPMemoryEntity>(line_trimmed) {
+            if entity.entity_type_marker == "entity" && entity.name == name {
+                deleted = true;
+                continue; // Skip this entity
+            }
+        }
+
+        // Check if this is a relation involving the entity
+        if let Ok(relation) = serde_json::from_str::<MCPMemoryRelation>(line_trimmed) {
+            if relation.relation_type_marker == "relation" {
+                if relation.from == name || relation.to == name {
+                    continue; // Skip relations involving deleted entity
+                }
+            }
+        }
+
+        new_lines.push(line_trimmed.to_string());
+    }
+
+    // Write back the filtered content
+    let new_content = new_lines.join("\n");
+    fs::write(&file_path, if new_content.is_empty() { "".to_string() } else { new_content + "\n" })
+        .with_context(|| format!("Cannot write MCP memory file: {:?}", file_path))?;
+
+    Ok(deleted)
+}
+
+/// Add observations to an existing MCP entity
+#[tauri::command]
+pub fn add_mcp_memory_observations(name: String, observations: Vec<String>) -> Result<bool, String> {
+    add_mcp_memory_observations_impl(name, observations).map_err(|err| err.to_string())
+}
+
+fn add_mcp_memory_observations_impl(name: String, new_observations: Vec<String>) -> Result<bool> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found in NPX cache"))?;
+
+    let file_path = PathBuf::from(&memory_path);
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Cannot read MCP memory file: {:?}", file_path))?;
+
+    let mut new_lines: Vec<String> = Vec::new();
+    let mut found = false;
+
+    // Update the entity's observations
+    for line in content.lines() {
+        let line_trimmed = line.trim();
+        if line_trimmed.is_empty() {
+            continue;
+        }
+
+        // Check if this is the entity to update
+        if let Ok(mut entity) = serde_json::from_str::<MCPMemoryEntity>(line_trimmed) {
+            if entity.entity_type_marker == "entity" && entity.name == name {
+                // Add new observations (avoid duplicates)
+                for obs in &new_observations {
+                    if !entity.observations.contains(obs) {
+                        entity.observations.push(obs.clone());
+                    }
+                }
+                let updated_line = serde_json::to_string(&entity)?;
+                new_lines.push(updated_line);
+                found = true;
+                continue;
+            }
+        }
+
+        new_lines.push(line_trimmed.to_string());
+    }
+
+    if !found {
+        return Ok(false);
+    }
+
+    // Write back the updated content
+    let new_content = new_lines.join("\n") + "\n";
+    fs::write(&file_path, new_content)
+        .with_context(|| format!("Cannot write MCP memory file: {:?}", file_path))?;
+
+    Ok(true)
+}

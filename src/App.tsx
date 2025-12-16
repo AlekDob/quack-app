@@ -5024,16 +5024,30 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalError(null);
 
     try {
-      // CRITICAL FIX: Verify terminal still exists in registry before updating
+      // CRITICAL FIX: Verify terminal exists in BOTH React state AND Rust backend registry
       // This prevents "Terminale non trovato" error when:
       // 1. Terminal was closed but React state wasn't updated
       // 2. User is editing a SavedAgent (not an active terminal)
-      const terminalStillExists = editingTerminal &&
+      // 3. Backend crashed/restarted but frontend still has stale state
+      const terminalInReactState = editingTerminal &&
         terminals.some(t => t.id === editingTerminal.id);
+
+      // Check if terminal exists in Rust backend registry
+      let terminalInBackend = false;
+      if (editingTerminal && terminalInReactState) {
+        try {
+          terminalInBackend = await invoke<boolean>("terminal_exists", { id: editingTerminal.id });
+        } catch (err) {
+          console.warn(`[handleConfirmNewTerminal] Failed to check terminal existence in backend:`, err);
+          terminalInBackend = false;
+        }
+      }
+
+      const terminalStillExists = terminalInReactState && terminalInBackend;
 
       // Log for debugging
       if (editingTerminal && !terminalStillExists) {
-        console.warn(`[handleConfirmNewTerminal] Terminal ${editingTerminal.id} not found in registry. Creating new terminal instead.`);
+        console.warn(`[handleConfirmNewTerminal] Terminal ${editingTerminal.id} not found. React state: ${terminalInReactState}, Backend: ${terminalInBackend}. Creating new terminal instead.`);
       }
 
       if (editingTerminal && terminalStillExists) {

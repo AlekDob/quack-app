@@ -74,6 +74,7 @@ export interface StepRulesProps {
   onBack: () => void;
   onConfirm: () => void;
   creating: boolean;
+  isEditing?: boolean; // True when editing existing agent
 }
 
 // Progress indicator props

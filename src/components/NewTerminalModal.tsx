@@ -127,9 +127,17 @@ function NewTerminalModal({
   // Track if we've initialized for this modal session
   const hasInitializedRef = useRef(false);
 
-  // Reset state when modal opens - ONLY trigger on open/close, not on prop changes
+  // Track last isEditing value to detect changes
+  const lastIsEditingRef = useRef(isEditing);
+
+  // Reset state when modal opens - trigger on open/close AND isEditing changes
   useEffect(() => {
-    if (open && !hasInitializedRef.current) {
+    // Detect if isEditing changed while modal was already open
+    const isEditingChanged = lastIsEditingRef.current !== isEditing;
+    lastIsEditingRef.current = isEditing;
+
+    // Initialize when modal opens OR when isEditing changes while open
+    if (open && (!hasInitializedRef.current || isEditingChanged)) {
       hasInitializedRef.current = true;
 
       // If isEditing prop is true (editing from external source like sidebar),
@@ -169,7 +177,7 @@ function NewTerminalModal({
     if (!open) {
       hasInitializedRef.current = false;
     }
-  }, [open]); // Only depend on 'open' - read other values at execution time
+  }, [open, isEditing]); // Depend on 'open' and 'isEditing' to ensure correct initialization
 
   // Load data when modal opens
   useEffect(() => {
@@ -728,6 +736,7 @@ function NewTerminalModal({
             onBack={handleRulesBack}
             onConfirm={handleFinalConfirm}
             creating={creating}
+            isEditing={isEditingAgent}
           />
         )}
 

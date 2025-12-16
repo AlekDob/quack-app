@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
-import { Brain, RefreshCw, ZoomIn, ZoomOut, Maximize2, X, Plus, Cloud, Sparkles } from "lucide-react";
+import { Brain, RefreshCw, ZoomIn, ZoomOut, Maximize2, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUnifiedMemory } from "../hooks/useUnifiedMemory";
 import type { UnifiedMemoryItem } from "../services/mcpMemoryService";
-import type { MemoryCategory, MemorySource } from "../types/memory";
+import type { MemoryCategory } from "../types/memory";
 import type { Tab } from "../components/TabBar";
 import "./MemoryGraphTabView.css";
 
@@ -15,7 +15,6 @@ interface GraphNode {
   observations: string[];
   val: number;
   color: string;
-  source: MemorySource;
   x?: number;
   y?: number;
 }
@@ -37,67 +36,57 @@ interface MemoryGraphTabViewProps {
 }
 
 /**
- * Color palette for Quack memory categories
- * Matches the colors used in UnifiedMemoryItem.tsx side panel
+ * Color palette for memory entity types
+ * Using the rose/magenta color for consistency with MCP Memory branding
  */
-const QUACK_CATEGORY_COLORS: Record<string, string> = {
+const ENTITY_TYPE_COLORS: Record<string, string> = {
   preference: "#3b82f6", // blue
   fact: "#10b981", // green
   decision: "#8b5cf6", // purple
   pattern: "#f97316", // orange
   mistake: "#ef4444", // red
   context: "#6b7280", // gray
+  person: "#E84A7F", // rose (MCP Memory color)
+  project: "#E84A7F", // rose
+  technology: "#00d9ff", // cyan
+  tool: "#00d9ff", // cyan
 };
 
 /**
- * MCP entities always use cyan/azure color
+ * Default color for unknown entity types
  */
-const MCP_COLOR = "#00d9ff";
+const DEFAULT_COLOR = "#E84A7F"; // rose (MCP Memory color)
 
-function getEntityColor(entityType: string, source: MemorySource): string {
-  // MCP memories always use cyan
-  if (source === "mcp") {
-    return MCP_COLOR;
-  }
-  // Quack memories use category-specific colors from side panel
-  return QUACK_CATEGORY_COLORS[entityType] || "#f97316";
+function getEntityColor(entityType: string): string {
+  return ENTITY_TYPE_COLORS[entityType.toLowerCase()] || DEFAULT_COLOR;
 }
 
 /**
  * Convert unified memory items to graph data
  */
-function convertToGraphData(
-  items: UnifiedMemoryItem[],
-  sourceFilter: MemorySource | "all"
-): GraphData {
-  const filteredItems = sourceFilter === "all"
-    ? items
-    : items.filter(item => item.source === sourceFilter);
+function convertToGraphData(items: UnifiedMemoryItem[]): GraphData {
+  const nodes: GraphNode[] = items.map((item) => {
+    // Use content (the actual observation) as display name, not entityName (which has timestamp suffix)
+    const displayName = item.content || (item.entityName || item.id).replace(/_/g, " ").replace(/^mcp-/, "");
 
-  const nodes: GraphNode[] = filteredItems.map((item) => {
-    const name = item.source === "mcp"
-      ? (item.entityName || item.id).replace(/_/g, " ")
-      : item.content.slice(0, 40) + (item.content.length > 40 ? "..." : "");
-
-    const observations = item.source === "mcp" && item.relations
+    const observations = item.relations
       ? [item.content, ...item.relations.map(r => `${r.relationType} -> ${r.to}`)]
       : [item.content];
 
     return {
       id: item.id,
-      name,
-      entityType: item.source === "mcp" ? (item.entityType || item.category) : item.category,
+      name: displayName.length > 40 ? displayName.slice(0, 40) + "..." : displayName,
+      entityType: item.entityType || item.category,
       observations,
       val: Math.max(4, Math.min(12, observations.length * 2 + 4)),
-      color: getEntityColor(item.category, item.source),
-      source: item.source,
+      color: getEntityColor(item.entityType || item.category),
     };
   });
 
   // Build links from MCP relations
   const links: GraphLink[] = [];
-  filteredItems.forEach(item => {
-    if (item.source === "mcp" && item.relations) {
+  items.forEach(item => {
+    if (item.relations) {
       item.relations.forEach(relation => {
         // Only add link if both nodes exist
         if (nodes.find(n => n.id === `mcp-${relation.from}`) &&
@@ -124,35 +113,34 @@ const CATEGORY_OPTIONS: { value: MemoryCategory; label: string }[] = [
   { value: "context", label: "Context" },
 ];
 
-// Zoom threshold for showing labels (same as in nodeCanvasObject)
+// Zoom threshold for showing labels
 const LABEL_ZOOM_THRESHOLD = 0.8;
 
 function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
-  const graphRef = useRef<ForceGraphMethods>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graphRef = useRef<ForceGraphMethods<any, any>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [sourceFilter, setSourceFilter] = useState<MemorySource | "all">("all");
   const [showAddForm, setShowAddForm] = useState(false);
   const [newMemoryContent, setNewMemoryContent] = useState("");
   const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>("fact");
-  const [currentZoom, setCurrentZoom] = useState(1);
 
   const {
     unifiedItems,
     isLoading,
     stats,
     refresh,
-    createQuackMemory,
+    createMemory,
     deleteMemory,
   } = useUnifiedMemory();
 
   // Build graph data from unified items
   useEffect(() => {
-    const data = convertToGraphData(unifiedItems, sourceFilter);
+    const data = convertToGraphData(unifiedItems);
     setGraphData(data);
-  }, [unifiedItems, sourceFilter]);
+  }, [unifiedItems]);
 
   // Update dimensions on resize
   useEffect(() => {
@@ -193,7 +181,9 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNode(node);
-    graphRef.current?.centerAt(node.x, node.y, 300);
+    if (node.x !== undefined && node.y !== undefined) {
+      graphRef.current?.centerAt(node.x, node.y, 300);
+    }
   }, []);
 
   const handleZoomIn = useCallback(() => {
@@ -216,16 +206,15 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
       return;
     }
 
-    await createQuackMemory(newMemoryContent.trim(), newMemoryCategory);
+    await createMemory(newMemoryContent.trim(), newMemoryCategory);
     setNewMemoryContent("");
     setShowAddForm(false);
-    toast.success("Memory added!");
-  }, [newMemoryContent, newMemoryCategory, createQuackMemory]);
+  }, [newMemoryContent, newMemoryCategory, createMemory]);
 
   const handleDeleteSelectedNode = useCallback(async () => {
     if (!selectedNode) return;
 
-    await deleteMemory(selectedNode.id, selectedNode.source);
+    await deleteMemory(selectedNode.id);
     setSelectedNode(null);
   }, [selectedNode, deleteMemory]);
 
@@ -236,9 +225,11 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
       const nodeSize = node.val;
       const isSelected = selectedNode?.id === node.id;
 
-      // Draw node - always circle for both MCP and Quack
+      if (node.x === undefined || node.y === undefined) return;
+
+      // Draw node circle
       ctx.beginPath();
-      ctx.arc(node.x!, node.y!, nodeSize, 0, 2 * Math.PI);
+      ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
       ctx.fillStyle = node.color;
       ctx.fill();
 
@@ -254,14 +245,13 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
         ctx.shadowBlur = 0;
       }
 
-      // Only show label when zoomed in enough (like Obsidian)
-      // Hide labels below zoom threshold
+      // Only show label when zoomed in enough
       if (globalScale >= LABEL_ZOOM_THRESHOLD) {
         ctx.font = `${fontSize}px General Sans, Inter, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-        ctx.fillText(label, node.x!, node.y! + nodeSize + fontSize + 2);
+        ctx.fillText(label, node.x, node.y + nodeSize + fontSize + 2);
       }
     },
     [selectedNode]
@@ -293,35 +283,18 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
       {/* Toolbar */}
       <div className="memory-graph-toolbar">
         <div className="memory-graph-toolbar-left">
-          <Brain size={16} className="memory-graph-toolbar-icon" />
+          <Brain size={16} className="memory-graph-toolbar-icon" style={{ color: "#E84A7F" }} />
           <span className="memory-graph-toolbar-title">Knowledge Graph</span>
 
           {/* Stats badges */}
           <div className="memory-graph-stats">
-            <span className="memory-graph-stat mcp" title="MCP (AI) memories">
-              <Cloud size={10} />
-              {stats.mcp}
+            <span className="memory-graph-stat mcp" title="Entities">
+              <Brain size={10} />
+              {stats.entities}
             </span>
-            <span className="memory-graph-stat quack" title="Quack (Pattern) memories">
-              <Sparkles size={10} />
-              {stats.quack}
+            <span className="memory-graph-stat relations" title="Relations">
+              {stats.relations}
             </span>
-          </div>
-        </div>
-
-        <div className="memory-graph-toolbar-center">
-          {/* Source filter */}
-          <div className="memory-graph-source-filter">
-            {(["all", "mcp", "quack"] as const).map((source) => (
-              <button
-                key={source}
-                type="button"
-                onClick={() => setSourceFilter(source)}
-                className={`memory-graph-filter-btn ${sourceFilter === source ? "active" : ""} ${source}`}
-              >
-                {source === "all" ? "All" : source === "mcp" ? "MCP" : "Quack"}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -421,7 +394,7 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
           </div>
         ) : graphData.nodes.length === 0 ? (
           <div className="memory-graph-empty">
-            <Brain size={48} />
+            <Brain size={48} style={{ color: "#E84A7F" }} />
             <h3>No memories yet</h3>
             <p>Start chatting or click + to add a memory</p>
           </div>
@@ -454,22 +427,17 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
               style={{ backgroundColor: selectedNode.color }}
             />
             <h4>{selectedNode.name}</h4>
-            <span className={`memory-graph-details-source ${selectedNode.source}`}>
-              {selectedNode.source === "mcp" ? "MCP" : "Quack"}
-            </span>
             <span className="memory-graph-details-type">
               {selectedNode.entityType}
             </span>
-            {selectedNode.source === "quack" && (
-              <button
-                type="button"
-                onClick={handleDeleteSelectedNode}
-                className="memory-graph-details-delete"
-                title="Delete memory"
-              >
-                Delete
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleDeleteSelectedNode}
+              className="memory-graph-details-delete"
+              title="Delete memory"
+            >
+              Delete
+            </button>
             <button
               type="button"
               onClick={() => setSelectedNode(null)}
@@ -478,16 +446,17 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
               <X size={14} />
             </button>
           </div>
-          <div className="memory-graph-details-observations">
-            {selectedNode.observations.map((obs, i) => (
-              <div key={i} className="memory-graph-observation">
-                {obs}
-              </div>
-            ))}
+          <div className="memory-graph-details-content">
+            <div className="memory-graph-details-observations">
+              {selectedNode.observations.map((obs, i) => (
+                <div key={i} className="memory-graph-observation">
+                  {obs}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

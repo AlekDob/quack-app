@@ -4,39 +4,28 @@ import type { UnifiedMemoryItem as UnifiedMemoryItemType } from "../../services/
 /**
  * Unified Memory List Component
  *
- * Renders list of memories from both Quack and MCP sources.
+ * Renders list of memories from MCP Memory.
  * Shows empty states when no memories exist.
- * Supports grouping by source or category.
+ * Supports grouping by category.
  */
 
-export type GroupMode = "none" | "source" | "category";
+export type GroupMode = "none" | "category";
 
 interface UnifiedMemoryListProps {
   items: UnifiedMemoryItemType[];
   isSearchMode: boolean;
   groupMode?: GroupMode;
-  onVerify?: (id: string) => void;
-  onArchive?: (id: string) => void;
-  onDelete: (id: string, source: "quack" | "mcp") => void;
+  onDelete: (id: string) => void;
 }
 
 export default function UnifiedMemoryList({
   items,
   isSearchMode,
-  groupMode = "source",
-  onVerify,
-  onArchive,
+  groupMode = "category",
   onDelete,
 }: UnifiedMemoryListProps) {
-  // Filter out archived Quack memories in normal mode
-  const filteredItems = isSearchMode
-    ? items
-    : items.filter(
-        (item) => item.source === "mcp" || !item.isArchived
-      );
-
   // Empty states
-  if (filteredItems.length === 0) {
+  if (items.length === 0) {
     if (isSearchMode) {
       return (
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
@@ -56,42 +45,42 @@ export default function UnifiedMemoryList({
         <div className="text-5xl mb-4">&#129504;</div>
         <h4
           className="text-base font-semibold mb-2"
-          style={{ color: "#f28c52" }}
+          style={{ color: "#E84A7F" }}
         >
           No memories yet
         </h4>
         <p className="text-sm text-white/50 max-w-xs mb-4">
-          Memories will appear here from two sources:
+          Memories will be saved here when:
         </p>
         <div className="flex flex-col gap-2 text-left text-xs">
           <div className="flex items-center gap-2">
             <span
               className="px-1.5 py-0.5 rounded"
               style={{
-                backgroundColor: "#f28c5215",
-                color: "#f28c52",
-                border: "1px solid #f28c5230",
+                backgroundColor: "#E84A7F15",
+                color: "#E84A7F",
+                border: "1px solid #E84A7F30",
               }}
             >
-              Quack
+              +
             </span>
             <span className="text-white/50">
-              Type # to save manual memories
+              You add a memory in Knowledge Graph
             </span>
           </div>
           <div className="flex items-center gap-2">
             <span
               className="px-1.5 py-0.5 rounded"
               style={{
-                backgroundColor: "#00d9ff15",
-                color: "#00d9ff",
-                border: "1px solid #00d9ff30",
+                backgroundColor: "#E84A7F15",
+                color: "#E84A7F",
+                border: "1px solid #E84A7F30",
               }}
             >
-              MCP
+              AI
             </span>
             <span className="text-white/50">
-              AI automatically saves important facts
+              AI saves facts automatically during chat
             </span>
           </div>
         </div>
@@ -101,24 +90,16 @@ export default function UnifiedMemoryList({
 
   // Render based on group mode
   if (!isSearchMode && groupMode !== "none") {
-    return renderGroupedItems(
-      filteredItems,
-      groupMode,
-      onVerify,
-      onArchive,
-      onDelete
-    );
+    return renderGroupedItems(items, onDelete);
   }
 
   // Render flat list for search results or no grouping
   return (
     <div className="flex flex-col gap-3">
-      {filteredItems.map((item) => (
+      {items.map((item) => (
         <UnifiedMemoryItem
           key={item.id}
           item={item}
-          onVerify={onVerify}
-          onArchive={onArchive}
           onDelete={onDelete}
         />
       ))}
@@ -127,19 +108,32 @@ export default function UnifiedMemoryList({
 }
 
 /**
- * Render items grouped by source or category
+ * Category colors
+ */
+const CATEGORY_COLORS: Record<string, string> = {
+  preference: "#3b82f6",
+  fact: "#10b981",
+  decision: "#8b5cf6",
+  pattern: "#f97316",
+  mistake: "#ef4444",
+  context: "#6b7280",
+  person: "#E84A7F",
+  project: "#E84A7F",
+  technology: "#00d9ff",
+  tool: "#00d9ff",
+};
+
+/**
+ * Render items grouped by category
  */
 function renderGroupedItems(
   items: UnifiedMemoryItemType[],
-  groupMode: GroupMode,
-  onVerify?: (id: string) => void,
-  onArchive?: (id: string) => void,
-  onDelete?: (id: string, source: "quack" | "mcp") => void
+  onDelete: (id: string) => void
 ) {
-  // Group items
+  // Group items by category
   const grouped = items.reduce(
     (acc, item) => {
-      const key = groupMode === "source" ? item.source : item.category;
+      const key = item.entityType || item.category || "other";
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -149,41 +143,21 @@ function renderGroupedItems(
     {} as Record<string, UnifiedMemoryItemType[]>
   );
 
-  // Sort keys
-  const sortedKeys = Object.keys(grouped).sort((a, b) => {
-    // For source grouping, put MCP first (AI memories are more reliable)
-    if (groupMode === "source") {
-      if (a === "mcp") return -1;
-      if (b === "mcp") return 1;
-    }
-    return a.localeCompare(b);
-  });
-
-  const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
-    mcp: { label: "AI Memory (MCP)", color: "#00d9ff" },
-    quack: { label: "Pattern Memory (Quack)", color: "#f28c52" },
-  };
+  // Sort keys alphabetically
+  const sortedKeys = Object.keys(grouped).sort();
 
   return (
     <div className="flex flex-col gap-4">
       {sortedKeys.map((key) => {
-        const groupLabel =
-          groupMode === "source"
-            ? SOURCE_LABELS[key]?.label || key
-            : key.charAt(0).toUpperCase() + key.slice(1);
-
-        const groupColor =
-          groupMode === "source"
-            ? SOURCE_LABELS[key]?.color || "#6b7280"
-            : undefined;
+        const groupColor = CATEGORY_COLORS[key.toLowerCase()] || "#E84A7F";
 
         return (
           <div key={key} className="flex flex-col gap-2">
             <h4
               className="text-xs font-semibold uppercase tracking-wide px-1 flex items-center gap-2"
-              style={{ color: groupColor || "rgba(255,255,255,0.5)" }}
+              style={{ color: groupColor }}
             >
-              {groupLabel}
+              {key.charAt(0).toUpperCase() + key.slice(1)}
               <span className="text-white/30 font-normal">
                 ({grouped[key].length})
               </span>
@@ -193,9 +167,7 @@ function renderGroupedItems(
                 <UnifiedMemoryItem
                   key={item.id}
                   item={item}
-                  onVerify={onVerify}
-                  onArchive={onArchive}
-                  onDelete={onDelete!}
+                  onDelete={onDelete}
                 />
               ))}
             </div>

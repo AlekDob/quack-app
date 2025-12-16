@@ -25,7 +25,9 @@ function createDiffFromStrings(oldString: string, newString: string, fileName?: 
 export const getToolColor = (toolName: string): string => {
   const name = toolName.toLowerCase();
   if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
-  if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316'; // orange
+  // MCP Memory tools get vibrant rose color
+  if (name.startsWith('mcp__memory') || name.startsWith('mcp_memory')) return '#E84A7F'; // vibrant rose
+  if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316'; // orange (other MCP tools)
   if (name === 'task') return '#8b5cf6'; // purple
   if (name === 'bash' || name === 'bashoutput' || name === 'killshell') return '#f59e0b'; // amber
   if (name === 'read' || name === 'glob' || name === 'grep') return '#3b82f6'; // blue
@@ -40,8 +42,9 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
 
   // Determine color based on tool type
   const isWebTool = toolName === 'webfetch' || toolName === 'websearch';
+  const isMcpMemoryTool = toolName.startsWith('mcp__memory') || toolName.startsWith('mcp_memory');
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
-  const iconColor = isWebTool ? '#10b981' : isMcpTool ? '#f97316' : 'currentColor';
+  const iconColor = isWebTool ? '#10b981' : isMcpMemoryTool ? '#E84A7F' : isMcpTool ? '#f97316' : 'currentColor';
 
   if (toolName === 'read') {
     return (
@@ -165,6 +168,23 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
     );
   }
 
+  // MCP Memory tools - brain icon
+  if (isMcpMemoryTool) {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+        <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+        <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+        <path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/>
+        <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/>
+        <path d="M3.477 10.896a4 4 0 0 1 .585-.396"/>
+        <path d="M19.938 10.5a4 4 0 0 1 .585.396"/>
+        <path d="M6 18a4 4 0 0 1-1.967-.516"/>
+        <path d="M19.967 17.484A4 4 0 0 1 18 18"/>
+      </svg>
+    );
+  }
+
   // MCP tools - generic icon for MCP operations
   if (isMcpTool) {
     return (
@@ -252,8 +272,9 @@ export const SystemInitializedWidget: React.FC<{
             {tools.map((tool, i) => {
               const toolNameLower = tool.toLowerCase();
               const isWebTool = toolNameLower === 'webfetch' || toolNameLower === 'websearch';
+              const isMcpMemoryTool = toolNameLower.startsWith('mcp__memory') || toolNameLower.startsWith('mcp_memory');
               const isMcpTool = toolNameLower.startsWith('mcp__') || toolNameLower.startsWith('mcp_');
-              const textColor = isWebTool ? '#10b981' : isMcpTool ? '#f97316' : undefined;
+              const textColor = isWebTool ? '#10b981' : isMcpMemoryTool ? '#E84A7F' : isMcpTool ? '#f97316' : undefined;
 
               return (
                 <span key={i} className="system-init-tool-badge" style={{ color: textColor }}>

@@ -1,12 +1,9 @@
 import { useState } from "react";
 import {
-  CheckCircle2,
-  Archive,
   Trash2,
   ChevronDown,
   ChevronRight,
   Brain,
-  Cloud,
   Link2,
 } from "lucide-react";
 import type { MemoryCategory } from "../../types/memory";
@@ -15,15 +12,12 @@ import type { UnifiedMemoryItem as UnifiedMemoryItemType } from "../../services/
 /**
  * Unified Memory Item Component
  *
- * Displays both Quack memories (pattern-based) and MCP entities
- * with source badges and appropriate actions for each type.
+ * Displays MCP memory entities with category badges and actions.
  */
 
 interface UnifiedMemoryItemProps {
   item: UnifiedMemoryItemType;
-  onVerify?: (id: string) => void;
-  onArchive?: (id: string) => void;
-  onDelete: (id: string, source: "quack" | "mcp") => void;
+  onDelete: (id: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -33,46 +27,21 @@ const CATEGORY_COLORS: Record<string, string> = {
   pattern: "#f97316", // orange
   mistake: "#ef4444", // red
   context: "#6b7280", // gray
-  person: "#ec4899", // pink
-  project: "#14b8a6", // teal
-  technology: "#06b6d4", // cyan
-  tool: "#84cc16", // lime
+  person: "#E84A7F", // rose
+  project: "#E84A7F", // rose
+  technology: "#00d9ff", // cyan
+  tool: "#00d9ff", // cyan
   concept: "#a855f7", // violet
-};
-
-const CONFIDENCE_COLORS = {
-  high: "#10b981",
-  medium: "#f59e0b",
-  low: "#6b7280",
-};
-
-const SOURCE_CONFIG = {
-  quack: {
-    label: "Quack",
-    color: "#f28c52",
-    icon: Brain,
-    description: "Pattern-based extraction",
-  },
-  mcp: {
-    label: "MCP",
-    color: "#00d9ff",
-    icon: Cloud,
-    description: "AI semantic extraction",
-  },
 };
 
 export default function UnifiedMemoryItem({
   item,
-  onVerify,
-  onArchive,
   onDelete,
 }: UnifiedMemoryItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const shouldTruncate = item.content.length > 120;
 
-  const handleVerify = () => onVerify?.(item.id);
-  const handleArchive = () => onArchive?.(item.id);
-  const handleDelete = () => onDelete(item.id, item.source);
+  const handleDelete = () => onDelete(item.id);
 
   const displayContent =
     !isExpanded && shouldTruncate
@@ -80,34 +49,16 @@ export default function UnifiedMemoryItem({
       : item.content;
 
   const categoryColor =
-    CATEGORY_COLORS[item.category as MemoryCategory] || CATEGORY_COLORS.context;
-  const sourceConfig = SOURCE_CONFIG[item.source];
-  const SourceIcon = sourceConfig.icon;
-
-  // Confidence only for Quack memories
-  const confidence = item.quackMemory?.confidence;
-  const confidenceColor = confidence
-    ? CONFIDENCE_COLORS[confidence]
-    : undefined;
+    CATEGORY_COLORS[(item.entityType || item.category || "").toLowerCase()] ||
+    "#E84A7F";
 
   return (
     <div className="p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/8 transition-colors">
-      {/* Header: Source Badge + Category + Indicators */}
+      {/* Header: Brain Icon + Category */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          {/* Source Badge */}
-          <span
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
-            style={{
-              backgroundColor: `${sourceConfig.color}15`,
-              color: sourceConfig.color,
-              border: `1px solid ${sourceConfig.color}30`,
-            }}
-            title={sourceConfig.description}
-          >
-            <SourceIcon size={10} />
-            {sourceConfig.label}
-          </span>
+          {/* Brain Icon */}
+          <Brain size={14} style={{ color: "#E84A7F" }} />
 
           {/* Category Badge */}
           <span
@@ -124,35 +75,19 @@ export default function UnifiedMemoryItem({
 
         {/* Status Indicators */}
         <div className="flex items-center gap-1">
-          {/* Confidence (Quack only) */}
-          {confidenceColor && (
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: confidenceColor }}
-              title={`Confidence: ${confidence}`}
-            />
-          )}
-
-          {/* Verified (Quack only) */}
-          {item.userVerified && (
-            <span title="Verified">
-              <CheckCircle2 size={14} className="text-green-500" />
-            </span>
-          )}
-
-          {/* Has Relations (MCP only) */}
+          {/* Has Relations */}
           {item.relations && item.relations.length > 0 && (
             <span title={`${item.relations.length} relations`}>
-              <Link2 size={14} className="text-cyan-500" />
+              <Link2 size={14} style={{ color: "#E84A7F" }} />
             </span>
           )}
         </div>
       </div>
 
-      {/* Entity Name (MCP only) */}
-      {item.entityName && (
-        <p className="text-xs text-cyan-400/80 font-medium mb-1">
-          {item.entityName}
+      {/* Entity Type Label - only show if different from content */}
+      {item.entityType && item.entityType !== item.category && (
+        <p className="text-xs font-medium mb-1" style={{ color: "#E84A7F" }}>
+          {item.entityType}
         </p>
       )}
 
@@ -182,7 +117,7 @@ export default function UnifiedMemoryItem({
         </button>
       )}
 
-      {/* Relations (MCP only, expanded) */}
+      {/* Relations (expanded) */}
       {isExpanded && item.relations && item.relations.length > 0 && (
         <div className="mb-2 p-2 bg-white/5 rounded border border-white/10">
           <p className="text-xs text-white/50 mb-1">Relations:</p>
@@ -190,7 +125,12 @@ export default function UnifiedMemoryItem({
             {item.relations.map((rel, idx) => (
               <span
                 key={`${rel.from}-${rel.relationType}-${rel.to}-${idx}`}
-                className="text-xs px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 rounded border border-cyan-500/20"
+                className="text-xs px-1.5 py-0.5 rounded border"
+                style={{
+                  backgroundColor: "#E84A7F10",
+                  color: "#E84A7F",
+                  borderColor: "#E84A7F20",
+                }}
               >
                 {rel.from === item.entityName
                   ? `${rel.relationType} -> ${rel.to}`
@@ -204,11 +144,6 @@ export default function UnifiedMemoryItem({
       {/* Footer: Metadata + Actions */}
       <div className="flex items-center justify-between pt-2 border-t border-white/10">
         <div className="flex flex-col gap-0.5 text-xs text-white/40">
-          {/* Scope (Quack only) */}
-          {item.scope && (
-            <span>{item.scope === "project" ? "Project" : "Global"}</span>
-          )}
-
           {/* Timestamp */}
           {item.createdAt && (
             <span title={new Date(item.createdAt).toLocaleString()}>
@@ -219,31 +154,7 @@ export default function UnifiedMemoryItem({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Verify (Quack only) */}
-          {item.source === "quack" && !item.userVerified && onVerify && (
-            <button
-              type="button"
-              onClick={handleVerify}
-              className="p-1.5 text-white/40 hover:text-green-500 hover:bg-green-500/10 rounded transition-colors"
-              title="Verify"
-            >
-              <CheckCircle2 size={14} />
-            </button>
-          )}
-
-          {/* Archive (Quack only) */}
-          {item.source === "quack" && !item.isArchived && onArchive && (
-            <button
-              type="button"
-              onClick={handleArchive}
-              className="p-1.5 text-white/40 hover:text-yellow-500 hover:bg-yellow-500/10 rounded transition-colors"
-              title="Archive"
-            >
-              <Archive size={14} />
-            </button>
-          )}
-
-          {/* Delete (both sources) */}
+          {/* Delete */}
           <button
             type="button"
             onClick={handleDelete}
