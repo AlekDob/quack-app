@@ -136,9 +136,11 @@ npm run test:coverage # Coverage report
 ## ✨ Features (`05-features/`)
 
 ### Implemented Features
-- **`quack-memory-foundation-implementation.md`** ✅ **NEW!** - Quack Memory foundation layer (Phase 1: types, storage, extraction)
-- **`memoryEmbedder-implementation.md`** ✅ **NEW!** - Memory Embedder service (Phase 2: local embeddings with Transformers.js)
+- **`mcp-memory-integration.md`** ✅ **NEW!** - MCP Memory hybrid system (Quack + AI memories, unified panel)
+- **`quack-memory-foundation-implementation.md`** ✅ - Quack Memory foundation layer (Phase 1: types, storage, extraction)
+- **`memoryEmbedder-implementation.md`** ✅ - Memory Embedder service (Phase 2: local embeddings with Transformers.js)
 - **`quack-memory-architecture.md`** - Quack Memory system architecture & design
+- **`memory-ui.md`** - Memory UI components & design system
 - **`progress-tracker.md`** ✅ - Long-Running Agent Progress System (Anthropic patterns)
 - **`RULES_SYSTEM.md`** ✅ - Rules system for explicit agent behavior configuration (Skills/Droids via Rules)
 - **`background-tasks.md`** ✅ - Background task system (non-blocking command/agent execution)
@@ -410,11 +412,11 @@ find docs/ -mtime -7 -name "*.md"
 
 ## 📊 Documentation Health
 
-**Last Updated**: 2025-12-15
-**Total Docs**: 39+ files
-**Test Coverage**: 197+ tests passing ✅
+**Last Updated**: 2025-12-16
+**Total Docs**: 42+ files
+**Test Coverage**: 230+ tests passing ✅ (including 33 MCP Memory tests)
 **Active Categories**: 7 (merged MCP docs into features)
-**Latest Addition**: Memory Embedder service (Transformers.js local embeddings)
+**Latest Addition**: MCP Memory Integration (hybrid Quack + AI memory system)
 **Optimization Tasks**: 21 identified (1 completed, 20 pending)
 **Deprecated Docs**: 8 (in archive)
 

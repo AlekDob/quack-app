@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Wrench } from 'lucide-react';
+import { Wrench, Brain } from 'lucide-react';
 import './ActionIcons.css';
 
 interface ActionIconsProps {
@@ -12,6 +12,7 @@ interface ActionIconsProps {
   onBrowserClick: () => void;
   onDroidFactoryClick: () => void;
   onGuideClick: () => void;
+  onMemoryGraphClick: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
@@ -30,6 +31,7 @@ function ActionIcons({
   onBrowserClick,
   onDroidFactoryClick,
   onGuideClick,
+  onMemoryGraphClick,
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
@@ -241,6 +243,18 @@ function ActionIcons({
       >
         <Wrench className="w-4 h-4" />
         <span className="action-icon-tooltip">Droid Factory</span>
+      </button>
+
+      {/* Memory Graph Icon */}
+      <button
+        type="button"
+        className="action-icon"
+        onClick={onMemoryGraphClick}
+        aria-label="Open Knowledge Graph"
+        data-tooltip="Knowledge Graph"
+      >
+        <Brain className="w-4 h-4" />
+        <span className="action-icon-tooltip">Knowledge Graph</span>
       </button>
 
       {/* Guide/Documentation Icon */}

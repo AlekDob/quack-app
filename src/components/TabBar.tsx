@@ -6,7 +6,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -258,6 +258,11 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           {tab.type === 'docs' && (
             <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
               📖
+            </span>
+          )}
+          {tab.type === 'memory-graph' && (
+            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
+              🧠
             </span>
           )}
           <span className="tab-label">{tab.label}</span>

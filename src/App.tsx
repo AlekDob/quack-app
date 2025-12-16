@@ -56,7 +56,9 @@ import SkillViewer from "./components/SkillViewer";
 import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import { useDocsTab } from "./hooks/useDocsTab";
+import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import DocsTabView from "./views/DocsTabView";
+import MemoryGraphTabView from "./views/MemoryGraphTabView";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { LicenseModal } from "./components/LicenseModal";
@@ -264,6 +266,9 @@ function AppContent() {
 
   // Documentation tab management
   const { openDocsTab } = useDocsTab();
+
+  // Memory Graph tab management
+  const { openMemoryGraphTab } = useMemoryGraphTab();
 
   // Terminal Window manager - opens separate Tauri window for terminals
   const { openTerminalWindow, updateProjects: updateTerminalWindowProjects, isOpen: terminalWindowOpen } = useTerminalWindowManager();
@@ -5976,6 +5981,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, [openDocsTab]);
 
+  // Handler for opening Knowledge Graph tab
+  const handleOpenMemoryGraphTab = useCallback(() => {
+    // Check if memory graph tab already exists
+    const existingTab = tabs.find(t => t.type === 'memory-graph');
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+      return;
+    }
+
+    const newTab = openMemoryGraphTab();
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
+
+    console.log('[Quack] Knowledge Graph tab opened:', newTab.id);
+  }, [openMemoryGraphTab, tabs]);
+
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
     updateActiveTab(tabId);
@@ -7659,6 +7680,7 @@ You have access to all Bash tools to execute git commands like:
               onTerminalClick={handleCreateAgentTerminal}
               onBrowserClick={handleOpenBrowserTab}
               onDroidFactoryClick={() => setDroidFactoryOpen(true)}
+              onMemoryGraphClick={handleOpenMemoryGraphTab}
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
@@ -7889,6 +7911,15 @@ You have access to all Bash tools to execute git commands like:
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'docs') {
                   return <DocsTabView tab={activeTab} isActive={true} />;
+                }
+                return null;
+              })()}
+
+              {/* Memory Graph Viewer - shown when memory-graph tab is active */}
+              {activeTabId.startsWith('memory-graph-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'memory-graph') {
+                  return <MemoryGraphTabView tab={activeTab} isActive={true} />;
                 }
                 return null;
               })()}

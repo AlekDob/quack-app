@@ -22,9 +22,10 @@ memory/
 
 ### Integration
 
-- **Hook**: `useMemory` from `@/hooks/useMemory`
-- **SidePanel Tab**: "memory" tab ID
-- **Icon**: Brain with neural connections (SVG)
+- **Hook**: `useUnifiedMemory` from `@/hooks/useUnifiedMemory`
+- **SidePanel Tab**: `"memory"` TabId
+- **Tab Position**: After Rules (order: Agent Context > File Explorer > Rules > Memory)
+- **Icon**: Lucide Brain icon (official SVG from lucide.dev)
 
 ## Components
 
@@ -319,6 +320,13 @@ All functions under 20 line limit ✅
 - [Memory Types](../../src/types/memory.ts)
 
 ## Changelog
+
+### 2025-12-16
+- Updated to Unified Memory Panel with Quack + MCP sources
+- Changed icon to official Lucide Brain icon
+- Changed tab order: Memory now after Rules
+- Added source badges (Quack orange, MCP cyan)
+- Integrated with Tauri commands for MCP file reading
 
 ### 2025-12-15
 - Initial implementation of Memory UI components

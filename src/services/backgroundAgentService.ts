@@ -128,6 +128,11 @@ async function handleTaskCompletion(
     return;
   }
 
+  // Guard: Skip if already completed (prevents infinite loop)
+  if (['completed', 'failed', 'cancelled'].includes(task.status)) {
+    return;
+  }
+
   // Update task status
   if (result.success) {
     store.completeTask(taskId, result);

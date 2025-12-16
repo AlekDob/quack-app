@@ -74,19 +74,11 @@ export function getAvatarUrl(avatarName: string): string {
  * @returns Full URL to the droid image
  */
 export function getDuckdroidUrl(): string {
-  // Cache buster to force image reload when updated
   const cacheBuster = `?v=2`;
-  let url: string;
   if (window.__TAURI__) {
-    // In Tauri v2, use convertFileSrc for proper asset protocol handling
-    url = convertFileSrc('/images/droid.jpeg', 'asset') + cacheBuster;
-    console.log('[getDuckdroidUrl] TAURI mode - URL:', url);
-  } else {
-    // In dev mode, use standard public path
-    url = `/droid.jpeg${cacheBuster}`;
-    console.log('[getDuckdroidUrl] DEV mode - URL:', url);
+    return convertFileSrc('/images/droid.jpeg', 'asset') + cacheBuster;
   }
-  return url;
+  return `/droid.jpeg${cacheBuster}`;
 }
 
 /**
@@ -94,17 +86,10 @@ export function getDuckdroidUrl(): string {
  * @returns Full URL to duck15.jpeg
  */
 export function getFallbackDuckUrl(): string {
-  let url: string;
   if (window.__TAURI__) {
-    // In Tauri v2, use convertFileSrc for proper asset protocol handling
-    url = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
-    console.log('[getFallbackDuckUrl] TAURI mode - URL:', url);
-  } else {
-    // In dev mode, use standard public path
-    url = `/images/ducks/new-avatars/duck15.jpeg`;
-    console.log('[getFallbackDuckUrl] DEV mode - URL:', url);
+    return convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
   }
-  return url;
+  return `/images/ducks/new-avatars/duck15.jpeg`;
 }
 
 /**
@@ -122,29 +107,22 @@ export function getRandomAvatar(): string {
  * @returns Avatar image URL or Promise for custom avatars
  */
 export function getAgentAvatar(_agentName: string, avatarFilename?: string): string | Promise<string> {
-  console.log('[getAgentAvatar] Called with:', { agentName: _agentName, avatarFilename });
-
   // If no avatar specified or empty string, use default duckdroid
   if (!avatarFilename || avatarFilename.trim() === '') {
-    console.log('[getAgentAvatar] No avatar or empty string, using duckdroid');
     return getDuckdroidUrl();
   }
 
   // Check if it's a custom avatar (UUID format)
   if (isCustomAvatar(avatarFilename)) {
-    console.log('[getAgentAvatar] Custom avatar detected');
-    // Return promise for custom avatar URL
     return getCustomAvatarUrl(avatarFilename);
   }
 
   // Check if it's a default avatar from new-avatars
   if (AVAILABLE_AVATARS.includes(avatarFilename)) {
-    console.log('[getAgentAvatar] Default avatar found:', avatarFilename);
     return getAvatarUrl(avatarFilename);
   }
 
-  // Fallback for old avatars that don't exist anymore - use duck15.jpeg
-  console.log('[getAgentAvatar] Old avatar not found, using fallback duck15.jpeg');
+  // Fallback for old avatars that don't exist anymore
   return getFallbackDuckUrl();
 }
 

@@ -25,23 +25,12 @@ export function AgentAvatar({
 }: AgentAvatarProps) {
   const avatarUrl = useAgentAvatar(agentName, avatarFilename);
 
-  console.log('[AgentAvatar] Rendering:', { agentName, avatarFilename, avatarUrl });
-
   return (
     <img
-      src={avatarUrl || getDuckdroidUrl()} // Fallback while loading - use getDuckdroidUrl for proper Tauri path
+      src={avatarUrl || getDuckdroidUrl()}
       alt={alt || agentName}
       className={className}
       style={style}
-      onLoad={() => console.log('[AgentAvatar] Image loaded successfully:', avatarUrl)}
-      onError={(e) => {
-        console.error('[AgentAvatar] Image failed to load:', {
-          url: avatarUrl,
-          agentName,
-          avatarFilename,
-          error: e
-        });
-      }}
     />
   );
 }
