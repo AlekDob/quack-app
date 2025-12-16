@@ -104,6 +104,7 @@ export default defineConfig(({ mode }) => {
           'terminal-window': resolve(rootDir, 'terminal-window.html'),
           pip: resolve(rootDir, 'pip.html'),
           browser: resolve(rootDir, 'browser.html'),
+          'tab-popout': resolve(rootDir, 'tab-popout.html'),
         },
 
         // External dependencies - don't bundle Node.js modules

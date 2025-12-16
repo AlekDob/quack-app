@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { SlashCommand } from '../hooks/useSlashCommands';
+import { canPopoutTab } from '../stores/popoutWindowStore';
 import './TabBar.css';
 
 export interface Tab {
@@ -28,15 +29,23 @@ interface ContextMenuState {
   tabId: string | null;
 }
 
+export interface PopoutPosition {
+  x: number;
+  y: number;
+  screenX: number;
+  screenY: number;
+}
+
 interface TabBarProps {
   tabs: Tab[];
   activeTabId: string;
   onTabClick: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onTabReorder?: (tabs: Tab[]) => void;
+  onTabPopout?: (tab: Tab, position: PopoutPosition) => void;
 }
 
-function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: TabBarProps) {
+function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTabPopout }: TabBarProps) {
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -45,7 +54,12 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
     y: 0,
     tabId: null,
   });
+  const [hasTriggeredPopout, setHasTriggeredPopout] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+
+  // Threshold in pixels - how far outside the tab bar to trigger popout
+  const POPOUT_THRESHOLD = 60;
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -204,13 +218,61 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
     setDragOverTabId(null);
   };
 
-  const handleDragEnd = () => {
+  // Check if cursor is outside tab bar bounds (for popout detection)
+  const isOutsideTabBar = useCallback((clientX: number, clientY: number): boolean => {
+    if (!tabBarRef.current) return false;
+
+    const rect = tabBarRef.current.getBoundingClientRect();
+    const isOutside = (
+      clientY < rect.top - POPOUT_THRESHOLD ||
+      clientY > rect.bottom + POPOUT_THRESHOLD ||
+      clientX < rect.left - POPOUT_THRESHOLD ||
+      clientX > rect.right + POPOUT_THRESHOLD
+    );
+
+    return isOutside;
+  }, [POPOUT_THRESHOLD]);
+
+  // Track popout state per tab to prevent duplicates
+  const popoutTriggeredRef = useRef<Set<string>>(new Set());
+
+  // Handle drag event to detect when tab is dragged outside
+  const handleDrag = useCallback((e: React.DragEvent, tab: Tab) => {
+    // Skip if no valid coordinates
+    if (e.clientX === 0 && e.clientY === 0) return;
+    if (!onTabPopout) return;
+
+    // Skip if popout already triggered for this specific tab (using ref for immediate check)
+    if (popoutTriggeredRef.current.has(tab.id)) return;
+
+    // Check if outside bounds
+    if (isOutsideTabBar(e.clientX, e.clientY)) {
+      console.log('[TabBar] Tab dragged outside bounds:', tab.id);
+
+      // Mark as triggered IMMEDIATELY using ref (synchronous)
+      popoutTriggeredRef.current.add(tab.id);
+      setHasTriggeredPopout(true);
+
+      // Trigger popout with position
+      onTabPopout(tab, {
+        x: e.clientX,
+        y: e.clientY,
+        screenX: e.screenX,
+        screenY: e.screenY,
+      });
+    }
+  }, [isOutsideTabBar, onTabPopout]);
+
+  const handleDragEnd = useCallback(() => {
     setDraggedTabId(null);
     setDragOverTabId(null);
-  };
+    setHasTriggeredPopout(false);
+    // Clear the ref for next drag operation
+    popoutTriggeredRef.current.clear();
+  }, []);
 
   return (
-    <div className="tab-bar" role="tablist">
+    <div className="tab-bar" role="tablist" ref={tabBarRef}>
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -225,6 +287,7 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
           title={tab.filePath || tab.label}
           draggable={tab.type !== 'chat'}
           onDragStart={(e) => handleDragStart(e, tab)}
+          onDrag={(e) => handleDrag(e, tab)}
           onDragOver={(e) => handleDragOver(e, tab)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, tab)}
@@ -266,6 +329,32 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder }: Tab
             </span>
           )}
           <span className="tab-label">{tab.label}</span>
+          {/* Popout button - opens tab in separate window */}
+          {tab.closable && canPopoutTab(tab) && onTabPopout && (
+            <button
+              type="button"
+              className="tab-popout-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Use current mouse position for window placement
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                onTabPopout(tab, {
+                  x: rect.left,
+                  y: rect.bottom,
+                  screenX: window.screenX + rect.left,
+                  screenY: window.screenY + rect.bottom + 50,
+                });
+              }}
+              aria-label={`Open ${tab.label} in new window`}
+              title="Open in new window"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 2H3C2.44772 2 2 2.44772 2 3V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M10 2H14V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M14 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
           {tab.closable && (
             <button
               type="button"

@@ -46,7 +46,8 @@ import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
 import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import { runDroidInBackground } from "./services/backgroundAgentService";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
-import TabBar, { type Tab } from "./components/TabBar";
+import TabBar, { type Tab, type PopoutPosition } from "./components/TabBar";
+import { useTabPopoutWindow } from "./hooks/useTabPopoutWindow";
 import ActionIcons from "./components/ActionIcons";
 import { XTermInstance } from "./components/XTermInstance";
 import { useTerminalWindowManager } from "./hooks/useTerminalWindowManager";
@@ -272,6 +273,18 @@ function AppContent() {
 
   // Terminal Window manager - opens separate Tauri window for terminals
   const { openTerminalWindow, updateProjects: updateTerminalWindowProjects, isOpen: terminalWindowOpen } = useTerminalWindowManager();
+
+  // Tab Popout Window manager - drag tabs out to separate windows
+  const handleTabReturn = useCallback((tab: Tab) => {
+    console.log('[App] Tab returned from popout:', tab.id);
+    setTabs(prev => {
+      // Don't add if already exists
+      if (prev.some(t => t.id === tab.id)) return prev;
+      return [...prev, tab];
+    });
+    setActiveTabId(tab.id);
+  }, []);
+  const { popoutTab, closePopoutWindow, isTabPoppedOut } = useTabPopoutWindow(handleTabReturn);
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -6136,6 +6149,38 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId]);
 
+  // Handle tab popout - drag tab outside tab bar to create floating window
+  const handleTabPopout = useCallback(async (tab: Tab, position: PopoutPosition) => {
+    console.log('[App] Tab popout requested:', tab.id, tab.type);
+
+    // Don't pop out chat tab
+    if (tab.type === 'chat') {
+      console.warn('[App] Cannot pop out chat tab');
+      return;
+    }
+
+    // Check if already popped out
+    if (isTabPoppedOut(tab.id)) {
+      console.log('[App] Tab already popped out:', tab.id);
+      return;
+    }
+
+    // Create popout window
+    const windowLabel = await popoutTab(tab, position);
+
+    if (windowLabel) {
+      // Remove tab from main window
+      setTabs(prev => prev.filter(t => t.id !== tab.id));
+
+      // Switch to chat tab if the active tab was popped out
+      if (activeTabId === tab.id) {
+        setActiveTabId('chat');
+      }
+
+      console.log('[App] Tab popped out successfully:', tab.id);
+    }
+  }, [popoutTab, isTabPoppedOut, activeTabId]);
+
   // Keyboard navigation for tabs (TAB key)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -7741,6 +7786,7 @@ You have access to all Bash tools to execute git commands like:
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}
               onTabReorder={handleTabReorder}
+              onTabPopout={handleTabPopout}
             />
 
             {/* Content Area - fills remaining space */}

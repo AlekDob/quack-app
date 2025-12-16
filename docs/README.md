@@ -136,7 +136,8 @@ npm run test:coverage # Coverage report
 ## ✨ Features (`05-features/`)
 
 ### Implemented Features
-- **`mcp-memory-integration.md`** ✅ **NEW!** - MCP Memory hybrid system (Quack + AI memories, unified panel)
+- **`tab-popout.md`** ✅ **NEW!** - Tab Popout Window feature (drag tabs to create floating windows, VS Code-style)
+- **`mcp-memory-integration.md`** ✅ - MCP Memory hybrid system (Quack + AI memories, unified panel)
 - **`quack-memory-foundation-implementation.md`** ✅ - Quack Memory foundation layer (Phase 1: types, storage, extraction)
 - **`memoryEmbedder-implementation.md`** ✅ - Memory Embedder service (Phase 2: local embeddings with Transformers.js)
 - **`quack-memory-architecture.md`** - Quack Memory system architecture & design
@@ -413,10 +414,10 @@ find docs/ -mtime -7 -name "*.md"
 ## 📊 Documentation Health
 
 **Last Updated**: 2025-12-16
-**Total Docs**: 42+ files
-**Test Coverage**: 230+ tests passing ✅ (including 33 MCP Memory tests)
+**Total Docs**: 43+ files
+**Test Coverage**: 232+ tests passing ✅ (including 35 Tab Popout tests)
 **Active Categories**: 7 (merged MCP docs into features)
-**Latest Addition**: MCP Memory Integration (hybrid Quack + AI memory system)
+**Latest Addition**: Tab Popout Window feature (VS Code-style floating windows)
 **Optimization Tasks**: 21 identified (1 completed, 20 pending)
 **Deprecated Docs**: 8 (in archive)
 
