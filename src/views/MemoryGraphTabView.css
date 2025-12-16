@@ -161,18 +161,7 @@
   padding: 10px 16px;
   background: rgba(242, 140, 82, 0.06);
   border-bottom: 1px solid rgba(242, 140, 82, 0.15);
-  animation: slideDown 0.15s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  /* Removed animation to prevent flickering */
 }
 
 .memory-graph-add-form-row {
@@ -183,7 +172,8 @@
 
 .memory-graph-add-input {
   flex: 1;
-  padding: 8px 12px;
+  height: 34px;
+  padding: 0 12px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
@@ -191,6 +181,7 @@
   color: #e7ebf3;
   outline: none;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .memory-graph-add-input::placeholder {
@@ -203,7 +194,8 @@
 }
 
 .memory-graph-add-select {
-  padding: 8px 12px;
+  height: 34px;
+  padding: 0 12px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
@@ -211,6 +203,7 @@
   color: #e7ebf3;
   cursor: pointer;
   outline: none;
+  box-sizing: border-box;
 }
 
 .memory-graph-add-select:focus {
@@ -218,7 +211,8 @@
 }
 
 .memory-graph-add-btn {
-  padding: 8px 16px;
+  height: 34px;
+  padding: 0 16px;
   background: linear-gradient(135deg, #f28c52 0%, #ffb26f 100%);
   border: none;
   border-radius: 6px;
@@ -227,26 +221,27 @@
   color: #ffffff;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .memory-graph-add-btn:hover {
   background: linear-gradient(135deg, #e17940 0%, #ffa05d 100%);
-  transform: translateY(-1px);
 }
 
 .memory-graph-add-cancel {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  background: none;
-  border: none;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .memory-graph-add-cancel:hover {
