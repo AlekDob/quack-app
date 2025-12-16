@@ -5024,7 +5024,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalError(null);
 
     try {
-      if (editingTerminal) {
+      // CRITICAL FIX: Verify terminal still exists in registry before updating
+      // This prevents "Terminale non trovato" error when:
+      // 1. Terminal was closed but React state wasn't updated
+      // 2. User is editing a SavedAgent (not an active terminal)
+      const terminalStillExists = editingTerminal &&
+        terminals.some(t => t.id === editingTerminal.id);
+
+      // Log for debugging
+      if (editingTerminal && !terminalStillExists) {
+        console.warn(`[handleConfirmNewTerminal] Terminal ${editingTerminal.id} not found in registry. Creating new terminal instead.`);
+      }
+
+      if (editingTerminal && terminalStillExists) {
         // CRITICAL FIX: Update terminal with timeout to prevent freeze
         await invokeWithTimeout("update_terminal", {
           id: editingTerminal.id,
@@ -5305,6 +5317,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     newTerminalBranch,      // FIX: Add branch to dependencies
     newTerminalUseWorktree, // FIX: Add useWorktree to dependencies
     tauriAvailable,
+    terminals,              // FIX: Add terminals to verify existence before update
   ]);
 
   // Quick create terminal - no modal, instant like VSCode (Phase 3 - AgentChat integration)
