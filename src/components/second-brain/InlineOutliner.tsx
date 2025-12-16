@@ -23,12 +23,46 @@ import {
   createMCPRelation,
   deleteMCPRelation,
   addMCPObservations,
+  updateMCPObservations,
   generateEntityName,
   categoryToEntityType,
   categoryToRelationType,
 } from '../../services/mcpMemoryService';
 import { parseMentions, parseSupertag } from '../../services/outlineTreeBuilder';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
+
+/**
+ * Get bullet/entity color based on entity type
+ */
+const getEntityColor = (entityType: string): string => {
+  const colors: Record<string, string> = {
+    preference: '#3b82f6',
+    fact: '#10b981',
+    decision: '#8b5cf6',
+    pattern: '#f97316',
+    mistake: '#ef4444',
+    context: '#6b7280',
+    person: '#E84A7F',
+    project: '#E84A7F',
+    technology: '#00d9ff',
+    tool: '#00d9ff',
+    task: '#f59e0b',
+    note: '#8b5cf6',
+    idea: '#10b981',
+  };
+  return colors[entityType.toLowerCase()] || '#6b7280';
+};
+
+/**
+ * Convert hex color to rgba with specified alpha
+ */
+const hexToRgba = (hex: string, alpha: number): string => {
+  const cleanHex = hex.replace('#', '');
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 /**
  * Editable observation component - for details in zoomed view
@@ -252,32 +286,23 @@ function InlineBullet({
     onFocus(node.id);
   }, [node.id, onFocus]);
 
-  // Get bullet color based on entity type
-  const getBulletColor = (entityType: string): string => {
-    const colors: Record<string, string> = {
-      preference: '#3b82f6',
-      fact: '#10b981',
-      decision: '#8b5cf6',
-      pattern: '#f97316',
-      mistake: '#ef4444',
-      context: '#6b7280',
-      person: '#E84A7F',
-      project: '#E84A7F',
-      technology: '#00d9ff',
-      tool: '#00d9ff',
-      task: '#f59e0b',
-      note: '#8b5cf6',
-      idea: '#10b981',
+
+  // Dynamic background color for focused state based on entity type
+  const focusedStyle = useMemo(() => {
+    if (!isFocused) return { paddingLeft: isZoomed ? 0 : node.depth * 24 };
+    const entityColor = getEntityColor(node.entityType);
+    return {
+      paddingLeft: isZoomed ? 0 : node.depth * 24,
+      backgroundColor: hexToRgba(entityColor, 0.08),
     };
-    return colors[entityType.toLowerCase()] || '#6b7280';
-  };
+  }, [isFocused, isZoomed, node.depth, node.entityType]);
 
   return (
     <div className="inline-bullet-container">
       <div
         className={`inline-bullet-row ${isFocused ? 'focused' : ''} ${isZoomed ? 'zoomed-title' : ''}`}
         onClick={handleRowClick}
-        style={{ paddingLeft: isZoomed ? 0 : node.depth * 24 }}
+        style={focusedStyle}
       >
         {/* Drag handle - only visible on hover */}
         {!isZoomed && (
@@ -300,7 +325,7 @@ function InlineBullet({
           type="button"
           className="inline-bullet-point"
           onClick={handleBulletClick}
-          style={{ backgroundColor: getBulletColor(node.entityType) }}
+          style={{ backgroundColor: getEntityColor(node.entityType) }}
           title="Click to zoom into this node"
         />
 
@@ -314,13 +339,14 @@ function InlineBullet({
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder="Type here... (Enter: new bullet, Tab: indent)"
+          style={isZoomed ? { color: getEntityColor(node.entityType) } : undefined}
         />
 
         {/* Supertag badge */}
         {node.entityType && node.entityType !== 'fact' && (
           <span
             className="inline-bullet-tag"
-            style={{ color: getBulletColor(node.entityType) }}
+            style={{ color: getEntityColor(node.entityType) }}
           >
             #{node.entityType}
           </span>
@@ -591,10 +617,27 @@ export function InlineOutliner({
   }, [allNodes, onRefresh]);
 
   const handleUpdate = useCallback(async (nodeId: string, content: string) => {
-    // TODO: Implement update via MCP
-    // For now, just log
-    console.log('Update node:', nodeId, content);
-  }, []);
+    try {
+      // Find the node to get its current observations
+      const node = allNodes.find(n => n.id === nodeId);
+      if (!node) {
+        console.warn('Node not found for update:', nodeId);
+        return;
+      }
+
+      // The title is observations[0], so we update it while keeping other observations
+      const newObservations = [...node.observations];
+      newObservations[0] = content;
+
+      const success = await updateMCPObservations(nodeId, newObservations);
+      if (success) {
+        toast.success('Updated');
+      }
+    } catch (err) {
+      console.error('Failed to update:', err);
+      toast.error('Failed to update');
+    }
+  }, [allNodes]);
 
   /**
    * Indent: Make this node a child of newParentId
@@ -780,7 +823,9 @@ export function InlineOutliner({
         <div className="observations-section">
           <div className="observations-header">
             <span className="observations-label">Details</span>
-            <span className="observations-count">{zoomedNode.observations.length - 1}</span>
+            <span className="observations-count">
+              {zoomedNode.observations.length - 1}
+            </span>
           </div>
           <div className="observations-list">
             {zoomedNode.observations.slice(1).map((obs, idx) => (
@@ -848,23 +893,22 @@ export function InlineOutliner({
               />
             ))}
 
-            {/* New bullet input - always at bottom */}
-            <div className="inline-bullet-row new-bullet" style={{ paddingLeft: zoomedNode ? 24 : 0 }}>
-              <div className="inline-bullet-toggle" />
-              <div className="inline-bullet-point new" />
-              <input
-                ref={newBulletRef}
-                type="text"
-                className="inline-bullet-input"
-                value={newBulletContent}
-                onChange={(e) => setNewBulletContent(e.target.value)}
-                onKeyDown={handleNewBulletKeyDown}
-                placeholder={zoomedNode
-                  ? "Add detail... (or #tag for new entity, @link for relation)"
-                  : "Type a new thought... #tag @mention"
-                }
-              />
-            </div>
+            {/* New bullet input - only at root level (zoom mode uses DETAILS section) */}
+            {!zoomedNode && (
+              <div className="inline-bullet-row new-bullet">
+                <div className="inline-bullet-toggle" />
+                <div className="inline-bullet-point new" />
+                <input
+                  ref={newBulletRef}
+                  type="text"
+                  className="inline-bullet-input"
+                  value={newBulletContent}
+                  onChange={(e) => setNewBulletContent(e.target.value)}
+                  onKeyDown={handleNewBulletKeyDown}
+                  placeholder="Type a new thought... #tag @mention"
+                />
+              </div>
+            )}
           </div>
         </SortableContext>
       </DndContext>

@@ -488,6 +488,7 @@ pub fn run() {
             fs::write_mcp_memory_entity,
             fs::delete_mcp_memory_entity,
             fs::add_mcp_memory_observations,
+            fs::update_mcp_memory_observations,
             fs::write_mcp_memory_relation,
             fs::delete_mcp_memory_relation,
             git::git_status_summary,

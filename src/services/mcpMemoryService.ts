@@ -616,3 +616,39 @@ export function categoryToRelationType(category: string): string {
 
   return typeMap[category.toLowerCase()] || "relates_to";
 }
+
+/**
+ * Update (replace) all observations for an MCP entity
+ * Used for updating entity title (observations[0]) and other observations
+ *
+ * @param name - Entity name
+ * @param observations - New observations array (replaces all existing)
+ * @returns true if updated, false if entity not found
+ */
+export async function updateMCPObservations(
+  name: string,
+  observations: string[]
+): Promise<boolean> {
+  try {
+    const updated = await invoke<boolean>("update_mcp_memory_observations", {
+      name,
+      observations,
+    });
+
+    if (updated) {
+      console.log("[MCPMemoryService] Observations updated for:", name);
+      // Refresh cache after update
+      await mcpMemoryService.refreshFromFile();
+      // Emit event so UI components can react
+      window.dispatchEvent(new CustomEvent('MCP_MEMORY_UPDATED'));
+    } else {
+      console.warn("[MCPMemoryService] Entity not found:", name);
+    }
+
+    return updated;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to update observations:", error);
+    toast.error("Failed to update entity");
+    return false;
+  }
+}

@@ -877,15 +877,13 @@
   min-height: 100%;
 }
 
-/* Breadcrumbs */
+/* Breadcrumbs - Minimal design */
 .inline-outliner-breadcrumbs {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 16px;
-  padding: 8px 12px;
-  background: rgba(232, 74, 127, 0.05);
-  border-radius: 8px;
+  padding: 8px 0;
   font-size: 13px;
 }
 
@@ -900,17 +898,17 @@
 }
 
 .breadcrumb-item:hover {
-  background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.9);
 }
 
 .breadcrumb-item.root {
   color: #E84A7F;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .breadcrumb-item.current {
-  color: #e7ebf3;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
   cursor: default;
 }
 
@@ -952,15 +950,13 @@
 }
 
 .inline-bullet-row.focused {
-  background: rgba(232, 74, 127, 0.08);
+  /* Background color is applied dynamically via inline style based on entity type */
 }
 
 .inline-bullet-row.zoomed-title {
   margin-bottom: 16px;
-  padding: 12px 16px;
-  background: rgba(232, 74, 127, 0.1);
-  border-radius: 8px;
-  border: 1px solid rgba(232, 74, 127, 0.2);
+  padding: 8px 0;
+  /* Minimal design - no background or border */
 }
 
 /* Toggle Button (expand/collapse) */
@@ -1234,10 +1230,8 @@
 
 .observations-section {
   margin: 16px 0 24px;
-  padding: 16px;
-  background: rgba(232, 74, 127, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid rgba(232, 74, 127, 0.3);
+  padding: 0;
+  /* Minimal design - no background or border */
 }
 
 .observations-header {
@@ -1258,8 +1252,8 @@
 .observations-count {
   font-size: 11px;
   padding: 2px 6px;
-  background: rgba(232, 74, 127, 0.2);
-  color: #E84A7F;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
   border-radius: 10px;
 }
 
@@ -1271,12 +1265,13 @@
 
 .observation-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   padding: 6px 8px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   transition: background 0.15s ease;
+  min-height: 28px;
 }
 
 .observation-item:hover {
@@ -1287,7 +1282,8 @@
   color: rgba(255, 255, 255, 0.3);
   font-weight: 500;
   flex-shrink: 0;
-  margin-top: 1px;
+  width: 12px;
+  text-align: center;
 }
 
 .observation-text {

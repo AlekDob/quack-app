@@ -1209,6 +1209,57 @@ fn add_mcp_memory_observations_impl(name: String, new_observations: Vec<String>)
     Ok(true)
 }
 
+/// Update observations of an existing MCP entity (replace all observations)
+#[tauri::command]
+pub fn update_mcp_memory_observations(name: String, observations: Vec<String>) -> Result<bool, String> {
+    update_mcp_memory_observations_impl(name, observations).map_err(|err| err.to_string())
+}
+
+fn update_mcp_memory_observations_impl(name: String, new_observations: Vec<String>) -> Result<bool> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found in NPX cache"))?;
+
+    let file_path = PathBuf::from(&memory_path);
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Cannot read MCP memory file: {:?}", file_path))?;
+
+    let mut new_lines: Vec<String> = Vec::new();
+    let mut found = false;
+
+    // Update the entity's observations (replace all)
+    for line in content.lines() {
+        let line_trimmed = line.trim();
+        if line_trimmed.is_empty() {
+            continue;
+        }
+
+        // Check if this is the entity to update
+        if let Ok(mut entity) = serde_json::from_str::<MCPMemoryEntity>(line_trimmed) {
+            if entity.entity_type_marker == "entity" && entity.name == name {
+                // Replace all observations
+                entity.observations = new_observations.clone();
+                let updated_line = serde_json::to_string(&entity)?;
+                new_lines.push(updated_line);
+                found = true;
+                continue;
+            }
+        }
+
+        new_lines.push(line_trimmed.to_string());
+    }
+
+    if !found {
+        return Ok(false);
+    }
+
+    // Write back the updated content
+    let new_content = new_lines.join("\n") + "\n";
+    fs::write(&file_path, new_content)
+        .with_context(|| format!("Cannot write MCP memory file: {:?}", file_path))?;
+
+    Ok(true)
+}
+
 /// Input for creating a new MCP memory relation
 #[derive(Deserialize, Debug)]
 pub struct CreateMCPRelationInput {
