@@ -936,9 +936,10 @@
 /* Inline Bullet Row */
 .inline-bullet-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Align items to top for multiline */
   gap: 4px;
-  padding: 4px 0;
+  padding: 4px 16px; /* Equal horizontal padding */
+  padding-right: 100px; /* Extra space for tag badge */
   min-height: 32px;
   border-radius: 4px;
   transition: background 0.1s ease;
@@ -967,6 +968,7 @@
   width: 20px;
   height: 20px;
   padding: 0;
+  margin-top: 6px; /* Align with first line of multiline text */
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.3);
@@ -997,6 +999,7 @@
 .inline-bullet-point {
   width: 8px;
   height: 8px;
+  margin-top: 12px; /* Align with first line of multiline text */
   border-radius: 50%;
   background: #6b7280;
   border: none;
@@ -1025,10 +1028,11 @@
   box-shadow: none;
 }
 
-/* Inline Input */
+/* Inline Input (textarea for multiline support) */
 .inline-bullet-input {
   flex: 1;
   min-width: 0;
+  width: 100%;
   background: transparent;
   border: none;
   outline: none;
@@ -1037,16 +1041,21 @@
   line-height: 1.6;
   padding: 4px 8px;
   margin-left: 4px;
+  /* Textarea-specific styles */
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  min-height: 24px;
+  max-height: none;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .inline-bullet-input::placeholder {
   color: rgba(255, 255, 255, 0.25);
 }
 
-.inline-bullet-input:focus {
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 4px;
-}
+/* No separate focus background - handled by parent row with dynamic color */
 
 .inline-bullet-input.zoomed-input {
   font-size: 18px;
@@ -1054,14 +1063,16 @@
   color: #E84A7F;
 }
 
-/* Supertag Badge */
+/* Supertag Badge - positioned absolutely at the end, aligned to top */
 .inline-bullet-tag {
+  position: absolute;
+  right: 12px; /* Match row padding */
+  top: 8px; /* Align with first line of text */
   font-size: 11px;
   font-weight: 500;
   padding: 2px 6px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
-  flex-shrink: 0;
 }
 
 /* Children Container */
@@ -1147,81 +1158,6 @@
 
 .inline-bullet-container {
   animation: bulletAppear 0.15s ease-out;
-}
-
-/* ===================================
-   DRAG & DROP STYLES
-   =================================== */
-
-/* Drag handle - visible on hover */
-.inline-bullet-drag-handle {
-  position: absolute;
-  left: -20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  opacity: 0;
-  color: rgba(255, 255, 255, 0.3);
-  cursor: grab;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.inline-bullet-row:hover .inline-bullet-drag-handle {
-  opacity: 1;
-}
-
-.inline-bullet-drag-handle:hover {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.inline-bullet-drag-handle:active {
-  cursor: grabbing;
-  color: #E84A7F;
-}
-
-/* Sortable wrapper */
-.sortable-bullet-wrapper {
-  position: relative;
-}
-
-.sortable-bullet-wrapper.dragging {
-  z-index: 1000;
-}
-
-.sortable-bullet-wrapper.dragging .inline-bullet-row {
-  background: rgba(232, 74, 127, 0.15);
-  border-radius: 6px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.sortable-bullet-wrapper.dragging .inline-bullet-drag-handle {
-  opacity: 1;
-  color: #E84A7F;
-}
-
-/* Drag handle area - captures drag events */
-.drag-handle-area {
-  cursor: grab;
-}
-
-.drag-handle-area:active {
-  cursor: grabbing;
-}
-
-/* Drop indicator animation */
-@keyframes dropPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(232, 74, 127, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(232, 74, 127, 0.2);
-  }
-}
-
-.sortable-bullet-wrapper[data-is-over="true"] .inline-bullet-row {
-  animation: dropPulse 0.6s ease infinite;
 }
 
 /* ===================================
@@ -1344,4 +1280,109 @@
 
 .observation-item.new-observation .observation-bullet {
   color: #E84A7F;
+}
+
+/* ===================================
+   INLINE AUTOCOMPLETE (for #tags and @mentions)
+   =================================== */
+
+.inline-bullet-input-wrapper {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.inline-autocomplete {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 200px;
+  max-width: 320px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: rgba(18, 20, 27, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  z-index: 1000;
+}
+
+.inline-autocomplete-header {
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.inline-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.inline-autocomplete-item:hover,
+.inline-autocomplete-item.selected {
+  background: rgba(232, 74, 127, 0.12);
+}
+
+.inline-autocomplete-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.inline-autocomplete-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #e7ebf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inline-autocomplete-new {
+  padding: 2px 6px;
+  background: rgba(232, 74, 127, 0.2);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #E84A7F;
+  text-transform: uppercase;
+}
+
+.inline-autocomplete-type {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Scrollbar for inline autocomplete */
+.inline-autocomplete::-webkit-scrollbar {
+  width: 4px;
+}
+
+.inline-autocomplete::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inline-autocomplete::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
 }

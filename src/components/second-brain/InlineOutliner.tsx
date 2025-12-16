@@ -1,10 +1,9 @@
 import { memo, useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronRight, GripVertical } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -12,7 +11,6 @@ import {
 import type { DragEndEvent } from '@dnd-kit/core';
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -24,12 +22,15 @@ import {
   deleteMCPRelation,
   addMCPObservations,
   updateMCPObservations,
+  updateMCPEntityType,
   generateEntityName,
   categoryToEntityType,
   categoryToRelationType,
+  mcpMemoryService,
 } from '../../services/mcpMemoryService';
 import { parseMentions, parseSupertag } from '../../services/outlineTreeBuilder';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
+import { SUPERTAGS } from './EntityAutocomplete';
 
 /**
  * Get bullet/entity color based on entity type
@@ -52,6 +53,123 @@ const getEntityColor = (entityType: string): string => {
   };
   return colors[entityType.toLowerCase()] || '#6b7280';
 };
+
+/**
+ * Detect trigger and query from input value at cursor position
+ */
+function detectTrigger(value: string, cursorPos: number): {
+  trigger: '@' | '#' | null;
+  query: string;
+  startIndex: number;
+} {
+  let startIndex = cursorPos - 1;
+
+  while (startIndex >= 0) {
+    const char = value[startIndex];
+    if (char === '@' || char === '#') {
+      const query = value.slice(startIndex + 1, cursorPos);
+      if (!query.includes(' ')) {
+        return { trigger: char as '@' | '#', query, startIndex };
+      }
+      return { trigger: null, query: '', startIndex: -1 };
+    }
+    if (char === ' ') {
+      return { trigger: null, query: '', startIndex: -1 };
+    }
+    startIndex--;
+  }
+  return { trigger: null, query: '', startIndex: -1 };
+}
+
+interface InlineAutocompleteProps {
+  trigger: '@' | '#';
+  query: string;
+  selectedIndex: number;
+  onSelect: (value: string, type: '@' | '#') => void;
+}
+
+/** Autocomplete item type */
+interface AutocompleteItem {
+  value: string;
+  label: string;
+  color: string;
+  isNew?: boolean;
+  entityType?: string;
+}
+
+/**
+ * Get autocomplete items based on trigger type
+ */
+function getAutocompleteItems(trigger: '@' | '#', query: string): AutocompleteItem[] {
+  if (trigger === '#') {
+    const filtered = SUPERTAGS.filter(st =>
+      st.value.toLowerCase().includes(query.toLowerCase())
+    );
+    const exactMatch = SUPERTAGS.some(st => st.value.toLowerCase() === query.toLowerCase());
+    if (query && !exactMatch) {
+      return [
+        { value: query, label: `Create #${query}`, color: '#6b7280', isNew: true },
+        ...filtered,
+      ];
+    }
+    return filtered;
+  }
+
+  const graph = mcpMemoryService.getKnowledgeGraph();
+  if (!graph) return [];
+
+  return graph.entities
+    .filter(e => e.name.toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 8)
+    .map(e => ({
+      value: e.name,
+      label: e.observations[0] || e.name,
+      color: getEntityColor(e.entityType),
+      entityType: e.entityType,
+    }));
+}
+
+/**
+ * Inline autocomplete dropdown for #tags and @mentions
+ */
+function InlineAutocomplete({ trigger, query, selectedIndex, onSelect }: InlineAutocompleteProps) {
+  const items = useMemo(() => getAutocompleteItems(trigger, query), [trigger, query]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="inline-autocomplete">
+      <div className="inline-autocomplete-header">
+        {trigger === '#' ? 'Supertags' : 'Entities'}
+      </div>
+      {items.map((item, index) => (
+        <button
+          key={`${trigger}-${item.value}`}
+          type="button"
+          className={`inline-autocomplete-item ${index === selectedIndex ? 'selected' : ''}`}
+          onClick={() => onSelect(item.value, trigger)}
+          onMouseDown={(e) => e.preventDefault()} // Prevent blur
+        >
+          <span
+            className="inline-autocomplete-indicator"
+            style={{ backgroundColor: item.color }}
+          />
+          <span className="inline-autocomplete-label">
+            {trigger === '#' ? `#${item.value}` : item.label}
+          </span>
+          {item.isNew && (
+            <span className="inline-autocomplete-new">new</span>
+          )}
+          {item.entityType && (
+            <span className="inline-autocomplete-type">
+              {item.entityType}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Convert hex color to rgba with specified alpha
@@ -172,8 +290,33 @@ function InlineBullet({
   allNodes,
 }: InlineBulletProps) {
   const [content, setContent] = useState(node.content);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const hasChildren = node.children.length > 0;
+
+  // Detect trigger for autocomplete
+  const triggerInfo = useMemo(
+    () => detectTrigger(content, cursorPosition),
+    [content, cursorPosition]
+  );
+
+  // Get autocomplete items
+  const autocompleteItems = useMemo((): AutocompleteItem[] => {
+    if (!triggerInfo.trigger) return [];
+    return getAutocompleteItems(triggerInfo.trigger, triggerInfo.query);
+  }, [triggerInfo]);
+
+  // Reset autocomplete index when items change
+  useEffect(() => {
+    setAutocompleteIndex(0);
+  }, [autocompleteItems.length]);
+
+  // Show autocomplete when trigger is detected
+  useEffect(() => {
+    setShowAutocomplete(!!triggerInfo.trigger && autocompleteItems.length > 0);
+  }, [triggerInfo.trigger, autocompleteItems.length]);
 
   // Focus input when this bullet is focused
   useEffect(() => {
@@ -190,12 +333,74 @@ function InlineBullet({
     setContent(node.content);
   }, [node.content]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  // Auto-resize textarea on mount and when content changes
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (textarea) {
+      // Reset height first to get accurate scrollHeight
+      textarea.style.height = '0';
+      // Set to scrollHeight but ensure minimum of 24px (single line)
+      const newHeight = Math.max(24, textarea.scrollHeight);
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, [content]);
+
+  // Handle autocomplete selection
+  const handleAutocompleteSelect = useCallback((value: string, type: '@' | '#') => {
+    const { startIndex } = triggerInfo;
+    if (startIndex >= 0) {
+      const before = content.slice(0, startIndex);
+      const after = content.slice(cursorPosition);
+      const newContent = `${before}${type}${value} ${after}`;
+      setContent(newContent);
+      setShowAutocomplete(false);
+
+      // Set cursor position after the inserted value
+      const newCursorPos = startIndex + type.length + value.length + 1;
+      setTimeout(() => {
+        inputRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+  }, [content, cursorPosition, triggerInfo]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle autocomplete navigation first
+    if (showAutocomplete && autocompleteItems.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setAutocompleteIndex(prev => (prev + 1) % autocompleteItems.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setAutocompleteIndex(prev => (prev - 1 + autocompleteItems.length) % autocompleteItems.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const selectedItem = autocompleteItems[autocompleteIndex];
+        if (selectedItem && triggerInfo.trigger) {
+          handleAutocompleteSelect(selectedItem.value, triggerInfo.trigger);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowAutocomplete(false);
+        return;
+      }
+    }
+
     const cursorAtStart = inputRef.current?.selectionStart === 0;
     const cursorAtEnd = inputRef.current?.selectionStart === content.length;
 
     switch (e.key) {
       case 'Enter':
+        // Shift+Enter = new line in textarea
+        if (e.shiftKey) {
+          // Allow default behavior (new line)
+          return;
+        }
         e.preventDefault();
         // Save current content first
         if (content !== node.content) {
@@ -258,10 +463,17 @@ function InlineBullet({
         inputRef.current?.blur();
         break;
     }
-  }, [content, node, onUpdate, onCreateBelow, onDelete, onIndent, onOutdent, onMoveUp, onMoveDown]);
+  }, [content, node, onUpdate, onCreateBelow, onDelete, onIndent, onOutdent, onMoveUp, onMoveDown, showAutocomplete, autocompleteItems, autocompleteIndex, triggerInfo, handleAutocompleteSelect]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
+    setCursorPosition(e.target.selectionStart || 0);
+
+    // Auto-resize textarea
+    const textarea = e.target;
+    textarea.style.height = '0';
+    const newHeight = Math.max(24, textarea.scrollHeight);
+    textarea.style.height = `${newHeight}px`;
   }, []);
 
   const handleBlur = useCallback(() => {
@@ -288,11 +500,12 @@ function InlineBullet({
 
 
   // Dynamic background color for focused state based on entity type
+  // Use marginLeft for depth indentation to preserve CSS padding
   const focusedStyle = useMemo(() => {
-    if (!isFocused) return { paddingLeft: isZoomed ? 0 : node.depth * 24 };
+    if (!isFocused) return { marginLeft: isZoomed ? 0 : node.depth * 24 };
     const entityColor = getEntityColor(node.entityType);
     return {
-      paddingLeft: isZoomed ? 0 : node.depth * 24,
+      marginLeft: isZoomed ? 0 : node.depth * 24,
       backgroundColor: hexToRgba(entityColor, 0.08),
     };
   }, [isFocused, isZoomed, node.depth, node.entityType]);
@@ -304,21 +517,16 @@ function InlineBullet({
         onClick={handleRowClick}
         style={focusedStyle}
       >
-        {/* Drag handle - only visible on hover */}
-        {!isZoomed && (
-          <div className="inline-bullet-drag-handle">
-            <GripVertical size={12} />
-          </div>
+        {/* Expand/Collapse toggle - only render if has children */}
+        {hasChildren && (
+          <button
+            type="button"
+            className={`inline-bullet-toggle has-children ${isExpanded ? 'expanded' : ''}`}
+            onClick={handleToggle}
+          >
+            <ChevronRight size={12} />
+          </button>
         )}
-
-        {/* Expand/Collapse toggle */}
-        <button
-          type="button"
-          className={`inline-bullet-toggle ${hasChildren ? 'has-children' : ''} ${isExpanded ? 'expanded' : ''}`}
-          onClick={handleToggle}
-        >
-          {hasChildren && <ChevronRight size={12} />}
-        </button>
 
         {/* Bullet point - click to zoom */}
         <button
@@ -329,18 +537,30 @@ function InlineBullet({
           title="Click to zoom into this node"
         />
 
-        {/* Inline editable content */}
-        <input
-          ref={inputRef}
-          type="text"
-          className={`inline-bullet-input ${isZoomed ? 'zoomed-input' : ''}`}
-          value={content}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          placeholder="Type here... (Enter: new bullet, Tab: indent)"
-          style={isZoomed ? { color: getEntityColor(node.entityType) } : undefined}
-        />
+        {/* Inline editable content with autocomplete */}
+        <div className="inline-bullet-input-wrapper">
+          <textarea
+            ref={inputRef}
+            className={`inline-bullet-input ${isZoomed ? 'zoomed-input' : ''}`}
+            value={content}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            placeholder="Type here... (Enter: new bullet, Tab: indent)"
+            style={isZoomed ? { color: getEntityColor(node.entityType) } : undefined}
+            rows={1}
+          />
+
+          {/* Autocomplete dropdown */}
+          {showAutocomplete && triggerInfo.trigger && (
+            <InlineAutocomplete
+              trigger={triggerInfo.trigger}
+              query={triggerInfo.query}
+              selectedIndex={autocompleteIndex}
+              onSelect={handleAutocompleteSelect}
+            />
+          )}
+        </div>
 
         {/* Supertag badge */}
         {node.entityType && node.entityType !== 'fact' && (
@@ -446,16 +666,59 @@ export function InlineOutliner({
   const [isCreating, setIsCreating] = useState(false);
   const newBulletRef = useRef<HTMLInputElement>(null);
   const [newBulletContent, setNewBulletContent] = useState('');
+  const [newBulletCursor, setNewBulletCursor] = useState(0);
+  const [newBulletAutocompleteIndex, setNewBulletAutocompleteIndex] = useState(0);
+  const [showNewBulletAutocomplete, setShowNewBulletAutocomplete] = useState(false);
+
+  // Detect trigger for new bullet autocomplete
+  const newBulletTriggerInfo = useMemo(
+    () => detectTrigger(newBulletContent, newBulletCursor),
+    [newBulletContent, newBulletCursor]
+  );
+
+  // Get autocomplete items for new bullet
+  const newBulletAutocompleteItems = useMemo((): AutocompleteItem[] => {
+    if (!newBulletTriggerInfo.trigger) return [];
+    return getAutocompleteItems(newBulletTriggerInfo.trigger, newBulletTriggerInfo.query);
+  }, [newBulletTriggerInfo]);
+
+  // Reset autocomplete index when items change
+  useEffect(() => {
+    setNewBulletAutocompleteIndex(0);
+  }, [newBulletAutocompleteItems.length]);
+
+  // Show autocomplete when trigger is detected
+  useEffect(() => {
+    setShowNewBulletAutocomplete(
+      !!newBulletTriggerInfo.trigger && newBulletAutocompleteItems.length > 0
+    );
+  }, [newBulletTriggerInfo.trigger, newBulletAutocompleteItems.length]);
+
+  // Handle autocomplete selection for new bullet
+  const handleNewBulletAutocompleteSelect = useCallback((value: string, type: '@' | '#') => {
+    const { startIndex } = newBulletTriggerInfo;
+    if (startIndex >= 0) {
+      const before = newBulletContent.slice(0, startIndex);
+      const after = newBulletContent.slice(newBulletCursor);
+      const newContent = `${before}${type}${value} ${after}`;
+      setNewBulletContent(newContent);
+      setShowNewBulletAutocomplete(false);
+
+      const newCursorPos = startIndex + type.length + value.length + 1;
+      setTimeout(() => {
+        newBulletRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+        setNewBulletCursor(newCursorPos);
+      }, 0);
+    }
+  }, [newBulletContent, newBulletCursor, newBulletTriggerInfo]);
 
   // DnD Kit sensors with activation constraints
+  // NOTE: KeyboardSensor removed because it intercepts Space key in inputs
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8, // 8px movement required before drag starts
       },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
@@ -511,8 +774,46 @@ export function InlineOutliner({
   }, []);
 
   const handleNewBulletKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle autocomplete navigation first
+    if (showNewBulletAutocomplete && newBulletAutocompleteItems.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setNewBulletAutocompleteIndex(prev => (prev + 1) % newBulletAutocompleteItems.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setNewBulletAutocompleteIndex(prev =>
+          (prev - 1 + newBulletAutocompleteItems.length) % newBulletAutocompleteItems.length
+        );
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const selectedItem = newBulletAutocompleteItems[newBulletAutocompleteIndex];
+        if (selectedItem && newBulletTriggerInfo.trigger) {
+          handleNewBulletAutocompleteSelect(selectedItem.value, newBulletTriggerInfo.trigger);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowNewBulletAutocomplete(false);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && newBulletContent.trim()) {
       e.preventDefault();
+
+      // If autocomplete is open, select the item instead of submitting
+      if (showNewBulletAutocomplete && newBulletAutocompleteItems.length > 0) {
+        const selectedItem = newBulletAutocompleteItems[newBulletAutocompleteIndex];
+        if (selectedItem && newBulletTriggerInfo.trigger) {
+          handleNewBulletAutocompleteSelect(selectedItem.value, newBulletTriggerInfo.trigger);
+          return;
+        }
+      }
 
       try {
         // Parse content
@@ -584,6 +885,7 @@ export function InlineOutliner({
 
         // Clear and keep focus for next entry
         setNewBulletContent('');
+        setNewBulletCursor(0);
         await onRefresh();
 
         // Focus new bullet input again
@@ -596,9 +898,10 @@ export function InlineOutliner({
       }
     } else if (e.key === 'Escape') {
       setNewBulletContent('');
+      setNewBulletCursor(0);
       newBulletRef.current?.blur();
     }
-  }, [newBulletContent, onRefresh, zoomedNode]);
+  }, [newBulletContent, onRefresh, zoomedNode, showNewBulletAutocomplete, newBulletAutocompleteItems, newBulletAutocompleteIndex, newBulletTriggerInfo, handleNewBulletAutocompleteSelect]);
 
   const handleDelete = useCallback(async (nodeId: string) => {
     try {
@@ -625,19 +928,45 @@ export function InlineOutliner({
         return;
       }
 
-      // The title is observations[0], so we update it while keeping other observations
-      const newObservations = [...node.observations];
-      newObservations[0] = content;
+      // Check if there's a #tag in the content (user wants to change entity type)
+      const newTag = parseSupertag(content);
 
-      const success = await updateMCPObservations(nodeId, newObservations);
-      if (success) {
+      // Clean content by removing the tag
+      const cleanedContent = content
+        .replace(/#[a-zA-Z0-9_-]+/g, '')
+        .trim();
+
+      // Update observations with cleaned content
+      const newObservations = [...node.observations];
+      newObservations[0] = cleanedContent || content; // Use cleaned content, fallback to original if empty
+
+      // If there's a new tag, update entity type (even if same - categoryToEntityType normalizes)
+      if (newTag) {
+        const newEntityType = categoryToEntityType(newTag);
+        console.log('[InlineOutliner] Tag detected:', newTag, '-> entityType:', newEntityType, 'current:', node.entityType);
+
+        // Always try to update if tag is present (handles custom tags too)
+        const typeSuccess = await updateMCPEntityType(nodeId, newEntityType);
+        if (typeSuccess) {
+          // Also update observations with cleaned content
+          await updateMCPObservations(nodeId, newObservations);
+          toast.success(`Updated to #${newTag}`);
+          await onRefresh(); // Refresh to see the new type
+          return;
+        }
+      }
+
+      // No tag - just update observations
+      const obsSuccess = await updateMCPObservations(nodeId, newObservations);
+      if (obsSuccess) {
         toast.success('Updated');
+        await onRefresh();
       }
     } catch (err) {
       console.error('Failed to update:', err);
       toast.error('Failed to update');
     }
-  }, [allNodes]);
+  }, [allNodes, onRefresh]);
 
   /**
    * Indent: Make this node a child of newParentId
@@ -896,17 +1225,30 @@ export function InlineOutliner({
             {/* New bullet input - only at root level (zoom mode uses DETAILS section) */}
             {!zoomedNode && (
               <div className="inline-bullet-row new-bullet">
-                <div className="inline-bullet-toggle" />
                 <div className="inline-bullet-point new" />
-                <input
-                  ref={newBulletRef}
-                  type="text"
-                  className="inline-bullet-input"
-                  value={newBulletContent}
-                  onChange={(e) => setNewBulletContent(e.target.value)}
-                  onKeyDown={handleNewBulletKeyDown}
-                  placeholder="Type a new thought... #tag @mention"
-                />
+                <div className="inline-bullet-input-wrapper">
+                  <input
+                    ref={newBulletRef}
+                    type="text"
+                    className="inline-bullet-input"
+                    value={newBulletContent}
+                    onChange={(e) => {
+                      setNewBulletContent(e.target.value);
+                      setNewBulletCursor(e.target.selectionStart || 0);
+                    }}
+                    onKeyDown={handleNewBulletKeyDown}
+                    placeholder="Type a new thought... #tag @mention"
+                  />
+                  {/* Autocomplete dropdown for new bullet */}
+                  {showNewBulletAutocomplete && newBulletTriggerInfo.trigger && (
+                    <InlineAutocomplete
+                      trigger={newBulletTriggerInfo.trigger}
+                      query={newBulletTriggerInfo.query}
+                      selectedIndex={newBulletAutocompleteIndex}
+                      onSelect={handleNewBulletAutocompleteSelect}
+                    />
+                  )}
+                </div>
               </div>
             )}
           </div>

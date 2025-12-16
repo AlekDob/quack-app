@@ -516,6 +516,8 @@ export function generateEntityName(content: string): string {
 
 /**
  * Helper: Map category to MCP entity type
+ * If the category is not in the predefined list, use the category itself as the type
+ * This allows custom tags like #workout, #health, etc.
  */
 export function categoryToEntityType(category: string): string {
   const typeMap: Record<string, string> = {
@@ -530,9 +532,12 @@ export function categoryToEntityType(category: string): string {
     idea: "idea",
     person: "person",
     project: "project",
+    technology: "technology",
+    tool: "tool",
   };
 
-  return typeMap[category.toLowerCase()] || "fact";
+  // Return the mapped type or the category itself for custom tags
+  return typeMap[category.toLowerCase()] || category.toLowerCase();
 }
 
 /**
@@ -649,6 +654,42 @@ export async function updateMCPObservations(
   } catch (error) {
     console.error("[MCPMemoryService] Failed to update observations:", error);
     toast.error("Failed to update entity");
+    return false;
+  }
+}
+
+/**
+ * Update the entity type of an MCP entity
+ * Used for changing the #supertag of an existing entity
+ *
+ * @param name - Entity name
+ * @param entityType - New entity type (e.g., "fact", "pattern", "person")
+ * @returns true if updated, false if entity not found
+ */
+export async function updateMCPEntityType(
+  name: string,
+  entityType: string
+): Promise<boolean> {
+  try {
+    const updated = await invoke<boolean>("update_mcp_memory_entity_type", {
+      name,
+      entityType,
+    });
+
+    if (updated) {
+      console.log("[MCPMemoryService] Entity type updated for:", name, "->", entityType);
+      // Refresh cache after update
+      await mcpMemoryService.refreshFromFile();
+      // Emit event so UI components can react
+      window.dispatchEvent(new CustomEvent('MCP_MEMORY_UPDATED'));
+    } else {
+      console.warn("[MCPMemoryService] Entity not found:", name);
+    }
+
+    return updated;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to update entity type:", error);
+    toast.error("Failed to update entity type");
     return false;
   }
 }

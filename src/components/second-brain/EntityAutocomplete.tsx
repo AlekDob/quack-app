@@ -17,18 +17,21 @@ interface AutocompleteItem {
   entityType?: string;
 }
 
-// Predefined supertags (entity types)
-const SUPERTAGS = [
-  { value: 'fact', label: 'Fact' },
-  { value: 'task', label: 'Task' },
-  { value: 'note', label: 'Note' },
-  { value: 'idea', label: 'Idea' },
-  { value: 'preference', label: 'Preference' },
-  { value: 'decision', label: 'Decision' },
-  { value: 'pattern', label: 'Pattern' },
-  { value: 'context', label: 'Context' },
-  { value: 'person', label: 'Person' },
-  { value: 'project', label: 'Project' },
+// Predefined supertags (entity types) with colors
+export const SUPERTAGS = [
+  { value: 'fact', label: 'Fact', color: '#10b981' },
+  { value: 'task', label: 'Task', color: '#f59e0b' },
+  { value: 'note', label: 'Note', color: '#8b5cf6' },
+  { value: 'idea', label: 'Idea', color: '#10b981' },
+  { value: 'preference', label: 'Preference', color: '#3b82f6' },
+  { value: 'decision', label: 'Decision', color: '#8b5cf6' },
+  { value: 'pattern', label: 'Pattern', color: '#f97316' },
+  { value: 'context', label: 'Context', color: '#6b7280' },
+  { value: 'person', label: 'Person', color: '#E84A7F' },
+  { value: 'project', label: 'Project', color: '#E84A7F' },
+  { value: 'mistake', label: 'Mistake', color: '#ef4444' },
+  { value: 'technology', label: 'Technology', color: '#00d9ff' },
+  { value: 'tool', label: 'Tool', color: '#00d9ff' },
 ];
 
 /**
