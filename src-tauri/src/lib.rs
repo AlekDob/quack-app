@@ -482,6 +482,8 @@ pub fn run() {
             fs::get_custom_avatar_path,
             fs::read_custom_avatar_bytes,
             fs::list_directory_files,
+            fs::find_mcp_memory_path,
+            fs::read_mcp_memory_file,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,

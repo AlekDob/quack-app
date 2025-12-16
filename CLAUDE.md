@@ -8,13 +8,6 @@ Your name is **Agent Magnus**, and you're the **Feature Coordinator**.
 **Notes:**
 Sei un esperto nell’implementare nuove feature
 
-**Selected Rules:**
-*IMPORTANT: Follow these rules strictly. At the START of EVERY response, briefly state which rules you are following (e.g., "Following rules: X, Y, Z").*
-
-| Rule | Path | Scope |
-|------|------|-------|
-| Analyze-Plan-act-test-review-document | `/Users/alekdob/Desktop/Dev/Personal/quack-app/.claude/rules/Analyze-Plan-act-test-review-document.md` | project |
-
 <!-- QUACK_AGENT_HEADER_END -->
 
 ## Project Context

@@ -44,6 +44,7 @@ import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
 import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
 import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
+import { runDroidInBackground } from "./services/backgroundAgentService";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import TabBar, { type Tab } from "./components/TabBar";
 import ActionIcons from "./components/ActionIcons";
@@ -88,6 +89,11 @@ import {
   saveAgentChatsToStorage,
   loadAgentChatsFromStorage,
 } from "./services/agentChatStorage";
+import { extractAndSaveMemories, extractManualMemoryFromInput } from "./services/memoryIntegration";
+import { getMemorySettings, addMemory } from "./services/memoryStorage";
+import { generateMemoryId } from "./services/memoryExtractor";
+import { buildMemoryObserverPrompt } from "./services/memoryObserverPrompt";
+import { dispatchMCPMemoryUpdate, type MCPKnowledgeGraph } from "./hooks/useUnifiedMemory";
 import { calculateProjectOverhead } from "./services/conversationRecovery";
 import { getDuckdroidUrl } from "./utils/agentAvatars";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
@@ -294,6 +300,75 @@ function AppContent() {
     Record<string, DirectoryEntry[]>
   >({});
   const [explorerRoot, setExplorerRoot] = useState<string | null>(null);
+
+  // 🧠 QUACK MEMORY: Listen for memory-observer background task completion
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    let unlisten: (() => void) | undefined;
+
+    listen<{ taskId: string; result: { success: boolean; output?: string; error?: string } }>(
+      'background-task-complete',
+      async (event) => {
+        const { result } = event.payload;
+
+        // Only process successful memory-observer tasks
+        if (!result.success || !result.output) return;
+
+        // Check if this looks like a memory-observer result (contains JSON with memories)
+        if (!result.output.includes('"memories"')) return;
+
+        try {
+          // Extract JSON from the output (may have surrounding text)
+          const jsonMatch = result.output.match(/\{[\s\S]*"memories"[\s\S]*\}/);
+          if (!jsonMatch) return;
+
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (!parsed.memories || !Array.isArray(parsed.memories)) return;
+
+          console.log(`[Memory Observer] Received ${parsed.memories.length} memories from background task`);
+
+          // Save each extracted memory
+          for (const mem of parsed.memories) {
+            if (mem.content && mem.category) {
+              const now = Date.now();
+              await addMemory({
+                id: generateMemoryId(),
+                content: mem.content,
+                category: mem.category as 'preference' | 'fact' | 'decision' | 'pattern' | 'mistake' | 'context',
+                confidence: mem.confidence || 'medium',
+                scope: explorerPath ? 'project' : 'global',
+                keywords: mem.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3).slice(0, 10),
+                projectPath: explorerPath || undefined,
+                createdAt: now,
+                lastAccessedAt: now,
+                accessCount: 0,
+                userVerified: false,
+                isArchived: false,
+              });
+              console.log(`[Memory Observer] Saved memory: ${mem.category} - "${mem.content.substring(0, 50)}..."`);
+            }
+          }
+
+          // Show toast if memories were saved
+          if (parsed.memories.length > 0) {
+            toast.success(`Extracted ${parsed.memories.length} memory(s)`, {
+              description: 'From tool execution analysis',
+              duration: 3000,
+            });
+          }
+        } catch (err) {
+          console.warn('[Memory Observer] Failed to parse memories:', err);
+        }
+      }
+    ).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [tauriAvailable, explorerPath]);
 
   // Available droids for @mention invocation (loaded from .claude/agents directories)
   const [availableDroids, setAvailableDroids] = useState<DroidMetadata[]>([]);
@@ -1129,38 +1204,125 @@ function AppContent() {
               }
             }
 
-            const agentSession = chatSessions.get(agentId);
-            console.log('🦆 [Telegram] Agent completed:', {
-              agentId,
-              agentName: agentMetadata?.name,
-              workingDir: agentMetadata?.cwd,
-              hasSession: !!agentSession,
-              isError: claudeEvent.is_error,
-              hasMetadata: !!agentMetadata,
-            });
-
-            // 🦆 Telegram notification now handled by notifyAgentReady in the "result" handler above
-
-            // Get all events from the last message to check for Write/Edit tools
-            setChatSessions((prev) => {
-              const agentMessages = prev.get(agentId) ?? [];
+            // 🧠 QUACK MEMORY: Use setChatSessions callback to access CURRENT state
+            // This avoids stale closure issue where chatSessions.get() returns old data
+            setChatSessions((currentSessions) => {
+              const agentMessages = currentSessions.get(agentId) ?? [];
               const lastMsg = agentMessages[agentMessages.length - 1];
+
+              console.log('🦆 [Telegram] Agent completed:', {
+                agentId,
+                agentName: agentMetadata?.name,
+                workingDir: agentMetadata?.cwd,
+                hasSession: agentMessages.length > 0,
+                isError: claudeEvent.is_error,
+                hasMetadata: !!agentMetadata,
+              });
+
+              console.log('[Memory Observer DEBUG] Processing messages for agent:', agentId,
+                lastMsg ? { eventsCount: lastMsg.events?.length, role: lastMsg.role } : 'no lastMsg');
 
               if (lastMsg && lastMsg.events) {
                 let hasFileModifications = false;
+                const toolExecutions: Array<{ name: string; input: unknown }> = [];
+
+                console.log('[Memory Observer DEBUG] Events to process:', lastMsg.events.length);
 
                 // Check assistant events for Write/Edit tool uses
-                lastMsg.events.forEach((evt) => {
-                  if (evt.type === 'assistant' && evt.message?.content) {
-                    evt.message.content.forEach((content) => {
+                // Also check for MCP Memory read_graph results
+                lastMsg.events.forEach((evt, idx) => {
+                  console.log(`[Memory Observer DEBUG] Event ${idx}:`, evt.type,
+                    evt.type === 'assistant' ? `content blocks: ${(evt as any).message?.content?.length}` : '');
+
+                  if (evt.type === 'assistant' && (evt as any).message?.content) {
+                    ((evt as any).message.content as any[]).forEach((content) => {
+                      console.log('[Memory Observer DEBUG] Content block:', content.type,
+                        content.type === 'tool_use' ? `name: ${content.name}` : '');
+
                       if (content.type === 'tool_use') {
                         const toolName = content.name?.toLowerCase();
-                        const input = content.input as any;
+                        const input = content.input;
+
+                        console.log('[Memory Observer] Found tool_use:', toolName);
 
                         // Check if Write or Edit tools were used
                         if ((toolName === 'write' && input?.file_path) ||
                             (toolName === 'edit' && input?.file_path)) {
                           hasFileModifications = true;
+                        }
+
+                        // Collect tool executions for memory observer
+                        if (toolName && ['write', 'edit', 'bash'].includes(toolName)) {
+                          console.log('[Memory Observer] Adding to toolExecutions:', toolName);
+                          toolExecutions.push({ name: toolName, input });
+                        }
+                      }
+                    });
+                  }
+
+                  // 🧠 MCP MEMORY: Intercept mcp__memory__ tool calls and results
+                  // When AI uses MCP Memory tools, capture the data for Memory Panel
+
+                  // First, check for tool_use calls to mcp__memory__ tools
+                  if (evt.type === 'assistant' && (evt as any).message?.content) {
+                    ((evt as any).message.content as any[]).forEach((content) => {
+                      if (content.type === 'tool_use' && content.name?.startsWith('mcp__memory__')) {
+                        console.log('[MCP Memory] 🔧 Detected MCP Memory tool call:', content.name, content.input);
+                      }
+                    });
+                  }
+
+                  // Then check for tool_result responses
+                  if (evt.type === 'user' && (evt as any).message?.content) {
+                    const contentArray = (evt as any).message.content as any[];
+                    console.log('[MCP Memory DEBUG] User event content types:', contentArray.map((c: any) => c.type));
+
+                    contentArray.forEach((content) => {
+                      if (content.type === 'tool_result') {
+                        console.log('[MCP Memory DEBUG] tool_result found:', {
+                          tool_use_id: content.tool_use_id,
+                          contentType: typeof content.content,
+                          contentPreview: typeof content.content === 'string'
+                            ? content.content.substring(0, 200)
+                            : JSON.stringify(content.content).substring(0, 200)
+                        });
+
+                        // Check if this is a result from mcp__memory__read_graph
+                        // The content might be a string or have a text field
+                        const resultContent = typeof content.content === 'string'
+                          ? content.content
+                          : content.content?.[0]?.text || content.text || JSON.stringify(content.content);
+
+                        // Look for knowledge graph structure in the result
+                        if (resultContent && resultContent.includes('entities') && resultContent.includes('relations')) {
+                          console.log('[MCP Memory] 📊 Found potential knowledge graph data');
+                          try {
+                            // Try to parse the JSON from the result
+                            const jsonMatch = resultContent.match(/\{[\s\S]*"entities"[\s\S]*"relations"[\s\S]*\}/);
+                            if (jsonMatch) {
+                              const graphData = JSON.parse(jsonMatch[0]) as MCPKnowledgeGraph;
+                              console.log('[MCP Memory] ✅ Parsed knowledge graph:', {
+                                entities: graphData.entities?.length || 0,
+                                relations: graphData.relations?.length || 0,
+                                entityNames: graphData.entities?.map(e => e.name),
+                              });
+                              // Dispatch event to update Memory Panel
+                              dispatchMCPMemoryUpdate(graphData);
+                            } else {
+                              console.log('[MCP Memory] ⚠️ JSON match failed, trying direct parse');
+                              // Try direct parse
+                              const graphData = JSON.parse(resultContent) as MCPKnowledgeGraph;
+                              if (graphData.entities) {
+                                console.log('[MCP Memory] ✅ Direct parse succeeded:', {
+                                  entities: graphData.entities?.length || 0,
+                                  relations: graphData.relations?.length || 0,
+                                });
+                                dispatchMCPMemoryUpdate(graphData);
+                              }
+                            }
+                          } catch (parseErr) {
+                            console.warn('[MCP Memory] ❌ Failed to parse knowledge graph:', parseErr);
+                          }
                         }
                       }
                     });
@@ -1171,9 +1333,58 @@ function AppContent() {
                 if (hasFileModifications) {
                   setRefreshExplorerTrigger(prev => prev + 1);
                 }
+
+                // 🧠 QUACK MEMORY: Launch memory-observer for tool executions
+                // Uses built-in prompt (no external droid file needed)
+                if (toolExecutions.length > 0) {
+                  console.log(`[Memory Observer] Tool executions detected: ${toolExecutions.length}`,
+                    toolExecutions.map(t => t.name));
+
+                  // Launch async task outside of setter (to avoid blocking React)
+                  setTimeout(async () => {
+                    try {
+                      const settings = await getMemorySettings();
+                      console.log('[Memory Observer] Settings check:', {
+                        enabled: settings.enabled,
+                        llmExtractionTrigger: settings.llmExtractionTrigger,
+                        extractionMode: settings.extractionMode,
+                      });
+
+                      // Only run if memory is enabled and tool-based extraction is on
+                      if (settings.enabled && settings.llmExtractionTrigger === 'tool-based') {
+                        // Build the full prompt with embedded system instructions
+                        const memoryObserverPrompt = buildMemoryObserverPrompt(toolExecutions);
+
+                        console.log(`[Memory Observer] Launching for ${toolExecutions.length} tool(s):`,
+                          toolExecutions.map(t => t.name).join(', '));
+
+                        // Use runDroidInBackground but with built-in prompt
+                        runDroidInBackground(
+                          'quack-memory-observer',
+                          'Memory Observer',
+                          memoryObserverPrompt,
+                          {
+                            model: 'haiku',
+                            priority: 'low',
+                            workingDirectory: explorerPath || undefined,
+                          }
+                        );
+                      } else {
+                        console.log('[Memory Observer] Skipping - conditions not met:', {
+                          enabled: settings.enabled,
+                          trigger: settings.llmExtractionTrigger,
+                          expected: 'tool-based',
+                        });
+                      }
+                    } catch (err) {
+                      console.warn('[Memory Observer] Failed to launch:', err);
+                    }
+                  }, 0);
+                }
               }
 
-              return prev;
+              // Return unchanged - we're just reading, not modifying
+              return currentSessions;
             });
           }
         });
@@ -1399,6 +1610,27 @@ function AppContent() {
     // Populate ref for Telegram integration (on first call)
     if (!sendMessageForAgentRef.current) {
       sendMessageForAgentRef.current = sendMessageForAgent;
+    }
+
+    // 🧠 QUACK MEMORY: Check for manual '#' trigger to save memory directly
+    if (content.trim().startsWith('#')) {
+      try {
+        const savedMemory = await extractManualMemoryFromInput(
+          content,
+          activeId, // sessionId
+          explorerPath || undefined // projectPath
+        );
+        if (savedMemory) {
+          console.log(`[sendMessageForAgent] 🧠 Manual memory saved: ${savedMemory.category} - "${savedMemory.content.substring(0, 50)}..."`);
+          toast.success(`Memory saved: ${savedMemory.category}`, {
+            description: savedMemory.content.substring(0, 100),
+            duration: 3000,
+          });
+        }
+      } catch (memErr) {
+        console.warn('[sendMessageForAgent] Manual memory extraction failed:', memErr);
+      }
+      // Continue sending the message to the AI regardless
     }
 
     // 🦆 RACE CONDITION FIX: Ensure listener is ready BEFORE calling invoke
@@ -1671,6 +1903,22 @@ function AppContent() {
         },
       ];
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
+
+      // 🧠 Quack Memory: Auto-extract memories from AI response
+      try {
+        const workingDir = activeTerminal?.cwd ?? explorerPath;
+        const memoriesExtracted = await extractAndSaveMemories(
+          response.result,
+          response.session_id,
+          workingDir
+        );
+        if (memoriesExtracted > 0) {
+          console.log(`[sendMessageForAgent] 🧠 Extracted ${memoriesExtracted} memories`);
+        }
+      } catch (memErr) {
+        // Non-critical, don't block chat
+        console.warn('[sendMessageForAgent] Memory extraction failed:', memErr);
+      }
 
       // ✅ CRITICAL FIX: Save session ID for resume support
       setChatSessionIds((prev) => {

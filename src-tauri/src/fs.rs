@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fs, path::PathBuf};
 use anyhow::{anyhow, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -914,4 +914,120 @@ fn list_directory_files_impl(path: String, extension: String) -> Result<Vec<Stri
     files.sort();
 
     Ok(files)
+}
+
+// ============================================
+// MCP Memory File Operations
+// ============================================
+
+/// MCP Memory entity as stored in memory.jsonl
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MCPMemoryEntity {
+    #[serde(rename = "type")]
+    pub entity_type_marker: String,
+    pub name: String,
+    #[serde(rename = "entityType")]
+    pub entity_type: String,
+    pub observations: Vec<String>,
+}
+
+/// MCP Memory relation as stored in memory.jsonl
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MCPMemoryRelation {
+    #[serde(rename = "type")]
+    pub relation_type_marker: String,
+    pub from: String,
+    pub to: String,
+    #[serde(rename = "relationType")]
+    pub relation_type: String,
+}
+
+/// Knowledge graph containing entities and relations
+#[derive(Serialize, Clone, Debug)]
+pub struct MCPKnowledgeGraph {
+    pub entities: Vec<MCPMemoryEntity>,
+    pub relations: Vec<MCPMemoryRelation>,
+}
+
+/// Find MCP memory.jsonl file location
+/// Searches in NPX cache directory for the server-memory package
+#[tauri::command]
+pub fn find_mcp_memory_path() -> Result<Option<String>, String> {
+    find_mcp_memory_path_impl().map_err(|err| err.to_string())
+}
+
+/// Read MCP memory knowledge graph from file
+#[tauri::command]
+pub fn read_mcp_memory_file() -> Result<MCPKnowledgeGraph, String> {
+    read_mcp_memory_file_impl().map_err(|err| err.to_string())
+}
+
+fn find_mcp_memory_path_impl() -> Result<Option<String>> {
+    let home = get_home()?;
+    let npx_cache_dir = PathBuf::from(&home).join(".npm").join("_npx");
+
+    if !npx_cache_dir.exists() {
+        return Ok(None);
+    }
+
+    // Search through all subdirectories in NPX cache
+    for entry in fs::read_dir(&npx_cache_dir)
+        .with_context(|| format!("Cannot read NPX cache directory: {:?}", npx_cache_dir))?
+    {
+        let entry = entry?;
+        let entry_path = entry.path();
+
+        if entry_path.is_dir() {
+            // Look for the memory.jsonl file path
+            let memory_file = entry_path
+                .join("node_modules")
+                .join("@modelcontextprotocol")
+                .join("server-memory")
+                .join("dist")
+                .join("memory.jsonl");
+
+            if memory_file.exists() {
+                return Ok(Some(memory_file.to_string_lossy().to_string()));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+fn read_mcp_memory_file_impl() -> Result<MCPKnowledgeGraph> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found in NPX cache"))?;
+
+    let file_path = PathBuf::from(&memory_path);
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Cannot read MCP memory file: {:?}", file_path))?;
+
+    let mut entities: Vec<MCPMemoryEntity> = Vec::new();
+    let mut relations: Vec<MCPMemoryRelation> = Vec::new();
+
+    // Parse JSONL format (one JSON object per line)
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        // Try to parse as entity first
+        if let Ok(entity) = serde_json::from_str::<MCPMemoryEntity>(line) {
+            if entity.entity_type_marker == "entity" {
+                entities.push(entity);
+                continue;
+            }
+        }
+
+        // Try to parse as relation
+        if let Ok(relation) = serde_json::from_str::<MCPMemoryRelation>(line) {
+            if relation.relation_type_marker == "relation" {
+                relations.push(relation);
+            }
+        }
+    }
+
+    Ok(MCPKnowledgeGraph { entities, relations })
 }
