@@ -10,6 +10,9 @@ import './TabPopoutWindowApp.css';
 const CodeEditor = lazy(() => import('./CodeEditorMonaco'));
 const MemoryGraphTabView = lazy(() => import('../views/MemoryGraphTabView'));
 const DocsViewer = lazy(() => import('./docs/DocsViewer'));
+const SkillViewer = lazy(() => import('./SkillViewer'));
+const CommandViewer = lazy(() => import('./CommandViewer'));
+const AgentViewer = lazy(() => import('./AgentViewer'));
 
 // Loading spinner component
 const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => (
@@ -212,6 +215,8 @@ const TabPopoutWindowApp: React.FC = () => {
         return '📄';
       case 'agent-terminal':
         return '🦆';
+      case 'agent':
+        return '🤖';
       case 'browser':
         return '🌐';
       case 'skill':
@@ -221,6 +226,8 @@ const TabPopoutWindowApp: React.FC = () => {
       case 'docs':
         return '📖';
       case 'memory-graph':
+        return '🧠';
+      case 'second-brain':
         return '🧠';
       default:
         return '📄';
@@ -284,10 +291,40 @@ const TabPopoutWindowApp: React.FC = () => {
         return renderPlaceholder('🌐', 'Browser', tab.url || 'No URL');
 
       case 'skill':
-        return renderPlaceholder('🔧', 'Skill', tab.skillName || 'Skill viewer coming soon...');
+        if (tab.skillName && tab.skillScope) {
+          return (
+            <Suspense fallback={<LoadingSpinner message="Loading skill..." />}>
+              <SkillViewer
+                skillName={tab.skillName}
+                skillScope={tab.skillScope}
+              />
+            </Suspense>
+          );
+        }
+        return renderPlaceholder('🔧', 'Skill', 'Missing skill information');
 
       case 'command':
-        return renderPlaceholder('⚡', 'Command', tab.command?.name || 'Command viewer coming soon...');
+        if (tab.command) {
+          return (
+            <Suspense fallback={<LoadingSpinner message="Loading command..." />}>
+              <CommandViewer command={tab.command} />
+            </Suspense>
+          );
+        }
+        return renderPlaceholder('⚡', 'Command', 'Missing command information');
+
+      case 'agent':
+        if (tab.agentName && tab.agentScope) {
+          return (
+            <Suspense fallback={<LoadingSpinner message="Loading agent..." />}>
+              <AgentViewer
+                agentName={tab.agentName}
+                agentScope={tab.agentScope}
+              />
+            </Suspense>
+          );
+        }
+        return renderPlaceholder('🤖', 'Agent', 'Missing agent information');
 
       case 'agent-terminal':
         return renderPlaceholder('🦆', 'Agent Terminal', 'Terminal cannot be popped out separately');

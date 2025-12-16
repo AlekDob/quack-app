@@ -58,8 +58,10 @@ import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import { useDocsTab } from "./hooks/useDocsTab";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
+import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
+import SecondBrainTabView from "./views/SecondBrainTabView";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { LicenseModal } from "./components/LicenseModal";
@@ -270,6 +272,9 @@ function AppContent() {
 
   // Memory Graph tab management
   const { openMemoryGraphTab } = useMemoryGraphTab();
+
+  // Second Brain tab management
+  const { openSecondBrainTab } = useSecondBrainTab();
 
   // Terminal Window manager - opens separate Tauri window for terminals
   const { openTerminalWindow, updateProjects: updateTerminalWindowProjects, isOpen: terminalWindowOpen } = useTerminalWindowManager();
@@ -6037,6 +6042,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[Quack] Knowledge Graph tab opened:', newTab.id);
   }, [openMemoryGraphTab, tabs]);
 
+  // Handler for opening Second Brain tab
+  const handleOpenSecondBrainTab = useCallback(() => {
+    // Check if second brain tab already exists
+    const existingTab = tabs.find(t => t.type === 'second-brain');
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+      return;
+    }
+
+    const newTab = openSecondBrainTab();
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
+
+    console.log('[Quack] Second Brain tab opened:', newTab.id);
+  }, [openSecondBrainTab, tabs]);
+
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
     updateActiveTab(tabId);
@@ -7753,6 +7774,7 @@ You have access to all Bash tools to execute git commands like:
               onBrowserClick={handleOpenBrowserTab}
               onDroidFactoryClick={() => setDroidFactoryOpen(true)}
               onMemoryGraphClick={handleOpenMemoryGraphTab}
+              onSecondBrainClick={handleOpenSecondBrainTab}
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
@@ -7993,6 +8015,15 @@ You have access to all Bash tools to execute git commands like:
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'memory-graph') {
                   return <MemoryGraphTabView tab={activeTab} isActive={true} />;
+                }
+                return null;
+              })()}
+
+              {/* Second Brain Outliner - shown when second-brain tab is active */}
+              {activeTabId.startsWith('second-brain-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'second-brain') {
+                  return <SecondBrainTabView tab={activeTab} isActive={true} />;
                 }
                 return null;
               })()}

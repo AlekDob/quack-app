@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Wrench, Brain } from 'lucide-react';
+import { Wrench, Brain, Network } from 'lucide-react';
 import './ActionIcons.css';
 
 interface ActionIconsProps {
@@ -13,6 +13,7 @@ interface ActionIconsProps {
   onDroidFactoryClick: () => void;
   onGuideClick: () => void;
   onMemoryGraphClick: () => void;
+  onSecondBrainClick: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
@@ -32,6 +33,7 @@ function ActionIcons({
   onDroidFactoryClick,
   onGuideClick,
   onMemoryGraphClick,
+  onSecondBrainClick,
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
@@ -255,6 +257,19 @@ function ActionIcons({
       >
         <Brain className="w-4 h-4" />
         <span className="action-icon-tooltip">Knowledge Graph</span>
+      </button>
+
+      {/* Second Brain Icon */}
+      <button
+        type="button"
+        className="action-icon second-brain-icon"
+        onClick={onSecondBrainClick}
+        aria-label="Open Second Brain"
+        data-tooltip="Second Brain"
+        style={{ color: '#E84A7F' }}
+      >
+        <Network className="w-4 h-4" />
+        <span className="action-icon-tooltip">Second Brain</span>
       </button>
 
       {/* Guide/Documentation Icon */}

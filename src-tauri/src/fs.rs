@@ -1208,3 +1208,121 @@ fn add_mcp_memory_observations_impl(name: String, new_observations: Vec<String>)
 
     Ok(true)
 }
+
+/// Input for creating a new MCP memory relation
+#[derive(Deserialize, Debug)]
+pub struct CreateMCPRelationInput {
+    pub from: String,
+    pub to: String,
+    #[serde(rename = "relationType")]
+    pub relation_type: String,
+}
+
+/// Write a new relation to the MCP memory file
+#[tauri::command]
+pub fn write_mcp_memory_relation(relation: CreateMCPRelationInput) -> Result<MCPMemoryRelation, String> {
+    write_mcp_memory_relation_impl(relation).map_err(|err| err.to_string())
+}
+
+fn write_mcp_memory_relation_impl(input: CreateMCPRelationInput) -> Result<MCPMemoryRelation> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found in NPX cache. Make sure the MCP memory server has been used at least once."))?;
+
+    let file_path = PathBuf::from(&memory_path);
+
+    // Create the relation struct
+    let relation = MCPMemoryRelation {
+        relation_type_marker: "relation".to_string(),
+        from: input.from,
+        to: input.to,
+        relation_type: input.relation_type,
+    };
+
+    // Serialize to JSON
+    let json_line = serde_json::to_string(&relation)
+        .with_context(|| "Failed to serialize relation to JSON")?;
+
+    // Check if file exists and doesn't end with newline
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    // First, ensure file ends with newline if it exists and has content
+    if file_path.exists() {
+        let mut check_file = fs::File::open(&file_path)
+            .with_context(|| format!("Cannot open MCP memory file: {:?}", file_path))?;
+
+        let file_len = check_file.metadata()?.len();
+        if file_len > 0 {
+            check_file.seek(SeekFrom::End(-1))?;
+            let mut last_byte = [0u8; 1];
+            check_file.read_exact(&mut last_byte)?;
+
+            // If file doesn't end with newline, add one before our content
+            if last_byte[0] != b'\n' {
+                let mut append_file = fs::OpenOptions::new()
+                    .append(true)
+                    .open(&file_path)?;
+                writeln!(append_file)?; // Add missing newline
+            }
+        }
+    }
+
+    // Append relation to file with newline
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+        .with_context(|| format!("Cannot open MCP memory file for writing: {:?}", file_path))?;
+
+    writeln!(file, "{}", json_line)
+        .with_context(|| format!("Cannot write to MCP memory file: {:?}", file_path))?;
+
+    Ok(relation)
+}
+
+/// Delete a specific relation from the MCP memory file
+#[tauri::command]
+pub fn delete_mcp_memory_relation(from: String, to: String) -> Result<bool, String> {
+    delete_mcp_memory_relation_impl(from, to).map_err(|err| err.to_string())
+}
+
+fn delete_mcp_memory_relation_impl(from: String, to: String) -> Result<bool> {
+    let memory_path = find_mcp_memory_path_impl()?
+        .ok_or_else(|| anyhow!("MCP memory file not found"))?;
+
+    let file_path = PathBuf::from(&memory_path);
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Cannot read MCP memory file: {:?}", file_path))?;
+
+    let mut new_lines: Vec<String> = Vec::new();
+    let mut found = false;
+
+    for line in content.lines() {
+        let line_trimmed = line.trim();
+        if line_trimmed.is_empty() {
+            continue;
+        }
+
+        // Check if this is the relation to delete
+        if let Ok(relation) = serde_json::from_str::<MCPMemoryRelation>(line_trimmed) {
+            if relation.relation_type_marker == "relation" {
+                if relation.from == from && relation.to == to {
+                    found = true;
+                    continue; // Skip this relation
+                }
+            }
+        }
+
+        new_lines.push(line_trimmed.to_string());
+    }
+
+    if !found {
+        return Ok(false);
+    }
+
+    // Write back the updated content
+    let new_content = new_lines.join("\n") + "\n";
+    fs::write(&file_path, new_content)
+        .with_context(|| format!("Cannot write MCP memory file: {:?}", file_path))?;
+
+    Ok(true)
+}

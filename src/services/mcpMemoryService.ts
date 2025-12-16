@@ -525,7 +525,94 @@ export function categoryToEntityType(category: string): string {
     pattern: "pattern",
     mistake: "mistake",
     context: "context",
+    task: "task",
+    note: "note",
+    idea: "idea",
+    person: "person",
+    project: "project",
   };
 
   return typeMap[category.toLowerCase()] || "fact";
+}
+
+/**
+ * Input for creating a new MCP relation
+ */
+export interface CreateMCPRelationInput {
+  from: string;
+  to: string;
+  relationType: string;
+}
+
+/**
+ * Create a relation between two entities in MCP memory
+ *
+ * @param input - Relation data (from, to, relationType)
+ * @returns The created relation or null on failure
+ */
+export async function createMCPRelation(
+  input: CreateMCPRelationInput
+): Promise<MCPRelation | null> {
+  try {
+    const relation = await invoke<MCPRelation>("write_mcp_memory_relation", {
+      relation: input,
+    });
+
+    console.log("[MCPMemoryService] Relation created:", `${input.from} -> ${input.to}`);
+
+    // Refresh cache after write
+    await mcpMemoryService.refreshFromFile();
+
+    return relation;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to create relation:", error);
+    toast.error("Failed to create relation");
+    return null;
+  }
+}
+
+/**
+ * Delete a relation from MCP memory
+ *
+ * @param from - Source entity name
+ * @param to - Target entity name
+ * @returns true if deleted, false if not found
+ */
+export async function deleteMCPRelation(from: string, to: string): Promise<boolean> {
+  try {
+    const deleted = await invoke<boolean>("delete_mcp_memory_relation", { from, to });
+
+    if (deleted) {
+      console.log("[MCPMemoryService] Relation deleted:", `${from} -> ${to}`);
+      // Refresh cache after delete
+      await mcpMemoryService.refreshFromFile();
+    } else {
+      console.warn("[MCPMemoryService] Relation not found:", `${from} -> ${to}`);
+    }
+
+    return deleted;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to delete relation:", error);
+    toast.error("Failed to delete relation");
+    return false;
+  }
+}
+
+/**
+ * Map category to relation type for @mentions
+ */
+export function categoryToRelationType(category: string): string {
+  const typeMap: Record<string, string> = {
+    preference: "prefers",
+    fact: "has_attribute",
+    decision: "decided_on",
+    pattern: "follows_pattern",
+    mistake: "made_mistake_with",
+    context: "relates_to",
+    task: "assigned_to",
+    note: "notes_about",
+    idea: "has_idea_for",
+  };
+
+  return typeMap[category.toLowerCase()] || "relates_to";
 }

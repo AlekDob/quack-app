@@ -778,6 +778,10 @@ function AppRefactored() {
             // TODO: Implement memory graph tab in AppRefactored
             console.log('Memory Graph clicked - not yet implemented in AppRefactored');
           }}
+          onSecondBrainClick={() => {
+            // TODO: Implement second brain tab in AppRefactored
+            console.log('Second Brain clicked - not yet implemented in AppRefactored');
+          }}
           onGuideClick={() => {
             // TODO: Implement docs tab in AppRefactored
             console.log('Guide clicked - docs tab not yet implemented in AppRefactored');
