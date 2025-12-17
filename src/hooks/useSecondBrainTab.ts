@@ -1,8 +1,13 @@
 import { useCallback } from 'react';
 import type { Tab } from '../components/TabBar';
 
+interface OpenSecondBrainOptions {
+  nodeId?: string;
+  nodeLabel?: string;
+}
+
 interface UseSecondBrainTabReturn {
-  openSecondBrainTab: () => Tab;
+  openSecondBrainTab: (options?: OpenSecondBrainOptions) => Tab;
   isSecondBrainTab: (tab: Tab) => boolean;
 }
 
@@ -11,12 +16,17 @@ interface UseSecondBrainTabReturn {
  * Creates a Tana-like outliner view integrated with MCP Memory
  */
 export function useSecondBrainTab(): UseSecondBrainTabReturn {
-  const openSecondBrainTab = useCallback((): Tab => {
+  const openSecondBrainTab = useCallback((options?: OpenSecondBrainOptions): Tab => {
+    const label = options?.nodeLabel
+      ? `${options.nodeLabel.slice(0, 20)}${options.nodeLabel.length > 20 ? '...' : ''}`
+      : 'Second Brain';
+
     return {
       id: `second-brain-${Date.now()}`,
-      label: 'Second Brain',
+      label,
       type: 'second-brain',
       closable: true,
+      initialNodeId: options?.nodeId,
     };
   }, []);
 

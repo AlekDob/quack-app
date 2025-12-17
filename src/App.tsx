@@ -6058,6 +6058,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[Quack] Second Brain tab opened:', newTab.id);
   }, [openSecondBrainTab, tabs]);
 
+  // Handler for opening Second Brain tab with a specific node (from Knowledge Graph)
+  const handleOpenSecondBrainWithNode = useCallback((nodeId: string, nodeLabel: string) => {
+    // Always create new tab when opening specific node
+    const newTab = openSecondBrainTab({ nodeId, nodeLabel });
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
+
+    console.log('[Quack] Second Brain tab opened with node:', nodeId, nodeLabel);
+  }, [openSecondBrainTab]);
+
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
     updateActiveTab(tabId);
@@ -8014,7 +8024,11 @@ You have access to all Bash tools to execute git commands like:
               {activeTabId.startsWith('memory-graph-') && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'memory-graph') {
-                  return <MemoryGraphTabView tab={activeTab} isActive={true} />;
+                  return <MemoryGraphTabView
+                    tab={activeTab}
+                    isActive={true}
+                    onOpenSecondBrain={handleOpenSecondBrainWithNode}
+                  />;
                 }
                 return null;
               })()}

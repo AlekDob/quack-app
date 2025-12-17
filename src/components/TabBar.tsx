@@ -20,6 +20,7 @@ export interface Tab {
   skillScope?: 'global' | 'project'; // Skill scope for skill tabs
   command?: SlashCommand; // Full command object for command tabs
   docsPath?: string; // Path to docs page for docs tabs
+  initialNodeId?: string; // Initial node to zoom into for second-brain tabs
 }
 
 interface ContextMenuState {

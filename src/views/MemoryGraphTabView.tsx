@@ -33,6 +33,7 @@ interface GraphData {
 interface MemoryGraphTabViewProps {
   tab: Tab;
   isActive: boolean;
+  onOpenSecondBrain?: (nodeId: string, nodeLabel: string) => void;
 }
 
 /**
@@ -118,7 +119,7 @@ const LABEL_ZOOM_THRESHOLD = 0.8;
 // Zoom threshold for showing tooltip on click (tooltip visible when zoomed OUT - i.e., low zoom)
 const TOOLTIP_ZOOM_THRESHOLD = 1.2;
 
-function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
+function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTabViewProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<ForceGraphMethods<any, any>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,18 +184,18 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
   }, [graphData]);
 
   const handleNodeClick = useCallback((node: GraphNode) => {
-    // Only show details panel when zoomed out (labels not visible)
-    // When zoomed in, labels are already visible so no need for details
-    if (currentZoom < TOOLTIP_ZOOM_THRESHOLD) {
-      setSelectedNode(node);
-    } else {
-      // Toggle selection for visual feedback when zoomed in
-      setSelectedNode(prev => prev?.id === node.id ? null : node);
+    // Open Second Brain tab with this node zoomed
+    if (onOpenSecondBrain) {
+      // Remove mcp- prefix from ID to match Second Brain's nodeMap keys
+      const nodeIdWithoutPrefix = node.id.replace(/^mcp-/, '');
+      onOpenSecondBrain(nodeIdWithoutPrefix, node.name);
     }
+    // Keep visual selection for feedback
+    setSelectedNode(prev => prev?.id === node.id ? null : node);
     if (node.x !== undefined && node.y !== undefined) {
       graphRef.current?.centerAt(node.x, node.y, 300);
     }
-  }, [currentZoom]);
+  }, [onOpenSecondBrain]);
 
   const handleZoomIn = useCallback(() => {
     const currentZoom = graphRef.current?.zoom() || 1;
@@ -433,45 +434,7 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
         )}
       </div>
 
-      {/* Selected Node Details - only show when zoomed out (labels not visible) */}
-      {selectedNode && currentZoom < TOOLTIP_ZOOM_THRESHOLD && (
-        <div className="memory-graph-details">
-          <div className="memory-graph-details-header">
-            <div
-              className="memory-graph-details-dot"
-              style={{ backgroundColor: selectedNode.color }}
-            />
-            <h4>{selectedNode.name}</h4>
-            <span className="memory-graph-details-type">
-              {selectedNode.entityType}
-            </span>
-            <button
-              type="button"
-              onClick={handleDeleteSelectedNode}
-              className="memory-graph-details-delete"
-              title="Delete memory"
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedNode(null)}
-              className="memory-graph-details-close"
-            >
-              <X size={14} />
-            </button>
-          </div>
-          <div className="memory-graph-details-content">
-            <div className="memory-graph-details-observations">
-              {selectedNode.observations.map((obs, i) => (
-                <div key={i} className="memory-graph-observation">
-                  {obs}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Node details drawer removed - now opens Second Brain tab instead */}
     </div>
   );
 }

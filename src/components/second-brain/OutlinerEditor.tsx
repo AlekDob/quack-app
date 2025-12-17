@@ -5,11 +5,15 @@ import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeB
 import InlineOutliner from './InlineOutliner';
 import SecondBrainSidebar from './SecondBrainSidebar';
 
+interface OutlinerEditorProps {
+  initialNodeId?: string;
+}
+
 /**
  * Main Outliner Editor Component
  * Tana/Logseq-style inline editing experience
  */
-export function OutlinerEditor() {
+export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
   const {
     tree,
     roots,
@@ -102,6 +106,21 @@ export function OutlinerEditor() {
       }
     }
   }, [tree, zoomedNode]);
+
+  // Zoom to initial node when tree loads (e.g., from Knowledge Graph click)
+  useEffect(() => {
+    if (initialNodeId && tree) {
+      const node = tree.nodeMap.get(initialNodeId);
+      console.log('[SecondBrain] Looking for initialNodeId:', initialNodeId);
+      console.log('[SecondBrain] Available nodeMap keys:', Array.from(tree.nodeMap.keys()).slice(0, 5));
+      if (node) {
+        console.log('[SecondBrain] Found node, zooming:', node.content);
+        setZoomedNode(node);
+      } else {
+        console.log('[SecondBrain] Node not found in nodeMap');
+      }
+    }
+  }, [initialNodeId, tree]);
 
   return (
     <div className="outliner-editor-container">

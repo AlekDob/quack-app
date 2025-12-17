@@ -22,7 +22,7 @@ function SecondBrainTabView({ tab, isActive }: SecondBrainTabViewProps) {
 
   return (
     <div className="second-brain-tab-view">
-      <OutlinerEditor />
+      <OutlinerEditor initialNodeId={tab.initialNodeId} />
     </div>
   );
 }
