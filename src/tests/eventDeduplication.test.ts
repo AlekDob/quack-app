@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
  */
 
 // Helper function to generate event ID (extracted from useClaudeChat.ts)
+// 🦆 UPDATED: Now includes tool_use.id for unique Task tool identification
 function getEventId(event: any): string {
   // For system events: use subtype only (session_id might not be set yet)
   if (event.type === 'system' && 'subtype' in event) {
@@ -20,10 +21,19 @@ function getEventId(event: any): string {
       return `assistant-${event.message.id}`;
     }
     // Fallback: hash the content blocks to detect duplicates
+    // 🦆 FIX: Include tool_use.id for unique identification of Task tool invocations
     const contentHash = event.message?.content
-      ?.map((b: any) => `${b.type}-${b.text?.substring(0, 20) || b.name || ''}`)
+      ?.map((b: any) => {
+        let id = `${b.type}-${b.text?.substring(0, 20) || b.name || ''}`;
+        // Include tool_use.id to ensure unique IDs for each tool invocation
+        // This fixes the bug where multiple Task tools (droids) got the same ID
+        if (b.type === 'tool_use' && b.id) {
+          id += `-${b.id}`;
+        }
+        return id;
+      })
       .join('|') || '';
-    return `assistant-${contentHash.substring(0, 50)}`;
+    return `assistant-${contentHash.substring(0, 80)}`;
   }
 
   // For user events: hash the tool results content
@@ -148,6 +158,8 @@ describe('Event Deduplication - Event ID Generation', () => {
     const id = getEventId(event);
     expect(id).toContain('assistant-');
     expect(id).toContain('tool_use-bash');
+    // 🦆 FIX: ID should now include tool_use.id for uniqueness
+    expect(id).toContain('tool-123');
   });
 
   it('should use tool_use_id for user events', () => {
@@ -413,5 +425,181 @@ describe('Event Deduplication - Edge Cases', () => {
     const id = getEventId(event);
     expect(id).toContain('assistant-');
     expect(id.length).toBeLessThan(100); // Hash should be compact
+  });
+});
+
+/**
+ * 🦆 Task Tool Deduplication Tests
+ *
+ * These tests specifically verify that multiple Task tool invocations
+ * (droids invoked with @mention) generate UNIQUE event IDs.
+ *
+ * Bug fix: Previously, multiple Task tools got the same ID because
+ * the hash only used tool name ("Task") without the unique tool_use.id.
+ */
+describe('Event Deduplication - Task Tool (Droid @mention) Fix', () => {
+  it('should generate UNIQUE IDs for multiple Task tools with different subagent_types', () => {
+    // This test verifies the fix for the bug where @hiroshi and @kaori
+    // would get the same event ID and only one TaskWidget would render
+    const event = {
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Task',
+            id: 'toolu_01ABC123',
+            input: { subagent_type: 'hiroshi', description: 'Research task' },
+          },
+          {
+            type: 'tool_use',
+            name: 'Task',
+            id: 'toolu_01DEF456',
+            input: { subagent_type: 'kaori', description: 'Design task' },
+          },
+        ],
+      },
+    };
+
+    const id = getEventId(event);
+
+    // The hash should include BOTH tool IDs, making the event unique
+    expect(id).toContain('toolu_01ABC123');
+    expect(id).toContain('toolu_01DEF456');
+  });
+
+  it('should generate DIFFERENT IDs for separate Task tool events', () => {
+    const event1 = {
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Task',
+            id: 'toolu_01ABC123',
+            input: { subagent_type: 'hiroshi', description: 'Task 1' },
+          },
+        ],
+      },
+    };
+
+    const event2 = {
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Task',
+            id: 'toolu_01DEF456',
+            input: { subagent_type: 'kaori', description: 'Task 2' },
+          },
+        ],
+      },
+    };
+
+    const id1 = getEventId(event1);
+    const id2 = getEventId(event2);
+
+    // IDs should be DIFFERENT because tool_use.id is different
+    expect(id1).not.toBe(id2);
+    expect(id1).toContain('toolu_01ABC123');
+    expect(id2).toContain('toolu_01DEF456');
+  });
+
+  it('should NOT deduplicate different droids in the same stream', () => {
+    const seenEventIds = new Set<string>();
+
+    // Simulate stream with multiple droid invocations
+    const events = [
+      {
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Task',
+              id: 'toolu_hiroshi_001',
+              input: { subagent_type: 'hiroshi', description: 'First droid' },
+            },
+          ],
+        },
+      },
+      {
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Task',
+              id: 'toolu_kaori_002',
+              input: { subagent_type: 'kaori', description: 'Second droid' },
+            },
+          ],
+        },
+      },
+      {
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Task',
+              id: 'toolu_mike_003',
+              input: { subagent_type: 'mike', description: 'Third droid' },
+            },
+          ],
+        },
+      },
+    ];
+
+    const uniqueEvents: any[] = [];
+
+    for (const event of events) {
+      const eventId = getEventId(event);
+
+      if (!seenEventIds.has(eventId)) {
+        seenEventIds.add(eventId);
+        uniqueEvents.push(event);
+      }
+    }
+
+    // ALL 3 droid invocations should be unique (not deduplicated)
+    expect(uniqueEvents.length).toBe(3);
+    expect(seenEventIds.size).toBe(3);
+  });
+
+  it('should still deduplicate IDENTICAL Task events (same tool_use.id)', () => {
+    const seenEventIds = new Set<string>();
+
+    // Same event arriving multiple times (real duplicate)
+    const taskEvent = {
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Task',
+            id: 'toolu_same_id',
+            input: { subagent_type: 'hiroshi', description: 'Same task' },
+          },
+        ],
+      },
+    };
+
+    const uniqueEvents: any[] = [];
+
+    // Simulate same event arriving 3 times (real duplicate scenario)
+    for (let i = 0; i < 3; i++) {
+      const eventId = getEventId(taskEvent);
+
+      if (!seenEventIds.has(eventId)) {
+        seenEventIds.add(eventId);
+        uniqueEvents.push(taskEvent);
+      }
+    }
+
+    // Should deduplicate to only 1 event (they have the same tool_use.id)
+    expect(uniqueEvents.length).toBe(1);
+    expect(seenEventIds.size).toBe(1);
   });
 });

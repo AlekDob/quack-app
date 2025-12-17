@@ -35,27 +35,13 @@ import type { ProjectInfo } from '../../hooks/useCurrentProject';
 import { parseMentions, parseSupertag } from '../../services/outlineTreeBuilder';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
 import { SUPERTAGS } from './EntityAutocomplete';
+import { getSupertagColor } from '../../services/supertagConfigService';
 
 /**
- * Get bullet/entity color based on entity type
+ * Get bullet/entity color based on entity type (uses dynamic config)
  */
 const getEntityColor = (entityType: string): string => {
-  const colors: Record<string, string> = {
-    preference: '#3b82f6',
-    fact: '#10b981',
-    decision: '#8b5cf6',
-    pattern: '#f97316',
-    mistake: '#ef4444',
-    context: '#6b7280',
-    person: '#E84A7F',
-    project: '#E84A7F',
-    technology: '#00d9ff',
-    tool: '#00d9ff',
-    task: '#f59e0b',
-    note: '#8b5cf6',
-    idea: '#10b981',
-  };
-  return colors[entityType.toLowerCase()] || '#6b7280';
+  return getSupertagColor(entityType);
 };
 
 /**
@@ -516,13 +502,13 @@ function InlineBullet({
 
   return (
     <div className="inline-bullet-container">
-      {/* Expand/Collapse toggle - positioned absolutely to the left */}
-      {hasChildren && (
+      {/* Expand/Collapse toggle - positioned absolutely to the left, hidden when zoomed (children shown separately) */}
+      {hasChildren && !isZoomed && (
         <button
           type="button"
           className={`inline-bullet-toggle has-children ${isExpanded ? 'expanded' : ''}`}
           onClick={handleToggle}
-          style={{ left: `${(isZoomed ? 0 : node.depth * 24) + 12}px` }}
+          style={{ left: `${node.depth * 24 + 12}px` }}
         >
           <ChevronRight size={12} />
         </button>

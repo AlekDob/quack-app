@@ -644,6 +644,11 @@ function AppContent() {
   // This prevents the bug where events are emitted before the listener is set up
   const activeListenersRef = useRef<Map<string, () => void>>(new Map());
 
+  // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
+  // This fixes the intermittent bug where Task/droid widgets don't appear because
+  // the event arrives before React's setState has created the streaming message
+  const eventBufferRef = useRef<Map<string, ClaudeEvent[]>>(new Map());
+
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
@@ -718,6 +723,86 @@ function AppContent() {
       return newMap;
     });
   }, []);
+
+  // 🦆 EVENT BUFFER FIX: Centralized event handler with buffering support
+  // This function handles all incoming Claude events and manages buffering
+  // when events arrive before the streaming message is ready
+  const handleClaudeEvent = useCallback((
+    agentId: string,
+    claudeEvent: ClaudeEvent,
+    source: string // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
+  ) => {
+    const evt = claudeEvent as any;
+    console.log(`🎯 [${source}] Event received for ${agentId}:`, {
+      type: claudeEvent.type,
+      hasMessage: !!evt.message,
+      contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
+    });
+
+    // Update chat session with incoming events
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      const agentMessages = newSessions.get(agentId) ?? [];
+      const lastMsg = agentMessages[agentMessages.length - 1];
+
+      // Check if we have a streaming message ready
+      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+        // 🦆 BUFFER FLUSH: First, check if there are buffered events to apply
+        const bufferedEvents = eventBufferRef.current.get(agentId) || [];
+        if (bufferedEvents.length > 0) {
+          console.log(`🦆 [${source}] Flushing ${bufferedEvents.length} buffered events for ${agentId}`);
+          eventBufferRef.current.delete(agentId);
+        }
+
+        const updatedMessages = [...agentMessages];
+
+        // Combine buffered events with current event
+        const allEvents = [...bufferedEvents, claudeEvent];
+
+        // Check if this is the first assistant response (for timestamp update)
+        const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
+                                         claudeEvent.message?.content &&
+                                         claudeEvent.message.content.length > 0 &&
+                                         lastMsg.timestamp === 0;
+
+        updatedMessages[updatedMessages.length - 1] = {
+          ...lastMsg,
+          events: [...(lastMsg.events || []), ...allEvents],
+          timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
+        };
+        newSessions.set(agentId, updatedMessages);
+
+        // Extract text content for Telegram notifications
+        if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
+          let textContent = '';
+          claudeEvent.message.content.forEach((content) => {
+            if (content.type === 'text' && content.text) {
+              textContent += content.text;
+            }
+          });
+
+          if (textContent) {
+            const existingText = lastAgentResponseRef.current.get(agentId) || '';
+            lastAgentResponseRef.current.set(agentId, existingText + textContent);
+          }
+        }
+      } else {
+        // 🦆 BUFFER: No streaming message yet - buffer the event for later
+        console.log(`🦆 [${source}] Buffering event for ${agentId} (no streaming message ready yet)`);
+        const buffer = eventBufferRef.current.get(agentId) || [];
+        buffer.push(claudeEvent);
+        eventBufferRef.current.set(agentId, buffer);
+      }
+
+      return newSessions;
+    });
+
+    // Handle token updates from result events
+    if (claudeEvent.type === 'result' && claudeEvent.usage) {
+      console.log(`[${source}] 🦆 Token update for ${agentId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
+      handleTokenUpdate(agentId, claudeEvent.usage, claudeEvent.total_cost_usd);
+    }
+  }, [handleTokenUpdate]);
 
   // Track usage from Claude Agent SDK response
   const trackUsage = useCallback((
@@ -1147,67 +1232,8 @@ function AppContent() {
         const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
           const claudeEvent = event.payload;
 
-          // 🦆 DEBUG: Log received events to verify multi-listener is working
-          const evt = claudeEvent as any;
-          console.log(`🎯 [Multi-Listener] Event received for ${agentId}:`, {
-            type: claudeEvent.type,
-            hasMessage: !!evt.message,
-            contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
-          });
-
-          // Update chat session with incoming events
-          setChatSessions((prev) => {
-            const newSessions = new Map(prev);
-            const agentMessages = newSessions.get(agentId) ?? [];
-            const lastMsg = agentMessages[agentMessages.length - 1];
-
-            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
-              const updatedMessages = [...agentMessages];
-
-              // 🦆 FIX: Update timestamp when assistant STARTS responding (first event with content)
-              // This ensures agents sort correctly (by response time, not user input time)
-              // Check if timestamp is still 0 (placeholder) and this is an assistant event with content
-              const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
-                                               claudeEvent.message?.content &&
-                                               claudeEvent.message.content.length > 0 &&
-                                               lastMsg.timestamp === 0;
-
-              updatedMessages[updatedMessages.length - 1] = {
-                ...lastMsg,
-                events: [...(lastMsg.events || []), claudeEvent],
-                // Update timestamp ONLY when first assistant response arrives (timestamp was 0)
-                timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
-              };
-              newSessions.set(agentId, updatedMessages);
-
-              // Extract and save text content from assistant messages for Telegram notifications
-              if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
-                let textContent = '';
-                claudeEvent.message.content.forEach((content) => {
-                  if (content.type === 'text' && content.text) {
-                    textContent += content.text;
-                  }
-                });
-
-                if (textContent) {
-                  // Append to existing response text (streaming)
-                  const existingText = lastAgentResponseRef.current.get(agentId) || '';
-                  lastAgentResponseRef.current.set(agentId, existingText + textContent);
-                }
-              }
-            }
-
-            return newSessions;
-          });
-
-          // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
-          // Note: result.usage contains tokens for the SINGLE turn, not cumulative session total
-          // The helper function accumulates across all turns to get total session usage
-          // total_cost_usd is cumulative and authoritative from SDK
-          if (claudeEvent.type === 'result' && claudeEvent.usage) {
-            console.log(`[Multi-Listener] 🦆 Token update for ${agentId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
-            handleTokenUpdate(agentId, claudeEvent.usage, claudeEvent.total_cost_usd);
-          }
+          // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
+          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener');
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -1456,47 +1482,12 @@ function AppContent() {
     }
 
     // Setup listener for the active agent NOW (before any message is sent)
-    // Using the same pattern as multi-listener to avoid code duplication
     const eventName = `claude-event:${activeId}`;
     console.log(`[Pre-warm] Setting up listener for activeId: ${activeId}`);
 
-    // NOTE: Event handling is duplicated here from multi-listener.
-    // TODO: Refactor to use useClaudeEventListener hook for centralized event handling
-    // For now, we reuse the same event handler pattern.
-
+    // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
     listen<ClaudeEvent>(eventName, (event) => {
-      const claudeEvent = event.payload;
-      console.log(`🎯 [Pre-warm] Event received for ${activeId}:`, { type: claudeEvent.type });
-
-      // Update chat sessions - same logic as multi-listener
-      setChatSessions((prev) => {
-        const newSessions = new Map(prev);
-        const agentMessages = newSessions.get(activeId) ?? [];
-        const lastMsg = agentMessages[agentMessages.length - 1];
-
-        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
-          const updatedMessages = [...agentMessages];
-          const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
-                                           claudeEvent.message?.content &&
-                                           claudeEvent.message.content.length > 0 &&
-                                           lastMsg.timestamp === 0;
-
-          updatedMessages[updatedMessages.length - 1] = {
-            ...lastMsg,
-            events: [...(lastMsg.events || []), claudeEvent],
-            timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
-          };
-          newSessions.set(activeId, updatedMessages);
-        }
-        return newSessions;
-      });
-
-      // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
-      // total_cost_usd is cumulative and authoritative from SDK
-      if (claudeEvent.type === 'result' && claudeEvent.usage) {
-        console.log(`[Pre-warm] 🦆 Token update for ${activeId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
-        handleTokenUpdate(activeId, claudeEvent.usage, claudeEvent.total_cost_usd);
-      }
+      handleClaudeEvent(activeId, event.payload, 'Pre-warm');
     }).then((unlisten) => {
       activeListenersRef.current.set(activeId, unlisten);
       console.log(`[Pre-warm] Listener ready for activeId: ${activeId}`);
@@ -1526,63 +1517,10 @@ function AppContent() {
       const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
         const claudeEvent = event.payload;
 
-        // 🦆 DEBUG: Log received events to verify listener is working
-        const evt = claudeEvent as any;
-        console.log(`🎯 [ensureListenerReady] Event received for ${agentId}:`, {
-          type: claudeEvent.type,
-          hasMessage: !!evt.message,
-          contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
-        });
+        // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
+        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady');
 
-        // Update chat session with incoming events
-        setChatSessions((prev) => {
-          const newSessions = new Map(prev);
-          const agentMessages = newSessions.get(agentId) ?? [];
-          const lastMsg = agentMessages[agentMessages.length - 1];
-
-          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
-            const updatedMessages = [...agentMessages];
-
-            // Update timestamp when assistant STARTS responding
-            const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
-                                             claudeEvent.message?.content &&
-                                             claudeEvent.message.content.length > 0 &&
-                                             lastMsg.timestamp === 0;
-
-            updatedMessages[updatedMessages.length - 1] = {
-              ...lastMsg,
-              events: [...(lastMsg.events || []), claudeEvent],
-              timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
-            };
-            newSessions.set(agentId, updatedMessages);
-
-            // Extract text content for Telegram notifications
-            if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
-              let textContent = '';
-              claudeEvent.message.content.forEach((content) => {
-                if (content.type === 'text' && content.text) {
-                  textContent += content.text;
-                }
-              });
-
-              if (textContent) {
-                const existingText = lastAgentResponseRef.current.get(agentId) || '';
-                lastAgentResponseRef.current.set(agentId, existingText + textContent);
-              }
-            }
-          }
-
-          return newSessions;
-        });
-
-        // 🦆 STAMINA FIX: Track tokens from result events using centralized helper
-        // total_cost_usd is cumulative and authoritative from SDK
-        if (claudeEvent.type === 'result' && claudeEvent.usage) {
-          console.log(`[ensureListenerReady] 🦆 Token update for ${agentId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
-          handleTokenUpdate(agentId, claudeEvent.usage, claudeEvent.total_cost_usd);
-        }
-
-        // Handle completion event
+        // Handle completion event - FileExplorer refresh
         if (claudeEvent.type === 'result') {
           // Trigger FileExplorer refresh if files were modified
           setChatSessions((prev) => {
@@ -1624,7 +1562,7 @@ function AppContent() {
     } catch (error) {
       console.error(`[Listener] Failed to setup for ${agentId}:`, error);
     }
-  }, []);
+  }, [handleClaudeEvent]);
 
   // Send message for specific agent
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
@@ -1825,10 +1763,31 @@ function AppContent() {
     // Clear previous response text for this agent (new conversation turn)
     lastAgentResponseRef.current.delete(activeId);
 
+    // 🦆 EVENT BUFFER FIX: Clear any stale buffered events from previous sessions
+    // and prepare for new events
+    eventBufferRef.current.delete(activeId);
+
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
       const agentMessages = newSessions.get(activeId) ?? [];
-      newSessions.set(activeId, [...agentMessages, assistantMessage]);
+
+      // 🦆 EVENT BUFFER FIX: Check if there are buffered events to apply immediately
+      // This handles the race condition where events arrive before this setState completes
+      const bufferedEvents = eventBufferRef.current.get(activeId) || [];
+      if (bufferedEvents.length > 0) {
+        console.log(`🦆 [sendMessageForAgent] Flushing ${bufferedEvents.length} buffered events for ${activeId}`);
+        eventBufferRef.current.delete(activeId);
+
+        // Apply buffered events to the new assistant message
+        const messageWithBufferedEvents = {
+          ...assistantMessage,
+          events: bufferedEvents,
+        };
+        newSessions.set(activeId, [...agentMessages, messageWithBufferedEvents]);
+      } else {
+        newSessions.set(activeId, [...agentMessages, assistantMessage]);
+      }
+
       return newSessions;
     });
 

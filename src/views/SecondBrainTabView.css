@@ -1679,3 +1679,480 @@
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* ===================================
+   SUPERTAG CONFIG DRAWER
+   =================================== */
+
+.supertag-config-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.supertag-config-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  max-width: 90vw;
+  height: 100vh;
+  background: rgba(18, 20, 27, 0.98);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  animation: slideInRight 0.2s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Drawer Header */
+.supertag-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.supertag-config-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.supertag-config-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.supertag-config-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e7ebf3;
+}
+
+.supertag-config-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.supertag-config-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Drawer Content */
+.supertag-config-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* Sections */
+.supertag-config-section {
+  margin-bottom: 24px;
+}
+
+.supertag-config-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 12px;
+}
+
+/* Form Group */
+.supertag-form-group {
+  margin-bottom: 16px;
+}
+
+.supertag-form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+}
+
+.supertag-form-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e7ebf3;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.supertag-form-input:focus {
+  border-color: rgba(232, 74, 127, 0.5);
+  box-shadow: 0 0 0 2px rgba(232, 74, 127, 0.1);
+}
+
+/* Color Picker */
+.supertag-color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.supertag-color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.supertag-color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.supertag-color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.supertag-color-swatch.selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.supertag-color-swatch.selected::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 2px;
+}
+
+.supertag-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.supertag-color-custom-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e7ebf3;
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.supertag-color-custom-input:focus {
+  border-color: rgba(232, 74, 127, 0.5);
+}
+
+.supertag-color-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Property List */
+.supertag-property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.supertag-property-item {
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.supertag-property-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.supertag-property-name {
+  flex: 1;
+  height: 32px;
+  padding: 0 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #e7ebf3;
+  font-size: 13px;
+  outline: none;
+}
+
+.supertag-property-name:focus {
+  border-color: rgba(232, 74, 127, 0.4);
+}
+
+.supertag-property-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.supertag-property-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.supertag-property-type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.supertag-property-type-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  min-width: 40px;
+}
+
+.supertag-property-type-select {
+  flex: 1;
+  height: 32px;
+  padding: 0 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #e7ebf3;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.supertag-property-type-select:focus {
+  border-color: rgba(232, 74, 127, 0.4);
+}
+
+/* Property Options (for select type) */
+.supertag-property-options {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.supertag-property-options-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.supertag-property-option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.supertag-property-option-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  color: #e7ebf3;
+  font-size: 12px;
+  outline: none;
+}
+
+.supertag-property-option-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.supertag-property-option-delete:hover {
+  color: #ef4444;
+}
+
+.supertag-property-option-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: #E84A7F;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.supertag-property-option-add:hover {
+  background: rgba(232, 74, 127, 0.1);
+}
+
+/* Add Property Button */
+.supertag-add-property-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  background: rgba(232, 74, 127, 0.08);
+  border: 1px dashed rgba(232, 74, 127, 0.3);
+  border-radius: 8px;
+  color: #E84A7F;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.supertag-add-property-btn:hover {
+  background: rgba(232, 74, 127, 0.15);
+  border-color: rgba(232, 74, 127, 0.5);
+}
+
+.supertag-add-property-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Empty Properties State */
+.supertag-property-empty {
+  text-align: center;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+/* Drawer Footer */
+.supertag-config-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.supertag-config-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.supertag-config-btn-cancel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.supertag-config-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.supertag-config-btn-save {
+  background: linear-gradient(135deg, #E84A7F 0%, #f06292 100%);
+  border: none;
+  color: #ffffff;
+}
+
+.supertag-config-btn-save:hover {
+  background: linear-gradient(135deg, #d63e6f 0%, #e91e63 100%);
+}
+
+.supertag-config-btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Scrollbar for drawer content */
+.supertag-config-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.supertag-config-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.supertag-config-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.supertag-config-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Sidebar tag item - right click indicator */
+.sidebar-tag-item:hover .sidebar-tag-name::after {
+  content: '  (right-click to edit)';
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+}

@@ -135,11 +135,18 @@ function generateEventId(event: any, eventType: string): string {
   }
 
   // For events with content: hash the actual content, not the wrapper
+  // 🦆 FIX: Include tool_use.id for unique identification of Task tool invocations
   if (event.message?.content) {
     const contentHash = Array.isArray(event.message.content)
-      ? event.message.content.map((block: any) =>
-          `${block.type}-${block.text?.substring(0, 20) || block.name || block.tool_use_id || ''}`
-        ).join('|')
+      ? event.message.content.map((block: any) => {
+          let id = `${block.type}-${block.text?.substring(0, 20) || block.name || ''}`;
+          // Include tool_use.id to ensure unique IDs for each tool invocation
+          // This fixes the bug where multiple Task tools (droids) got the same ID
+          if (block.type === 'tool_use' && block.id) {
+            id += `-${block.id}`;
+          }
+          return id;
+        }).join('|')
       : JSON.stringify(event.message.content);
     return `${eventType}-${hashString(contentHash)}`;
   }

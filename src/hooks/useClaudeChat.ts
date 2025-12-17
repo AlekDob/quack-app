@@ -214,10 +214,19 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             return `assistant-${event.message.id}`;
           }
           // Fallback: hash the content blocks to detect duplicates
+          // 🦆 FIX: Include tool_use.id for unique identification of Task tool invocations
           const contentHash = event.message?.content
-            ?.map((b: any) => `${b.type}-${b.text?.substring(0, 20) || b.name || ''}`)
+            ?.map((b: any) => {
+              let id = `${b.type}-${b.text?.substring(0, 20) || b.name || ''}`;
+              // Include tool_use.id to ensure unique IDs for each tool invocation
+              // This fixes the bug where multiple Task tools (droids) got the same ID
+              if (b.type === 'tool_use' && b.id) {
+                id += `-${b.id}`;
+              }
+              return id;
+            })
             .join('|') || '';
-          return `assistant-${contentHash.substring(0, 50)}`;
+          return `assistant-${contentHash.substring(0, 80)}`;
         }
 
         // For user events: hash the tool results content

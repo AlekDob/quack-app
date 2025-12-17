@@ -1,11 +1,11 @@
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
-import { Brain, RefreshCw, Search, X, PanelRightClose, PanelRightOpen, Globe, FolderOpen } from 'lucide-react';
+import { Brain, RefreshCw, Search, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useOutlineTree } from '../../hooks/useOutlineTree';
 import { useCurrentProject } from '../../hooks/useCurrentProject';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
 import type { MemoryScope } from '../../services/mcpMemoryService';
 import InlineOutliner from './InlineOutliner';
-import SecondBrainSidebar, { type ScopeViewFilter } from './SecondBrainSidebar';
+import SecondBrainSidebar from './SecondBrainSidebar';
 
 interface OutlinerEditorProps {
   initialNodeId?: string;
@@ -30,7 +30,6 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
     expandedNodes,
     search,
     filterByTag,
-    filterByScope,
   } = useOutlineTree();
 
   // Project detection
@@ -41,19 +40,10 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [zoomedNode, setZoomedNode] = useState<OutlineNodeType | null>(null);
 
-  // Scope state for new memories
-  const [selectedScope, setSelectedScope] = useState<MemoryScope>('global');
-  // Selected project name (for 'project' scope)
-  const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
-  // View filter for displaying memories
-  const [viewFilter, setViewFilter] = useState<ScopeViewFilter>('all');
-
-  // Auto-select detected project when it becomes available (if no project selected yet)
-  useEffect(() => {
-    if (currentProject?.name && !selectedProjectName) {
-      setSelectedProjectName(currentProject.name);
-    }
-  }, [currentProject?.name, selectedProjectName]);
+  // Scope state for new memories (always global now)
+  const selectedScope: MemoryScope = 'global';
+  // Selected project name from detection
+  const selectedProjectName = currentProject?.name || null;
 
   // Build breadcrumbs from zoomed node path
   const breadcrumbs = useMemo(() => {
@@ -75,16 +65,9 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
     return path;
   }, [zoomedNode, tree]);
 
-  // Filter roots by search query, tag filter, and scope
+  // Filter roots by search query and tag filter
   const filteredRoots = useMemo(() => {
     let filtered = roots;
-
-    // Apply scope filter first (if filterByScope is available)
-    // Use selectedProjectName if set, otherwise fall back to detected project
-    const projectForFilter = selectedProjectName || currentProject?.name;
-    if (viewFilter !== 'all' && filterByScope) {
-      filtered = filterByScope(viewFilter, projectForFilter);
-    }
 
     // Apply tag filter
     if (activeTagFilter) {
@@ -103,7 +86,7 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
     }
 
     return filtered;
-  }, [roots, searchQuery, search, activeTagFilter, filterByTag, viewFilter, filterByScope, selectedProjectName, currentProject?.name]);
+  }, [roots, searchQuery, search, activeTagFilter, filterByTag]);
 
   const handleTagFilter = useCallback((tag: string | null) => {
     setActiveTagFilter(tag);
@@ -281,13 +264,6 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
           onFilterByTag={handleTagFilter}
           activeFilter={activeTagFilter}
           onAddNew={handleSidebarAddNew}
-          currentProject={currentProject}
-          selectedScope={selectedScope}
-          onScopeChange={setSelectedScope}
-          selectedProjectName={selectedProjectName}
-          onProjectChange={setSelectedProjectName}
-          viewFilter={viewFilter}
-          onViewFilterChange={setViewFilter}
         />
       )}
     </div>
