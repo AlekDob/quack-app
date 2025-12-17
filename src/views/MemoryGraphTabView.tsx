@@ -113,8 +113,10 @@ const CATEGORY_OPTIONS: { value: MemoryCategory; label: string }[] = [
   { value: "context", label: "Context" },
 ];
 
-// Zoom threshold for showing labels
+// Zoom threshold for showing labels (labels visible when zoomed IN enough)
 const LABEL_ZOOM_THRESHOLD = 0.8;
+// Zoom threshold for showing tooltip on click (tooltip visible when zoomed OUT - i.e., low zoom)
+const TOOLTIP_ZOOM_THRESHOLD = 1.2;
 
 function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,6 +128,7 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newMemoryContent, setNewMemoryContent] = useState("");
   const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>("fact");
+  const [currentZoom, setCurrentZoom] = useState(1);
 
   const {
     unifiedItems,
@@ -180,11 +183,18 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
   }, [graphData]);
 
   const handleNodeClick = useCallback((node: GraphNode) => {
-    setSelectedNode(node);
+    // Only show details panel when zoomed out (labels not visible)
+    // When zoomed in, labels are already visible so no need for details
+    if (currentZoom < TOOLTIP_ZOOM_THRESHOLD) {
+      setSelectedNode(node);
+    } else {
+      // Toggle selection for visual feedback when zoomed in
+      setSelectedNode(prev => prev?.id === node.id ? null : node);
+    }
     if (node.x !== undefined && node.y !== undefined) {
       graphRef.current?.centerAt(node.x, node.y, 300);
     }
-  }, []);
+  }, [currentZoom]);
 
   const handleZoomIn = useCallback(() => {
     const currentZoom = graphRef.current?.zoom() || 1;
@@ -220,8 +230,6 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
 
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const label = node.name;
-      const fontSize = Math.max(9, 11 / globalScale);
       const nodeSize = node.val;
       const isSelected = selectedNode?.id === node.id;
 
@@ -245,13 +253,15 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
         ctx.shadowBlur = 0;
       }
 
-      // Only show label when zoomed in enough
+      // Draw labels only when zoomed IN enough (globalScale >= threshold)
+      // When zoomed out, labels are hidden and tooltip takes over
       if (globalScale >= LABEL_ZOOM_THRESHOLD) {
-        ctx.font = `${fontSize}px General Sans, Inter, sans-serif`;
+        const fontSize = Math.max(10, 12 / globalScale);
+        ctx.font = `${fontSize}px Inter, sans-serif`;
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-        ctx.fillText(label, node.x, node.y + nodeSize + fontSize + 2);
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.fillText(node.name, node.x, node.y + nodeSize + 4);
       }
     },
     [selectedNode]
@@ -406,8 +416,13 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
             height={dimensions.height}
             backgroundColor="transparent"
             nodeCanvasObject={nodeCanvasObject}
+            nodeCanvasObjectMode={() => "replace"}
             linkCanvasObject={linkCanvasObject}
+            linkCanvasObjectMode={() => "replace"}
+            nodeLabel={(node: GraphNode) => currentZoom < LABEL_ZOOM_THRESHOLD ? node.name : ""}
+            linkLabel={(link: GraphLink) => currentZoom < LABEL_ZOOM_THRESHOLD ? link.relationType : ""}
             onNodeClick={handleNodeClick}
+            onZoom={(transform) => setCurrentZoom(transform.k)}
             nodeRelSize={6}
             linkDirectionalArrowLength={0}
             cooldownTicks={100}
@@ -418,8 +433,8 @@ function MemoryGraphTabView({ tab, isActive }: MemoryGraphTabViewProps) {
         )}
       </div>
 
-      {/* Selected Node Details */}
-      {selectedNode && (
+      {/* Selected Node Details - only show when zoomed out (labels not visible) */}
+      {selectedNode && currentZoom < TOOLTIP_ZOOM_THRESHOLD && (
         <div className="memory-graph-details">
           <div className="memory-graph-details-header">
             <div

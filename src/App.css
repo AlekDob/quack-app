@@ -31,6 +31,11 @@
   grid-template-columns: 850px minmax(0, 1fr) 0px; /* ← 0px, toggle button is fixed */
 }
 
+/* Full-width tabs (docs, second-brain) should expand to fill the space */
+.app-shell.side-panel-collapsed .terminal-pane.full-width-tab {
+  grid-column: 2 / 4; /* Extend to cover both column 2 and 3 */
+}
+
 .app-shell::before {
   content: "";
   position: fixed;

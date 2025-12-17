@@ -7542,7 +7542,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || !activeId ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -7610,7 +7610,7 @@ You have access to all Bash tools to execute git commands like:
         />
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
-        <section className="terminal-pane">
+        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') ? 'full-width-tab' : ''}`}>
           {terminals.length === 0 ? (
             /* Empty state when no agents - show image or guide */
             <div
@@ -8156,8 +8156,8 @@ You have access to all Bash tools to execute git commands like:
           // Sessions props
           onSelectSession={handleSelectSession}
           sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props
-          isCollapsed={sidePanelCollapsed}
+          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph) are active
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-')}
           onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
