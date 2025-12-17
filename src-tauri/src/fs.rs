@@ -1428,3 +1428,153 @@ fn delete_mcp_memory_relation_impl(from: String, to: String) -> Result<bool> {
 
     Ok(true)
 }
+
+// ============================================
+// Project Detection
+// ============================================
+
+/// Project info detected from filesystem
+#[derive(Serialize, Clone, Debug)]
+pub struct ProjectInfo {
+    /// Absolute path to project root
+    pub root_path: String,
+    /// Project name (directory name)
+    pub name: String,
+    /// Detected markers (e.g., ".git", "package.json", "CLAUDE.md")
+    pub markers: Vec<String>,
+}
+
+/// Detect project root from a starting path
+/// Walks up the directory tree looking for project markers
+#[tauri::command]
+pub fn detect_project_root(starting_path: String) -> Result<Option<ProjectInfo>, String> {
+    detect_project_root_impl(starting_path).map_err(|err| err.to_string())
+}
+
+fn detect_project_root_impl(starting_path: String) -> Result<Option<ProjectInfo>> {
+    // If path is empty, "~" or doesn't exist, use current working directory
+    let start = if starting_path.is_empty() || starting_path == "~" {
+        std::env::current_dir().unwrap_or_else(|_| {
+            dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+        })
+    } else {
+        PathBuf::from(&starting_path)
+    };
+
+    // If path doesn't exist, try current_dir as fallback
+    if !start.exists() {
+        let fallback = std::env::current_dir().ok();
+        if let Some(cwd) = fallback {
+            if cwd.exists() {
+                return detect_project_root_impl(cwd.to_string_lossy().to_string());
+            }
+        }
+        return Ok(None);
+    }
+
+    // Get the directory to start from (if path is a file, use its parent)
+    let start_dir = if start.is_file() {
+        start.parent().map(|p| p.to_path_buf()).unwrap_or(start)
+    } else {
+        start
+    };
+
+    // Canonicalize to get absolute path
+    let mut current = fs::canonicalize(&start_dir)
+        .with_context(|| format!("Cannot canonicalize path: {:?}", start_dir))?;
+
+    // Primary markers - these definitively identify a project root
+    let primary_markers = [".git", "CLAUDE.md"];
+
+    // Secondary markers - only valid if no primary marker in parent
+    let secondary_markers = [
+        "package.json",   // Node.js project
+        "Cargo.toml",     // Rust project (but also in subdirs!)
+        "pyproject.toml", // Python project
+        "go.mod",         // Go project
+        "build.gradle",   // Gradle project
+        "pom.xml",        // Maven project
+        ".project",       // Eclipse project
+    ];
+
+    // Collect all candidates as we walk up
+    let mut best_candidate: Option<(PathBuf, Vec<String>, usize)> = None;
+
+    // Walk up the directory tree
+    loop {
+        let mut found_markers = Vec::new();
+        let mut has_primary = false;
+
+        // Check for primary markers first
+        for marker in &primary_markers {
+            let marker_path = current.join(marker);
+            if marker_path.exists() {
+                found_markers.push(marker.to_string());
+                has_primary = true;
+            }
+        }
+
+        // Check for secondary markers
+        for marker in &secondary_markers {
+            let marker_path = current.join(marker);
+            if marker_path.exists() {
+                found_markers.push(marker.to_string());
+            }
+        }
+
+        // If we found any markers, record this candidate
+        if !found_markers.is_empty() {
+            let score = if has_primary { 100 } else { 0 } + found_markers.len();
+
+            // If this has a primary marker, it's definitively the root
+            if has_primary {
+                let project_name = current
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+
+                return Ok(Some(ProjectInfo {
+                    root_path: current.to_string_lossy().to_string(),
+                    name: project_name,
+                    markers: found_markers,
+                }));
+            }
+
+            // Otherwise, keep track of best secondary candidate
+            if best_candidate.is_none() || score > best_candidate.as_ref().unwrap().2 {
+                best_candidate = Some((current.clone(), found_markers, score));
+            }
+        }
+
+        // Move to parent directory
+        match current.parent() {
+            Some(parent) => {
+                // Stop at home directory or root
+                let home = get_home().ok();
+                if Some(current.to_string_lossy().to_string()) == home {
+                    break;
+                }
+                current = parent.to_path_buf();
+            }
+            None => break, // Reached filesystem root
+        }
+    }
+
+    // Return best candidate if we found one
+    if let Some((path, markers, _)) = best_candidate {
+        let project_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        return Ok(Some(ProjectInfo {
+            root_path: path.to_string_lossy().to_string(),
+            name: project_name,
+            markers,
+        }));
+    }
+
+    Ok(None)
+}

@@ -938,7 +938,7 @@
   display: flex;
   align-items: flex-start; /* Align items to top for multiline */
   gap: 4px;
-  padding: 4px 16px; /* Equal horizontal padding */
+  padding: 4px 16px 4px 36px; /* Extra left padding for toggle button */
   padding-right: 100px; /* Extra space for tag badge */
   min-height: 32px;
   border-radius: 4px;
@@ -956,19 +956,20 @@
 
 .inline-bullet-row.zoomed-title {
   margin-bottom: 16px;
-  padding: 8px 0;
+  padding: 8px 16px;
   /* Minimal design - no background or border */
 }
 
-/* Toggle Button (expand/collapse) */
+/* Toggle Button (expand/collapse) - positioned absolutely outside the row */
 .inline-bullet-toggle {
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
   padding: 0;
-  margin-top: 6px; /* Align with first line of multiline text */
+  top: 10px; /* Align with bullet point vertically */
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.3);
@@ -976,6 +977,7 @@
   border-radius: 4px;
   flex-shrink: 0;
   transition: all 0.15s ease;
+  z-index: 1;
 }
 
 .inline-bullet-toggle:hover {
@@ -1063,11 +1065,29 @@
   color: #E84A7F;
 }
 
-/* Supertag Badge - positioned absolutely at the end, aligned to top */
-.inline-bullet-tag {
+/* Badges container - positioned absolutely at the end, aligned to top */
+.inline-bullet-badges {
   position: absolute;
-  right: 12px; /* Match row padding */
-  top: 8px; /* Align with first line of text */
+  right: 16px; /* More space from edge */
+  top: 10px; /* A bit lower to align better with text */
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Project Badge */
+.inline-bullet-project-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  background: rgba(232, 74, 127, 0.15);
+  color: #E84A7F;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Supertag Badge */
+.inline-bullet-tag {
   font-size: 11px;
   font-weight: 500;
   padding: 2px 6px;
@@ -1085,10 +1105,22 @@
 /* New Bullet Row */
 .inline-bullet-row.new-bullet {
   opacity: 0.7;
+  background: transparent !important; /* Ensure no inherited background */
+}
+
+/* Only add margin when in detail/zoom view */
+.inline-bullet-row.new-bullet.in-detail-view {
+  margin: 16px 0px 0px 24px;
 }
 
 .inline-bullet-row.new-bullet:focus-within {
   opacity: 1;
+  background: transparent !important;
+}
+
+/* New bullet point should be gray */
+.inline-bullet-point.new {
+  background-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* Empty State */
@@ -1166,7 +1198,7 @@
 
 .observations-section {
   margin: 16px 0 24px;
-  padding: 0;
+  padding: 0 16px;
   /* Minimal design - no background or border */
 }
 
@@ -1385,4 +1417,265 @@
 .inline-autocomplete::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
+}
+
+/* ===================================
+   SCOPE SELECTOR - Project/Global
+   =================================== */
+
+.sidebar-scope-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-scope-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 8px;
+}
+
+.sidebar-scope-label svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sidebar-scope-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.sidebar-scope-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #e7ebf3;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-scope-button:hover {
+  border-color: rgba(232, 74, 127, 0.3);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.sidebar-scope-button.open {
+  border-color: rgba(232, 74, 127, 0.5);
+}
+
+.sidebar-scope-button-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-scope-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-scope-icon.global {
+  color: #3b82f6;
+}
+
+.sidebar-scope-icon.project {
+  color: #E84A7F;
+}
+
+.sidebar-scope-chevron {
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.sidebar-scope-button.open .sidebar-scope-chevron {
+  transform: rotate(180deg);
+}
+
+.sidebar-scope-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: rgba(18, 20, 27, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.sidebar-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  color: #e7ebf3;
+  font-size: 13px;
+}
+
+.sidebar-scope-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-scope-option.active {
+  background: rgba(232, 74, 127, 0.1);
+}
+
+.sidebar-scope-option-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-scope-option-icon.global {
+  color: #3b82f6;
+}
+
+.sidebar-scope-option-icon.project {
+  color: #E84A7F;
+}
+
+.sidebar-scope-option-text {
+  flex: 1;
+}
+
+.sidebar-scope-option-check {
+  width: 14px;
+  height: 14px;
+  color: #E84A7F;
+}
+
+/* Scope Filter Tabs in Sidebar */
+.sidebar-scope-filters {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.sidebar-scope-filter {
+  flex: 1;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.sidebar-scope-filter:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar-scope-filter.active {
+  background: rgba(232, 74, 127, 0.15);
+  border-color: rgba(232, 74, 127, 0.3);
+  color: #E84A7F;
+}
+
+/* Scope Statistics */
+.sidebar-scope-stats {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0 0;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sidebar-scope-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-scope-stat-value {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* No Project Detected State */
+.sidebar-no-project {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.sidebar-no-project svg {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ===================================
+   ZOOMED NODE METADATA (Detail View)
+   =================================== */
+
+/* Container for metadata badges above zoomed node title */
+.zoomed-node-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 8px;
+}
+
+/* Project badge with @ prefix */
+.zoomed-node-project-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(232, 74, 127, 0.12);
+  border: 1px solid rgba(232, 74, 127, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #E84A7F;
+  white-space: nowrap;
+}
+
+/* Tag badge with # prefix */
+.zoomed-node-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }

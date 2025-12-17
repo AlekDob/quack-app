@@ -492,6 +492,7 @@ pub fn run() {
             fs::update_mcp_memory_entity_type,
             fs::write_mcp_memory_relation,
             fs::delete_mcp_memory_relation,
+            fs::detect_project_root,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,

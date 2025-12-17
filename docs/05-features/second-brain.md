@@ -256,6 +256,54 @@ UI updates with new bullet
 5. **Minimal design**: No heavy backgrounds, clean interface
 6. **Full-width when active**: Side panel collapses for more space
 
+## Project-Scoped Memories
+
+Second Brain supports **project-scoped memories** - memories that belong to a specific project vs global memories visible everywhere.
+
+### Scope Types
+
+| Scope | Icon | Description |
+|-------|------|-------------|
+| **Global** | Globe | Memories visible in all projects (user facts, preferences) |
+| **Project** | Folder | Memories specific to current project (patterns, decisions) |
+
+### How It Works
+
+1. **Scope Selector**: In the sidebar, choose "Global" or current project name
+2. **View Filters**: Tab buttons to show "All" / "Global" / "Project" memories
+3. **Project Detection**: Quack auto-detects project via `.git`, `package.json`, `CLAUDE.md`
+
+### MCP Relation
+
+Project-scoped memories use the `belongs_to_project` relation:
+
+```jsonl
+// Entity scoped to quack-app project
+{"type":"entity","name":"pattern_hooks","entityType":"pattern","observations":["Use custom hooks"]}
+{"type":"relation","from":"pattern_hooks","to":"quack-app","relationType":"belongs_to_project"}
+```
+
+### Architecture
+
+```
++------------------------------------------------------------------+
+|  Project Scoping                                                  |
+|  +-- useCurrentProject.ts (hook for project detection)           |
+|  +-- detect_project_root (Rust command)                          |
+|  +-- mcpMemoryService.ts (scope filtering functions)             |
+|  +-- SecondBrainSidebar.tsx (scope selector + filters)           |
++------------------------------------------------------------------+
+```
+
+### Implementation Files
+
+| File | Purpose |
+|------|---------|
+| `src/hooks/useCurrentProject.ts` | Project detection hook |
+| `src-tauri/src/fs.rs` | `detect_project_root` command |
+| `src/services/mcpMemoryService.ts` | `createProjectScopedEntity`, `filterEntitiesByScope` |
+| `src/components/second-brain/SecondBrainSidebar.tsx` | Scope dropdown & filters |
+
 ## Related Documentation
 
 - [MCP Memory Integration](./mcp-memory-integration.md) - Memory system architecture
@@ -264,6 +312,11 @@ UI updates with new bullet
 ## Changelog
 
 ### December 2025
+- **Project-Scoped Memories**: Memories can now be Global or Project-specific
+  - Scope selector dropdown in sidebar
+  - View filters (All/Global/Project)
+  - Auto project detection via marker files
+  - `belongs_to_project` relation for project scoping
 - Initial implementation of Second Brain tab
 - Tana/Logseq-style inline editing
 - Zoom/focus mode with breadcrumbs

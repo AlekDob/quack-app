@@ -17,6 +17,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
   createMCPEntity,
+  createProjectScopedEntity,
+  ensureProjectEntity,
   deleteMCPEntity,
   createMCPRelation,
   deleteMCPRelation,
@@ -27,7 +29,9 @@ import {
   categoryToEntityType,
   categoryToRelationType,
   mcpMemoryService,
+  type MemoryScope,
 } from '../../services/mcpMemoryService';
+import type { ProjectInfo } from '../../hooks/useCurrentProject';
 import { parseMentions, parseSupertag } from '../../services/outlineTreeBuilder';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
 import { SUPERTAGS } from './EntityAutocomplete';
@@ -512,22 +516,23 @@ function InlineBullet({
 
   return (
     <div className="inline-bullet-container">
+      {/* Expand/Collapse toggle - positioned absolutely to the left */}
+      {hasChildren && (
+        <button
+          type="button"
+          className={`inline-bullet-toggle has-children ${isExpanded ? 'expanded' : ''}`}
+          onClick={handleToggle}
+          style={{ left: `${(isZoomed ? 0 : node.depth * 24) + 12}px` }}
+        >
+          <ChevronRight size={12} />
+        </button>
+      )}
+
       <div
         className={`inline-bullet-row ${isFocused ? 'focused' : ''} ${isZoomed ? 'zoomed-title' : ''}`}
         onClick={handleRowClick}
         style={focusedStyle}
       >
-        {/* Expand/Collapse toggle - only render if has children */}
-        {hasChildren && (
-          <button
-            type="button"
-            className={`inline-bullet-toggle has-children ${isExpanded ? 'expanded' : ''}`}
-            onClick={handleToggle}
-          >
-            <ChevronRight size={12} />
-          </button>
-        )}
-
         {/* Bullet point - click to zoom */}
         <button
           type="button"
@@ -562,19 +567,31 @@ function InlineBullet({
           )}
         </div>
 
-        {/* Supertag badge */}
-        {node.entityType && node.entityType !== 'fact' && (
-          <span
-            className="inline-bullet-tag"
-            style={{ color: getEntityColor(node.entityType) }}
-          >
-            #{node.entityType}
-          </span>
+        {/* Badges container - only show in list view, not when zoomed */}
+        {!isZoomed && (
+          <div className="inline-bullet-badges">
+            {/* Project badge */}
+            {node.projectName && (
+              <span className="inline-bullet-project-badge">
+                @{node.projectName}
+              </span>
+            )}
+
+            {/* Supertag badge */}
+            {node.entityType && node.entityType !== 'fact' && (
+              <span
+                className="inline-bullet-tag"
+                style={{ color: getEntityColor(node.entityType) }}
+              >
+                #{node.entityType}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Children */}
-      {hasChildren && isExpanded && (
+      {/* Children - don't render when this is the zoomed title (children are shown below) */}
+      {hasChildren && isExpanded && !isZoomed && (
         <div className="inline-bullet-children">
           {node.children.map((child, index) => (
             <InlineBullet
@@ -648,6 +665,12 @@ interface InlineOutlinerProps {
   zoomedNode: OutlineNodeType | null;
   onZoom: (node: OutlineNodeType | null) => void;
   breadcrumbs: OutlineNodeType[];
+  /** Selected scope for new memories */
+  selectedScope: MemoryScope;
+  /** Current project info (null if no project detected) */
+  currentProject: ProjectInfo | null;
+  /** Selected project name for 'project' scope */
+  selectedProjectName: string | null;
 }
 
 /**
@@ -661,6 +684,9 @@ export function InlineOutliner({
   zoomedNode,
   onZoom,
   breadcrumbs,
+  selectedScope,
+  currentProject,
+  selectedProjectName,
 }: InlineOutlinerProps) {
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -829,9 +855,12 @@ export function InlineOutliner({
           return;
         }
 
-        // ZOOMED MODE: Add as observation to current entity
-        if (zoomedNode && !supertag) {
-          // Plain text → add as observation to zoomed entity
+        // ZOOMED MODE on PROJECT: Create new entity related to the project
+        // (Not as observation, but as a separate thought linked to this project)
+        const isZoomedOnProject = zoomedNode?.entityType === 'project';
+
+        if (zoomedNode && !supertag && !isZoomedOnProject) {
+          // Plain text on non-project → add as observation to zoomed entity
           if (cleanedContent) {
             await addMCPObservations(zoomedNode.id, [cleanedContent]);
             toast.success('Observation added');
@@ -847,7 +876,7 @@ export function InlineOutliner({
             toast.success(`Linked to ${mention}`);
           }
         }
-        // ROOT MODE or #tag specified: Create new entity
+        // ROOT MODE or #tag specified OR zoomed on project: Create new entity
         else {
           const entityType = supertag || 'fact';
 
@@ -856,21 +885,51 @@ export function InlineOutliner({
             return;
           }
 
-          // Create new entity
+          // Create new entity with scope
           const entityName = generateEntityName(cleanedContent);
-          await createMCPEntity({
+          const entityData = {
             name: entityName,
             entityType: categoryToEntityType(entityType),
             observations: [cleanedContent],
-          });
+          };
 
-          // If we're zoomed, also create "contains" relation
-          if (zoomedNode) {
+          // SPECIAL CASE: Zoomed on a project → auto-relate to that project
+          if (isZoomedOnProject && zoomedNode) {
+            // Create entity first (global)
+            await createMCPEntity(entityData);
+            // Then add belongs_to_project relation to the zoomed project
             await createMCPRelation({
-              from: zoomedNode.id,
-              to: entityName,
-              relationType: 'contains',
+              from: entityName,
+              to: zoomedNode.id,
+              relationType: 'belongs_to_project',
             });
+            console.log('[InlineOutliner] Created entity related to project:', entityName, '->', zoomedNode.id);
+            toast.success(`Added to ${zoomedNode.content.slice(0, 20)}...`);
+          }
+          // Use project-scoped entity if scope is 'project' and project is selected
+          // Prefer selectedProjectName (from dropdown) over currentProject (auto-detected)
+          else {
+            const projectToUse = selectedProjectName || currentProject?.name;
+            if (selectedScope === 'project' && projectToUse) {
+              // Ensure project entity exists first (use currentProject.root_path if available)
+              await ensureProjectEntity(projectToUse, currentProject?.root_path || '');
+              // Create entity with project relation
+              await createProjectScopedEntity(entityData, projectToUse);
+              console.log('[InlineOutliner] Created project-scoped entity:', entityName, '->', projectToUse);
+            } else {
+              // Create global entity (no project relation)
+              await createMCPEntity(entityData);
+              console.log('[InlineOutliner] Created global entity:', entityName);
+            }
+
+            // If we're zoomed on non-project, also create "contains" relation
+            if (zoomedNode) {
+              await createMCPRelation({
+                from: zoomedNode.id,
+                to: entityName,
+                relationType: 'contains',
+              });
+            }
           }
 
           // Create relations for @mentions
@@ -901,7 +960,7 @@ export function InlineOutliner({
       setNewBulletCursor(0);
       newBulletRef.current?.blur();
     }
-  }, [newBulletContent, onRefresh, zoomedNode, showNewBulletAutocomplete, newBulletAutocompleteItems, newBulletAutocompleteIndex, newBulletTriggerInfo, handleNewBulletAutocompleteSelect]);
+  }, [newBulletContent, onRefresh, zoomedNode, showNewBulletAutocomplete, newBulletAutocompleteItems, newBulletAutocompleteIndex, newBulletTriggerInfo, handleNewBulletAutocompleteSelect, selectedScope, currentProject]);
 
   const handleDelete = useCallback(async (nodeId: string) => {
     try {
@@ -1124,6 +1183,27 @@ export function InlineOutliner({
         </div>
       )}
 
+      {/* Zoomed node metadata badges (above title) */}
+      {zoomedNode && (
+        <div className="zoomed-node-meta">
+          {/* Project badge */}
+          {zoomedNode.projectName && (
+            <span className="zoomed-node-project-badge">
+              @{zoomedNode.projectName}
+            </span>
+          )}
+          {/* Supertag badge */}
+          {zoomedNode.entityType && zoomedNode.entityType !== 'fact' && (
+            <span
+              className="zoomed-node-tag-badge"
+              style={{ color: getEntityColor(zoomedNode.entityType) }}
+            >
+              #{zoomedNode.entityType}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Zoomed node title */}
       {zoomedNode && (
         <InlineBullet
@@ -1222,35 +1302,35 @@ export function InlineOutliner({
               />
             ))}
 
-            {/* New bullet input - only at root level (zoom mode uses DETAILS section) */}
-            {!zoomedNode && (
-              <div className="inline-bullet-row new-bullet">
-                <div className="inline-bullet-point new" />
-                <div className="inline-bullet-input-wrapper">
-                  <input
-                    ref={newBulletRef}
-                    type="text"
-                    className="inline-bullet-input"
-                    value={newBulletContent}
-                    onChange={(e) => {
-                      setNewBulletContent(e.target.value);
-                      setNewBulletCursor(e.target.selectionStart || 0);
-                    }}
-                    onKeyDown={handleNewBulletKeyDown}
-                    placeholder="Type a new thought... #tag @mention"
+            {/* New bullet input - at root level OR in zoom mode for adding related thoughts */}
+            <div className={`inline-bullet-row new-bullet ${zoomedNode ? 'in-detail-view' : ''}`}>
+              <div className="inline-bullet-point new" />
+              <div className="inline-bullet-input-wrapper">
+                <input
+                  ref={newBulletRef}
+                  type="text"
+                  className="inline-bullet-input"
+                  value={newBulletContent}
+                  onChange={(e) => {
+                    setNewBulletContent(e.target.value);
+                    setNewBulletCursor(e.target.selectionStart || 0);
+                  }}
+                  onKeyDown={handleNewBulletKeyDown}
+                  placeholder={zoomedNode
+                    ? `Add thought related to ${zoomedNode.content.slice(0, 20)}${zoomedNode.content.length > 20 ? '...' : ''}`
+                    : "Type a new thought... #tag @mention"}
+                />
+                {/* Autocomplete dropdown for new bullet */}
+                {showNewBulletAutocomplete && newBulletTriggerInfo.trigger && (
+                  <InlineAutocomplete
+                    trigger={newBulletTriggerInfo.trigger}
+                    query={newBulletTriggerInfo.query}
+                    selectedIndex={newBulletAutocompleteIndex}
+                    onSelect={handleNewBulletAutocompleteSelect}
                   />
-                  {/* Autocomplete dropdown for new bullet */}
-                  {showNewBulletAutocomplete && newBulletTriggerInfo.trigger && (
-                    <InlineAutocomplete
-                      trigger={newBulletTriggerInfo.trigger}
-                      query={newBulletTriggerInfo.query}
-                      selectedIndex={newBulletAutocompleteIndex}
-                      onSelect={handleNewBulletAutocompleteSelect}
-                    />
-                  )}
-                </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </SortableContext>
       </DndContext>

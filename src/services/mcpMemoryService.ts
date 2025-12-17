@@ -693,3 +693,204 @@ export async function updateMCPEntityType(
     return false;
   }
 }
+
+// ============================================
+// Project-Scoped Memories
+// ============================================
+
+/** Scope type for memories */
+export type MemoryScope = 'global' | 'project';
+
+/** Project entity type identifier */
+export const PROJECT_ENTITY_TYPE = 'project';
+
+/** Relation type for project scoping */
+export const PROJECT_RELATION_TYPE = 'belongs_to_project';
+
+/**
+ * Ensure a project entity exists in memory
+ * Creates the project entity if it doesn't exist
+ *
+ * @param projectName - Name of the project (e.g., "quack-app")
+ * @param projectPath - Full path to the project root
+ * @returns true if project entity exists or was created
+ */
+export async function ensureProjectEntity(
+  projectName: string,
+  projectPath: string
+): Promise<boolean> {
+  try {
+    const graph = mcpMemoryService.getKnowledgeGraph();
+
+    // Check if project entity already exists
+    const existingProject = graph?.entities.find(
+      (e) => e.entityType === PROJECT_ENTITY_TYPE && e.name === projectName
+    );
+
+    if (existingProject) {
+      console.log("[MCPMemoryService] Project entity exists:", projectName);
+      return true;
+    }
+
+    // Create project entity
+    const entity = await createMCPEntity({
+      name: projectName,
+      entityType: PROJECT_ENTITY_TYPE,
+      observations: [`Path: ${projectPath}`],
+    });
+
+    if (entity) {
+      console.log("[MCPMemoryService] Project entity created:", projectName);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to ensure project entity:", error);
+    return false;
+  }
+}
+
+/**
+ * Create an entity with project scope
+ * Creates the entity and adds a "belongs_to_project" relation
+ *
+ * @param input - Entity data
+ * @param projectName - Name of the project to scope to
+ * @returns The created entity or null on failure
+ */
+export async function createProjectScopedEntity(
+  input: CreateMCPEntityInput,
+  projectName: string
+): Promise<MCPEntity | null> {
+  try {
+    // Create the entity first
+    const entity = await createMCPEntity(input);
+
+    if (!entity) {
+      return null;
+    }
+
+    // Create the project scope relation
+    await createMCPRelation({
+      from: entity.name,
+      to: projectName,
+      relationType: PROJECT_RELATION_TYPE,
+    });
+
+    console.log("[MCPMemoryService] Project-scoped entity created:", entity.name, "->", projectName);
+    return entity;
+  } catch (error) {
+    console.error("[MCPMemoryService] Failed to create project-scoped entity:", error);
+    return null;
+  }
+}
+
+/**
+ * Get the project scope for an entity
+ * Returns the project name if the entity belongs to a project, null for global
+ *
+ * @param entityName - Name of the entity
+ * @returns Project name or null for global
+ */
+export function getEntityProjectScope(entityName: string): string | null {
+  const graph = mcpMemoryService.getKnowledgeGraph();
+  if (!graph) return null;
+
+  const relation = graph.relations.find(
+    (r) => r.from === entityName && r.relationType === PROJECT_RELATION_TYPE
+  );
+
+  return relation?.to || null;
+}
+
+/**
+ * Filter entities by scope
+ *
+ * @param scope - 'global' | 'project' | 'all'
+ * @param projectName - Required when scope is 'project'
+ * @returns Filtered entities
+ */
+export function filterEntitiesByScope(
+  scope: 'global' | 'project' | 'all',
+  projectName?: string
+): MCPEntity[] {
+  const graph = mcpMemoryService.getKnowledgeGraph();
+  if (!graph) return [];
+
+  if (scope === 'all') {
+    return graph.entities;
+  }
+
+  // Build a set of entity names that belong to a project
+  const projectScopedEntities = new Set(
+    graph.relations
+      .filter((r) => r.relationType === PROJECT_RELATION_TYPE)
+      .map((r) => r.from)
+  );
+
+  if (scope === 'global') {
+    // Return entities that don't have a project relation
+    return graph.entities.filter((e) => !projectScopedEntities.has(e.name));
+  }
+
+  if (scope === 'project' && projectName) {
+    // Return entities that belong to the specified project
+    const projectEntityNames = new Set(
+      graph.relations
+        .filter(
+          (r) =>
+            r.relationType === PROJECT_RELATION_TYPE && r.to === projectName
+        )
+        .map((r) => r.from)
+    );
+
+    return graph.entities.filter((e) => projectEntityNames.has(e.name));
+  }
+
+  return [];
+}
+
+/**
+ * Get all projects in memory
+ * Returns entities with entityType 'project'
+ */
+export function getAllProjects(): MCPEntity[] {
+  const graph = mcpMemoryService.getKnowledgeGraph();
+  if (!graph) return [];
+
+  return graph.entities.filter((e) => e.entityType === PROJECT_ENTITY_TYPE);
+}
+
+/**
+ * Get scope statistics
+ * Returns count of global vs project-scoped memories
+ */
+export function getScopeStatistics(projectName?: string): {
+  total: number;
+  global: number;
+  project: number;
+} {
+  const graph = mcpMemoryService.getKnowledgeGraph();
+  if (!graph) return { total: 0, global: 0, project: 0 };
+
+  const total = graph.entities.length;
+  const projectScopedEntities = new Set(
+    graph.relations
+      .filter((r) => r.relationType === PROJECT_RELATION_TYPE)
+      .map((r) => r.from)
+  );
+
+  const global = graph.entities.filter(
+    (e) => !projectScopedEntities.has(e.name)
+  ).length;
+
+  const project = projectName
+    ? graph.relations.filter(
+        (r) =>
+          r.relationType === PROJECT_RELATION_TYPE && r.to === projectName
+      ).length
+    : projectScopedEntities.size;
+
+  return { total, global, project };
+}

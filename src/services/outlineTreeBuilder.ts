@@ -17,6 +17,8 @@ export interface OutlineNode {
   isExpanded: boolean;
   mentions: string[]; // Entity names mentioned via @
   createdAt?: number;
+  /** Project name this node belongs to (via belongs_to_project relation) */
+  projectName?: string;
 }
 
 export interface OutlineTree {
@@ -91,9 +93,43 @@ export function buildOutlineTree(graph: MCPKnowledgeGraph): OutlineTree {
   }
 
   // Second pass: Build parent-child relationships from "contains" relations
+  // and project associations from "belongs_to_project" relations
   for (const relation of graph.relations) {
     if (relation.relationType === 'contains') {
       childToParent.set(relation.to, relation.from);
+    } else if (relation.relationType === 'belongs_to_project') {
+      // relation.from = entity name, relation.to = project name
+      const node = nodeMap.get(relation.from);
+      if (node) {
+        node.projectName = relation.to;
+      }
+
+      // Also treat belongs_to_project as a parent-child relationship
+      // so that when you zoom into a project, you see its related entities
+      let projectNode = nodeMap.get(relation.to);
+
+      // If exact match not found, try to find a project with similar name
+      // (handles cases like "quack-app" vs "quack_app_mj9v7pk2")
+      if (!projectNode) {
+        const normalizedTarget = relation.to.toLowerCase().replace(/[-_]/g, '');
+        for (const [name, node] of nodeMap.entries()) {
+          if (node.entityType === 'project') {
+            const normalizedName = name.toLowerCase().replace(/[-_]/g, '').replace(/[a-z0-9]{8}$/, ''); // Remove ID suffix
+            const normalizedContent = node.content.toLowerCase().replace(/[-_]/g, '').replace(/\s+/g, '');
+            if (normalizedName.includes(normalizedTarget) || normalizedContent.includes(normalizedTarget)) {
+              projectNode = node;
+              break;
+            }
+          }
+        }
+      }
+
+      if (projectNode && projectNode.entityType === 'project') {
+        // Only add as child if not already a child of something else
+        if (!childToParent.has(relation.from)) {
+          childToParent.set(relation.from, projectNode.id); // Use actual project node ID
+        }
+      }
     }
   }
 

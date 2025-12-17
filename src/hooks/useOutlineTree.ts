@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { loadMCPMemoryFromFile } from '../services/mcpMemoryService';
+import {
+  loadMCPMemoryFromFile,
+  filterEntitiesByScope,
+  type MemoryScope,
+} from '../services/mcpMemoryService';
 import {
   buildOutlineTree,
   flattenTree,
@@ -9,6 +13,9 @@ import {
   type OutlineTree,
   type OutlineNode,
 } from '../services/outlineTreeBuilder';
+
+/** Scope view filter type */
+export type ScopeViewFilter = 'all' | 'global' | 'project';
 
 interface UseOutlineTreeReturn {
   tree: OutlineTree | null;
@@ -21,6 +28,7 @@ interface UseOutlineTreeReturn {
   toggleExpand: (nodeId: string) => void;
   search: (query: string) => OutlineNode[];
   filterByTag: (tag: string) => OutlineNode[];
+  filterByScope: (scope: ScopeViewFilter, projectName?: string) => OutlineNode[];
   expandedNodes: Set<string>;
   setExpandedNodes: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
@@ -106,6 +114,29 @@ export function useOutlineTree(): UseOutlineTreeReturn {
     return filterBySupertag(tree, tag);
   }, [tree]);
 
+  /**
+   * Filter roots by scope (global, project, or all)
+   */
+  const filterByScope = useCallback((
+    scope: ScopeViewFilter,
+    projectName?: string
+  ): OutlineNode[] => {
+    if (!tree) return [];
+    if (scope === 'all') return tree.roots;
+
+    // Get filtered entities from MCP service
+    const filteredEntities = filterEntitiesByScope(
+      scope === 'global' ? 'global' : 'project',
+      projectName
+    );
+
+    // Create a set of entity names that pass the filter
+    const filteredNames = new Set(filteredEntities.map(e => e.name));
+
+    // Filter roots to only include those in the filtered set
+    return tree.roots.filter(root => filteredNames.has(root.id));
+  }, [tree]);
+
   const supertagCounts = useMemo(() => {
     if (!tree) return new Map<string, number>();
     return getSupertagCounts(tree);
@@ -130,6 +161,7 @@ export function useOutlineTree(): UseOutlineTreeReturn {
     toggleExpand,
     search,
     filterByTag,
+    filterByScope,
     expandedNodes,
     setExpandedNodes,
   };

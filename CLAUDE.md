@@ -125,8 +125,38 @@ describe('Feature Name', () => {
 - `rehype-slug@6.0.0` - Auto-generate heading IDs
 - `rehype-autolink-headings@7.1.0` - Add anchor links to headings
 
-##Ui rule
-⚠️ Non usare emojii 
+## UI Rule
+
+Do not use emojis in the UI.
+
+## Memory Context (MCP Memory)
+
+Quack uses **MCP Memory** (`@modelcontextprotocol/server-memory`) for semantic memories. Memories can be **Global** (visible everywhere) or **Project-scoped** (visible only in a specific project).
+
+**Project-scoped memories use the `belongs_to_project` relation:**
+
+```jsonl
+// Project entity
+{"type":"entity","name":"quack-app","entityType":"project","observations":["Path: /Users/alekdob/Desktop/Dev/Personal/quack-app"]}
+
+// Memory scoped to project
+{"type":"entity","name":"pattern_react_hooks","entityType":"pattern","observations":["Use custom hooks for reusable logic"]}
+{"type":"relation","from":"pattern_react_hooks","to":"quack-app","relationType":"belongs_to_project"}
+```
+
+**When saving memories via AI:**
+- **Global memories**: Facts about user, preferences, general knowledge - NO project relation needed
+- **Project memories**: Patterns, decisions, context specific to THIS project - ADD `belongs_to_project` relation
+
+**Current project: quack-app**
+- When saving project-specific memories, create relation: `{ from: "<entity>", to: "quack-app", relationType: "belongs_to_project" }`
+- Global memories (about Alek, general preferences) don't need project relation
+
+**MCP Tools for Memories:**
+- `mcp__memory__create_entities` - Create new memory entities
+- `mcp__memory__create_relations` - Create relations between entities (including `belongs_to_project`)
+- `mcp__memory__search_nodes` - Search existing memories
+- `mcp__memory__read_graph` - Read entire knowledge graph
 
 ## Critical Rules
 

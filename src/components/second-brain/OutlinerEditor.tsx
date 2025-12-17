@@ -1,19 +1,23 @@
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
-import { Brain, RefreshCw, Search, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Brain, RefreshCw, Search, X, PanelRightClose, PanelRightOpen, Globe, FolderOpen } from 'lucide-react';
 import { useOutlineTree } from '../../hooks/useOutlineTree';
+import { useCurrentProject } from '../../hooks/useCurrentProject';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
+import type { MemoryScope } from '../../services/mcpMemoryService';
 import InlineOutliner from './InlineOutliner';
-import SecondBrainSidebar from './SecondBrainSidebar';
+import SecondBrainSidebar, { type ScopeViewFilter } from './SecondBrainSidebar';
 
 interface OutlinerEditorProps {
   initialNodeId?: string;
+  /** Starting path for project detection (default: cwd or home) */
+  projectPath?: string;
 }
 
 /**
  * Main Outliner Editor Component
  * Tana/Logseq-style inline editing experience
  */
-export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
+export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorProps) {
   const {
     tree,
     roots,
@@ -26,12 +30,30 @@ export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
     expandedNodes,
     search,
     filterByTag,
+    filterByScope,
   } = useOutlineTree();
+
+  // Project detection
+  const { project: currentProject, refresh: refreshProject } = useCurrentProject(projectPath);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [zoomedNode, setZoomedNode] = useState<OutlineNodeType | null>(null);
+
+  // Scope state for new memories
+  const [selectedScope, setSelectedScope] = useState<MemoryScope>('global');
+  // Selected project name (for 'project' scope)
+  const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
+  // View filter for displaying memories
+  const [viewFilter, setViewFilter] = useState<ScopeViewFilter>('all');
+
+  // Auto-select detected project when it becomes available (if no project selected yet)
+  useEffect(() => {
+    if (currentProject?.name && !selectedProjectName) {
+      setSelectedProjectName(currentProject.name);
+    }
+  }, [currentProject?.name, selectedProjectName]);
 
   // Build breadcrumbs from zoomed node path
   const breadcrumbs = useMemo(() => {
@@ -53,13 +75,23 @@ export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
     return path;
   }, [zoomedNode, tree]);
 
-  // Filter roots by search query and tag filter
+  // Filter roots by search query, tag filter, and scope
   const filteredRoots = useMemo(() => {
     let filtered = roots;
 
-    // Apply tag filter first
+    // Apply scope filter first (if filterByScope is available)
+    // Use selectedProjectName if set, otherwise fall back to detected project
+    const projectForFilter = selectedProjectName || currentProject?.name;
+    if (viewFilter !== 'all' && filterByScope) {
+      filtered = filterByScope(viewFilter, projectForFilter);
+    }
+
+    // Apply tag filter
     if (activeTagFilter) {
-      filtered = filterByTag(activeTagFilter);
+      const tagFiltered = filterByTag(activeTagFilter);
+      // Intersect with current filter
+      const tagFilteredIds = new Set(tagFiltered.map(n => n.id));
+      filtered = filtered.filter(root => tagFilteredIds.has(root.id));
     }
 
     // Then apply search query
@@ -71,7 +103,7 @@ export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
     }
 
     return filtered;
-  }, [roots, searchQuery, search, activeTagFilter, filterByTag]);
+  }, [roots, searchQuery, search, activeTagFilter, filterByTag, viewFilter, filterByScope, selectedProjectName, currentProject?.name]);
 
   const handleTagFilter = useCallback((tag: string | null) => {
     setActiveTagFilter(tag);
@@ -219,6 +251,9 @@ export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
                 zoomedNode={null}
                 onZoom={handleZoom}
                 breadcrumbs={[]}
+                selectedScope={selectedScope}
+                currentProject={currentProject}
+                selectedProjectName={selectedProjectName}
               />
             </div>
           ) : (
@@ -230,6 +265,9 @@ export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
               zoomedNode={zoomedNode}
               onZoom={handleZoom}
               breadcrumbs={breadcrumbs}
+              selectedScope={selectedScope}
+              currentProject={currentProject}
+              selectedProjectName={selectedProjectName}
             />
           )}
         </div>
@@ -243,6 +281,13 @@ export function OutlinerEditor({ initialNodeId }: OutlinerEditorProps) {
           onFilterByTag={handleTagFilter}
           activeFilter={activeTagFilter}
           onAddNew={handleSidebarAddNew}
+          currentProject={currentProject}
+          selectedScope={selectedScope}
+          onScopeChange={setSelectedScope}
+          selectedProjectName={selectedProjectName}
+          onProjectChange={setSelectedProjectName}
+          viewFilter={viewFilter}
+          onViewFilterChange={setViewFilter}
         />
       )}
     </div>
