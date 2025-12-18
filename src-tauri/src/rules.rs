@@ -3,6 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
+/// Bundled rule: MCP Memory as Second Brain
+/// This rule is installed automatically for all Quack users on first run
+const BUNDLED_RULE_MCP_MEMORY: &str = include_str!("../../.claude/rules/use-mcp-memory-second-brain.md");
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rule {
     pub id: String,
@@ -204,5 +208,69 @@ pub fn delete_rule(
         .map_err(|e| format!("Failed to delete rule file: {}", e))?;
 
     log::info!("Deleted rule '{}' from {:?}", name, file_path);
+    Ok(())
+}
+
+/// Bundled rule definition for automatic installation
+struct BundledRule {
+    name: &'static str,
+    content: &'static str,
+}
+
+/// List of bundled rules to install for all Quack users
+const BUNDLED_RULES: &[BundledRule] = &[
+    BundledRule {
+        name: "use-mcp-memory-second-brain",
+        content: BUNDLED_RULE_MCP_MEMORY,
+    },
+];
+
+/// Install bundled rules to ~/.claude/rules/ on first run
+///
+/// This function is called during app startup and ensures that
+/// all Quack users have access to essential global rules.
+///
+/// Rules are only installed if they don't already exist, preserving
+/// any user customizations.
+pub fn install_bundled_rules() -> Result<(), String> {
+    let home_dir = std::env::var("HOME")
+        .map_err(|_| "Could not determine home directory")?;
+
+    let global_rules_dir = PathBuf::from(home_dir).join(".claude/rules");
+
+    // Create directory if it doesn't exist
+    if !global_rules_dir.exists() {
+        fs::create_dir_all(&global_rules_dir)
+            .map_err(|e| format!("Failed to create global rules directory: {}", e))?;
+        log::info!("🦆 Created global rules directory: {:?}", global_rules_dir);
+    }
+
+    let mut installed_count = 0;
+    let mut skipped_count = 0;
+
+    for rule in BUNDLED_RULES {
+        let file_path = global_rules_dir.join(format!("{}.md", rule.name));
+
+        if file_path.exists() {
+            // Rule already exists, don't overwrite user customizations
+            log::debug!("🦆 Bundled rule '{}' already exists, skipping", rule.name);
+            skipped_count += 1;
+        } else {
+            // Install the bundled rule
+            fs::write(&file_path, rule.content)
+                .map_err(|e| format!("Failed to install bundled rule '{}': {}", rule.name, e))?;
+            log::info!("🦆 Installed bundled rule: {}", rule.name);
+            installed_count += 1;
+        }
+    }
+
+    if installed_count > 0 {
+        log::info!(
+            "🦆 Bundled rules installation complete: {} installed, {} already present",
+            installed_count,
+            skipped_count
+        );
+    }
+
     Ok(())
 }

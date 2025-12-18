@@ -198,6 +198,12 @@ pub fn run() {
                     log::warn!("⚠️ Failed to migrate API keys to keychain: {}", e);
                 }
             });
+
+            // 📜 Install bundled rules for all Quack users on first run
+            // This ensures essential global rules (like MCP Memory Second Brain) are available
+            if let Err(e) = rules::install_bundled_rules() {
+                log::warn!("⚠️ Failed to install bundled rules: {}", e);
+            }
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {

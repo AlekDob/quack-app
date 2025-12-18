@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Rule, RulesResponse } from '../types';
 import { useRules } from './useRules';
+import { areRulePathsEqual, normalizeRulePath } from '../utils/rulePathUtils';
 
 export interface AgentRuleInfo {
   name: string;
@@ -59,16 +60,25 @@ export function useAgentRules(
   const { rules, loading: rulesLoading, error: rulesError, loadRules } = useRules(basePath);
   const [error, setError] = useState<string | null>(null);
 
-  // Combine all rules for lookup
+  // Combine all rules for lookup - store both original and normalized paths
   const allRulesMap = useMemo(() => {
     const map = new Map<string, { rule: Rule; scope: 'project' | 'global' }>();
 
     rules.project.forEach(rule => {
+      // Store with both original path and normalized path for flexible lookup
       map.set(rule.filePath, { rule, scope: 'project' });
+      const normalizedPath = normalizeRulePath(rule.filePath);
+      if (normalizedPath !== rule.filePath) {
+        map.set(normalizedPath, { rule, scope: 'project' });
+      }
     });
 
     rules.global.forEach(rule => {
       map.set(rule.filePath, { rule, scope: 'global' });
+      const normalizedPath = normalizeRulePath(rule.filePath);
+      if (normalizedPath !== rule.filePath) {
+        map.set(normalizedPath, { rule, scope: 'global' });
+      }
     });
 
     return map;
@@ -84,7 +94,12 @@ export function useAgentRules(
     const missing: string[] = [];
 
     for (const rulePath of selectedRules) {
-      const found = allRulesMap.get(rulePath);
+      // Try to find by original path first, then by normalized path
+      let found = allRulesMap.get(rulePath);
+      if (!found) {
+        const normalizedPath = normalizeRulePath(rulePath);
+        found = allRulesMap.get(normalizedPath);
+      }
 
       if (found) {
         result.push({

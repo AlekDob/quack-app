@@ -23,6 +23,7 @@ import {
 } from '../utils/customAvatarStorage';
 import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
 import { useRules } from '../hooks/useRules';
+import { normalizeRulePaths, areRulePathsEqual } from '../utils/rulePathUtils';
 
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
@@ -204,9 +205,11 @@ function NewTerminalModal({
     const notFoundRules: string[] = [];
 
     for (const rulePath of personality.selectedRules) {
-      const matchedRule = allRules.find(r =>
-        r.filePath === rulePath || r.filePath.endsWith(rulePath) || rulePath.endsWith(r.filePath)
-      );
+      // Use areRulePathsEqual to properly match normalized paths with absolute paths
+      // This handles cases like:
+      // - Saved: ".claude/rules/my-rule.md"
+      // - Backend: "/Users/xxx/project/.claude/rules/my-rule.md"
+      const matchedRule = allRules.find(r => areRulePathsEqual(r.filePath, rulePath));
 
       if (matchedRule) {
         restoredRules.push(matchedRule.filePath);
@@ -559,15 +562,23 @@ function NewTerminalModal({
   // ===== Final Confirmation =====
 
   async function handleFinalConfirm() {
-    // Build updated personality with selected rules
+    // Normalize rule paths for portable storage
+    // - Project rules: `.claude/rules/name.md` (relative)
+    // - Global rules: `~/.claude/rules/name.md` (tilde notation)
+    const normalizedRules = selectedRules.length > 0
+      ? normalizeRulePaths(selectedRules, path)
+      : undefined;
+
+    // Build updated personality with normalized rules
     const updatedPersonality: Partial<AgentPersonality> = {
       ...localPersonality,
-      selectedRules: selectedRules.length > 0 ? selectedRules : undefined,
+      selectedRules: normalizedRules,
     };
 
     // DEBUG: Log what we're sending
     console.log('[MODAL] handleFinalConfirm called');
-    console.log('[MODAL] Selected rules:', selectedRules);
+    console.log('[MODAL] Selected rules (original):', selectedRules);
+    console.log('[MODAL] Selected rules (normalized):', normalizedRules);
     console.log('[MODAL] Updated personality:', JSON.stringify(updatedPersonality, null, 2));
 
     onPersonalityChange?.(updatedPersonality);

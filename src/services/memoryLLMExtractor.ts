@@ -7,10 +7,16 @@
  *
  * Inspired by Claude-Mem's observation system.
  *
+ * NOTE: Uses dynamic import for @anthropic-ai/sdk to prevent Node.js 'fs'
+ * module from being bundled into the production build.
+ *
  * @module services/memoryLLMExtractor
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+// REMOVED static import to fix production build error:
+// TypeError: Module name, 'fs' does not resolve to a valid URL
+// import Anthropic from "@anthropic-ai/sdk";
+
 import { toast } from "sonner";
 import type {
   QuackMemory,
@@ -132,6 +138,8 @@ export const extractMemoriesWithLLM = async (
   }
 
   try {
+    // Dynamic import to prevent Node.js 'fs' from being bundled
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
     const message = await client.messages.create({
@@ -221,6 +229,8 @@ export const extractMemoriesFromTool = async (
   }
 
   try {
+    // Dynamic import to prevent Node.js 'fs' from being bundled
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
     const toolContext = `
@@ -318,6 +328,8 @@ export const analyzeSession = async (
   try {
     toast.info("Analyzing session...");
 
+    // Dynamic import to prevent Node.js 'fs' from being bundled
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
     // Create conversation summary

@@ -6,6 +6,7 @@
  */
 
 import type { AgentPersonality } from '../types';
+import { migrateRulePaths } from './rulePathUtils';
 
 export interface SavedAgent {
   id: string;
@@ -24,6 +25,7 @@ const MAX_AGENTS = 50; // Reasonable limit to prevent storage issues
 
 /**
  * Get all saved agents from localStorage
+ * Automatically migrates legacy absolute rule paths to normalized format
  */
 export function getSavedAgents(): SavedAgent[] {
   try {
@@ -33,12 +35,48 @@ export function getSavedAgents(): SavedAgent[] {
     const agents = JSON.parse(stored) as SavedAgent[];
 
     // Validate structure and filter out corrupted entries
-    return agents.filter(agent =>
+    const validAgents = agents.filter(agent =>
       agent.id &&
       agent.name &&
       typeof agent.createdAt === 'number' &&
       typeof agent.lastUsed === 'number'
     );
+
+    // Silently migrate legacy rule paths to normalized format
+    let needsSave = false;
+    const migratedAgents = validAgents.map(agent => {
+      if (agent.personality?.selectedRules && agent.personality.selectedRules.length > 0) {
+        const originalPaths = agent.personality.selectedRules;
+        const normalizedPaths = migrateRulePaths(originalPaths);
+
+        // Check if any path was actually changed
+        const wasChanged = originalPaths.some((path, i) => path !== normalizedPaths[i]);
+        if (wasChanged) {
+          needsSave = true;
+          console.log(`[agentStorage] Migrated rule paths for agent "${agent.name}"`);
+          return {
+            ...agent,
+            personality: {
+              ...agent.personality,
+              selectedRules: normalizedPaths,
+            },
+          };
+        }
+      }
+      return agent;
+    });
+
+    // Save migrated data back to storage (silently)
+    if (needsSave) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedAgents));
+        console.log('[agentStorage] Saved migrated agents to storage');
+      } catch (saveError) {
+        console.warn('[agentStorage] Failed to save migrated agents:', saveError);
+      }
+    }
+
+    return migratedAgents;
   } catch (error) {
     console.error('Failed to load saved agents:', error);
     return [];

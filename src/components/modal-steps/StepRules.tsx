@@ -10,6 +10,7 @@ import { useState, useMemo } from 'react';
 import type { Rule, RuleScope } from '../../types';
 import type { StepRulesProps } from './types';
 import { CreateRuleModal } from './CreateRuleModal';
+import { getDisplayPath, areRulePathsEqual } from '../../utils/rulePathUtils';
 
 export function StepRules({
   availableRules,
@@ -70,7 +71,8 @@ export function StepRules({
   };
 
   const renderRuleItem = (rule: Rule, scope: 'project' | 'global') => {
-    const isSelected = selectedRules.includes(rule.filePath);
+    // Use areRulePathsEqual to handle both normalized and absolute paths
+    const isSelected = selectedRules.some(path => areRulePathsEqual(path, rule.filePath));
 
     return (
       <label key={rule.filePath} className="config-item">
@@ -95,7 +97,7 @@ export function StepRules({
               Applies to: {rule.frontmatter.globs.join(', ')}
             </span>
           )}
-          <span className="config-item-path">{rule.filePath}</span>
+          <span className="config-item-path">{getDisplayPath(rule.filePath)}</span>
         </div>
       </label>
     );

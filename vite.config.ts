@@ -107,16 +107,15 @@ export default defineConfig(({ mode }) => {
           'tab-popout': resolve(rootDir, 'tab-popout.html'),
         },
 
-        // External dependencies - don't bundle Node.js modules
-        // Note: These will be resolved at runtime by Tauri/Node.js
+        // External dependencies - only Claude Agent SDK runs in Node.js subprocess
+        // IMPORTANT: Do NOT externalize Node.js builtins (fs, path, etc.)
+        // They must be replaced with empty polyfills via resolve.alias
         external: (id: string) => {
-          // Externalize the Claude SDK and all Node.js built-ins
+          // Only externalize Claude SDK - it runs in Node.js subprocess, not browser
           if (id.includes('@anthropic-ai/claude-agent-sdk')) {
             return true;
           }
-          // Node.js built-in modules
-          const builtins = ['fs', 'path', 'child_process', 'crypto', 'os', 'stream', 'url', 'readline', 'fs/promises', 'util', 'events'];
-          return builtins.includes(id);
+          return false;
         },
 
         output: {
@@ -224,6 +223,38 @@ export default defineConfig(({ mode }) => {
           propertyReadSideEffects: false,
           tryCatchDeoptimization: false,
         } : false,
+      },
+    },
+
+    // Resolve aliases for Node.js modules that shouldn't be bundled
+    resolve: {
+      alias: {
+        // Provide empty module for Node.js built-ins that some libraries try to import
+        // This fixes the "Module name, 'fs' does not resolve to a valid URL" error
+        // caused by @anthropic-ai/sdk importing fs, path, url, etc.
+        'fs': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'path': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'os': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'crypto': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'url': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'util': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'stream': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'events': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'child_process': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'readline': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'fs/promises': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        // Also handle node: prefix imports
+        'node:fs': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:path': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:os': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:crypto': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:url': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:util': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:stream': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:events': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:child_process': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:readline': resolve(rootDir, 'src/polyfills/empty-module.ts'),
+        'node:fs/promises': resolve(rootDir, 'src/polyfills/empty-module.ts'),
       },
     },
 

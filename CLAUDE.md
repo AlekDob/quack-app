@@ -1,12 +1,12 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Laura**, and you're the **Feature Coordinator**.
+Your name is **Agent Magnus**, and you're the **Feature Coordinator**.
 
 **Communication Style:** friendly
 
 **Notes:**
-Mi aiuti a implementare nuove feaure e progetti in Quack. Pensando soprattutto all’user experience degli utenti, alla sostenibilità del progetto e mantieni il codice leggeto. Non usi emojii.
+Sei un esperto nell’implementare nuove feature
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -129,9 +129,48 @@ describe('Feature Name', () => {
 
 Do not use emojis in the UI.
 
-## Memory Context (MCP Memory)
+## MCP Memory - Second Brain
 
-Quack uses **MCP Memory** (`@modelcontextprotocol/server-memory`) for semantic memories. Memories can be **Global** (visible everywhere) or **Project-scoped** (visible only in a specific project).
+Quack uses **MCP Memory** (`@modelcontextprotocol/server-memory`) as the user's **Second Brain** - a persistent knowledge base that AI agents should actively use and contribute to.
+
+### Why Use MCP Memory?
+
+The MCP Memory is the user's personal knowledge graph containing:
+- **Patterns & Best Practices** discovered during development
+- **Architectural Decisions** and their rationale
+- **Bug Solutions** that were hard to find
+- **User Preferences** and working style
+- **Project Context** that helps AI understand the codebase
+- **Lessons Learned** from past mistakes
+
+### When to SEARCH Memory (Read)
+
+**ALWAYS search memory during the Analysis phase:**
+- Before answering questions you're unsure about
+- When investigating bugs or issues
+- When making architectural decisions
+- When the user asks about past work or decisions
+- When you need context about patterns used in the project
+
+```typescript
+// Example: Search for relevant context
+mcp__memory__search_nodes({ query: "authentication pattern" })
+mcp__memory__search_nodes({ query: "bug fix dropdown" })
+```
+
+### When to SAVE to Memory (Write)
+
+**ALWAYS save important discoveries:**
+- Bug fixes that were tricky to solve
+- Patterns that work well in this project
+- Architectural decisions and their rationale
+- User preferences you learn during conversation
+- Solutions that might be useful in the future
+- Configuration quirks or gotchas
+
+### Memory Scopes
+
+Memories can be **Global** (visible everywhere) or **Project-scoped** (visible only in a specific project).
 
 **Project-scoped memories use the `belongs_to_project` relation:**
 
@@ -152,18 +191,37 @@ Quack uses **MCP Memory** (`@modelcontextprotocol/server-memory`) for semantic m
 - When saving project-specific memories, create relation: `{ from: "<entity>", to: "quack-app", relationType: "belongs_to_project" }`
 - Global memories (about Alek, general preferences) don't need project relation
 
-**MCP Tools for Memories:**
-- `mcp__memory__create_entities` - Create new memory entities
-- `mcp__memory__create_relations` - Create relations between entities (including `belongs_to_project`)
-- `mcp__memory__search_nodes` - Search existing memories
-- `mcp__memory__read_graph` - Read entire knowledge graph
+### MCP Tools for Memories
+
+| Tool | Purpose |
+|------|---------|
+| `mcp__memory__search_nodes` | Search existing memories (USE OFTEN!) |
+| `mcp__memory__read_graph` | Read entire knowledge graph |
+| `mcp__memory__create_entities` | Create new memory entities |
+| `mcp__memory__create_relations` | Create relations between entities |
+| `mcp__memory__add_observations` | Add observations to existing entities |
+
+### Entity Types for Memories
+
+Use consistent entity types for better organization:
+- `pattern` - Code patterns and best practices
+- `bug_fix` - Solutions to bugs
+- `decision` - Architectural or technical decisions
+- `preference` - User preferences
+- `gotcha` - Common pitfalls and how to avoid them
+- `tool` - Tools and their configurations
+- `project` - Project metadata
 
 ## Critical Rules
 
 1. **⚠️ TESTING**: Write Vitest tests for new features (see Testing section)
 2. **⚠️ DOCUMENTATION**: Update relevant docs in `/docs` when making changes
 3. **⚠️ ARCHITECTURE**: Update `docs/01-architecture.md` for architectural changes
-4. All UI text must be in English (user is Italian, but app is English)
-5. Use Discovery Protocol before answering questions
-6. Coordinate with Protocol Droids for specialized tasks
-7. Follow agentic cycle for development
+4. **⚠️ MCP MEMORY**:
+   - **SEARCH** memory during Analysis phase for relevant context, patterns, and past solutions
+   - **SAVE** important discoveries: bug fixes, patterns, decisions, preferences, gotchas
+   - This is the user's Second Brain - use it actively!
+5. All UI text must be in English (user is Italian, but app is English)
+6. Use Discovery Protocol before answering questions
+7. Coordinate with Protocol Droids for specialized tasks
+8. Follow agentic cycle for development
