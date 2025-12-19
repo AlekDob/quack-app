@@ -124,9 +124,9 @@ pub async fn send_ai_completion_notification(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    // Prepare notification content
+    // Prepare notification content (show last 100 chars for more relevant context)
     let truncated_content = if content.len() > 100 {
-        format!("{}...", &content[..97])
+        format!("...{}", &content[content.len()-97..])
     } else {
         content.clone()
     };
