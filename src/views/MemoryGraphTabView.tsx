@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
 import { Brain, RefreshCw, ZoomIn, ZoomOut, Maximize2, X, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -76,10 +76,11 @@ function convertToGraphData(items: UnifiedMemoryItem[]): GraphData {
 
     return {
       id: item.id,
-      name: displayName.length > 40 ? displayName.slice(0, 40) + "..." : displayName,
+      name: displayName.length > 50 ? displayName.slice(0, 50) + "..." : displayName,
       entityType: item.entityType || item.category,
       observations,
-      val: Math.max(4, Math.min(12, observations.length * 2 + 4)),
+      // Obsidian-style: smaller nodes (3-6px radius)
+      val: Math.max(3, Math.min(6, observations.length + 3)),
       color: getEntityColor(item.entityType || item.category),
     };
   });
@@ -119,6 +120,80 @@ const LABEL_ZOOM_THRESHOLD = 0.8;
 // Zoom threshold for showing tooltip on click (tooltip visible when zoomed OUT - i.e., low zoom)
 const TOOLTIP_ZOOM_THRESHOLD = 1.2;
 
+/**
+ * Check if two label bounding boxes overlap
+ */
+function labelsOverlap(
+  label1: { x: number; y: number; width: number; height: number },
+  label2: { x: number; y: number; width: number; height: number }
+): boolean {
+  return !(
+    label1.x + label1.width < label2.x ||
+    label2.x + label2.width < label1.x ||
+    label1.y + label1.height < label2.y ||
+    label2.y + label2.height < label1.y
+  );
+}
+
+/**
+ * Calculate which nodes should show labels (no collisions)
+ * Obsidian-style: smaller text, more spacing tolerance
+ */
+function calculateVisibleLabels(
+  nodes: GraphNode[],
+  globalScale: number,
+  selectedNodeId: string | null,
+  hoveredNodeId: string | null
+): Set<string> {
+  const visibleLabels = new Set<string>();
+  const labelBoxes: Map<string, { x: number; y: number; width: number; height: number }> = new Map();
+
+  // Smaller font like Obsidian
+  const fontSize = Math.max(9, 11 / globalScale);
+  const charWidth = fontSize * 0.55;
+  const labelHeight = fontSize + 6;
+  const padding = 8; // Extra padding between labels
+
+  // Sort nodes by priority: selected > hovered > larger nodes > others
+  const sortedNodes = [...nodes].sort((a, b) => {
+    if (a.id === selectedNodeId) return -1;
+    if (b.id === selectedNodeId) return 1;
+    if (a.id === hoveredNodeId) return -1;
+    if (b.id === hoveredNodeId) return 1;
+    return b.val - a.val;
+  });
+
+  for (const node of sortedNodes) {
+    if (node.x === undefined || node.y === undefined) continue;
+
+    const labelWidth = node.name.length * charWidth + padding * 2;
+    const labelX = node.x - labelWidth / 2;
+    const labelY = node.y + node.val + 6;
+
+    const currentBox = {
+      x: labelX - padding,
+      y: labelY - padding,
+      width: labelWidth + padding * 2,
+      height: labelHeight + padding * 2
+    };
+
+    let hasCollision = false;
+    for (const [, existingBox] of labelBoxes) {
+      if (labelsOverlap(currentBox, existingBox)) {
+        hasCollision = true;
+        break;
+      }
+    }
+
+    if (node.id === selectedNodeId || node.id === hoveredNodeId || !hasCollision) {
+      visibleLabels.add(node.id);
+      labelBoxes.set(node.id, currentBox);
+    }
+  }
+
+  return visibleLabels;
+}
+
 function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTabViewProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<ForceGraphMethods<any, any>>(undefined);
@@ -130,6 +205,7 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
   const [newMemoryContent, setNewMemoryContent] = useState("");
   const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>("fact");
   const [currentZoom, setCurrentZoom] = useState(1);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   const {
     unifiedItems,
@@ -172,12 +248,28 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
     }
   }, [isActive, refresh]);
 
+  // Configure D3 forces - BALANCED: readable labels, moderate spacing
+  useEffect(() => {
+    if (graphRef.current) {
+      const fg = graphRef.current;
+
+      // Light repulsion - keeps nodes readable but not too spread
+      fg.d3Force('charge')?.strength(-8);
+
+      // Medium link distance
+      fg.d3Force('link')?.distance(55);
+
+      // Light center pull
+      fg.d3Force('center')?.strength(0.08);
+    }
+  }, [graphData.nodes.length, graphData.links]);
+
   // Center graph after data loads
   useEffect(() => {
     if (graphData.nodes.length > 0 && graphRef.current) {
       const timeoutId = setTimeout(() => {
-        graphRef.current?.zoomToFit(400, 50);
-      }, 500);
+        graphRef.current?.zoomToFit(400, 80);
+      }, 600);
 
       return () => clearTimeout(timeoutId);
     }
@@ -229,10 +321,22 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
     setSelectedNode(null);
   }, [selectedNode, deleteMemory]);
 
+  // Memoize visible labels calculation
+  const visibleLabels = useMemo(() => {
+    if (currentZoom < LABEL_ZOOM_THRESHOLD) return new Set<string>();
+    return calculateVisibleLabels(
+      graphData.nodes,
+      currentZoom,
+      selectedNode?.id || null,
+      hoveredNodeId
+    );
+  }, [graphData.nodes, currentZoom, selectedNode?.id, hoveredNodeId]);
+
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const nodeSize = node.val;
       const isSelected = selectedNode?.id === node.id;
+      const isHovered = hoveredNodeId === node.id;
 
       if (node.x === undefined || node.y === undefined) return;
 
@@ -241,6 +345,13 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
       ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
       ctx.fillStyle = node.color;
       ctx.fill();
+
+      // Hover state - subtle highlight
+      if (isHovered && !isSelected) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
 
       // Selected state
       if (isSelected) {
@@ -254,18 +365,27 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
         ctx.shadowBlur = 0;
       }
 
-      // Draw labels only when zoomed IN enough (globalScale >= threshold)
-      // When zoomed out, labels are hidden and tooltip takes over
-      if (globalScale >= LABEL_ZOOM_THRESHOLD) {
-        const fontSize = Math.max(10, 12 / globalScale);
-        ctx.font = `${fontSize}px Inter, sans-serif`;
+      // Draw labels only for visible nodes (collision-free, hovered, or selected)
+      const shouldShowLabel = visibleLabels.has(node.id);
+
+      if (globalScale >= LABEL_ZOOM_THRESHOLD && shouldShowLabel) {
+        // Obsidian-style smaller font
+        const fontSize = Math.max(9, 11 / globalScale);
+        ctx.font = `400 ${fontSize}px Inter, -apple-system, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.fillText(node.name, node.x, node.y + nodeSize + 4);
+
+        // Obsidian-style: subtle gray labels, white on hover
+        if (isHovered || isSelected) {
+          ctx.fillStyle = "#ffffff";
+        } else {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        }
+
+        ctx.fillText(node.name, node.x, node.y + nodeSize + 6);
       }
     },
-    [selectedNode]
+    [selectedNode, hoveredNodeId, visibleLabels]
   );
 
   const linkCanvasObject = useCallback(
@@ -423,13 +543,20 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
             nodeLabel={(node: GraphNode) => currentZoom < LABEL_ZOOM_THRESHOLD ? node.name : ""}
             linkLabel={(link: GraphLink) => currentZoom < LABEL_ZOOM_THRESHOLD ? link.relationType : ""}
             onNodeClick={handleNodeClick}
+            onNodeHover={(node: GraphNode | null) => setHoveredNodeId(node?.id || null)}
             onZoom={(transform) => setCurrentZoom(transform.k)}
-            nodeRelSize={6}
+            nodeRelSize={1}
             linkDirectionalArrowLength={0}
-            cooldownTicks={100}
-            warmupTicks={50}
-            d3AlphaDecay={0.02}
-            d3VelocityDecay={0.3}
+            cooldownTicks={200}
+            warmupTicks={100}
+            d3AlphaDecay={0.01}
+            d3VelocityDecay={0.2}
+            d3AlphaMin={0.001}
+            linkDistance={55}
+            dagMode={undefined}
+            enableNodeDrag={true}
+            minZoom={0.1}
+            maxZoom={8}
           />
         )}
       </div>

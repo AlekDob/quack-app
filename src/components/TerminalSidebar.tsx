@@ -47,6 +47,7 @@ interface SortableRepositoryGroupProps {
   onOpenGitPanel?: () => void;
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number;
+  onCreateAgent?: () => void; // Create new agent associated with this project
 }
 
 function SortableRepositoryGroup({
@@ -730,6 +731,7 @@ export default function TerminalSidebar({
                     onOpenGitPanel={onOpenGitPanel}
                     onOpenTerminalWindow={onOpenTerminalWindow}
                     gitRefreshTrigger={gitRefreshTrigger}
+                    onCreateAgent={onCreateAgent}
                   />
                 );
               })}

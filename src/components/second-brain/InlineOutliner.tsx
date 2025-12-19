@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -173,6 +173,71 @@ const hexToRgba = (hex: string, alpha: number): string => {
 };
 
 /**
+ * Extract date from observation string with [YYYY-MM-DD] prefix
+ * Returns the date as a sortable string, or empty string if no date found
+ */
+const extractDateFromObservation = (obs: string): string => {
+  const match = obs.match(/^\[(\d{4}-\d{2}-\d{2})\]/);
+  return match ? match[1] : '';
+};
+
+/**
+ * Sort observations by date (most recent first)
+ * Observations with dates come first, sorted descending
+ * Observations without dates come last in original order
+ */
+const sortObservationsByDate = (observations: string[]): string[] => {
+  const withDates: { obs: string; date: string }[] = [];
+  const withoutDates: string[] = [];
+
+  for (const obs of observations) {
+    const date = extractDateFromObservation(obs);
+    if (date) {
+      withDates.push({ obs, date });
+    } else {
+      withoutDates.push(obs);
+    }
+  }
+
+  // Sort by date descending (most recent first)
+  withDates.sort((a, b) => b.date.localeCompare(a.date));
+
+  return [...withDates.map(w => w.obs), ...withoutDates];
+};
+
+/**
+ * Extract date from node content with [YYYY-MM-DD] prefix
+ */
+const extractDateFromContent = (content: string): string => {
+  const match = content.match(/^\[(\d{4}-\d{2}-\d{2})\]/);
+  return match ? match[1] : '';
+};
+
+/**
+ * Sort child nodes by date (most recent first)
+ * Nodes with dates in content come first, sorted descending
+ * Nodes without dates come last in original order
+ */
+const sortNodesByDate = (nodes: OutlineNodeType[]): OutlineNodeType[] => {
+  const withDates: { node: OutlineNodeType; date: string }[] = [];
+  const withoutDates: OutlineNodeType[] = [];
+
+  for (const node of nodes) {
+    const date = extractDateFromContent(node.content);
+    if (date) {
+      withDates.push({ node, date });
+    } else {
+      withoutDates.push(node);
+    }
+  }
+
+  // Sort by date descending (most recent first)
+  withDates.sort((a, b) => b.date.localeCompare(a.date));
+
+  return [...withDates.map(w => w.node), ...withoutDates];
+};
+
+/**
  * Editable observation component - for details in zoomed view
  */
 interface EditableObservationProps {
@@ -255,6 +320,8 @@ interface InlineBulletProps {
   onMoveDown: (nodeId: string) => void;
   expandedNodes: Set<string>;
   allNodes: OutlineNodeType[];
+  /** Current project name (for document link visibility) */
+  currentProjectName?: string;
 }
 
 /**
@@ -278,6 +345,7 @@ function InlineBullet({
   onMoveDown,
   expandedNodes,
   allNodes,
+  currentProjectName,
 }: InlineBulletProps) {
   const [content, setContent] = useState(node.content);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -489,6 +557,49 @@ function InlineBullet({
   }, [node.id, onFocus]);
 
 
+  // Check if this is a document node (entityType: document)
+  const isDocumentNode = node.entityType === 'document';
+
+  // For document nodes, extract the file path from observations
+  // The file path is typically an observation that looks like a path (starts with / or contains .md)
+  // node.content contains the first observation (description), so we need to search all observations
+  const documentFilePath = useMemo(() => {
+    if (!isDocumentNode) return null;
+
+    // Search through all observations for a file path
+    for (const obs of node.observations) {
+      const trimmed = obs.trim();
+      // Check for absolute paths or relative paths with file extensions
+      if (trimmed.startsWith('/') || trimmed.match(/^[.~]?[\w/-]+\.\w+$/)) {
+        return trimmed;
+      }
+    }
+    return null;
+  }, [isDocumentNode, node.observations]);
+
+  // Determine if document link should be shown:
+  // - Must have a valid file path extracted from observations
+  // - Show if path is absolute (starts with / or ~)
+  // - Show if we're in the same project as the document
+  // - Hide otherwise (can't resolve relative path from different project)
+  const isAbsolutePath = documentFilePath?.startsWith('/') || documentFilePath?.startsWith('~') || false;
+  const isSameProject = !node.projectName || node.projectName === currentProjectName;
+  const canOpenDocument = isDocumentNode && documentFilePath && (isAbsolutePath || isSameProject);
+
+  // Handle opening document file in a new tab
+  const handleOpenDocument = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canOpenDocument || !documentFilePath) return;
+
+    console.log('[InlineOutliner] Opening document:', documentFilePath, 'from project:', node.projectName);
+
+    // Dispatch custom event to open file in App.tsx
+    // Include projectName so App can resolve path from correct project
+    window.dispatchEvent(new CustomEvent('OPEN_FILE_IN_TAB', {
+      detail: { filePath: documentFilePath, projectName: node.projectName }
+    }));
+  }, [canOpenDocument, documentFilePath, node.projectName]);
+
   // Dynamic background color for focused state based on entity type
   // Use marginLeft for depth indentation to preserve CSS padding
   const focusedStyle = useMemo(() => {
@@ -556,11 +667,17 @@ function InlineBullet({
         {/* Badges container - only show in list view, not when zoomed */}
         {!isZoomed && (
           <div className="inline-bullet-badges">
-            {/* Project badge */}
-            {node.projectName && (
-              <span className="inline-bullet-project-badge">
-                @{node.projectName}
-              </span>
+            {/* Document link icon - clickable to open file in new tab */}
+            {/* Only show if path is absolute OR we're in the same project */}
+            {canOpenDocument && (
+              <button
+                type="button"
+                className="inline-bullet-doc-link"
+                onClick={handleOpenDocument}
+                title={`Open document: ${documentFilePath}`}
+              >
+                <FileText size={14} />
+              </button>
             )}
 
             {/* Supertag badge */}
@@ -572,6 +689,13 @@ function InlineBullet({
                 #{node.entityType}
               </span>
             )}
+
+            {/* Project badge - hide if node is a child (already indented under project) */}
+            {node.projectName && !node.parentId && (
+              <span className="inline-bullet-project-badge">
+                @{node.projectName}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -579,28 +703,32 @@ function InlineBullet({
       {/* Children - don't render when this is the zoomed title (children are shown below) */}
       {hasChildren && isExpanded && !isZoomed && (
         <div className="inline-bullet-children">
-          {node.children.map((child, index) => (
-            <InlineBullet
-              key={child.id}
-              node={child}
-              isExpanded={expandedNodes.has(child.id)}
-              isFocused={false}
-              isZoomed={false}
-              previousSibling={index > 0 ? node.children[index - 1] : null}
-              onToggleExpand={onToggleExpand}
-              onFocus={onFocus}
-              onZoom={onZoom}
-              onCreateBelow={onCreateBelow}
-              onDelete={onDelete}
-              onUpdate={onUpdate}
-              onIndent={onIndent}
-              onOutdent={onOutdent}
-              onMoveUp={onMoveUp}
-              onMoveDown={onMoveDown}
-              expandedNodes={expandedNodes}
-              allNodes={allNodes}
-            />
-          ))}
+          {(() => {
+            const sortedChildren = sortNodesByDate(node.children);
+            return sortedChildren.map((child, index) => (
+              <InlineBullet
+                key={child.id}
+                node={child}
+                isExpanded={expandedNodes.has(child.id)}
+                isFocused={false}
+                isZoomed={false}
+                previousSibling={index > 0 ? sortedChildren[index - 1] : null}
+                onToggleExpand={onToggleExpand}
+                onFocus={onFocus}
+                onZoom={onZoom}
+                onCreateBelow={onCreateBelow}
+                onDelete={onDelete}
+                onUpdate={onUpdate}
+                onIndent={onIndent}
+                onOutdent={onOutdent}
+                onMoveUp={onMoveUp}
+                onMoveDown={onMoveDown}
+                expandedNodes={expandedNodes}
+                allNodes={allNodes}
+                currentProjectName={currentProjectName}
+              />
+            ));
+          })()}
         </div>
       )}
     </div>
@@ -750,11 +878,10 @@ export function InlineOutliner({
   }, [roots, zoomedNode, expandedNodes]);
 
   // Display nodes - either zoomed node's children or roots
+  // Sorted by date: nodes with [YYYY-MM-DD] prefix first (most recent), then the rest
   const displayNodes = useMemo(() => {
-    if (zoomedNode) {
-      return zoomedNode.children;
-    }
-    return roots;
+    const nodes = zoomedNode ? zoomedNode.children : roots;
+    return sortNodesByDate(nodes);
   }, [roots, zoomedNode]);
 
   const handleFocus = useCallback((nodeId: string) => {
@@ -1210,6 +1337,7 @@ export function InlineOutliner({
           onMoveDown={handleMoveDown}
           expandedNodes={expandedNodes}
           allNodes={allNodes}
+          currentProjectName={currentProject?.name}
         />
       )}
 
@@ -1223,11 +1351,11 @@ export function InlineOutliner({
             </span>
           </div>
           <div className="observations-list">
-            {zoomedNode.observations.slice(1).map((obs, idx) => (
+            {sortObservationsByDate(zoomedNode.observations.slice(1)).map((obs, idx) => (
               <EditableObservation
-                key={`obs-${idx}`}
+                key={`obs-${obs.slice(0, 50)}-${idx}`}
                 value={obs}
-                index={idx + 1}
+                index={zoomedNode.observations.indexOf(obs)}
                 entityId={zoomedNode.id}
                 onRefresh={onRefresh}
               />
@@ -1285,6 +1413,7 @@ export function InlineOutliner({
                 onMoveDown={handleMoveDown}
                 expandedNodes={expandedNodes}
                 allNodes={allNodes}
+                currentProjectName={currentProject?.name}
               />
             ))}
 

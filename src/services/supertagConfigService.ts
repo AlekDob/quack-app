@@ -57,6 +57,7 @@ export const DEFAULT_SUPERTAG_COLORS: Record<string, string> = {
   goal: '#E84A7F',
   habit: '#3b82f6',
   review: '#f97316',
+  document: '#14b8a6', // teal - for linked documentation files
 };
 
 // Color palette for picker

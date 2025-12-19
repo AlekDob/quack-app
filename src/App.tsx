@@ -4193,6 +4193,138 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, [tauriAvailable]);
 
+  // 📄 Listen for OPEN_FILE_IN_TAB events from Second Brain (document nodes)
+  useEffect(() => {
+    const handleOpenFileInTab = async (event: CustomEvent<{ filePath: string; projectName?: string }>) => {
+      const { filePath, projectName } = event.detail;
+      console.log('🦆 Opening file from Second Brain:', filePath, 'projectName:', projectName);
+
+      // Resolve relative paths to absolute paths
+      let absolutePath = filePath;
+
+      if (!filePath.startsWith('/')) {
+        // For relative paths, try to find the project path from MCP memory
+        let projectPath: string | null = null;
+
+        if (projectName) {
+          try {
+            // Read MCP memory to find project path
+            const graph = await invoke<{ entities: Array<{ name: string; entityType: string; observations: string[] }> }>('read_mcp_memory_file');
+
+            // Find the project entity
+            const projectEntity = graph.entities.find(
+              e => e.entityType === 'project' && e.name.toLowerCase() === projectName.toLowerCase()
+            );
+
+            if (projectEntity) {
+              // Extract path from observations (format: "Path: /path/to/project")
+              const pathObs = projectEntity.observations.find(obs => obs.startsWith('Path:'));
+              if (pathObs) {
+                projectPath = pathObs.substring(5).trim(); // Remove "Path:" prefix
+                console.log('🦆 Found project path from MCP memory:', projectPath);
+              }
+            }
+          } catch (err) {
+            console.warn('🦆 Failed to lookup project path from MCP memory:', err);
+          }
+        }
+
+        // Use project path from memory, or fall back to current explorerRoot
+        const basePath = projectPath || explorerRoot;
+        if (basePath) {
+          absolutePath = `${basePath}/${filePath}`;
+        }
+      }
+
+      const fileName = absolutePath.split('/').pop() || 'Document';
+      const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+
+      const fileTabId = `file-${absolutePath}`;
+      const newFileTab: Tab = {
+        id: fileTabId,
+        label: fileName,
+        type: 'file',
+        filePath: absolutePath,
+        closable: true,
+        icon: fileExtension === 'md' ? '📝' :
+              fileExtension === 'ts' || fileExtension === 'tsx' ? '📘' :
+              fileExtension === 'js' || fileExtension === 'jsx' ? '📙' :
+              fileExtension === 'json' ? '📋' : '📄',
+      };
+
+      // Add tab if it doesn't exist
+      setTabs((prevTabs) => {
+        const existingTab = prevTabs.find(t => t.id === fileTabId);
+        if (!existingTab) {
+          return [...prevTabs, newFileTab];
+        }
+        return prevTabs;
+      });
+
+      setActiveTabId(fileTabId);
+
+      // Load file content (like handleOpenFilePreview does)
+      setPreviewFile({ name: fileName, path: absolutePath });
+      setPreviewContent('');
+      setPreviewImageData(null);
+      setPreviewError(null);
+      setPreviewDiffInfo(null);
+      setPreviewLineChanges(null);
+      setLoadingPreview(true);
+
+      try {
+        // Check if file is an image
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif'];
+        const isImage = imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+
+        if (isImage) {
+          // Load image as base64
+          const base64Data = await invoke<string>('read_file_preview', { path: absolutePath });
+          const ext = fileName.toLowerCase().split('.').pop() || 'png';
+          const mimeTypes: Record<string, string> = {
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'webp': 'image/webp',
+            'svg': 'image/svg+xml',
+            'ico': 'image/x-icon',
+            'tiff': 'image/tiff',
+            'tif': 'image/tiff',
+          };
+          const mimeType = mimeTypes[ext] || 'image/png';
+          setPreviewImageData(`data:${mimeType};base64,${base64Data}`);
+        } else {
+          // Load file content
+          const content = await invoke<string>('read_file_content', { path: absolutePath });
+          setPreviewContent(content);
+        }
+
+        toast.success('Document opened!', {
+          description: fileName,
+          duration: 2000,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('🦆 Error loading file from Second Brain:', message);
+        setPreviewError(message);
+        toast.error('Failed to open document', {
+          description: message,
+          duration: 4000,
+        });
+      } finally {
+        setLoadingPreview(false);
+      }
+    };
+
+    window.addEventListener('OPEN_FILE_IN_TAB', handleOpenFileInTab as unknown as EventListener);
+
+    return () => {
+      window.removeEventListener('OPEN_FILE_IN_TAB', handleOpenFileInTab as unknown as EventListener);
+    };
+  }, [explorerRoot]);
+
   useEffect(() => {
     if (!tauriAvailable) {
       setBooting(false);

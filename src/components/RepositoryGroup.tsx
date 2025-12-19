@@ -42,6 +42,7 @@ interface RepositoryGroupProps {
   onOpenGitPanel?: () => void; // Function to open Git Panel drawer
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
+  onCreateAgent?: () => void; // Create new agent associated with this project
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -857,6 +858,7 @@ export default function RepositoryGroup({
   onOpenGitPanel,
   onOpenTerminalWindow,
   gitRefreshTrigger,
+  onCreateAgent,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1366,6 +1368,29 @@ export default function RepositoryGroup({
                 <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
               </svg>
             </button>
+            {/* New Agent button */}
+            {onCreateAgent && (
+              <button
+                type="button"
+                onClick={onCreateAgent}
+                title="New Agent"
+                className="repo-action-btn"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>
