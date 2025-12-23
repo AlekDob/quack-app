@@ -26,15 +26,34 @@ import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal from './AddKanbanTaskModal';
 import KanbanChatDrawer from './KanbanChatDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
-import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent } from '../../types';
+import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage } from '../../types';
+import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import './KanbanView.css';
 
 interface KanbanViewProps {
   terminals: TerminalInfo[];
   onExitKanban?: () => void;
+  // Chat integration from App.tsx
+  chatSessions: Map<string, ChatMessage[]>;
+  chatLoadingMap: Map<string, boolean>;
+  onSendMessage: (agentId: string, content: string, options?: ChatSendOptions) => Promise<void>;
+  onAbortStream: (agentId: string) => void;
+  onClearConversation: (agentId: string) => void;
+  getLastPrompt: (agentId: string) => string | null;
+  sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
 }
 
-export default function KanbanView({ terminals, onExitKanban }: KanbanViewProps) {
+export default function KanbanView({
+  terminals,
+  onExitKanban,
+  chatSessions,
+  chatLoadingMap,
+  onSendMessage,
+  onAbortStream,
+  onClearConversation,
+  getLastPrompt,
+  sessionTokensMap,
+}: KanbanViewProps) {
   const {
     tasks,
     selectedTaskId,
@@ -278,6 +297,14 @@ export default function KanbanView({ terminals, onExitKanban }: KanbanViewProps)
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
         onTaskUpdate={updateTask}
+        // Chat integration from App.tsx
+        chatSessions={chatSessions}
+        chatLoadingMap={chatLoadingMap}
+        onSendMessage={onSendMessage}
+        onAbortStream={onAbortStream}
+        onClearConversation={onClearConversation}
+        getLastPrompt={getLastPrompt}
+        sessionTokensMap={sessionTokensMap}
       />
     </div>
   );

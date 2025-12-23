@@ -2094,6 +2094,297 @@ function AppContent() {
     return lastPromptsRef.current.get(activeId) || '';
   }, [activeId]);
 
+  // ============================================
+  // KANBAN CHAT INTEGRATION FUNCTIONS
+  // These versions accept a targetAgentId parameter for Kanban tasks
+  // ============================================
+
+  // Send message for a specific agent (used by Kanban)
+  const sendMessageForTargetAgent = useCallback(async (targetAgentId: string, content: string, options?: ChatSendOptions) => {
+    if (!content.trim() || !targetAgentId) return;
+
+    // Store the original activeId to restore later
+    const originalActiveId = activeId;
+
+    // Temporarily set activeId to the target for the sendMessageForAgent function
+    // Note: This is a workaround since sendMessageForAgent uses activeId internally
+    // A cleaner solution would refactor sendMessageForAgent to accept targetAgentId
+
+    // For now, we'll duplicate the core logic here for Kanban tasks
+    // This ensures Kanban chat sessions are isolated from main agent sessions
+
+    // Check if chat is configured
+    if (!isChatConfigured) {
+      const errorMessage: ChatMessage = {
+        id: `msg-${Date.now()}-error`,
+        role: 'assistant',
+        content: 'Quack quack! Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
+        timestamp: Date.now(),
+        status: 'error',
+        error: 'Not configured',
+      };
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(targetAgentId) ?? [];
+        newSessions.set(targetAgentId, [...agentMessages, errorMessage]);
+        return newSessions;
+      });
+      return;
+    }
+
+    // Generate unique message ID for this stream
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const streamKey = `${targetAgentId}-${messageId}`;
+
+    console.log(`[sendMessageForTargetAgent] Starting stream ${streamKey} for Kanban task`);
+
+    // Save the prompt for restoration on abort
+    lastPromptsRef.current.set(targetAgentId, content);
+
+    // Create abort controller
+    const abortController = new AbortController();
+    abortControllersRef.current.set(streamKey, abortController);
+
+    // Track this stream as active
+    if (!activeStreamsRef.current.has(targetAgentId)) {
+      activeStreamsRef.current.set(targetAgentId, new Set());
+    }
+    activeStreamsRef.current.get(targetAgentId)!.add(streamKey);
+
+    // Get current messages for this agent
+    const currentMessages = chatSessions.get(targetAgentId) ?? [];
+
+    // Create user message
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}-user`,
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+      status: 'sending',
+    };
+
+    // Add user message
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      newSessions.set(targetAgentId, [...currentMessages, userMessage]);
+      return newSessions;
+    });
+
+    // Set loading for this agent
+    setChatLoadingMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(targetAgentId, true);
+      return newMap;
+    });
+
+    // Create assistant message placeholder
+    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessage: ChatMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: 0,
+      status: 'streaming',
+      settings: {
+        model: (options?.model || 'sonnet') as 'opus' | 'sonnet' | 'haiku',
+        effort: options?.effort || 'medium',
+        thinkingMode: options?.thinkingMode || 'auto',
+      },
+    };
+
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      const agentMessages = newSessions.get(targetAgentId) ?? [];
+      newSessions.set(targetAgentId, [...agentMessages, assistantMessage]);
+      return newSessions;
+    });
+
+    try {
+      // Ensure listener is ready for this Kanban task
+      await ensureListenerReady(targetAgentId);
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // Build context from conversation history
+      const agentHistory = chatConversationHistoryRef.current.get(targetAgentId) ?? [];
+      let prompt = content;
+      if (agentHistory.length > 0) {
+        const history = agentHistory
+          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+          .join('\n\n');
+        prompt = `${history}\n\nUser: ${content}`;
+      }
+
+      // Create abort promise
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (abortController.signal.aborted) {
+          reject(new Error('Aborted'));
+        }
+        abortController.signal.addEventListener('abort', () => {
+          reject(new Error('Aborted'));
+        });
+      });
+
+      // Call Rust backend
+      const response = await Promise.race([
+        invoke<{
+          result: string;
+          session_id: string;
+          total_cost_usd: number;
+          usage: UsageStats;
+        }>('send_message_via_sdk_streaming', {
+          agentId: targetAgentId,
+          request: {
+            prompt,
+            model: options?.model || 'sonnet',
+            thinkingMode: options?.thinkingMode,
+            permissionMode: options?.permissionMode,
+            attachments: [],
+            cwd: options?.workingDirectory || '/',
+            sessionId: undefined,
+            effort: options?.effort,
+          },
+        }),
+        abortPromise,
+      ]);
+
+      // Update message with final result
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(targetAgentId) ?? [];
+        newSessions.set(
+          targetAgentId,
+          agentMessages.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: response.result,
+                  status: 'complete' as const,
+                }
+              : msg
+          )
+        );
+        return newSessions;
+      });
+
+      // Add to conversation history
+      const updatedHistory = [
+        ...agentHistory,
+        { role: 'user' as const, content },
+        { role: 'assistant' as const, content: response.result },
+      ];
+      chatConversationHistoryRef.current.set(targetAgentId, updatedHistory);
+
+      // Update tokens
+      setChatTokensMap((prev) => {
+        const newMap = new Map(prev);
+        const current = newMap.get(targetAgentId) || {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+          totalCost: 0,
+        };
+        newMap.set(targetAgentId, {
+          inputTokens: current.inputTokens + (response.usage?.input_tokens || 0),
+          outputTokens: current.outputTokens + (response.usage?.output_tokens || 0),
+          cacheCreationTokens: current.cacheCreationTokens + (response.usage?.cache_creation_input_tokens || 0),
+          cacheReadTokens: current.cacheReadTokens + (response.usage?.cache_read_input_tokens || 0),
+          totalCost: current.totalCost + response.total_cost_usd,
+        });
+        return newMap;
+      });
+
+      console.log(`[sendMessageForTargetAgent] Completed for ${targetAgentId}`);
+
+    } catch (err) {
+      console.error('[sendMessageForTargetAgent] Error:', err);
+
+      const wasAborted = abortController.signal.aborted;
+
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        const agentMessages = newSessions.get(targetAgentId) ?? [];
+        newSessions.set(
+          targetAgentId,
+          agentMessages.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: wasAborted ? 'Stream stopped by user' : `Error: ${err instanceof Error ? err.message : String(err)}`,
+                  status: 'error' as const,
+                  error: wasAborted ? 'Aborted' : String(err),
+                }
+              : msg
+          )
+        );
+        return newSessions;
+      });
+    } finally {
+      // Clear loading state
+      setChatLoadingMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(targetAgentId, false);
+        return newMap;
+      });
+
+      // Clean up stream tracking
+      activeStreamsRef.current.get(targetAgentId)?.delete(streamKey);
+      abortControllersRef.current.delete(streamKey);
+    }
+  }, [isChatConfigured, chatSessions, ensureListenerReady]);
+
+  // Abort stream for a specific agent (used by Kanban)
+  const abortStreamForTargetAgent = useCallback((targetAgentId: string) => {
+    const activeStreams = activeStreamsRef.current.get(targetAgentId);
+    if (!activeStreams || activeStreams.size === 0) {
+      console.log('[abortStreamForTargetAgent] No active streams for:', targetAgentId);
+      return;
+    }
+
+    console.log(`[abortStreamForTargetAgent] Aborting ${activeStreams.size} stream(s) for: ${targetAgentId}`);
+
+    activeStreams.forEach((streamKey) => {
+      const abortController = abortControllersRef.current.get(streamKey);
+      if (abortController && !abortController.signal.aborted) {
+        abortController.abort();
+      }
+    });
+  }, []);
+
+  // Clear conversation for a specific agent (used by Kanban)
+  const clearConversationForTargetAgent = useCallback((targetAgentId: string) => {
+    // Clear local UI state
+    setChatSessions((prev) => {
+      const newSessions = new Map(prev);
+      newSessions.set(targetAgentId, []);
+      return newSessions;
+    });
+
+    // Clear conversation history
+    chatConversationHistoryRef.current.delete(targetAgentId);
+
+    // Clear last prompt
+    lastPromptsRef.current.delete(targetAgentId);
+
+    // Clear tokens
+    setChatTokensMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(targetAgentId);
+      return newMap;
+    });
+
+    console.log('[clearConversationForTargetAgent] Cleared for:', targetAgentId);
+  }, []);
+
+  // Get last prompt for a specific agent (used by Kanban)
+  const getLastPromptForTargetAgent = useCallback((targetAgentId: string): string | null => {
+    return lastPromptsRef.current.get(targetAgentId) || null;
+  }, []);
+
+  // ============================================
+  // END KANBAN CHAT INTEGRATION FUNCTIONS
+  // ============================================
+
   // Compact conversation for current agent (custom implementation since SDK /compact is buggy)
   const compactCurrentAgentConversation = useCallback(async () => {
     if (!activeId) return;
@@ -7948,6 +8239,14 @@ You have access to all Bash tools to execute git commands like:
                 <KanbanView
                   terminals={terminals}
                   onExitKanban={toggleKanbanView}
+                  // Chat integration for Kanban tasks
+                  chatSessions={chatSessions}
+                  chatLoadingMap={chatLoadingMap}
+                  onSendMessage={sendMessageForTargetAgent}
+                  onAbortStream={abortStreamForTargetAgent}
+                  onClearConversation={clearConversationForTargetAgent}
+                  getLastPrompt={getLastPromptForTargetAgent}
+                  sessionTokensMap={chatTokensMap}
                 />
               )}
 

@@ -2,7 +2,7 @@
  * KanbanChatDrawer Component
  *
  * A drawer that displays the ChatView for a selected Kanban task.
- * Handles session creation, resumption, and token tracking.
+ * Uses the chat system from App.tsx (Tauri backend) instead of direct SDK calls.
  *
  * - New task in_progress → Auto-send initial prompt
  * - Existing session → Resume conversation
@@ -12,8 +12,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import ChatView from '../ChatView';
-import { useClaudeChat } from '../../hooks/useClaudeChat';
-import type { KanbanTask } from '../../types';
+import type { KanbanTask, ChatMessage } from '../../types';
 import type { ChatSendOptions, ThinkingMode, PermissionMode } from '../../hooks/useClaudeChat';
 import type { EffortLevel } from '../../types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
@@ -23,6 +22,14 @@ interface KanbanChatDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onTaskUpdate: (id: string, updates: Partial<KanbanTask>) => Promise<void>;
+  // Chat integration from App.tsx
+  chatSessions: Map<string, ChatMessage[]>;
+  chatLoadingMap: Map<string, boolean>;
+  onSendMessage: (agentId: string, content: string, options?: ChatSendOptions) => Promise<void>;
+  onAbortStream: (agentId: string) => void;
+  onClearConversation: (agentId: string) => void;
+  getLastPrompt: (agentId: string) => string | null;
+  sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
 }
 
 // Helper function to get avatar image URL
@@ -38,6 +45,13 @@ export default function KanbanChatDrawer({
   isOpen,
   onClose,
   onTaskUpdate,
+  chatSessions,
+  chatLoadingMap,
+  onSendMessage,
+  onAbortStream,
+  onClearConversation,
+  getLastPrompt,
+  sessionTokensMap,
 }: KanbanChatDrawerProps) {
   // Track if we've auto-sent the initial prompt for this task
   const hasAutoSentRef = useRef<string | null>(null);
@@ -55,26 +69,20 @@ export default function KanbanChatDrawer({
   // Get working directory from task
   const workingDirectory = task?.projectPath || '/';
 
-  // Initialize Claude chat hook with session resumption support
-  const {
-    messages,
-    isLoading,
-    sendMessage,
-    clearConversation,
-    getCurrentSessionId,
-    sessionTokens,
-    abortStream,
-    getLastPrompt,
-    loadHistoricalMessages,
-  } = useClaudeChat({
-    initialSessionId: task?.sessionId,
-    initialTokens: task ? {
-      inputTokens: task.inputTokens ?? 0,
-      outputTokens: task.outputTokens ?? 0,
-      cacheCreationTokens: task.cacheCreationTokens ?? 0,
-      cacheReadTokens: task.cacheReadTokens ?? 0,
-    } : undefined,
-  });
+  // Use task.id as the agentId for chat sessions
+  // This allows each Kanban task to have its own chat session
+  const agentId = task?.id || '';
+
+  // Get messages and loading state for this task
+  const messages = chatSessions.get(agentId) || [];
+  const isLoading = chatLoadingMap.get(agentId) || false;
+  const sessionTokens = sessionTokensMap.get(agentId) || {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalCost: 0,
+  };
 
   // Load avatar URL
   useEffect(() => {
@@ -126,7 +134,7 @@ export default function KanbanChatDrawer({
 
   // Auto-send initial prompt when task moves to in_progress
   useEffect(() => {
-    if (!task || !isOpen) return;
+    if (!task || !isOpen || !agentId) return;
 
     // Only auto-send for in_progress tasks without a session
     if (
@@ -141,73 +149,44 @@ export default function KanbanChatDrawer({
 
       // Small delay to ensure UI is ready
       setTimeout(() => {
-        sendMessage(task.prompt, {
+        onSendMessage(agentId, task.prompt, {
           workingDirectory,
           model,
           thinkingMode,
           permissionMode,
           effort,
-          onComplete: () => {
-            // Capture session ID after first message
-            const sessionId = getCurrentSessionId();
-            if (sessionId && task.id) {
-              console.log('[KanbanChatDrawer] Saving session ID:', sessionId);
-              onTaskUpdate(task.id, { sessionId });
-            }
-          },
         });
       }, 100);
     }
-  }, [task, isOpen, sendMessage, workingDirectory, model, thinkingMode, permissionMode, effort, getCurrentSessionId, onTaskUpdate]);
-
-  // Update task tokens when they change
-  useEffect(() => {
-    if (!task || !isOpen) return;
-
-    // Debounce token updates
-    const timeout = setTimeout(() => {
-      const currentSessionId = getCurrentSessionId();
-      const hasTokenChanges =
-        sessionTokens.inputTokens !== (task.inputTokens ?? 0) ||
-        sessionTokens.outputTokens !== (task.outputTokens ?? 0);
-
-      if (hasTokenChanges || (currentSessionId && !task.sessionId)) {
-        onTaskUpdate(task.id, {
-          sessionId: currentSessionId || task.sessionId,
-          inputTokens: sessionTokens.inputTokens,
-          outputTokens: sessionTokens.outputTokens,
-          cacheCreationTokens: sessionTokens.cacheCreationTokens,
-          cacheReadTokens: sessionTokens.cacheReadTokens,
-        });
-      }
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-  }, [sessionTokens, task, isOpen, getCurrentSessionId, onTaskUpdate]);
+  }, [task, isOpen, agentId, onSendMessage, workingDirectory, model, thinkingMode, permissionMode, effort]);
 
   // Handle sending messages
   const handleSendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
-    await sendMessage(content, {
+    if (!agentId) return;
+
+    await onSendMessage(agentId, content, {
       ...options,
       workingDirectory,
       model: options?.model || model,
       thinkingMode: options?.thinkingMode || thinkingMode,
       permissionMode: options?.permissionMode || permissionMode,
       effort: options?.effort || effort,
-      onComplete: () => {
-        // Update session ID if not already set
-        const sessionId = getCurrentSessionId();
-        if (sessionId && task && !task.sessionId) {
-          onTaskUpdate(task.id, { sessionId });
-        }
-      },
     });
-  }, [sendMessage, workingDirectory, model, thinkingMode, permissionMode, effort, getCurrentSessionId, task, onTaskUpdate]);
+  }, [agentId, onSendMessage, workingDirectory, model, thinkingMode, permissionMode, effort]);
+
+  // Handle abort stream
+  const handleAbortStream = useCallback(() => {
+    if (agentId) {
+      onAbortStream(agentId);
+    }
+  }, [agentId, onAbortStream]);
 
   // Handle clear conversation
   const handleClearConversation = useCallback(() => {
     if (confirm('Are you sure you want to clear this conversation? This cannot be undone.')) {
-      clearConversation();
+      if (agentId) {
+        onClearConversation(agentId);
+      }
       if (task) {
         onTaskUpdate(task.id, {
           sessionId: undefined,
@@ -219,7 +198,10 @@ export default function KanbanChatDrawer({
       }
       hasAutoSentRef.current = null; // Allow re-send if needed
     }
-  }, [clearConversation, task, onTaskUpdate]);
+  }, [agentId, onClearConversation, task, onTaskUpdate]);
+
+  // Get last prompt for this task
+  const lastPrompt = agentId ? getLastPrompt(agentId) : null;
 
   // Get accent color from task
   const accentColor = task?.assignedAgent?.color || '#f28c52';
@@ -297,8 +279,8 @@ export default function KanbanChatDrawer({
               effort={effort}
               onEffortChange={setEffort}
               // Streaming control
-              onAbortStream={abortStream}
-              lastPrompt={getLastPrompt()}
+              onAbortStream={handleAbortStream}
+              lastPrompt={lastPrompt ?? undefined}
               // Conversation management
               onClearConversation={handleClearConversation}
               // Token usage
@@ -307,7 +289,7 @@ export default function KanbanChatDrawer({
                 outputTokens: sessionTokens.outputTokens,
                 cacheCreationTokens: sessionTokens.cacheCreationTokens,
                 cacheReadTokens: sessionTokens.cacheReadTokens,
-                totalCost: task.totalCost ?? 0,
+                totalCost: task.totalCost ?? sessionTokens.totalCost ?? 0,
               }}
               // Agent display
               agentName={task.assignedAgent?.name || 'Kanban Task'}
