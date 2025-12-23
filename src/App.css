@@ -2593,6 +2593,12 @@ button.directory-chooser:hover {
 
 .app-shell.kanban-mode {
   transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden !important; /* Prevent horizontal scroll during drag */
+}
+
+/* Ensure kanban content area doesn't scroll horizontally */
+.app-shell.kanban-mode .terminal-container {
+  overflow-x: hidden !important;
 }
 
 .agents-panel,

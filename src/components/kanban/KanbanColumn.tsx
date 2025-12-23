@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import KanbanCard from './KanbanCard';
-import type { KanbanTask, KanbanStatus } from '../../types';
+import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
 
 interface KanbanColumnProps {
   id: KanbanStatus;
@@ -23,6 +23,10 @@ interface KanbanColumnProps {
   selectedTaskId: string | null;
   onTaskClick: (task: KanbanTask) => void;
   onTaskDelete: (taskId: string) => void;
+  onTaskEdit?: (task: KanbanTask) => void;
+  // Chat state for activity indicators
+  chatLoadingMap?: Map<string, boolean>;
+  chatSessions?: Map<string, ChatMessage[]>;
 }
 
 export default function KanbanColumn({
@@ -33,6 +37,9 @@ export default function KanbanColumn({
   selectedTaskId,
   onTaskClick,
   onTaskDelete,
+  onTaskEdit,
+  chatLoadingMap,
+  chatSessions,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -85,15 +92,28 @@ export default function KanbanColumn({
               {id === 'done' && 'Completed tasks will appear here'}
             </div>
           ) : (
-            tasks.map((task) => (
-              <KanbanCard
-                key={task.id}
-                task={task}
-                isSelected={task.id === selectedTaskId}
-                onClick={() => onTaskClick(task)}
-                onDelete={() => onTaskDelete(task.id)}
-              />
-            ))
+            tasks.map((task) => {
+              // Get chat state for this task
+              const isLoading = chatLoadingMap?.get(task.id) || false;
+              const messages = chatSessions?.get(task.id) || [];
+              const hasMessages = messages.length > 0;
+              const hasUserMessage = messages.some(msg => msg.role === 'user');
+              const isDormant = !hasUserMessage;
+
+              return (
+                <KanbanCard
+                  key={task.id}
+                  task={task}
+                  isSelected={task.id === selectedTaskId}
+                  isLoading={isLoading}
+                  hasMessages={hasMessages}
+                  isDormant={isDormant}
+                  onClick={() => onTaskClick(task)}
+                  onDelete={() => onTaskDelete(task.id)}
+                  onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
+                />
+              );
+            })
           )}
         </SortableContext>
       </div>

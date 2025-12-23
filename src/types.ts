@@ -1364,4 +1364,7 @@ export interface KanbanTask {
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
   totalCost?: number;
+
+  // Attachments (images)
+  attachments?: ChatAttachment[];
 }

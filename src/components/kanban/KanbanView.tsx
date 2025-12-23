@@ -26,7 +26,7 @@ import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal from './AddKanbanTaskModal';
 import KanbanChatDrawer from './KanbanChatDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
-import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage } from '../../types';
+import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import './KanbanView.css';
 
@@ -41,6 +41,13 @@ interface KanbanViewProps {
   onClearConversation: (agentId: string) => void;
   getLastPrompt: (agentId: string) => string | null;
   sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
+  // New Agent creation
+  onCreateNewAgent?: (projectPath: string) => void;
+  // Default settings from global settings
+  defaultModel?: 'opus' | 'sonnet' | 'haiku';
+  defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
+  defaultPermissionMode?: 'plan' | 'bypass';
+  defaultEffort?: 'low' | 'medium' | 'high';
 }
 
 export default function KanbanView({
@@ -53,6 +60,11 @@ export default function KanbanView({
   onClearConversation,
   getLastPrompt,
   sessionTokensMap,
+  onCreateNewAgent,
+  defaultModel,
+  defaultThinkingMode,
+  defaultPermissionMode,
+  defaultEffort,
 }: KanbanViewProps) {
   const {
     tasks,
@@ -72,6 +84,7 @@ export default function KanbanView({
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
+  const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
 
   // Show ALL tasks (cross-project view)
   const todoTasks = tasks.filter((t) => t.status === 'todo');
@@ -144,31 +157,60 @@ export default function KanbanView({
     }
   }, [deleteTask]);
 
+  // Handle task edit (open modal in edit mode)
+  const handleTaskEdit = useCallback((task: KanbanTask) => {
+    setEditingTask(task);
+    setIsModalOpen(true);
+  }, []);
+
   // Handle drawer close
   const handleDrawerClose = useCallback(() => {
     closeDrawer();
   }, [closeDrawer]);
 
-  // Handle new task creation
-  const handleCreateTask = useCallback(async (
+  // Handle task creation or update
+  const handleCreateOrUpdateTask = useCallback(async (
     title: string,
     prompt: string,
     projectPath: string,
     projectName: string,
     branch: string | undefined,
-    agent: KanbanAssignedAgent | undefined
+    agent: KanbanAssignedAgent | undefined,
+    attachments: ChatAttachment[]
   ) => {
-    await addTask({
-      title,
-      prompt,
-      status: 'todo',
-      projectPath,
-      projectName,
-      branch,
-      assignedAgent: agent,
-    });
+    if (editingTask) {
+      // Update existing task
+      await updateTask(editingTask.id, {
+        title,
+        prompt,
+        projectPath,
+        projectName,
+        branch,
+        assignedAgent: agent,
+        attachments,
+      });
+    } else {
+      // Create new task
+      await addTask({
+        title,
+        prompt,
+        status: 'todo',
+        projectPath,
+        projectName,
+        branch,
+        assignedAgent: agent,
+        attachments,
+      });
+    }
     setIsModalOpen(false);
-  }, [addTask]);
+    setEditingTask(null);
+  }, [addTask, updateTask, editingTask]);
+
+  // Handle modal close
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false);
+    setEditingTask(null);
+  }, []);
 
   // Get selected task for drawer
   const selectedTask = getSelectedTask();
@@ -244,6 +286,9 @@ export default function KanbanView({
             selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
+            onTaskEdit={handleTaskEdit}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
           />
 
           <KanbanColumn
@@ -259,6 +304,9 @@ export default function KanbanView({
             selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
+            onTaskEdit={handleTaskEdit}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
           />
 
           <KanbanColumn
@@ -274,6 +322,9 @@ export default function KanbanView({
             selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
+            onTaskEdit={handleTaskEdit}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
           />
         </div>
 
@@ -283,12 +334,14 @@ export default function KanbanView({
         </DragOverlay>
       </DndContext>
 
-      {/* Add Task Modal */}
+      {/* Add/Edit Task Modal */}
       <AddKanbanTaskModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateTask}
+        onClose={handleModalClose}
+        onSubmit={handleCreateOrUpdateTask}
         terminals={terminals}
+        onCreateNewAgent={onCreateNewAgent}
+        editTask={editingTask}
       />
 
       {/* Chat Drawer */}
@@ -305,6 +358,11 @@ export default function KanbanView({
         onClearConversation={onClearConversation}
         getLastPrompt={getLastPrompt}
         sessionTokensMap={sessionTokensMap}
+        // Default settings from global settings
+        defaultModel={defaultModel}
+        defaultThinkingMode={defaultThinkingMode}
+        defaultPermissionMode={defaultPermissionMode}
+        defaultEffort={defaultEffort}
       />
     </div>
   );

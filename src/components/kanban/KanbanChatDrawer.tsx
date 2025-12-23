@@ -30,6 +30,11 @@ interface KanbanChatDrawerProps {
   onClearConversation: (agentId: string) => void;
   getLastPrompt: (agentId: string) => string | null;
   sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
+  // Default settings from global settings
+  defaultModel?: 'opus' | 'sonnet' | 'haiku';
+  defaultThinkingMode?: ThinkingMode;
+  defaultPermissionMode?: PermissionMode;
+  defaultEffort?: EffortLevel;
 }
 
 // Helper function to get avatar image URL
@@ -52,6 +57,10 @@ export default function KanbanChatDrawer({
   onClearConversation,
   getLastPrompt,
   sessionTokensMap,
+  defaultModel = 'sonnet',
+  defaultThinkingMode = 'auto',
+  defaultPermissionMode = 'bypass',
+  defaultEffort = 'medium',
 }: KanbanChatDrawerProps) {
   // Track if we've auto-sent the initial prompt for this task
   const hasAutoSentRef = useRef<string | null>(null);
@@ -59,12 +68,12 @@ export default function KanbanChatDrawer({
   // Avatar URL state
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // Chat settings state
+  // Chat settings state - use global defaults from settings
   const [inputDraft, setInputDraft] = useState('');
-  const [model, setModel] = useState<'opus' | 'sonnet' | 'haiku'>('sonnet');
-  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('auto');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypass');
-  const [effort, setEffort] = useState<EffortLevel>('medium');
+  const [model, setModel] = useState<'opus' | 'sonnet' | 'haiku'>(defaultModel);
+  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(defaultThinkingMode);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(defaultPermissionMode);
+  const [effort, setEffort] = useState<EffortLevel>(defaultEffort);
 
   // Get working directory from task
   const workingDirectory = task?.projectPath || '/';
@@ -155,6 +164,8 @@ export default function KanbanChatDrawer({
           thinkingMode,
           permissionMode,
           effort,
+          // Include attachments if any
+          attachments: task.attachments || [],
         });
       }, 100);
     }

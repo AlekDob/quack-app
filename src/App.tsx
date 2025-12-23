@@ -2296,6 +2296,14 @@ function AppContent() {
 
       console.log(`[sendMessageForTargetAgent] Completed for ${targetAgentId}`);
 
+      // 🦆 Notify that Kanban task agent completed response (plays Quack sound + toast)
+      // Find task info to get a better label
+      const kanbanTasks = useKanbanStore.getState().tasks;
+      const kanbanTask = kanbanTasks.find(t => t.id === targetAgentId);
+      const taskLabel = kanbanTask?.title || kanbanTask?.assignedAgent?.name || 'Kanban Task';
+      const taskCwd = kanbanTask?.projectPath || '';
+      notifyAgentReadyRef.current({ id: targetAgentId, label: taskLabel, cwd: taskCwd });
+
     } catch (err) {
       console.error('[sendMessageForTargetAgent] Error:', err);
 
@@ -2708,9 +2716,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
   }, [gitSummary, selectedGitPath]);
 
-  // Grid columns: Hide sidebar when Kanban is active
+  // Grid columns: Hide sidebar when Kanban is active (hide BOTH sidebars)
   const gridTemplateColumns = isKanbanViewActive
-    ? (sidePanelCollapsed ? "0px minmax(0, 1fr) 0px" : "0px minmax(0, 1fr) 420px")
+    ? "0px minmax(0, 1fr) 0px"  // Kanban mode: hide both sidebars
     : (sidePanelCollapsed ? "360px minmax(0, 1fr) 0px" : "360px minmax(0, 1fr) 420px");
 
   // Update PiP window with current agent states
@@ -5369,6 +5377,46 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setShowNewTerminalModal(true);
   }, [activeTerminal, explorerPath, tauriAvailable, terminals.length]);
 
+  // Open New Terminal Modal with a specific project path (for Kanban integration)
+  const handleOpenNewAgentForKanban = useCallback((projectPath: string) => {
+    if (!tauriAvailable) {
+      setExplorerError("Terminals available only via desktop app.");
+      return;
+    }
+
+    // 💰 Check Pro limit before opening modal
+    if (!canCreateTerminal(terminals.length)) {
+      setUpgradeLimitType('terminals');
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    // Reset to clean state
+    setEditingTerminal(null);
+    setNewTerminalError(null);
+    const index = terminals.length;
+    const defaultColor = TERMINAL_COLORS[index % TERMINAL_COLORS.length];
+    setNewTerminalName(getRandomName());
+    setNewTerminalColor(defaultColor);
+    setNewTerminalWorkingOn("");
+    setNewTerminalAvatar("");
+    setNewTerminalBranch("");
+    setNewTerminalUseWorktree(false);
+    setNewTerminalPersonality({
+      role: 'Feature Coordinator',
+      intro: 'Experienced PM specializing in feature delivery and team coordination',
+      communicationStyle: 'friendly',
+      specialties: ['feature-planning', 'team-alignment'],
+      personality: 'Organized. Proactive',
+      skills: [],
+      expressions: [],
+    });
+
+    // Set the project path from Kanban
+    setNewTerminalPath(projectPath);
+    setShowNewTerminalModal(true);
+  }, [tauriAvailable, terminals.length]);
+
   const handleCancelNewTerminal = useCallback(() => {
     if (creatingTerminal) {
       return;
@@ -7957,7 +8005,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || isKanbanViewActive ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -8247,6 +8295,13 @@ You have access to all Bash tools to execute git commands like:
                   onClearConversation={clearConversationForTargetAgent}
                   getLastPrompt={getLastPromptForTargetAgent}
                   sessionTokensMap={chatTokensMap}
+                  // New Agent creation for Kanban
+                  onCreateNewAgent={handleOpenNewAgentForKanban}
+                  // Default settings from global presets
+                  defaultModel={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                  defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+                  defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                  defaultEffort={currentSettings.effort || 'medium'}
                 />
               )}
 

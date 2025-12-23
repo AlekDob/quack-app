@@ -30,8 +30,9 @@
   height: 100%;
   width: 100%;
   padding: 20px 24px;
-  background: var(--kanban-bg);
+  background: transparent;
   overflow: hidden;
+  overflow-x: hidden !important; /* Prevent horizontal scroll during drag */
   flex: 1;
   min-height: 0;
 }
@@ -722,6 +723,35 @@
   flex-shrink: 0;
 }
 
+/* New Agent button in grid */
+.kanban-new-agent-card {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.15);
+  background: transparent;
+}
+
+.kanban-new-agent-card:hover {
+  background: rgba(242, 140, 82, 0.08);
+  border-color: var(--kanban-accent);
+}
+
+.kanban-new-agent-card .kanban-agent-name {
+  color: var(--kanban-text-secondary);
+}
+
+.kanban-new-agent-card:hover .kanban-agent-name {
+  color: var(--kanban-accent);
+}
+
+.kanban-new-agent-icon {
+  background: rgba(242, 140, 82, 0.15);
+  color: var(--kanban-accent);
+}
+
+.kanban-new-agent-card:hover .kanban-new-agent-icon {
+  background: rgba(242, 140, 82, 0.25);
+}
+
 /* Task preview */
 .kanban-task-preview {
   padding: 12px;
@@ -787,7 +817,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 600px;
+  width: 800px;
   max-width: 92vw;
   background: #0f111a;
   border-left: 1px solid var(--kanban-border);
@@ -885,4 +915,315 @@
 
 .kanban-drawer-empty svg {
   opacity: 0.5;
+}
+
+/* ==========================================
+   Context Menu Styles
+   ========================================== */
+
+.kanban-context-menu {
+  min-width: 140px;
+  background: #1e2030;
+  border: 1px solid var(--kanban-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: contextMenuFadeIn 0.12s ease;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.kanban-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--kanban-text-primary);
+  cursor: pointer;
+  transition: background 0.12s ease;
+  text-align: left;
+}
+
+.kanban-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kanban-context-menu-item.delete {
+  color: #ef4444;
+}
+
+.kanban-context-menu-item.delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* ==========================================
+   Attachment Styles for Modal
+   ========================================== */
+
+.kanban-form-hint {
+  font-weight: 400;
+  color: var(--kanban-text-muted);
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.kanban-prompt-wrapper {
+  position: relative;
+  border-radius: 8px;
+  transition: box-shadow 0.15s ease;
+}
+
+.kanban-prompt-wrapper.drag-over {
+  box-shadow: 0 0 0 2px var(--kanban-accent);
+}
+
+.kanban-prompt-wrapper textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--kanban-border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--kanban-text-primary);
+  transition: border-color 0.15s ease;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.kanban-prompt-wrapper textarea:focus {
+  outline: none;
+  border-color: var(--kanban-accent);
+}
+
+.kanban-prompt-wrapper textarea::placeholder {
+  color: var(--kanban-text-muted);
+}
+
+.kanban-prompt-drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(242, 140, 82, 0.15);
+  border: 2px dashed var(--kanban-accent);
+  border-radius: 8px;
+  color: var(--kanban-accent);
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.kanban-attachment-error {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.kanban-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.kanban-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--kanban-border);
+  border-radius: 6px;
+  max-width: 200px;
+}
+
+.kanban-attachment-preview {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.kanban-attachment-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  flex-shrink: 0;
+  color: var(--kanban-text-muted);
+}
+
+.kanban-attachment-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kanban-attachment-name {
+  font-size: 11px;
+  color: var(--kanban-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban-attachment-size {
+  font-size: 10px;
+  color: var(--kanban-text-muted);
+}
+
+.kanban-attachment-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--kanban-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.kanban-attachment-remove:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* ===== Status Badge Styles ===== */
+.kanban-status-badge {
+  font-size: 0.75rem;
+  margin-left: 6px;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+/* Busy/streaming badge - pulses with energy */
+.kanban-status-badge.busy {
+  animation: kanbanBadgeBusy 0.6s ease-in-out infinite;
+  opacity: 1;
+}
+
+@keyframes kanbanBadgeBusy {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+/* Waiting for response badge - gentle bounce */
+.kanban-status-badge.waiting {
+  animation: kanbanBadgeBounce 2s ease-in-out infinite;
+  opacity: 1;
+}
+
+@keyframes kanbanBadgeBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  10% {
+    transform: translateY(-3px) scale(1.1);
+  }
+  20% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(-2px) scale(1.05);
+  }
+  40% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Sleeping/dormant badge - very subtle */
+.kanban-status-badge.sleeping {
+  animation: kanbanBadgeSleep 3s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+@keyframes kanbanBadgeSleep {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translateY(-2px) rotate(-5deg) scale(1.05);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 0.4;
+  }
+  75% {
+    transform: translateY(-2px) rotate(5deg) scale(1.05);
+    opacity: 0.5;
+  }
+}
+
+/* ===== Progress Bar Styles ===== */
+.kanban-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.kanban-progress-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--kanban-accent, #f28c52),
+    transparent
+  );
+  animation: kanbanProgressSlide 1.5s ease-in-out infinite;
+  border-radius: 1px;
+}
+
+@keyframes kanbanProgressSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
 }
