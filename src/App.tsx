@@ -62,6 +62,8 @@ import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
 import SecondBrainTabView from "./views/SecondBrainTabView";
+import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
+import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { LicenseModal } from "./components/LicenseModal";
@@ -276,6 +278,8 @@ function AppContent() {
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
 
+  // Claude Assets Manager tab - hook is called later after tabs state is defined
+
   // Terminal Window manager - opens separate Tauri window for terminals
   const { openTerminalWindow, updateProjects: updateTerminalWindowProjects, isOpen: terminalWindowOpen } = useTerminalWindowManager();
 
@@ -488,6 +492,13 @@ function AppContent() {
       lastActiveTabPerTerminal.current.set(activeId, tabId);
     }
   }, [activeId]);
+
+  // Claude Assets Manager tab - must be after tabs state is defined
+  const { openClaudeAssetsTab } = useClaudeAssetsTab({
+    tabs,
+    setTabs,
+    setActiveTabId: updateActiveTab,
+  });
 
   // Tabs per terminal/agent - each agent has its own set of file tabs
   const [tabsByTerminal, setTabsByTerminal] = useState<Map<string, Tab[]>>(new Map());
@@ -7643,7 +7654,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -7711,7 +7722,7 @@ You have access to all Bash tools to execute git commands like:
         />
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
-        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') ? 'full-width-tab' : ''}`}>
+        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'full-width-tab' : ''}`}>
           {terminals.length === 0 ? (
             /* Empty state when no agents - show image or guide */
             <div
@@ -7876,10 +7887,13 @@ You have access to all Bash tools to execute git commands like:
               onDroidFactoryClick={() => setDroidFactoryOpen(true)}
               onMemoryGraphClick={handleOpenMemoryGraphTab}
               onSecondBrainClick={handleOpenSecondBrainTab}
+              onClaudeAssetsClick={openClaudeAssetsTab}
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
               terminalWindowOpen={terminalWindowOpen}
+              secondBrainOpen={tabs.some(t => t.type === 'second-brain' && t.id === activeTabId)}
+              claudeAssetsOpen={tabs.some(t => t.type === 'claude-assets' && t.id === activeTabId)}
               isAuthenticated={claudeCliAvailable !== false}
               onLoginClick={async () => {
                 try {
@@ -8133,6 +8147,39 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+              {/* Claude Assets Manager - shown when claude-assets tab is active */}
+              {activeTabId.startsWith('claude-assets-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'claude-assets') {
+                  return (
+                    <ClaudeAssetsTabView
+                      tab={activeTab}
+                      isActive={true}
+                      terminals={terminals}
+                      onOpenFile={(path) => {
+                        // Open file in Monaco editor tab
+                        const fileName = path.split('/').pop() || 'file';
+                        const existingTab = tabs.find(t => t.type === 'file' && t.filePath === path);
+                        if (existingTab) {
+                          setActiveTabId(existingTab.id);
+                        } else {
+                          const newTab: Tab = {
+                            id: `file-${Date.now()}`,
+                            label: fileName,
+                            type: 'file',
+                            closable: true,
+                            filePath: path,
+                          };
+                          setTabs(prev => [...prev, newTab]);
+                          setActiveTabId(newTab.id);
+                        }
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
               {tabs.some(t => t.type === 'agent-terminal') && (
                 <div style={{
@@ -8261,8 +8308,8 @@ You have access to all Bash tools to execute git commands like:
           // Sessions props
           onSelectSession={handleSelectSession}
           sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph) are active
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-')}
+          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) are active
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-')}
           onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}

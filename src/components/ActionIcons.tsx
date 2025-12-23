@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Wrench, Brain, Network } from 'lucide-react';
+import { Wrench, Brain, Network, Package } from 'lucide-react';
 import './ActionIcons.css';
 
 interface ActionIconsProps {
@@ -14,9 +14,12 @@ interface ActionIconsProps {
   onGuideClick: () => void;
   onMemoryGraphClick: () => void;
   onSecondBrainClick: () => void;
+  onClaudeAssetsClick?: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
+  secondBrainOpen?: boolean;
+  claudeAssetsOpen?: boolean;
   // Authentication status
   isAuthenticated?: boolean;
   onLoginClick?: () => void;
@@ -34,9 +37,12 @@ function ActionIcons({
   onGuideClick,
   onMemoryGraphClick,
   onSecondBrainClick,
+  onClaudeAssetsClick,
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
+  secondBrainOpen = false,
+  claudeAssetsOpen = false,
   isAuthenticated = true,
   onLoginClick,
 }: ActionIconsProps) {
@@ -262,15 +268,30 @@ function ActionIcons({
       {/* Second Brain Icon */}
       <button
         type="button"
-        className="action-icon second-brain-icon"
+        className={`action-icon second-brain-icon ${secondBrainOpen ? 'active' : ''}`}
         onClick={onSecondBrainClick}
         aria-label="Open Second Brain"
         data-tooltip="Second Brain"
-        style={{ color: '#E84A7F' }}
+        style={secondBrainOpen ? { color: '#E84A7F' } : undefined}
       >
         <Network className="w-4 h-4" />
         <span className="action-icon-tooltip">Second Brain</span>
       </button>
+
+      {/* Claude Assets Icon */}
+      {onClaudeAssetsClick && (
+        <button
+          type="button"
+          className={`action-icon ${claudeAssetsOpen ? 'active' : ''}`}
+          onClick={onClaudeAssetsClick}
+          aria-label="Open Claude Assets Manager"
+          data-tooltip="Claude Assets"
+          style={claudeAssetsOpen ? { color: '#22c55e' } : undefined}
+        >
+          <Package className="w-4 h-4" />
+          <span className="action-icon-tooltip">Claude Assets</span>
+        </button>
+      )}
 
       {/* Guide/Documentation Icon */}
       <button

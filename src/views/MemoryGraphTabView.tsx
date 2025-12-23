@@ -552,7 +552,6 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
             d3AlphaDecay={0.01}
             d3VelocityDecay={0.2}
             d3AlphaMin={0.001}
-            linkDistance={55}
             dagMode={undefined}
             enableNodeDrag={true}
             minZoom={0.1}

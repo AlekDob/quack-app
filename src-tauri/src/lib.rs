@@ -42,6 +42,7 @@ mod telegram_central;
 mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security)
 mod terminal;
 mod background_tasks; // 🚀 Background tasks for async agent execution
+mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -651,7 +652,13 @@ pub fn run() {
             background_tasks::start_background_watcher,
             background_tasks::pause_background_task,
             background_tasks::resume_background_task,
-            background_tasks::cancel_background_task
+            background_tasks::cancel_background_task,
+            // 📦 Claude Assets Manager commands
+            claude_assets::list_claude_assets,
+            claude_assets::copy_claude_asset,
+            claude_assets::delete_claude_asset,
+            claude_assets::move_claude_asset,
+            claude_assets::read_claude_asset
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
