@@ -2577,6 +2577,24 @@ button.directory-chooser:hover {
   }
 }
 
+/* ============================================
+   KANBAN MODE
+   ============================================
+   Hide sidebar and expand content area when Kanban board is active.
+*/
+
+.app-shell.kanban-mode .sidebar {
+  display: none;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-shell.kanban-mode {
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .agents-panel,
 .context-panel {
   display: flex;

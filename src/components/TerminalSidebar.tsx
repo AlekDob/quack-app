@@ -26,7 +26,7 @@ import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
 import BackgroundTasksSidebarButton from "./BackgroundTasksSidebarButton";
-import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult } from "../types";
+import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
 // Sortable Repository Group wrapper
 interface SortableRepositoryGroupProps {
@@ -143,6 +143,9 @@ interface TerminalSidebarProps {
   // PiP props
   onTogglePip?: () => void;
   isPipOpen?: boolean;
+  // Kanban View props
+  isKanbanViewActive?: boolean;
+  onToggleKanbanView?: () => void;
   // Quack sound props
   onToggleQuackSound?: () => void;
   quackSoundEnabled?: boolean;
@@ -181,6 +184,9 @@ export default function TerminalSidebar({
   // PiP props
   onTogglePip,
   isPipOpen,
+  // Kanban View props
+  isKanbanViewActive = false,
+  onToggleKanbanView,
   // Quack sound props
   onToggleQuackSound,
   quackSoundEnabled,
@@ -611,6 +617,29 @@ export default function TerminalSidebar({
         <div className="sidebar-header-top" data-tauri-drag-region>
           {/* Title removed to avoid conflict with macOS traffic lights */}
           <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+            {/* Kanban View Button */}
+            <button
+              type="button"
+              className="sidebar-button"
+              onClick={onToggleKanbanView}
+              style={{
+                background: isKanbanViewActive ? 'rgba(139, 92, 246, 0.2)' : undefined,
+                borderColor: isKanbanViewActive ? 'rgba(139, 92, 246, 0.4)' : undefined,
+                color: isKanbanViewActive ? '#8b5cf6' : undefined,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              title={isKanbanViewActive ? 'Switch to Agent List' : 'Switch to Kanban Board'}
+            >
+              {/* Trello-style board icon */}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="5" height="18" rx="1" />
+                <rect x="10" y="3" width="5" height="12" rx="1" />
+                <rect x="17" y="3" width="5" height="15" rx="1" />
+              </svg>
+              Board
+            </button>
             {/* PiP Mode Button */}
             {onTogglePip && (
               <button
@@ -689,6 +718,7 @@ export default function TerminalSidebar({
         />
       </div>
 
+      {/* Agent List - always shown in sidebar */}
       <div className="explorer-root-label sidebar-terminals-label">
         ACTIVE AGENTS
       </div>
@@ -696,8 +726,8 @@ export default function TerminalSidebar({
       <div className="sidebar-list" style={{ marginTop: '5px' }}>
         {/* Metro Style View is now the only option */}
 
-        {/* Metro-style repository groups with drag-and-drop */}
-        <DndContext
+            {/* Metro-style repository groups with drag-and-drop */}
+            <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleRepoDragStart}
@@ -804,9 +834,9 @@ export default function TerminalSidebar({
         )}
 
         {terminals.length > 0 && cwdGroups.groups.length === 0 && (
-          <div className="empty-state">No terminals found</div>
-        )}
-      </div>
+              <div className="empty-state">No terminals found</div>
+            )}
+          </div>
 
       {/* Context menu */}
       {contextMenu && (

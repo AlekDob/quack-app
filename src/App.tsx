@@ -66,6 +66,8 @@ import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useKanbanStore } from "./stores/kanbanStore";
+import KanbanView from "./components/kanban/KanbanView";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
@@ -274,6 +276,9 @@ function AppContent() {
 
   // Memory Graph tab management
   const { openMemoryGraphTab } = useMemoryGraphTab();
+
+  // Kanban View state from store
+  const { isKanbanViewActive, toggleKanbanView, loadTasks: loadKanbanTasks } = useKanbanStore();
 
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
@@ -2412,9 +2417,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
   }, [gitSummary, selectedGitPath]);
 
-  const gridTemplateColumns = sidePanelCollapsed
-    ? "360px minmax(0, 1fr) 0px"
-    : "360px minmax(0, 1fr) 420px";
+  // Grid columns: Hide sidebar when Kanban is active
+  const gridTemplateColumns = isKanbanViewActive
+    ? (sidePanelCollapsed ? "0px minmax(0, 1fr) 0px" : "0px minmax(0, 1fr) 420px")
+    : (sidePanelCollapsed ? "360px minmax(0, 1fr) 0px" : "360px minmax(0, 1fr) 420px");
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -4601,6 +4607,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     void bootstrap();
   }, [ensureNotificationPermission, loadDirectory, tauriAvailable]);
+
+  // Load Kanban tasks on mount
+  useEffect(() => {
+    loadKanbanTasks();
+  }, [loadKanbanTasks]);
+
   useEffect(() => {
     if (!tauriAvailable) {
       setBooting(false);
@@ -7654,7 +7666,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -7698,6 +7710,9 @@ You have access to all Bash tools to execute git commands like:
           // PiP props
           onTogglePip={togglePipWindow}
           isPipOpen={isPipOpen}
+          // Kanban View props
+          isKanbanViewActive={isKanbanViewActive}
+          onToggleKanbanView={toggleKanbanView}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
           quackSoundEnabled={quackSoundEnabled}
@@ -7856,8 +7871,8 @@ You have access to all Bash tools to execute git commands like:
           ) : (
             /* Chat area when agents are active */
             <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* Action Icons - aligned right above tabs */}
-              <ActionIcons
+              {/* Action Icons - aligned right above tabs (hidden in Kanban mode) */}
+              {!isKanbanViewActive && <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
               onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
@@ -7914,22 +7929,30 @@ You have access to all Bash tools to execute git commands like:
                   console.error("Failed to open claude login:", error);
                 }
               }}
-            />
+            />}
 
-            {/* Tab Bar - VSCode style */}
-            <TabBar
+            {/* Tab Bar - VSCode style (hidden in Kanban mode) */}
+            {!isKanbanViewActive && <TabBar
               tabs={tabs}
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}
               onTabReorder={handleTabReorder}
               onTabPopout={handleTabPopout}
-            />
+            />}
 
             {/* Content Area - fills remaining space */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              {/* Chat View - shown when chat tab is active */}
-              {activeTabId === 'chat' && (
+              {/* Kanban View - full width when active, cross-project view */}
+              {isKanbanViewActive && (
+                <KanbanView
+                  terminals={terminals}
+                  onExitKanban={toggleKanbanView}
+                />
+              )}
+
+              {/* Chat View - shown when chat tab is active and Kanban is not active */}
+              {activeTabId === 'chat' && !isKanbanViewActive && (
                 <ChatView
               key={activeId ?? 'no-agent'}
               messages={currentAgentMessages}

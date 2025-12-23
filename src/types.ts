@@ -1301,3 +1301,67 @@ export interface CreateRuleParams {
   globs?: string[];
   alwaysApply?: boolean;
 }
+
+// ==========================================
+// Kanban Board Types
+// ==========================================
+
+/**
+ * Status of a Kanban task
+ */
+export type KanbanStatus = 'todo' | 'in_progress' | 'done';
+
+/**
+ * Agent info for Kanban tasks - based on TerminalInfo (active agents in sidebar)
+ * This represents the actual agent/terminal that will execute the task
+ */
+export interface KanbanAssignedAgent {
+  // Core identity
+  id: string;                         // Terminal/Agent ID
+  name: string;                       // Agent name (e.g., "Agent Magnus")
+  color: string;                      // Agent color
+  avatar?: string;                    // Avatar filename or custom avatar UUID
+
+  // Project context
+  projectPath: string;                // Project directory
+  projectName: string;                // Display name (e.g., "quack-app")
+  branch?: string;                    // Git branch
+  useWorktree?: boolean;              // Whether using Git worktree
+  worktreePath?: string;              // Worktree path if different from cwd
+
+  // Optional metadata
+  workingOn?: string;                 // What the agent is working on
+  personality?: Record<string, unknown>; // Agent personality traits
+}
+
+/**
+ * A task on the Kanban board - now supports cross-project view
+ */
+export interface KanbanTask {
+  id: string;
+  title: string;                      // Short title for the card
+  prompt: string;                     // Full chat prompt
+  status: KanbanStatus;
+  assignedAgent?: KanbanAssignedAgent;
+
+  // Project context (derived from assignedAgent or set manually)
+  projectPath: string;                // Which project this task belongs to
+  projectName: string;                // Display name for the project
+  branch?: string;                    // Git branch for the task
+
+  // Session management
+  sessionId?: string;                 // Claude SDK session ID for resume
+  terminalId?: string;                // Associated terminal ID (if started)
+
+  // Timestamps
+  createdAt: number;
+  startedAt?: number;
+  completedAt?: number;
+
+  // Token tracking for cost display
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  totalCost?: number;
+}
