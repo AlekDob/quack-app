@@ -451,6 +451,7 @@ interface SidePanelProps {
   // Collapse props
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isKanbanViewActive?: boolean; // NEW: Hide toggle when in Kanban mode
 
   // MCP props
   onOpenMcpConfig?: (filePath: string) => void; // NEW: Open .mcp.json in editor
@@ -546,6 +547,7 @@ export default function SidePanel({
   // Collapse
   isCollapsed = false,
   onToggleCollapse,
+  isKanbanViewActive = false, // NEW: Hide toggle when in Kanban mode
 
   // MCP
   onOpenMcpConfig,
@@ -676,8 +678,8 @@ export default function SidePanel({
 
   return (
     <aside className={`side-panel ${shouldBeCollapsed ? 'collapsed' : ''}`}>
-      {/* Toggle button */}
-      {onToggleCollapse && (
+      {/* Toggle button - hidden when in Kanban mode (use Kanban button to exit instead) */}
+      {onToggleCollapse && !isKanbanViewActive && (
         <button
           type="button"
           className="side-panel-toggle"

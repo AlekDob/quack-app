@@ -617,29 +617,6 @@ export default function TerminalSidebar({
         <div className="sidebar-header-top" data-tauri-drag-region>
           {/* Title removed to avoid conflict with macOS traffic lights */}
           <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
-            {/* Kanban View Button */}
-            <button
-              type="button"
-              className="sidebar-button"
-              onClick={onToggleKanbanView}
-              style={{
-                background: isKanbanViewActive ? 'rgba(139, 92, 246, 0.2)' : undefined,
-                borderColor: isKanbanViewActive ? 'rgba(139, 92, 246, 0.4)' : undefined,
-                color: isKanbanViewActive ? '#8b5cf6' : undefined,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              title={isKanbanViewActive ? 'Switch to Agent List' : 'Switch to Kanban Board'}
-            >
-              {/* Trello-style board icon */}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="5" height="18" rx="1" />
-                <rect x="10" y="3" width="5" height="12" rx="1" />
-                <rect x="17" y="3" width="5" height="15" rx="1" />
-              </svg>
-              Board
-            </button>
             {/* PiP Mode Button */}
             {onTogglePip && (
               <button
@@ -719,8 +696,35 @@ export default function TerminalSidebar({
       </div>
 
       {/* Agent List - always shown in sidebar */}
-      <div className="explorer-root-label sidebar-terminals-label">
-        ACTIVE AGENTS
+      <div className="explorer-root-label sidebar-terminals-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '12px' }}>
+        <span>ACTIVE AGENTS</span>
+        {/* Kanban View Button */}
+        <button
+          type="button"
+          onClick={onToggleKanbanView}
+          style={{
+            background: isKanbanViewActive ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+            border: `1px solid ${isKanbanViewActive ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+            borderRadius: '4px',
+            padding: '3px 8px',
+            fontSize: '10px',
+            fontWeight: 500,
+            color: isKanbanViewActive ? '#8b5cf6' : 'rgba(255, 255, 255, 0.6)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            transition: 'all 0.2s ease',
+          }}
+          title={isKanbanViewActive ? 'Switch to Agent List' : 'Switch to Kanban Board'}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="5" height="18" rx="1" />
+            <rect x="10" y="3" width="5" height="12" rx="1" />
+            <rect x="17" y="3" width="5" height="15" rx="1" />
+          </svg>
+          Kanban
+        </button>
       </div>
 
       <div className="sidebar-list" style={{ marginTop: '5px' }}>

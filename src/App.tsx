@@ -2099,6 +2099,55 @@ function AppContent() {
   // These versions accept a targetAgentId parameter for Kanban tasks
   // ============================================
 
+  // 🦆 Load Kanban task chat sessions from saved sessionIds
+  // This restores conversations after app restart
+  const loadKanbanChatSessions = useCallback(async () => {
+    const { tasks } = useKanbanStore.getState();
+    const tasksWithSessions = tasks.filter(t => t.sessionId);
+
+    if (tasksWithSessions.length === 0) {
+      console.log('[loadKanbanChatSessions] No Kanban tasks with sessionIds to load');
+      return;
+    }
+
+    console.log(`[loadKanbanChatSessions] Loading ${tasksWithSessions.length} Kanban chat sessions...`);
+
+    for (const task of tasksWithSessions) {
+      if (!task.sessionId) continue;
+
+      try {
+        // Load session details from Rust backend
+        const details = await invoke<{
+          id: string;
+          messages: Array<{ role: string; content: string; timestamp?: number }>;
+        }>('get_session_details', { sessionId: task.sessionId });
+
+        if (details?.messages && details.messages.length > 0) {
+          // Convert SessionHistoryMessage to ChatMessage
+          const chatMessages: ChatMessage[] = details.messages.map((msg, index) => ({
+            id: `kanban-${task.id}-restored-${index}`,
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+            timestamp: msg.timestamp || Date.now(),
+            status: 'complete' as const,
+          }));
+
+          // Add to chatSessions using task.id as key (not sessionId!)
+          setChatSessions(prev => {
+            const newSessions = new Map(prev);
+            newSessions.set(task.id, chatMessages);
+            return newSessions;
+          });
+
+          console.log(`[loadKanbanChatSessions] Restored ${chatMessages.length} messages for task ${task.id} (session: ${task.sessionId})`);
+        }
+      } catch (error) {
+        console.warn(`[loadKanbanChatSessions] Failed to load session ${task.sessionId} for task ${task.id}:`, error);
+        // Continue loading other sessions even if one fails
+      }
+    }
+  }, []);
+
   // Send message for a specific agent (used by Kanban)
   const sendMessageForTargetAgent = useCallback(async (targetAgentId: string, content: string, options?: ChatSendOptions) => {
     if (!content.trim() || !targetAgentId) return;
@@ -2137,6 +2186,14 @@ function AppContent() {
     const streamKey = `${targetAgentId}-${messageId}`;
 
     console.log(`[sendMessageForTargetAgent] Starting stream ${streamKey} for Kanban task`);
+
+    // 🦆 Get existing sessionId from Kanban task for conversation continuity
+    const kanbanTasks = useKanbanStore.getState().tasks;
+    const kanbanTask = kanbanTasks.find(t => t.id === targetAgentId);
+    const existingSessionId = kanbanTask?.sessionId;
+    if (existingSessionId) {
+      console.log(`[sendMessageForTargetAgent] Resuming session ${existingSessionId} for task ${targetAgentId}`);
+    }
 
     // Save the prompt for restoration on abort
     lastPromptsRef.current.set(targetAgentId, content);
@@ -2238,9 +2295,9 @@ function AppContent() {
             model: options?.model || 'sonnet',
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
-            attachments: [],
+            attachments: options?.attachments || [],
             cwd: options?.workingDirectory || '/',
-            sessionId: undefined,
+            sessionId: existingSessionId, // 🦆 Pass existing sessionId for conversation continuity
             effort: options?.effort,
           },
         }),
@@ -2294,14 +2351,29 @@ function AppContent() {
         return newMap;
       });
 
-      console.log(`[sendMessageForTargetAgent] Completed for ${targetAgentId}`);
+      console.log(`[sendMessageForTargetAgent] Completed for ${targetAgentId}, session_id: ${response.session_id}`);
+
+      // 🦆 CRITICAL: Save sessionId in Kanban task for persistence across app restarts
+      if (response.session_id) {
+        const { updateTask } = useKanbanStore.getState();
+        await updateTask(targetAgentId, {
+          sessionId: response.session_id,
+          // Also update token usage on the task
+          inputTokens: (kanbanTask?.inputTokens || 0) + (response.usage?.input_tokens || 0),
+          outputTokens: (kanbanTask?.outputTokens || 0) + (response.usage?.output_tokens || 0),
+          cacheCreationTokens: (kanbanTask?.cacheCreationTokens || 0) + (response.usage?.cache_creation_input_tokens || 0),
+          cacheReadTokens: (kanbanTask?.cacheReadTokens || 0) + (response.usage?.cache_read_input_tokens || 0),
+          totalCost: (kanbanTask?.totalCost || 0) + response.total_cost_usd,
+        });
+        console.log(`[sendMessageForTargetAgent] Saved sessionId ${response.session_id} to Kanban task ${targetAgentId}`);
+      }
 
       // 🦆 Notify that Kanban task agent completed response (plays Quack sound + toast)
-      // Find task info to get a better label
-      const kanbanTasks = useKanbanStore.getState().tasks;
-      const kanbanTask = kanbanTasks.find(t => t.id === targetAgentId);
-      const taskLabel = kanbanTask?.title || kanbanTask?.assignedAgent?.name || 'Kanban Task';
-      const taskCwd = kanbanTask?.projectPath || '';
+      // Find task info to get a better label (re-fetch since we updated)
+      const updatedKanbanTasks = useKanbanStore.getState().tasks;
+      const updatedKanbanTask = updatedKanbanTasks.find(t => t.id === targetAgentId);
+      const taskLabel = updatedKanbanTask?.title || updatedKanbanTask?.assignedAgent?.name || 'Kanban Task';
+      const taskCwd = updatedKanbanTask?.projectPath || '';
       notifyAgentReadyRef.current({ id: targetAgentId, label: taskLabel, cwd: taskCwd });
 
     } catch (err) {
@@ -8302,6 +8374,8 @@ You have access to all Bash tools to execute git commands like:
                   defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
                   defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
                   defaultEffort={currentSettings.effort || 'medium'}
+                  // 🦆 Load saved chat sessions from sessionIds
+                  onLoadChatSessions={loadKanbanChatSessions}
                 />
               )}
 
@@ -8685,9 +8759,10 @@ You have access to all Bash tools to execute git commands like:
           // Sessions props
           onSelectSession={handleSelectSession}
           sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) are active
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-')}
+          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) or Kanban is active
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || isKanbanViewActive}
           onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
+          isKanbanViewActive={isKanbanViewActive} // NEW: Hide toggle when in Kanban mode
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
         />

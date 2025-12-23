@@ -27,6 +27,8 @@ interface KanbanColumnProps {
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
   chatSessions?: Map<string, ChatMessage[]>;
+  // Drop target from parent (more reliable than internal isOver)
+  isDropTarget?: boolean;
 }
 
 export default function KanbanColumn({
@@ -40,6 +42,7 @@ export default function KanbanColumn({
   onTaskEdit,
   chatLoadingMap,
   chatSessions,
+  isDropTarget = false,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -48,6 +51,9 @@ export default function KanbanColumn({
       status: id,
     },
   });
+
+  // Use parent-provided isDropTarget OR internal isOver for highlighting
+  const showDropHighlight = isDropTarget || isOver;
 
   // Get column color based on status
   const getColumnColor = () => {
@@ -66,7 +72,7 @@ export default function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`kanban-column ${isOver ? 'drop-target' : ''}`}
+      className={`kanban-column ${showDropHighlight ? 'drop-target' : ''}`}
     >
       {/* Column header */}
       <div className="kanban-column-header">

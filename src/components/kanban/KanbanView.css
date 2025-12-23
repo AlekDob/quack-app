@@ -123,8 +123,9 @@
 }
 
 .kanban-column.drop-target {
-  background: var(--kanban-column-hover-bg);
+  background: rgba(242, 140, 82, 0.08);
   border-color: var(--kanban-accent);
+  box-shadow: 0 0 0 2px rgba(242, 140, 82, 0.2), inset 0 0 20px rgba(242, 140, 82, 0.05);
 }
 
 /* Column header */
@@ -173,6 +174,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 150px; /* Easier drop target when empty or few cards */
 }
 
 /* Empty state */
@@ -817,8 +819,8 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 800px;
-  max-width: 92vw;
+  width: 1000px;
+  max-width: 94vw;
   background: #0f111a;
   border-left: 1px solid var(--kanban-border);
   transform: translateX(100%);

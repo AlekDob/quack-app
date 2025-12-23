@@ -12,13 +12,16 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import KanbanColumn from './KanbanColumn';
@@ -48,6 +51,8 @@ interface KanbanViewProps {
   defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
   defaultPermissionMode?: 'plan' | 'bypass';
   defaultEffort?: 'low' | 'medium' | 'high';
+  // 🦆 Load saved chat sessions from sessionIds
+  onLoadChatSessions?: () => Promise<void>;
 }
 
 export default function KanbanView({
@@ -65,6 +70,7 @@ export default function KanbanView({
   defaultThinkingMode,
   defaultPermissionMode,
   defaultEffort,
+  onLoadChatSessions,
 }: KanbanViewProps) {
   const {
     tasks,
@@ -85,16 +91,54 @@ export default function KanbanView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
+  const [overColumnId, setOverColumnId] = useState<string | null>(null);
+
+  // Custom collision detection that prioritizes columns over cards
+  // This makes dropping on columns much easier
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    // First, check if we're over a column using pointerWithin (more forgiving)
+    const pointerCollisions = pointerWithin(args);
+
+    // Find column collisions (prioritize these)
+    const columnCollisions = pointerCollisions.filter(
+      collision => ['todo', 'in_progress', 'done'].includes(collision.id as string)
+    );
+
+    // If we're over a column, return that
+    if (columnCollisions.length > 0) {
+      return columnCollisions;
+    }
+
+    // Fallback to rectIntersection for better detection
+    const rectCollisions = rectIntersection(args);
+    const columnRectCollisions = rectCollisions.filter(
+      collision => ['todo', 'in_progress', 'done'].includes(collision.id as string)
+    );
+
+    if (columnRectCollisions.length > 0) {
+      return columnRectCollisions;
+    }
+
+    // Last resort: any collision
+    return rectCollisions;
+  }, []);
 
   // Show ALL tasks (cross-project view)
   const todoTasks = tasks.filter((t) => t.status === 'todo');
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
   const doneTasks = tasks.filter((t) => t.status === 'done');
 
-  // Load tasks on mount
+  // Load tasks on mount, then load chat sessions from saved sessionIds
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    const initializeKanban = async () => {
+      await loadTasks();
+      // 🦆 Load saved chat sessions after tasks are loaded
+      if (onLoadChatSessions) {
+        await onLoadChatSessions();
+      }
+    };
+    initializeKanban();
+  }, [loadTasks, onLoadChatSessions]);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -117,10 +161,21 @@ export default function KanbanView({
     }
   };
 
+  // Handle drag over - track which column we're hovering
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (over && ['todo', 'in_progress', 'done'].includes(over.id as string)) {
+      setOverColumnId(over.id as string);
+    } else {
+      setOverColumnId(null);
+    }
+  };
+
   // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
+    setOverColumnId(null);
 
     if (!over) return;
 
@@ -267,8 +322,9 @@ export default function KanbanView({
       {/* Kanban columns */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={customCollisionDetection}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <div className="kanban-columns">
@@ -289,6 +345,7 @@ export default function KanbanView({
             onTaskEdit={handleTaskEdit}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            isDropTarget={overColumnId === 'todo'}
           />
 
           <KanbanColumn
@@ -307,6 +364,7 @@ export default function KanbanView({
             onTaskEdit={handleTaskEdit}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            isDropTarget={overColumnId === 'in_progress'}
           />
 
           <KanbanColumn
@@ -325,6 +383,7 @@ export default function KanbanView({
             onTaskEdit={handleTaskEdit}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            isDropTarget={overColumnId === 'done'}
           />
         </div>
 
