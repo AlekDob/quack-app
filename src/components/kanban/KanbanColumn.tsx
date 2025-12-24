@@ -7,6 +7,7 @@
  * Uses @dnd-kit/core for drop functionality.
  */
 
+import { useState, useCallback, type DragEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -24,11 +25,14 @@ interface KanbanColumnProps {
   onTaskClick: (task: KanbanTask) => void;
   onTaskDelete: (taskId: string) => void;
   onTaskEdit?: (task: KanbanTask) => void;
+  onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
   chatSessions?: Map<string, ChatMessage[]>;
   // Drop target from parent (more reliable than internal isOver)
   isDropTarget?: boolean;
+  // Handler for agent drop from sidebar (native HTML5 drag-and-drop)
+  onSidebarAgentDrop?: (agentId: string, targetColumn: KanbanStatus) => void;
 }
 
 export default function KanbanColumn({
@@ -40,9 +44,11 @@ export default function KanbanColumn({
   onTaskClick,
   onTaskDelete,
   onTaskEdit,
+  onProjectClick,
   chatLoadingMap,
   chatSessions,
   isDropTarget = false,
+  onSidebarAgentDrop,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -52,8 +58,40 @@ export default function KanbanColumn({
     },
   });
 
-  // Use parent-provided isDropTarget OR internal isOver for highlighting
-  const showDropHighlight = isDropTarget || isOver;
+  // Track native HTML5 drag-over state for sidebar agents
+  const [isNativeDragOver, setIsNativeDragOver] = useState(false);
+
+  // Use parent-provided isDropTarget OR internal isOver OR native drag for highlighting
+  const showDropHighlight = isDropTarget || isOver || isNativeDragOver;
+
+  // Native HTML5 drag handlers for sidebar agent drops
+  const handleNativeDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    // Check if this is a sidebar agent drag
+    const types = e.dataTransfer.types;
+    if (types.includes('application/x-quack-agent')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsNativeDragOver(true);
+    }
+  }, []);
+
+  const handleNativeDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    // Only reset if leaving the column entirely (not just entering a child)
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setIsNativeDragOver(false);
+    }
+  }, []);
+
+  const handleNativeDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsNativeDragOver(false);
+
+    const agentId = e.dataTransfer.getData('application/x-quack-agent');
+    if (agentId && onSidebarAgentDrop) {
+      onSidebarAgentDrop(agentId, id);
+    }
+  }, [id, onSidebarAgentDrop]);
 
   // Get column color based on status
   const getColumnColor = () => {
@@ -73,6 +111,9 @@ export default function KanbanColumn({
     <div
       ref={setNodeRef}
       className={`kanban-column ${showDropHighlight ? 'drop-target' : ''}`}
+      onDragOver={handleNativeDragOver}
+      onDragLeave={handleNativeDragLeave}
+      onDrop={handleNativeDrop}
     >
       {/* Column header */}
       <div className="kanban-column-header">
@@ -93,8 +134,8 @@ export default function KanbanColumn({
         >
           {tasks.length === 0 ? (
             <div className="kanban-column-empty">
-              {id === 'todo' && 'No tasks yet. Create one!'}
-              {id === 'in_progress' && 'Drag tasks here to start working'}
+              {id === 'todo' && 'Drag an agent here or click Add Task'}
+              {id === 'in_progress' && 'Drag tasks or agents here to start'}
               {id === 'done' && 'Completed tasks will appear here'}
             </div>
           ) : (
@@ -117,6 +158,7 @@ export default function KanbanColumn({
                   onClick={() => onTaskClick(task)}
                   onDelete={() => onTaskDelete(task.id)}
                   onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
+                  onProjectClick={onProjectClick}
                 />
               );
             })

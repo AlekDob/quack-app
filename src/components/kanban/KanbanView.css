@@ -43,7 +43,6 @@
   justify-content: flex-start;
   align-items: center;
   gap: 16px;
-  padding-left: 70px; /* Avoid macOS traffic lights overlap */
   padding-bottom: 16px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--kanban-border);
@@ -281,15 +280,61 @@
 .kanban-card-project {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: var(--kanban-text-muted);
-  margin-bottom: 6px;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--kanban-text-secondary);
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* Clickable project button */
+.kanban-card-project.kanban-card-project-clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.kanban-card-project.kanban-card-project-clickable:hover {
+  background: rgba(242, 140, 82, 0.12);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: var(--kanban-accent);
+}
+
+.kanban-card-project.kanban-card-project-clickable:hover svg {
+  opacity: 1;
+  color: var(--kanban-accent);
 }
 
 .kanban-card-project svg {
-  opacity: 0.6;
+  opacity: 0.7;
   flex-shrink: 0;
+}
+
+.kanban-card-project-name {
+  font-weight: 600;
+  color: var(--kanban-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban-card-project-clickable:hover .kanban-card-project-name {
+  color: var(--kanban-accent);
+}
+
+.kanban-card-project-arrow {
+  opacity: 0;
+  margin-left: auto;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.kanban-card-project-clickable:hover .kanban-card-project-arrow {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 .kanban-card-separator {

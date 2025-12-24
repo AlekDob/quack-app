@@ -26,7 +26,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
-import AddKanbanTaskModal from './AddKanbanTaskModal';
+import AddKanbanTaskModal, { type KanbanTaskInitialValues } from './AddKanbanTaskModal';
 import KanbanChatDrawer from './KanbanChatDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
@@ -53,6 +53,8 @@ interface KanbanViewProps {
   defaultEffort?: 'low' | 'medium' | 'high';
   // 🦆 Load saved chat sessions from sessionIds
   onLoadChatSessions?: () => Promise<void>;
+  // Open side panel when clicking on project name
+  onProjectClick?: (projectPath: string) => void;
 }
 
 export default function KanbanView({
@@ -71,6 +73,7 @@ export default function KanbanView({
   defaultPermissionMode,
   defaultEffort,
   onLoadChatSessions,
+  onProjectClick,
 }: KanbanViewProps) {
   const {
     tasks,
@@ -92,6 +95,8 @@ export default function KanbanView({
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
+  // Initial values for modal when agent is dragged from sidebar
+  const [modalInitialValues, setModalInitialValues] = useState<KanbanTaskInitialValues | null>(null);
 
   // Custom collision detection that prioritizes columns over cards
   // This makes dropping on columns much easier
@@ -265,7 +270,41 @@ export default function KanbanView({
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
     setEditingTask(null);
+    setModalInitialValues(null);
   }, []);
+
+  // Handle agent drop from sidebar (native HTML5 drag-and-drop)
+  const handleSidebarAgentDrop = useCallback((
+    agentId: string,
+    targetColumn: KanbanStatus
+  ) => {
+    // Find the agent/terminal by id
+    const agent = terminals.find(t => t.id === agentId);
+    if (!agent) {
+      console.warn('[KanbanView] Agent not found for drag:', agentId);
+      return;
+    }
+
+    // Extract project name from path
+    const pathParts = agent.cwd.split('/');
+    const projectName = pathParts[pathParts.length - 1];
+
+    // Pre-populate modal with agent data
+    const initialValues: KanbanTaskInitialValues = {
+      projectPath: agent.cwd,
+      projectName,
+      branch: agent.branch,
+      agentId: agent.id,
+      agentName: agent.label,
+      agentAvatar: agent.avatar,
+      agentColor: agent.color,
+      targetStatus: targetColumn,
+    };
+
+    setModalInitialValues(initialValues);
+    setEditingTask(null);
+    setIsModalOpen(true);
+  }, [terminals]);
 
   // Get selected task for drawer
   const selectedTask = getSelectedTask();
@@ -281,23 +320,8 @@ export default function KanbanView({
 
   return (
     <div className="kanban-view">
-      {/* Header with navigation and Add Task button - draggable region */}
+      {/* Header with Add Task button - draggable region */}
       <div className="kanban-header" data-tauri-drag-region>
-        {/* Exit Kanban button */}
-        {onExitKanban && (
-          <button
-            className="kanban-exit-button"
-            onClick={onExitKanban}
-            title="Back to Agents"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5"/>
-              <path d="M12 19l-7-7 7-7"/>
-            </svg>
-            Agents
-          </button>
-        )}
-
         {/* Title - also draggable */}
         <h1 className="kanban-title" data-tauri-drag-region>Kanban Board</h1>
 
@@ -343,9 +367,11 @@ export default function KanbanView({
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
+            onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
             isDropTarget={overColumnId === 'todo'}
+            onSidebarAgentDrop={handleSidebarAgentDrop}
           />
 
           <KanbanColumn
@@ -362,9 +388,11 @@ export default function KanbanView({
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
+            onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
             isDropTarget={overColumnId === 'in_progress'}
+            onSidebarAgentDrop={handleSidebarAgentDrop}
           />
 
           <KanbanColumn
@@ -381,9 +409,11 @@ export default function KanbanView({
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
+            onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
             isDropTarget={overColumnId === 'done'}
+            onSidebarAgentDrop={handleSidebarAgentDrop}
           />
         </div>
 
@@ -401,6 +431,7 @@ export default function KanbanView({
         terminals={terminals}
         onCreateNewAgent={onCreateNewAgent}
         editTask={editingTask}
+        initialValues={modalInitialValues}
       />
 
       {/* Chat Drawer */}

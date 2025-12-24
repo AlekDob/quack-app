@@ -27,6 +27,18 @@ interface FileStatResult {
   is_symlink: boolean;
 }
 
+// Initial values from drag-and-drop (sidebar agent to Kanban column)
+export interface KanbanTaskInitialValues {
+  projectPath?: string;
+  projectName?: string;
+  branch?: string;
+  agentId?: string;
+  agentName?: string;
+  agentAvatar?: string;
+  agentColor?: string;
+  targetStatus?: 'todo' | 'in_progress' | 'done';
+}
+
 interface AddKanbanTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,6 +56,8 @@ interface AddKanbanTaskModalProps {
   onCreateNewAgent?: (projectPath: string) => void;
   // Edit mode: pass existing task to pre-fill form
   editTask?: KanbanTask | null;
+  // Initial values from drag-and-drop (sidebar agent to Kanban)
+  initialValues?: KanbanTaskInitialValues | null;
 }
 
 // Helper function to get avatar image URL
@@ -79,6 +93,7 @@ export default function AddKanbanTaskModal({
   terminals,
   onCreateNewAgent,
   editTask,
+  initialValues,
 }: AddKanbanTaskModalProps) {
   // Determine if we're in edit mode
   const isEditMode = !!editTask;
@@ -176,7 +191,7 @@ export default function AddKanbanTaskModal({
     }
   }, [isOpen, terminals]);
 
-  // Reset form when modal opens (or populate for edit mode)
+  // Reset form when modal opens (or populate for edit mode / initialValues from drag)
   useEffect(() => {
     if (isOpen) {
       setAttachmentError(null);
@@ -190,6 +205,14 @@ export default function AddKanbanTaskModal({
         setSelectedAgentId(editTask.assignedAgent?.id || '');
         // Load existing attachments
         setAttachments(editTask.attachments || []);
+      } else if (initialValues) {
+        // Drag-and-drop mode: pre-populate with agent data from sidebar
+        setTitle(''); // User fills this
+        setPrompt(''); // User fills this
+        setSelectedProjectPath(initialValues.projectPath || '');
+        setSelectedBranch(initialValues.branch || '');
+        setSelectedAgentId(initialValues.agentId || '');
+        setAttachments([]);
       } else {
         // Create mode: reset form
         setTitle('');
@@ -200,7 +223,7 @@ export default function AddKanbanTaskModal({
         setAttachments([]);
       }
     }
-  }, [isOpen, editTask]);
+  }, [isOpen, editTask, initialValues]);
 
   // Auto-select first project if only one exists
   useEffect(() => {
@@ -209,8 +232,13 @@ export default function AddKanbanTaskModal({
     }
   }, [isOpen, projectGroups, selectedProjectPath]);
 
-  // Auto-select branch when project changes
+  // Auto-select branch when project changes (but NOT when using initialValues)
   useEffect(() => {
+    // Skip auto-selection if we have initialValues with a branch already set
+    if (initialValues?.branch && selectedProjectPath === initialValues.projectPath) {
+      return;
+    }
+
     if (currentProject && currentProject.branches.length > 0) {
       // Try to select 'main' or first branch
       const defaultBranch = currentProject.branches.includes('main')
@@ -220,8 +248,12 @@ export default function AddKanbanTaskModal({
     } else {
       setSelectedBranch('');
     }
-    setSelectedAgentId('');
-  }, [selectedProjectPath, currentProject]);
+
+    // Only reset agent if NOT using initialValues
+    if (!initialValues?.agentId) {
+      setSelectedAgentId('');
+    }
+  }, [selectedProjectPath, currentProject, initialValues]);
 
   // Get avatar URL for a terminal
   const getTerminalAvatarUrl = useCallback(

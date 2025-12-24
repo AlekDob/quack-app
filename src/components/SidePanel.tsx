@@ -678,8 +678,8 @@ export default function SidePanel({
 
   return (
     <aside className={`side-panel ${shouldBeCollapsed ? 'collapsed' : ''}`}>
-      {/* Toggle button - hidden when in Kanban mode (use Kanban button to exit instead) */}
-      {onToggleCollapse && !isKanbanViewActive && (
+      {/* Toggle button - hidden only when in Kanban mode AND panel is collapsed */}
+      {onToggleCollapse && (!isKanbanViewActive || !shouldBeCollapsed) && (
         <button
           type="button"
           className="side-panel-toggle"

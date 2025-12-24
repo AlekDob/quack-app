@@ -2788,10 +2788,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
   }, [gitSummary, selectedGitPath]);
 
-  // Grid columns: Hide sidebar when Kanban is active (hide BOTH sidebars)
-  const gridTemplateColumns = isKanbanViewActive
-    ? "0px minmax(0, 1fr) 0px"  // Kanban mode: hide both sidebars
-    : (sidePanelCollapsed ? "360px minmax(0, 1fr) 0px" : "360px minmax(0, 1fr) 420px");
+  // Grid columns: Always show left sidebar (360px), Kanban replaces main content area
+  // Right side panel can be toggled in both normal and Kanban mode
+  const gridTemplateColumns = sidePanelCollapsed
+    ? "360px minmax(0, 1fr) 0px"
+    : "360px minmax(0, 1fr) 420px";
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -6102,6 +6103,25 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     ]
   );
 
+  // Handle project click from Kanban - show side panel with project context (without exiting Kanban)
+  const handleKanbanProjectClick = useCallback((projectPath: string) => {
+    // Find an agent (terminal) that belongs to this project
+    const projectAgent = terminals.find(t => t.cwd === projectPath);
+
+    if (projectAgent) {
+      // Select the agent (this populates the side panel with agent context)
+      setActiveId(projectAgent.id);
+
+      // Expand the side panel to show the agent context
+      setSidePanelCollapsed(false);
+
+      // Load the project directory for file explorer
+      void loadDirectory(projectPath);
+    } else {
+      console.warn(`No agent found for project: ${projectPath}`);
+    }
+  }, [terminals, loadDirectory]);
+
 
   // ============================================
   // AgentChat Management Handlers (Phase 1)
@@ -8077,7 +8097,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || !activeId || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || isKanbanViewActive ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanViewActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -8376,6 +8396,8 @@ You have access to all Bash tools to execute git commands like:
                   defaultEffort={currentSettings.effort || 'medium'}
                   // 🦆 Load saved chat sessions from sessionIds
                   onLoadChatSessions={loadKanbanChatSessions}
+                  // Open side panel when clicking on project name
+                  onProjectClick={handleKanbanProjectClick}
                 />
               )}
 
@@ -8759,10 +8781,11 @@ You have access to all Bash tools to execute git commands like:
           // Sessions props
           onSelectSession={handleSelectSession}
           sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) or Kanban is active
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || isKanbanViewActive}
+          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) are active
+          // Note: Kanban view now allows side panel to be opened when clicking on project name
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-')}
           onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
-          isKanbanViewActive={isKanbanViewActive} // NEW: Hide toggle when in Kanban mode
+          isKanbanViewActive={isKanbanViewActive} // Used to show/hide toggle button
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
         />

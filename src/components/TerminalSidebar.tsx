@@ -698,18 +698,18 @@ export default function TerminalSidebar({
       {/* Agent List - always shown in sidebar */}
       <div className="explorer-root-label sidebar-terminals-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '12px' }}>
         <span>ACTIVE AGENTS</span>
-        {/* Kanban View Button */}
+        {/* View Toggle Button - switches between Kanban and Agents */}
         <button
           type="button"
           onClick={onToggleKanbanView}
           style={{
-            background: isKanbanViewActive ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-            border: `1px solid ${isKanbanViewActive ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+            background: isKanbanViewActive ? 'rgba(242, 140, 82, 0.15)' : 'rgba(139, 92, 246, 0.15)',
+            border: `1px solid ${isKanbanViewActive ? 'rgba(242, 140, 82, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`,
             borderRadius: '4px',
             padding: '3px 8px',
             fontSize: '10px',
             fontWeight: 500,
-            color: isKanbanViewActive ? '#8b5cf6' : 'rgba(255, 255, 255, 0.6)',
+            color: isKanbanViewActive ? '#f28c52' : '#8b5cf6',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -718,12 +718,23 @@ export default function TerminalSidebar({
           }}
           title={isKanbanViewActive ? 'Switch to Agent List' : 'Switch to Kanban Board'}
         >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="5" height="18" rx="1" />
-            <rect x="10" y="3" width="5" height="12" rx="1" />
-            <rect x="17" y="3" width="5" height="15" rx="1" />
-          </svg>
-          Kanban
+          {isKanbanViewActive ? (
+            // Agents icon (people/users)
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          ) : (
+            // Kanban icon (columns)
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="5" height="18" rx="1" />
+              <rect x="10" y="3" width="5" height="12" rx="1" />
+              <rect x="17" y="3" width="5" height="15" rx="1" />
+            </svg>
+          )}
+          {isKanbanViewActive ? 'Agents' : 'Kanban'}
         </button>
       </div>
 

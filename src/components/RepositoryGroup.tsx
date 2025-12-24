@@ -338,6 +338,17 @@ function SortableAgent({
     onGitMenuToggle(showGitMenu ? null : agent.id);
   }, [onGitMenuToggle, showGitMenu, agent.id]);
 
+  // Native HTML5 drag handler for dragging agent to Kanban board
+  const handleNativeDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    // Set custom data type for Kanban to identify this as an agent drag
+    e.dataTransfer.setData('application/x-quack-agent', agent.id);
+    e.dataTransfer.effectAllowed = 'copy';
+    // Set a nice drag image (optional - browser default works too)
+    if (e.currentTarget) {
+      e.dataTransfer.setDragImage(e.currentTarget, 20, 20);
+    }
+  }, [agent.id]);
+
   // Get relative time string with opacity - re-calculate on tick change
   const relativeTime = useMemo(() => getRelativeTimeString(lastAssistantTimestamp), [lastAssistantTimestamp, tick]);
 
@@ -359,6 +370,8 @@ function SortableAgent({
         gap: '8px',
       }}
       className="group"
+      draggable
+      onDragStart={handleNativeDragStart}
     >
       {/* LEFT SECTION: Timing + Metro Station (OUTSIDE colored background) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '35px' }}>

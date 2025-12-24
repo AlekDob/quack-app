@@ -24,6 +24,7 @@ interface KanbanCardProps {
   onClick?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
+  onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
 }
 
 // Helper function to get avatar image URL
@@ -43,6 +44,7 @@ export default function KanbanCard({
   onClick,
   onDelete,
   onEdit,
+  onProjectClick,
 }: KanbanCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -199,19 +201,30 @@ export default function KanbanCard({
           </div>
         )}
 
-        {/* Project info */}
-        <div className="kanban-card-project">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* Project info - clickable to open side panel */}
+        <button
+          type="button"
+          className="kanban-card-project kanban-card-project-clickable"
+          onClick={(e) => {
+            e.stopPropagation();
+            onProjectClick?.(task.projectPath);
+          }}
+          title="Open project context panel"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
-          <span>{task.projectName}</span>
+          <span className="kanban-card-project-name">{task.projectName}</span>
           {task.branch && (
             <>
               <span className="kanban-card-separator">/</span>
               <span className="kanban-card-branch">{task.branch}</span>
             </>
           )}
-        </div>
+          <svg className="kanban-card-project-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </button>
 
         {/* Prompt preview */}
         <p className="kanban-card-prompt">{promptPreview}</p>

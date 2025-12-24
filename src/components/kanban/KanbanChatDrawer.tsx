@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import ChatView from '../ChatView';
 import type { KanbanTask, ChatMessage } from '../../types';
@@ -217,7 +218,9 @@ export default function KanbanChatDrawer({
   // Get accent color from task
   const accentColor = task?.assignedAgent?.color || '#f28c52';
 
-  return (
+  // Use portal to ensure drawer is always positioned relative to viewport
+  // This fixes issues with parent transforms affecting position: fixed
+  const drawerContent = (
     <div className={`kanban-drawer ${isOpen ? 'open' : ''}`}>
       {/* Backdrop */}
       <div className="kanban-drawer-backdrop" onClick={onClose} />
@@ -321,4 +324,7 @@ export default function KanbanChatDrawer({
       </div>
     </div>
   );
+
+  // Render drawer in portal to ensure it's always at viewport right edge
+  return createPortal(drawerContent, document.body);
 }
