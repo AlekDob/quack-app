@@ -864,8 +864,8 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 1000px;
-  max-width: 94vw;
+  width: 1200px;
+  max-width: 96vw;
   background: #0f111a;
   border-left: 1px solid var(--kanban-border);
   transform: translateX(100%);

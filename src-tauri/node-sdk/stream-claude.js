@@ -5,12 +5,101 @@
  * Called by Rust backend via subprocess
  *
  * Events are emitted via stdout as JSON lines
+ * Responses (e.g., AskUserQuestion answers) are received via stdin as JSON lines
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { readFileSync, existsSync } from 'fs';
-import { extname, join } from 'path';
+import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
+import { createInterface } from 'readline';
+import { fileURLToPath } from 'url';
+
+// Get the directory of this script for kanban-mcp-server.js path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// =============================================================================
+// BIDIRECTIONAL COMMUNICATION SYSTEM
+// =============================================================================
+
+/**
+ * Pending requests waiting for responses from frontend
+ * Key: requestId, Value: { resolve, reject, timeout }
+ */
+const pendingRequests = new Map();
+
+/**
+ * Generate unique request ID
+ */
+function generateRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Set up stdin listener for receiving responses from frontend
+ * Messages are JSON lines with format: { requestId: string, ...data }
+ */
+const stdinReader = createInterface({
+  input: process.stdin,
+  terminal: false,
+});
+
+stdinReader.on('line', (line) => {
+  try {
+    const message = JSON.parse(line);
+    console.error(`[STDIN] Received message:`, JSON.stringify(message, null, 2));
+
+    if (message.requestId && pendingRequests.has(message.requestId)) {
+      const { resolve, timeout } = pendingRequests.get(message.requestId);
+      clearTimeout(timeout);
+      pendingRequests.delete(message.requestId);
+      resolve(message);
+    } else {
+      console.error(`[STDIN] Unknown requestId or no pending request:`, message.requestId);
+    }
+  } catch (error) {
+    console.error(`[STDIN] Failed to parse message:`, error.message, line);
+  }
+});
+
+stdinReader.on('close', () => {
+  console.error(`[STDIN] Stream closed`);
+});
+
+/**
+ * Send a request to frontend and wait for response
+ * @param {string} type - Request type (e.g., 'ask_user_question')
+ * @param {object} data - Request data
+ * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+ * @returns {Promise<object>} Response from frontend
+ */
+async function requestFromFrontend(type, data, timeoutMs = 0) {
+  const requestId = generateRequestId();
+
+  return new Promise((resolve, reject) => {
+    let timeout = null;
+
+    if (timeoutMs > 0) {
+      timeout = setTimeout(() => {
+        pendingRequests.delete(requestId);
+        reject(new Error(`Request ${requestId} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    }
+
+    pendingRequests.set(requestId, { resolve, reject, timeout });
+
+    // Emit request to frontend via stdout
+    const request = {
+      type,
+      requestId,
+      ...data,
+    };
+
+    console.log(JSON.stringify(request));
+    console.error(`[STDIN] Sent request ${requestId} of type ${type}`);
+  });
+}
 
 /**
  * Map friendly model names to official API model IDs
@@ -42,7 +131,12 @@ const {
   outputFormat, // Structured outputs configuration (beta)
   effort, // Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
   mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
+  allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
 } = config;
+
+// DEBUG: Log what we received from Rust
+console.error(`[DEBUG] Raw config received:`, JSON.stringify(config, null, 2).substring(0, 500));
+console.error(`[DEBUG] allowedTools from config:`, allowedTools);
 
 /**
  * Load MCP servers from .mcp.json file in the working directory
@@ -162,9 +256,11 @@ function createMessageContent(text, imagePaths = []) {
   return content;
 }
 
-// Streaming input generator for messages with images
+// Streaming input generator for messages
+// IMPORTANT: SDK MCP servers REQUIRE streaming input mode (async generator)
+// See: https://platform.claude.com/docs/en/agent-sdk/custom-tools
 async function* generateMessages() {
-  // Build message content with text and images
+  // Build message content with text and optional images
   const content = createMessageContent(prompt, attachments);
 
   yield {
@@ -262,6 +358,41 @@ async function main() {
     const modelId = getModelId(model);
     console.error(`[DEBUG] Model mapping: "${model}" → "${modelId}"`);
 
+    // Default tools if not provided by frontend
+    const defaultAllowedTools = [
+      'Skill',        // Required to enable Skills from .claude/skills/
+      'Task',         // Subagents
+      'Read',
+      'Write',
+      'Edit',
+      'Bash',
+      'Glob',
+      'Grep',
+      'WebFetch',
+      'WebSearch',
+      'TodoWrite',
+      'NotebookEdit',
+      'SlashCommand',
+      'BashOutput',
+      'KillShell',
+      'ExitPlanMode',
+      'AskUserQuestion', // Interactive questions to user (SDK v0.1.71+)
+      // Kanban Tools - Custom MCP tools for task management
+      'mcp__kanban-tools__kanban_list_tasks',
+      'mcp__kanban-tools__kanban_move_task',
+      'mcp__kanban-tools__kanban_create_task',
+      'mcp__kanban-tools__kanban_update_task',
+      'mcp__kanban-tools__kanban_delete_task',
+      'mcp__kanban-tools__kanban_get_workload',
+    ];
+
+    // Use allowedTools from config if provided, otherwise use defaults
+    const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
+      ? allowedTools
+      : defaultAllowedTools;
+
+    console.error(`[DEBUG] Using ${resolvedAllowedTools.length} allowed tools:`, resolvedAllowedTools.slice(0, 5).join(', ') + '...');
+
     const options = {
       model: modelId,
       // Enable automatic reading of CLAUDE.md and project settings
@@ -269,24 +400,84 @@ async function main() {
       // Enable Skills + all standard tools for full SDK capabilities
       // Skills require explicit "Skill" in allowedTools to be loaded and invoked
       // See: https://platform.claude.com/docs/en/agent-sdk/skills
-      allowedTools: [
-        'Skill',        // Required to enable Skills from .claude/skills/
-        'Task',         // Subagents
-        'Read',
-        'Write',
-        'Edit',
-        'Bash',
-        'Glob',
-        'Grep',
-        'WebFetch',
-        'WebSearch',
-        'TodoWrite',
-        'NotebookEdit',
-        'SlashCommand',
-        'BashOutput',
-        'KillShell',
-        'ExitPlanMode',
-      ],
+      allowedTools: resolvedAllowedTools,
+      // 🗣️ Inject AskUserQuestion instructions into ALL projects via system prompt append
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: `
+
+## Interactive Questions (AskUserQuestion Tool)
+
+When you need user input to make a decision, USE the AskUserQuestion tool instead of asking in plain text.
+
+**Use AskUserQuestion when:**
+- User must choose between 2-4 implementation approaches
+- Selecting technologies, libraries, or patterns
+- Confirming potentially destructive actions
+- Getting preferences for ambiguous requirements
+
+**Do NOT use it for:**
+- Open-ended questions needing detailed text
+- Questions with more than 4 options
+- Simple confirmations inferrable from context
+
+Example: If user asks "help me choose a database", use AskUserQuestion with options like PostgreSQL, MongoDB, SQLite rather than listing them in text.
+`
+      },
+
+      // =============================================================================
+      // PERMISSION CALLBACK - Handles AskUserQuestion and other permission requests
+      // NOTE: AskUserQuestion does NOT appear in "Available Tools" list - it's handled
+      // internally by the SDK and only triggers when Claude decides to ask the user
+      // =============================================================================
+      canUseTool: async (toolName, input, options) => {
+        console.error(`[canUseTool] 🔧 PERMISSION REQUEST for tool: ${toolName}`);
+        console.error(`[canUseTool] Input:`, JSON.stringify(input, null, 2).substring(0, 500));
+
+        // Handle AskUserQuestion tool - requires user interaction
+        if (toolName === 'AskUserQuestion') {
+          console.error(`[canUseTool] AskUserQuestion detected, forwarding to frontend`);
+          console.error(`[canUseTool] Questions:`, JSON.stringify(input.questions, null, 2));
+
+          try {
+            // Send request to frontend and wait for user's answers (no timeout)
+            // The frontend will receive this event and show the widget
+            // The requestId is used to match the response when user answers
+            const response = await requestFromFrontend('ask_user_question', {
+              questions: input.questions,
+              // Include any tool context if available from SDK
+              toolContext: options?.signal ? 'with_signal' : 'no_signal',
+            }, 0); // 0 = no timeout, wait indefinitely
+
+            console.error(`[canUseTool] Received answers from frontend:`, JSON.stringify(response.answers, null, 2));
+
+            // Return the answers to the SDK
+            // The answers format should match what SDK expects:
+            // { "Question text": "Selected option label" }
+            return {
+              behavior: 'allow',
+              updatedInput: {
+                questions: input.questions,
+                answers: response.answers,
+              },
+            };
+          } catch (error) {
+            console.error(`[canUseTool] Error getting answers:`, error.message);
+            // Deny if we couldn't get answers
+            return {
+              behavior: 'deny',
+              message: `Failed to get user answers: ${error.message}`,
+            };
+          }
+        }
+
+        // Default: allow all other tools
+        return {
+          behavior: 'allow',
+          updatedInput: input,
+        };
+      },
     };
 
     // Only add permissionMode if explicitly provided (not undefined)
@@ -350,19 +541,41 @@ async function main() {
       resolvedMcpServers = loadMCPServersFromFile(cwd);
     }
 
+    // Always add Kanban Tools MCP server (stdio-based for reliability)
+    // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
+    // See: https://github.com/anthropics/claude-code/issues/6710
+    // Using stdio transport instead for stability
+    const kanbanMcpServerPath = join(__dirname, 'kanban-mcp-server.js');
+    console.error(`[MCP] Kanban MCP server path: ${kanbanMcpServerPath}`);
+
+    // Merge MCP servers: file-based servers + Kanban tools server (stdio)
+    options.mcpServers = {
+      ...(resolvedMcpServers || {}),
+      'kanban-tools': {
+        command: 'node',
+        args: [kanbanMcpServerPath],
+      },
+    };
+
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
-      options.mcpServers = resolvedMcpServers;
-      console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length} MCP servers:`, Object.keys(resolvedMcpServers).join(', '));
+      console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + 1} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] No MCP servers configured - using SDK defaults only`);
+      console.error(`[MCP] Using Kanban Tools MCP server only (stdio)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
 
-    // Query Claude with streaming input mode (supports images)
-    // Use AsyncGenerator if we have attachments, otherwise use simple prompt
+    // Query Claude with streaming input mode
+    // IMPORTANT: SDK MCP servers REQUIRE streaming input mode (async generator)
+    // We ALWAYS use the generator when MCP servers are configured
+    // See: https://platform.claude.com/docs/en/agent-sdk/custom-tools
+    const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
+    const useStreamingInput = hasMcpServers || (attachments && attachments.length > 0);
+
+    console.error(`[DEBUG] Using streaming input mode: ${useStreamingInput} (MCP servers: ${hasMcpServers}, attachments: ${attachments?.length || 0})`);
+
     const stream = query({
-      prompt: attachments && attachments.length > 0 ? generateMessages() : prompt,
+      prompt: useStreamingInput ? generateMessages() : prompt,
       options,
     });
 
@@ -373,6 +586,14 @@ async function main() {
         console.error(`[DEBUG] System initialized - Session: ${event.session_id}`);
         if (event.slash_commands) {
           console.error(`[DEBUG] Available slash commands:`, event.slash_commands);
+        }
+        // Log MCP server connection status
+        if (event.mcp_servers) {
+          console.error(`[MCP] Server status:`, JSON.stringify(event.mcp_servers, null, 2));
+          const failedServers = event.mcp_servers.filter(s => s.status !== 'connected');
+          if (failedServers.length > 0) {
+            console.error(`[MCP] ⚠️ Failed to connect to servers:`, failedServers);
+          }
         }
       }
 
@@ -398,6 +619,10 @@ async function main() {
     emitEvent({
       type: 'complete',
     });
+
+    // 🦆 IMPORTANT: Exit process cleanly to avoid hanging
+    // MCP servers may keep event loop open, so we need explicit exit
+    process.exit(0);
   } catch (error) {
     emitError(error);
     process.exit(1);

@@ -1,0 +1,263 @@
+/* AskUserQuestion Widget - Interactive question UI */
+
+.ask-user-widget {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  transition: all 0.2s ease;
+}
+
+.ask-user-widget:not(.disabled):hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+
+.ask-user-widget.disabled {
+  opacity: 0.7;
+}
+
+.ask-user-widget.answered {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+/* Header */
+.ask-user-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: rgba(139, 92, 246, 0.9);
+}
+
+.ask-user-widget.answered .ask-user-header {
+  color: rgba(34, 197, 94, 0.9);
+}
+
+.ask-user-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ask-user-answered-badge {
+  margin-left: auto;
+  background: rgba(34, 197, 94, 0.2);
+  color: rgba(34, 197, 94, 1);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Questions container */
+.ask-user-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Individual question */
+.ask-user-question {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ask-user-question-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ask-user-chip {
+  background: rgba(139, 92, 246, 0.2);
+  color: rgba(139, 92, 246, 1);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ask-user-widget.answered .ask-user-chip {
+  background: rgba(34, 197, 94, 0.2);
+  color: rgba(34, 197, 94, 1);
+}
+
+.ask-user-question-text {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ask-user-multi-hint {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* Options grid */
+.ask-user-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Individual option button */
+.ask-user-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.ask-user-option:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.ask-user-option.selected {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.ask-user-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.ask-user-option-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+.ask-user-option.selected .ask-user-option-check {
+  color: rgba(139, 92, 246, 1);
+}
+
+.ask-user-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ask-user-option-label {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ask-user-option-desc {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Other option toggle */
+.ask-user-other-toggle {
+  border-style: dashed;
+}
+
+/* Other text input */
+.ask-user-other-input {
+  margin-left: 30px;
+  margin-top: -4px;
+}
+
+.ask-user-other-input input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ask-user-other-input input:focus {
+  border-color: rgba(139, 92, 246, 0.6);
+}
+
+.ask-user-other-input input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ask-user-other-input input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Actions */
+.ask-user-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ask-user-submit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(139, 92, 246, 0.9);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ask-user-submit:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.ask-user-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Animation for appearing */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ask-user-widget:not(.disabled) {
+  animation: slideIn 0.25s ease-out;
+}

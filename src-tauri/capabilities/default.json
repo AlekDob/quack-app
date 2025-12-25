@@ -29,6 +29,7 @@
     "dialog:default",
     "notification:default",
     "store:default",
+    "store:allow-reload",
     "shell:default",
     "shell:allow-execute",
     "shell:allow-spawn",

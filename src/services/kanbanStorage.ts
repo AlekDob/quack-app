@@ -44,6 +44,7 @@ export const saveKanbanTasks = async (tasks: KanbanTask[]): Promise<void> => {
  * Loads kanban tasks from persistent storage with defensive validation
  *
  * Features:
+ * - Forces reload from disk to catch external changes (e.g., from MCP server)
  * - Validates data structure (must be array)
  * - Filters out corrupted/invalid entries
  * - Auto-cleans storage on corruption detection
@@ -60,6 +61,17 @@ export const saveKanbanTasks = async (tasks: KanbanTask[]): Promise<void> => {
 export const loadKanbanTasks = async (): Promise<KanbanTask[]> => {
   try {
     const store = await Store.load(getTestModeStoreName("quack-kanban-tasks.json"));
+
+    // IMPORTANT: Force reload from disk to catch external changes
+    // This is needed because the MCP server writes directly to the file,
+    // bypassing the Tauri Store's in-memory cache
+    try {
+      await store.reload();
+    } catch (reloadError) {
+      console.warn("[kanbanStorage] Failed to reload from disk:", reloadError);
+      // Continue with cached data if reload fails
+    }
+
     const stored = await store.get<KanbanTask[]>(KANBAN_TASKS_KEY);
 
     // Defensive: Validate data structure before returning

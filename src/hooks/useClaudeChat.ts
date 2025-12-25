@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, EffortLevel } from '../types';
-import { streamClaudeMessage, abortSessionStream } from '../services/claudeSDK';
+import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, EffortLevel, AskUserQuestionAnswers, PendingUserQuestion } from '../types';
+import { streamClaudeMessage, abortSessionStream, sendToolResult } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
 import debugLogger from '../services/debugLogger';
 import posthog from 'posthog-js';
@@ -73,6 +73,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   // even if React re-renders or state updates trigger multiple renders
   // IMPORTANT: Never clear this Set - it's the source of truth for deduplication
   const seenEventIdsRef = useRef<Set<string>>(new Set());
+
+  // 🗣️ AskUserQuestion: Track pending questions and answered questions
+  const [pendingQuestionIds, setPendingQuestionIds] = useState<Set<string>>(new Set());
+  const [answeredQuestions, setAnsweredQuestions] = useState<Map<string, AskUserQuestionAnswers>>(new Map());
 
   // Initialize (SDK doesn't need initialization)
   const initialize = useCallback(async () => {
@@ -648,6 +652,65 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     );
   }, [sessionTokens]);
 
+  // 🗣️ AskUserQuestion: Handle user answering a question from the agent
+  const answerUserQuestion = useCallback(async (
+    toolUseId: string,
+    answers: AskUserQuestionAnswers,
+    workingDirectory?: string
+  ) => {
+    if (!claudeSessionId.current) {
+      console.error('[useClaudeChat] Cannot answer question: no active session');
+      return;
+    }
+
+    console.log('[useClaudeChat] 🗣️ Answering user question:', { toolUseId, answers });
+
+    // Mark question as answered
+    setAnsweredQuestions(prev => new Map(prev).set(toolUseId, answers));
+    setPendingQuestionIds(prev => {
+      const next = new Set(prev);
+      next.delete(toolUseId);
+      return next;
+    });
+
+    try {
+      // Format the answer as a tool result
+      const formattedAnswer = Object.entries(answers)
+        .map(([header, value]) => {
+          const valueStr = Array.isArray(value) ? value.join(', ') : value;
+          return `${header}: ${valueStr}`;
+        })
+        .join('\n');
+
+      // Send the tool result to continue the conversation
+      await sendToolResult(
+        claudeSessionId.current,
+        toolUseId,
+        formattedAnswer,
+        workingDirectory
+      );
+
+      console.log('[useClaudeChat] 🗣️ Question answered successfully');
+
+      // Track analytics
+      posthog.capture('user_question_answered', {
+        question_count: Object.keys(answers).length,
+        tool_use_id: toolUseId,
+      });
+    } catch (err) {
+      console.error('[useClaudeChat] Failed to send question answer:', err);
+      setError(`Failed to submit answer: ${err}`);
+
+      // Revert the answered state
+      setAnsweredQuestions(prev => {
+        const next = new Map(prev);
+        next.delete(toolUseId);
+        return next;
+      });
+      setPendingQuestionIds(prev => new Set(prev).add(toolUseId));
+    }
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -668,5 +731,9 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     localSoftReset,
     exportConversation,
     getRecoveryRecommendation,
+    // 🗣️ AskUserQuestion support
+    answerUserQuestion,
+    pendingQuestionIds,
+    answeredQuestions,
   };
 }

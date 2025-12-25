@@ -610,6 +610,60 @@ export type ClaudeEvent =
   | ClaudeContentBlockDeltaEvent
   | ClaudeContentBlockStopEvent;
 
+// ============================================
+// AskUserQuestion Types (SDK v0.1.71+)
+// ============================================
+
+/**
+ * A single option in an AskUserQuestion
+ */
+export interface AskUserQuestionOption {
+  /** Display text for this option (1-5 words) */
+  label: string;
+  /** Explanation of what this option means */
+  description: string;
+}
+
+/**
+ * A single question in AskUserQuestion
+ */
+export interface AskUserQuestion {
+  /** The complete question to ask (ends with ?) */
+  question: string;
+  /** Short label displayed as chip/tag (max 12 chars) */
+  header: string;
+  /** Available choices (2-4 options) */
+  options: AskUserQuestionOption[];
+  /** true = checkbox (multi), false = radio (single) */
+  multiSelect: boolean;
+}
+
+/**
+ * Input for the AskUserQuestion tool
+ */
+export interface AskUserQuestionInput {
+  /** Questions to ask (1-4) */
+  questions: AskUserQuestion[];
+}
+
+/**
+ * User's answers to AskUserQuestion
+ * Keys are question headers, values are selected label(s)
+ */
+export interface AskUserQuestionAnswers {
+  [questionHeader: string]: string | string[];
+}
+
+/**
+ * State for a pending question waiting for user response
+ */
+export interface PendingUserQuestion {
+  toolUseId: string;
+  input: AskUserQuestionInput;
+  timestamp: number;
+  answered: boolean;
+}
+
 // Slash Commands types
 export type SlashCommandScope = 'built-in' | 'project' | 'user' | 'plugin' | 'mcp';
 
@@ -1367,4 +1421,13 @@ export interface KanbanTask {
 
   // Attachments (images)
   attachments?: ChatAttachment[];
+
+  // Subtask hierarchy (for task decomposition)
+  parentTaskId?: string;              // ID of parent task if this is a subtask
+
+  // Progress tracking (for update tool)
+  progress?: number;                  // 0-100 percentage
+  notes?: string;                     // Additional notes
+  blockedBy?: string;                 // ID of blocking task
+  completionNote?: string;            // Note when marked as done
 }

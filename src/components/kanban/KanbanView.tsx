@@ -145,6 +145,7 @@ export default function KanbanView({
     initializeKanban();
   }, [loadTasks, onLoadChatSessions]);
 
+
   // Configure drag sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {

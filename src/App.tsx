@@ -56,6 +56,7 @@ import AgentViewer from "./components/AgentViewer";
 import SkillViewer from "./components/SkillViewer";
 import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
+import KanbanToast from "./components/KanbanToast";
 import { useDocsTab } from "./hooks/useDocsTab";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
@@ -303,6 +304,10 @@ function AppContent() {
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // 🗣️ AskUserQuestion: Track pending requests from canUseTool callback
+  // Maps requestId -> { agentId, questions } for responding via stdin
+  const [pendingUserQuestions, setPendingUserQuestions] = useState<Map<string, { agentId: string; questions: unknown[] }>>(new Map());
+
   // 🔵 Read-once notification badge system: Track last read timestamp for each agent
   // When user clicks an agent, we mark it as "read" by storing current timestamp
   // Badge shows only if lastAssistantMessage > lastRead (new message after last read)
@@ -480,6 +485,10 @@ function AppContent() {
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  // Track sidebar state before Kanban view to restore it on exit
+  const sidePanelCollapsedBeforeKanbanRef = useRef<boolean | null>(null);
+  // Track if user wants side panel expanded while in Kanban mode (e.g., clicked on project name)
+  const [kanbanSidePanelExpanded, setKanbanSidePanelExpanded] = useState(false);
   const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(false);
 
   // Tab system state
@@ -1864,6 +1873,13 @@ function AppContent() {
             // ✅ New SDK 0.1.54+ features
             outputFormat: options?.outputFormat, // Structured outputs (beta)
             effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
+            // 🗣️ Enable interactive tools like AskUserQuestion (SDK v0.1.71+)
+            // NOTE: Must use camelCase because Rust struct uses #[serde(rename_all = "camelCase")]
+            allowedTools: [
+              'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+              'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
+              'AskUserQuestion',
+            ],
           },
         }),
         abortPromise,
@@ -2299,6 +2315,13 @@ function AppContent() {
             cwd: options?.workingDirectory || '/',
             sessionId: existingSessionId, // 🦆 Pass existing sessionId for conversation continuity
             effort: options?.effort,
+            // 🗣️ Enable interactive tools like AskUserQuestion (SDK v0.1.71+)
+            // NOTE: Must use camelCase because Rust struct uses #[serde(rename_all = "camelCase")]
+            allowedTools: [
+              'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+              'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
+              'AskUserQuestion',
+            ],
           },
         }),
         abortPromise,
@@ -2539,6 +2562,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           model: 'haiku', // Use faster model for summaries
           permissionMode: 'bypass',
           cwd: activeTerminal?.cwd ?? explorerPath,
+          // 🗣️ Enable interactive tools (SDK v0.1.71+) - though AskUserQuestion unlikely for /compact
+          // NOTE: Must use camelCase because Rust struct uses #[serde(rename_all = "camelCase")]
+          allowedTools: [
+            'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+            'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
+            'AskUserQuestion',
+          ],
         },
       });
 
@@ -2790,9 +2820,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Grid columns: Always show left sidebar (360px), Kanban replaces main content area
   // Right side panel can be toggled in both normal and Kanban mode
-  const gridTemplateColumns = sidePanelCollapsed
-    ? "360px minmax(0, 1fr) 0px"
-    : "360px minmax(0, 1fr) 420px";
+  // In Kanban mode: default collapsed unless kanbanSidePanelExpanded is true (user clicked on project)
+  const shouldShowSidePanel = isKanbanViewActive
+    ? kanbanSidePanelExpanded && !sidePanelCollapsed
+    : !sidePanelCollapsed;
+  const gridTemplateColumns = shouldShowSidePanel
+    ? "360px minmax(0, 1fr) 420px"
+    : "360px minmax(0, 1fr) 0px";
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -3227,6 +3261,73 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       togglePipWindow();
     });
 
+    // Listen for Kanban updates from Claude Agent SDK custom tools
+    const unlistenKanbanUpdatePromise = listen<{
+      eventType: string;
+      payload: {
+        taskId?: string;
+        task?: unknown;
+        title?: string;
+        previousStatus?: string;
+        newStatus?: string;
+        completionNote?: string;
+        reason?: string;
+        updates?: Record<string, unknown>;
+        parentTaskId?: string;
+      };
+      timestamp: number;
+      agentId: string;
+    }>("kanban:update", async (event) => {
+      console.log("📋 Kanban update event received:", event.payload);
+      const { eventType, payload } = event.payload;
+
+      // Reload tasks from storage to sync with backend changes
+      await loadKanbanTasks();
+
+      // Show toast notification based on event type
+      const toastMessages: Record<string, string> = {
+        task_created: payload.parentTaskId
+          ? `Subtask created: "${(payload.task as { title?: string })?.title || 'New task'}"`
+          : `Task created: "${(payload.task as { title?: string })?.title || 'New task'}"`,
+        task_moved: `Task moved to ${payload.newStatus}${payload.completionNote ? ` - ${payload.completionNote}` : ''}`,
+        task_updated: `Task updated`,
+        task_deleted: `Task "${payload.title}" deleted${payload.reason ? ` - ${payload.reason}` : ''}`,
+      };
+
+      const message = toastMessages[eventType];
+      if (message) {
+        // Use console for now, will be replaced with toast
+        console.log(`📋 Kanban: ${message}`);
+        // TODO: Add toast notification here
+      }
+    });
+
+    // 🗣️ Listen for AskUserQuestion events from SDK (via canUseTool callback)
+    // These events come from all agents, so we need to track them by requestId
+    // The event pattern is ask-user-question:{agentId}
+    const askUserQuestionListeners: Array<Promise<() => void>> = [];
+
+    // Setup listeners for each active terminal/agent
+    terminals.forEach((terminal) => {
+      const eventName = `ask-user-question:${terminal.id}`;
+      const unlistenPromise = listen<{
+        requestId: string;
+        questions: unknown[];
+        agentId: string;
+      }>(eventName, (event) => {
+        console.log(`🗣️ AskUserQuestion event received for agent ${terminal.id}:`, event.payload);
+        const { requestId, questions, agentId } = event.payload;
+
+        // Store the pending question for when user responds
+        setPendingUserQuestions((prev) => {
+          const next = new Map(prev);
+          next.set(requestId, { agentId, questions });
+          return next;
+        });
+      });
+      askUserQuestionListeners.push(unlistenPromise);
+    });
+
     // Listen for Telegram /status command
     const unlistenTelegramStatusPromise = listen<{ unique_id: string; telegram_chat_id: number }>(
       "telegram-command-status",
@@ -3264,9 +3365,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenKanbanUpdatePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenTelegramStatusPromise.then(unlisten => unlisten()).catch(() => undefined);
+      // Cleanup AskUserQuestion listeners
+      askUserQuestionListeners.forEach(p => p.then(unlisten => unlisten()).catch(() => undefined));
     };
-  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, terminals]);
+  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, terminals, loadKanbanTasks]);
 
   // Auto-save terminals to storage (debounced to avoid excessive writes)
   useEffect(() => {
@@ -6115,6 +6219,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Expand the side panel to show the agent context
       setSidePanelCollapsed(false);
 
+      // Mark that we want the side panel expanded in Kanban mode
+      setKanbanSidePanelExpanded(true);
+
       // Load the project directory for file explorer
       void loadDirectory(projectPath);
     } else {
@@ -6612,6 +6719,26 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     console.log('[Quack] Second Brain tab opened with node:', nodeId, nodeLabel);
   }, [openSecondBrainTab]);
+
+  // Handler for toggling Kanban view with sidebar collapse/restore
+  const handleToggleKanbanView = useCallback(() => {
+    if (!isKanbanViewActive) {
+      // Opening Kanban: save current sidebar state and collapse it
+      sidePanelCollapsedBeforeKanbanRef.current = sidePanelCollapsed;
+      setSidePanelCollapsed(true);
+      // Reset Kanban side panel expansion state
+      setKanbanSidePanelExpanded(false);
+    } else {
+      // Closing Kanban: restore previous sidebar state
+      if (sidePanelCollapsedBeforeKanbanRef.current !== null) {
+        setSidePanelCollapsed(sidePanelCollapsedBeforeKanbanRef.current);
+        sidePanelCollapsedBeforeKanbanRef.current = null;
+      }
+      // Reset Kanban side panel expansion state
+      setKanbanSidePanelExpanded(false);
+    }
+    toggleKanbanView();
+  }, [isKanbanViewActive, sidePanelCollapsed, toggleKanbanView]);
 
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
@@ -8097,7 +8224,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanViewActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanViewActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanViewActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -8143,7 +8270,7 @@ You have access to all Bash tools to execute git commands like:
           isPipOpen={isPipOpen}
           // Kanban View props
           isKanbanViewActive={isKanbanViewActive}
-          onToggleKanbanView={toggleKanbanView}
+          onToggleKanbanView={handleToggleKanbanView}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
           quackSoundEnabled={quackSoundEnabled}
@@ -8378,7 +8505,7 @@ You have access to all Bash tools to execute git commands like:
               {isKanbanViewActive && (
                 <KanbanView
                   terminals={terminals}
-                  onExitKanban={toggleKanbanView}
+                  onExitKanban={handleToggleKanbanView}
                   // Chat integration for Kanban tasks
                   chatSessions={chatSessions}
                   chatLoadingMap={chatLoadingMap}
@@ -8782,9 +8909,16 @@ You have access to all Bash tools to execute git commands like:
           onSelectSession={handleSelectSession}
           sessionsRefreshKey={sessionsRefreshKey}
           // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) are active
-          // Note: Kanban view now allows side panel to be opened when clicking on project name
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-')}
-          onToggleCollapse={() => setSidePanelCollapsed(!sidePanelCollapsed)}
+          // In Kanban mode: use kanbanSidePanelExpanded to control visibility
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanViewActive && !kanbanSidePanelExpanded)}
+          onToggleCollapse={() => {
+            if (isKanbanViewActive) {
+              // In Kanban mode, toggle kanbanSidePanelExpanded
+              setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);
+            } else {
+              setSidePanelCollapsed(!sidePanelCollapsed);
+            }
+          }}
           isKanbanViewActive={isKanbanViewActive} // Used to show/hide toggle button
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
@@ -9068,6 +9202,9 @@ You have access to all Bash tools to execute git commands like:
           open={showBackgroundTasksDrawer}
           onClose={() => setShowBackgroundTasksDrawer(false)}
         />
+
+        {/* Kanban toast notifications for Claude tool events */}
+        <KanbanToast />
       </div>
 
       {introReplayActive && (

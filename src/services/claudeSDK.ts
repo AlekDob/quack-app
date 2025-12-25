@@ -288,6 +288,7 @@ export async function* streamClaudeMessage(
         'TodoWrite',
         'NotebookEdit',
         'SlashCommand',
+        'AskUserQuestion', // 🗣️ Interactive questions to user (SDK v0.1.71+)
       ],
     };
 
@@ -690,4 +691,54 @@ export function abortAllStreams(): void {
  */
 export function getActiveStreamCount(): number {
   return activeStreams.size;
+}
+
+/**
+ * Send a tool result back to the Claude SDK for an active session
+ * Used for interactive tools like AskUserQuestion (legacy approach)
+ */
+export async function sendToolResult(
+  sessionId: string,
+  toolUseId: string,
+  result: string,
+  workingDirectory?: string
+): Promise<void> {
+  console.log('[claudeSDK] 🗣️ Sending tool result:', { sessionId, toolUseId, resultLength: result.length });
+
+  try {
+    await invoke('send_tool_result_to_sdk', {
+      sessionId,
+      toolUseId,
+      result,
+      workingDirectory: workingDirectory || process.cwd?.() || '.',
+    });
+    console.log('[claudeSDK] 🗣️ Tool result sent successfully');
+  } catch (err) {
+    console.error('[claudeSDK] Failed to send tool result:', err);
+    throw err;
+  }
+}
+
+/**
+ * Answer an AskUserQuestion request via stdin to the active SDK process
+ * This is the new approach that uses bidirectional communication
+ */
+export async function answerUserQuestionViaStdin(
+  agentId: string,
+  requestId: string,
+  answers: Record<string, string>
+): Promise<void> {
+  console.log('[claudeSDK] 🗣️ Answering user question via stdin:', { agentId, requestId, answers });
+
+  try {
+    await invoke('answer_user_question', {
+      agentId,
+      requestId,
+      answers,
+    });
+    console.log('[claudeSDK] 🗣️ Answer sent successfully via stdin');
+  } catch (err) {
+    console.error('[claudeSDK] Failed to send answer via stdin:', err);
+    throw err;
+  }
 }

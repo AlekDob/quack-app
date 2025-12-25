@@ -15,9 +15,10 @@ import {
 import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
 import { TaskWidget } from './TaskWidget';
+import AskUserQuestionWidget from './AskUserQuestionWidget';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
-import type { ClaudeEvent} from '../types';
+import type { ClaudeEvent, AskUserQuestionAnswers } from '../types';
 import { BugReportWidget, WebAnalysisCard } from './structured-outputs';
 import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
 
@@ -31,9 +32,22 @@ interface StreamMessageProps {
   agentName?: string;
   agentAvatar?: string;
   workingDirectory?: string; // Current working directory for file operations
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  pendingQuestionIds?: Set<string>; // Tool IDs with pending questions
+  answeredQuestions?: Map<string, AskUserQuestionAnswers>; // Already answered questions
 }
 
-const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, onFilePathClick, agentName = 'Jack', agentAvatar, workingDirectory }) => {
+const StreamMessage: React.FC<StreamMessageProps> = ({
+  message,
+  streamMessages,
+  onFilePathClick,
+  agentName = 'Jack',
+  agentAvatar,
+  workingDirectory,
+  onUserQuestionAnswer,
+  pendingQuestionIds,
+  answeredQuestions,
+}) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -261,6 +275,24 @@ const StreamMessage: React.FC<StreamMessageProps> = ({ message, streamMessages, 
                   plan={input.plan}
                   workingDirectory={workingDirectory}
                   defaultExpanded={true}
+                />
+              );
+            }
+
+            // AskUserQuestion tool - interactive questions from agent
+            if (toolName === 'askuserquestion' && input?.questions && Array.isArray(input.questions)) {
+              const isPending = pendingQuestionIds?.has(toolId);
+              const existingAnswer = answeredQuestions?.get(toolId);
+              const isAnswered = !!existingAnswer || !!toolResult;
+
+              return (
+                <AskUserQuestionWidget
+                  key={idx}
+                  questions={input.questions}
+                  toolUseId={toolId}
+                  onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers)}
+                  disabled={isAnswered}
+                  existingAnswers={existingAnswer}
                 />
               );
             }

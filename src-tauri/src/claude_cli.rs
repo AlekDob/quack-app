@@ -1,10 +1,51 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::{Path, PathBuf}, process::Stdio, sync::Mutex};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}, process::Stdio, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
+use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::Mutex as TokioMutex;
 use once_cell::sync::Lazy;
+
+// =============================================================================
+// ACTIVE PROCESS MANAGEMENT (for bidirectional communication)
+// =============================================================================
+
+/// Store active Node.js SDK processes with their stdin handles
+/// Key: agent_id, Value: ChildStdin handle
+static ACTIVE_PROCESSES: Lazy<TokioMutex<HashMap<String, ChildStdin>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
+/// Send a message to an active SDK process via stdin
+pub async fn send_to_process(agent_id: &str, message: &str) -> Result<(), String> {
+    let mut processes = ACTIVE_PROCESSES.lock().await;
+
+    if let Some(stdin) = processes.get_mut(agent_id) {
+        let line = format!("{}\n", message);
+        stdin.write_all(line.as_bytes()).await
+            .map_err(|e| format!("Failed to write to process stdin: {}", e))?;
+        stdin.flush().await
+            .map_err(|e| format!("Failed to flush process stdin: {}", e))?;
+        log::info!("[SDK] 📤 Sent message to process {}: {}...", agent_id, &message[..std::cmp::min(100, message.len())]);
+        Ok(())
+    } else {
+        Err(format!("No active process found for agent: {}", agent_id))
+    }
+}
+
+/// Register an active process stdin
+async fn register_process_stdin(agent_id: String, stdin: ChildStdin) {
+    let mut processes = ACTIVE_PROCESSES.lock().await;
+    processes.insert(agent_id.clone(), stdin);
+    log::info!("[SDK] 📝 Registered stdin for agent: {}", agent_id);
+}
+
+/// Unregister a process when it completes
+async fn unregister_process(agent_id: &str) {
+    let mut processes = ACTIVE_PROCESSES.lock().await;
+    processes.remove(agent_id);
+    log::info!("[SDK] 🗑️ Unregistered stdin for agent: {}", agent_id);
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeCliResponse {
@@ -59,6 +100,38 @@ pub enum ClaudeEvent {
         #[serde(flatten)]
         extra: serde_json::Value,
     },
+    // Kanban event (from kanban-tools MCP server)
+    #[serde(rename = "kanban_event")]
+    KanbanEvent {
+        #[serde(rename = "eventType")]
+        event_type: String,
+        payload: serde_json::Value,
+        timestamp: u64,
+    },
+    // AskUserQuestion event - requires user input (SDK v0.1.71+)
+    #[serde(rename = "ask_user_question")]
+    AskUserQuestion {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        questions: Vec<AskUserQuestionQuestion>,
+    },
+}
+
+/// Question structure for AskUserQuestion tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AskUserQuestionQuestion {
+    pub question: String,
+    pub header: String,
+    pub options: Vec<AskUserQuestionOption>,
+    #[serde(rename = "multiSelect")]
+    pub multi_select: bool,
+}
+
+/// Option structure for AskUserQuestion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AskUserQuestionOption {
+    pub label: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,6 +200,8 @@ pub struct ClaudeCliRequest {
     pub effort: Option<String>,
     // ✅ Setting sources control (to prevent "Prompt is too long" errors)
     pub setting_sources: Option<Vec<String>>,
+    // 🗣️ Allowed tools list (SDK v0.1.57+) - enables specific tools like AskUserQuestion
+    pub allowed_tools: Option<Vec<String>>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -878,6 +953,7 @@ pub async fn send_message_via_sdk_streaming(
         output_format, // ✅ Extract output_format for structured outputs
         effort, // ✅ Extract effort parameter (SDK 0.1.54+)
         setting_sources, // ✅ Extract setting_sources to control prompt length
+        allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -981,6 +1057,15 @@ pub async fn send_message_via_sdk_streaming(
         log::info!("[SDK DEBUG] Adding settingSources to config: {:?}", sources);
     } else {
         log::info!("[SDK DEBUG] Using default settingSources: ['project']");
+    }
+
+    // 🗣️ Add allowedTools if provided (SDK v0.1.57+)
+    // This enables specific tools like AskUserQuestion
+    if let Some(tools) = allowed_tools {
+        config["allowedTools"] = serde_json::Value::Array(
+            tools.iter().map(|t| serde_json::Value::String(t.clone())).collect()
+        );
+        log::info!("[SDK DEBUG] Adding allowedTools to config: {:?}", tools);
     }
 
     let config_str = config.to_string();
@@ -1097,6 +1182,7 @@ pub async fn send_message_via_sdk_streaming(
         .arg(&script_path)
         .arg(&config_str)
         .current_dir(node_sdk_dir)
+        .stdin(Stdio::piped())   // Enable stdin for bidirectional communication (AskUserQuestion)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -1206,6 +1292,11 @@ pub async fn send_message_via_sdk_streaming(
 
     log::info!("[SDK DEBUG] Node.js process spawned successfully");
 
+    // Take stdin for bidirectional communication (AskUserQuestion)
+    if let Some(stdin) = child.stdin.take() {
+        register_process_stdin(agent_id.clone(), stdin).await;
+    }
+
     // Read stdout for events (in foreground to stream in real-time)
     let stdout = child.stdout.take()
         .ok_or("Failed to capture stdout".to_string())?;
@@ -1272,6 +1363,41 @@ pub async fn send_message_via_sdk_streaming(
                     ClaudeEvent::Complete { .. } => {
                         log::info!("[SDK] ✅ Stream complete event received");
                     }
+                    ClaudeEvent::KanbanEvent { event_type, payload, timestamp } => {
+                        log::info!("[SDK] 📋 Kanban event: type={}, timestamp={}", event_type, timestamp);
+                        // Emit kanban-specific event to frontend for real-time UI updates
+                        let kanban_event_name = "kanban:update".to_string();
+                        match app.emit(&kanban_event_name, serde_json::json!({
+                            "eventType": event_type,
+                            "payload": payload,
+                            "timestamp": timestamp,
+                            "agentId": agent_id
+                        })) {
+                            Ok(_) => {
+                                log::info!("[SDK] 📋 Emitted kanban:update event to frontend");
+                            }
+                            Err(e) => {
+                                log::error!("[SDK] ❌ Failed to emit kanban event: {:?}", e);
+                            }
+                        }
+                    }
+                    ClaudeEvent::AskUserQuestion { request_id, questions } => {
+                        log::info!("[SDK] 🗣️ AskUserQuestion event: requestId={}, {} questions", request_id, questions.len());
+                        // Emit ask_user_question event to frontend
+                        let ask_event_name = format!("ask-user-question:{}", agent_id);
+                        match app.emit(&ask_event_name, serde_json::json!({
+                            "requestId": request_id,
+                            "questions": questions,
+                            "agentId": agent_id
+                        })) {
+                            Ok(_) => {
+                                log::info!("[SDK] 🗣️ Emitted ask-user-question event to frontend");
+                            }
+                            Err(e) => {
+                                log::error!("[SDK] ❌ Failed to emit ask-user-question event: {:?}", e);
+                            }
+                        }
+                    }
                     _ => {}
                 }
 
@@ -1324,6 +1450,9 @@ pub async fn send_message_via_sdk_streaming(
     let status = child.wait().await
         .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?;
 
+    // Cleanup: unregister the process stdin
+    unregister_process(&agent_id).await;
+
     // Collect stderr if available
     let stderr_output = if let Some(handle) = stderr_handle {
         handle.await.unwrap_or_default()
@@ -1349,6 +1478,113 @@ pub async fn send_message_via_sdk_streaming(
     final_result.ok_or_else(|| {
         "No result event found in Node.js SDK output".to_string()
     })
+}
+
+/// Send a tool result back to the Claude SDK for interactive tools like AskUserQuestion
+/// This creates a new SDK call with the tool result to continue the conversation
+#[tauri::command]
+pub async fn send_tool_result_to_sdk(
+    app: AppHandle,
+    session_id: String,
+    tool_use_id: String,
+    result: String,
+    working_directory: Option<String>,
+) -> Result<(), String> {
+    log::info!("[SDK] 🗣️ Sending tool result for tool_use_id: {}", tool_use_id);
+
+    // Get the Node.js script path
+    let script_path = get_sdk_script_path(&app)?;
+
+    // Build the tool result config
+    let config = serde_json::json!({
+        "toolResult": {
+            "type": "tool_result",
+            "tool_use_id": tool_use_id,
+            "content": result,
+        },
+        "sessionId": session_id,
+        "cwd": working_directory,
+    });
+
+    let config_json = serde_json::to_string(&config)
+        .map_err(|e| format!("Failed to serialize tool result config: {}", e))?;
+
+    log::info!("[SDK] 🗣️ Tool result config: {}", config_json);
+
+    // Spawn Node.js process to send the tool result
+    let mut command = Command::new("node");
+    command
+        .arg(&script_path)
+        .arg("--tool-result")
+        .arg(&config_json)
+        .current_dir(working_directory.as_deref().unwrap_or("."))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let child = command.spawn()
+        .map_err(|e| format!("Failed to spawn Node.js for tool result: {}", e))?;
+
+    let output = child.wait_with_output().await
+        .map_err(|e| format!("Failed to wait for tool result process: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::error!("[SDK] Tool result failed: {}", stderr);
+        return Err(format!("Tool result failed: {}", stderr));
+    }
+
+    log::info!("[SDK] 🗣️ Tool result sent successfully");
+    Ok(())
+}
+
+/// Send answers to an AskUserQuestion request via stdin to the active SDK process
+/// This uses the bidirectional communication system to respond to the Node.js process
+#[tauri::command]
+pub async fn answer_user_question(
+    agent_id: String,
+    request_id: String,
+    answers: serde_json::Value,
+) -> Result<(), String> {
+    log::info!("[SDK] 🗣️ Answering user question for agent: {}, requestId: {}", agent_id, request_id);
+    log::info!("[SDK] 🗣️ Answers: {:?}", answers);
+
+    // Build the response message
+    let response = serde_json::json!({
+        "requestId": request_id,
+        "answers": answers,
+    });
+
+    let message = serde_json::to_string(&response)
+        .map_err(|e| format!("Failed to serialize answer: {}", e))?;
+
+    // Send to the active process via stdin
+    send_to_process(&agent_id, &message).await?;
+
+    log::info!("[SDK] 🗣️ Answer sent successfully");
+    Ok(())
+}
+
+/// Helper to get the SDK script path
+fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
+    // Try to find the bundled script first
+    let resource_path = app.path().resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+    let script_path = resource_path.join("node-sdk").join("stream-claude.js");
+    if script_path.exists() {
+        return Ok(script_path);
+    }
+
+    // Fallback to development path
+    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("node-sdk")
+        .join("stream-claude.js");
+
+    if dev_path.exists() {
+        return Ok(dev_path);
+    }
+
+    Err("Could not find stream-claude.js script".to_string())
 }
 
 
