@@ -58,6 +58,7 @@ import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import KanbanToast from "./components/KanbanToast";
 import { useDocsTab } from "./hooks/useDocsTab";
+import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
 import DocsTabView from "./views/DocsTabView";
@@ -75,6 +76,7 @@ import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
 import { useDroidFactory } from "./hooks/useDroidFactory";
+import IDEOnboarding from "./components/settings/IDEOnboarding";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorMonaco";
 import { parseDiff } from "./lib/diffParser";
@@ -6740,6 +6742,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     toggleKanbanView();
   }, [isKanbanViewActive, sidePanelCollapsed, toggleKanbanView]);
 
+  // Global keyboard shortcuts
+  useGlobalKeyboardShortcuts({
+    toggleKanban: handleToggleKanbanView,
+    openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
+    newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
+    toggleSidePanel: useCallback(() => {
+      setSidePanelCollapsed(prev => !prev);
+    }, []),
+    focusFileSearch: useCallback(() => {
+      // Focus the File Explorer search input
+      const searchInput = document.querySelector<HTMLInputElement>('input.explorer-search');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }, []),
+  });
+
   // Tab management handlers
   const handleTabClick = useCallback((tabId: string) => {
     updateActiveTab(tabId);
@@ -9386,6 +9406,9 @@ You have access to all Bash tools to execute git commands like:
         onActivateLicense={handleActivateLicense}
         limitType={upgradeLimitType}
       />
+
+      {/* IDE Onboarding - First-run dialog to select preferred IDE */}
+      <IDEOnboarding />
 
       {/* Terminal Window - Now opens as separate Tauri window via useTerminalWindowManager */}
 

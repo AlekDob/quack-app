@@ -249,6 +249,19 @@
   transform: translateY(-1px);
 }
 
+/* IDE-enabled Open button - orange theme */
+.edit-summary-bar-open-btn.ide-enabled {
+  background: rgba(242, 140, 82, 0.15);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.edit-summary-bar-open-btn.ide-enabled:hover {
+  background: rgba(242, 140, 82, 0.25);
+  border-color: rgba(242, 140, 82, 0.5);
+  color: #f28c52;
+}
+
 /* Deleted file items - red theme */
 .edit-summary-bar-file-deleted {
   border-color: rgba(239, 68, 68, 0.15);
@@ -294,14 +307,36 @@
   transition: all 0.2s ease;
 }
 
-.edit-summary-bar-open-all-btn:hover {
+.edit-summary-bar-open-all-btn:hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.25);
   border-color: rgba(34, 197, 94, 0.5);
   transform: translateY(-1px);
 }
 
+.edit-summary-bar-open-all-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .edit-summary-bar-open-all-btn svg {
   color: rgba(34, 197, 94, 0.8);
+}
+
+/* IDE-enabled Open All button - orange theme */
+.edit-summary-bar-open-all-btn.ide-enabled {
+  background: rgba(242, 140, 82, 0.15);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.edit-summary-bar-open-all-btn.ide-enabled:hover:not(:disabled) {
+  background: rgba(242, 140, 82, 0.25);
+  border-color: rgba(242, 140, 82, 0.5);
+}
+
+.edit-summary-bar-open-all-btn.ide-enabled svg {
+  color: rgba(242, 140, 82, 0.8);
 }
 
 /* Dark mode adjustments */

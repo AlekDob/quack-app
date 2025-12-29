@@ -43,6 +43,7 @@ mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security
 mod terminal;
 mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
+mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -500,6 +501,15 @@ pub fn run() {
             fs::write_mcp_memory_relation,
             fs::delete_mcp_memory_relation,
             fs::detect_project_root,
+            // IDE Integration commands
+            ide_integration::detect_installed_ides,
+            ide_integration::set_preferred_ide,
+            ide_integration::execute_ide_command,
+            ide_integration::focus_ide,
+            ide_integration::arrange_windows_side_by_side,
+            ide_integration::sync_focus_both_apps,
+            ide_integration::open_file_in_ide,
+            ide_integration::open_multiple_files_in_ide,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,

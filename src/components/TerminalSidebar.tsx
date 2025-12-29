@@ -26,6 +26,7 @@ import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
 import BackgroundTasksSidebarButton from "./BackgroundTasksSidebarButton";
+import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
 // Sortable Repository Group wrapper
@@ -676,14 +677,16 @@ export default function TerminalSidebar({
               </button>
             )}
             {/* New Agent Button */}
-            <button
-              type="button"
-              className="sidebar-button"
-              onClick={onCreateAgent}
-              disabled={creating}
-            >
-              {creating ? "Creating…" : "New"}
-            </button>
+            <KeyboardShortcutTooltip label="New Agent" shortcut="⌘N">
+              <button
+                type="button"
+                className="sidebar-button"
+                onClick={onCreateAgent}
+                disabled={creating}
+              >
+                {creating ? "Creating…" : "New"}
+              </button>
+            </KeyboardShortcutTooltip>
           </div>
         </div>
         <input
@@ -699,43 +702,49 @@ export default function TerminalSidebar({
       <div className="explorer-root-label sidebar-terminals-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '12px' }}>
         <span>ACTIVE AGENTS</span>
         {/* View Toggle Button - switches between Kanban and Agents */}
-        <button
-          type="button"
-          onClick={onToggleKanbanView}
-          style={{
-            background: isKanbanViewActive ? 'rgba(242, 140, 82, 0.15)' : 'rgba(139, 92, 246, 0.15)',
-            border: `1px solid ${isKanbanViewActive ? 'rgba(242, 140, 82, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`,
-            borderRadius: '4px',
-            padding: '3px 8px',
-            fontSize: '10px',
-            fontWeight: 500,
-            color: isKanbanViewActive ? '#f28c52' : '#8b5cf6',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            transition: 'all 0.2s ease',
-          }}
-          title={isKanbanViewActive ? 'Switch to Agent List' : 'Switch to Kanban Board'}
+        <KeyboardShortcutTooltip
+          label={isKanbanViewActive ? 'Agents' : 'Kanban'}
+          shortcut="⌘K"
+          position="left"
         >
-          {isKanbanViewActive ? (
-            // Agents icon (people/users)
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          ) : (
-            // Kanban icon (columns)
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="5" height="18" rx="1" />
-              <rect x="10" y="3" width="5" height="12" rx="1" />
-              <rect x="17" y="3" width="5" height="15" rx="1" />
-            </svg>
-          )}
-          {isKanbanViewActive ? 'Agents' : 'Kanban'}
-        </button>
+          <button
+            type="button"
+            onClick={onToggleKanbanView}
+            style={{
+              background: isKanbanViewActive ? 'rgba(242, 140, 82, 0.15)' : 'rgba(139, 92, 246, 0.15)',
+              border: `1px solid ${isKanbanViewActive ? 'rgba(242, 140, 82, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`,
+              borderRadius: '4px',
+              padding: '3px 8px',
+              fontSize: '10px',
+              fontWeight: 500,
+              color: isKanbanViewActive ? '#f28c52' : '#8b5cf6',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.2s ease',
+            }}
+            aria-label={isKanbanViewActive ? 'Switch to Agents (⌘K)' : 'Switch to Kanban (⌘K)'}
+          >
+            {isKanbanViewActive ? (
+              // Agents icon (people/users)
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            ) : (
+              // Kanban icon (columns)
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="5" height="18" rx="1" />
+                <rect x="10" y="3" width="5" height="12" rx="1" />
+                <rect x="17" y="3" width="5" height="15" rx="1" />
+              </svg>
+            )}
+            {isKanbanViewActive ? 'Agents' : 'Kanban'}
+          </button>
+        </KeyboardShortcutTooltip>
       </div>
 
       <div className="sidebar-list" style={{ marginTop: '5px' }}>

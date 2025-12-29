@@ -1431,3 +1431,36 @@ export interface KanbanTask {
   blockedBy?: string;                 // ID of blocking task
   completionNote?: string;            // Note when marked as done
 }
+
+// ==========================================
+// Keyboard Shortcuts Types
+// ==========================================
+
+/**
+ * Available shortcut action IDs
+ */
+export type ShortcutActionId = 'toggleKanban' | 'openTerminalWindow' | 'toggleSidePanel' | 'newAgent' | 'focusFileSearch';
+
+/**
+ * Configuration for a single keyboard shortcut
+ */
+export interface ShortcutConfig {
+  id: ShortcutActionId;
+  label: string;
+  description: string;
+  defaultKeys: string; // e.g., "Meta+K" for Cmd+K
+  currentKeys: string; // User's customized keys
+}
+
+/**
+ * Initial values when creating a Kanban task from drag-drop
+ */
+export interface KanbanTaskInitialValues {
+  projectPath: string;
+  projectName: string;
+  branch?: string;
+  agentId?: string;
+  agentName?: string;
+  agentAvatar?: string;
+  agentColor?: string;
+}

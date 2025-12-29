@@ -1,0 +1,126 @@
+/**
+ * ShortcutInput Styles
+ *
+ * Features:
+ * - Dark glassmorphism input
+ * - Orange glow effect during recording mode
+ * - Conflict state with red border
+ * - Pulse animation for recording state
+ */
+
+.shortcut-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.shortcut-input {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e4e4e7;
+  user-select: none;
+}
+
+.shortcut-input:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.shortcut-input:focus {
+  outline: none;
+  border-color: rgba(242, 140, 82, 0.5);
+}
+
+/* Recording state - pulsing orange glow */
+.shortcut-input.recording {
+  border-color: #f28c52;
+  background: rgba(242, 140, 82, 0.1);
+  animation: shortcut-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes shortcut-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(242, 140, 82, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(242, 140, 82, 0.7);
+  }
+}
+
+.shortcut-recording-text {
+  color: #f28c52;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* Conflict state - red border */
+.shortcut-input.conflict {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Disabled state */
+.shortcut-input.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Shortcut keys display */
+.shortcut-keys {
+  letter-spacing: 1px;
+}
+
+/* Reset button */
+.shortcut-reset-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shortcut-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #e4e4e7;
+}
+
+.shortcut-reset-btn:active {
+  transform: scale(0.95);
+}
+
+/* Conflict warning */
+.shortcut-conflict-warning {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  color: #ef4444;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 10;
+}

@@ -34,6 +34,13 @@
         "@modelcontextprotocol/server-postgres",
         "${FLOW_POSTGRES_URL}"
       ]
+    },
+    "ide-tools": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "./src-tauri/node-sdk/ide-mcp-server.js"
+      ]
     }
   }
 }

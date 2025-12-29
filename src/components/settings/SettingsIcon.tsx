@@ -59,6 +59,17 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'ide':
+      return (
+        <svg {...iconProps}>
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <path d="M8 21h8"/>
+          <path d="M12 17v4"/>
+          <path d="M7 8l3 3-3 3"/>
+          <path d="M13 11h4"/>
+        </svg>
+      );
+
     case 'license':
       return (
         <svg {...iconProps}>
@@ -89,6 +100,16 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         <svg {...iconProps}>
           <polyline points="4 17 10 11 4 5"/>
           <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+      );
+
+    case 'keyboard-shortcuts':
+      return (
+        <svg {...iconProps}>
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01"/>
+          <path d="M6 12h.01M18 12h.01"/>
+          <path d="M8 16h8"/>
         </svg>
       );
 

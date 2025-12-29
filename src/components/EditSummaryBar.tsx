@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import FileStatusBadge, { type FileStatus } from './FileStatusBadge';
 import FileDiffButton from './FileDiffButton';
+import { useIDEStore, selectHasPreferredIDE } from '../stores/ideStore';
 import './EditSummaryBar.css';
 
 export interface LineChange {
@@ -31,6 +32,12 @@ interface EditSummaryBarProps {
 
 export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDiffClick, onClear, onClearEdits }: EditSummaryBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isOpeningAll, setIsOpeningAll] = useState(false);
+
+  // IDE Integration
+  const hasPreferredIDE = useIDEStore(selectHasPreferredIDE);
+  const openFileInIDE = useIDEStore((state) => state.openFileInIDE);
+  const openMultipleFilesInIDE = useIDEStore((state) => state.openMultipleFilesInIDE);
 
   // Support both onClear and deprecated onClearEdits
   const handleClear = onClear || onClearEdits;
@@ -48,8 +55,25 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
   const hasModifiedFiles = modifiedFiles.length > 0;
   const hasDeletes = deletes.length > 0;
 
-  const handleFileClick = (filePath: string, lineChanges?: LineChange[]) => {
-    if (onFileClick) {
+  const handleFileClick = async (filePath: string, lineChanges?: LineChange[]) => {
+    console.log('[EditSummaryBar] handleFileClick called with:', { filePath, lineChanges, hasPreferredIDE });
+
+    // If IDE is configured, open in external IDE
+    if (hasPreferredIDE) {
+      try {
+        // Get first line from line changes for navigation
+        const firstLine = lineChanges?.[0]?.line;
+        console.log('[EditSummaryBar] Opening in IDE:', { filePath, firstLine });
+        await openFileInIDE(filePath, firstLine);
+      } catch (error) {
+        console.error('[EditSummaryBar] Failed to open file in IDE:', error);
+        // Fallback to internal handler
+        if (onFileClick) {
+          onFileClick(filePath, lineChanges);
+        }
+      }
+    } else if (onFileClick) {
+      // No IDE configured, use internal handler
       onFileClick(filePath, lineChanges);
     }
   };
@@ -60,8 +84,24 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
     }
   };
 
-  const handleOpenAll = () => {
-    if (onFileClick) {
+  const handleOpenAll = async () => {
+    // If IDE is configured, open all files in external IDE
+    if (hasPreferredIDE) {
+      setIsOpeningAll(true);
+      try {
+        const filePaths = edits.map(edit => edit.filePath);
+        await openMultipleFilesInIDE(filePaths);
+      } catch (error) {
+        console.error('[EditSummaryBar] Failed to open files in IDE:', error);
+        // Fallback to internal handler
+        if (onFileClick) {
+          edits.forEach(edit => onFileClick(edit.filePath, edit.lineChanges));
+        }
+      } finally {
+        setIsOpeningAll(false);
+      }
+    } else if (onFileClick) {
+      // No IDE configured, use internal handler
       edits.forEach(edit => onFileClick(edit.filePath, edit.lineChanges));
     }
   };
@@ -139,14 +179,14 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                             onDiffClick={(path) => handleDiffClick(path, 'created')}
                           />
                           <button
-                            className="edit-summary-bar-open-btn"
+                            className={`edit-summary-bar-open-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleFileClick(edit.filePath, edit.lineChanges);
                             }}
-                            title="Open file"
+                            title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
                           >
-                            Open
+                            {hasPreferredIDE ? 'IDE' : 'Open'}
                           </button>
                         </div>
                       </div>
@@ -188,14 +228,14 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                             onDiffClick={(path) => handleDiffClick(path, 'modified')}
                           />
                           <button
-                            className="edit-summary-bar-open-btn"
+                            className={`edit-summary-bar-open-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleFileClick(edit.filePath, edit.lineChanges);
                             }}
-                            title="Open file"
+                            title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
                           >
-                            Open
+                            {hasPreferredIDE ? 'IDE' : 'Open'}
                           </button>
                         </div>
                       </div>
@@ -244,16 +284,27 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
             {(hasNewFiles || hasModifiedFiles) && (
               <div className="edit-summary-bar-footer">
                 <button
-                  className="edit-summary-bar-open-all-btn"
+                  className={`edit-summary-bar-open-all-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
                   onClick={handleOpenAll}
+                  disabled={isOpeningAll}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
-                  </svg>
-                  Open All Modified Files
+                  {hasPreferredIDE ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" />
+                      <path d="M8 21h8" />
+                      <path d="M12 17v4" />
+                      <path d="M7 8l3 3-3 3" />
+                      <path d="M13 11h4" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7" />
+                      <rect x="14" y="3" width="7" height="7" />
+                      <rect x="14" y="14" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                  )}
+                  {isOpeningAll ? 'Opening...' : hasPreferredIDE ? 'Open All in IDE' : 'Open All Modified Files'}
                 </button>
               </div>
             )}

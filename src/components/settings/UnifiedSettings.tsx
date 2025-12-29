@@ -6,10 +6,12 @@ import GeneralSettings from './categories/GeneralSettings';
 import ClaudeCodeSettings from './categories/ClaudeCodeSettings';
 import AIAssistantSettings from './categories/AIAssistantSettings';
 import AgentModesSettings from './categories/AgentModesSettings';
+import IDESettings from './categories/IDESettings';
 import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
 import TerminalSettings from './categories/TerminalSettings';
+import KeyboardShortcutsSettings from './categories/KeyboardShortcutsSettings';
 import DebugSettings from './categories/DebugSettings';
 import AboutSettings from './categories/AboutSettings';
 import './UnifiedSettings.css';
@@ -47,6 +49,8 @@ export default function UnifiedSettings({
         return <AIAssistantSettings />;
       case 'agent-modes':
         return <AgentModesSettings />;
+      case 'ide':
+        return <IDESettings />;
       case 'license':
         return <LicenseSettings />;
       case 'notifications':
@@ -55,6 +59,8 @@ export default function UnifiedSettings({
         return <AppearanceSettings />;
       case 'terminal':
         return <TerminalSettings />;
+      case 'keyboard-shortcuts':
+        return <KeyboardShortcutsSettings />;
       case 'debug':
         return <DebugSettings />;
       case 'about':

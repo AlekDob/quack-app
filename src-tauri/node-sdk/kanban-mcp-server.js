@@ -47,10 +47,90 @@ function getTauriStorePath() {
 
 const KANBAN_STORE_PATH = join(getTauriStorePath(), 'quack-kanban-tasks.json');
 const CHAT_STORE_PATH = join(getTauriStorePath(), 'quack-chats.json');
+const TERMINALS_STORE_PATH = join(getTauriStorePath(), 'quack-terminals.json');
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Load available agents (terminals) from the sidebar
+ * Returns array of agents with their info
+ */
+function loadAvailableAgents() {
+  try {
+    if (!existsSync(TERMINALS_STORE_PATH)) {
+      console.error(`[KanbanMCP] Terminals store not found: ${TERMINALS_STORE_PATH}`);
+      return [];
+    }
+
+    const data = JSON.parse(readFileSync(TERMINALS_STORE_PATH, 'utf8'));
+    const terminals = data.terminals || [];
+
+    return terminals.map(t => ({
+      id: t.id,
+      name: t.label,
+      color: t.color,
+      avatar: t.avatar,
+      projectPath: t.cwd,
+      projectName: t.cwd ? t.cwd.split('/').pop() : 'Unknown',
+      branch: t.branch,
+      workingOn: t.workingOn,
+      personality: t.personality,
+    }));
+  } catch (error) {
+    console.error(`[KanbanMCP] Error loading agents: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Find an agent by ID or by fuzzy name matching
+ * @param {string} identifier - Agent ID or name to search for
+ * @param {string} projectPath - Optional: filter by project path
+ * @returns {object|null} - Matching agent or null
+ */
+function findAgent(identifier, projectPath = null) {
+  const agents = loadAvailableAgents();
+
+  if (!identifier) return null;
+
+  // First try exact ID match
+  let agent = agents.find(a => a.id === identifier);
+  if (agent) {
+    console.error(`[KanbanMCP] Found agent by exact ID: ${agent.name}`);
+    return agent;
+  }
+
+  // Filter by project if specified
+  let searchPool = projectPath
+    ? agents.filter(a => a.projectPath === projectPath)
+    : agents;
+
+  // Try exact name match (case-insensitive)
+  const lowerIdentifier = identifier.toLowerCase();
+  agent = searchPool.find(a =>
+    a.name.toLowerCase() === lowerIdentifier ||
+    a.name.toLowerCase() === `agent ${lowerIdentifier}`
+  );
+  if (agent) {
+    console.error(`[KanbanMCP] Found agent by exact name: ${agent.name}`);
+    return agent;
+  }
+
+  // Try partial name match (contains)
+  agent = searchPool.find(a =>
+    a.name.toLowerCase().includes(lowerIdentifier) ||
+    lowerIdentifier.includes(a.name.toLowerCase().replace('agent ', ''))
+  );
+  if (agent) {
+    console.error(`[KanbanMCP] Found agent by partial name: ${agent.name}`);
+    return agent;
+  }
+
+  console.error(`[KanbanMCP] No agent found for: ${identifier}`);
+  return null;
+}
 
 /**
  * Load chat session for a specific agent
@@ -229,6 +309,41 @@ async function handleMoveTask(args) {
     (args.completionNote ? `\nNote: ${args.completionNote}` : '');
 }
 
+async function handleListAgents(args) {
+  const agents = loadAvailableAgents();
+
+  // Filter by project if specified
+  let filtered = agents;
+  if (args.projectPath) {
+    filtered = agents.filter(a => a.projectPath === args.projectPath);
+  }
+
+  const summary = {
+    totalAgents: filtered.length,
+    agents: filtered.map(a => ({
+      id: a.id,
+      name: a.name,
+      color: a.color,
+      avatar: a.avatar,
+      projectPath: a.projectPath,
+      projectName: a.projectName,
+      branch: a.branch,
+      workingOn: a.workingOn,
+    })),
+    // Group by project for easier reading
+    byProject: Object.entries(
+      filtered.reduce((acc, a) => {
+        const proj = a.projectName || 'Unknown';
+        if (!acc[proj]) acc[proj] = [];
+        acc[proj].push({ id: a.id, name: a.name, branch: a.branch });
+        return acc;
+      }, {})
+    ).map(([projectName, agents]) => ({ projectName, agents })),
+  };
+
+  return JSON.stringify(summary, null, 2);
+}
+
 async function handleCreateTask(args) {
   console.error(`[KanbanMCP] handleCreateTask called with:`, JSON.stringify(args));
 
@@ -242,6 +357,29 @@ async function handleCreateTask(args) {
     }
   }
 
+  // Find and assign agent if specified
+  let assignedAgent = null;
+  if (args.assignedAgentId || args.assignedAgentName) {
+    const agentIdentifier = args.assignedAgentId || args.assignedAgentName;
+    const foundAgent = findAgent(agentIdentifier, args.projectPath);
+
+    if (foundAgent) {
+      assignedAgent = {
+        id: foundAgent.id,
+        name: foundAgent.name,
+        color: foundAgent.color,
+        avatar: foundAgent.avatar,
+        projectPath: foundAgent.projectPath,
+        projectName: foundAgent.projectName,
+        branch: foundAgent.branch,
+      };
+      console.error(`[KanbanMCP] Assigned to agent: ${assignedAgent.name} (${assignedAgent.id})`);
+    } else {
+      console.error(`[KanbanMCP] Warning: Could not find agent "${agentIdentifier}"`);
+      // Don't fail - just create unassigned task
+    }
+  }
+
   const newTask = {
     id: generateTaskId(),
     title: args.title,
@@ -251,6 +389,7 @@ async function handleCreateTask(args) {
     projectName: args.projectName,
     branch: args.branch,
     parentTaskId: args.parentTaskId,
+    assignedAgent: assignedAgent,
     createdAt: Date.now(),
   };
 
@@ -270,8 +409,17 @@ async function handleCreateTask(args) {
     return `Error: Failed to save new task`;
   }
 
-  return `Created task "${newTask.title}" (ID: ${newTask.id}) in ${newTask.status}` +
-    (args.parentTaskId ? `\nSubtask of: ${args.parentTaskId}` : '');
+  let resultMsg = `Created task "${newTask.title}" (ID: ${newTask.id}) in ${newTask.status}`;
+  if (assignedAgent) {
+    resultMsg += `\nAssigned to: ${assignedAgent.name}`;
+  } else if (args.assignedAgentId || args.assignedAgentName) {
+    resultMsg += `\nWarning: Could not find agent "${args.assignedAgentId || args.assignedAgentName}" - task created unassigned`;
+  }
+  if (args.parentTaskId) {
+    resultMsg += `\nSubtask of: ${args.parentTaskId}`;
+  }
+
+  return resultMsg;
 }
 
 async function handleUpdateTask(args) {
@@ -460,6 +608,19 @@ async function handleGetSessionContext(args) {
 
 const TOOLS = [
   {
+    name: 'kanban_list_agents',
+    description: 'List all available agents from the sidebar. Use this FIRST before creating tasks to see which agents exist and their IDs. Agents can be assigned to tasks by name (e.g., "Magnus", "Mei", "Laura") or by ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: {
+          type: 'string',
+          description: 'Filter agents by project path. Omit to see all agents.',
+        },
+      },
+    },
+  },
+  {
     name: 'kanban_list_tasks',
     description: 'List all Kanban tasks. Use this to understand the current project context, see what tasks exist, and check workload before creating new tasks.',
     inputSchema: {
@@ -547,7 +708,11 @@ const TOOLS = [
         },
         assignedAgentId: {
           type: 'string',
-          description: 'ID of agent to assign. Omit to leave unassigned.',
+          description: 'ID of agent to assign (exact UUID). Use kanban_list_agents to get agent IDs.',
+        },
+        assignedAgentName: {
+          type: 'string',
+          description: 'Name of agent to assign (e.g., "Magnus", "Mei", "Laura"). Supports fuzzy matching - will find "Agent Magnus" if you pass "Magnus".',
         },
       },
       required: ['title', 'prompt', 'projectPath', 'projectName'],
@@ -676,6 +841,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let result;
 
     switch (name) {
+      case 'kanban_list_agents':
+        result = await handleListAgents(args || {});
+        break;
       case 'kanban_list_tasks':
         result = await handleListTasks(args || {});
         break;

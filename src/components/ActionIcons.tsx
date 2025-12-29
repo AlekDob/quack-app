@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Wrench, Brain, Network, Package } from 'lucide-react';
+import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import './ActionIcons.css';
 
 interface ActionIconsProps {
@@ -167,40 +168,40 @@ function ActionIcons({
       </button>
 
       {/* Terminal Icon */}
-      <button
-        type="button"
-        className={`action-icon ${terminalWindowOpen ? 'active' : ''}`}
-        onClick={onTerminalClick}
-        aria-label="Open Terminals"
-        data-tooltip={terminalWindowOpen ? "Terminals (Open)" : "Terminals"}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect
-            x="1"
-            y="2"
-            width="14"
-            height="12"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            fill="none"
-          />
-          <path
-            d="M3.5 6L6 8L3.5 10"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.5 10H10.5"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-        </svg>
-        <span className="action-icon-tooltip">Terminals</span>
-      </button>
+      <KeyboardShortcutTooltip label="Terminal" shortcut="⌘T">
+        <button
+          type="button"
+          className={`action-icon ${terminalWindowOpen ? 'active' : ''}`}
+          onClick={onTerminalClick}
+          aria-label="Open Terminals (⌘T)"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect
+              x="1"
+              y="2"
+              width="14"
+              height="12"
+              rx="1.5"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              fill="none"
+            />
+            <path
+              d="M3.5 6L6 8L3.5 10"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M7.5 10H10.5"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </KeyboardShortcutTooltip>
 
       {/* Browser Icon */}
       <button
@@ -332,32 +333,33 @@ function ActionIcons({
       </button>
 
       {/* Side Panel Toggle Icon */}
-      <button
-        type="button"
-        className={`action-icon ${!sidePanelCollapsed ? 'active' : ''}`}
-        onClick={onToggleSidePanel}
-        aria-label={sidePanelCollapsed ? "Open side panel" : "Close side panel"}
-        data-tooltip={sidePanelCollapsed ? "Open Side Panel" : "Close Side Panel"}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect
-            x="2"
-            y="2"
-            width="12"
-            height="12"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            fill="none"
-          />
-          <path
-            d="M10 2V14"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
+      <KeyboardShortcutTooltip label="Side Panel" shortcut="⌘B">
+        <button
+          type="button"
+          className={`action-icon ${!sidePanelCollapsed ? 'active' : ''}`}
+          onClick={onToggleSidePanel}
+          aria-label={sidePanelCollapsed ? "Open side panel (⌘B)" : "Close side panel (⌘B)"}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect
+              x="2"
+              y="2"
+              width="12"
+              height="12"
+              rx="1.5"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              fill="none"
+            />
+            <path
+              d="M10 2V14"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </KeyboardShortcutTooltip>
     </div>
   );
 }

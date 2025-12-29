@@ -136,7 +136,8 @@ npm run test:coverage # Coverage report
 ## ✨ Features (`05-features/`)
 
 ### Implemented Features
-- **`tab-popout.md`** ✅ **NEW!** - Tab Popout Window feature (drag tabs to create floating windows, VS Code-style)
+- **`kanban-board.md`** ✅ **UPDATED!** - Kanban Board with 8 MCP tools, fuzzy agent matching, drag-agent-to-kanban, session context
+- **`tab-popout.md`** ✅ - Tab Popout Window feature (drag tabs to create floating windows, VS Code-style)
 - **`mcp-memory-integration.md`** ✅ - MCP Memory hybrid system (Quack + AI memories, unified panel)
 - **`quack-memory-foundation-implementation.md`** ✅ - Quack Memory foundation layer (Phase 1: types, storage, extraction)
 - **`memoryEmbedder-implementation.md`** ✅ - Memory Embedder service (Phase 2: local embeddings with Transformers.js)
@@ -413,11 +414,11 @@ find docs/ -mtime -7 -name "*.md"
 
 ## 📊 Documentation Health
 
-**Last Updated**: 2025-12-16
+**Last Updated**: 2025-12-25
 **Total Docs**: 43+ files
 **Test Coverage**: 232+ tests passing ✅ (including 35 Tab Popout tests)
 **Active Categories**: 7 (merged MCP docs into features)
-**Latest Addition**: Tab Popout Window feature (VS Code-style floating windows)
+**Latest Addition**: Kanban MCP Tools Integration (7 tools, session context reading)
 **Optimization Tasks**: 21 identified (1 completed, 20 pending)
 **Deprecated Docs**: 8 (in archive)
 

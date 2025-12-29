@@ -1,0 +1,67 @@
+/**
+ * KeyboardShortcutsSettings Styles
+ */
+
+.keyboard-shortcuts-settings .settings-row {
+  position: relative;
+}
+
+/* Footer with reset all button */
+.keyboard-shortcuts-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.reset-all-btn {
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reset-all-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.reset-all-btn:active {
+  transform: scale(0.98);
+}
+
+/* Help text */
+.keyboard-shortcuts-help {
+  margin-top: 24px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #71717a;
+  line-height: 1.6;
+}
+
+.keyboard-shortcuts-help p {
+  margin: 0;
+}
+
+.keyboard-shortcuts-help p + p {
+  margin-top: 4px;
+}
+
+.keyboard-shortcuts-help kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: #a1a1aa;
+}
