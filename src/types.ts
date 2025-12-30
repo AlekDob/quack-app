@@ -1366,6 +1366,11 @@ export interface CreateRuleParams {
 export type KanbanStatus = 'todo' | 'in_progress' | 'done';
 
 /**
+ * Type of Kanban task - determines card appearance and behavior
+ */
+export type KanbanTaskType = 'agent' | 'shell' | 'watch';
+
+/**
  * Agent info for Kanban tasks - based on TerminalInfo (active agents in sidebar)
  * This represents the actual agent/terminal that will execute the task
  */
@@ -1389,30 +1394,44 @@ export interface KanbanAssignedAgent {
 }
 
 /**
- * A task on the Kanban board - now supports cross-project view
+ * A task on the Kanban board - supports agent tasks, shell commands, and file watchers
  */
 export interface KanbanTask {
   id: string;
   title: string;                      // Short title for the card
-  prompt: string;                     // Full chat prompt
+  prompt: string;                     // Full chat prompt (for agent tasks)
   status: KanbanStatus;
   assignedAgent?: KanbanAssignedAgent;
+
+  // Task type - determines card appearance and behavior
+  type: KanbanTaskType;               // 'agent' | 'shell' | 'watch' (default: 'agent')
 
   // Project context (derived from assignedAgent or set manually)
   projectPath: string;                // Which project this task belongs to
   projectName: string;                // Display name for the project
   branch?: string;                    // Git branch for the task
 
-  // Session management
+  // Session management (for agent tasks)
   sessionId?: string;                 // Claude SDK session ID for resume
   terminalId?: string;                // Associated terminal ID (if started)
+
+  // Shell task specific fields
+  command?: string;                   // Shell command to run (e.g., "npm run build")
+  exitCode?: number;                  // Process exit code when done
+  pid?: number;                       // Process ID for kill functionality
+
+  // Watch task specific fields
+  watchPatterns?: string[];           // Glob patterns to watch (e.g., ["src/**/*.ts"])
+  watchDebounceMs?: number;           // Debounce delay in ms (default: 300)
+  watchCommand?: string;              // Command to run when files change
+  lastTriggered?: number;             // Timestamp of last trigger
 
   // Timestamps
   createdAt: number;
   startedAt?: number;
   completedAt?: number;
 
-  // Token tracking for cost display
+  // Token tracking for cost display (agent tasks only)
   inputTokens?: number;
   outputTokens?: number;
   cacheCreationTokens?: number;
@@ -1453,7 +1472,7 @@ export interface ShortcutConfig {
 }
 
 /**
- * Initial values when creating a Kanban task from drag-drop
+ * Initial values when creating a Kanban task from drag-drop or /background command
  */
 export interface KanbanTaskInitialValues {
   projectPath: string;
@@ -1463,4 +1482,9 @@ export interface KanbanTaskInitialValues {
   agentName?: string;
   agentAvatar?: string;
   agentColor?: string;
+  // New fields for shell/watch tasks
+  type?: KanbanTaskType;              // Task type (default: 'agent')
+  command?: string;                   // Shell command for shell/watch tasks
+  watchPatterns?: string[];           // Patterns for watch tasks
+  watchDebounceMs?: number;           // Debounce for watch tasks
 }

@@ -2,7 +2,10 @@
  * KanbanCard Component
  *
  * A draggable card representing a task on the Kanban board.
- * Shows task title, project name, assigned agent avatar/name, and color accent.
+ * Supports three task types:
+ * - agent: Claude chat tasks (shows avatar, prompt preview)
+ * - shell: Shell command tasks (shows terminal icon, command, exit code)
+ * - watch: File watcher tasks (shows eye icon, patterns, last triggered)
  *
  * Uses @dnd-kit/sortable for drag-and-drop functionality.
  */
@@ -15,15 +18,24 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import type { KanbanTask } from '../../types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
 
+// Task type colors
+const TASK_TYPE_COLORS = {
+  agent: null, // Uses agent color
+  shell: '#22c55e', // Green
+  watch: '#3b82f6', // Blue
+};
+
 interface KanbanCardProps {
   task: KanbanTask;
   isSelected?: boolean;
-  isLoading?: boolean;        // Whether the chat is currently streaming
+  isLoading?: boolean;        // Whether the chat is currently streaming (agent) or process running (shell)
   hasMessages?: boolean;      // Whether there are messages in the chat
   isDormant?: boolean;        // No user interaction yet (chat empty)
+  shellOutput?: string;       // Shell command output (in-memory, not persisted)
   onClick?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
+  onKill?: () => void;        // Kill running shell/watch process
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
 }
 
@@ -41,9 +53,11 @@ export default function KanbanCard({
   isLoading = false,
   hasMessages = false,
   isDormant = true,
+  shellOutput,
   onClick,
   onDelete,
   onEdit,
+  onKill,
   onProjectClick,
 }: KanbanCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -123,25 +137,68 @@ export default function KanbanCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Get the accent color from the assigned agent, or default
-  const accentColor = task.assignedAgent?.color || '#6b7280';
+  // Get task type (default to 'agent' for backwards compatibility)
+  const taskType = task.type || 'agent';
+  const isShellTask = taskType === 'shell';
+  const isWatchTask = taskType === 'watch';
+  const isAgentTask = taskType === 'agent';
+
+  // Get the accent color based on task type
+  const accentColor = isShellTask
+    ? TASK_TYPE_COLORS.shell
+    : isWatchTask
+      ? TASK_TYPE_COLORS.watch
+      : (task.assignedAgent?.color || '#6b7280');
 
   // Truncate title if too long
   const displayTitle = task.title.length > 40
     ? task.title.substring(0, 40) + '...'
     : task.title;
 
-  // Truncate prompt preview
-  const promptPreview = task.prompt.length > 60
-    ? task.prompt.substring(0, 60) + '...'
+  // Truncate prompt/command preview
+  const previewText = isShellTask || isWatchTask
+    ? (task.command || task.watchCommand || '')
     : task.prompt;
+  const promptPreview = previewText.length > 60
+    ? previewText.substring(0, 60) + '...'
+    : previewText;
+
+  // Get last 3 lines of shell output for preview
+  const getShellOutputPreview = () => {
+    if (!shellOutput) return null;
+    const lines = shellOutput.trim().split('\n');
+    return lines.slice(-3).join('\n');
+  };
+
+  // Format relative time for watch tasks
+  const getLastTriggeredText = () => {
+    if (!task.lastTriggered) return null;
+    const diff = Date.now() - task.lastTriggered;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
 
   // Determine status badge for in_progress tasks
   const getStatusBadge = () => {
     if (task.status !== 'in_progress') return null;
-    if (isLoading) return '⚡'; // Busy/streaming
-    if (isDormant || !hasMessages) return '💤'; // Dormant/no interaction
-    return '💬'; // Has messages, waiting for response
+
+    if (isShellTask) {
+      if (isLoading) return null; // Show spinner instead
+      return null;
+    }
+
+    if (isWatchTask) {
+      return null; // Watch icon is enough
+    }
+
+    // Agent tasks
+    if (isLoading) return null; // Show spinner instead
+    if (isDormant || !hasMessages) return null;
+    return null;
   };
 
   const statusBadge = getStatusBadge();
@@ -169,29 +226,57 @@ export default function KanbanCard({
 
       {/* Card content */}
       <div className="kanban-card-content">
-        {/* Header with title, status badge, and delete button */}
+        {/* Header with title, type badge, status badge, and delete button */}
         <div className="kanban-card-header">
-          <h4 className="kanban-card-title">
-            {displayTitle}
-            {statusBadge && (
-              <span className={badgeClassName}>{statusBadge}</span>
+          <div className="kanban-card-title-row">
+            {/* Task type badge for non-agent tasks */}
+            {!isAgentTask && (
+              <span
+                className="kanban-task-type-badge"
+                style={{ backgroundColor: accentColor }}
+              >
+                {isShellTask ? 'SHELL' : 'WATCH'}
+              </span>
             )}
-          </h4>
-          {onDelete && (
-            <button
-              className="kanban-card-delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              title="Delete task"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
+            <h4 className="kanban-card-title">
+              {displayTitle}
+              {statusBadge && (
+                <span className={badgeClassName}>{statusBadge}</span>
+              )}
+            </h4>
+          </div>
+          <div className="kanban-card-actions">
+            {/* Kill button for running shell/watch tasks */}
+            {(isShellTask || isWatchTask) && task.status === 'in_progress' && task.pid && onKill && (
+              <button
+                className="kanban-card-kill"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onKill();
+                }}
+                title="Kill process"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                </svg>
+              </button>
+            )}
+            {onDelete && (
+              <button
+                className="kanban-card-delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                title="Delete task"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Progress bar when streaming/busy */}
@@ -226,11 +311,45 @@ export default function KanbanCard({
           </svg>
         </button>
 
-        {/* Prompt preview */}
+        {/* Prompt/Command preview */}
         <p className="kanban-card-prompt">{promptPreview}</p>
 
-        {/* Agent info */}
-        {task.assignedAgent && (
+        {/* Shell output preview (last 3 lines) */}
+        {isShellTask && shellOutput && (
+          <div className="kanban-card-shell-output">
+            <pre>{getShellOutputPreview()}</pre>
+          </div>
+        )}
+
+        {/* Watch task info */}
+        {isWatchTask && (
+          <div className="kanban-card-watch-info">
+            {task.watchPatterns && task.watchPatterns.length > 0 && (
+              <div className="kanban-card-watch-patterns">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <span>{task.watchPatterns.slice(0, 2).join(', ')}{task.watchPatterns.length > 2 ? '...' : ''}</span>
+              </div>
+            )}
+            {task.lastTriggered && (
+              <div className="kanban-card-watch-triggered">
+                Last: {getLastTriggeredText()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Shell task exit code */}
+        {isShellTask && task.status === 'done' && task.exitCode !== undefined && (
+          <div className={`kanban-card-exit-code ${task.exitCode === 0 ? 'success' : 'error'}`}>
+            Exit: {task.exitCode}
+          </div>
+        )}
+
+        {/* Agent info - only for agent tasks */}
+        {isAgentTask && task.assignedAgent && (
           <div className="kanban-card-agent">
             {avatarUrl ? (
               <img
@@ -253,27 +372,53 @@ export default function KanbanCard({
         )}
 
 
-        {/* Footer: cost and session ID */}
+        {/* Footer: cost/session for agents, PID for shell/watch */}
         <div className="kanban-card-footer">
-          {task.totalCost !== undefined && task.totalCost > 0 && (
-            <div className="kanban-card-cost">
-              ${task.totalCost.toFixed(4)}
-            </div>
+          {/* Agent task footer */}
+          {isAgentTask && (
+            <>
+              {task.totalCost !== undefined && task.totalCost > 0 && (
+                <div className="kanban-card-cost">
+                  ${task.totalCost.toFixed(4)}
+                </div>
+              )}
+              {task.sessionId && (
+                <div
+                  className="kanban-card-session"
+                  title={`Session: ${task.sessionId}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(task.sessionId!);
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span>{task.sessionId.slice(0, 8)}...</span>
+                </div>
+              )}
+            </>
           )}
-          {task.sessionId && (
-            <div
-              className="kanban-card-session"
-              title={`Session: ${task.sessionId}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(task.sessionId!);
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              <span>{task.sessionId.slice(0, 8)}...</span>
-            </div>
+          {/* Shell/Watch task footer */}
+          {(isShellTask || isWatchTask) && (
+            <>
+              {task.pid && task.status === 'in_progress' && (
+                <div className="kanban-card-pid" title={`Process ID: ${task.pid}`}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 17 10 11 4 5" />
+                    <line x1="12" y1="19" x2="20" y2="19" />
+                  </svg>
+                  <span>PID: {task.pid}</span>
+                </div>
+              )}
+              {isShellTask && task.status === 'done' && (
+                <div className="kanban-card-duration">
+                  {task.startedAt && task.completedAt && (
+                    <span>{Math.round((task.completedAt - task.startedAt) / 1000)}s</span>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -335,7 +480,17 @@ export default function KanbanCard({
  * Simplified card for drag overlay (no interactivity)
  */
 export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
-  const accentColor = task.assignedAgent?.color || '#6b7280';
+  const taskType = task.type || 'agent';
+  const isShellTask = taskType === 'shell';
+  const isWatchTask = taskType === 'watch';
+  const isAgentTask = taskType === 'agent';
+
+  const accentColor = isShellTask
+    ? TASK_TYPE_COLORS.shell
+    : isWatchTask
+      ? TASK_TYPE_COLORS.watch
+      : (task.assignedAgent?.color || '#6b7280');
+
   const displayTitle = task.title.length > 40
     ? task.title.substring(0, 40) + '...'
     : task.title;
@@ -347,11 +502,21 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
         style={{ backgroundColor: accentColor }}
       />
       <div className="kanban-card-content">
-        <h4 className="kanban-card-title">{displayTitle}</h4>
+        <div className="kanban-card-title-row">
+          {!isAgentTask && (
+            <span
+              className="kanban-task-type-badge"
+              style={{ backgroundColor: accentColor }}
+            >
+              {isShellTask ? 'SHELL' : 'WATCH'}
+            </span>
+          )}
+          <h4 className="kanban-card-title">{displayTitle}</h4>
+        </div>
         <div className="kanban-card-project">
           <span>{task.projectName}</span>
         </div>
-        {task.assignedAgent && (
+        {isAgentTask && task.assignedAgent && (
           <div className="kanban-card-agent">
             <span className="kanban-card-agent-name">
               {task.assignedAgent.name}

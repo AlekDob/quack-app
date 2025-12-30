@@ -1,4 +1,4 @@
-import { type MouseEvent, useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { type MouseEvent, useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { Store } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
@@ -43,6 +43,9 @@ interface RepositoryGroupProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onCreateAgent?: () => void; // Create new agent associated with this project
+  // Kanban mode props
+  isKanbanViewActive?: boolean;
+  onToggleKanbanView?: () => void;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -123,6 +126,9 @@ interface SortableAgentProps {
   handleGitOperation: (operation: string, terminal: TerminalInfo) => void;
   isWorktree?: boolean;
   isDraggingAny?: boolean;
+  // Kanban mode props
+  isKanbanViewActive?: boolean;
+  onToggleKanbanView?: () => void;
 }
 
 function SortableAgent({
@@ -138,6 +144,8 @@ function SortableAgent({
   handleGitOperation,
   isWorktree = false,
   isDraggingAny = false,
+  isKanbanViewActive = false,
+  onToggleKanbanView,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -326,8 +334,24 @@ function SortableAgent({
     transition: 'all 0.3s ease',
   }), [isWorktree, showNotificationBadge, agent.color]);
 
+  // 🦆 Track drag state to prevent click after drag
+  const wasDraggedRef = useRef(false);
+
   // Memoize callbacks to prevent recreation
-  const handleSelect = useCallback(() => onSelect(agent), [onSelect, agent]);
+  const handleSelect = useCallback(() => {
+    // Don't trigger click if we just finished dragging
+    if (wasDraggedRef.current) {
+      wasDraggedRef.current = false;
+      return;
+    }
+
+    // If in Kanban mode, switch back to agent view AND select the agent
+    if (isKanbanViewActive && onToggleKanbanView) {
+      onToggleKanbanView();
+    }
+    onSelect(agent);
+  }, [onSelect, agent, isKanbanViewActive, onToggleKanbanView]);
+
   const handleContextMenu = useCallback((e: MouseEvent) => onContextMenu(e, agent), [onContextMenu, agent]);
   const handleClose = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -340,6 +364,8 @@ function SortableAgent({
 
   // Native HTML5 drag handler for dragging agent to Kanban board
   const handleNativeDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    // Mark that we started dragging - will prevent click on drag end
+    wasDraggedRef.current = true;
     // Set custom data type for Kanban to identify this as an agent drag
     e.dataTransfer.setData('application/x-quack-agent', agent.id);
     e.dataTransfer.effectAllowed = 'copy';
@@ -348,6 +374,14 @@ function SortableAgent({
       e.dataTransfer.setDragImage(e.currentTarget, 20, 20);
     }
   }, [agent.id]);
+
+  // Reset drag flag after drag ends (success or cancel)
+  const handleNativeDragEnd = useCallback(() => {
+    // Reset after a short delay to prevent click from firing
+    setTimeout(() => {
+      wasDraggedRef.current = false;
+    }, 100);
+  }, []);
 
   // Get relative time string with opacity - re-calculate on tick change
   const relativeTime = useMemo(() => getRelativeTimeString(lastAssistantTimestamp), [lastAssistantTimestamp, tick]);
@@ -372,6 +406,7 @@ function SortableAgent({
       className="group"
       draggable
       onDragStart={handleNativeDragStart}
+      onDragEnd={handleNativeDragEnd}
     >
       {/* LEFT SECTION: Timing + Metro Station (OUTSIDE colored background) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '35px' }}>
@@ -851,7 +886,9 @@ const MemoizedSortableAgent = memo(SortableAgent, (prevProps, nextProps) => {
     prevProps.isDraggingAny === nextProps.isDraggingAny &&
     prevProps.isWorktree === nextProps.isWorktree &&
     prevProps.chatSessions === nextProps.chatSessions &&
-    prevProps.lastReadTimestamps === nextProps.lastReadTimestamps
+    prevProps.lastReadTimestamps === nextProps.lastReadTimestamps &&
+    prevProps.isKanbanViewActive === nextProps.isKanbanViewActive &&
+    prevProps.onToggleKanbanView === nextProps.onToggleKanbanView
   )
 });
 
@@ -872,6 +909,8 @@ export default function RepositoryGroup({
   onOpenTerminalWindow,
   gitRefreshTrigger,
   onCreateAgent,
+  isKanbanViewActive = false,
+  onToggleKanbanView,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1508,6 +1547,8 @@ export default function RepositoryGroup({
                         handleGitOperation={handleGitOperation}
                         isWorktree={false}
                         isDraggingAny={isDraggingAny}
+                        isKanbanViewActive={isKanbanViewActive}
+                        onToggleKanbanView={onToggleKanbanView}
                       />
                     ))}
                   </SortableContext>
@@ -1790,7 +1831,13 @@ export default function RepositoryGroup({
                           {/* RIGHT SECTION: Colored Background with Avatar + Content */}
                           <div
                             className={`agent-card`}
-                            onClick={() => onSelect(agent)}
+                            onClick={() => {
+                              // If in Kanban mode, switch back to agent view AND select the agent
+                              if (isKanbanViewActive && onToggleKanbanView) {
+                                onToggleKanbanView();
+                              }
+                              onSelect(agent);
+                            }}
                             onContextMenu={(e) => onContextMenu(e, agent)}
                             onMouseEnter={() => setHoveredAgentId(agent.id)}
                             onMouseLeave={() => setHoveredAgentId(null)}

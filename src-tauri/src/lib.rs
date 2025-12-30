@@ -156,6 +156,7 @@ pub fn run() {
         .manage(license::LicenseState::default()) // Register license state
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
+        .manage(background_tasks::KanbanShellManager::new()) // Register Kanban shell manager
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -665,6 +666,9 @@ pub fn run() {
             background_tasks::pause_background_task,
             background_tasks::resume_background_task,
             background_tasks::cancel_background_task,
+            // Kanban shell task commands
+            background_tasks::start_kanban_shell_task,
+            background_tasks::kill_kanban_shell_task,
             // 📦 Claude Assets Manager commands
             claude_assets::list_claude_assets,
             claude_assets::copy_claude_asset,

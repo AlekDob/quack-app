@@ -579,3 +579,193 @@ pub async fn cancel_background_task(
 
     Ok(())
 }
+
+// ==========================================
+// Kanban Shell Task Commands
+// ==========================================
+
+/// State for managing Kanban shell processes
+pub struct KanbanShellManager {
+    /// Map of task_id -> child process handle
+    processes: Mutex<HashMap<String, Child>>,
+}
+
+impl KanbanShellManager {
+    pub fn new() -> Self {
+        Self {
+            processes: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for KanbanShellManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Start a Kanban shell task and return the PID
+#[tauri::command]
+pub async fn start_kanban_shell_task(
+    app: AppHandle,
+    task_id: String,
+    command: String,
+    working_directory: Option<String>,
+) -> Result<u32, String> {
+    log::info!(
+        "[KanbanShell:{}] Starting command: {}",
+        task_id,
+        command
+    );
+
+    // Build the command
+    let mut cmd = if cfg!(target_os = "windows") {
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg(&command);
+        c
+    } else {
+        let mut c = Command::new("sh");
+        c.arg("-c").arg(&command);
+        c
+    };
+
+    if let Some(ref cwd) = working_directory {
+        cmd.current_dir(cwd);
+    }
+
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let mut child = cmd.spawn().map_err(|e| {
+        log::error!("[KanbanShell:{}] Failed to spawn command: {}", task_id, e);
+        format!("Failed to spawn command: {}", e)
+    })?;
+
+    // Get PID before taking stdout/stderr
+    let pid = child.id().ok_or("Failed to get process ID")?;
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
+
+    // Store the child process for later kill
+    let manager: tauri::State<KanbanShellManager> = app.state();
+    {
+        let mut processes = manager.processes.lock().await;
+        processes.insert(task_id.clone(), child);
+    }
+
+    // Spawn task to stream stdout
+    let app_clone = app.clone();
+    let task_id_clone = task_id.clone();
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let _ = app_clone.emit("kanban-shell-output", serde_json::json!({
+                "taskId": task_id_clone,
+                "output": format!("{}\n", line)
+            }));
+        }
+    });
+
+    // Spawn task to stream stderr
+    let app_clone2 = app.clone();
+    let task_id_clone2 = task_id.clone();
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let _ = app_clone2.emit("kanban-shell-output", serde_json::json!({
+                "taskId": task_id_clone2,
+                "output": format!("{}\n", line)
+            }));
+        }
+    });
+
+    // Spawn task to wait for process completion
+    let app_clone3 = app.clone();
+    let task_id_clone3 = task_id.clone();
+    tokio::spawn(async move {
+        // Wait a bit for the process to be stored
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let manager: tauri::State<KanbanShellManager> = app_clone3.state();
+        let mut child = {
+            let mut processes = manager.processes.lock().await;
+            processes.remove(&task_id_clone3)
+        };
+
+        if let Some(ref mut c) = child {
+            match c.wait().await {
+                Ok(status) => {
+                    let exit_code = status.code().unwrap_or(-1);
+                    log::info!(
+                        "[KanbanShell:{}] Process exited with code: {}",
+                        task_id_clone3,
+                        exit_code
+                    );
+                    let _ = app_clone3.emit("kanban-shell-exit", serde_json::json!({
+                        "taskId": task_id_clone3,
+                        "exitCode": exit_code
+                    }));
+                }
+                Err(e) => {
+                    log::error!(
+                        "[KanbanShell:{}] Process wait error: {}",
+                        task_id_clone3,
+                        e
+                    );
+                    let _ = app_clone3.emit("kanban-shell-exit", serde_json::json!({
+                        "taskId": task_id_clone3,
+                        "exitCode": -1
+                    }));
+                }
+            }
+        }
+    });
+
+    log::info!("[KanbanShell:{}] Started with PID: {}", task_id, pid);
+    Ok(pid)
+}
+
+/// Kill a running Kanban shell task
+#[tauri::command]
+pub async fn kill_kanban_shell_task(
+    app: AppHandle,
+    task_id: String,
+    pid: u32,
+) -> Result<(), String> {
+    log::info!("[KanbanShell:{}] Killing process with PID: {}", task_id, pid);
+
+    // Try to kill via the stored process handle first
+    let manager: tauri::State<KanbanShellManager> = app.state();
+    {
+        let mut processes = manager.processes.lock().await;
+        if let Some(mut child) = processes.remove(&task_id) {
+            if let Err(e) = child.kill().await {
+                log::warn!("[KanbanShell:{}] Failed to kill via handle: {}", task_id, e);
+            }
+        }
+    }
+
+    // Also try system kill as backup
+    #[cfg(unix)]
+    {
+        use std::process::Command as StdCommand;
+        let _ = StdCommand::new("kill")
+            .arg("-9")
+            .arg(pid.to_string())
+            .output();
+    }
+
+    #[cfg(windows)]
+    {
+        use std::process::Command as StdCommand;
+        let _ = StdCommand::new("taskkill")
+            .arg("/F")
+            .arg("/PID")
+            .arg(pid.to_string())
+            .output();
+    }
+
+    log::info!("[KanbanShell:{}] Process killed", task_id);
+    Ok(())
+}

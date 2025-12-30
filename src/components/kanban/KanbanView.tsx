@@ -8,7 +8,7 @@
  * Uses @dnd-kit for drag-and-drop functionality.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -28,7 +28,9 @@ import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal, { type KanbanTaskInitialValues } from './AddKanbanTaskModal';
 import KanbanChatDrawer from './KanbanChatDrawer';
+import KanbanShellDrawer from './KanbanShellDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
+import { useKanbanShellTask } from '../../hooks/useKanbanShellTask';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
@@ -98,6 +100,22 @@ export default function KanbanView({
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
   // Initial values for modal when agent is dragged from sidebar
   const [modalInitialValues, setModalInitialValues] = useState<KanbanTaskInitialValues | null>(null);
+  // Shell drawer state (separate from chat drawer)
+  const [isShellDrawerOpen, setIsShellDrawerOpen] = useState(false);
+  const [selectedShellTaskId, setSelectedShellTaskId] = useState<string | null>(null);
+
+  // Shell task management hook
+  const {
+    outputs: shellOutputs,
+    startShellTask,
+    killShellTask,
+    getTaskOutput,
+    isTaskRunning,
+    clearOutput,
+  } = useKanbanShellTask();
+
+  // Track which shell tasks we've already started to avoid double-starting
+  const startedShellTasksRef = useRef<Set<string>>(new Set());
 
   // Custom collision detection that prioritizes columns over cards
   // This makes dropping on columns much easier
@@ -145,6 +163,25 @@ export default function KanbanView({
     };
     initializeKanban();
   }, [loadTasks, onLoadChatSessions]);
+
+  // Auto-start shell tasks that are in_progress but not yet running
+  useEffect(() => {
+    const shellTasksToStart = tasks.filter(task =>
+      task.type === 'shell' &&
+      task.status === 'in_progress' &&
+      task.command &&
+      !task.pid && // No PID means not started yet
+      !task.completedAt && // Not already completed
+      !startedShellTasksRef.current.has(task.id) &&
+      !isTaskRunning(task.id)
+    );
+
+    shellTasksToStart.forEach(task => {
+      console.log(`[KanbanView] Auto-starting shell task: ${task.id} - ${task.command}`);
+      startedShellTasksRef.current.add(task.id);
+      startShellTask(task.id);
+    });
+  }, [tasks, isTaskRunning, startShellTask]);
 
 
   // Configure drag sensors
@@ -215,18 +252,39 @@ export default function KanbanView({
     }
   };
 
-  // Handle card click
+  // Handle card click - different behavior for agent vs shell/watch tasks
   const handleTaskClick = useCallback((task: KanbanTask) => {
-    selectTask(task.id);
-    openDrawer();
-  }, [selectTask, openDrawer]);
+    const taskType = task.type || 'agent';
+
+    if (taskType === 'shell' || taskType === 'watch') {
+      // Open shell drawer for shell/watch tasks
+      setSelectedShellTaskId(task.id);
+      setIsShellDrawerOpen(true);
+      // Close agent drawer if open
+      closeDrawer();
+    } else {
+      // Open chat drawer for agent tasks
+      selectTask(task.id);
+      openDrawer();
+      // Close shell drawer if open
+      setIsShellDrawerOpen(false);
+      setSelectedShellTaskId(null);
+    }
+  }, [selectTask, openDrawer, closeDrawer]);
 
   // Handle task deletion
   const handleTaskDelete = useCallback((taskId: string) => {
     if (confirm('Are you sure you want to delete this task?')) {
       deleteTask(taskId);
+      // Also clear shell output if this was a shell task
+      clearOutput(taskId);
+      // Close shell drawer if this task was selected
+      if (selectedShellTaskId === taskId) {
+        setIsShellDrawerOpen(false);
+        setSelectedShellTaskId(null);
+      }
     }
-  }, [deleteTask]);
+  }, [deleteTask, clearOutput, selectedShellTaskId]);
 
   // Handle task edit (open modal in edit mode)
   const handleTaskEdit = useCallback((task: KanbanTask) => {
@@ -261,7 +319,7 @@ export default function KanbanView({
         attachments,
       });
     } else {
-      // Create new task
+      // Create new task (default to agent type)
       await addTask({
         title,
         prompt,
@@ -271,6 +329,7 @@ export default function KanbanView({
         branch,
         assignedAgent: agent,
         attachments,
+        type: 'agent',
       });
     }
     setIsModalOpen(false);
@@ -317,8 +376,43 @@ export default function KanbanView({
     setIsModalOpen(true);
   }, [terminals]);
 
+  // Handle shell drawer close
+  const handleShellDrawerClose = useCallback(() => {
+    setIsShellDrawerOpen(false);
+    setSelectedShellTaskId(null);
+  }, []);
+
+  // Handle shell task start
+  const handleShellStart = useCallback(async (taskId: string) => {
+    await startShellTask(taskId);
+  }, [startShellTask]);
+
+  // Handle shell task kill
+  const handleShellKill = useCallback(async (taskId: string) => {
+    await killShellTask(taskId);
+  }, [killShellTask]);
+
+  // Handle shell output clear
+  const handleShellClearOutput = useCallback((taskId: string) => {
+    clearOutput(taskId);
+  }, [clearOutput]);
+
+  // Handle kill from card (without opening drawer)
+  const handleCardKill = useCallback(async (taskId: string) => {
+    await killShellTask(taskId);
+  }, [killShellTask]);
+
   // Get selected task for drawer
   const selectedTask = getSelectedTask();
+
+  // Convert shell outputs to format expected by columns
+  const shellOutputsForColumns = new Map<string, { output: string; isRunning: boolean }>();
+  shellOutputs.forEach((value, key) => {
+    shellOutputsForColumns.set(key, {
+      output: value.output,
+      isRunning: value.isRunning,
+    });
+  });
 
   if (isLoading) {
     return (
@@ -378,9 +472,11 @@ export default function KanbanView({
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
+            onTaskKill={handleCardKill}
             onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            shellOutputs={shellOutputsForColumns}
             isDropTarget={overColumnId === 'todo'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
           />
@@ -399,9 +495,11 @@ export default function KanbanView({
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
+            onTaskKill={handleCardKill}
             onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            shellOutputs={shellOutputsForColumns}
             isDropTarget={overColumnId === 'in_progress'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
           />
@@ -420,9 +518,11 @@ export default function KanbanView({
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
+            onTaskKill={handleCardKill}
             onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            shellOutputs={shellOutputsForColumns}
             isDropTarget={overColumnId === 'done'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
           />
@@ -445,7 +545,7 @@ export default function KanbanView({
         initialValues={modalInitialValues}
       />
 
-      {/* Chat Drawer */}
+      {/* Chat Drawer - for agent tasks */}
       <KanbanChatDrawer
         task={selectedTask}
         isOpen={isDrawerOpen}
@@ -464,6 +564,18 @@ export default function KanbanView({
         defaultThinkingMode={defaultThinkingMode}
         defaultPermissionMode={defaultPermissionMode}
         defaultEffort={defaultEffort}
+      />
+
+      {/* Shell Drawer - for shell/watch tasks */}
+      <KanbanShellDrawer
+        task={selectedShellTaskId ? tasks.find(t => t.id === selectedShellTaskId) || null : null}
+        isOpen={isShellDrawerOpen}
+        onClose={handleShellDrawerClose}
+        output={selectedShellTaskId ? getTaskOutput(selectedShellTaskId) : ''}
+        isRunning={selectedShellTaskId ? isTaskRunning(selectedShellTaskId) : false}
+        onKill={() => selectedShellTaskId && handleShellKill(selectedShellTaskId)}
+        onStart={() => selectedShellTaskId && handleShellStart(selectedShellTaskId)}
+        onClearOutput={() => selectedShellTaskId && handleShellClearOutput(selectedShellTaskId)}
       />
     </div>
   );

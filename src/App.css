@@ -8125,6 +8125,54 @@ button.directory-chooser:hover {
   line-height: 1;
 }
 
+/* ===== Sidebar Kanban Button ===== */
+.sidebar-kanban-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 20px;
+  background: rgba(59, 130, 246, 0.08);
+  border: none;
+  border-top: 1px solid rgba(59, 130, 246, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-kanban-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar-kanban-btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-top-color: rgba(59, 130, 246, 0.3);
+}
+
+.sidebar-kanban-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-kanban-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+}
+
+.sidebar-kanban-btn.active .sidebar-kanban-btn-icon {
+  opacity: 1;
+}
+
+.sidebar-kanban-btn span {
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* ========================================
    Context Panel Styles
    ======================================== */

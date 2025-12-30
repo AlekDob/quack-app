@@ -77,6 +77,7 @@ export const useKanbanStore = create<KanbanState>()(
             ...taskData,
             id: generateTaskId(),
             createdAt: Date.now(),
+            type: taskData.type || 'agent', // Default to agent task
           };
 
           const tasks = [...get().tasks, newTask];

@@ -25,7 +25,7 @@ import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
-import BackgroundTasksSidebarButton from "./BackgroundTasksSidebarButton";
+import { useKanbanStore } from '../stores/kanbanStore';
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
@@ -49,6 +49,9 @@ interface SortableRepositoryGroupProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number;
   onCreateAgent?: () => void; // Create new agent associated with this project
+  // Kanban mode props
+  isKanbanViewActive?: boolean;
+  onToggleKanbanView?: () => void;
 }
 
 function SortableRepositoryGroup({
@@ -167,7 +170,6 @@ interface TerminalSidebarProps {
   onOpenSettings?: () => void; // Open settings panel
   onOpenGitPanel?: () => void; // Open Git Panel drawer
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
-  onOpenBackgroundTasks?: () => void; // Open Background Tasks drawer
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
 }
 
@@ -209,9 +211,10 @@ export default function TerminalSidebar({
   onOpenSettings,
   onOpenGitPanel,
   onOpenTerminalWindow,
-  onOpenBackgroundTasks,
   gitRefreshTrigger,
 }: TerminalSidebarProps) {
+  // Kanban store for toggling Kanban view (replaces old Background Tasks)
+  const { setKanbanViewActive } = useKanbanStore();
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
   void _onUpdateAgentChat; // Will be used in rename functionality (Phase 4)
@@ -455,8 +458,13 @@ export default function TerminalSidebar({
   }, [filteredTerminals]);
 
   // SIMPLE: Just select terminal - no AgentChat logic!
+  // If in Kanban mode, also switch back to Agent view
   const handleSelectTerminal = (terminal: TerminalInfo) => {
     onSelect(terminal.id);
+    // If we're in Kanban mode, switch back to Agent view when clicking an agent
+    if (isKanbanViewActive && onToggleKanbanView) {
+      onToggleKanbanView();
+    }
   };
 
   const handleContextMenu = (event: MouseEvent, terminal: TerminalInfo) => {
@@ -806,6 +814,8 @@ export default function TerminalSidebar({
                     onOpenTerminalWindow={onOpenTerminalWindow}
                     gitRefreshTrigger={gitRefreshTrigger}
                     onCreateAgent={onCreateAgent}
+                    isKanbanViewActive={isKanbanViewActive}
+                    onToggleKanbanView={onToggleKanbanView}
                   />
                 );
               })}
@@ -898,10 +908,24 @@ export default function TerminalSidebar({
         />
       )}
 
-      {/* Background Tasks Button */}
-      {onOpenBackgroundTasks && (
-        <BackgroundTasksSidebarButton onClick={onOpenBackgroundTasks} />
-      )}
+      {/* Kanban Board Button (replaces old Background Tasks) */}
+      <button
+        type="button"
+        className={`sidebar-kanban-btn ${isKanbanViewActive ? 'active' : ''}`}
+        onClick={() => setKanbanViewActive(!isKanbanViewActive)}
+        title={isKanbanViewActive ? 'Exit Kanban Board' : 'Open Kanban Board'}
+      >
+        <div className="sidebar-kanban-btn-content">
+          <div className="sidebar-kanban-btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="5" height="18" rx="1" />
+              <rect x="10" y="3" width="5" height="12" rx="1" />
+              <rect x="17" y="3" width="5" height="8" rx="1" />
+            </svg>
+          </div>
+          <span>Kanban Board</span>
+        </div>
+      </button>
 
       {/* Settings Button */}
       {onOpenSettings && (

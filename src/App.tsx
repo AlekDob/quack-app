@@ -42,9 +42,10 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
-import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
-import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
-import { runDroidInBackground } from "./services/backgroundAgentService";
+// Old Background Tasks system - replaced by Kanban shell tasks
+// import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
+// import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
+// import { runDroidInBackground } from "./services/backgroundAgentService";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import TabBar, { type Tab, type PopoutPosition } from "./components/TabBar";
 import { useTabPopoutWindow } from "./hooks/useTabPopoutWindow";
@@ -155,7 +156,8 @@ import { getRandomName } from "./utils/agentNames";
 import "./App.css";
 import "./components/MetroStyle.css";
 import "./components/DrawerAnimations.css";
-import "./components/BackgroundTasks.css";
+// Old Background Tasks CSS - no longer needed, Kanban has its own styles
+// import "./components/BackgroundTasks.css";
 
 const INTRO_REPLAY_DURATION_MS = 5000;
 
@@ -263,8 +265,8 @@ function AppContent() {
     userStats,
   } = useDroidFactory();
 
-  // Background Agents initialization
-  useBackgroundAgentInit();
+  // Old Background Agents initialization - removed, using Kanban shell tasks now
+  // useBackgroundAgentInit();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();
@@ -596,7 +598,8 @@ function AppContent() {
 
   // Background state
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
-  const [showBackgroundTasksDrawer, setShowBackgroundTasksDrawer] = useState(false);
+  // Old Background Tasks drawer - replaced by Kanban
+  // const [showBackgroundTasksDrawer, setShowBackgroundTasksDrawer] = useState(false);
 
   // 💰 License and upgrade modals state
   const [showLicenseModal, setShowLicenseModal] = useState(false);
@@ -1437,17 +1440,9 @@ function AppContent() {
                         console.log(`[Memory Observer] Launching for ${toolExecutions.length} tool(s):`,
                           toolExecutions.map(t => t.name).join(', '));
 
-                        // Use runDroidInBackground but with built-in prompt
-                        runDroidInBackground(
-                          'quack-memory-observer',
-                          'Memory Observer',
-                          memoryObserverPrompt,
-                          {
-                            model: 'haiku',
-                            priority: 'low',
-                            workingDirectory: explorerPath || undefined,
-                          }
-                        );
+                        // TODO: Memory Observer now needs to use Kanban shell tasks
+                        // Old runDroidInBackground removed, needs migration
+                        console.log('[Memory Observer] Background agent not yet migrated to Kanban');
                       } else {
                         console.log('[Memory Observer] Skipping - conditions not met:', {
                           enabled: settings.enabled,
@@ -8390,7 +8385,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenSettings={() => setShowSettings(true)}
           onOpenGitPanel={() => setShowGitDrawer(true)}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
-          onOpenBackgroundTasks={() => setShowBackgroundTasksDrawer(true)}
+          // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
         />
 
@@ -9298,10 +9293,7 @@ You have access to all Bash tools to execute git commands like:
           userStats={userStats}
         />
 
-        <BackgroundTasksDrawer
-          open={showBackgroundTasksDrawer}
-          onClose={() => setShowBackgroundTasksDrawer(false)}
-        />
+        {/* Old BackgroundTasksDrawer - removed, replaced by Kanban shell tasks */}
 
         {/* Kanban toast notifications for Claude tool events */}
         <KanbanToast />

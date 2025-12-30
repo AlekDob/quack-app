@@ -7,9 +7,9 @@ import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
 import AgentRulesBanner from './AgentRulesBanner';
-import { useBackgroundAgentStore } from '../stores/backgroundAgentStore';
+import { useKanbanStore } from '../stores/kanbanStore';
 import { useAgentRules } from '../hooks/useAgentRules';
-import type { ChatMessage, AgentInfo, BackgroundTaskType, BackgroundTaskPriority } from '../types';
+import type { ChatMessage, AgentInfo } from '../types';
 import type {
   ChatSendOptions,
   ThinkingMode,
@@ -176,7 +176,9 @@ export default function ChatView({
         }
 
         const args = commandArgs.trim();
-        const { createTask } = useBackgroundAgentStore.getState();
+        const { addTask } = useKanbanStore.getState();
+        const projectPath = basePath || '/';
+        const projectName = projectPath.split('/').pop() || 'Unknown';
 
         // Check if it's an agent invocation: @agentname prompt
         const agentMatch = args.match(/^@(\w+)\s+(.+)$/s);
@@ -184,41 +186,29 @@ export default function ChatView({
         if (agentMatch) {
           // Agent task: /background @code-reviewer Review this code
           const [, agentName, prompt] = agentMatch;
-          createTask({
-            name: `Agent: ${agentName}`,
-            type: 'agent' as BackgroundTaskType,
-            priority: 'medium' as BackgroundTaskPriority,
-            agentId: agentName,
+          await addTask({
+            title: `Agent: ${agentName}`,
             prompt: prompt,
-            workingDirectory: basePath || process.cwd(),
+            status: 'in_progress',
+            projectPath,
+            projectName,
+            type: 'agent',
           });
-          toast.success(`Background task created: Agent ${agentName}`);
+          toast.success(`Kanban task created: Agent ${agentName}`);
         } else {
           // Shell command task: /background npm run build
-          // Determine task type from command
-          // NOTE: 'watch' type requires watchPatterns, so we only use it for explicit watch commands
-          // Dev servers (like tauri:dev, vite dev) should be 'build' type
-          let taskType: BackgroundTaskType = 'custom';
-          if (args.includes('build') || args.includes('compile') || args.includes('dev')) {
-            taskType = 'build';
-          } else if (args.includes('test') || args.includes('vitest') || args.includes('jest')) {
-            taskType = 'test';
-          } else if (args.includes('watch')) {
-            // Only use 'watch' type if command explicitly contains 'watch'
-            // This still won't work without watchPatterns, so treat as 'custom' for now
-            taskType = 'custom';
-          } else if (args.includes('lint') || args.includes('analyze') || args.includes('audit')) {
-            taskType = 'analysis';
-          }
-
-          createTask({
-            name: args.length > 40 ? args.substring(0, 40) + '...' : args,
-            type: taskType,
-            priority: 'medium' as BackgroundTaskPriority,
+          // Create as shell task in Kanban
+          const taskTitle = args.length > 40 ? args.substring(0, 40) + '...' : args;
+          await addTask({
+            title: taskTitle,
+            prompt: args,
+            status: 'in_progress', // Auto-start shell tasks
+            projectPath,
+            projectName,
+            type: 'shell',
             command: args,
-            workingDirectory: basePath || process.cwd(),
           });
-          toast.success(`Background task created: ${args.length > 30 ? args.substring(0, 30) + '...' : args}`);
+          toast.success(`Kanban shell task created: ${args.length > 30 ? args.substring(0, 30) + '...' : args}`);
         }
         return; // Don't send as normal message
       }
