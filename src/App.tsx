@@ -281,7 +281,10 @@ function AppContent() {
   const { openMemoryGraphTab } = useMemoryGraphTab();
 
   // Kanban View state from store
-  const { isKanbanViewActive, toggleKanbanView, loadTasks: loadKanbanTasks } = useKanbanStore();
+  const { isKanbanViewActive, toggleKanbanView, loadTasks: loadKanbanTasks, tasks: kanbanTasks } = useKanbanStore();
+
+  // Count tasks in progress for badge
+  const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
 
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
@@ -2117,8 +2120,8 @@ function AppContent() {
   // These versions accept a targetAgentId parameter for Kanban tasks
   // ============================================
 
-  // 🦆 Load Kanban task chat sessions from saved sessionIds
-  // This restores conversations after app restart
+  // 🦆 Load Kanban task chat sessions from Quack storage first (preserves events for tool widgets)
+  // Falls back to Rust backend if not found in storage
   const loadKanbanChatSessions = useCallback(async () => {
     const { tasks } = useKanbanStore.getState();
     const tasksWithSessions = tasks.filter(t => t.sessionId);
@@ -2130,18 +2133,65 @@ function AppContent() {
 
     console.log(`[loadKanbanChatSessions] Loading ${tasksWithSessions.length} Kanban chat sessions...`);
 
+    // Load Quack storage first (contains full ChatMessage[] with events for tool widgets)
+    let store: Awaited<ReturnType<typeof Store.load>> | null = null;
+    try {
+      store = await Store.load('quack-chats.json');
+    } catch (error) {
+      console.warn('[loadKanbanChatSessions] Could not load quack-chats.json store:', error);
+    }
+
     for (const task of tasksWithSessions) {
       if (!task.sessionId) continue;
 
       try {
-        // Load session details from Rust backend
+        // 🦆 FIX: First try to load from Quack storage (preserves events for tool widgets)
+        if (store) {
+          const savedChat = await store.get<{
+            messages: ChatMessage[];
+            tokens?: { inputTokens: number; outputTokens: number };
+            sessionId?: string;
+            timestamp?: number;
+          }>(`chat-${task.id}`);
+
+          if (savedChat?.messages && savedChat.messages.length > 0) {
+            // Use saved messages directly - they have events for tool widget rendering
+            setChatSessions(prev => {
+              const newSessions = new Map(prev);
+              newSessions.set(task.id, savedChat.messages);
+              return newSessions;
+            });
+
+            // Also restore tokens if available
+            if (savedChat.tokens) {
+              setChatTokensMap(prev => {
+                const newMap = new Map(prev);
+                // Provide defaults for missing fields (older saves may not have all fields)
+                newMap.set(task.id, {
+                  inputTokens: savedChat.tokens!.inputTokens || 0,
+                  outputTokens: savedChat.tokens!.outputTokens || 0,
+                  cacheCreationTokens: (savedChat.tokens as { cacheCreationTokens?: number }).cacheCreationTokens || 0,
+                  cacheReadTokens: (savedChat.tokens as { cacheReadTokens?: number }).cacheReadTokens || 0,
+                  totalCost: (savedChat.tokens as { totalCost?: number }).totalCost || 0,
+                });
+                return newMap;
+              });
+            }
+
+            console.log(`[loadKanbanChatSessions] Restored ${savedChat.messages.length} messages with events for task ${task.id} from Quack storage`);
+            continue; // Successfully loaded, skip Rust backend fallback
+          }
+        }
+
+        // Fallback: Load from Rust backend (loses events, shows raw text only)
+        console.log(`[loadKanbanChatSessions] Falling back to Rust backend for task ${task.id}`);
         const details = await invoke<{
           id: string;
           messages: Array<{ role: string; content: string; timestamp?: number }>;
         }>('get_session_details', { sessionId: task.sessionId });
 
         if (details?.messages && details.messages.length > 0) {
-          // Convert SessionHistoryMessage to ChatMessage
+          // Convert SessionHistoryMessage to ChatMessage (without events - raw text display)
           const chatMessages: ChatMessage[] = details.messages.map((msg, index) => ({
             id: `kanban-${task.id}-restored-${index}`,
             role: msg.role as 'user' | 'assistant',
@@ -2150,14 +2200,13 @@ function AppContent() {
             status: 'complete' as const,
           }));
 
-          // Add to chatSessions using task.id as key (not sessionId!)
           setChatSessions(prev => {
             const newSessions = new Map(prev);
             newSessions.set(task.id, chatMessages);
             return newSessions;
           });
 
-          console.log(`[loadKanbanChatSessions] Restored ${chatMessages.length} messages for task ${task.id} (session: ${task.sessionId})`);
+          console.log(`[loadKanbanChatSessions] Restored ${chatMessages.length} messages (raw text) for task ${task.id} from Rust backend`);
         }
       } catch (error) {
         console.warn(`[loadKanbanChatSessions] Failed to load session ${task.sessionId} for task ${task.id}:`, error);
@@ -2165,6 +2214,26 @@ function AppContent() {
       }
     }
   }, []);
+
+  // 🦆 Save Kanban chat session to persistent storage for MCP access
+  const saveKanbanChatSession = useCallback(async (taskId: string, messages: ChatMessage[], sessionId?: string) => {
+    try {
+      const store = await Store.load('quack-chats.json');
+      const tokens = chatTokensMap.get(taskId);
+
+      await store.set(`chat-${taskId}`, {
+        messages,
+        tokens,
+        sessionId,
+        timestamp: Date.now(),
+      });
+      await store.save();
+
+      console.log(`[saveKanbanChatSession] Saved ${messages.length} messages for task ${taskId}`);
+    } catch (error) {
+      console.warn('[saveKanbanChatSession] Failed to save chat:', error);
+    }
+  }, [chatTokensMap]);
 
   // Send message for a specific agent (used by Kanban)
   const sendMessageForTargetAgent = useCallback(async (targetAgentId: string, content: string, options?: ChatSendOptions) => {
@@ -2313,7 +2382,8 @@ function AppContent() {
             model: options?.model || 'sonnet',
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
-            attachments: options?.attachments || [],
+            // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
+            attachments: (options?.attachments || []).map(att => att.path).filter(Boolean),
             cwd: options?.workingDirectory || '/',
             sessionId: existingSessionId, // 🦆 Pass existing sessionId for conversation continuity
             effort: options?.effort,
@@ -2401,6 +2471,15 @@ function AppContent() {
       const taskCwd = updatedKanbanTask?.projectPath || '';
       notifyAgentReadyRef.current({ id: targetAgentId, label: taskLabel, cwd: taskCwd });
 
+      // 🦆 Save chat session to persistent storage for MCP Kanban access
+      // Get the updated messages after setChatSessions has completed
+      setChatSessions((prevSessions) => {
+        const updatedMessages = prevSessions.get(targetAgentId) || [];
+        // Fire and forget - don't block on this
+        saveKanbanChatSession(targetAgentId, updatedMessages, response.session_id);
+        return prevSessions; // Don't modify state, just read it
+      });
+
     } catch (err) {
       console.error('[sendMessageForTargetAgent] Error:', err);
 
@@ -2436,7 +2515,7 @@ function AppContent() {
       activeStreamsRef.current.get(targetAgentId)?.delete(streamKey);
       abortControllersRef.current.delete(streamKey);
     }
-  }, [isChatConfigured, chatSessions, ensureListenerReady]);
+  }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession]);
 
   // Abort stream for a specific agent (used by Kanban)
   const abortStreamForTargetAgent = useCallback((targetAgentId: string) => {
@@ -8291,6 +8370,7 @@ You have access to all Bash tools to execute git commands like:
           // Kanban View props
           isKanbanViewActive={isKanbanViewActive}
           onToggleKanbanView={handleToggleKanbanView}
+          inProgressTaskCount={inProgressTaskCount}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
           quackSoundEnabled={quackSoundEnabled}

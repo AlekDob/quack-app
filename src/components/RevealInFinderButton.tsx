@@ -27,14 +27,14 @@ export default function RevealInFinderButton({
   return (
     <button
       onClick={handleReveal}
-      className={`reveal-in-finder-button ${className}`}
+      className={`reveal-in-finder-btn ${className}`}
       title={label}
       type="button"
     >
-      {/* Folder icon SVG */}
+      {/* Folder icon SVG - compact size to match @ button */}
       <svg
-        width="16"
-        height="16"
+        width="12"
+        height="12"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"

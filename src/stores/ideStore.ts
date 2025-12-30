@@ -184,19 +184,25 @@ export const useIDEStore = create<IDEState>()(
       // IDE Operations
       openFileInIDE: async (path: string, line?: number, column?: number) => {
         const { preferredIDE } = get();
+        console.log('[IDE Store] openFileInIDE called. Current preferredIDE from store:', preferredIDE);
+
         if (!preferredIDE) {
+          console.error('[IDE Store] No preferred IDE set!');
           throw new Error('No preferred IDE set');
         }
 
         console.log('[IDE Store] Opening file:', { path, line, column, ideId: preferredIDE });
 
         // Use dedicated Rust command that handles path escaping correctly
-        return invoke<string>('open_file_in_ide', {
+        const result = await invoke<string>('open_file_in_ide', {
           ideId: preferredIDE,
           filePath: path,
           line: line ?? null,
           column: column ?? null,
         });
+
+        console.log('[IDE Store] Rust command result:', result);
+        return result;
       },
 
       openMultipleFilesInIDE: async (paths: string[]) => {

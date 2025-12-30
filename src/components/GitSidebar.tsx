@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { GitBranch, TerminalInfo } from '../types'
+import type { GitBranch, TerminalInfo, GitWorktree } from '../types'
 import { AgentAvatar } from './AgentAvatar'
 import './GitSidebar.css'
 
@@ -10,6 +10,9 @@ interface GitSidebarProps {
   onBranchSwitch?: (branchName: string) => void
   unstagedCount: number
   onMerge?: (sourceBranch: string, targetBranch: string) => Promise<void>
+  worktrees?: GitWorktree[]
+  onRemoveWorktree?: (worktreePath: string, force?: boolean) => Promise<void>
+  onOpenWorktree?: (worktreePath: string) => void
 }
 
 type SectionState = {
@@ -17,6 +20,7 @@ type SectionState = {
   remotes: boolean
   tags: boolean
   stashes: boolean
+  worktrees: boolean
 }
 
 type BranchFolder = {
@@ -29,6 +33,9 @@ function GitSidebar({
   onBranchSwitch,
   unstagedCount,
   onMerge,
+  worktrees = [],
+  onRemoveWorktree,
+  onOpenWorktree,
 }: GitSidebarProps) {
   const [filter, setFilter] = useState('')
   const [collapsed, setCollapsed] = useState<SectionState>({
@@ -36,6 +43,7 @@ function GitSidebar({
     remotes: false,
     tags: true,
     stashes: true,
+    worktrees: false,
   })
   const [branchFolders, setBranchFolders] = useState<{ [key: string]: boolean }>({})
   const [draggingBranch, setDraggingBranch] = useState<string | null>(null)
@@ -79,6 +87,13 @@ function GitSidebar({
     })
     return remotes
   }, [branches])
+
+  // Filter worktrees - exclude the main worktree (first one is usually the main repo)
+  const secondaryWorktrees = useMemo(() => {
+    if (worktrees.length <= 1) return []
+    // First worktree is typically the main repo, rest are secondary
+    return worktrees.slice(1).filter(wt => !wt.isBare)
+  }, [worktrees])
 
   const toggleSection = (section: keyof SectionState) => {
     setCollapsed((prev) => ({ ...prev, [section]: !prev[section] }))
@@ -188,6 +203,52 @@ function GitSidebar({
         console.error('Merge failed:', error)
       }
     }
+  }
+
+  const handleRemoveWorktree = async (worktreePath: string, branchName: string, force = false) => {
+    if (!onRemoveWorktree) return
+
+    // First confirmation (only if not forcing)
+    if (!force) {
+      const confirmed = window.confirm(
+        `Remove worktree for branch '${branchName}'?\n\nThis will delete the folder:\n${worktreePath}\n\nMake sure all changes are committed and pushed.`
+      )
+      if (!confirmed) return
+    }
+
+    try {
+      await onRemoveWorktree(worktreePath, force)
+    } catch (error) {
+      const errorStr = String(error)
+      console.error('Failed to remove worktree:', error)
+
+      // Check if error is about modified/untracked files
+      if (errorStr.includes('modified or untracked files') || errorStr.includes('contains modified')) {
+        const forceConfirmed = window.confirm(
+          `The worktree contains uncommitted changes.\n\nDo you want to force delete it anyway?\n\nWARNING: All uncommitted changes will be lost!`
+        )
+        if (forceConfirmed) {
+          try {
+            await onRemoveWorktree(worktreePath, true)
+          } catch (forceError) {
+            alert(`Failed to force remove worktree: ${forceError}`)
+          }
+        }
+      } else {
+        alert(`Failed to remove worktree: ${error}`)
+      }
+    }
+  }
+
+  const handleOpenWorktree = (worktreePath: string) => {
+    if (onOpenWorktree) {
+      onOpenWorktree(worktreePath)
+    }
+  }
+
+  // Get display name from path (last folder name)
+  const getWorktreeDisplayName = (path: string) => {
+    return path.split('/').pop() || path
   }
 
   return (
@@ -535,6 +596,101 @@ function GitSidebar({
         {!collapsed.stashes && (
           <div className="git-sidebar-section-content">
             <div className="git-empty">No stashes</div>
+          </div>
+        )}
+      </section>
+
+      {/* Worktrees Section */}
+      <section className="git-sidebar-section">
+        <button
+          type="button"
+          className="git-sidebar-section-header"
+          onClick={() => toggleSection('worktrees')}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            style={{
+              transform: collapsed.worktrees ? 'rotate(0deg)' : 'rotate(90deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <span>Worktrees</span>
+          {secondaryWorktrees.length > 0 && (
+            <span className="git-sidebar-section-count">{secondaryWorktrees.length}</span>
+          )}
+        </button>
+        {!collapsed.worktrees && (
+          <div className="git-sidebar-section-content">
+            {secondaryWorktrees.length === 0 ? (
+              <div className="git-empty">No worktrees</div>
+            ) : (
+              secondaryWorktrees.map((wt) => {
+                const agent = getAgentForBranch(wt.branch)
+                return (
+                  <div key={wt.path} className="git-sidebar-worktree-item">
+                    <button
+                      type="button"
+                      className="git-sidebar-worktree-main"
+                      onClick={() => handleOpenWorktree(wt.path)}
+                      title={`Open worktree: ${wt.path}`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                      </svg>
+                      <div className="git-sidebar-worktree-info">
+                        <span className="git-sidebar-worktree-name">
+                          {getWorktreeDisplayName(wt.path)}
+                        </span>
+                        <span className="git-sidebar-worktree-branch">
+                          {wt.isDetached ? `(${wt.commitHash.slice(0, 7)})` : wt.branch}
+                        </span>
+                      </div>
+                      {agent && (
+                        <AgentAvatar
+                          agentName={agent.label}
+                          avatarFilename={agent.avatar}
+                          alt={agent.label}
+                          className="git-sidebar-branch-avatar"
+                        />
+                      )}
+                    </button>
+                    <div className="git-sidebar-worktree-actions">
+                      <button
+                        type="button"
+                        className="git-sidebar-worktree-action merge"
+                        onClick={() => handleMerge(wt.branch)}
+                        title={`Merge ${wt.branch} into current branch`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="18" cy="18" r="3" />
+                          <circle cx="6" cy="6" r="3" />
+                          <path d="M6 21V9a9 9 0 0 0 9 9" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="git-sidebar-worktree-action remove"
+                        onClick={() => handleRemoveWorktree(wt.path, wt.branch)}
+                        title="Remove worktree"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
         )}
       </section>

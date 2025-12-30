@@ -30,7 +30,7 @@
 .file-explorer .explorer-row {
   gap: 0.3rem; /* 0.35rem → 0.3rem - more compact */
   padding: 0.1rem 0.35rem; /* 0.15rem 0.4rem → 0.1rem 0.35rem - more compact */
-  margin-bottom: 0; /* Remove margin between rows */
+  margin-bottom: 0; /* No margin for files */
   border-radius: 3px; /* 4px → 3px - smaller */
   border: none; /* Remove heavy borders */
   background: transparent; /* Start transparent */
@@ -39,6 +39,11 @@
   box-shadow: none; /* Remove shadows */
   transition: background 0.1s ease; /* Quick transition */
   cursor: pointer !important; /* Fix cursor on search results */
+}
+
+/* Directory rows - slight vertical spacing */
+.file-explorer .explorer-row.directory {
+  margin-bottom: 4px;
 }
 
 /* Hover - subtle highlight like VSCode */
@@ -168,6 +173,39 @@
 
 .file-explorer .reveal-in-finder-btn:hover svg {
   opacity: 1 !important; /* Full opacity on hover */
+}
+
+/* Open in IDE button - minimal, matches reveal-in-finder style */
+.file-explorer .open-in-ide-button {
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px !important;
+  min-height: 13px !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  cursor: pointer;
+  color: #a855f7; /* Purple for IDE */
+}
+
+.file-explorer .open-in-ide-button:hover {
+  background: transparent !important;
+  opacity: 0.7 !important;
+}
+
+.file-explorer .open-in-ide-button svg {
+  width: 10px !important;
+  height: 10px !important;
+  opacity: 0.6 !important;
+}
+
+.file-explorer .open-in-ide-button:hover svg {
+  opacity: 1 !important;
 }
 
 /* Compact content padding */

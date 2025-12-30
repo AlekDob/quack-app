@@ -9,7 +9,7 @@
  * - Done tasks → View history (read-only mode possible)
  */
 
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import ChatView from '../ChatView';
@@ -63,9 +63,6 @@ export default function KanbanChatDrawer({
   defaultPermissionMode = 'bypass',
   defaultEffort = 'medium',
 }: KanbanChatDrawerProps) {
-  // Track if we've auto-sent the initial prompt for this task
-  const hasAutoSentRef = useRef<string | null>(null);
-
   // Avatar URL state
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -142,39 +139,22 @@ export default function KanbanChatDrawer({
     };
   }, [isOpen]);
 
-  // Auto-send initial prompt when task moves to in_progress
+  // 🦆 Pre-populate input with task prompt when opening drawer (if chat is empty)
   useEffect(() => {
-    if (!task || !isOpen || !agentId) return;
-
-    // Only auto-send for in_progress tasks without a session
-    if (
-      task.status === 'in_progress' &&
-      !task.sessionId &&
-      hasAutoSentRef.current !== task.id
-    ) {
-      // Mark as sent to prevent duplicate sends
-      hasAutoSentRef.current = task.id;
-
-      console.log('[KanbanChatDrawer] Auto-sending initial prompt for task:', task.id);
-
-      // Small delay to ensure UI is ready
-      setTimeout(() => {
-        onSendMessage(agentId, task.prompt, {
-          workingDirectory,
-          model,
-          thinkingMode,
-          permissionMode,
-          effort,
-          // Include attachments if any
-          attachments: task.attachments || [],
-        });
-      }, 100);
+    if (isOpen && task && messages.length === 0 && task.prompt) {
+      setInputDraft(task.prompt);
     }
-  }, [task, isOpen, agentId, onSendMessage, workingDirectory, model, thinkingMode, permissionMode, effort]);
+  }, [isOpen, task, messages.length]);
 
-  // Handle sending messages
+  // Handle sending messages - auto-change to in_progress on first send
   const handleSendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
-    if (!agentId) return;
+    if (!agentId || !task) return;
+
+    // 🦆 Auto-change status to in_progress on first message (if currently todo)
+    if (task.status === 'todo' && messages.length === 0) {
+      console.log('[KanbanChatDrawer] First message sent, changing status to in_progress');
+      await onTaskUpdate(task.id, { status: 'in_progress' });
+    }
 
     await onSendMessage(agentId, content, {
       ...options,
@@ -184,7 +164,7 @@ export default function KanbanChatDrawer({
       permissionMode: options?.permissionMode || permissionMode,
       effort: options?.effort || effort,
     });
-  }, [agentId, onSendMessage, workingDirectory, model, thinkingMode, permissionMode, effort]);
+  }, [agentId, task, messages.length, onTaskUpdate, onSendMessage, workingDirectory, model, thinkingMode, permissionMode, effort]);
 
   // Handle abort stream
   const handleAbortStream = useCallback(() => {
@@ -208,7 +188,6 @@ export default function KanbanChatDrawer({
           cacheReadTokens: 0,
         });
       }
-      hasAutoSentRef.current = null; // Allow re-send if needed
     }
   }, [agentId, onClearConversation, task, onTaskUpdate]);
 
@@ -263,6 +242,22 @@ export default function KanbanChatDrawer({
               <span className="kanban-drawer-title" title={task.title}>
                 {task.title}
               </span>
+            )}
+            {/* Session ID - clickable to copy */}
+            {task?.sessionId && (
+              <button
+                type="button"
+                className="kanban-drawer-session-id"
+                onClick={() => {
+                  navigator.clipboard.writeText(task.sessionId!);
+                }}
+                title="Click to copy session ID"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>Session: {task.sessionId}</span>
+              </button>
             )}
           </div>
           <button className="kanban-drawer-close" onClick={onClose}>

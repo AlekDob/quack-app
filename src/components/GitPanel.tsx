@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 import GitSidebar from './GitSidebar'
 import GitFilesColumn from './GitFilesColumn'
-import type { GitBranch, GitCommitEntry, GitStatusEntry, GitStatusSummary, GitPullResult, TerminalInfo } from '../types'
+import type { GitBranch, GitCommitEntry, GitStatusEntry, GitStatusSummary, GitPullResult, TerminalInfo, GitWorktree } from '../types'
 
 interface GitPanelProps {
   summary: GitStatusSummary | null
@@ -25,6 +25,7 @@ interface GitPanelProps {
   rootPath: string | null
   terminals: TerminalInfo[]
   onBranchSwitch?: (branchName: string) => void
+  onOpenWorktree?: (worktreePath: string) => void
 }
 
 const TIMELINE_LINE_LEFT = 20
@@ -188,10 +189,12 @@ function GitPanel({
   rootPath,
   terminals,
   onBranchSwitch,
+  onOpenWorktree,
 }: GitPanelProps) {
   const [pushing, setPushing] = useState(false)
   const [pulling, setPulling] = useState(false)
   const [branches, setBranches] = useState<GitBranch[]>([])
+  const [worktrees, setWorktrees] = useState<GitWorktree[]>([])
 
   // Load branches
   useEffect(() => {
@@ -210,6 +213,24 @@ function GitPanel({
 
     loadBranches()
   }, [rootPath, summary]) // Reload when summary changes (e.g., after branch switch)
+
+  // Load worktrees
+  useEffect(() => {
+    const loadWorktrees = async () => {
+      if (!rootPath) return
+      try {
+        const result = await invoke<GitWorktree[]>('git_list_worktrees', {
+          rootPath: rootPath,
+        })
+        setWorktrees(result)
+      } catch (error) {
+        console.error('Failed to load worktrees:', error)
+        setWorktrees([])
+      }
+    }
+
+    loadWorktrees()
+  }, [rootPath, summary]) // Reload when summary changes
 
   const handlePush = async () => {
     if (!rootPath || !summary?.branch) return
@@ -293,6 +314,29 @@ function GitPanel({
     }
   }
 
+  const handleRemoveWorktree = async (worktreePath: string, force = false) => {
+    if (!rootPath) return
+
+    try {
+      await invoke('git_remove_worktree', {
+        path: worktreePath,
+        force: force,
+        rootPath: rootPath,
+      })
+
+      // Reload worktrees
+      const result = await invoke<GitWorktree[]>('git_list_worktrees', {
+        rootPath: rootPath,
+      })
+      setWorktrees(result)
+
+      onRefresh()
+    } catch (error) {
+      console.error('Failed to remove worktree:', error)
+      throw error // Re-throw so GitSidebar can show error
+    }
+  }
+
   const groupedEntries = useMemo(() => {
     const entries = summary?.entries ?? []
     const staged: GitStatusEntry[] = []
@@ -368,6 +412,9 @@ function GitPanel({
             onBranchSwitch={onBranchSwitch}
             unstagedCount={groupedEntries.unstaged.length}
             onMerge={handleMerge}
+            worktrees={worktrees}
+            onRemoveWorktree={handleRemoveWorktree}
+            onOpenWorktree={onOpenWorktree}
           />
 
           {/* FILES COLUMN - Unstaged/Staged */}

@@ -31,6 +31,7 @@ import KanbanChatDrawer from './KanbanChatDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
+import { toast } from 'sonner';
 import './KanbanView.css';
 
 interface KanbanViewProps {
@@ -194,6 +195,15 @@ export default function KanbanView({
       const task = tasks.find((t) => t.id === taskId);
 
       if (task && task.status !== newStatus) {
+        // 🦆 Block moving to TODO if task has chat messages (conversation started)
+        if (newStatus === 'todo') {
+          const taskMessages = chatSessions.get(taskId) || [];
+          if (taskMessages.length > 0) {
+            toast.warning('This task has an active conversation and cannot be moved back to TODO. Move it to Done instead, or clear the conversation first.');
+            return;
+          }
+        }
+
         moveTask(taskId, newStatus);
 
         // If moved to in_progress, auto-select and open drawer

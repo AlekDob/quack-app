@@ -253,11 +253,29 @@ export default function KanbanCard({
         )}
 
 
-        {task.status === 'done' && task.totalCost !== undefined && (
-          <div className="kanban-card-cost">
-            ${task.totalCost.toFixed(4)}
-          </div>
-        )}
+        {/* Footer: cost and session ID */}
+        <div className="kanban-card-footer">
+          {task.totalCost !== undefined && task.totalCost > 0 && (
+            <div className="kanban-card-cost">
+              ${task.totalCost.toFixed(4)}
+            </div>
+          )}
+          {task.sessionId && (
+            <div
+              className="kanban-card-session"
+              title={`Session: ${task.sessionId}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(task.sessionId!);
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>{task.sessionId.slice(0, 8)}...</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Context Menu - rendered via Portal to escape card's stacking context */}

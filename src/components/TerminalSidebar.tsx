@@ -147,6 +147,7 @@ interface TerminalSidebarProps {
   // Kanban View props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
+  inProgressTaskCount?: number; // Number of tasks in progress (for badge)
   // Quack sound props
   onToggleQuackSound?: () => void;
   quackSoundEnabled?: boolean;
@@ -188,6 +189,7 @@ export default function TerminalSidebar({
   // Kanban View props
   isKanbanViewActive = false,
   onToggleKanbanView,
+  inProgressTaskCount = 0,
   // Quack sound props
   onToggleQuackSound,
   quackSoundEnabled,
@@ -743,6 +745,24 @@ export default function TerminalSidebar({
               </svg>
             )}
             {isKanbanViewActive ? 'Agents' : 'Kanban'}
+            {/* Badge for in-progress tasks (only show when not in Kanban view) */}
+            {!isKanbanViewActive && inProgressTaskCount > 0 && (
+              <span
+                style={{
+                  background: '#f28c52',
+                  color: '#fff',
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  padding: '1px 5px',
+                  borderRadius: '8px',
+                  marginLeft: '2px',
+                  minWidth: '14px',
+                  textAlign: 'center',
+                }}
+              >
+                {inProgressTaskCount}
+              </span>
+            )}
           </button>
         </KeyboardShortcutTooltip>
       </div>

@@ -373,6 +373,13 @@ pub fn open_file_in_ide(
         .find(|e| e.id == ide_id)
         .ok_or_else(|| format!("Unknown IDE: {}", ide_id))?;
 
+    log::info!("[IDE] Found IDE entry: id={}, name={}, cli={}, cli_style={}",
+        entry.id, entry.name, entry.cli, entry.cli_style);
+
+    // Check if CLI is available
+    let cli_available = is_cli_available(entry.cli);
+    log::info!("[IDE] CLI '{}' available: {}", entry.cli, cli_available);
+
     // Find the project root to open with file explorer
     let project_root = find_project_root(&file_path);
     log::info!("[IDE] Project root detected: {:?}", project_root);
@@ -384,9 +391,36 @@ pub fn open_file_in_ide(
 
     match entry.cli_style {
         "vscode" => {
+            // If CLI not available, try using 'open -a' with the app
+            if !cli_available {
+                log::info!("[IDE] CLI not available, using 'open -a' with app: {}", entry.app_path);
+
+                // Open project folder first
+                if let Some(ref root) = project_root {
+                    let _ = Command::new("open")
+                        .arg("-a")
+                        .arg(entry.app_path)
+                        .arg(root)
+                        .spawn();
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+
+                // Then open the file
+                let result = Command::new("open")
+                    .arg("-a")
+                    .arg(entry.app_path)
+                    .arg(&file_path)
+                    .spawn();
+
+                return match result {
+                    Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                    Err(e) => Err(format!("Failed to open file: {}", e)),
+                };
+            }
+
             // Step 1: Open project folder first (if found)
             if let Some(ref root) = project_root {
-                log::info!("[IDE] Step 1: Opening project folder: {}", root);
+                log::info!("[IDE] Step 1: Opening project folder with CLI '{}': {}", entry.cli, root);
                 let _ = Command::new(entry.cli)
                     .arg(root)
                     .spawn();
@@ -412,7 +446,7 @@ pub fn open_file_in_ide(
             args.push("--goto".to_string());
             args.push(goto_arg);
 
-            log::info!("[IDE] Step 2: Opening file with args: {:?}", args);
+            log::info!("[IDE] Step 2: Opening file with CLI '{}' and args: {:?}", entry.cli, args);
 
             let result = Command::new(entry.cli)
                 .args(&args)
@@ -449,7 +483,34 @@ pub fn open_file_in_ide(
             }
         }
         "zed" => {
-            // Zed: project then file:line
+            // Zed: If CLI not available, use 'open -a'
+            if !cli_available {
+                log::info!("[IDE] Zed CLI not available, using 'open -a' with app: {}", entry.app_path);
+
+                // Open project folder first
+                if let Some(ref root) = project_root {
+                    let _ = Command::new("open")
+                        .arg("-a")
+                        .arg(entry.app_path)
+                        .arg(root)
+                        .spawn();
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+
+                // Then open the file
+                let result = Command::new("open")
+                    .arg("-a")
+                    .arg(entry.app_path)
+                    .arg(&file_path)
+                    .spawn();
+
+                return match result {
+                    Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                    Err(e) => Err(format!("Failed to open file: {}", e)),
+                };
+            }
+
+            // Zed with CLI: project then file:line
             let mut args = Vec::new();
 
             if let Some(ref root) = project_root {

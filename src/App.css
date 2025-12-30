@@ -3336,7 +3336,7 @@ button.directory-chooser:hover {
   align-items: center;
   gap: 0.45rem;
   padding: 0.25rem 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.65rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(28, 30, 36, 0.3);
@@ -3631,6 +3631,7 @@ button.directory-chooser:hover {
 /* Sezioni dell'explorer */
 .explorer-section {
   display: block;
+  padding: 0.5rem 0;
 }
 
 .search-results-section {
@@ -4096,6 +4097,15 @@ button.directory-chooser:hover {
 
 .context-menu-item-danger:hover {
   background: rgba(255, 107, 107, 0.15);
+}
+
+.context-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.context-menu-item:hover svg {
+  opacity: 1;
 }
 
 /* Empty state with quack */
@@ -7655,7 +7665,40 @@ button.directory-chooser:hover {
   text-decoration: underline;
 }
 
-/* Reveal in Finder Button */
+/* Reveal in Finder Button - Base minimal style */
+.reveal-in-finder-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  min-height: 13px;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.reveal-in-finder-btn:hover {
+  opacity: 0.7;
+}
+
+.reveal-in-finder-btn svg {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.reveal-in-finder-btn:hover svg {
+  opacity: 1;
+}
+
+/* Legacy class for backwards compatibility */
 .reveal-in-finder-button {
   display: inline-flex;
   align-items: center;

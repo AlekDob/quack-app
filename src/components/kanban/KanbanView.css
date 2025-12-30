@@ -421,12 +421,48 @@
   }
 }
 
+/* Card footer with cost and session */
+.kanban-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 /* Card cost display */
 .kanban-card-cost {
-  margin-top: 8px;
   font-size: 10px;
   font-family: 'SF Mono', 'Fira Code', monospace;
   color: var(--kanban-done-color);
+}
+
+/* Session ID badge */
+.kanban-card-session {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 9px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.kanban-card-session:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.kanban-card-session svg {
+  opacity: 0.6;
+}
+
+.kanban-card-session:hover svg {
+  opacity: 1;
 }
 
 /* Loading state */
@@ -919,6 +955,44 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Session ID in drawer header */
+.kanban-drawer-session-id {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+}
+
+.kanban-drawer-session-id:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.kanban-drawer-session-id svg {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.kanban-drawer-session-id:hover svg {
+  opacity: 1;
+}
+
+.kanban-drawer-session-id span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kanban-drawer-close {

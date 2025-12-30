@@ -10,6 +10,7 @@ import {
 } from "react";
 import FileContextMenu from "./FileContextMenu";
 import RevealInFinderButton from "./RevealInFinderButton";
+import OpenInIDEButton from "./OpenInIDEButton";
 import FileIcon from "./FileIcon";
 import "./FileExplorer.compact.css";
 
@@ -431,6 +432,7 @@ function FileExplorer({
                 )}
                 {/* Show actions for both files AND directories */}
                 <div className="explorer-file-actions">
+                  <OpenInIDEButton path={entry.path} iconOnly />
                   <RevealInFinderButton path={entry.path} iconOnly />
                   {onMentionFile && (
                     <button
@@ -650,6 +652,7 @@ function FileExplorer({
                   />
                   <span className="explorer-name">{result.name}</span>
                   <div className="explorer-file-actions">
+                    <OpenInIDEButton path={result.path} iconOnly />
                     <RevealInFinderButton path={result.path} iconOnly />
                     {onMentionFile && (
                       <button

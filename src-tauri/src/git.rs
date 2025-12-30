@@ -570,14 +570,18 @@ fn git_list_branches_impl(root_path: Option<String>) -> Result<Vec<GitBranch>> {
         // Check if this is the current branch (starts with '* ')
         let is_current = line.starts_with('*');
 
+        // Check if this branch has a worktree (starts with '+ ')
+        let has_worktree = line.starts_with('+');
+
         // FIX: Correctly handle branch name extraction
         // Output format: "* main     abc123 [origin/main] message" for current branch
+        //                "+ feat/xyz abc123 [origin/feat/xyz] message" for worktree branches
         //                "  feat/xyz abc123 [origin/feat/xyz] message" for other branches
-        // The prefix is always 2 characters: "* " for current, "  " for others
-        let line = if is_current {
-            &line[2..] // Remove "* " prefix
+        // The prefix is always 2 characters: "* " for current, "+ " for worktree, "  " for others
+        let line = if is_current || has_worktree {
+            &line[2..] // Remove "* " or "+ " prefix
         } else {
-            line.trim_start() // Remove leading spaces for non-current branches
+            line.trim_start() // Remove leading spaces for normal branches
         };
 
         // Parse branch name (first word)

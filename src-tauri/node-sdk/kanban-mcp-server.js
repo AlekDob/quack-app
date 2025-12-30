@@ -256,6 +256,7 @@ async function handleListTasks(args) {
     tasks: filtered.map(t => ({
       id: t.id,
       title: t.title,
+      prompt: t.prompt, // Full task prompt/description
       status: t.status,
       projectName: t.projectName,
       projectPath: t.projectPath,
@@ -264,11 +265,16 @@ async function handleListTasks(args) {
         id: t.assignedAgent.id,
         name: t.assignedAgent.name,
       } : null,
+      sessionId: t.sessionId, // Claude SDK session ID for conversation continuity
       parentTaskId: t.parentTaskId,
       progress: t.progress,
       createdAt: t.createdAt,
       startedAt: t.startedAt,
       completedAt: t.completedAt,
+      // Token usage info
+      inputTokens: t.inputTokens,
+      outputTokens: t.outputTokens,
+      totalCost: t.totalCost,
     })),
   };
 
