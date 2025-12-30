@@ -34,6 +34,7 @@ import { useKanbanShellTask } from '../../hooks/useKanbanShellTask';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import './KanbanView.css';
 
 interface KanbanViewProps {
@@ -272,9 +273,14 @@ export default function KanbanView({
     }
   }, [selectTask, openDrawer, closeDrawer]);
 
-  // Handle task deletion
-  const handleTaskDelete = useCallback((taskId: string) => {
-    if (confirm('Are you sure you want to delete this task?')) {
+  // Handle task deletion with async Tauri dialog
+  const handleTaskDelete = useCallback(async (taskId: string) => {
+    const confirmed = await confirm('Are you sure you want to delete this task?', {
+      title: 'Delete Task',
+      kind: 'warning',
+    });
+
+    if (confirmed) {
       deleteTask(taskId);
       // Also clear shell output if this was a shell task
       clearOutput(taskId);

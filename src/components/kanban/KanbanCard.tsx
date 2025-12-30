@@ -33,7 +33,7 @@ interface KanbanCardProps {
   isDormant?: boolean;        // No user interaction yet (chat empty)
   shellOutput?: string;       // Shell command output (in-memory, not persisted)
   onClick?: () => void;
-  onDelete?: () => void;
+  onDelete?: () => void | Promise<void>;
   onEdit?: () => void;
   onKill?: () => void;        // Kill running shell/watch process
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel

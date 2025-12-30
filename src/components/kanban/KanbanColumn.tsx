@@ -23,7 +23,7 @@ interface KanbanColumnProps {
   tasks: KanbanTask[];
   selectedTaskId: string | null;
   onTaskClick: (task: KanbanTask) => void;
-  onTaskDelete: (taskId: string) => void;
+  onTaskDelete: (taskId: string) => void | Promise<void>;
   onTaskEdit?: (task: KanbanTask) => void;
   onTaskKill?: (taskId: string) => void; // Kill shell/watch process
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel

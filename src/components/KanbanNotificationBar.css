@@ -1,0 +1,151 @@
+/* Kanban Notification Bar - Persistent notification after /background command */
+.kanban-notification-bar {
+  position: relative;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(109, 40, 217, 0.08) 100%);
+  border-top: 1px solid rgba(139, 92, 246, 0.25);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+  flex-shrink: 0;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Progress bar at the top */
+.kanban-notification-bar-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.8), rgba(168, 85, 247, 0.8));
+  transition: width 0.05s linear;
+}
+
+/* Content container */
+.kanban-notification-bar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 12px;
+}
+
+/* Left side - icon and text */
+.kanban-notification-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Icon container */
+.kanban-notification-bar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(139, 92, 246, 0.15);
+  border-radius: 8px;
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+/* Text container */
+.kanban-notification-bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kanban-notification-bar-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.kanban-notification-bar-subtitle {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+/* Actions container */
+.kanban-notification-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Base button style */
+.kanban-notification-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+/* Primary button - Open Kanban */
+.kanban-notification-bar-btn-primary {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #a855f7;
+}
+
+.kanban-notification-bar-btn-primary:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Dismiss button */
+.kanban-notification-bar-btn-dismiss {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.kanban-notification-bar-btn-dismiss:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+}
+
+/* Animation for fade out */
+.kanban-notification-bar.fading {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}

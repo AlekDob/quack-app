@@ -25,7 +25,6 @@ import RepositoryGroup from "./RepositoryGroup";
 import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
-import { useKanbanStore } from '../stores/kanbanStore';
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
@@ -213,8 +212,6 @@ export default function TerminalSidebar({
   onOpenTerminalWindow,
   gitRefreshTrigger,
 }: TerminalSidebarProps) {
-  // Kanban store for toggling Kanban view (replaces old Background Tasks)
-  const { setKanbanViewActive } = useKanbanStore();
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
   void _onUpdateAgentChat; // Will be used in rename functionality (Phase 4)
@@ -907,25 +904,6 @@ export default function TerminalSidebar({
           onCloseTerminal={() => onClose(contextMenu.terminal.id)}
         />
       )}
-
-      {/* Kanban Board Button (replaces old Background Tasks) */}
-      <button
-        type="button"
-        className={`sidebar-kanban-btn ${isKanbanViewActive ? 'active' : ''}`}
-        onClick={() => setKanbanViewActive(!isKanbanViewActive)}
-        title={isKanbanViewActive ? 'Exit Kanban Board' : 'Open Kanban Board'}
-      >
-        <div className="sidebar-kanban-btn-content">
-          <div className="sidebar-kanban-btn-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="5" height="18" rx="1" />
-              <rect x="10" y="3" width="5" height="12" rx="1" />
-              <rect x="17" y="3" width="5" height="8" rx="1" />
-            </svg>
-          </div>
-          <span>Kanban Board</span>
-        </div>
-      </button>
 
       {/* Settings Button */}
       {onOpenSettings && (

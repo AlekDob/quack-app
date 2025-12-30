@@ -7,7 +7,7 @@ import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
 import AgentRulesBanner from './AgentRulesBanner';
-import { useKanbanStore } from '../stores/kanbanStore';
+import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { useAgentRules } from '../hooks/useAgentRules';
 import type { ChatMessage, AgentInfo } from '../types';
 import type {
@@ -176,7 +176,7 @@ export default function ChatView({
         }
 
         const args = commandArgs.trim();
-        const { addTask } = useKanbanStore.getState();
+        const { addTask, showNotification, isKanbanViewActive } = useKanbanStore.getState();
         const projectPath = basePath || '/';
         const projectName = projectPath.split('/').pop() || 'Unknown';
 
@@ -186,7 +186,7 @@ export default function ChatView({
         if (agentMatch) {
           // Agent task: /background @code-reviewer Review this code
           const [, agentName, prompt] = agentMatch;
-          await addTask({
+          const newTask = await addTask({
             title: `Agent: ${agentName}`,
             prompt: prompt,
             status: 'in_progress',
@@ -195,11 +195,19 @@ export default function ChatView({
             type: 'agent',
           });
           toast.success(`Kanban task created: Agent ${agentName}`);
+          // Show notification bar if not already in Kanban view
+          if (!isKanbanViewActive) {
+            showNotification({
+              taskId: newTask.id,
+              taskTitle: `Agent: ${agentName}`,
+              taskType: 'agent',
+            });
+          }
         } else {
           // Shell command task: /background npm run build
           // Create as shell task in Kanban
           const taskTitle = args.length > 40 ? args.substring(0, 40) + '...' : args;
-          await addTask({
+          const newTask = await addTask({
             title: taskTitle,
             prompt: args,
             status: 'in_progress', // Auto-start shell tasks
@@ -209,6 +217,14 @@ export default function ChatView({
             command: args,
           });
           toast.success(`Kanban shell task created: ${args.length > 30 ? args.substring(0, 30) + '...' : args}`);
+          // Show notification bar if not already in Kanban view
+          if (!isKanbanViewActive) {
+            showNotification({
+              taskId: newTask.id,
+              taskTitle: taskTitle,
+              taskType: 'shell',
+            });
+          }
         }
         return; // Don't send as normal message
       }

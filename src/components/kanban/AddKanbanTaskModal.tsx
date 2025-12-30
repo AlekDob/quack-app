@@ -14,7 +14,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ClipboardEvent } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import type { TerminalInfo, KanbanAssignedAgent, KanbanTask, ChatAttachment } from '../../types';
+import type { DroidMetadata, SkillMetadata } from '../modal-steps/types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
+import { loadAvailableDroids, loadAvailableSkills } from '../../utils/skillsAndDroidsLoader';
 
 // Constants for attachment handling
 const MAX_ATTACHMENTS = 4;
@@ -113,6 +115,13 @@ export default function AddKanbanTaskModal({
   // Avatar URL cache for custom avatars
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
 
+  // Droids and Skills state
+  const [availableDroids, setAvailableDroids] = useState<DroidMetadata[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<SkillMetadata[]>([]);
+  const [selectedDroids, setSelectedDroids] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [loadingDroidsSkills, setLoadingDroidsSkills] = useState(false);
+
   // Group terminals by repository
   const projectGroups = useMemo(() => {
     const groups: Map<string, ProjectGroup> = new Map();
@@ -191,6 +200,35 @@ export default function AddKanbanTaskModal({
     }
   }, [isOpen, terminals]);
 
+  // Load droids and skills when project changes
+  useEffect(() => {
+    async function loadDroidsAndSkills() {
+      if (!selectedProjectPath) {
+        setAvailableDroids([]);
+        setAvailableSkills([]);
+        return;
+      }
+
+      setLoadingDroidsSkills(true);
+      try {
+        const [droids, skills] = await Promise.all([
+          loadAvailableDroids(selectedProjectPath),
+          loadAvailableSkills(selectedProjectPath),
+        ]);
+        setAvailableDroids(droids);
+        setAvailableSkills(skills);
+      } catch (err) {
+        console.error('Failed to load droids/skills:', err);
+      } finally {
+        setLoadingDroidsSkills(false);
+      }
+    }
+
+    if (isOpen && selectedProjectPath) {
+      loadDroidsAndSkills();
+    }
+  }, [isOpen, selectedProjectPath]);
+
   // Reset form when modal opens (or populate for edit mode / initialValues from drag)
   useEffect(() => {
     if (isOpen) {
@@ -205,6 +243,9 @@ export default function AddKanbanTaskModal({
         setSelectedAgentId(editTask.assignedAgent?.id || '');
         // Load existing attachments
         setAttachments(editTask.attachments || []);
+        // Reset droids/skills selection for edit mode
+        setSelectedDroids([]);
+        setSelectedSkills([]);
       } else if (initialValues) {
         // Drag-and-drop mode: pre-populate with agent data from sidebar
         setTitle(''); // User fills this
@@ -213,6 +254,8 @@ export default function AddKanbanTaskModal({
         setSelectedBranch(initialValues.branch || '');
         setSelectedAgentId(initialValues.agentId || '');
         setAttachments([]);
+        setSelectedDroids([]);
+        setSelectedSkills([]);
       } else {
         // Create mode: reset form
         setTitle('');
@@ -221,6 +264,8 @@ export default function AddKanbanTaskModal({
         setSelectedBranch('');
         setSelectedAgentId('');
         setAttachments([]);
+        setSelectedDroids([]);
+        setSelectedSkills([]);
       }
     }
   }, [isOpen, editTask, initialValues]);
@@ -503,9 +548,29 @@ export default function AddKanbanTaskModal({
   // Handle form submission
   const handleSubmit = useCallback(() => {
     const trimmedTitle = title.trim();
-    const trimmedPrompt = prompt.trim();
+    let trimmedPrompt = prompt.trim();
 
     if (!trimmedTitle || !trimmedPrompt || !selectedProjectPath) return;
+
+    // Append selected droids to prompt
+    if (selectedDroids.length > 0) {
+      const selectedDroidNames = selectedDroids
+        .map(id => availableDroids.find(d => d.id === id)?.name)
+        .filter(Boolean);
+      if (selectedDroidNames.length > 0) {
+        trimmedPrompt += `\n\n---\nDroids to use for this task: ${selectedDroidNames.join(', ')}`;
+      }
+    }
+
+    // Append selected skills to prompt
+    if (selectedSkills.length > 0) {
+      const selectedSkillNames = selectedSkills
+        .map(id => availableSkills.find(s => s.id === id)?.name)
+        .filter(Boolean);
+      if (selectedSkillNames.length > 0) {
+        trimmedPrompt += `\n\n---\nSkills to use for this task: ${selectedSkillNames.join(', ')}`;
+      }
+    }
 
     const projectName = currentProject?.name || getRepoDisplayName(selectedProjectPath);
 
@@ -549,6 +614,10 @@ export default function AddKanbanTaskModal({
     terminals,
     onSubmit,
     attachments,
+    selectedDroids,
+    selectedSkills,
+    availableDroids,
+    availableSkills,
   ]);
 
   // Handle keyboard events
@@ -602,7 +671,7 @@ export default function AddKanbanTaskModal({
           {/* Project Selection */}
           <div className="kanban-form-field">
             <label htmlFor="task-project">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               Project
@@ -631,7 +700,7 @@ export default function AddKanbanTaskModal({
           {currentProject && currentProject.branches.length > 0 && (
             <div className="kanban-form-field">
               <label htmlFor="task-branch">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="6" y1="3" x2="6" y2="15" />
                   <circle cx="18" cy="6" r="3" />
                   <circle cx="6" cy="18" r="3" />
@@ -658,7 +727,7 @@ export default function AddKanbanTaskModal({
           {currentProject && (
             <div className="kanban-form-field">
               <label>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
@@ -728,6 +797,114 @@ export default function AddKanbanTaskModal({
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Droids Selection (optional) */}
+          {currentProject && availableDroids.length > 0 && (
+            <div className="kanban-form-field">
+              <label>
+                {/* Robot icon - same as side panel droids tab */}
+                <svg viewBox="0 0 20 20" width="14" height="14" style={{ color: '#f28c52' }}>
+                  <rect x="4" y="4" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                  <line x1="10" y1="2" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <circle cx="10" cy="2" r="1" fill="currentColor" />
+                  <circle cx="7.5" cy="9" r="1.3" fill="currentColor" />
+                  <circle cx="12.5" cy="9" r="1.3" fill="currentColor" />
+                  <line x1="7.5" y1="13" x2="12.5" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                Droids (optional)
+                <span className="kanban-form-hint">
+                  {selectedDroids.length > 0 ? `${selectedDroids.length} selected` : 'multi-select'}
+                </span>
+              </label>
+              {loadingDroidsSkills ? (
+                <div className="kanban-loading-indicator">Loading droids...</div>
+              ) : (
+                <div className="kanban-selection-grid">
+                  {availableDroids.map((droid) => (
+                    <button
+                      key={droid.id}
+                      type="button"
+                      className={`kanban-selection-card ${selectedDroids.includes(droid.id) ? 'selected' : ''} ${droid.isGlobal ? 'global' : ''}`}
+                      onClick={() => {
+                        setSelectedDroids(prev =>
+                          prev.includes(droid.id)
+                            ? prev.filter(id => id !== droid.id)
+                            : [...prev, droid.id]
+                        );
+                      }}
+                    >
+                      <div className="kanban-selection-icon droid">
+                        {/* Robot icon */}
+                        <svg viewBox="0 0 20 20" width="16" height="16">
+                          <rect x="4" y="4" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                          <line x1="10" y1="2" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <circle cx="10" cy="2" r="1" fill="currentColor" />
+                          <circle cx="7.5" cy="9" r="1.3" fill="currentColor" />
+                          <circle cx="12.5" cy="9" r="1.3" fill="currentColor" />
+                          <line x1="7.5" y1="13" x2="12.5" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div className="kanban-selection-info">
+                        <span className="kanban-selection-name">{droid.name}</span>
+                        <span className="kanban-selection-desc">{droid.specialization}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Skills Selection (optional) */}
+          {currentProject && availableSkills.length > 0 && (
+            <div className="kanban-form-field">
+              <label>
+                {/* Lightning/star icon - same as side panel skills tab */}
+                <svg viewBox="0 0 20 20" width="14" height="14" style={{ color: '#fbbf24' }}>
+                  <path d="M10 2l2 4 4.5 0.5-3.25 3 1 4.5-4.25-2.5-4.25 2.5 1-4.5L3.5 6.5 8 6z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M10 11v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                Skills (optional)
+                <span className="kanban-form-hint">
+                  {selectedSkills.length > 0 ? `${selectedSkills.length} selected` : 'multi-select'}
+                </span>
+              </label>
+              {loadingDroidsSkills ? (
+                <div className="kanban-loading-indicator">Loading skills...</div>
+              ) : (
+                <div className="kanban-selection-grid">
+                  {availableSkills.map((skill) => (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      className={`kanban-selection-card ${selectedSkills.includes(skill.id) ? 'selected' : ''} ${skill.isGlobal ? 'global' : ''}`}
+                      onClick={() => {
+                        setSelectedSkills(prev =>
+                          prev.includes(skill.id)
+                            ? prev.filter(id => id !== skill.id)
+                            : [...prev, skill.id]
+                        );
+                      }}
+                    >
+                      <div className="kanban-selection-icon skill">
+                        {/* Lightning/star icon */}
+                        <svg viewBox="0 0 20 20" width="16" height="16">
+                          <path d="M10 2l2 4 4.5 0.5-3.25 3 1 4.5-4.25-2.5-4.25 2.5 1-4.5L3.5 6.5 8 6z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M10 11v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div className="kanban-selection-info">
+                        <span className="kanban-selection-name">{skill.name}</span>
+                        <span className="kanban-selection-desc" title={skill.description}>
+                          {skill.description.length > 50 ? skill.description.substring(0, 50) + '...' : skill.description}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

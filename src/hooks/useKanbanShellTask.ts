@@ -53,8 +53,14 @@ interface UseKanbanShellTaskReturn {
  */
 export function useKanbanShellTask(): UseKanbanShellTaskReturn {
   const [outputs, setOutputs] = useState<Map<string, ShellTaskOutput>>(new Map());
+  const outputsRef = useRef<Map<string, ShellTaskOutput>>(outputs); // Ref for stable access in callbacks
   const unlistenRefs = useRef<Map<string, UnlistenFn[]>>(new Map());
   const { updateTask, moveTask } = useKanbanStore();
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    outputsRef.current = outputs;
+  }, [outputs]);
 
   // Setup global event listeners for shell output
   useEffect(() => {
@@ -208,7 +214,7 @@ export function useKanbanShellTask(): UseKanbanShellTaskReturn {
    * Kill a running shell task
    */
   const killShellTask = useCallback(async (taskId: string) => {
-    const outputState = outputs.get(taskId);
+    const outputState = outputsRef.current.get(taskId);
     if (!outputState?.pid) {
       console.warn('[useKanbanShellTask] No PID found for task:', taskId);
       return;
@@ -246,21 +252,23 @@ export function useKanbanShellTask(): UseKanbanShellTaskReturn {
     } catch (error) {
       console.error('[useKanbanShellTask] Failed to kill task:', error);
     }
-  }, [outputs, updateTask, moveTask]);
+  }, [updateTask, moveTask]); // Removed 'outputs' dep - uses ref
 
   /**
    * Get output for a specific task
+   * Uses ref for stable reference (won't cause re-renders when used in useEffect deps)
    */
   const getTaskOutput = useCallback((taskId: string): string => {
-    return outputs.get(taskId)?.output || '';
-  }, [outputs]);
+    return outputsRef.current.get(taskId)?.output || '';
+  }, []); // Empty deps - uses ref
 
   /**
    * Check if a task is running
+   * Uses ref for stable reference (won't cause re-renders when used in useEffect deps)
    */
   const isTaskRunning = useCallback((taskId: string): boolean => {
-    return outputs.get(taskId)?.isRunning ?? false;
-  }, [outputs]);
+    return outputsRef.current.get(taskId)?.isRunning ?? false;
+  }, []); // Empty deps - uses ref
 
   /**
    * Clear output for a task (when deleted)

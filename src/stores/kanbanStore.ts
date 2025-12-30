@@ -15,6 +15,13 @@ import {
   loadKanbanTasks,
 } from '../services/kanbanStorage';
 
+// Notification for showing "Open Kanban" bar after background task creation
+export interface KanbanNotification {
+  taskId: string;
+  taskTitle: string;
+  taskType: 'shell' | 'agent' | 'watch';
+}
+
 interface KanbanState {
   // State
   tasks: KanbanTask[];
@@ -22,6 +29,8 @@ interface KanbanState {
   isDrawerOpen: boolean;
   isKanbanViewActive: boolean;
   isLoading: boolean;
+  // Notification state for "Open Kanban" bar
+  pendingNotification: KanbanNotification | null;
 
   // Actions
   loadTasks: () => Promise<void>;
@@ -34,6 +43,9 @@ interface KanbanState {
   closeDrawer: () => void;
   toggleKanbanView: () => void;
   setKanbanViewActive: (active: boolean) => void;
+  // Notification actions
+  showNotification: (notification: KanbanNotification) => void;
+  dismissNotification: () => void;
 
   // Selectors
   getTasksByStatus: (status: KanbanStatus) => KanbanTask[];
@@ -58,6 +70,7 @@ export const useKanbanStore = create<KanbanState>()(
         isDrawerOpen: false,
         isKanbanViewActive: false,
         isLoading: false,
+        pendingNotification: null,
 
         // Load tasks from storage
         loadTasks: async () => {
@@ -177,6 +190,16 @@ export const useKanbanStore = create<KanbanState>()(
         // Set kanban view active state directly
         setKanbanViewActive: (active) => {
           set({ isKanbanViewActive: active });
+        },
+
+        // Show notification bar (after /background command)
+        showNotification: (notification) => {
+          set({ pendingNotification: notification });
+        },
+
+        // Dismiss notification bar
+        dismissNotification: () => {
+          set({ pendingNotification: null });
         },
 
         // Selector: Get tasks by status

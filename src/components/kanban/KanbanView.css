@@ -605,9 +605,17 @@
 }
 
 .kanban-form-field label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   font-weight: 500;
   color: var(--kanban-text-secondary);
+}
+
+.kanban-form-field label svg {
+  flex-shrink: 0;
 }
 
 .kanban-form-field input,
@@ -833,6 +841,117 @@
 
 .kanban-new-agent-card:hover .kanban-new-agent-icon {
   background: rgba(242, 140, 82, 0.25);
+}
+
+/* Droids and Skills selection grid */
+.kanban-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.kanban-selection-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--kanban-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  position: relative;
+}
+
+.kanban-selection-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.kanban-selection-card.selected {
+  background: rgba(242, 140, 82, 0.1);
+  border-color: var(--kanban-accent);
+}
+
+/* Global items have a subtle dashed border */
+.kanban-selection-card.global {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.kanban-selection-card.global:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.kanban-selection-card.global.selected {
+  border-style: solid;
+  border-color: var(--kanban-accent);
+}
+
+.kanban-selection-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Droid icon - orange like side panel (#f28c52) */
+.kanban-selection-icon.droid {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+/* Skill icon - yellow like side panel (#fbbf24) */
+.kanban-selection-icon.skill {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.kanban-selection-card.selected .kanban-selection-icon.droid {
+  background: rgba(242, 140, 82, 0.25);
+}
+
+.kanban-selection-card.selected .kanban-selection-icon.skill {
+  background: rgba(251, 191, 36, 0.25);
+}
+
+.kanban-selection-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kanban-selection-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--kanban-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban-selection-desc {
+  font-size: 10px;
+  color: var(--kanban-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban-loading-indicator {
+  padding: 12px;
+  text-align: center;
+  color: var(--kanban-text-muted);
+  font-size: 12px;
 }
 
 /* Task preview */

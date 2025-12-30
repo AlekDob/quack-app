@@ -71,6 +71,7 @@ import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
 import KanbanView from "./components/kanban/KanbanView";
+import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import { ProBanner } from "./components/ProBanner";
@@ -283,7 +284,7 @@ function AppContent() {
   const { openMemoryGraphTab } = useMemoryGraphTab();
 
   // Kanban View state from store
-  const { isKanbanViewActive, toggleKanbanView, loadTasks: loadKanbanTasks, tasks: kanbanTasks } = useKanbanStore();
+  const { isKanbanViewActive, toggleKanbanView, setKanbanViewActive, loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification } = useKanbanStore();
 
   // Count tasks in progress for badge
   const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
@@ -8620,6 +8621,18 @@ You have access to all Bash tools to execute git commands like:
                   onLoadChatSessions={loadKanbanChatSessions}
                   // Open side panel when clicking on project name
                   onProjectClick={handleKanbanProjectClick}
+                />
+              )}
+
+              {/* Kanban Notification Bar - shown after /background command creates a task */}
+              {pendingNotification && !isKanbanViewActive && (
+                <KanbanNotificationBar
+                  taskTitle={pendingNotification.taskTitle}
+                  onOpenKanban={() => {
+                    setKanbanViewActive(true);
+                    dismissNotification();
+                  }}
+                  onDismiss={dismissNotification}
                 />
               )}
 
