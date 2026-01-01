@@ -59,6 +59,47 @@
 - **Saved Commands Drawer**: `src/components/SavedCommandsDrawer.tsx` – drawer for saved commands
 - **Saved Command Modal**: `src/components/SavedCommandModal.tsx` – modal for editing commands
 
+#### Kanban Board
+
+- **Kanban View**: `src/components/kanban/KanbanView.tsx` – main container with three-column layout (TODO, In Progress, Done)
+- **Kanban Column**: `src/components/kanban/KanbanColumn.tsx` – droppable column with drag-and-drop support
+- **Kanban Card**: `src/components/kanban/KanbanCard.tsx` – draggable task card with project/agent info
+- **Kanban Chat Drawer**: `src/components/kanban/KanbanChatDrawer.tsx` – chat drawer for task interaction (uses props, NOT useClaudeChat)
+- **Add Kanban Task Modal**: `src/components/kanban/AddKanbanTaskModal.tsx` – task creation modal
+- **Kanban Store**: `src/stores/kanbanStore.ts` – Zustand store with persistence for task state
+- **Kanban MCP Server**: `src-tauri/node-sdk/kanban-mcp-server.js` – MCP server with 8 tools for AI-driven task management
+
+**MCP Tools**: `kanban_list_agents`, `kanban_list_tasks`, `kanban_create_task`, `kanban_move_task`, `kanban_update_task`, `kanban_delete_task`, `kanban_get_workload`, `kanban_get_session_context`
+
+**Keyboard Shortcut**: `Cmd+K` to toggle Kanban view
+
+#### Background Tasks
+
+- **Background Agent Store**: `src/stores/backgroundAgentStore.ts` – Zustand store for task queue, priority, state
+- **Background Agent Service**: `src/services/backgroundAgentService.ts` – queue processor, event listeners, task execution
+- **Background Tasks Drawer**: `src/components/BackgroundTasksDrawer.tsx` – UI panel for viewing/managing tasks
+- **Use Background Agents Hook**: `src/hooks/useBackgroundAgents.ts` – React hook for background task operations
+- **Rust Backend**: `src-tauri/src/background_tasks.rs` – process spawning, output streaming, lifecycle management
+
+**Task Types**: agent, build, test, analysis, watch, custom
+**Command**: `/background <shell-command>` or `/background @<agent> <prompt>`
+
+#### Second Brain (Knowledge Graph)
+
+- **Second Brain Tab View**: `src/views/SecondBrainTabView.tsx` – tab container for outliner
+- **Outliner Editor**: `src/components/second-brain/OutlinerEditor.tsx` – toolbar, search, main layout
+- **Inline Outliner**: `src/components/second-brain/InlineOutliner.tsx` – bullet list with inline editing
+- **Second Brain Sidebar**: `src/components/second-brain/SecondBrainSidebar.tsx` – supertag filters, recent items
+- **Entity Autocomplete**: `src/components/second-brain/EntityAutocomplete.tsx` – @mention and #tag autocomplete
+- **Outline Tree Builder**: `src/services/outlineTreeBuilder.ts` – MCP graph to tree converter
+- **Use Outline Tree Hook**: `src/hooks/useOutlineTree.ts` – tree state, expand/collapse, search
+
+#### Memory Graph
+
+- **Memory Graph Tab View**: `src/views/MemoryGraphTabView.tsx` – force-directed graph visualization
+- **MCP Memory Service**: `src/services/mcpMemoryService.ts` – CRUD, cache, events for MCP Memory
+- **Use Unified Memory Hook**: `src/hooks/useUnifiedMemory.ts` – React hook for memory state
+
 #### Services & SDK Integration
 
 - **Claude SDK Service**: `src/services/claudeSDK.ts` – wrapper around `@anthropic-ai/claude-agent-sdk` with streaming support

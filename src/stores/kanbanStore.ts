@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { KanbanTask, KanbanStatus, KanbanAssignedAgent } from '../types';
+import type { KanbanTask, KanbanStatus, KanbanAssignedAgent, TaskCompletionResult } from '../types';
 import {
   saveKanbanTasks,
   loadKanbanTasks,
@@ -31,12 +31,16 @@ interface KanbanState {
   isLoading: boolean;
   // Notification state for "Open Kanban" bar
   pendingNotification: KanbanNotification | null;
+  // Flag to trigger new task modal opening (from keyboard shortcut)
+  isNewTaskModalRequested: boolean;
+  // Task IDs currently being documented
+  processingDocumentation: Set<string>;
 
   // Actions
   loadTasks: () => Promise<void>;
   addTask: (task: Omit<KanbanTask, 'id' | 'createdAt'>) => Promise<KanbanTask>;
   updateTask: (id: string, updates: Partial<KanbanTask>) => Promise<void>;
-  moveTask: (id: string, newStatus: KanbanStatus) => Promise<void>;
+  moveTask: (id: string, newStatus: KanbanStatus, onComplete?: (task: KanbanTask) => void) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   selectTask: (id: string | null) => void;
   openDrawer: () => void;
@@ -46,11 +50,18 @@ interface KanbanState {
   // Notification actions
   showNotification: (notification: KanbanNotification) => void;
   dismissNotification: () => void;
+  // New task modal actions (for keyboard shortcut)
+  requestNewTaskModal: () => void;
+  clearNewTaskModalRequest: () => void;
+  // Task completion documentation tracking
+  markDocumentationProcessing: (taskId: string) => void;
+  markDocumentationComplete: (taskId: string, result: TaskCompletionResult) => void;
 
   // Selectors
   getTasksByStatus: (status: KanbanStatus) => KanbanTask[];
   getTasksByProject: (projectPath: string) => KanbanTask[];
   getSelectedTask: () => KanbanTask | null;
+  hasDocumentation: (taskId: string) => boolean;
 }
 
 /**
@@ -71,6 +82,8 @@ export const useKanbanStore = create<KanbanState>()(
         isKanbanViewActive: false,
         isLoading: false,
         pendingNotification: null,
+        isNewTaskModalRequested: false,
+        processingDocumentation: new Set(),
 
         // Load tasks from storage
         loadTasks: async () => {
@@ -117,7 +130,7 @@ export const useKanbanStore = create<KanbanState>()(
         },
 
         // Move task to a new status column
-        moveTask: async (id, newStatus) => {
+        moveTask: async (id, newStatus, onComplete) => {
           const task = get().tasks.find((t) => t.id === id);
           if (!task) {
             console.warn('[kanbanStore] Task not found:', id);
@@ -142,6 +155,14 @@ export const useKanbanStore = create<KanbanState>()(
           await saveKanbanTasks(tasks);
 
           console.log('[kanbanStore] Moved task:', id, 'to', newStatus);
+
+          // Call completion callback if moving to done
+          if (newStatus === 'done' && onComplete) {
+            const updatedTask = tasks.find((t) => t.id === id);
+            if (updatedTask) {
+              onComplete(updatedTask);
+            }
+          }
         },
 
         // Delete a task
@@ -202,6 +223,49 @@ export const useKanbanStore = create<KanbanState>()(
           set({ pendingNotification: null });
         },
 
+        // Request new task modal to open (triggered by keyboard shortcut)
+        requestNewTaskModal: () => {
+          set({ isNewTaskModalRequested: true });
+        },
+
+        // Clear the request after modal has been opened
+        clearNewTaskModalRequest: () => {
+          set({ isNewTaskModalRequested: false });
+        },
+
+        // Mark task as being documented
+        markDocumentationProcessing: (taskId) => {
+          const processingDocumentation = new Set(get().processingDocumentation);
+          processingDocumentation.add(taskId);
+          set({ processingDocumentation });
+          console.log('[kanbanStore] Marking task for documentation:', taskId);
+        },
+
+        // Mark documentation as complete and update task
+        markDocumentationComplete: async (taskId, result) => {
+          const processingDocumentation = new Set(get().processingDocumentation);
+          processingDocumentation.delete(taskId);
+
+          const updates: Partial<KanbanTask> = {};
+          if (result.memoryEntityId) {
+            updates.memoryEntityId = result.memoryEntityId;
+          }
+          if (result.docFilePath) {
+            updates.docFilePath = result.docFilePath;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            const tasks = get().tasks.map((t) =>
+              t.id === taskId ? { ...t, ...updates } : t
+            );
+            set({ tasks, processingDocumentation });
+            await saveKanbanTasks(tasks);
+            console.log('[kanbanStore] Documentation complete for task:', taskId, updates);
+          } else {
+            set({ processingDocumentation });
+          }
+        },
+
         // Selector: Get tasks by status
         getTasksByStatus: (status) => {
           return get().tasks.filter((t) => t.status === status);
@@ -217,6 +281,12 @@ export const useKanbanStore = create<KanbanState>()(
           const { tasks, selectedTaskId } = get();
           if (!selectedTaskId) return null;
           return tasks.find((t) => t.id === selectedTaskId) ?? null;
+        },
+
+        // Selector: Check if task has documentation
+        hasDocumentation: (taskId) => {
+          const task = get().tasks.find((t) => t.id === taskId);
+          return !!(task?.docFilePath || task?.memoryEntityId);
         },
       }),
       {

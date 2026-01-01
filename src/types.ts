@@ -1449,6 +1449,16 @@ export interface KanbanTask {
   notes?: string;                     // Additional notes
   blockedBy?: string;                 // ID of blocking task
   completionNote?: string;            // Note when marked as done
+
+  // Chat settings (persisted per task)
+  chatModel?: 'opus' | 'sonnet' | 'haiku';
+  chatThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
+  chatPermissionMode?: 'plan' | 'bypass';
+  chatEffort?: 'low' | 'medium' | 'high';
+
+  // Task completion tracking
+  docFilePath?: string;               // Path to generated documentation
+  memoryEntityId?: string;            // ID of memory entity in Second Brain
 }
 
 // ==========================================
@@ -1458,7 +1468,7 @@ export interface KanbanTask {
 /**
  * Available shortcut action IDs
  */
-export type ShortcutActionId = 'toggleKanban' | 'openTerminalWindow' | 'toggleSidePanel' | 'newAgent' | 'focusFileSearch';
+export type ShortcutActionId = 'toggleKanban' | 'openTerminalWindow' | 'toggleSidePanel' | 'newAgent' | 'focusFileSearch' | 'newKanbanTask';
 
 /**
  * Configuration for a single keyboard shortcut
@@ -1487,4 +1497,63 @@ export interface KanbanTaskInitialValues {
   command?: string;                   // Shell command for shell/watch tasks
   watchPatterns?: string[];           // Patterns for watch tasks
   watchDebounceMs?: number;           // Debounce for watch tasks
+}
+
+// ============================================================================
+// TASK COMPLETION HOOKS
+// ============================================================================
+
+/**
+ * Context passed to task completion hooks
+ */
+export interface TaskCompletionContext {
+  task: KanbanTask;
+  chatMessages: ChatMessage[];
+  options: TaskCompletionOptions;
+}
+
+/**
+ * Options for task completion processing
+ */
+export interface TaskCompletionOptions {
+  /** Skip documentation generation */
+  skipDocumentation?: boolean;
+  /** Source of the completion trigger */
+  source?: 'user' | 'agent' | 'automation';
+  /** Custom completion note */
+  completionNote?: string;
+}
+
+/**
+ * Result of task completion processing
+ */
+export interface TaskCompletionResult {
+  /** ID of the created memory entity */
+  memoryEntityId?: string;
+  /** Path to the created documentation file */
+  docFilePath?: string;
+  /** Generated summary of the task */
+  summary?: string;
+  /** Whether documentation was skipped */
+  skipped?: boolean;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Summary extracted from task conversation
+ */
+export interface TaskSummary {
+  /** Original objective from task prompt */
+  objective: string;
+  /** AI-generated summary of work done */
+  summary: string;
+  /** Key decisions made during the task */
+  keyDecisions: string[];
+  /** Files that were modified */
+  filesModified: string[];
+  /** Tools that were used */
+  toolsUsed: string[];
+  /** Duration in milliseconds */
+  durationMs?: number;
 }

@@ -119,6 +119,7 @@
   border: 1px solid var(--kanban-border);
   overflow: hidden;
   transition: background 0.15s ease, border-color 0.15s ease;
+  min-height: 0; /* Allow column to shrink and enable internal scroll */
 }
 
 .kanban-column.drop-target {
@@ -173,7 +174,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 150px; /* Easier drop target when empty or few cards */
+  min-height: 0; /* Allow scroll to work properly */
 }
 
 /* Empty state */
@@ -197,6 +198,7 @@
   overflow: hidden;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0; /* Prevent cards from being compressed */
 }
 
 .kanban-card:hover {
@@ -274,6 +276,32 @@
 .kanban-card-delete:hover {
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
+}
+
+/* Documentation badge */
+.kanban-doc-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--kanban-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.kanban-doc-badge:not(:disabled):hover {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.kanban-doc-badge:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* Card project info */
@@ -430,11 +458,18 @@
   margin-top: 8px;
 }
 
-/* Card cost display */
-.kanban-card-cost {
+/* Card message count display */
+.kanban-card-messages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   font-family: 'SF Mono', 'Fira Code', monospace;
-  color: var(--kanban-done-color);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.kanban-card-messages svg {
+  opacity: 0.6;
 }
 
 /* Session ID badge */
@@ -489,6 +524,10 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
 /* Scrollbar styling */
@@ -710,7 +749,8 @@
 
 /* Large modal variant */
 .kanban-modal.kanban-modal-large {
-  width: 580px;
+  width: 720px;
+  max-width: 90vw;
   max-height: 85vh;
   overflow-y: auto;
 }
@@ -1479,6 +1519,47 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
+}
+
+/* Agent row - contains agent info on left, ready badge on right */
+.kanban-card-agent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Ready badge - shows when agent task finished and awaiting review */
+.kanban-ready-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  flex-shrink: 0;
+  animation: ready-pulse 2s ease-in-out infinite;
+}
+
+.kanban-ready-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.6);
+}
+
+@keyframes ready-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Task type badge (SHELL/WATCH) */

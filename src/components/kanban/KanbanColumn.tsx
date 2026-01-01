@@ -168,6 +168,7 @@ export default function KanbanColumn({
                   isSelected={task.id === selectedTaskId}
                   isLoading={isTaskLoading}
                   hasMessages={hasMessages}
+                  messageCount={messages.length}
                   isDormant={isDormant}
                   shellOutput={shellOutput}
                   onClick={() => onTaskClick(task)}

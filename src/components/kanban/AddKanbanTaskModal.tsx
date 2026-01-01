@@ -11,7 +11,7 @@
  * 4. Enter Title and Prompt
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, type ClipboardEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ClipboardEvent, useLayoutEffect } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import type { TerminalInfo, KanbanAssignedAgent, KanbanTask, ChatAttachment } from '../../types';
 import type { DroidMetadata, SkillMetadata } from '../modal-steps/types';
@@ -41,6 +41,16 @@ export interface KanbanTaskInitialValues {
   targetStatus?: 'todo' | 'in_progress' | 'done';
 }
 
+// Draft state for persisting form data when modal is closed
+export interface KanbanTaskDraft {
+  title: string;
+  prompt: string;
+  projectPath: string;
+  branch: string;
+  agentId: string;
+  attachments: ChatAttachment[];
+}
+
 interface AddKanbanTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -60,6 +70,10 @@ interface AddKanbanTaskModalProps {
   editTask?: KanbanTask | null;
   // Initial values from drag-and-drop (sidebar agent to Kanban)
   initialValues?: KanbanTaskInitialValues | null;
+  // Draft state for persisting form data
+  draft?: KanbanTaskDraft | null;
+  // Callback to save draft when form changes
+  onDraftChange?: (draft: KanbanTaskDraft) => void;
 }
 
 // Helper function to get avatar image URL
@@ -96,6 +110,8 @@ export default function AddKanbanTaskModal({
   onCreateNewAgent,
   editTask,
   initialValues,
+  draft,
+  onDraftChange,
 }: AddKanbanTaskModalProps) {
   // Determine if we're in edit mode
   const isEditMode = !!editTask;
@@ -121,6 +137,10 @@ export default function AddKanbanTaskModal({
   const [selectedDroids, setSelectedDroids] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [loadingDroidsSkills, setLoadingDroidsSkills] = useState(false);
+
+  // Track if form has been initialized for this modal session
+  const isInitializedRef = useRef(false);
+  const prevIsOpenRef = useRef(false);
 
   // Group terminals by repository
   const projectGroups = useMemo(() => {
@@ -229,46 +249,90 @@ export default function AddKanbanTaskModal({
     }
   }, [isOpen, selectedProjectPath]);
 
-  // Reset form when modal opens (or populate for edit mode / initialValues from drag)
-  useEffect(() => {
-    if (isOpen) {
-      setAttachmentError(null);
+  // Reset form when modal opens (or populate for edit mode / initialValues from drag / draft)
+  // Use refs to prevent re-initialization on every draft change
+  useLayoutEffect(() => {
+    // Detect if modal just opened (transition from closed to open)
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
 
-      if (editTask) {
-        // Edit mode: populate with existing task data
-        setTitle(editTask.title);
-        setPrompt(editTask.prompt);
-        setSelectedProjectPath(editTask.projectPath);
-        setSelectedBranch(editTask.branch || '');
-        setSelectedAgentId(editTask.assignedAgent?.id || '');
-        // Load existing attachments
-        setAttachments(editTask.attachments || []);
-        // Reset droids/skills selection for edit mode
-        setSelectedDroids([]);
-        setSelectedSkills([]);
-      } else if (initialValues) {
-        // Drag-and-drop mode: pre-populate with agent data from sidebar
-        setTitle(''); // User fills this
-        setPrompt(''); // User fills this
-        setSelectedProjectPath(initialValues.projectPath || '');
-        setSelectedBranch(initialValues.branch || '');
-        setSelectedAgentId(initialValues.agentId || '');
-        setAttachments([]);
-        setSelectedDroids([]);
-        setSelectedSkills([]);
-      } else {
-        // Create mode: reset form
-        setTitle('');
-        setPrompt('');
-        setSelectedProjectPath('');
-        setSelectedBranch('');
-        setSelectedAgentId('');
-        setAttachments([]);
-        setSelectedDroids([]);
-        setSelectedSkills([]);
+    // If modal closed, reset initialization flag for next open
+    if (!isOpen) {
+      isInitializedRef.current = false;
+      return;
+    }
+
+    // Only initialize once per modal session
+    if (isInitializedRef.current) {
+      return;
+    }
+
+    // Mark as initialized
+    isInitializedRef.current = true;
+    setAttachmentError(null);
+
+    if (editTask) {
+      // Edit mode: populate with existing task data
+      setTitle(editTask.title);
+      setPrompt(editTask.prompt);
+      setSelectedProjectPath(editTask.projectPath);
+      setSelectedBranch(editTask.branch || '');
+      setSelectedAgentId(editTask.assignedAgent?.id || '');
+      // Load existing attachments
+      setAttachments(editTask.attachments || []);
+      // Reset droids/skills selection for edit mode
+      setSelectedDroids([]);
+      setSelectedSkills([]);
+    } else if (initialValues) {
+      // Drag-and-drop mode: pre-populate with agent data from sidebar
+      // This resets the draft because user dragged a new agent
+      setTitle('');
+      setPrompt('');
+      setSelectedProjectPath(initialValues.projectPath || '');
+      setSelectedBranch(initialValues.branch || '');
+      setSelectedAgentId(initialValues.agentId || '');
+      setAttachments([]);
+      setSelectedDroids([]);
+      setSelectedSkills([]);
+    } else if (draft) {
+      // Restore from draft (user closed modal accidentally)
+      setTitle(draft.title);
+      setPrompt(draft.prompt);
+      setSelectedProjectPath(draft.projectPath);
+      setSelectedBranch(draft.branch);
+      setSelectedAgentId(draft.agentId);
+      setAttachments(draft.attachments);
+      setSelectedDroids([]);
+      setSelectedSkills([]);
+    } else {
+      // Create mode: reset form
+      setTitle('');
+      setPrompt('');
+      setSelectedProjectPath('');
+      setSelectedBranch('');
+      setSelectedAgentId('');
+      setAttachments([]);
+      setSelectedDroids([]);
+      setSelectedSkills([]);
+    }
+  }, [isOpen, editTask, initialValues, draft]);
+
+  // Save draft when form changes (only in create mode, not edit mode)
+  useEffect(() => {
+    if (isOpen && !editTask && onDraftChange) {
+      // Only save draft if there's meaningful content
+      if (title || prompt || selectedProjectPath) {
+        onDraftChange({
+          title,
+          prompt,
+          projectPath: selectedProjectPath,
+          branch: selectedBranch,
+          agentId: selectedAgentId,
+          attachments,
+        });
       }
     }
-  }, [isOpen, editTask, initialValues]);
+  }, [isOpen, editTask, title, prompt, selectedProjectPath, selectedBranch, selectedAgentId, attachments, onDraftChange]);
 
   // Auto-select first project if only one exists
   useEffect(() => {
@@ -626,9 +690,18 @@ export default function AddKanbanTaskModal({
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
-      } else if (e.key === 'Enter' && e.metaKey && title.trim() && prompt.trim() && selectedProjectPath) {
-        e.preventDefault();
-        handleSubmit();
+      } else if (e.key === 'Enter') {
+        // Check if we can submit
+        const canSubmit = title.trim() && prompt.trim() && selectedProjectPath;
+        if (!canSubmit) return;
+
+        // Allow Enter from input fields (not textarea) or Cmd+Enter from anywhere
+        const isFromTextarea = (e.target as HTMLElement).tagName === 'TEXTAREA';
+
+        if (e.metaKey || e.ctrlKey || !isFromTextarea) {
+          e.preventDefault();
+          handleSubmit();
+        }
       }
     },
     [title, prompt, selectedProjectPath, handleSubmit, onClose]

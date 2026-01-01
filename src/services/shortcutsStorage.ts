@@ -53,6 +53,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = {
     defaultKeys: "Meta+F",
     currentKeys: "Meta+F",
   },
+  newKanbanTask: {
+    id: "newKanbanTask",
+    label: "New Kanban Task",
+    description: "Create a new task in Kanban view",
+    defaultKeys: "Meta+Shift+N",
+    currentKeys: "Meta+Shift+N",
+  },
 };
 
 /**

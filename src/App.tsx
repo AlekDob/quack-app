@@ -284,7 +284,7 @@ function AppContent() {
   const { openMemoryGraphTab } = useMemoryGraphTab();
 
   // Kanban View state from store
-  const { isKanbanViewActive, toggleKanbanView, setKanbanViewActive, loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification } = useKanbanStore();
+  const { isKanbanViewActive, toggleKanbanView, setKanbanViewActive, loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
 
   // Count tasks in progress for badge
   const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
@@ -2818,6 +2818,49 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       toast.error('Failed to open session in terminal');
     }
   }, [activeId, chatSessionIds, agentChats, explorerPath, openTerminalWindow]);
+
+  // Open Kanban task session in terminal window with claude --resume command
+  const openKanbanSessionInTerminal = useCallback(async (taskId: string) => {
+    const task = kanbanTasks.find(t => t.id === taskId);
+    if (!task) {
+      toast.error('Task not found');
+      return;
+    }
+
+    if (!task.sessionId) {
+      toast.error('No session ID found for this task');
+      return;
+    }
+
+    try {
+      const terminalCwd = task.projectPath || explorerPath || process.env.HOME || '~';
+      const terminalLabel = `Resume ${task.sessionId.slice(0, 8)}`;
+
+      // Prepare projects list from agent chats
+      const projects = agentChats.map(agent => ({
+        path: agent.cwd,
+        name: agent.cwd.split('/').pop() || agent.cwd,
+      }));
+      // Remove duplicates by path
+      const uniqueProjects = projects.filter(
+        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
+      );
+
+      // Open terminal window with initial command to resume session
+      await openTerminalWindow(uniqueProjects, {
+        projectPath: terminalCwd,
+        command: `claude --resume ${task.sessionId}`,
+        terminalLabel: terminalLabel,
+      });
+
+      toast.success('Opening session in terminal window', {
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Failed to open Kanban session in terminal:', error);
+      toast.error('Failed to open session in terminal');
+    }
+  }, [kanbanTasks, agentChats, explorerPath, openTerminalWindow]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -6833,6 +6876,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         searchInput.select();
       }
     }, []),
+    newKanbanTask: useCallback(() => {
+      // Only works when Kanban view is active
+      if (isKanbanViewActive) {
+        requestNewTaskModal();
+      }
+    }, [isKanbanViewActive, requestNewTaskModal]),
   });
 
   // Tab management handlers
@@ -8621,6 +8670,10 @@ You have access to all Bash tools to execute git commands like:
                   onLoadChatSessions={loadKanbanChatSessions}
                   // Open side panel when clicking on project name
                   onProjectClick={handleKanbanProjectClick}
+                  // Diff drawer handler
+                  onDiffClick={handleDiffClick}
+                  // Open session in terminal handler
+                  onOpenSessionInTerminal={openKanbanSessionInTerminal}
                 />
               )}
 
@@ -8706,8 +8759,8 @@ You have access to all Bash tools to execute git commands like:
             />
               )}
 
-              {/* File Preview - shown when file tab is active */}
-              {activeTabId.startsWith('file-') && (
+              {/* File Preview - shown when file tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('file-') && !isKanbanViewActive && (
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                   <FilePreviewDrawer
                     ref={previewDrawerRef}
@@ -8769,8 +8822,8 @@ You have access to all Bash tools to execute git commands like:
                 </div>
               )}
 
-              {/* Agent Viewer - shown when agent tab is active */}
-              {activeTabId.startsWith('agent-') && (() => {
+              {/* Agent Viewer - shown when agent tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('agent-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'agent' && activeTab.agentName && activeTab.agentScope) {
                   return (
@@ -8785,8 +8838,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Browser Manager - shown when browser tab is active */}
-              {activeTabId.startsWith('browser-manager-') && (() => {
+              {/* Browser Manager - shown when browser tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('browser-manager-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'browser') {
                   return <BrowserManager />;
@@ -8794,8 +8847,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Skill Viewer - shown when skill tab is active */}
-              {activeTabId.startsWith('skill-') && (() => {
+              {/* Skill Viewer - shown when skill tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('skill-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'skill' && activeTab.skillName && activeTab.skillScope) {
                   return (
@@ -8810,8 +8863,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Command Viewer - shown when command tab is active */}
-              {activeTabId.startsWith('command-') && (() => {
+              {/* Command Viewer - shown when command tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('command-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'command' && activeTab.command) {
                   return (
@@ -8824,8 +8877,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Documentation Viewer - shown when docs tab is active */}
-              {activeTabId.startsWith('docs-') && (() => {
+              {/* Documentation Viewer - shown when docs tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('docs-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'docs') {
                   return <DocsTabView tab={activeTab} isActive={true} />;
@@ -8833,8 +8886,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Memory Graph Viewer - shown when memory-graph tab is active */}
-              {activeTabId.startsWith('memory-graph-') && (() => {
+              {/* Memory Graph Viewer - shown when memory-graph tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('memory-graph-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'memory-graph') {
                   return <MemoryGraphTabView
@@ -8846,8 +8899,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Second Brain Outliner - shown when second-brain tab is active */}
-              {activeTabId.startsWith('second-brain-') && (() => {
+              {/* Second Brain Outliner - shown when second-brain tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('second-brain-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'second-brain') {
                   return <SecondBrainTabView tab={activeTab} isActive={true} />;
@@ -8855,8 +8908,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Claude Assets Manager - shown when claude-assets tab is active */}
-              {activeTabId.startsWith('claude-assets-') && (() => {
+              {/* Claude Assets Manager - shown when claude-assets tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('claude-assets-') && !isKanbanViewActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'claude-assets') {
                   return (
@@ -8888,8 +8941,8 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility */}
-              {tabs.some(t => t.type === 'agent-terminal') && (
+              {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility (hidden in Kanban mode) */}
+              {tabs.some(t => t.type === 'agent-terminal') && !isKanbanViewActive && (
                 <div style={{
                   flex: 1,
                   minHeight: 0,

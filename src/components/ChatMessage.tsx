@@ -432,7 +432,23 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
               const seenKeys = new Set<string>();
               const uniqueEvents: typeof message.events = [];
 
-              for (const event of message.events) {
+              // 🦆 FIX: Define event type priority for correct ordering
+              // system.init should ALWAYS be first, result should ALWAYS be last
+              const getEventPriority = (event: any): number => {
+                if (event.type === 'system' && event.subtype === 'init') return 0; // First
+                if (event.type === 'system') return 1;
+                if (event.type === 'assistant') return 2;
+                if (event.type === 'user') return 3;
+                if (event.type === 'result') return 99; // Last
+                return 50; // Default middle priority
+              };
+
+              // Sort events by priority BEFORE deduplication
+              const sortedEvents = [...message.events].sort((a, b) =>
+                getEventPriority(a) - getEventPriority(b)
+              );
+
+              for (const event of sortedEvents) {
                 // Generate unique key (same logic as before)
                 const eventKey = (() => {
                   if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
@@ -467,7 +483,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                 uniqueEvents.push(event);
               }
 
-              console.log(`[ChatMessage] Rendered ${uniqueEvents.length} unique events (${message.events.length - uniqueEvents.length} duplicates removed)`);
+              console.log(`[ChatMessage] Rendered ${uniqueEvents.length} unique events (sorted by priority, ${message.events.length - uniqueEvents.length} duplicates removed)`);
 
               return uniqueEvents.map((event, idx) => {
                 // Generate key again for React (stable key generation)

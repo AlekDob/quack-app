@@ -26,7 +26,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
-import AddKanbanTaskModal, { type KanbanTaskInitialValues } from './AddKanbanTaskModal';
+import AddKanbanTaskModal, { type KanbanTaskInitialValues, type KanbanTaskDraft } from './AddKanbanTaskModal';
 import KanbanChatDrawer from './KanbanChatDrawer';
 import KanbanShellDrawer from './KanbanShellDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
@@ -59,6 +59,10 @@ interface KanbanViewProps {
   onLoadChatSessions?: () => Promise<void>;
   // Open side panel when clicking on project name
   onProjectClick?: (projectPath: string) => void;
+  // Diff drawer handler (passed to ChatView via KanbanChatDrawer)
+  onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
+  // Open session in terminal handler (for claude --resume)
+  onOpenSessionInTerminal?: (taskId: string) => void;
 }
 
 export default function KanbanView({
@@ -78,6 +82,8 @@ export default function KanbanView({
   defaultEffort,
   onLoadChatSessions,
   onProjectClick,
+  onDiffClick,
+  onOpenSessionInTerminal,
 }: KanbanViewProps) {
   const {
     tasks,
@@ -93,6 +99,8 @@ export default function KanbanView({
     closeDrawer,
     getSelectedTask,
     updateTask,
+    isNewTaskModalRequested,
+    clearNewTaskModalRequest,
   } = useKanbanStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,6 +109,8 @@ export default function KanbanView({
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
   // Initial values for modal when agent is dragged from sidebar
   const [modalInitialValues, setModalInitialValues] = useState<KanbanTaskInitialValues | null>(null);
+  // Draft state - persists when modal is closed accidentally
+  const [modalDraft, setModalDraft] = useState<KanbanTaskDraft | null>(null);
   // Shell drawer state (separate from chat drawer)
   const [isShellDrawerOpen, setIsShellDrawerOpen] = useState(false);
   const [selectedShellTaskId, setSelectedShellTaskId] = useState<string | null>(null);
@@ -164,6 +174,14 @@ export default function KanbanView({
     };
     initializeKanban();
   }, [loadTasks, onLoadChatSessions]);
+
+  // Handle keyboard shortcut request to open new task modal
+  useEffect(() => {
+    if (isNewTaskModalRequested) {
+      setIsModalOpen(true);
+      clearNewTaskModalRequest();
+    }
+  }, [isNewTaskModalRequested, clearNewTaskModalRequest]);
 
   // Auto-start shell tasks that are in_progress but not yet running
   useEffect(() => {
@@ -340,12 +358,16 @@ export default function KanbanView({
     }
     setIsModalOpen(false);
     setEditingTask(null);
+    setModalInitialValues(null);
+    // Clear draft after successful creation
+    setModalDraft(null);
   }, [addTask, updateTask, editingTask]);
 
-  // Handle modal close
+  // Handle modal close - keeps draft intact for accidental closes
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
     setEditingTask(null);
+    // Clear initialValues but keep draft - user can reopen with "New Task" button
     setModalInitialValues(null);
   }, []);
 
@@ -377,6 +399,8 @@ export default function KanbanView({
       targetStatus: targetColumn,
     };
 
+    // Clear draft when dragging a new agent (starting fresh)
+    setModalDraft(null);
     setModalInitialValues(initialValues);
     setEditingTask(null);
     setIsModalOpen(true);
@@ -549,6 +573,8 @@ export default function KanbanView({
         onCreateNewAgent={onCreateNewAgent}
         editTask={editingTask}
         initialValues={modalInitialValues}
+        draft={modalDraft}
+        onDraftChange={setModalDraft}
       />
 
       {/* Chat Drawer - for agent tasks */}
@@ -570,6 +596,10 @@ export default function KanbanView({
         defaultThinkingMode={defaultThinkingMode}
         defaultPermissionMode={defaultPermissionMode}
         defaultEffort={defaultEffort}
+        // Diff drawer handler
+        onDiffClick={onDiffClick}
+        // Open session in terminal handler
+        onOpenSessionInTerminal={onOpenSessionInTerminal}
       />
 
       {/* Shell Drawer - for shell/watch tasks */}

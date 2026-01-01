@@ -20,6 +20,7 @@ interface ShortcutActions {
   newAgent?: () => void;
   toggleSidePanel?: () => void;
   focusFileSearch?: () => void;
+  newKanbanTask?: () => void;
 }
 
 /**

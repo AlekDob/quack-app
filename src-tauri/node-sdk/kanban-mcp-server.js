@@ -54,6 +54,34 @@ const TERMINALS_STORE_PATH = join(getTauriStorePath(), 'quack-terminals.json');
 // =============================================================================
 
 /**
+ * Trigger completion hook when a task is moved to done
+ * Writes a completion event file that the frontend can detect
+ */
+async function triggerCompletionHook(task, chatSession) {
+  try {
+    const eventPath = join(getTauriStorePath(), 'completion-events', `${task.id}.json`);
+    const event = {
+      taskId: task.id,
+      task: task,
+      chatSession: chatSession,
+      source: 'mcp',
+      timestamp: Date.now(),
+    };
+
+    // Ensure directory exists
+    const dir = join(getTauriStorePath(), 'completion-events');
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    writeFileSync(eventPath, JSON.stringify(event, null, 2));
+    console.error(`[KanbanMCP] Wrote completion event for task ${task.id}`);
+  } catch (error) {
+    console.error(`[KanbanMCP] Error writing completion event: ${error.message}`);
+  }
+}
+
+/**
  * Load available agents (terminals) from the sidebar
  * Returns array of agents with their info
  */
@@ -301,6 +329,12 @@ async function handleMoveTask(args) {
     task.completedAt = Date.now();
     if (args.completionNote) {
       task.completionNote = args.completionNote;
+    }
+
+    // Trigger completion hook unless skipDocumentation is true
+    if (args.skipDocumentation !== true && task.assignedAgent?.id) {
+      const chatSession = loadChatSession(task.assignedAgent.id);
+      await triggerCompletionHook(task, chatSession);
     }
   }
 
@@ -655,7 +689,7 @@ const TOOLS = [
   },
   {
     name: 'kanban_move_task',
-    description: 'Move a task to a different status column. Use this to mark a task as complete when finished, or to change task status. This is how you signal that your work on a task is done.',
+    description: 'Move a task to a different status column. Use this to mark a task as complete when finished, or to change task status. This is how you signal that your work on a task is done. When moving to "done", this automatically triggers documentation generation unless skipDocumentation is true.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -671,6 +705,10 @@ const TOOLS = [
         completionNote: {
           type: 'string',
           description: 'Note when marking as done (e.g., "All tests passing, feature complete")',
+        },
+        skipDocumentation: {
+          type: 'boolean',
+          description: 'Skip automatic documentation generation when moving to done. Default is false.',
         },
       },
       required: ['taskId', 'newStatus'],

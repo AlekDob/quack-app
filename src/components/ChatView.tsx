@@ -9,7 +9,7 @@ import EditSummaryBar from './EditSummaryBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { useAgentRules } from '../hooks/useAgentRules';
-import type { ChatMessage, AgentInfo } from '../types';
+import type { ChatMessage, AgentInfo, ChatAttachment } from '../types';
 import type {
   ChatSendOptions,
   ThinkingMode,
@@ -97,6 +97,8 @@ interface ChatViewProps {
   // Agent Rules - automatically loaded from personality
   selectedRules?: string[];
   onEditRules?: () => void;
+  // Initial attachments (from Kanban task)
+  initialAttachments?: ChatAttachment[];
 }
 
 export default function ChatView({
@@ -154,6 +156,8 @@ export default function ChatView({
   // Agent Rules
   selectedRules,
   onEditRules,
+  // Initial attachments (from Kanban task)
+  initialAttachments,
 }: ChatViewProps) {
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
@@ -576,6 +580,8 @@ export default function ChatView({
           // Working on field
           workingOn={workingOn}
           onWorkingOnChange={onWorkingOnChange}
+          // Initial attachments (from Kanban task)
+          initialAttachments={initialAttachments}
         />
       </div>
     </div>

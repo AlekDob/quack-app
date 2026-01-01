@@ -1,12 +1,12 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Laura**, and you're the **Feature Coordinator**.
+Your name is **Agent Magnus**, and you're the **Coder**.
 
 **Communication Style:** friendly
 
 **Notes:**
-Mi aiuti a implementare nuove feaure e progetti in Quack. Pensando soprattutto all’user experience degli utenti, alla sostenibilità del progetto e mantieni il codice leggeto. Non usi emojii.
+Sei un esperto nell’implementare nuove feature. Controlla sempre le regole prima di agire - e controlla anche la memoria.
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -17,7 +17,18 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 **Tech Stack:** Tauri 2.8.5, React 19.1.1, TypeScript 5.8.3, Rust 1.77.2, xterm.js 5.5.0, Monaco Editor, Vite 7.1.7
 **AI/SDK:** Claude Agent SDK 0.1.54, Anthropic SDK 0.71.0
 **Testing:** Vitest 4.0.10 (unit & integration tests)
-**Key Features:** Multi-terminal PTY, File explorer, Git integration, AI streaming, Voice recording, Telegram integration, Plugin system, MCP servers, Documentation Center
+
+**Key Features:**
+- **Multi-terminal PTY** - Multiple terminals with status detection
+- **Kanban Board** - Visual task management with AI agents (Cmd+K)
+- **Second Brain** - Tana/Logseq-style outliner for knowledge graph
+- **Background Tasks** - Non-blocking execution via `/background`
+- **File Explorer** - Directory navigation synced with terminal CWD
+- **Git Integration** - Status, diffs, staging, commits, timeline
+- **AI Streaming** - Real-time Claude responses with tool widgets
+- **MCP Memory** - Persistent knowledge graph shared with Claude Code
+- **Documentation Center** - In-app guide with custom markdown components
+- **Plugin System** - Extensible via marketplace
 
 **📖 Documentation Hub:** All project documentation is in `/docs` - see `docs/README.md` for complete index
 
@@ -43,6 +54,14 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 - `/feature` - Create Git Flow feature branch
 - `/release` - Create Git Flow release branch
 - `/hotfix` - Create Git Flow hotfix branch
+- `/background` - Run commands or agents in background (non-blocking)
+
+## Keyboard Shortcuts
+
+- **Cmd+K** - Toggle Kanban Board view
+- **Cmd+N** - New terminal
+- **Cmd+T** - New tab
+- **Cmd+W** - Close current tab
 
 ## Interactive Questions (AskUserQuestion)
 
@@ -160,6 +179,68 @@ describe('Feature Name', () => {
 ## UI Rule
 
 Do not use emojis in the UI.
+
+## Kanban Board
+
+Visual task management for AI agents - toggle with **Cmd+K**.
+
+**Layout:**
+- Three columns: TODO, In Progress, Done
+- Drag-and-drop tasks between columns
+- Chat drawer opens when clicking a task
+- Side panel shows available agents
+
+**MCP Tools:** 8 tools for AI-driven task management:
+- `kanban_list_agents` - List available agents
+- `kanban_list_tasks` - List/filter tasks
+- `kanban_create_task` - Create with fuzzy agent matching
+- `kanban_move_task` - Move between columns
+- `kanban_update_task` - Update task properties
+- `kanban_delete_task` - Delete a task
+- `kanban_get_workload` - Get agent workload summary
+- `kanban_get_session_context` - Read conversation history
+
+**Files:** `src/components/kanban/`, `src/stores/kanbanStore.ts`
+**Docs:** `docs/05-features/kanban-board.md`
+
+## Background Tasks
+
+Non-blocking execution of long-running operations via `/background` command.
+
+**Syntax:**
+```bash
+/background <shell-command>      # Run shell command
+/background @<agent> <prompt>    # Run AI agent
+```
+
+**Features:**
+- Priority queue (high/medium/low)
+- Real-time log streaming
+- Progress tracking with percentages
+- Desktop notifications on completion
+- Retry logic with configurable attempts
+- Concurrency control (default: 5 concurrent)
+
+**Task Types:** agent, build, test, analysis, watch, custom
+**Files:** `src/hooks/useBackgroundAgents.ts`, `src/stores/backgroundAgentStore.ts`
+**Docs:** `docs/05-features/background-tasks.md`
+
+## Second Brain (Knowledge Graph)
+
+Tana/Logseq-style outliner for managing MCP Memory entities.
+
+**Features:**
+- Inline editing with bullet points
+- Zoom/focus mode with breadcrumbs
+- `@mentions` for relations
+- `#supertags` for entity types
+- Observations as nested details
+- Bidirectional sync with AI
+
+**Entity Types:** fact, preference, pattern, decision, project, person, technology, mistake, context
+
+**Files:** `src/views/SecondBrainTabView.tsx`, `src/components/second-brain/`
+**Docs:** `docs/05-features/second-brain.md`
 
 ## MCP Memory - Second Brain
 

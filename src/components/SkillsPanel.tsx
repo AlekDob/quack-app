@@ -15,6 +15,19 @@ interface SkillsPanelProps {
   onRefresh: () => void;
 }
 
+// Drag handler for skill items
+const handleSkillDragStart = (e: React.DragEvent, skill: SkillInfo) => {
+  const skillData = {
+    type: 'skill',
+    name: skill.name,
+    path: skill.file_path,
+    description: skill.description,
+  };
+  e.dataTransfer.setData('application/quack-skill', JSON.stringify(skillData));
+  e.dataTransfer.setData('text/plain', JSON.stringify(skillData));
+  e.dataTransfer.effectAllowed = 'copy';
+};
+
 export default function SkillsPanel({
   skills,
   loading,
@@ -201,8 +214,10 @@ export default function SkillsPanel({
                     .map((skill) => (
                       <div
                         key={skill.name}
-                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
                         onClick={() => onSelectSkill(skill)}
+                        draggable
+                        onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
                         {/* Lightning Icon */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(248, 183, 57, 0.15)" }}>
@@ -253,8 +268,10 @@ export default function SkillsPanel({
                     .map((skill) => (
                       <div
                         key={skill.name}
-                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
                         onClick={() => onSelectSkill(skill)}
+                        draggable
+                        onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
                         {/* Lightning Icon */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(248, 183, 57, 0.15)" }}>

@@ -136,23 +136,35 @@ npm run test:coverage # Coverage report
 ## ✨ Features (`05-features/`)
 
 ### Implemented Features
-- **`kanban-board.md`** ✅ **UPDATED!** - Kanban Board with 8 MCP tools, fuzzy agent matching, drag-agent-to-kanban, session context
-- **`tab-popout.md`** ✅ - Tab Popout Window feature (drag tabs to create floating windows, VS Code-style)
-- **`mcp-memory-integration.md`** ✅ - MCP Memory hybrid system (Quack + AI memories, unified panel)
-- **`quack-memory-foundation-implementation.md`** ✅ - Quack Memory foundation layer (Phase 1: types, storage, extraction)
-- **`memoryEmbedder-implementation.md`** ✅ - Memory Embedder service (Phase 2: local embeddings with Transformers.js)
+
+**Core Features:**
+- **`kanban-board.md`** ✅ - Kanban Board with 8 MCP tools, Cmd+K toggle, fuzzy agent matching, drag-agent-to-kanban, session context
+- **`background-tasks.md`** ✅ - Background task system (`/background` command, priority queue, real-time logs)
+- **`second-brain.md`** ✅ - Tana/Logseq-style outliner for knowledge graph (inline editing, @mentions, #supertags)
+- **`mcp-memory-integration.md`** ✅ - MCP Memory system (MCP-only architecture, knowledge graph)
+- **`task-completion-hooks.md`** ✅ - Auto-documentation & MCP Memory persistence for completed Kanban tasks
+
+**Memory & Knowledge:**
 - **`quack-memory-architecture.md`** - Quack Memory system architecture & design
+- **`quack-memory-foundation-implementation.md`** ✅ - Quack Memory foundation layer (types, storage, extraction)
+- **`memoryEmbedder-implementation.md`** ✅ - Memory Embedder service (local embeddings with Transformers.js)
 - **`memory-ui.md`** - Memory UI components & design system
-- **`progress-tracker.md`** ✅ - Long-Running Agent Progress System (Anthropic patterns)
-- **`RULES_SYSTEM.md`** ✅ - Rules system for explicit agent behavior configuration (Skills/Droids via Rules)
-- **`background-tasks.md`** ✅ - Background task system (non-blocking command/agent execution)
+
+**AI & Agents:**
 - **`CLAUDE_SDK_054.md`** ✅ - Claude Agent SDK 0.1.54 features (effort, thinking, droids)
+- **`RULES_SYSTEM.md`** ✅ - Rules system for agent behavior configuration (Skills/Droids via Rules)
+- **`progress-tracker.md`** ✅ - Long-Running Agent Progress System (Anthropic patterns)
+
+**UI & Views:**
+- **`tab-popout.md`** ✅ - Tab Popout Window feature (drag tabs to create floating windows, VS Code-style)
+- **`token-counter-implementation.md`** - Token usage tracking
+
+**MCP & Plugins:**
 - **`MCP_CONFIGURATION.md`** ✅ - Model Context Protocol setup & configuration guide
 - **`MCP_DYNAMIC_LOADING.md`** - Dynamic MCP server loading
 - **`MCP_TEMPLATE_IMPLEMENTATION.md`** - MCP template system
-- **`PERFORMANCE_OPTIMIZATIONS.md`** - Performance improvements
 - **`PLUGIN_MARKETPLACE_IMPLEMENTATION.md`** - Plugin marketplace system
-- **`token-counter-implementation.md`** - Token usage tracking
+- **`PERFORMANCE_OPTIMIZATIONS.md`** - Performance improvements
 
 ### Feature Documentation Template
 ```markdown
@@ -414,11 +426,18 @@ find docs/ -mtime -7 -name "*.md"
 
 ## 📊 Documentation Health
 
-**Last Updated**: 2025-12-25
-**Total Docs**: 43+ files
-**Test Coverage**: 232+ tests passing ✅ (including 35 Tab Popout tests)
-**Active Categories**: 7 (merged MCP docs into features)
-**Latest Addition**: Kanban MCP Tools Integration (7 tools, session context reading)
+**Last Updated**: 2026-01-01
+**Total Docs**: 45+ files
+**Test Coverage**: 232+ tests passing
+**Active Categories**: 8 (Architecture, Bug Fixes, Testing, Build, Features, Design, Archive, Optimizations)
+
+**Key Features Documented**:
+- Kanban Board (8 MCP tools, Cmd+K toggle, agent assignment)
+- Background Tasks (/background command, priority queue, real-time logs)
+- Second Brain (Tana-style outliner, @mentions, #supertags)
+- MCP Memory (knowledge graph, entity types, project scoping)
+- Task Completion Hooks (auto-documentation on task done)
+
 **Optimization Tasks**: 21 identified (1 completed, 20 pending)
 **Deprecated Docs**: 8 (in archive)
 

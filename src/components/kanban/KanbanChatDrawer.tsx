@@ -9,7 +9,7 @@
  * - Done tasks → View history (read-only mode possible)
  */
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import ChatView from '../ChatView';
@@ -36,6 +36,10 @@ interface KanbanChatDrawerProps {
   defaultThinkingMode?: ThinkingMode;
   defaultPermissionMode?: PermissionMode;
   defaultEffort?: EffortLevel;
+  // Diff drawer handler (passed to ChatView)
+  onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
+  // Open session in terminal handler (for claude --resume)
+  onOpenSessionInTerminal?: (taskId: string) => void;
 }
 
 // Helper function to get avatar image URL
@@ -62,16 +66,29 @@ export default function KanbanChatDrawer({
   defaultThinkingMode = 'auto',
   defaultPermissionMode = 'bypass',
   defaultEffort = 'medium',
+  onDiffClick,
+  onOpenSessionInTerminal,
 }: KanbanChatDrawerProps) {
   // Avatar URL state
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // Chat settings state - use global defaults from settings
+  // Track last initialized task to avoid resetting draft unnecessarily
+  const lastInitializedTaskIdRef = useRef<string | null>(null);
+
+  // Chat settings state - initialized from task settings, falling back to global defaults
   const [inputDraft, setInputDraft] = useState('');
-  const [model, setModel] = useState<'opus' | 'sonnet' | 'haiku'>(defaultModel);
-  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(defaultThinkingMode);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(defaultPermissionMode);
-  const [effort, setEffort] = useState<EffortLevel>(defaultEffort);
+  const [model, setModel] = useState<'opus' | 'sonnet' | 'haiku'>(
+    task?.chatModel || defaultModel
+  );
+  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(
+    task?.chatThinkingMode || defaultThinkingMode
+  );
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
+    task?.chatPermissionMode || defaultPermissionMode
+  );
+  const [effort, setEffort] = useState<EffortLevel>(
+    task?.chatEffort || defaultEffort
+  );
 
   // Get working directory from task
   const workingDirectory = task?.projectPath || '/';
@@ -139,12 +156,67 @@ export default function KanbanChatDrawer({
     };
   }, [isOpen]);
 
-  // 🦆 Pre-populate input with task prompt when opening drawer (if chat is empty)
+  // 🦆 Initialize input draft ONLY when task actually changes (not on every re-render)
+  // Uses ref to track if we've already initialized for this task
   useEffect(() => {
-    if (isOpen && task && messages.length === 0 && task.prompt) {
-      setInputDraft(task.prompt);
+    const currentTaskId = task?.id || null;
+
+    // Only initialize draft if task actually changed
+    if (currentTaskId !== lastInitializedTaskIdRef.current) {
+      lastInitializedTaskIdRef.current = currentTaskId;
+
+      if (task) {
+        // Pre-populate with task prompt only if chat is empty
+        if (messages.length === 0 && task.prompt) {
+          setInputDraft(task.prompt);
+        } else {
+          // Clear draft when switching to a task with existing messages
+          setInputDraft('');
+        }
+      } else {
+        setInputDraft('');
+      }
     }
-  }, [isOpen, task, messages.length]);
+  }, [task?.id, task?.prompt, messages.length]);
+
+  // Load chat settings from task (separate from draft init to avoid conflicts)
+  useEffect(() => {
+    if (task) {
+      setModel(task.chatModel || defaultModel);
+      setThinkingMode(task.chatThinkingMode || defaultThinkingMode);
+      setPermissionMode(task.chatPermissionMode || defaultPermissionMode);
+      setEffort(task.chatEffort || defaultEffort);
+    }
+  }, [task?.id, task?.chatModel, task?.chatThinkingMode, task?.chatPermissionMode, task?.chatEffort, defaultModel, defaultThinkingMode, defaultPermissionMode, defaultEffort]);
+
+  // Save chat settings to task when they change
+  const handleModelChange = useCallback((newModel: 'opus' | 'sonnet' | 'haiku') => {
+    setModel(newModel);
+    if (task) {
+      onTaskUpdate(task.id, { chatModel: newModel });
+    }
+  }, [task, onTaskUpdate]);
+
+  const handleThinkingModeChange = useCallback((newMode: ThinkingMode) => {
+    setThinkingMode(newMode);
+    if (task) {
+      onTaskUpdate(task.id, { chatThinkingMode: newMode });
+    }
+  }, [task, onTaskUpdate]);
+
+  const handlePermissionModeChange = useCallback((newMode: PermissionMode) => {
+    setPermissionMode(newMode);
+    if (task) {
+      onTaskUpdate(task.id, { chatPermissionMode: newMode });
+    }
+  }, [task, onTaskUpdate]);
+
+  const handleEffortChange = useCallback((newEffort: EffortLevel) => {
+    setEffort(newEffort);
+    if (task) {
+      onTaskUpdate(task.id, { chatEffort: newEffort });
+    }
+  }, [task, onTaskUpdate]);
 
   // Handle sending messages - auto-change to in_progress on first send
   const handleSendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
@@ -196,6 +268,13 @@ export default function KanbanChatDrawer({
 
   // Get accent color from task
   const accentColor = task?.assignedAgent?.color || '#f28c52';
+
+  // Handler to open session in terminal (wraps taskId for ChatView)
+  const handleOpenSessionInTerminal = useCallback(() => {
+    if (task?.id && onOpenSessionInTerminal) {
+      onOpenSessionInTerminal(task.id);
+    }
+  }, [task?.id, onOpenSessionInTerminal]);
 
   // Use portal to ensure drawer is always positioned relative to viewport
   // This fixes issues with parent transforms affecting position: fixed
@@ -272,6 +351,7 @@ export default function KanbanChatDrawer({
         <div className="kanban-drawer-content">
           {task ? (
             <ChatView
+              key={task.id} // 🦆 Force remount on task change to reset internal state (attachments, etc.)
               messages={messages}
               isLoading={isLoading}
               onSendMessage={handleSendMessage}
@@ -280,13 +360,13 @@ export default function KanbanChatDrawer({
               inputDraft={inputDraft}
               onInputDraftChange={setInputDraft}
               model={model}
-              onModelChange={setModel}
+              onModelChange={handleModelChange}
               thinkingMode={thinkingMode}
-              onThinkingModeChange={setThinkingMode}
+              onThinkingModeChange={handleThinkingModeChange}
               permissionMode={permissionMode}
-              onPermissionModeChange={setPermissionMode}
+              onPermissionModeChange={handlePermissionModeChange}
               effort={effort}
-              onEffortChange={setEffort}
+              onEffortChange={handleEffortChange}
               // Streaming control
               onAbortStream={handleAbortStream}
               lastPrompt={lastPrompt ?? undefined}
@@ -304,6 +384,12 @@ export default function KanbanChatDrawer({
               agentName={task.assignedAgent?.name || 'Kanban Task'}
               agentAvatar={task.assignedAgent?.avatar}
               projectName={task.projectName}
+              // Initial attachments - only show if chat is empty (not yet sent)
+              initialAttachments={messages.length === 0 ? task.attachments : undefined}
+              // Diff drawer handler
+              onDiffClick={onDiffClick}
+              // Open session in terminal
+              onOpenSessionInTerminal={task?.sessionId ? handleOpenSessionInTerminal : undefined}
             />
           ) : (
             <div className="kanban-drawer-empty">

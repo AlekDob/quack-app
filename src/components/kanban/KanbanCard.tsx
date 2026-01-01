@@ -15,6 +15,8 @@ import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-shell';
+import { FileText } from 'lucide-react';
 import type { KanbanTask } from '../../types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
 
@@ -30,8 +32,10 @@ interface KanbanCardProps {
   isSelected?: boolean;
   isLoading?: boolean;        // Whether the chat is currently streaming (agent) or process running (shell)
   hasMessages?: boolean;      // Whether there are messages in the chat
+  messageCount?: number;      // Number of messages in the chat
   isDormant?: boolean;        // No user interaction yet (chat empty)
   shellOutput?: string;       // Shell command output (in-memory, not persisted)
+  processingDocumentation?: Set<string>; // Set of task IDs currently processing documentation
   onClick?: () => void;
   onDelete?: () => void | Promise<void>;
   onEdit?: () => void;
@@ -52,8 +56,10 @@ export default function KanbanCard({
   isSelected = false,
   isLoading = false,
   hasMessages = false,
+  messageCount = 0,
   isDormant = true,
   shellOutput,
+  processingDocumentation,
   onClick,
   onDelete,
   onEdit,
@@ -182,31 +188,27 @@ export default function KanbanCard({
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  // Determine status badge for in_progress tasks
-  const getStatusBadge = () => {
-    if (task.status !== 'in_progress') return null;
+  // Determine if task is ready (finished working, has messages, not loading)
+  const isReady = isAgentTask &&
+    task.status === 'in_progress' &&
+    hasMessages &&
+    !isLoading &&
+    !isDormant;
 
-    if (isShellTask) {
-      if (isLoading) return null; // Show spinner instead
-      return null;
+  // Handle opening documentation
+  const handleOpenDoc = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (task.docFilePath) {
+      try {
+        await open(task.docFilePath);
+      } catch (err) {
+        console.error('Failed to open documentation:', err);
+      }
     }
+  }, [task.docFilePath]);
 
-    if (isWatchTask) {
-      return null; // Watch icon is enough
-    }
-
-    // Agent tasks
-    if (isLoading) return null; // Show spinner instead
-    if (isDormant || !hasMessages) return null;
-    return null;
-  };
-
-  const statusBadge = getStatusBadge();
-  const badgeClassName = isLoading
-    ? 'kanban-status-badge busy'
-    : (isDormant || !hasMessages)
-      ? 'kanban-status-badge sleeping'
-      : 'kanban-status-badge waiting';
+  // Check if documentation is being processed
+  const isProcessingDoc = processingDocumentation?.has(task.id) ?? false;
 
   return (
     <div
@@ -240,12 +242,36 @@ export default function KanbanCard({
             )}
             <h4 className="kanban-card-title">
               {displayTitle}
-              {statusBadge && (
-                <span className={badgeClassName}>{statusBadge}</span>
-              )}
             </h4>
           </div>
           <div className="kanban-card-actions">
+            {/* Documentation badge - show if doc exists or is being processed */}
+            {(task.docFilePath || isProcessingDoc) && (
+              <button
+                className="kanban-doc-badge"
+                onClick={handleOpenDoc}
+                disabled={isProcessingDoc}
+                title={isProcessingDoc ? "Generating documentation..." : "Open documentation"}
+              >
+                {isProcessingDoc ? (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="animate-spin"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
+                  <FileText size={14} />
+                )}
+              </button>
+            )}
             {/* Kill button for running shell/watch tasks */}
             {(isShellTask || isWatchTask) && task.status === 'in_progress' && task.pid && onKill && (
               <button
@@ -348,38 +374,50 @@ export default function KanbanCard({
           </div>
         )}
 
-        {/* Agent info - only for agent tasks */}
+        {/* Agent info row - agent on left, ready badge on right */}
         {isAgentTask && task.assignedAgent && (
-          <div className="kanban-card-agent">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={task.assignedAgent.name}
-                className="kanban-card-avatar"
-              />
-            ) : (
-              <div
-                className="kanban-card-avatar-placeholder"
-                style={{ backgroundColor: accentColor }}
-              >
-                {task.assignedAgent.name.charAt(0).toUpperCase()}
-              </div>
+          <div className="kanban-card-agent-row">
+            <div className="kanban-card-agent">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={task.assignedAgent.name}
+                  className="kanban-card-avatar"
+                />
+              ) : (
+                <div
+                  className="kanban-card-avatar-placeholder"
+                  style={{ backgroundColor: accentColor }}
+                >
+                  {task.assignedAgent.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="kanban-card-agent-name">
+                {task.assignedAgent.name}
+              </span>
+            </div>
+            {/* Ready indicator - shows when agent finished and awaiting review */}
+            {isReady && (
+              <span className="kanban-ready-badge">
+                <span className="kanban-ready-dot" />
+                Ready
+              </span>
             )}
-            <span className="kanban-card-agent-name">
-              {task.assignedAgent.name}
-            </span>
           </div>
         )}
 
 
-        {/* Footer: cost/session for agents, PID for shell/watch */}
+        {/* Footer: message count/session for agents, PID for shell/watch */}
         <div className="kanban-card-footer">
           {/* Agent task footer */}
           {isAgentTask && (
             <>
-              {task.totalCost !== undefined && task.totalCost > 0 && (
-                <div className="kanban-card-cost">
-                  ${task.totalCost.toFixed(4)}
+              {messageCount > 0 && (
+                <div className="kanban-card-messages" title={`${messageCount} messages in conversation`}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span>{messageCount}</span>
                 </div>
               )}
               {task.sessionId && (

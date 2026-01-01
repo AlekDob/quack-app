@@ -70,6 +70,8 @@ interface ChatInputProps {
   // Working on field
   workingOn?: string;
   onWorkingOnChange?: (value: string) => void;
+  // Initial attachments (from Kanban task)
+  initialAttachments?: ChatAttachment[];
 }
 
 export default function ChatInput({
@@ -93,11 +95,19 @@ export default function ChatInput({
   onOpenPromptEngineer,
   workingOn = '',
   onWorkingOnChange,
+  initialAttachments,
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
-  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize attachments from prop (for Kanban tasks)
+  useEffect(() => {
+    if (initialAttachments && initialAttachments.length > 0) {
+      setAttachments(initialAttachments);
+    }
+  }, [initialAttachments]);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1102,13 +1112,15 @@ export default function ChatInput({
     console.log('[DragOver] Event triggered!', e.dataTransfer.types);
     e.preventDefault(); // Essential to allow drop - DON'T stopPropagation!
 
-    // Check if it's a file being dragged
+    // Check if it's a file, skill, or droid being dragged
     const hasQuackFile = e.dataTransfer.types.includes('application/quack-file');
+    const hasQuackSkill = e.dataTransfer.types.includes('application/quack-skill');
+    const hasQuackDroid = e.dataTransfer.types.includes('application/quack-droid');
     const hasTextPlain = e.dataTransfer.types.includes('text/plain');
 
-    console.log('[DragOver] Has quack-file:', hasQuackFile, 'Has text/plain:', hasTextPlain);
+    console.log('[DragOver] Has quack-file:', hasQuackFile, 'Has quack-skill:', hasQuackSkill, 'Has quack-droid:', hasQuackDroid, 'Has text/plain:', hasTextPlain);
 
-    if (hasQuackFile || hasTextPlain) {
+    if (hasQuackFile || hasQuackSkill || hasQuackDroid || hasTextPlain) {
       e.dataTransfer.dropEffect = 'copy';
       setIsDragOver(true);
     }
@@ -1134,6 +1146,80 @@ export default function ChatInput({
     console.log('[Drop] Event received', e.dataTransfer.types);
 
     if (!textareaRef.current) return;
+
+    // Check if a skill is being dropped
+    const skillDataStr = e.dataTransfer.getData('application/quack-skill');
+    if (skillDataStr) {
+      try {
+        const skillData = JSON.parse(skillDataStr) as { type: string; name: string; path: string };
+        console.log('[Drop] Skill data:', skillData);
+
+        if (skillData.type === 'skill') {
+          // Insert skill reference at cursor position
+          const cursorPos = textareaRef.current.selectionStart;
+          const beforeCursor = input.substring(0, cursorPos);
+          const afterCursor = input.substring(cursorPos);
+
+          // Add space before if needed
+          const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+          const prefix = needsSpaceBefore ? ' ' : '';
+          const mention = `${prefix}@skill:${skillData.name} `;
+          const newInput = beforeCursor + mention + afterCursor;
+
+          console.log('[Drop] New input with skill:', newInput);
+          setInput(newInput);
+
+          // Position cursor after mention
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              const newCursorPos = beforeCursor.length + mention.length;
+              textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+          }, 0);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to parse skill data:', err);
+      }
+    }
+
+    // Check if a droid is being dropped
+    const droidDataStr = e.dataTransfer.getData('application/quack-droid');
+    if (droidDataStr) {
+      try {
+        const droidData = JSON.parse(droidDataStr) as { type: string; name: string; path: string; color?: string };
+        console.log('[Drop] Droid data:', droidData);
+
+        if (droidData.type === 'droid') {
+          // Insert droid reference at cursor position (uses existing @agent syntax)
+          const cursorPos = textareaRef.current.selectionStart;
+          const beforeCursor = input.substring(0, cursorPos);
+          const afterCursor = input.substring(cursorPos);
+
+          // Add space before if needed
+          const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+          const prefix = needsSpaceBefore ? ' ' : '';
+          const mention = `${prefix}@${droidData.name} `;
+          const newInput = beforeCursor + mention + afterCursor;
+
+          console.log('[Drop] New input with droid:', newInput);
+          setInput(newInput);
+
+          // Position cursor after mention
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              const newCursorPos = beforeCursor.length + mention.length;
+              textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+          }, 0);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to parse droid data:', err);
+      }
+    }
 
     // Check if files are being dropped from Finder (native files)
     const finderFiles = Array.from(e.dataTransfer.files);
@@ -1596,6 +1682,30 @@ export default function ChatInput({
               {matchedAgents.map((agent, idx) => (
                 <div key={idx} className="chat-input-mention-chip-wrapper">
                   <AgentMentionChip agentName={agent.name} />
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        {/* Show skill mention chips */}
+        {(() => {
+          // Extract @skill:name mentions from input
+          const skillMentionRegex = /@skill:([^\s]+)/g;
+          const skillMentions: string[] = [];
+          let match;
+          while ((match = skillMentionRegex.exec(input)) !== null) {
+            skillMentions.push(match[1]);
+          }
+          if (skillMentions.length === 0) return null;
+
+          return (
+            <div className="chat-input-mentions">
+              {skillMentions.map((skillName, idx) => (
+                <div key={idx} className="chat-input-skill-chip">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                  </svg>
+                  <span>{skillName.replace(/-/g, ' ')}</span>
                 </div>
               ))}
             </div>

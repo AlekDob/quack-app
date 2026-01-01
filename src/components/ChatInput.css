@@ -15,7 +15,7 @@
 }
 
 .chat-input-container.drag-over::before {
-  content: "📄 Drop file to insert";
+  content: "Drop to insert";
   position: absolute;
   top: -32px;
   left: 50%;
@@ -30,6 +30,30 @@
   pointer-events: none;
   z-index: 1001;
   animation: dropHintFade 0.2s ease;
+}
+
+/* Skill drop styling */
+.chat-input-container.drag-over-skill {
+  border-top: 2px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  box-shadow: 0 -2px 12px rgba(251, 191, 36, 0.2);
+}
+
+.chat-input-container.drag-over-skill::before {
+  content: "Drop skill to insert";
+  background: rgba(251, 191, 36, 0.95);
+}
+
+/* Droid drop styling */
+.chat-input-container.drag-over-droid {
+  border-top: 2px solid #4ecdc4;
+  background: rgba(78, 205, 196, 0.08);
+  box-shadow: 0 -2px 12px rgba(78, 205, 196, 0.2);
+}
+
+.chat-input-container.drag-over-droid::before {
+  content: "Drop droid to mention";
+  background: rgba(78, 205, 196, 0.95);
 }
 
 @keyframes dropHintFade {
@@ -195,6 +219,42 @@
 .file-path {
   font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
   color: rgba(255, 255, 255, 0.45);
+}
+
+/* Skill-specific styling */
+.skill-badge {
+  background: rgba(251, 191, 36, 0.15);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: #fbbf24;
+}
+
+.skill-item .agent-autocomplete-name {
+  color: #fbbf24;
+}
+
+/* Skill mention chip in chat input */
+.chat-input-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fbbf24;
+  animation: chipSlideIn 0.2s ease-out;
+}
+
+.chat-input-skill-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
 
 /* Loading state */

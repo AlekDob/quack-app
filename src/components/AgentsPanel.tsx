@@ -29,6 +29,20 @@ interface AgentsPanelProps {
   ) => Promise<void>;
 }
 
+// Drag handler for droid/agent items
+const handleDroidDragStart = (e: React.DragEvent, agent: AgentInfo) => {
+  const droidData = {
+    type: 'droid',
+    name: agent.name,
+    path: agent.file_path,
+    description: agent.description,
+    color: agent.color,
+  };
+  e.dataTransfer.setData('application/quack-droid', JSON.stringify(droidData));
+  e.dataTransfer.setData('text/plain', JSON.stringify(droidData));
+  e.dataTransfer.effectAllowed = 'copy';
+};
+
 export default function AgentsPanel({
   agents,
   loading,
@@ -249,8 +263,10 @@ export default function AgentsPanel({
                     .map((agent) => (
                       <div
                         key={`project-${agent.name}`}
-                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
                         onClick={() => onSelectAgent(agent)}
+                        draggable
+                        onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
                         {/* Robot Icon */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(78, 205, 196, 0.15)" }}>
@@ -317,8 +333,10 @@ export default function AgentsPanel({
                     .map((agent) => (
                       <div
                         key={`global-${agent.name}`}
-                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
                         onClick={() => onSelectAgent(agent)}
+                        draggable
+                        onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
                         {/* Robot Icon */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(78, 205, 196, 0.15)" }}>

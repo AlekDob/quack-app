@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
+import { forceCollide, forceRadial } from "d3-force";
 import { Brain, RefreshCw, ZoomIn, ZoomOut, Maximize2, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUnifiedMemory } from "../hooks/useUnifiedMemory";
@@ -66,22 +67,52 @@ function getEntityColor(entityType: string): string {
  * Convert unified memory items to graph data
  */
 function convertToGraphData(items: UnifiedMemoryItem[]): GraphData {
+  // First pass: count incoming relations to identify hub nodes
+  const incomingRelations = new Map<string, number>();
+  items.forEach(item => {
+    if (item.relations) {
+      item.relations.forEach(relation => {
+        const targetId = `mcp-${relation.to}`;
+        incomingRelations.set(targetId, (incomingRelations.get(targetId) || 0) + 1);
+      });
+    }
+  });
+
   const nodes: GraphNode[] = items.map((item) => {
+    const entityType = item.entityType || item.category;
+    const isProject = entityType.toLowerCase() === 'project';
+    const connectionCount = incomingRelations.get(item.id) || 0;
+
     // Use content (the actual observation) as display name, not entityName (which has timestamp suffix)
-    const displayName = item.content || (item.entityName || item.id).replace(/_/g, " ").replace(/^mcp-/, "");
+    let displayName = item.content || (item.entityName || item.id).replace(/_/g, " ").replace(/^mcp-/, "");
+
+    // For project nodes, prefix with type indicator
+    if (isProject) {
+      const shortName = displayName.length > 30 ? displayName.slice(0, 30) + "..." : displayName;
+      displayName = `[Project] ${shortName}`;
+    } else {
+      displayName = displayName.length > 50 ? displayName.slice(0, 50) + "..." : displayName;
+    }
 
     const observations = item.relations
       ? [item.content, ...item.relations.map(r => `${r.relationType} -> ${r.to}`)]
       : [item.content];
 
+    // Project nodes and hub nodes (many connections) are larger
+    let nodeSize = Math.max(3, Math.min(6, observations.length + 3));
+    if (isProject) {
+      nodeSize = 12; // Projects are always large
+    } else if (connectionCount > 5) {
+      nodeSize = Math.min(10, 6 + connectionCount * 0.5); // Hub nodes scale with connections
+    }
+
     return {
       id: item.id,
-      name: displayName.length > 50 ? displayName.slice(0, 50) + "..." : displayName,
-      entityType: item.entityType || item.category,
+      name: displayName,
+      entityType,
       observations,
-      // Obsidian-style: smaller nodes (3-6px radius)
-      val: Math.max(3, Math.min(6, observations.length + 3)),
-      color: getEntityColor(item.entityType || item.category),
+      val: nodeSize,
+      color: getEntityColor(entityType),
     };
   });
 
@@ -248,19 +279,26 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
     }
   }, [isActive, refresh]);
 
-  // Configure D3 forces - BALANCED: readable labels, moderate spacing
+  // Configure D3 forces - BALANCED: readable clusters, moderate spread
   useEffect(() => {
     if (graphRef.current) {
       const fg = graphRef.current;
 
-      // Light repulsion - keeps nodes readable but not too spread
-      fg.d3Force('charge')?.strength(-8);
+      // Moderate repulsion for readability
+      fg.d3Force('charge')?.strength(-60);
 
       // Medium link distance
-      fg.d3Force('link')?.distance(55);
+      fg.d3Force('link')?.distance(60);
 
-      // Light center pull
-      fg.d3Force('center')?.strength(0.08);
+      // Radial force with larger radius - keeps nodes in a reasonable area
+      fg.d3Force('radial', forceRadial(250, 0, 0).strength(0.3));
+
+      // Collision force prevents overlap with good spacing
+      fg.d3Force('collide', forceCollide()
+        .radius((node: unknown) => (node as GraphNode).val + 25)
+        .strength(0.9)
+        .iterations(3)
+      );
     }
   }, [graphData.nodes.length, graphData.links]);
 
@@ -337,8 +375,16 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
       const nodeSize = node.val;
       const isSelected = selectedNode?.id === node.id;
       const isHovered = hoveredNodeId === node.id;
+      const isProject = node.entityType.toLowerCase() === 'project';
+
+      // When hovering any node, dim all others
+      const someNodeIsHovered = hoveredNodeId !== null;
+      const shouldDim = someNodeIsHovered && !isHovered && !isSelected;
 
       if (node.x === undefined || node.y === undefined) return;
+
+      // Apply global alpha for dimming effect
+      ctx.globalAlpha = shouldDim ? 0.25 : 1;
 
       // Draw node circle
       ctx.beginPath();
@@ -346,11 +392,23 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
       ctx.fillStyle = node.color;
       ctx.fill();
 
-      // Hover state - subtle highlight
-      if (isHovered && !isSelected) {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-        ctx.lineWidth = 1.5;
+      // Project nodes get a special ring
+      if (isProject) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.lineWidth = 2;
         ctx.stroke();
+      }
+
+      // Hover state - bright highlight
+      if (isHovered && !isSelected) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        // Glow effect on hover
+        ctx.shadowColor = node.color;
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
       }
 
       // Selected state
@@ -369,13 +427,15 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
       const shouldShowLabel = visibleLabels.has(node.id);
 
       if (globalScale >= LABEL_ZOOM_THRESHOLD && shouldShowLabel) {
-        // Obsidian-style smaller font
-        const fontSize = Math.max(9, 11 / globalScale);
-        ctx.font = `400 ${fontSize}px Inter, -apple-system, sans-serif`;
+        // Project nodes get slightly larger font
+        const baseFontSize = isProject ? 13 : 11;
+        const fontSize = Math.max(9, baseFontSize / globalScale);
+        const fontWeight = isProject ? '600' : '400';
+        ctx.font = `${fontWeight} ${fontSize}px Inter, -apple-system, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
 
-        // Obsidian-style: subtle gray labels, white on hover
+        // Bright white on hover, subtle gray otherwise
         if (isHovered || isSelected) {
           ctx.fillStyle = "#ffffff";
         } else {
@@ -384,6 +444,9 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
 
         ctx.fillText(node.name, node.x, node.y + nodeSize + 6);
       }
+
+      // Reset global alpha
+      ctx.globalAlpha = 1;
     },
     [selectedNode, hoveredNodeId, visibleLabels]
   );
@@ -395,14 +458,24 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
 
       if (!source.x || !source.y || !target.x || !target.y) return;
 
+      // Dim links when hovering, unless connected to hovered node
+      const isConnectedToHovered = hoveredNodeId !== null &&
+        (source.id === hoveredNodeId || target.id === hoveredNodeId);
+
+      ctx.globalAlpha = hoveredNodeId !== null && !isConnectedToHovered ? 0.15 : 1;
+
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
       ctx.lineTo(target.x, target.y);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isConnectedToHovered
+        ? "rgba(255, 255, 255, 0.4)"
+        : "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = isConnectedToHovered ? 1.5 : 1;
       ctx.stroke();
+
+      ctx.globalAlpha = 1;
     },
-    []
+    [hoveredNodeId]
   );
 
   if (!isActive || tab.type !== 'memory-graph') {
@@ -540,6 +613,14 @@ function MemoryGraphTabView({ tab, isActive, onOpenSecondBrain }: MemoryGraphTab
             nodeCanvasObjectMode={() => "replace"}
             linkCanvasObject={linkCanvasObject}
             linkCanvasObjectMode={() => "replace"}
+            nodePointerAreaPaint={(node: GraphNode, color: string, ctx: CanvasRenderingContext2D) => {
+              // Larger hit area for easier hover detection
+              const hitRadius = Math.max(node.val + 10, 15);
+              ctx.beginPath();
+              ctx.arc(node.x || 0, node.y || 0, hitRadius, 0, 2 * Math.PI);
+              ctx.fillStyle = color;
+              ctx.fill();
+            }}
             nodeLabel={(node: GraphNode) => currentZoom < LABEL_ZOOM_THRESHOLD ? node.name : ""}
             linkLabel={(link: GraphLink) => currentZoom < LABEL_ZOOM_THRESHOLD ? link.relationType : ""}
             onNodeClick={handleNodeClick}
