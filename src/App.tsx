@@ -62,15 +62,16 @@ import { useDocsTab } from "./hooks/useDocsTab";
 import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
+import { useKanbanTab } from "./hooks/useKanbanTab";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
 import SecondBrainTabView from "./views/SecondBrainTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
+import KanbanTabView from "./views/KanbanTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
-import KanbanView from "./components/kanban/KanbanView";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -283,14 +284,17 @@ function AppContent() {
   // Memory Graph tab management
   const { openMemoryGraphTab } = useMemoryGraphTab();
 
-  // Kanban View state from store
-  const { isKanbanViewActive, toggleKanbanView, setKanbanViewActive, loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
+  // Kanban state from store (no longer using isKanbanTabActive overlay)
+  const { loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
 
   // Count tasks in progress for badge
   const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
 
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
+
+  // Kanban tab management
+  const { openKanbanTab } = useKanbanTab();
 
   // Claude Assets Manager tab - hook is called later after tabs state is defined
 
@@ -504,6 +508,11 @@ function AppContent() {
     { id: 'chat', label: 'Chat', type: 'chat', closable: false }
   ]);
   const [activeTabId, setActiveTabId] = useState('chat');
+
+  // Derived state: is Kanban tab currently active?
+  // This replaces the old isKanbanTabActive overlay approach
+  const isKanbanTabActive = activeTabId === 'kanban-board';
+
   // Track last active tab per terminal/agent
   const lastActiveTabPerTerminal = useRef<Map<string, string>>(new Map());
 
@@ -1123,8 +1132,13 @@ function AppContent() {
       // console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs); // Performance: Disabled logging
       setTabsByTerminal((prev) => {
         const updated = new Map(prev);
-        // Filter out chat tab (always present) - save only file/terminal tabs
-        const agentTabs = tabs.filter(t => t.type !== 'chat');
+        // Filter out chat tab (always present) and special tabs - save only file tabs
+        // Special tabs persist across agents and shouldn't be stored per-agent
+        const specialTabTypes = [
+          'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
+          'agent', 'skill', 'command', 'browser-manager', 'agent-terminal', 'chat'
+        ];
+        const agentTabs = tabs.filter(t => !specialTabTypes.includes(t.type));
         updated.set(previousId, agentTabs);
         return updated;
       });
@@ -1135,15 +1149,34 @@ function AppContent() {
       const restoredTabs = tabsByTerminal.get(activeId) || [];
       // console.log(`🦆 [Tab Management] Restoring tabs for agent: ${activeId}`, restoredTabs); // Performance: Disabled logging
 
-      // Always include chat tab + restored agent tabs
-      setTabs([
-        { id: 'chat', label: 'Chat', type: 'chat', closable: false },
-        ...restoredTabs
-      ]);
+      // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
+      // These tabs should persist across agent switches - they are not agent-specific
+      const specialTabTypes = [
+        'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
+        'agent', 'skill', 'command', 'browser-manager', 'agent-terminal'
+      ];
 
-      // Always activate chat tab when switching agents for consistent UX
-      // Users expect to see the agent chat first, not the last visited tab
-      setActiveTabId('chat');
+      // Always include chat tab + restored agent tabs + preserve special tabs
+      setTabs(prevTabs => {
+        const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
+        return [
+          { id: 'chat', label: 'Chat', type: 'chat', closable: false },
+          ...restoredTabs,
+          ...specialTabs
+        ];
+      });
+
+      // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
+      // This prevents the "tab closes immediately" bug when opening Kanban
+      const isSpecialTabActive = specialTabTypes.some(type =>
+        activeTabId.includes(type) || activeTabId === 'kanban-board'
+      );
+
+      if (!isSpecialTabActive) {
+        // Always activate chat tab when switching agents for consistent UX
+        // Users expect to see the agent chat first, not the last visited tab
+        setActiveTabId('chat');
+      }
     }
 
     // Update previous activeId ref
@@ -2561,6 +2594,151 @@ function AppContent() {
     return lastPromptsRef.current.get(targetAgentId) || null;
   }, []);
 
+  // Compact conversation for a specific agent (used by Kanban)
+  const compactConversationForTargetAgent = useCallback(async (targetAgentId: string) => {
+    const currentMessages = chatSessions.get(targetAgentId) ?? [];
+    const totalMessages = currentMessages.length;
+
+    // Need at least 6 messages to compact (keep last 5, summarize the rest)
+    if (totalMessages < 6) {
+      toast.info('Not enough messages to compact (need at least 6)', {
+        duration: 3000,
+      });
+      return;
+    }
+
+    console.log('[compactConversationForTargetAgent] Starting compaction for:', targetAgentId);
+
+    try {
+      // Keep last 5 messages, summarize everything before
+      const messagesToKeep = 5;
+      const messagesToSummarize = currentMessages.slice(0, totalMessages - messagesToKeep);
+      const messagesToPreserve = currentMessages.slice(totalMessages - messagesToKeep);
+
+      // Create a text representation of messages to summarize
+      const conversationText = messagesToSummarize
+        .map((msg) => {
+          const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
+          return `${role}: ${msg.content}`;
+        })
+        .join('\n\n');
+
+      // Create the compaction prompt (similar to Claude Code's /compact)
+      const compactPrompt = `Please create a concise summary of the following conversation history. Focus on:
+- Key decisions and conclusions reached
+- Important code changes or implementations discussed
+- Critical context needed for future interactions
+- Technical details that should not be lost
+
+Keep the summary brief but informative (aim for 200-300 words maximum).
+
+Conversation to summarize:
+${conversationText}
+
+Please respond ONLY with the summary, no preamble or explanations.`;
+
+      // Show loading indicator
+      toast.loading('Compacting conversation...', {
+        duration: 1000,
+        id: 'compacting',
+      });
+
+      // Set loading state
+      setChatLoadingMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(targetAgentId, true);
+        return newMap;
+      });
+
+      // Generate unique message ID
+      const messageId = `msg-${Date.now()}-compact`;
+
+      // Get working directory for this task from kanban store
+      const kanbanTask = useKanbanStore.getState().tasks.find(t => t.id === targetAgentId);
+      const workingDir = kanbanTask?.projectPath || explorerPath;
+
+      // Call Claude to generate summary using Haiku (faster + cheaper for summaries)
+      const response = await invoke<{
+        result: string;
+        session_id: string;
+        total_cost_usd: number;
+        usage: UsageStats;
+      }>('send_message_via_sdk_streaming', {
+        agentId: targetAgentId,
+        request: {
+          prompt: compactPrompt,
+          model: 'haiku', // Use faster model for summaries
+          permissionMode: 'bypass',
+          cwd: workingDir,
+          allowedTools: [
+            'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+            'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
+            'AskUserQuestion',
+          ],
+        },
+      });
+
+      // Create a system message with the summary
+      const summaryMessage: ChatMessage = {
+        id: messageId,
+        role: 'assistant',
+        content: `📦 **Conversation Summary** (${messagesToSummarize.length} messages compacted)\n\n${response.result}`,
+        timestamp: Date.now(),
+        status: 'complete',
+        events: [],
+      };
+
+      // Replace old messages with summary + keep recent messages
+      setChatSessions((prev) => {
+        const newSessions = new Map(prev);
+        newSessions.set(targetAgentId, [summaryMessage, ...messagesToPreserve]);
+        return newSessions;
+      });
+
+      console.log(`[compactConversationForTargetAgent] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
+
+      // Get current tokens and estimate reduction
+      const currentTokens = chatTokensMap.get(targetAgentId);
+      const currentInputTokens = currentTokens?.inputTokens || 0;
+      const currentOutputTokens = currentTokens?.outputTokens || 0;
+
+      // Estimate 60% reduction (based on removed messages)
+      const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
+      const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
+      const savedTokens = (currentInputTokens + currentOutputTokens) - (reducedInputTokens + reducedOutputTokens);
+
+      // Update token counts
+      setChatTokensMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(targetAgentId, {
+          inputTokens: reducedInputTokens,
+          outputTokens: reducedOutputTokens,
+          cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
+          cacheReadTokens: currentTokens?.cacheReadTokens || 0,
+          totalCost: currentTokens?.totalCost || 0, // Preserve cost through compaction
+        });
+        return newMap;
+      });
+
+      toast.dismiss('compacting');
+      toast.success(`Compacted! ${messagesToSummarize.length} messages → 1 summary. ~${savedTokens.toLocaleString()} tokens freed`, {
+        duration: 5000,
+      });
+
+    } catch (error) {
+      console.error('[compactConversationForTargetAgent] Failed to compact:', error);
+      toast.dismiss('compacting');
+      toast.error('Failed to compact conversation');
+    } finally {
+      // Clear loading state
+      setChatLoadingMap((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(targetAgentId, false);
+        return newMap;
+      });
+    }
+  }, [chatSessions, chatTokensMap, explorerPath]);
+
   // ============================================
   // END KANBAN CHAT INTEGRATION FUNCTIONS
   // ============================================
@@ -2941,7 +3119,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Grid columns: Always show left sidebar (360px), Kanban replaces main content area
   // Right side panel can be toggled in both normal and Kanban mode
   // In Kanban mode: default collapsed unless kanbanSidePanelExpanded is true (user clicked on project)
-  const shouldShowSidePanel = isKanbanViewActive
+  const shouldShowSidePanel = isKanbanTabActive
     ? kanbanSidePanelExpanded && !sidePanelCollapsed
     : !sidePanelCollapsed;
   const gridTemplateColumns = shouldShowSidePanel
@@ -6840,29 +7018,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[Quack] Second Brain tab opened with node:', nodeId, nodeLabel);
   }, [openSecondBrainTab]);
 
-  // Handler for toggling Kanban view with sidebar collapse/restore
-  const handleToggleKanbanView = useCallback(() => {
-    if (!isKanbanViewActive) {
-      // Opening Kanban: save current sidebar state and collapse it
-      sidePanelCollapsedBeforeKanbanRef.current = sidePanelCollapsed;
-      setSidePanelCollapsed(true);
-      // Reset Kanban side panel expansion state
-      setKanbanSidePanelExpanded(false);
-    } else {
-      // Closing Kanban: restore previous sidebar state
-      if (sidePanelCollapsedBeforeKanbanRef.current !== null) {
-        setSidePanelCollapsed(sidePanelCollapsedBeforeKanbanRef.current);
-        sidePanelCollapsedBeforeKanbanRef.current = null;
-      }
-      // Reset Kanban side panel expansion state
-      setKanbanSidePanelExpanded(false);
+  // Handler for opening/focusing Kanban tab (toggle behavior with Cmd+K)
+  // Refactored to avoid nested state updates which can cause race conditions
+  const handleOpenKanbanTab = useCallback(() => {
+    // Toggle: if already on Kanban tab, switch back to Chat
+    if (activeTabId === 'kanban-board') {
+      console.log('[Quack] Kanban tab toggled off, returning to chat');
+      setActiveTabId('chat');
+      return;
     }
-    toggleKanbanView();
-  }, [isKanbanViewActive, sidePanelCollapsed, toggleKanbanView]);
+
+    // Check if kanban tab already exists
+    const existingTab = tabs.find(t => t.type === 'kanban');
+
+    if (existingTab) {
+      // Tab exists, just focus it
+      console.log('[Quack] Kanban tab exists, focusing it');
+      setActiveTabId('kanban-board');
+    } else {
+      // Create new kanban tab and focus it
+      const newTab = openKanbanTab();
+      console.log('[Quack] Kanban tab created:', newTab.id);
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId('kanban-board');
+    }
+  }, [openKanbanTab, activeTabId, tabs]);
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
-    toggleKanban: handleToggleKanbanView,
+    toggleKanban: handleOpenKanbanTab,
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
     toggleSidePanel: useCallback(() => {
@@ -6877,11 +7061,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     }, []),
     newKanbanTask: useCallback(() => {
-      // Only works when Kanban view is active
-      if (isKanbanViewActive) {
+      // Only works when Kanban tab is active
+      const isKanbanTabActive = activeTabId === 'kanban-board';
+      if (isKanbanTabActive) {
         requestNewTaskModal();
       }
-    }, [isKanbanViewActive, requestNewTaskModal]),
+    }, [activeTabId, requestNewTaskModal]),
   });
 
   // Tab management handlers
@@ -6998,7 +7183,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Handle tab popout - drag tab outside tab bar to create floating window
   const handleTabPopout = useCallback(async (tab: Tab, position: PopoutPosition) => {
-    console.log('[App] Tab popout requested:', tab.id, tab.type);
+    console.log('[App] Tab popout requested:', tab.id, tab.type, position);
 
     // Don't pop out chat tab
     if (tab.type === 'chat') {
@@ -7012,19 +7197,27 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    // Create popout window
-    const windowLabel = await popoutTab(tab, position);
+    try {
+      // Create popout window
+      console.log('[App] Calling popoutTab...');
+      const windowLabel = await popoutTab(tab, position);
+      console.log('[App] popoutTab returned:', windowLabel);
 
-    if (windowLabel) {
-      // Remove tab from main window
-      setTabs(prev => prev.filter(t => t.id !== tab.id));
+      if (windowLabel) {
+        // Remove tab from main window
+        setTabs(prev => prev.filter(t => t.id !== tab.id));
 
-      // Switch to chat tab if the active tab was popped out
-      if (activeTabId === tab.id) {
-        setActiveTabId('chat');
+        // Switch to chat tab if the active tab was popped out
+        if (activeTabId === tab.id) {
+          setActiveTabId('chat');
+        }
+
+        console.log('[App] Tab popped out successfully:', tab.id);
+      } else {
+        console.warn('[App] popoutTab returned null - window creation may have failed');
       }
-
-      console.log('[App] Tab popped out successfully:', tab.id);
+    } catch (error) {
+      console.error('[App] Tab popout error:', error);
     }
   }, [popoutTab, isTabPoppedOut, activeTabId]);
 
@@ -7132,17 +7325,36 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       color: activeTerminal?.color
     };
 
-    setTabs([chatTab, ...terminalTabs]);
+    // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
+    // These tabs should persist across agent switches - they are not agent-specific
+    const specialTabTypes = [
+      'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
+      'agent', 'skill', 'command', 'browser-manager', 'agent-terminal'
+    ];
 
-    // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
-    if (terminalTabs.length > 0) {
-      const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
-      if (!activeTabExists) {
-        setActiveTabId(terminalTabs[0].id);
+    setTabs(prevTabs => {
+      // Keep any special tabs that were open
+      const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
+      return [chatTab, ...terminalTabs, ...specialTabs];
+    });
+
+    // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
+    // This prevents the "tab closes immediately" bug when opening Kanban
+    const isSpecialTabActive = specialTabTypes.some(type =>
+      activeTabId.includes(type) || activeTabId === 'kanban-board'
+    );
+
+    if (!isSpecialTabActive) {
+      // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
+      if (terminalTabs.length > 0) {
+        const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
+        if (!activeTabExists) {
+          setActiveTabId(terminalTabs[0].id);
+        }
+      } else {
+        // No file tabs, activate chat
+        setActiveTabId('chat');
       }
-    } else {
-      // No file tabs, activate chat
-      setActiveTabId('chat');
     }
 
     // Update the ref to track this terminal as the "previous" for next switch
@@ -8368,7 +8580,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanViewActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanViewActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanViewActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -8413,8 +8625,8 @@ You have access to all Bash tools to execute git commands like:
           onTogglePip={togglePipWindow}
           isPipOpen={isPipOpen}
           // Kanban View props
-          isKanbanViewActive={isKanbanViewActive}
-          onToggleKanbanView={handleToggleKanbanView}
+          isKanbanTabActive={isKanbanTabActive}
+          onOpenKanbanTab={handleOpenKanbanTab}
           inProgressTaskCount={inProgressTaskCount}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
@@ -8574,8 +8786,8 @@ You have access to all Bash tools to execute git commands like:
           ) : (
             /* Chat area when agents are active */
             <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* Action Icons - aligned right above tabs (hidden in Kanban mode) */}
-              {!isKanbanViewActive && <ActionIcons
+              {/* Action Icons - aligned right above tabs */}
+              <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
               onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
@@ -8632,57 +8844,60 @@ You have access to all Bash tools to execute git commands like:
                   console.error("Failed to open claude login:", error);
                 }
               }}
-            />}
+            />
 
-            {/* Tab Bar - VSCode style (hidden in Kanban mode) */}
-            {!isKanbanViewActive && <TabBar
+            {/* Tab Bar - VSCode style (always shown) */}
+            <TabBar
               tabs={tabs}
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}
               onTabReorder={handleTabReorder}
               onTabPopout={handleTabPopout}
-            />}
+            />
 
             {/* Content Area - fills remaining space */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              {/* Kanban View - full width when active, cross-project view */}
-              {isKanbanViewActive && (
-                <KanbanView
-                  terminals={terminals}
-                  onExitKanban={handleToggleKanbanView}
-                  // Chat integration for Kanban tasks
-                  chatSessions={chatSessions}
-                  chatLoadingMap={chatLoadingMap}
-                  onSendMessage={sendMessageForTargetAgent}
-                  onAbortStream={abortStreamForTargetAgent}
-                  onClearConversation={clearConversationForTargetAgent}
-                  getLastPrompt={getLastPromptForTargetAgent}
-                  sessionTokensMap={chatTokensMap}
-                  // New Agent creation for Kanban
-                  onCreateNewAgent={handleOpenNewAgentForKanban}
-                  // Default settings from global presets
-                  defaultModel={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
-                  defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
-                  defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
-                  defaultEffort={currentSettings.effort || 'medium'}
-                  // 🦆 Load saved chat sessions from sessionIds
-                  onLoadChatSessions={loadKanbanChatSessions}
-                  // Open side panel when clicking on project name
-                  onProjectClick={handleKanbanProjectClick}
-                  // Diff drawer handler
-                  onDiffClick={handleDiffClick}
-                  // Open session in terminal handler
-                  onOpenSessionInTerminal={openKanbanSessionInTerminal}
-                />
-              )}
+              {/* Kanban Tab View - shown when kanban tab is active */}
+              {activeTabId === 'kanban-board' && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'kanban') {
+                  return (
+                    <KanbanTabView
+                      tab={activeTab}
+                      isActive={true}
+                      terminals={terminals}
+                      chatSessions={chatSessions}
+                      chatLoadingMap={chatLoadingMap}
+                      onSendMessage={sendMessageForTargetAgent}
+                      onAbortStream={abortStreamForTargetAgent}
+                      onClearConversation={clearConversationForTargetAgent}
+                      onCompactConversation={compactConversationForTargetAgent}
+                      getLastPrompt={getLastPromptForTargetAgent}
+                      sessionTokensMap={chatTokensMap}
+                      onCreateNewAgent={handleOpenNewAgentForKanban}
+                      defaultModel={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                      defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+                      defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                      defaultEffort={currentSettings.effort || 'medium'}
+                      onLoadChatSessions={loadKanbanChatSessions}
+                      onProjectClick={handleKanbanProjectClick}
+                      onDiffClick={handleDiffClick}
+                      onOpenSessionInTerminal={openKanbanSessionInTerminal}
+                      onToggleSidePanel={() => setKanbanSidePanelExpanded(!kanbanSidePanelExpanded)}
+                      sidePanelExpanded={kanbanSidePanelExpanded}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Kanban Notification Bar - shown after /background command creates a task */}
-              {pendingNotification && !isKanbanViewActive && (
+              {pendingNotification && !isKanbanTabActive && (
                 <KanbanNotificationBar
                   taskTitle={pendingNotification.taskTitle}
                   onOpenKanban={() => {
-                    setKanbanViewActive(true);
+                    handleOpenKanbanTab();
                     dismissNotification();
                   }}
                   onDismiss={dismissNotification}
@@ -8690,7 +8905,7 @@ You have access to all Bash tools to execute git commands like:
               )}
 
               {/* Chat View - shown when chat tab is active and Kanban is not active */}
-              {activeTabId === 'chat' && !isKanbanViewActive && (
+              {activeTabId === 'chat' && !isKanbanTabActive && (
                 <ChatView
               key={activeId ?? 'no-agent'}
               messages={currentAgentMessages}
@@ -8760,7 +8975,7 @@ You have access to all Bash tools to execute git commands like:
               )}
 
               {/* File Preview - shown when file tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('file-') && !isKanbanViewActive && (
+              {activeTabId.startsWith('file-') && !isKanbanTabActive && (
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                   <FilePreviewDrawer
                     ref={previewDrawerRef}
@@ -8823,7 +9038,7 @@ You have access to all Bash tools to execute git commands like:
               )}
 
               {/* Agent Viewer - shown when agent tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('agent-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('agent-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'agent' && activeTab.agentName && activeTab.agentScope) {
                   return (
@@ -8839,7 +9054,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Browser Manager - shown when browser tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('browser-manager-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('browser-manager-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'browser') {
                   return <BrowserManager />;
@@ -8848,7 +9063,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Skill Viewer - shown when skill tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('skill-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('skill-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'skill' && activeTab.skillName && activeTab.skillScope) {
                   return (
@@ -8864,7 +9079,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Command Viewer - shown when command tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('command-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('command-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'command' && activeTab.command) {
                   return (
@@ -8878,7 +9093,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Documentation Viewer - shown when docs tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('docs-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('docs-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'docs') {
                   return <DocsTabView tab={activeTab} isActive={true} />;
@@ -8887,7 +9102,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Memory Graph Viewer - shown when memory-graph tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('memory-graph-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('memory-graph-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'memory-graph') {
                   return <MemoryGraphTabView
@@ -8900,7 +9115,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Second Brain Outliner - shown when second-brain tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('second-brain-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('second-brain-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'second-brain') {
                   return <SecondBrainTabView tab={activeTab} isActive={true} />;
@@ -8909,7 +9124,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Claude Assets Manager - shown when claude-assets tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('claude-assets-') && !isKanbanViewActive && (() => {
+              {activeTabId.startsWith('claude-assets-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'claude-assets') {
                   return (
@@ -8942,7 +9157,7 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility (hidden in Kanban mode) */}
-              {tabs.some(t => t.type === 'agent-terminal') && !isKanbanViewActive && (
+              {tabs.some(t => t.type === 'agent-terminal') && !isKanbanTabActive && (
                 <div style={{
                   flex: 1,
                   minHeight: 0,
@@ -9071,16 +9286,16 @@ You have access to all Bash tools to execute git commands like:
           sessionsRefreshKey={sessionsRefreshKey}
           // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) are active
           // In Kanban mode: use kanbanSidePanelExpanded to control visibility
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanViewActive && !kanbanSidePanelExpanded)}
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanTabActive && !kanbanSidePanelExpanded)}
           onToggleCollapse={() => {
-            if (isKanbanViewActive) {
+            if (isKanbanTabActive) {
               // In Kanban mode, toggle kanbanSidePanelExpanded
               setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);
             } else {
               setSidePanelCollapsed(!sidePanelCollapsed);
             }
           }}
-          isKanbanViewActive={isKanbanViewActive} // Used to show/hide toggle button
+          isKanbanTabActive={isKanbanTabActive} // Used to show/hide toggle button
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
         />

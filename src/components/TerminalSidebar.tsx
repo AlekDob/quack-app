@@ -48,9 +48,9 @@ interface SortableRepositoryGroupProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number;
   onCreateAgent?: () => void; // Create new agent associated with this project
-  // Kanban mode props
-  isKanbanViewActive?: boolean;
-  onToggleKanbanView?: () => void;
+  // Kanban tab props
+  isKanbanTabActive?: boolean;
+  onOpenKanbanTab?: () => void;
 }
 
 function SortableRepositoryGroup({
@@ -146,9 +146,9 @@ interface TerminalSidebarProps {
   // PiP props
   onTogglePip?: () => void;
   isPipOpen?: boolean;
-  // Kanban View props
-  isKanbanViewActive?: boolean;
-  onToggleKanbanView?: () => void;
+  // Kanban tab props
+  isKanbanTabActive?: boolean;
+  onOpenKanbanTab?: () => void;
   inProgressTaskCount?: number; // Number of tasks in progress (for badge)
   // Quack sound props
   onToggleQuackSound?: () => void;
@@ -187,9 +187,9 @@ export default function TerminalSidebar({
   // PiP props
   onTogglePip,
   isPipOpen,
-  // Kanban View props
-  isKanbanViewActive = false,
-  onToggleKanbanView,
+  // Kanban tab props
+  isKanbanTabActive = false,
+  onOpenKanbanTab,
   inProgressTaskCount = 0,
   // Quack sound props
   onToggleQuackSound,
@@ -455,13 +455,9 @@ export default function TerminalSidebar({
   }, [filteredTerminals]);
 
   // SIMPLE: Just select terminal - no AgentChat logic!
-  // If in Kanban mode, also switch back to Agent view
+  // When clicking an agent, just select it (tab switching is handled by App.tsx)
   const handleSelectTerminal = (terminal: TerminalInfo) => {
     onSelect(terminal.id);
-    // If we're in Kanban mode, switch back to Agent view when clicking an agent
-    if (isKanbanViewActive && onToggleKanbanView) {
-      onToggleKanbanView();
-    }
   };
 
   const handleContextMenu = (event: MouseEvent, terminal: TerminalInfo) => {
@@ -708,50 +704,40 @@ export default function TerminalSidebar({
       {/* Agent List - always shown in sidebar */}
       <div className="explorer-root-label sidebar-terminals-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '12px' }}>
         <span>ACTIVE AGENTS</span>
-        {/* View Toggle Button - switches between Kanban and Agents */}
+        {/* Kanban Button - opens Kanban tab */}
         <KeyboardShortcutTooltip
-          label={isKanbanViewActive ? 'Agents' : 'Kanban'}
+          label="Kanban"
           shortcut="⌘K"
           position="left"
         >
           <button
             type="button"
-            onClick={onToggleKanbanView}
+            onClick={onOpenKanbanTab}
             style={{
-              background: isKanbanViewActive ? 'rgba(242, 140, 82, 0.15)' : 'rgba(139, 92, 246, 0.15)',
-              border: `1px solid ${isKanbanViewActive ? 'rgba(242, 140, 82, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`,
+              background: isKanbanTabActive ? 'rgba(139, 92, 246, 0.25)' : 'rgba(139, 92, 246, 0.15)',
+              border: `1px solid ${isKanbanTabActive ? 'rgba(139, 92, 246, 0.5)' : 'rgba(139, 92, 246, 0.3)'}`,
               borderRadius: '4px',
               padding: '3px 8px',
               fontSize: '10px',
               fontWeight: 500,
-              color: isKanbanViewActive ? '#f28c52' : '#8b5cf6',
+              color: '#8b5cf6',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
               transition: 'all 0.2s ease',
             }}
-            aria-label={isKanbanViewActive ? 'Switch to Agents (⌘K)' : 'Switch to Kanban (⌘K)'}
+            aria-label="Open Kanban (⌘K)"
           >
-            {isKanbanViewActive ? (
-              // Agents icon (people/users)
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            ) : (
-              // Kanban icon (columns)
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="5" height="18" rx="1" />
-                <rect x="10" y="3" width="5" height="12" rx="1" />
-                <rect x="17" y="3" width="5" height="15" rx="1" />
-              </svg>
-            )}
-            {isKanbanViewActive ? 'Agents' : 'Kanban'}
-            {/* Badge for in-progress tasks (only show when not in Kanban view) */}
-            {!isKanbanViewActive && inProgressTaskCount > 0 && (
+            {/* Kanban icon (columns) */}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="5" height="18" rx="1" />
+              <rect x="10" y="3" width="5" height="12" rx="1" />
+              <rect x="17" y="3" width="5" height="15" rx="1" />
+            </svg>
+            Kanban
+            {/* Badge for in-progress tasks */}
+            {inProgressTaskCount > 0 && (
               <span
                 style={{
                   background: '#f28c52',
@@ -811,8 +797,8 @@ export default function TerminalSidebar({
                     onOpenTerminalWindow={onOpenTerminalWindow}
                     gitRefreshTrigger={gitRefreshTrigger}
                     onCreateAgent={onCreateAgent}
-                    isKanbanViewActive={isKanbanViewActive}
-                    onToggleKanbanView={onToggleKanbanView}
+                    isKanbanTabActive={isKanbanTabActive}
+                    onOpenKanbanTab={onOpenKanbanTab}
                   />
                 );
               })}

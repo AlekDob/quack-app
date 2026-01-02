@@ -207,6 +207,12 @@ pub fn run() {
             if let Err(e) = rules::install_bundled_rules() {
                 log::warn!("⚠️ Failed to install bundled rules: {}", e);
             }
+
+            // 🦆 Install bundled slash commands for all Quack users on first run
+            // This ensures essential global commands (like /background) are available in any project
+            if let Err(e) = slash_commands::install_bundled_commands() {
+                log::warn!("⚠️ Failed to install bundled commands: {}", e);
+            }
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {

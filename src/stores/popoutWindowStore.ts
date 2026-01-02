@@ -115,13 +115,17 @@ export const usePopoutWindowStore = create<PopoutWindowState>()(
       // Get window by tab ID
       getWindowByTabId: (tabId: string) => {
         const { windows } = get();
+        console.log(`[PopoutStore] getWindowByTabId(${tabId}) - windows in store:`, windows.size);
 
         for (const windowInfo of windows.values()) {
+          console.log(`[PopoutStore] Checking window:`, windowInfo.windowLabel, 'with tab:', windowInfo.tab.id);
           if (windowInfo.tab.id === tabId) {
+            console.log(`[PopoutStore] Found match for ${tabId}`);
             return windowInfo;
           }
         }
 
+        console.log(`[PopoutStore] No window found for ${tabId}`);
         return undefined;
       },
 
@@ -200,6 +204,11 @@ export function generateWindowLabel(tab: Tab): string {
 export function canPopoutTab(tab: Tab): boolean {
   // Chat tabs cannot be popped out (main app tab)
   if (tab.type === 'chat') {
+    return false;
+  }
+
+  // Kanban tabs cannot be popped out - they require main app state (terminals, chat sessions, etc.)
+  if (tab.type === 'kanban') {
     return false;
   }
 

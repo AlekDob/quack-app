@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -334,22 +334,48 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
               🧠
             </span>
           )}
+          {tab.type === 'kanban' && (
+            <span className="tab-icon" aria-hidden="true">
+              {/* Kanban board icon */}
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7V7h5v10zm6 0h-4v-6h4v6z"/>
+              </svg>
+            </span>
+          )}
           <span className="tab-label">{tab.label}</span>
           {/* Popout button - opens tab in separate window */}
+          {/* Using span with role="button" to avoid button-inside-button HTML error */}
           {tab.closable && canPopoutTab(tab) && onTabPopout && (
-            <button
-              type="button"
+            <span
+              role="button"
+              tabIndex={0}
               className="tab-popout-btn"
               onClick={(e) => {
                 e.stopPropagation();
+                console.log('[TabBar] Popout button clicked for tab:', tab.id, tab.type);
                 // Use current mouse position for window placement
                 const rect = (e.target as HTMLElement).getBoundingClientRect();
-                onTabPopout(tab, {
+                const position = {
                   x: rect.left,
                   y: rect.bottom,
                   screenX: window.screenX + rect.left,
                   screenY: window.screenY + rect.bottom + 50,
-                });
+                };
+                console.log('[TabBar] Calling onTabPopout with position:', position);
+                onTabPopout(tab, position);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                  onTabPopout(tab, {
+                    x: rect.left,
+                    y: rect.bottom,
+                    screenX: window.screenX + rect.left,
+                    screenY: window.screenY + rect.bottom + 50,
+                  });
+                }
               }}
               aria-label={`Open ${tab.label} in new window`}
               title="Open in new window"
@@ -359,20 +385,28 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
                 <path d="M10 2H14V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M14 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-            </button>
+            </span>
           )}
           {tab.closable && (
-            <button
-              type="button"
+            <span
+              role="button"
+              tabIndex={0}
               className="tab-close"
               onClick={(e) => handleCloseClick(e, tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTabClose(tab.id);
+                }
+              }}
               aria-label={`Close ${tab.label}`}
               title="Close"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-            </button>
+            </span>
           )}
         </button>
       ))}

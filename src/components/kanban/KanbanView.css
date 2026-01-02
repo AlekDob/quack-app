@@ -166,6 +166,37 @@
   color: var(--kanban-text-secondary);
 }
 
+/* Clear All button for Done column */
+.kanban-column-clear-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--kanban-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.kanban-column-header:hover .kanban-column-clear-all {
+  opacity: 1;
+}
+
+.kanban-column-clear-all:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.kanban-column-clear-all:active {
+  transform: scale(0.95);
+}
+
 /* Column content (scrollable) */
 .kanban-column-content {
   flex: 1;

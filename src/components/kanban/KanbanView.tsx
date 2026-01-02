@@ -46,6 +46,7 @@ interface KanbanViewProps {
   onSendMessage: (agentId: string, content: string, options?: ChatSendOptions) => Promise<void>;
   onAbortStream: (agentId: string) => void;
   onClearConversation: (agentId: string) => void;
+  onCompactConversation: (agentId: string) => void;
   getLastPrompt: (agentId: string) => string | null;
   sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
   // New Agent creation
@@ -63,6 +64,9 @@ interface KanbanViewProps {
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
   // Open session in terminal handler (for claude --resume)
   onOpenSessionInTerminal?: (taskId: string) => void;
+  // Side panel toggle (for "Agents" button in header)
+  onToggleSidePanel?: () => void;
+  sidePanelExpanded?: boolean;
 }
 
 export default function KanbanView({
@@ -73,6 +77,7 @@ export default function KanbanView({
   onSendMessage,
   onAbortStream,
   onClearConversation,
+  onCompactConversation,
   getLastPrompt,
   sessionTokensMap,
   onCreateNewAgent,
@@ -84,6 +89,8 @@ export default function KanbanView({
   onProjectClick,
   onDiffClick,
   onOpenSessionInTerminal,
+  onToggleSidePanel,
+  sidePanelExpanded = false,
 }: KanbanViewProps) {
   const {
     tasks,
@@ -309,6 +316,29 @@ export default function KanbanView({
       }
     }
   }, [deleteTask, clearOutput, selectedShellTaskId]);
+
+  // Handle clearing all done tasks
+  const handleClearDone = useCallback(async () => {
+    const doneCount = doneTasks.length;
+    if (doneCount === 0) return;
+
+    const confirmed = await confirm(
+      `Delete all ${doneCount} completed task${doneCount > 1 ? 's' : ''}? This action cannot be undone.`,
+      {
+        title: 'Clear Completed Tasks',
+        kind: 'warning',
+      }
+    );
+
+    if (confirmed) {
+      // Delete all done tasks
+      for (const task of doneTasks) {
+        deleteTask(task.id);
+        clearOutput(task.id);
+      }
+      toast.success(`Cleared ${doneCount} completed task${doneCount > 1 ? 's' : ''}`);
+    }
+  }, [doneTasks, deleteTask, clearOutput]);
 
   // Handle task edit (open modal in edit mode)
   const handleTaskEdit = useCallback((task: KanbanTask) => {
@@ -555,6 +585,7 @@ export default function KanbanView({
             shellOutputs={shellOutputsForColumns}
             isDropTarget={overColumnId === 'done'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
+            onClearAll={handleClearDone}
           />
         </div>
 
@@ -589,6 +620,7 @@ export default function KanbanView({
         onSendMessage={onSendMessage}
         onAbortStream={onAbortStream}
         onClearConversation={onClearConversation}
+        onCompactConversation={onCompactConversation}
         getLastPrompt={getLastPrompt}
         sessionTokensMap={sessionTokensMap}
         // Default settings from global settings

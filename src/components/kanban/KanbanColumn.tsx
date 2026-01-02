@@ -36,6 +36,8 @@ interface KanbanColumnProps {
   isDropTarget?: boolean;
   // Handler for agent drop from sidebar (native HTML5 drag-and-drop)
   onSidebarAgentDrop?: (agentId: string, targetColumn: KanbanStatus) => void;
+  // Handler for clearing all tasks in Done column
+  onClearAll?: () => void;
 }
 
 export default function KanbanColumn({
@@ -54,6 +56,7 @@ export default function KanbanColumn({
   shellOutputs,
   isDropTarget = false,
   onSidebarAgentDrop,
+  onClearAll,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -128,6 +131,22 @@ export default function KanbanColumn({
           </span>
           <h3>{title}</h3>
           <span className="kanban-column-count">{tasks.length}</span>
+          {/* Clear All button - only show in Done column when there are tasks */}
+          {id === 'done' && tasks.length > 0 && onClearAll && (
+            <button
+              className="kanban-column-clear-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearAll();
+              }}
+              title="Clear all completed tasks"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

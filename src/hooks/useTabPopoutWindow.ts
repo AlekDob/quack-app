@@ -41,13 +41,38 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
     updatePosition,
     updateSize,
     getWindowByTabId,
+    getAllWindows,
     initializeStore
   } = usePopoutWindowStore();
 
-  // Initialize store on mount
+  // Initialize store on mount and cleanup stale entries
   useEffect(() => {
-    initializeStore();
-  }, [initializeStore]);
+    const init = async () => {
+      await initializeStore();
+
+      // After store is loaded, validate that windows actually exist
+      // This cleans up stale entries from previous sessions where windows weren't properly closed
+      console.log('[TabPopoutWindow] Validating stored windows...');
+
+      const storedWindows = getAllWindows();
+      if (storedWindows.length > 0) {
+        const existingTauriWindows = await WebviewWindow.getAll();
+        const existingLabels = new Set(existingTauriWindows.map(w => w.label));
+
+        console.log(`[TabPopoutWindow] Found ${storedWindows.length} stored windows, ${existingLabels.size} actual Tauri windows`);
+
+        // Remove stale entries
+        for (const storedWindow of storedWindows) {
+          if (!existingLabels.has(storedWindow.windowLabel)) {
+            console.log(`[TabPopoutWindow] Removing stale window entry: ${storedWindow.windowLabel}`);
+            await removeWindow(storedWindow.windowLabel);
+          }
+        }
+      }
+    };
+
+    init();
+  }, [initializeStore, getAllWindows, removeWindow]);
 
   // Listen for drag-back events from popout windows
   useEffect(() => {
@@ -99,6 +124,8 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
         return { width: 900, height: 700 };
       case 'memory-graph':
         return { width: 1000, height: 800 };
+      case 'kanban':
+        return { width: 1400, height: 900 }; // Large window for Kanban board
       default:
         return { width: 800, height: 600 };
     }
@@ -111,11 +138,14 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
     tab: Tab,
     position: PopoutPosition
   ): Promise<string | null> => {
+    console.log(`[TabPopoutWindow] popoutTab called for:`, tab.id, tab.type);
+
     // Validate tab can be popped out
     if (!canPopoutTab(tab)) {
       console.warn(`[TabPopoutWindow] Tab type ${tab.type} cannot be popped out`);
       return null;
     }
+    console.log(`[TabPopoutWindow] canPopoutTab check passed`);
 
     // DEBOUNCE: Check if this tab was recently popped out
     const now = Date.now();
@@ -124,12 +154,14 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
       console.log(`[TabPopoutWindow] Debouncing popout for tab ${tab.id}, too soon after last popout`);
       return null;
     }
+    console.log(`[TabPopoutWindow] debounce check passed`);
 
     // MUTEX: Check if this tab is already being processed
     if (pendingPopoutsRef.current.has(tab.id)) {
       console.log(`[TabPopoutWindow] Popout already in progress for tab ${tab.id}`);
       return null;
     }
+    console.log(`[TabPopoutWindow] mutex check passed`);
 
     // Mark as pending immediately
     pendingPopoutsRef.current.add(tab.id);
@@ -137,9 +169,12 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
 
     try {
       const windowLabel = generateWindowLabel(tab);
+      console.log(`[TabPopoutWindow] Generated window label:`, windowLabel);
 
       // Check if already exists
+      console.log(`[TabPopoutWindow] Checking for existing windows...`);
       const allWindows = await WebviewWindow.getAll();
+      console.log(`[TabPopoutWindow] Found ${allWindows.length} existing windows:`, allWindows.map(w => w.label));
       const existingByTab = allWindows.find(w => w.label.includes(tab.id));
 
       if (existingByTab) {
@@ -153,15 +188,19 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
       // Prepare tab data for URL
       const tabData = encodeURIComponent(JSON.stringify(tab));
       const url = `tab-popout.html?tabId=${tab.id}&tabType=${tab.type}&tabData=${tabData}`;
+      console.log(`[TabPopoutWindow] Creating window with URL:`, url);
 
       // Determine window size based on tab type
       const windowSize = getWindowSizeForTabType(tab.type);
+      console.log(`[TabPopoutWindow] Window size:`, windowSize);
 
       // Calculate position (center on cursor)
       const windowX = Math.max(0, position.screenX - windowSize.width / 2);
       const windowY = Math.max(0, position.screenY - 30);
+      console.log(`[TabPopoutWindow] Window position:`, { x: windowX, y: windowY });
 
       // Create new window with macOS-style overlay titlebar
+      console.log(`[TabPopoutWindow] Creating WebviewWindow...`);
       const webview = new WebviewWindow(windowLabel, {
         url,
         title: tab.label,
@@ -177,27 +216,42 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
         alwaysOnTop: false,
         focus: true,
       });
+      console.log(`[TabPopoutWindow] WebviewWindow created, setting up listeners...`);
 
-      // Wait for window creation
-      await webview.once('tauri://created', async () => {
-        console.log(`[TabPopoutWindow] Created window for tab ${tab.id}`);
-        setPopoutWindows(prev => new Map(prev).set(tab.id, webview));
+      // Wait for window creation with timeout
+      const createdPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Window creation timed out after 5s'));
+        }, 5000);
 
-        // Save to store for persistence
-        const windowInfo: PopoutWindowInfo = {
-          windowLabel,
-          tab,
-          position: { x: windowX, y: windowY },
-          size: windowSize,
-          createdAt: Date.now(),
-        };
-        await addWindow(windowInfo);
+        webview.once('tauri://created', async () => {
+          clearTimeout(timeout);
+          console.log(`[TabPopoutWindow] tauri://created event received for tab ${tab.id}`);
+          setPopoutWindows(prev => new Map(prev).set(tab.id, webview));
 
-        // Emit creation event
-        await emitTo(windowLabel, 'tab-popout-created', { tab });
+          // Save to store for persistence
+          const windowInfo: PopoutWindowInfo = {
+            windowLabel,
+            tab,
+            position: { x: windowX, y: windowY },
+            size: windowSize,
+            createdAt: Date.now(),
+          };
+          await addWindow(windowInfo);
 
-        // Clean up pending state after successful creation
-        pendingPopoutsRef.current.delete(tab.id);
+          // Emit creation event
+          await emitTo(windowLabel, 'tab-popout-created', { tab });
+
+          // Clean up pending state after successful creation
+          pendingPopoutsRef.current.delete(tab.id);
+          resolve();
+        });
+
+        webview.once('tauri://error', (e) => {
+          clearTimeout(timeout);
+          console.error(`[TabPopoutWindow] tauri://error event:`, e);
+          reject(new Error(`Window creation error: ${e.payload}`));
+        });
       });
 
       // Handle window close
@@ -205,6 +259,10 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
         console.log(`[TabPopoutWindow] Window destroyed for tab ${tab.id}`);
         handleWindowClose(tab.id, windowLabel);
       });
+
+      // Wait for creation to complete
+      await createdPromise;
+      console.log(`[TabPopoutWindow] Window fully created:`, windowLabel);
 
       return windowLabel;
     } catch (error) {
@@ -270,7 +328,10 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
    * Check if a tab is currently popped out
    */
   const isTabPoppedOut = useCallback((tabId: string): boolean => {
-    return popoutWindows.has(tabId) || !!getWindowByTabId(tabId);
+    const inLocalState = popoutWindows.has(tabId);
+    const inStore = getWindowByTabId(tabId);
+    console.log(`[TabPopoutWindow] isTabPoppedOut check for ${tabId}: inLocalState=${inLocalState}, inStore=${!!inStore}`);
+    return inLocalState || !!inStore;
   }, [popoutWindows, getWindowByTabId]);
 
   /**

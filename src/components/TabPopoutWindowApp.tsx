@@ -13,6 +13,7 @@ const DocsViewer = lazy(() => import('./docs/DocsViewer'));
 const SkillViewer = lazy(() => import('./SkillViewer'));
 const CommandViewer = lazy(() => import('./CommandViewer'));
 const AgentViewer = lazy(() => import('./AgentViewer'));
+const KanbanPopoutView = lazy(() => import('./kanban/KanbanPopoutView'));
 
 // Loading spinner component
 const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => (
@@ -229,6 +230,8 @@ const TabPopoutWindowApp: React.FC = () => {
         return '🧠';
       case 'second-brain':
         return '🧠';
+      case 'kanban':
+        return '📋';
       default:
         return '📄';
     }
@@ -331,6 +334,13 @@ const TabPopoutWindowApp: React.FC = () => {
 
       case 'chat':
         return renderPlaceholder('💬', 'Chat', 'Chat cannot be popped out');
+
+      case 'kanban':
+        return (
+          <Suspense fallback={<LoadingSpinner message="Loading Kanban board..." />}>
+            <KanbanPopoutView />
+          </Suspense>
+        );
 
       default:
         return renderPlaceholder('📄', 'Unknown Tab Type', tab.type);

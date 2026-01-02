@@ -29,6 +29,7 @@ interface KanbanChatDrawerProps {
   onSendMessage: (agentId: string, content: string, options?: ChatSendOptions) => Promise<void>;
   onAbortStream: (agentId: string) => void;
   onClearConversation: (agentId: string) => void;
+  onCompactConversation: (agentId: string) => void;
   getLastPrompt: (agentId: string) => string | null;
   sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
   // Default settings from global settings
@@ -60,6 +61,7 @@ export default function KanbanChatDrawer({
   onSendMessage,
   onAbortStream,
   onClearConversation,
+  onCompactConversation,
   getLastPrompt,
   sessionTokensMap,
   defaultModel = 'sonnet',
@@ -269,6 +271,13 @@ export default function KanbanChatDrawer({
   // Get accent color from task
   const accentColor = task?.assignedAgent?.color || '#f28c52';
 
+  // Handle compact conversation
+  const handleCompactConversation = useCallback(() => {
+    if (agentId) {
+      onCompactConversation(agentId);
+    }
+  }, [agentId, onCompactConversation]);
+
   // Handler to open session in terminal (wraps taskId for ChatView)
   const handleOpenSessionInTerminal = useCallback(() => {
     if (task?.id && onOpenSessionInTerminal) {
@@ -372,6 +381,7 @@ export default function KanbanChatDrawer({
               lastPrompt={lastPrompt ?? undefined}
               // Conversation management
               onClearConversation={handleClearConversation}
+              onCompactConversation={handleCompactConversation}
               // Token usage
               sessionTokens={{
                 inputTokens: sessionTokens.inputTokens,

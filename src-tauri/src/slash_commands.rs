@@ -3,6 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
+/// Bundled command: /background - Run commands or agents in background
+/// This command is installed automatically for all Quack users on first run
+const BUNDLED_COMMAND_BACKGROUND: &str = include_str!("../../.claude/commands/background.md");
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlashCommand {
     pub name: String,
@@ -312,4 +316,69 @@ Execute the command according to the instructions in <command-context> above."#,
     log::info!("🦆 Expanded command with context ({} chars)", final_content.len());
 
     Ok(final_content)
+}
+
+/// Bundled command definition for automatic installation
+struct BundledCommand {
+    name: &'static str,
+    content: &'static str,
+}
+
+/// List of bundled commands to install for all Quack users
+/// These are core Quack features that should be available in any project
+const BUNDLED_COMMANDS: &[BundledCommand] = &[
+    BundledCommand {
+        name: "background",
+        content: BUNDLED_COMMAND_BACKGROUND,
+    },
+];
+
+/// Install bundled commands to ~/.claude/commands/ on first run
+///
+/// This function is called during app startup and ensures that
+/// all Quack users have access to essential global commands like /background.
+///
+/// Commands are only installed if they don't already exist, preserving
+/// any user customizations.
+pub fn install_bundled_commands() -> Result<(), String> {
+    let home_dir = std::env::var("HOME")
+        .map_err(|_| "Could not determine home directory")?;
+
+    let global_commands_dir = PathBuf::from(home_dir).join(".claude/commands");
+
+    // Create directory if it doesn't exist
+    if !global_commands_dir.exists() {
+        fs::create_dir_all(&global_commands_dir)
+            .map_err(|e| format!("Failed to create global commands directory: {}", e))?;
+        log::info!("🦆 Created global commands directory: {:?}", global_commands_dir);
+    }
+
+    let mut installed_count = 0;
+    let mut skipped_count = 0;
+
+    for cmd in BUNDLED_COMMANDS {
+        let file_path = global_commands_dir.join(format!("{}.md", cmd.name));
+
+        if file_path.exists() {
+            // Command already exists, don't overwrite user customizations
+            log::debug!("🦆 Bundled command '{}' already exists, skipping", cmd.name);
+            skipped_count += 1;
+        } else {
+            // Install the bundled command
+            fs::write(&file_path, cmd.content)
+                .map_err(|e| format!("Failed to install bundled command '{}': {}", cmd.name, e))?;
+            log::info!("🦆 Installed bundled command: /{}", cmd.name);
+            installed_count += 1;
+        }
+    }
+
+    if installed_count > 0 {
+        log::info!(
+            "🦆 Bundled commands installation complete: {} installed, {} already present",
+            installed_count,
+            skipped_count
+        );
+    }
+
+    Ok(())
 }
