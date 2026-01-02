@@ -207,11 +207,6 @@ export function canPopoutTab(tab: Tab): boolean {
     return false;
   }
 
-  // Kanban tabs cannot be popped out - they require main app state (terminals, chat sessions, etc.)
-  if (tab.type === 'kanban') {
-    return false;
-  }
-
-  // All other tab types can be popped out
+  // All other tab types can be popped out (including kanban - uses read-only popout view)
   return true;
 }

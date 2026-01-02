@@ -2,8 +2,8 @@
  * KanbanPopoutView Component
  *
  * Standalone Kanban board for popout windows.
- * Read-only view that displays tasks from the store.
- * Does not support chat or agent assignment (requires main app).
+ * Includes full chat drawer functionality with standalone chat system.
+ * Uses usePopoutKanbanChat hook for independent chat management.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -22,9 +22,13 @@ import {
   type CollisionDetection,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { emit } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
+import KanbanChatDrawer from './KanbanChatDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
+import { usePopoutKanbanChat } from '../../hooks/usePopoutKanbanChat';
 import type { KanbanTask, KanbanStatus } from '../../types';
 import { toast } from 'sonner';
 import './KanbanView.css';
@@ -36,15 +40,45 @@ export default function KanbanPopoutView() {
     loadTasks,
     moveTask,
     deleteTask,
+    updateTask,
+    selectedTaskId,
+    isDrawerOpen,
+    selectTask,
+    openDrawer,
+    closeDrawer,
   } = useKanbanStore();
+
+  // Standalone chat system for popout
+  const {
+    chatSessions,
+    chatLoadingMap,
+    sessionTokensMap,
+    loadChatSession,
+    sendMessage,
+    abortStream,
+    clearConversation,
+    compactConversation,
+    getLastPrompt,
+  } = usePopoutKanbanChat();
 
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
+
+  // Get selected task object
+  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : null;
 
   // Filter tasks by status
   const todoTasks = tasks.filter((t) => t.status === 'todo');
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
   const doneTasks = tasks.filter((t) => t.status === 'done');
+
+  // Load chat session when task is selected
+  useEffect(() => {
+    if (selectedTaskId && isDrawerOpen) {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      loadChatSession(selectedTaskId, task?.sessionId);
+    }
+  }, [selectedTaskId, isDrawerOpen, tasks, loadChatSession]);
 
   // Load tasks on mount
   useEffect(() => {
@@ -113,10 +147,42 @@ export default function KanbanPopoutView() {
     }
   };
 
-  // Handle task click - show info toast since we can't open chat in popout
+  // Handle task click - open drawer in popout window
   const handleTaskClick = useCallback((task: KanbanTask) => {
-    toast.info('Open the main app to chat with this task');
-  }, []);
+    selectTask(task.id);
+    openDrawer();
+  }, [selectTask, openDrawer]);
+
+  // Handle drawer close
+  const handleCloseDrawer = useCallback(() => {
+    closeDrawer();
+    selectTask(null);
+  }, [closeDrawer, selectTask]);
+
+  // Handle send message - wrapper for usePopoutKanbanChat
+  const handleSendMessage = useCallback(async (agentId: string, content: string, options?: Parameters<typeof sendMessage>[2]) => {
+    await sendMessage(agentId, content, options);
+  }, [sendMessage]);
+
+  // Handle abort stream
+  const handleAbortStream = useCallback((agentId: string) => {
+    abortStream(agentId);
+  }, [abortStream]);
+
+  // Handle clear conversation
+  const handleClearConversation = useCallback((agentId: string) => {
+    clearConversation(agentId);
+  }, [clearConversation]);
+
+  // Handle compact conversation
+  const handleCompactConversation = useCallback((agentId: string) => {
+    compactConversation(agentId);
+  }, [compactConversation]);
+
+  // Handle task update
+  const handleTaskUpdate = useCallback(async (id: string, updates: Partial<KanbanTask>) => {
+    await updateTask(id, updates);
+  }, [updateTask]);
 
   // Handle task delete
   const handleTaskDelete = useCallback(async (taskId: string) => {
@@ -125,6 +191,24 @@ export default function KanbanPopoutView() {
       toast.success('Task deleted');
     }
   }, [deleteTask]);
+
+  // Handle return to tab bar
+  const handleReturnToTab = useCallback(async () => {
+    try {
+      // Get tab data from URL params
+      const params = new URLSearchParams(window.location.search);
+      const tabDataParam = params.get('tabData');
+      if (tabDataParam) {
+        const tab = JSON.parse(decodeURIComponent(tabDataParam));
+        await emit('tab-popout-dragback', { tab });
+      }
+      // Close this window
+      const appWindow = getCurrentWindow();
+      await appWindow.close();
+    } catch (error) {
+      console.error('[KanbanPopoutView] Failed to return to tab:', error);
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -138,8 +222,20 @@ export default function KanbanPopoutView() {
 
   return (
     <div className="kanban-view">
-      {/* Header */}
-      <div className="kanban-header" data-tauri-drag-region>
+      {/* Drag region for macOS traffic lights area */}
+      <div
+        data-tauri-drag-region
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '36px',
+          zIndex: 10,
+        }}
+      />
+      {/* Header - extra padding for macOS traffic lights in popout */}
+      <div className="kanban-header" data-tauri-drag-region style={{ paddingTop: '36px' }}>
         <h1 className="kanban-title" data-tauri-drag-region>Kanban Board</h1>
         <div style={{ flex: 1 }} data-tauri-drag-region />
         <span style={{
@@ -151,6 +247,33 @@ export default function KanbanPopoutView() {
         }}>
           Popout Mode - Drag tasks to move
         </span>
+        {/* Return to tab button */}
+        <button
+          type="button"
+          onClick={handleReturnToTab}
+          title="Return to tab bar"
+          aria-label="Return to tab bar"
+          style={{
+            marginLeft: '12px',
+            padding: '6px 8px',
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: '6px',
+            color: 'rgba(255,255,255,0.7)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '12px',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 3H10C11.1046 3 12 3.89543 12 5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M14 10L12 8L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 3V12C3 12.5523 3.44772 13 4 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          Return to Tab
+        </button>
       </div>
 
       {/* Kanban columns */}
@@ -173,7 +296,7 @@ export default function KanbanPopoutView() {
               </svg>
             }
             tasks={todoTasks}
-            selectedTaskId={null}
+            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             isDropTarget={overColumnId === 'todo'}
@@ -188,7 +311,7 @@ export default function KanbanPopoutView() {
               </svg>
             }
             tasks={inProgressTasks}
-            selectedTaskId={null}
+            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             isDropTarget={overColumnId === 'in_progress'}
@@ -203,7 +326,7 @@ export default function KanbanPopoutView() {
               </svg>
             }
             tasks={doneTasks}
-            selectedTaskId={null}
+            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             isDropTarget={overColumnId === 'done'}
@@ -217,6 +340,22 @@ export default function KanbanPopoutView() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Chat Drawer */}
+      <KanbanChatDrawer
+        task={selectedTask || null}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        onTaskUpdate={handleTaskUpdate}
+        chatSessions={chatSessions}
+        chatLoadingMap={chatLoadingMap}
+        onSendMessage={handleSendMessage}
+        onAbortStream={handleAbortStream}
+        onClearConversation={handleClearConversation}
+        onCompactConversation={handleCompactConversation}
+        getLastPrompt={getLastPrompt}
+        sessionTokensMap={sessionTokensMap}
+      />
     </div>
   );
 }

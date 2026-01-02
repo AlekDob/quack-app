@@ -231,7 +231,7 @@ const TabPopoutWindowApp: React.FC = () => {
       case 'second-brain':
         return '🧠';
       case 'kanban':
-        return '📋';
+        return null; // Kanban uses SVG icon, not emoji
       default:
         return '📄';
     }
@@ -358,37 +358,40 @@ const TabPopoutWindowApp: React.FC = () => {
   return (
     <div className="tab-popout-window">
       {/* Custom Titlebar - Draggable (macOS traffic lights are native) */}
-      <div
-        className={`tab-popout-titlebar ${isDragging ? 'dragging' : ''}`}
-        onMouseDown={handleTitlebarMouseDown}
-        onMouseUp={handleTitlebarMouseUp}
-      >
-        <div className="tab-popout-title">
-          <span className="tab-popout-icon">{getTabIcon(tab.type)}</span>
-          <span className="tab-popout-label">
-            {tab.label}
-            {hasUnsavedChanges && <span className="tab-popout-unsaved">*</span>}
-          </span>
-          {/* Show full file path for file tabs */}
-          {tab.type === 'file' && tab.filePath && (
-            <span className="tab-popout-filepath">{tab.filePath}</span>
-          )}
-        </div>
-        {/* Return to tab button */}
-        <button
-          type="button"
-          className="tab-popout-return-btn"
-          onClick={handleReturnToTab}
-          title="Return to tab bar"
-          aria-label="Return to tab bar"
+      {/* Hide titlebar for kanban - it has its own header with drag region */}
+      {tab.type !== 'kanban' && (
+        <div
+          className={`tab-popout-titlebar ${isDragging ? 'dragging' : ''}`}
+          onMouseDown={handleTitlebarMouseDown}
+          onMouseUp={handleTitlebarMouseUp}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 3H10C11.1046 3 12 3.89543 12 5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M14 10L12 8L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M3 3V12C3 12.5523 3.44772 13 4 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
+          <div className="tab-popout-title">
+            <span className="tab-popout-icon">{getTabIcon(tab.type)}</span>
+            <span className="tab-popout-label">
+              {tab.label}
+              {hasUnsavedChanges && <span className="tab-popout-unsaved">*</span>}
+            </span>
+            {/* Show full file path for file tabs */}
+            {tab.type === 'file' && tab.filePath && (
+              <span className="tab-popout-filepath">{tab.filePath}</span>
+            )}
+          </div>
+          {/* Return to tab button */}
+          <button
+            type="button"
+            className="tab-popout-return-btn"
+            onClick={handleReturnToTab}
+            title="Return to tab bar"
+            aria-label="Return to tab bar"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 3H10C11.1046 3 12 3.89543 12 5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M14 10L12 8L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 3V12C3 12.5523 3.44772 13 4 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Content Area */}
       <div className="tab-popout-content">
