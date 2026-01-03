@@ -7,7 +7,7 @@
  * Uses @dnd-kit/core for drop functionality.
  */
 
-import { useState, useCallback, type DragEvent } from 'react';
+import { useState, useCallback, useMemo, type DragEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -15,13 +15,43 @@ import {
 } from '@dnd-kit/sortable';
 import KanbanCard from './KanbanCard';
 import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
+import { groupTasksByCompletionDate, type DateGroup } from '../../utils/kanbanDateGrouping';
+
+// Types for In Progress column grouping by status
+type InProgressBucket = 'ready' | 'working';
+
+interface TaskWithState {
+  task: KanbanTask;
+  isLoading: boolean;
+  hasMessages: boolean;
+  isDormant: boolean;
+  shellState?: { output: string; isRunning: boolean };
+}
+
+interface InProgressGroup {
+  bucket: InProgressBucket;
+  label: string;
+  tasks: TaskWithState[];
+}
+
+/**
+ * Determine if an agent task is "ready" (finished working, awaiting review)
+ */
+function isTaskReady(
+  task: KanbanTask,
+  isLoading: boolean,
+  hasMessages: boolean,
+  isDormant: boolean
+): boolean {
+  const isAgentTask = (task.type || 'agent') === 'agent';
+  return isAgentTask && hasMessages && !isLoading && !isDormant;
+}
 
 interface KanbanColumnProps {
   id: KanbanStatus;
   title: string;
   icon: React.ReactNode;
   tasks: KanbanTask[];
-  selectedTaskId: string | null;
   onTaskClick: (task: KanbanTask) => void;
   onTaskDelete: (taskId: string) => void | Promise<void>;
   onTaskEdit?: (task: KanbanTask) => void;
@@ -45,7 +75,6 @@ export default function KanbanColumn({
   title,
   icon,
   tasks,
-  selectedTaskId,
   onTaskClick,
   onTaskDelete,
   onTaskEdit,
@@ -71,6 +100,57 @@ export default function KanbanColumn({
 
   // Use parent-provided isDropTarget OR internal isOver OR native drag for highlighting
   const showDropHighlight = isDropTarget || isOver || isNativeDragOver;
+
+  // Group tasks by completion date for Done column
+  const dateGroups: DateGroup[] = useMemo(() => {
+    if (id === 'done' && tasks.length > 0) {
+      return groupTasksByCompletionDate(tasks);
+    }
+    return [];
+  }, [id, tasks]);
+
+  // Group tasks by status for In Progress column (Ready vs Working)
+  const inProgressGroups: InProgressGroup[] = useMemo(() => {
+    if (id !== 'in_progress' || tasks.length === 0) return [];
+
+    const ready: TaskWithState[] = [];
+    const working: TaskWithState[] = [];
+
+    tasks.forEach((task) => {
+      const isLoading = chatLoadingMap?.get(task.id) || false;
+      const messages = chatSessions?.get(task.id) || [];
+      const hasMessages = messages.length > 0;
+      const hasUserMessage = messages.some((msg) => msg.role === 'user');
+      const isDormant = !hasUserMessage;
+      const shellState = shellOutputs?.get(task.id);
+
+      const taskWithState: TaskWithState = {
+        task,
+        isLoading,
+        hasMessages,
+        isDormant,
+        shellState,
+      };
+
+      if (isTaskReady(task, isLoading, hasMessages, isDormant)) {
+        ready.push(taskWithState);
+      } else {
+        working.push(taskWithState);
+      }
+    });
+
+    const groups: InProgressGroup[] = [];
+    // Ready tasks first (at the top)
+    if (ready.length > 0) {
+      groups.push({ bucket: 'ready', label: 'READY', tasks: ready });
+    }
+    // Working tasks below
+    if (working.length > 0) {
+      groups.push({ bucket: 'working', label: 'WORKING', tasks: working });
+    }
+
+    return groups;
+  }, [id, tasks, chatLoadingMap, chatSessions, shellOutputs]);
 
   // Native HTML5 drag handlers for sidebar agent drops
   const handleNativeDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -162,7 +242,85 @@ export default function KanbanColumn({
               {id === 'in_progress' && 'Drag tasks or agents here to start'}
               {id === 'done' && 'Completed tasks will appear here'}
             </div>
+          ) : id === 'done' && dateGroups.length > 0 ? (
+            // Render grouped tasks for Done column (by completion date)
+            dateGroups.map((group) => (
+              <div key={group.bucket} className="kanban-date-group">
+                <div className="kanban-date-group-header">
+                  <span className="kanban-date-group-label">{group.label}</span>
+                  <span className="kanban-date-group-count">{group.tasks.length}</span>
+                </div>
+                {group.tasks.map((task) => {
+                  const isLoading = chatLoadingMap?.get(task.id) || false;
+                  const messages = chatSessions?.get(task.id) || [];
+                  const hasMessages = messages.length > 0;
+                  const hasUserMessage = messages.some(msg => msg.role === 'user');
+                  const isDormant = !hasUserMessage;
+                  const shellState = shellOutputs?.get(task.id);
+                  const isShellRunning = shellState?.isRunning || false;
+                  const shellOutput = shellState?.output || '';
+                  const taskType = task.type || 'agent';
+                  const isTaskLoading = taskType === 'agent' ? isLoading : isShellRunning;
+
+                  return (
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      isLoading={isTaskLoading}
+                      hasMessages={hasMessages}
+                      messageCount={messages.length}
+                      isDormant={isDormant}
+                      shellOutput={shellOutput}
+                      onClick={() => onTaskClick(task)}
+                      onDelete={() => onTaskDelete(task.id)}
+                      onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
+                      onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
+                      onProjectClick={onProjectClick}
+                    />
+                  );
+                })}
+              </div>
+            ))
+          ) : id === 'in_progress' && inProgressGroups.length > 0 ? (
+            // Render grouped tasks for In Progress column (Ready vs Working)
+            inProgressGroups.map((group) => (
+              <div
+                key={group.bucket}
+                className={`kanban-status-group kanban-status-group--${group.bucket}`}
+              >
+                <div className="kanban-status-group-header">
+                  <span className={`kanban-status-indicator kanban-status-indicator--${group.bucket}`} />
+                  <span className="kanban-status-group-label">{group.label}</span>
+                  <span className="kanban-status-group-count">{group.tasks.length}</span>
+                </div>
+                {group.tasks.map(({ task, isLoading, hasMessages, isDormant, shellState }) => {
+                  const messages = chatSessions?.get(task.id) || [];
+                  const isShellRunning = shellState?.isRunning || false;
+                  const shellOutput = shellState?.output || '';
+                  const taskType = task.type || 'agent';
+                  const isTaskLoading = taskType === 'agent' ? isLoading : isShellRunning;
+
+                  return (
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      isLoading={isTaskLoading}
+                      hasMessages={hasMessages}
+                      messageCount={messages.length}
+                      isDormant={isDormant}
+                      shellOutput={shellOutput}
+                      onClick={() => onTaskClick(task)}
+                      onDelete={() => onTaskDelete(task.id)}
+                      onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
+                      onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
+                      onProjectClick={onProjectClick}
+                    />
+                  );
+                })}
+              </div>
+            ))
           ) : (
+            // Render flat list for TODO column
             tasks.map((task) => {
               // Get chat state for this task (agent tasks)
               const isLoading = chatLoadingMap?.get(task.id) || false;
@@ -184,7 +342,6 @@ export default function KanbanColumn({
                 <KanbanCard
                   key={task.id}
                   task={task}
-                  isSelected={task.id === selectedTaskId}
                   isLoading={isTaskLoading}
                   hasMessages={hasMessages}
                   messageCount={messages.length}

@@ -21,7 +21,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir, platform } from 'os';
 
@@ -82,10 +82,10 @@ async function triggerCompletionHook(task, chatSession) {
 }
 
 /**
- * Load available agents (terminals) from the sidebar
- * Returns array of agents with their info
+ * Load agents from terminals store (active terminals with projects)
+ * Returns array of agents with full context (projectPath, branch, etc.)
  */
-function loadAvailableAgents() {
+function loadAgentsFromTerminals() {
   try {
     if (!existsSync(TERMINALS_STORE_PATH)) {
       console.error(`[KanbanMCP] Terminals store not found: ${TERMINALS_STORE_PATH}`);
@@ -105,11 +105,129 @@ function loadAvailableAgents() {
       branch: t.branch,
       workingOn: t.workingOn,
       personality: t.personality,
+      source: 'terminal', // Track source for debugging
     }));
   } catch (error) {
-    console.error(`[KanbanMCP] Error loading agents: ${error.message}`);
+    console.error(`[KanbanMCP] Error loading agents from terminals: ${error.message}`);
     return [];
   }
+}
+
+/**
+ * Load agents from .quack/agent-personalities folder
+ * These are saved agent configurations that may not have active terminals
+ * @param {string|null} projectPath - If specified, look for .quack folder in this project
+ */
+function loadAgentsFromPersonalities(projectPath = null) {
+  try {
+    // Determine where to look for personalities
+    // If projectPath is specified, look in that project's .quack folder
+    // Otherwise, look in common locations
+    const searchPaths = [];
+
+    if (projectPath) {
+      searchPaths.push(join(projectPath, '.quack', 'agent-personalities'));
+    }
+
+    // Also search in CWD if different from projectPath
+    const cwd = process.cwd();
+    if (cwd !== projectPath) {
+      searchPaths.push(join(cwd, '.quack', 'agent-personalities'));
+    }
+
+    const agents = [];
+    const seenIds = new Set();
+
+    for (const personalitiesDir of searchPaths) {
+      if (!existsSync(personalitiesDir)) {
+        continue;
+      }
+
+      const files = readdirSync(personalitiesDir).filter(f => f.endsWith('.json'));
+
+      for (const file of files) {
+        try {
+          const filePath = join(personalitiesDir, file);
+          const data = JSON.parse(readFileSync(filePath, 'utf8'));
+
+          // Skip if we've already seen this agent (by ID)
+          if (seenIds.has(data.id)) {
+            continue;
+          }
+          seenIds.add(data.id);
+
+          // Skip default/example files
+          if (data.id === 'default' || file.startsWith('example-')) {
+            continue;
+          }
+
+          agents.push({
+            id: data.id,
+            name: data.name,
+            color: null, // Personalities don't have color
+            avatar: null, // Personalities don't have avatar
+            projectPath: null, // Personalities are project-agnostic
+            projectName: null,
+            branch: null,
+            workingOn: null,
+            personality: {
+              role: data.role,
+              communicationStyle: data.communicationStyle,
+              customNotes: data.customNotes,
+              personality: data.personality,
+              specialties: data.specialties,
+              skills: data.skills,
+              expressions: data.expressions,
+              intro: data.intro,
+            },
+            source: 'personality', // Track source for debugging
+          });
+        } catch (fileError) {
+          console.error(`[KanbanMCP] Error reading personality file ${file}: ${fileError.message}`);
+        }
+      }
+    }
+
+    return agents;
+  } catch (error) {
+    console.error(`[KanbanMCP] Error loading agents from personalities: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Load available agents from multiple sources (terminals + personalities)
+ * Terminals have priority (more complete data), personalities are fallback
+ * Returns array of agents with their info
+ */
+function loadAvailableAgents() {
+  // 1. Load from terminals (primary source - has projectPath, branch, etc.)
+  const terminalAgents = loadAgentsFromTerminals();
+
+  // 2. Load from personalities (secondary source - no projectPath)
+  const personalityAgents = loadAgentsFromPersonalities();
+
+  // 3. Merge with deduplication (terminals have priority)
+  const seenIds = new Set(terminalAgents.map(a => a.id));
+  const seenNames = new Set(terminalAgents.map(a => a.name?.toLowerCase()));
+
+  const uniquePersonalityAgents = personalityAgents.filter(a => {
+    // Skip if ID already exists from terminals
+    if (seenIds.has(a.id)) {
+      return false;
+    }
+    // Skip if name already exists from terminals (fuzzy match)
+    if (a.name && seenNames.has(a.name.toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
+
+  const allAgents = [...terminalAgents, ...uniquePersonalityAgents];
+
+  console.error(`[KanbanMCP] Loaded ${terminalAgents.length} agents from terminals, ${uniquePersonalityAgents.length} from personalities (${allAgents.length} total)`);
+
+  return allAgents;
 }
 
 /**
@@ -325,6 +443,10 @@ async function handleMoveTask(args) {
   if (args.newStatus === 'in_progress' && !task.startedAt) {
     task.startedAt = Date.now();
   }
+  // Reset completedAt when task moves OUT of done status
+  if (previousStatus === 'done' && args.newStatus !== 'done') {
+    task.completedAt = undefined;
+  }
   if (args.newStatus === 'done') {
     task.completedAt = Date.now();
     if (args.completionNote) {
@@ -355,11 +477,19 @@ async function handleListAgents(args) {
   // Filter by project if specified
   let filtered = agents;
   if (args.projectPath) {
-    filtered = agents.filter(a => a.projectPath === args.projectPath);
+    // Include agents with matching projectPath OR agents without projectPath (from personalities)
+    // This allows showing both active terminal agents AND saved personalities
+    filtered = agents.filter(a => a.projectPath === args.projectPath || a.projectPath === null);
   }
+
+  // Separate by source for better understanding
+  const fromTerminals = filtered.filter(a => a.source === 'terminal');
+  const fromPersonalities = filtered.filter(a => a.source === 'personality');
 
   const summary = {
     totalAgents: filtered.length,
+    fromTerminals: fromTerminals.length,
+    fromPersonalities: fromPersonalities.length,
     agents: filtered.map(a => ({
       id: a.id,
       name: a.name,
@@ -369,13 +499,16 @@ async function handleListAgents(args) {
       projectName: a.projectName,
       branch: a.branch,
       workingOn: a.workingOn,
+      role: a.personality?.role || null,
+      communicationStyle: a.personality?.communicationStyle || null,
+      source: a.source, // 'terminal' or 'personality'
     })),
     // Group by project for easier reading
     byProject: Object.entries(
       filtered.reduce((acc, a) => {
-        const proj = a.projectName || 'Unknown';
+        const proj = a.projectName || (a.source === 'personality' ? 'Saved Personalities' : 'Unknown');
         if (!acc[proj]) acc[proj] = [];
-        acc[proj].push({ id: a.id, name: a.name, branch: a.branch });
+        acc[proj].push({ id: a.id, name: a.name, branch: a.branch, source: a.source });
         return acc;
       }, {})
     ).map(([projectName, agents]) => ({ projectName, agents })),

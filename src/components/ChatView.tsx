@@ -6,8 +6,10 @@ import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
+import KanbanTasksBar from './KanbanTasksBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
+import { useKanbanTaskCounts } from '../hooks/useKanbanTaskCounts';
 import { useAgentRules } from '../hooks/useAgentRules';
 import type { ChatMessage, AgentInfo, ChatAttachment } from '../types';
 import type {
@@ -99,6 +101,10 @@ interface ChatViewProps {
   onEditRules?: () => void;
   // Initial attachments (from Kanban task)
   initialAttachments?: ChatAttachment[];
+  // Hide the KanbanTasksBar (for use inside Kanban drawer)
+  hideKanbanTasksBar?: boolean;
+  // Callback to open Kanban view (passed from App.tsx)
+  onOpenKanban?: () => void;
 }
 
 export default function ChatView({
@@ -158,9 +164,17 @@ export default function ChatView({
   onEditRules,
   // Initial attachments (from Kanban task)
   initialAttachments,
+  // Hide the KanbanTasksBar (for use inside Kanban drawer)
+  hideKanbanTasksBar = false,
+  // Callback to open Kanban view
+  onOpenKanban,
 }: ChatViewProps) {
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
+
+  // Kanban task counts for the tasks bar
+  const { todoCount, inProgressCount } = useKanbanTaskCounts(basePath);
+
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
 
@@ -470,6 +484,13 @@ export default function ChatView({
             // Instead, just hide the bar by doing nothing
             console.log('Edits are automatically cleared when a new message arrives');
           }}
+        />
+      )}
+      {!hideKanbanTasksBar && onOpenKanban && (
+        <KanbanTasksBar
+          todoCount={todoCount}
+          inProgressCount={inProgressCount}
+          onOpenKanban={onOpenKanban}
         />
       )}
       <div className="chat-view-footer">

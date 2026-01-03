@@ -27,10 +27,10 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal, { type KanbanTaskInitialValues, type KanbanTaskDraft } from './AddKanbanTaskModal';
-import KanbanChatDrawer from './KanbanChatDrawer';
 import KanbanShellDrawer from './KanbanShellDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import { useKanbanShellTask } from '../../hooks/useKanbanShellTask';
+import { useKanbanPolling } from '../../hooks/useKanbanPolling';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
@@ -60,13 +60,18 @@ interface KanbanViewProps {
   onLoadChatSessions?: () => Promise<void>;
   // Open side panel when clicking on project name
   onProjectClick?: (projectPath: string) => void;
-  // Diff drawer handler (passed to ChatView via KanbanChatDrawer)
+  // Diff drawer handler (passed to ChatView via task tab)
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
   // Open session in terminal handler (for claude --resume)
   onOpenSessionInTerminal?: (taskId: string) => void;
   // Side panel toggle (for "Agents" button in header)
   onToggleSidePanel?: () => void;
   sidePanelExpanded?: boolean;
+  // Mini panel toggle - exits Kanban to Chat with mini panel in sidebar
+  onToggleMiniPanel?: () => void;
+  showMiniPanel?: boolean;
+  // Open task in new tab
+  onOpenTaskTab?: (task: KanbanTask) => void;
 }
 
 export default function KanbanView({
@@ -91,20 +96,17 @@ export default function KanbanView({
   onOpenSessionInTerminal,
   onToggleSidePanel,
   sidePanelExpanded = false,
+  onToggleMiniPanel,
+  showMiniPanel = false,
+  onOpenTaskTab,
 }: KanbanViewProps) {
   const {
     tasks,
-    selectedTaskId,
-    isDrawerOpen,
     isLoading,
     loadTasks,
     addTask,
     moveTask,
     deleteTask,
-    selectTask,
-    openDrawer,
-    closeDrawer,
-    getSelectedTask,
     updateTask,
     isNewTaskModalRequested,
     clearNewTaskModalRequest,
@@ -181,6 +183,10 @@ export default function KanbanView({
     };
     initializeKanban();
   }, [loadTasks, onLoadChatSessions]);
+
+  // 🦆 MCP SYNC: Poll for task changes from external sources (MCP server, other windows)
+  // This ensures the Kanban UI stays in sync when tasks are created/modified via MCP tools
+  useKanbanPolling({ enabled: true, interval: 5000 }); // 5 second interval for low overhead
 
   // Handle keyboard shortcut request to open new task modal
   useEffect(() => {
@@ -269,10 +275,9 @@ export default function KanbanView({
 
         moveTask(taskId, newStatus);
 
-        // If moved to in_progress, auto-select and open drawer
-        if (newStatus === 'in_progress') {
-          selectTask(taskId);
-          openDrawer();
+        // If moved to in_progress, open task in new tab
+        if (newStatus === 'in_progress' && onOpenTaskTab) {
+          onOpenTaskTab(task);
         }
       }
     }
@@ -286,17 +291,16 @@ export default function KanbanView({
       // Open shell drawer for shell/watch tasks
       setSelectedShellTaskId(task.id);
       setIsShellDrawerOpen(true);
-      // Close agent drawer if open
-      closeDrawer();
     } else {
-      // Open chat drawer for agent tasks
-      selectTask(task.id);
-      openDrawer();
+      // Open task in new tab for agent tasks
+      if (onOpenTaskTab) {
+        onOpenTaskTab(task);
+      }
       // Close shell drawer if open
       setIsShellDrawerOpen(false);
       setSelectedShellTaskId(null);
     }
-  }, [selectTask, openDrawer, closeDrawer]);
+  }, [onOpenTaskTab]);
 
   // Handle task deletion with async Tauri dialog
   const handleTaskDelete = useCallback(async (taskId: string) => {
@@ -346,10 +350,6 @@ export default function KanbanView({
     setIsModalOpen(true);
   }, []);
 
-  // Handle drawer close
-  const handleDrawerClose = useCallback(() => {
-    closeDrawer();
-  }, [closeDrawer]);
 
   // Handle task creation or update
   const handleCreateOrUpdateTask = useCallback(async (
@@ -462,9 +462,6 @@ export default function KanbanView({
     await killShellTask(taskId);
   }, [killShellTask]);
 
-  // Get selected task for drawer
-  const selectedTask = getSelectedTask();
-
   // Convert shell outputs to format expected by columns
   const shellOutputsForColumns = new Map<string, { output: string; isRunning: boolean }>();
   shellOutputs.forEach((value, key) => {
@@ -506,6 +503,24 @@ export default function KanbanView({
           </svg>
           Add Task
         </button>
+
+        {/* Mini Panel toggle button - returns to chat with mini panel in sidebar */}
+        {onToggleMiniPanel && (
+          <button
+            className={`kanban-mini-panel-toggle ${showMiniPanel ? 'active' : ''}`}
+            onClick={onToggleMiniPanel}
+            title={showMiniPanel ? 'Hide sidebar panel' : 'Show in sidebar and return to chat'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* Sidebar with panel icon */}
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+              <line x1="9" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="15" x2="21" y2="15" />
+            </svg>
+            {showMiniPanel ? 'Hide Panel' : 'Sidebar View'}
+          </button>
+        )}
       </div>
 
       {/* Kanban columns */}
@@ -528,7 +543,6 @@ export default function KanbanView({
               </svg>
             }
             tasks={todoTasks}
-            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
@@ -551,7 +565,6 @@ export default function KanbanView({
               </svg>
             }
             tasks={inProgressTasks}
-            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
@@ -574,7 +587,6 @@ export default function KanbanView({
               </svg>
             }
             tasks={doneTasks}
-            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
@@ -606,32 +618,6 @@ export default function KanbanView({
         initialValues={modalInitialValues}
         draft={modalDraft}
         onDraftChange={setModalDraft}
-      />
-
-      {/* Chat Drawer - for agent tasks */}
-      <KanbanChatDrawer
-        task={selectedTask}
-        isOpen={isDrawerOpen}
-        onClose={handleDrawerClose}
-        onTaskUpdate={updateTask}
-        // Chat integration from App.tsx
-        chatSessions={chatSessions}
-        chatLoadingMap={chatLoadingMap}
-        onSendMessage={onSendMessage}
-        onAbortStream={onAbortStream}
-        onClearConversation={onClearConversation}
-        onCompactConversation={onCompactConversation}
-        getLastPrompt={getLastPrompt}
-        sessionTokensMap={sessionTokensMap}
-        // Default settings from global settings
-        defaultModel={defaultModel}
-        defaultThinkingMode={defaultThinkingMode}
-        defaultPermissionMode={defaultPermissionMode}
-        defaultEffort={defaultEffort}
-        // Diff drawer handler
-        onDiffClick={onDiffClick}
-        // Open session in terminal handler
-        onOpenSessionInTerminal={onOpenSessionInTerminal}
       />
 
       {/* Shell Drawer - for shell/watch tasks */}

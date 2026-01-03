@@ -11,7 +11,6 @@ const CodeEditor = lazy(() => import('./CodeEditorMonaco'));
 const MemoryGraphTabView = lazy(() => import('../views/MemoryGraphTabView'));
 const DocsViewer = lazy(() => import('./docs/DocsViewer'));
 const SkillViewer = lazy(() => import('./SkillViewer'));
-const CommandViewer = lazy(() => import('./CommandViewer'));
 const AgentViewer = lazy(() => import('./AgentViewer'));
 const KanbanPopoutView = lazy(() => import('./kanban/KanbanPopoutView'));
 
@@ -307,14 +306,8 @@ const TabPopoutWindowApp: React.FC = () => {
         return renderPlaceholder('🔧', 'Skill', 'Missing skill information');
 
       case 'command':
-        if (tab.command) {
-          return (
-            <Suspense fallback={<LoadingSpinner message="Loading command..." />}>
-              <CommandViewer command={tab.command} />
-            </Suspense>
-          );
-        }
-        return renderPlaceholder('⚡', 'Command', 'Missing command information');
+        // Command tabs are no longer created - clicking a command uses handleUseCommand instead
+        return renderPlaceholder('⚡', 'Command', 'This tab type is deprecated');
 
       case 'agent':
         if (tab.agentName && tab.agentScope) {

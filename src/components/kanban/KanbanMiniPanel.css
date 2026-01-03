@@ -1,0 +1,360 @@
+/**
+ * KanbanMiniPanel Styles
+ *
+ * Compact Kanban view for the side panel.
+ * Follows Quack brand guidelines: orange accent, glassmorphism, minimal SVG icons.
+ */
+
+.kanban-mini-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* Header */
+.mini-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mini-panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-panel-icon {
+  color: var(--accent-color, #f28c52);
+}
+
+.mini-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e7ebf3);
+  letter-spacing: -0.01em;
+}
+
+.mini-panel-total {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* Quick Actions */
+.mini-panel-quick-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mini-panel-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mini-panel-action-btn.primary {
+  background: linear-gradient(135deg, #f28c52 0%, #ffb26f 100%);
+  color: white;
+}
+
+.mini-panel-action-btn.primary:hover {
+  background: linear-gradient(135deg, #e17940 0%, #ffa05d 100%);
+  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.3);
+  transform: translateY(-1px);
+}
+
+.mini-panel-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mini-panel-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(242, 140, 82, 0.4);
+}
+
+/* Sections Container */
+.mini-panel-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Section */
+.mini-panel-section {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.mini-panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mini-panel-section-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mini-panel-section-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-panel-chevron {
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.mini-panel-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.mini-panel-section-icon {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mini-panel-section-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.mini-panel-section-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Section Content */
+.mini-panel-section-content {
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mini-panel-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Date Groups (for Done column) */
+.mini-panel-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mini-panel-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mini-panel-date-count {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Task Card */
+.mini-task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+}
+
+.mini-task-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(242, 140, 82, 0.3);
+  transform: translateX(2px);
+}
+
+.mini-task-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Status Indicators */
+.mini-task-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mini-task-status.ready {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.mini-task-status.working {
+  background: #f28c52;
+  animation: pulse 1.5s infinite;
+}
+
+.mini-task-status.done {
+  background: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: white;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.mini-task-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.mini-task-preview {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.mini-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.mini-task-agent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mini-task-project {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+/* Empty State */
+.mini-panel-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.mini-panel-empty-state p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mini-panel-empty-state span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Scrollbar */
+.kanban-mini-panel::-webkit-scrollbar,
+.mini-panel-sections::-webkit-scrollbar {
+  width: 4px;
+}
+
+.kanban-mini-panel::-webkit-scrollbar-track,
+.mini-panel-sections::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-mini-panel::-webkit-scrollbar-thumb,
+.mini-panel-sections::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.kanban-mini-panel::-webkit-scrollbar-thumb:hover,
+.mini-panel-sections::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

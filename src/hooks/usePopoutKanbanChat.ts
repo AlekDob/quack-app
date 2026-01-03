@@ -12,7 +12,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Store } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { ChatMessage, KanbanTask } from '../types';
+import type { ChatMessage, KanbanTask, ClaudeEvent } from '../types';
 import type { ChatSendOptions } from './useClaudeChat';
 
 interface ChatTokens {
@@ -36,16 +36,6 @@ interface UsePopoutKanbanChatReturn {
   clearConversation: (taskId: string) => void;
   compactConversation: (taskId: string) => void;
   getLastPrompt: (taskId: string) => string | null;
-}
-
-// Streaming event type from Rust backend
-interface StreamingEvent {
-  session_id?: string;
-  content?: string;
-  event_type: 'text' | 'tool_use' | 'tool_result' | 'error' | 'complete' | 'start';
-  tool_name?: string;
-  tool_input?: string;
-  error?: string;
 }
 
 export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
@@ -194,32 +184,38 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
 
     try {
       // Get existing session ID from kanban task if resuming
+      // IMPORTANT: Use 'kanbanTasks' key - must match KANBAN_TASKS_KEY in kanbanStorage.ts
       const kanbanStore = await Store.load('quack-kanban-tasks.json');
-      const tasks = await kanbanStore.get<KanbanTask[]>('tasks') || [];
+      const tasks = await kanbanStore.get<KanbanTask[]>('kanbanTasks') || [];
       const task = tasks.find(t => t.id === taskId);
       const existingSessionId = task?.sessionId;
 
-      // Setup stream listener
-      const streamKey = `stream-${taskId}-${Date.now()}`;
+      // Setup stream listener using correct event pattern (claude-event:{agentId})
+      const eventName = `claude-event:${taskId}`;
       let accumulatedContent = '';
       let sessionIdFromStream: string | undefined;
 
-      const unlisten = await listen<StreamingEvent>(streamKey, (event) => {
+      console.log(`[usePopoutKanbanChat] Setting up listener for: ${eventName}`);
+
+      const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
         if (!activeStreamsRef.current.get(taskId)) {
           // Stream was aborted
           return;
         }
 
-        const { event_type, content: eventContent, session_id, error } = event.payload;
+        const claudeEvent = event.payload;
 
-        if (session_id) {
-          sessionIdFromStream = session_id;
+        // Extract session_id from various event types
+        if ('session_id' in claudeEvent && claudeEvent.session_id) {
+          sessionIdFromStream = claudeEvent.session_id;
         }
 
-        switch (event_type) {
-          case 'text':
-            if (eventContent) {
-              accumulatedContent += eventContent;
+        // Handle different event types
+        switch (claudeEvent.type) {
+          case 'content_block_delta':
+            // Streaming text content
+            if ('delta' in claudeEvent && claudeEvent.delta?.text) {
+              accumulatedContent += claudeEvent.delta.text;
               setChatSessions(prev => {
                 const newSessions = new Map(prev);
                 const msgs = [...(newSessions.get(taskId) || [])];
@@ -233,7 +229,31 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
             }
             break;
 
-          case 'complete':
+          case 'assistant':
+            // Complete assistant message
+            if ('message' in claudeEvent && claudeEvent.message?.content) {
+              const textContent = claudeEvent.message.content
+                .filter((block): block is { type: 'text'; text: string } => block.type === 'text' && !!block.text)
+                .map(block => block.text)
+                .join('');
+              if (textContent) {
+                accumulatedContent = textContent;
+                setChatSessions(prev => {
+                  const newSessions = new Map(prev);
+                  const msgs = [...(newSessions.get(taskId) || [])];
+                  const lastIndex = msgs.findIndex(m => m.id === assistantMessageId);
+                  if (lastIndex >= 0) {
+                    msgs[lastIndex] = { ...msgs[lastIndex], content: accumulatedContent };
+                  }
+                  newSessions.set(taskId, msgs);
+                  return newSessions;
+                });
+              }
+            }
+            break;
+
+          case 'result':
+            // Stream complete
             setChatSessions(prev => {
               const newSessions = new Map(prev);
               const msgs = [...(newSessions.get(taskId) || [])];
@@ -259,7 +279,10 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
             break;
 
           case 'error':
-            console.error(`[usePopoutKanbanChat] Stream error:`, error);
+            console.error(`[usePopoutKanbanChat] Stream error:`, claudeEvent);
+            const errorMessage = 'message' in claudeEvent && typeof claudeEvent.message === 'string'
+              ? claudeEvent.message
+              : 'An error occurred';
             setChatSessions(prev => {
               const newSessions = new Map(prev);
               const msgs = [...(newSessions.get(taskId) || [])];
@@ -267,7 +290,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
               if (lastIndex >= 0) {
                 msgs[lastIndex] = {
                   ...msgs[lastIndex],
-                  content: error || 'An error occurred',
+                  content: errorMessage,
                   status: 'error',
                 };
               }
@@ -288,12 +311,13 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
 
       listenersRef.current.set(taskId, unlisten);
 
-      // Call Tauri backend to start streaming
+      // Call Tauri backend to start streaming with correct parameters
+      console.log(`[usePopoutKanbanChat] Invoking send_message_via_sdk_streaming for taskId: ${taskId}`);
       await invoke('send_message_via_sdk_streaming', {
+        agentId: taskId,
         request: {
-          content,
-          workingDirectory: options?.workingDirectory || task?.projectPath || '/',
-          streamKey,
+          prompt: content,
+          cwd: options?.workingDirectory || task?.projectPath || '/',
           sessionId: existingSessionId,
           model: options?.model || 'sonnet',
           thinkingMode: options?.thinkingMode || 'auto',

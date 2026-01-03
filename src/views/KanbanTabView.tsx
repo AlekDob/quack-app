@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { Tab } from '../components/TabBar';
 import KanbanView from '../components/kanban/KanbanView';
-import type { TerminalInfo, ChatMessage, ChatAttachment } from '../types';
+import type { TerminalInfo, ChatMessage, ChatAttachment, KanbanTask } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 
 interface KanbanTabViewProps {
@@ -29,6 +29,11 @@ interface KanbanTabViewProps {
   // Side panel toggle
   onToggleSidePanel?: () => void;
   sidePanelExpanded?: boolean;
+  // Mini panel toggle - exits Kanban to Chat with mini panel in sidebar
+  onToggleMiniPanel?: () => void;
+  showMiniPanel?: boolean;
+  // Task tab handling
+  onOpenTaskTab?: (task: KanbanTask) => void;
 }
 
 /**
@@ -58,6 +63,9 @@ function KanbanTabView({
   onOpenSessionInTerminal,
   onToggleSidePanel,
   sidePanelExpanded,
+  onToggleMiniPanel,
+  showMiniPanel,
+  onOpenTaskTab,
 }: KanbanTabViewProps) {
   if (!isActive || tab.type !== 'kanban') {
     return null;
@@ -86,6 +94,9 @@ function KanbanTabView({
         onOpenSessionInTerminal={onOpenSessionInTerminal}
         onToggleSidePanel={onToggleSidePanel}
         sidePanelExpanded={sidePanelExpanded}
+        onToggleMiniPanel={onToggleMiniPanel}
+        showMiniPanel={showMiniPanel}
+        onOpenTaskTab={onOpenTaskTab}
       />
     </div>
   );

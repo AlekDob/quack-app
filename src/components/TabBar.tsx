@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -21,6 +21,7 @@ export interface Tab {
   command?: SlashCommand; // Full command object for command tabs
   docsPath?: string; // Path to docs page for docs tabs
   initialNodeId?: string; // Initial node to zoom into for second-brain tabs
+  taskId?: string; // Reference to Kanban task for task tabs
 }
 
 interface ContextMenuState {
@@ -294,12 +295,22 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
           onDrop={(e) => handleDrop(e, tab)}
           onDragEnd={handleDragEnd}
         >
-          {tab.color && tab.type !== 'agent-terminal' && tab.type !== 'agent' && (
+          {tab.color && tab.type !== 'agent-terminal' && tab.type !== 'agent' && tab.type !== 'task' && (
             <span
               className="tab-color-indicator"
               style={{ backgroundColor: tab.color }}
               aria-hidden="true"
             />
+          )}
+          {tab.type === 'task' && (
+            <span className="tab-icon" aria-hidden="true">
+              {/* Task icon - clipboard with lines */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={tab.color || 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="9" y1="9" x2="15" y2="9" />
+                <line x1="9" y1="13" x2="15" y2="13" />
+              </svg>
+            </span>
           )}
           {tab.type === 'agent-terminal' && (
             <span className="tab-icon" aria-hidden="true">

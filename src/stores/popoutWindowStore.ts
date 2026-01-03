@@ -207,6 +207,16 @@ export function canPopoutTab(tab: Tab): boolean {
     return false;
   }
 
-  // All other tab types can be popped out (including kanban - uses read-only popout view)
+  // Kanban tabs use mini-panel in sidebar instead of popout windows
+  if (tab.type === 'kanban') {
+    return false;
+  }
+
+  // Task tabs are displayed inline, no popout needed
+  if (tab.type === 'task') {
+    return false;
+  }
+
+  // All other tab types can be popped out
   return true;
 }

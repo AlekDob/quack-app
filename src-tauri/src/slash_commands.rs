@@ -150,18 +150,21 @@ pub fn list_slash_commands(_app: AppHandle, base_path: String) -> Result<SlashCo
     log::info!("🦆 Reading project commands from: {:?}", project_commands_dir);
     let project_commands = read_commands_from_dir(&project_commands_dir, "project");
     log::info!("🦆 Found {} project commands", project_commands.len());
-    custom.extend(project_commands);
 
-    // Sort commands: builtin first, then global, then project, then alphabetically by name
-    custom.sort_by(|a, b| {
-        match (a.scope.as_str(), b.scope.as_str()) {
-            ("global", "project") => std::cmp::Ordering::Less,
-            ("project", "global") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
-    });
+    // 3. Deduplicate: project commands override global commands with the same name
+    // This ensures that if a user has both a global and project command with the same name,
+    // only the project-level command is shown (project takes precedence)
+    for project_cmd in project_commands {
+        // Remove any existing global command with the same name
+        custom.retain(|cmd| cmd.name.to_lowercase() != project_cmd.name.to_lowercase());
+        // Add the project command
+        custom.push(project_cmd);
+    }
 
-    log::info!("🦆 Total custom commands: {}", custom.len());
+    // Sort commands alphabetically by name (ignore scope priority for consistent UX)
+    custom.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    log::info!("🦆 Total custom commands (after dedup): {}", custom.len());
 
     Ok(SlashCommandsResponse { builtin, custom })
 }

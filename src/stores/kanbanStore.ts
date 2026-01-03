@@ -37,7 +37,7 @@ interface KanbanState {
   processingDocumentation: Set<string>;
 
   // Actions
-  loadTasks: () => Promise<void>;
+  loadTasks: (options?: { silent?: boolean }) => Promise<void>;
   addTask: (task: Omit<KanbanTask, 'id' | 'createdAt'>) => Promise<KanbanTask>;
   updateTask: (id: string, updates: Partial<KanbanTask>) => Promise<void>;
   moveTask: (id: string, newStatus: KanbanStatus, onComplete?: (task: KanbanTask) => void) => Promise<void>;
@@ -86,14 +86,20 @@ export const useKanbanStore = create<KanbanState>()(
         processingDocumentation: new Set(),
 
         // Load tasks from storage
-        loadTasks: async () => {
-          set({ isLoading: true });
+        // Use { silent: true } for background polling to avoid showing loading indicator
+        loadTasks: async (options) => {
+          const silent = options?.silent ?? false;
+          if (!silent) {
+            set({ isLoading: true });
+          }
           try {
             const tasks = await loadKanbanTasks();
             set({ tasks, isLoading: false });
           } catch (error) {
             console.error('[kanbanStore] Failed to load tasks:', error);
-            set({ isLoading: false });
+            if (!silent) {
+              set({ isLoading: false });
+            }
           }
         },
 
@@ -144,6 +150,10 @@ export const useKanbanStore = create<KanbanState>()(
             updates.startedAt = Date.now();
           } else if (newStatus === 'done' && task.status !== 'done') {
             updates.completedAt = Date.now();
+          }
+          // Reset completedAt when task moves OUT of done status
+          if (task.status === 'done' && newStatus !== 'done') {
+            updates.completedAt = undefined;
           }
 
           const tasks = get().tasks.map((t) =>

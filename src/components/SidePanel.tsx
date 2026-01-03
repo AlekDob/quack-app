@@ -7,14 +7,16 @@ import HooksPanel from "./HooksPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import { RulesPanel } from "./RulesPanel";
 import MemoryPanel from "./memory/MemoryPanel";
+import KanbanMiniPanel from "./kanban/KanbanMiniPanel";
 import { useRules } from "../hooks/useRules";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
+import { useKanbanStore } from "../stores/kanbanStore";
 import AgentContextPanel from "./AgentContextPanel";
 import TerminalToolBar from "./TerminalToolBar";
 import UsagePanel from "./UsagePanel";
 import { SessionsPanel } from "./SessionsPanel";
-import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality, HookConfig } from "../types";
+import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality, HookConfig, ChatMessage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
 /**
@@ -23,7 +25,7 @@ import type { SlashCommand } from "../hooks/useSlashCommands";
  * Note: Marketplace is now a drawer (not a tab)
  */
 
-type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "rules" | "sessions" | "terminal" | "usage" | "memory";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "rules" | "sessions" | "terminal" | "usage" | "memory" | "kanban";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -352,6 +354,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M19.967 17.484A4 4 0 0 1 18 18" />
     </svg>
   ),
+  kanban: (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {/* List view icon - like task board */}
+      <rect x="3" y="3" width="14" height="3" rx="1" />
+      <rect x="3" y="8" width="14" height="3" rx="1" />
+      <rect x="3" y="13" width="14" height="3" rx="1" />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -398,7 +408,6 @@ interface SidePanelProps {
 
   // Commands props
   onUseCommand: (command: SlashCommand) => void;
-  onViewCommand: (command: SlashCommand) => void;
 
   // Context props
   tauriAvailable: boolean;
@@ -455,6 +464,13 @@ interface SidePanelProps {
 
   // MCP props
   onOpenMcpConfig?: (filePath: string) => void; // NEW: Open .mcp.json in editor
+
+  // Kanban Mini Panel props
+  chatLoadingMap?: Map<string, boolean>;
+  chatSessions?: Map<string, ChatMessage[]>;
+  onKanbanTaskClick?: (taskId: string) => void;
+  onOpenKanban?: () => void;
+  showKanbanMiniPanel?: boolean; // Controls if Kanban tab is shown/active
 }
 
 export default function SidePanel({
@@ -494,7 +510,6 @@ export default function SidePanel({
 
   // Commands
   onUseCommand,
-  onViewCommand,
 
   // Context
   tauriAvailable,
@@ -551,6 +566,13 @@ export default function SidePanel({
 
   // MCP
   onOpenMcpConfig,
+
+  // Kanban Mini Panel
+  chatLoadingMap = new Map(),
+  chatSessions = new Map(),
+  onKanbanTaskClick,
+  onOpenKanban,
+  showKanbanMiniPanel = false,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("agent-context");
 
@@ -565,6 +587,18 @@ export default function SidePanel({
   // Load MCP servers for badge counter
   const { servers: mcpServers } = useMCPServers(workingDir);
   const mcpCount = mcpServers.length;
+
+  // Load Kanban tasks count
+  const { tasks: kanbanTasks } = useKanbanStore();
+  const kanbanInProgressCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
+  const kanbanTotalCount = kanbanTasks.length;
+
+  // Auto-switch to Kanban tab when mini panel is shown
+  useEffect(() => {
+    if (showKanbanMiniPanel && activeTab !== 'kanban') {
+      setActiveTab('kanban');
+    }
+  }, [showKanbanMiniPanel, activeTab]);
 
   // Auto-refresh agents and skills when their tabs are opened
   useEffect(() => {
@@ -649,6 +683,14 @@ export default function SidePanel({
       label: "Sessions",
       icon: icons.sessions,
     },
+    // Kanban Mini Panel - shown only when enabled
+    ...(showKanbanMiniPanel ? [{
+      id: "kanban" as TabId,
+      label: "Kanban Tasks",
+      icon: icons.kanban,
+      badge: kanbanInProgressCount > 0 ? kanbanInProgressCount : kanbanTotalCount,
+      hasContent: kanbanTotalCount > 0,
+    }] : []),
     // Terminal tab hidden - integrated into terminal-windows
     // {
     //   id: "terminal" as TabId,
@@ -831,7 +873,6 @@ export default function SidePanel({
             <CommandsPanel
               basePath={rootPath || ''}
               onUseCommand={onUseCommand}
-              onViewCommand={onViewCommand}
             />
           </div>
         )}
@@ -854,6 +895,17 @@ export default function SidePanel({
         {activeTab === "memory" && (
           <div className="side-panel-pane">
             <MemoryPanel />
+          </div>
+        )}
+
+        {activeTab === "kanban" && showKanbanMiniPanel && (
+          <div className="side-panel-pane">
+            <KanbanMiniPanel
+              chatLoadingMap={chatLoadingMap}
+              chatSessions={chatSessions}
+              onTaskClick={onKanbanTaskClick || (() => {})}
+              onOpenKanban={onOpenKanban || (() => {})}
+            />
           </div>
         )}
 

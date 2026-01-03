@@ -1,0 +1,67 @@
+/* Kanban Tasks Bar - Styled identically to EditSummaryBar but with orange theme */
+.kanban-tasks-bar {
+  background: linear-gradient(135deg, rgba(242, 140, 82, 0.08) 0%, rgba(251, 191, 36, 0.08) 100%);
+  border-top: 1px solid rgba(242, 140, 82, 0.25);
+  border-bottom: 1px solid rgba(242, 140, 82, 0.25);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  flex-shrink: 0; /* Don't shrink when space is tight */
+}
+
+/* Header - Always visible */
+.kanban-tasks-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.kanban-tasks-bar-header:hover {
+  background: rgba(242, 140, 82, 0.05);
+}
+
+.kanban-tasks-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(242, 140, 82, 1);
+}
+
+.kanban-tasks-bar-title svg {
+  color: rgba(242, 140, 82, 0.8);
+  flex-shrink: 0;
+}
+
+.kanban-tasks-bar-label {
+  color: var(--color-text);
+}
+
+/* Badge styling */
+.kanban-tasks-bar-badge {
+  padding: 2px 8px;
+  background: rgba(242, 140, 82, 0.15);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(242, 140, 82, 1);
+}
+
+/* In progress badge - slightly different shade */
+.kanban-tasks-bar-badge-progress {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: rgba(251, 191, 36, 1);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .kanban-tasks-bar {
+    background: linear-gradient(135deg, rgba(242, 140, 82, 0.06) 0%, rgba(251, 191, 36, 0.06) 100%);
+  }
+}

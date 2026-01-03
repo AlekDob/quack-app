@@ -29,7 +29,6 @@ const TASK_TYPE_COLORS = {
 
 interface KanbanCardProps {
   task: KanbanTask;
-  isSelected?: boolean;
   isLoading?: boolean;        // Whether the chat is currently streaming (agent) or process running (shell)
   hasMessages?: boolean;      // Whether there are messages in the chat
   messageCount?: number;      // Number of messages in the chat
@@ -53,7 +52,6 @@ function getAvatarUrl(avatarName: string): string {
 
 export default function KanbanCard({
   task,
-  isSelected = false,
   isLoading = false,
   hasMessages = false,
   messageCount = 0,
@@ -216,7 +214,7 @@ export default function KanbanCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`kanban-card ${isDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+      className={`kanban-card ${isDragging ? 'dragging' : ''}`}
       onClick={onClick}
       onContextMenu={handleContextMenu}
     >

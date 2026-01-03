@@ -3,17 +3,14 @@ import type { SlashCommand } from '../hooks/useSlashCommands';
 interface CommandItemProps {
   command: SlashCommand;
   onUse: (command: SlashCommand) => void;
-  onView?: (command: SlashCommand) => void;
   onEdit?: (command: SlashCommand) => void;
   onDelete?: (command: SlashCommand) => void;
 }
 
-export function CommandItem({ command, onUse, onView, onEdit, onDelete }: CommandItemProps) {
+export function CommandItem({ command, onUse, onEdit, onDelete }: CommandItemProps) {
   return (
     <div
-      className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
-      onClick={() => onView?.(command)}
-      title="Click to view command details"
+      className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200"
     >
       {/* Command Icon */}
       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">

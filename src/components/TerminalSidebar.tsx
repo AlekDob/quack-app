@@ -26,7 +26,7 @@ import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
-import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
+import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo, KanbanTask } from "../types";
 
 // Sortable Repository Group wrapper
 interface SortableRepositoryGroupProps {
@@ -51,6 +51,10 @@ interface SortableRepositoryGroupProps {
   // Kanban tab props
   isKanbanTabActive?: boolean;
   onOpenKanbanTab?: () => void;
+  // Kanban tasks to show under agents
+  inProgressTasks?: KanbanTask[];
+  onOpenTaskTab?: (task: KanbanTask) => void;
+  activeTaskId?: string | null;
 }
 
 function SortableRepositoryGroup({
@@ -150,6 +154,10 @@ interface TerminalSidebarProps {
   isKanbanTabActive?: boolean;
   onOpenKanbanTab?: () => void;
   inProgressTaskCount?: number; // Number of tasks in progress (for badge)
+  // Kanban tasks to show under agents in sidebar
+  inProgressTasks?: KanbanTask[];
+  onOpenTaskTab?: (task: KanbanTask) => void;
+  activeTaskId?: string | null; // Currently active task tab
   // Quack sound props
   onToggleQuackSound?: () => void;
   quackSoundEnabled?: boolean;
@@ -191,6 +199,10 @@ export default function TerminalSidebar({
   isKanbanTabActive = false,
   onOpenKanbanTab,
   inProgressTaskCount = 0,
+  // Kanban tasks to show under agents
+  inProgressTasks = [],
+  onOpenTaskTab,
+  activeTaskId = null,
   // Quack sound props
   onToggleQuackSound,
   quackSoundEnabled,
@@ -799,6 +811,9 @@ export default function TerminalSidebar({
                     onCreateAgent={onCreateAgent}
                     isKanbanTabActive={isKanbanTabActive}
                     onOpenKanbanTab={onOpenKanbanTab}
+                    inProgressTasks={inProgressTasks}
+                    onOpenTaskTab={onOpenTaskTab}
+                    activeTaskId={activeTaskId}
                   />
                 );
               })}

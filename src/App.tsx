@@ -55,7 +55,6 @@ import { useTerminalWindowManager } from "./hooks/useTerminalWindowManager";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
 import SkillViewer from "./components/SkillViewer";
-import CommandViewer from "./components/CommandViewer";
 import BrowserManager from "./components/BrowserManager";
 import KanbanToast from "./components/KanbanToast";
 import { useDocsTab } from "./hooks/useDocsTab";
@@ -63,6 +62,7 @@ import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
 import { useKanbanTab } from "./hooks/useKanbanTab";
+import { useKanbanChatSync } from "./hooks/useKanbanChatSync";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
 import SecondBrainTabView from "./views/SecondBrainTabView";
@@ -152,6 +152,7 @@ import type {
   SessionInfo,
   SavedAgent,
   HookConfig,
+  KanbanTask,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
 
@@ -290,11 +291,17 @@ function AppContent() {
   // Count tasks in progress for badge
   const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
 
+  // Get in-progress tasks to show under agents in sidebar
+  const inProgressTasks = kanbanTasks.filter(t => t.status === 'in_progress');
+
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
 
   // Kanban tab management
   const { openKanbanTab } = useKanbanTab();
+
+  // Kanban sync - emit loading state and task changes to popout windows
+  const { emitLoadingState, emitTasksChanged } = useKanbanChatSync();
 
   // Claude Assets Manager tab - hook is called later after tabs state is defined
 
@@ -315,6 +322,10 @@ function AppContent() {
 
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // 🦆 Active Task per Agent: When a task is selected, its chat is shown in the agent's main Chat tab
+  // Key: agentId, Value: taskId (or null if no task is active)
+  const [activeTaskPerAgent, setActiveTaskPerAgent] = useState<Map<string, string>>(new Map());
 
   // 🗣️ AskUserQuestion: Track pending requests from canUseTool callback
   // Maps requestId -> { agentId, questions } for responding via stdin
@@ -501,6 +512,8 @@ function AppContent() {
   const sidePanelCollapsedBeforeKanbanRef = useRef<boolean | null>(null);
   // Track if user wants side panel expanded while in Kanban mode (e.g., clicked on project name)
   const [kanbanSidePanelExpanded, setKanbanSidePanelExpanded] = useState(false);
+  // Show Kanban Mini Panel in sidebar (toggled via button in Kanban tab header)
+  const [showKanbanMiniPanel, setShowKanbanMiniPanel] = useState(false);
   const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(false);
 
   // Tab system state
@@ -512,6 +525,59 @@ function AppContent() {
   // Derived state: is Kanban tab currently active?
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
+
+  // Derived state: which task is currently active for the current agent (for sidebar highlighting)
+  // Tasks are now shown in the agent's Chat tab, not in separate tabs
+  const activeTaskId = activeId ? (activeTaskPerAgent.get(activeId) || null) : null;
+
+  // 🦆 Display tabs: when a task is active, show the task title in the first tab instead of agent name
+  // Also filters out any old task tabs (type: 'task') that may be persisted from before the refactor
+  const displayTabs = useMemo(() => {
+    // 🦆 CLEANUP: Filter out any old task tabs that were created before the refactor
+    // Tasks are now shown in the agent's Chat tab, not as separate tabs
+    const cleanedTabs = tabs.filter(tab => tab.type !== 'task');
+
+    // If no active task, just return cleaned tabs
+    if (!activeTaskId) return cleanedTabs;
+
+    // Find the active task to get its title
+    const activeTask = kanbanTasks.find(t => t.id === activeTaskId);
+    if (!activeTask) return cleanedTabs;
+
+    // Replace the 'chat' tab with task info (changes type to 'task' to get task icon)
+    return cleanedTabs.map(tab => {
+      if (tab.id === 'chat') {
+        const taskLabel = activeTask.title.length > 25
+          ? activeTask.title.substring(0, 25) + '...'
+          : activeTask.title;
+        return {
+          ...tab,
+          type: 'task' as const, // Change type so TabBar shows task icon
+          label: taskLabel,
+          color: activeTask.assignedAgent?.color,
+          taskId: activeTaskId,
+        };
+      }
+      return tab;
+    });
+  }, [tabs, activeTaskId, kanbanTasks]);
+
+  // 🦆 CLEANUP EFFECT: Remove any old task tabs from state permanently
+  // This runs once when the component mounts to clean up any persisted task tabs
+  const hasCleanedOldTaskTabs = useRef(false);
+  useEffect(() => {
+    if (hasCleanedOldTaskTabs.current) return;
+    hasCleanedOldTaskTabs.current = true;
+
+    setTabs(prev => {
+      const taskTabs = prev.filter(tab => tab.type === 'task');
+      if (taskTabs.length > 0) {
+        console.log(`[Quack] Cleaning up ${taskTabs.length} old task tabs from previous refactor`);
+        return prev.filter(tab => tab.type !== 'task');
+      }
+      return prev;
+    });
+  }, []);
 
   // Track last active tab per terminal/agent
   const lastActiveTabPerTerminal = useRef<Map<string, string>>(new Map());
@@ -714,6 +780,29 @@ function AppContent() {
 
   // Session ID tracking per agent - for resuming sessions in terminal
   const [chatSessionIds, setChatSessionIds] = useState<Map<string, string>>(new Map());
+
+  // 🦆 KANBAN SYNC: Emit loading state to popout windows for real-time sync
+  // LIGHTWEIGHT: Only triggers when chatLoadingMap changes (not during streaming)
+  // This enables the Kanban popout to show "Working"/"Ready" status
+  useEffect(() => {
+    emitLoadingState(chatLoadingMap);
+  }, [chatLoadingMap, emitLoadingState]);
+
+  // 🦆 KANBAN SYNC: Emit task changes to popout windows
+  // Track previous tasks to detect actual changes (not just re-renders)
+  const prevKanbanTasksRef = useRef<string>('');
+  useEffect(() => {
+    const currentFingerprint = kanbanTasks
+      .map(t => `${t.id}:${t.status}`)
+      .sort()
+      .join(',');
+    if (currentFingerprint !== prevKanbanTasksRef.current) {
+      prevKanbanTasksRef.current = currentFingerprint;
+      if (kanbanTasks.length > 0 || prevKanbanTasksRef.current !== '') {
+        emitTasksChanged('update');
+      }
+    }
+  }, [kanbanTasks, emitTasksChanged]);
 
   // 🦆 STAMINA FIX: Centralized token tracking helper to avoid code duplication
   // This function is called from all event listeners (Multi-Listener, Pre-warm, ensureListenerReady)
@@ -2234,6 +2323,18 @@ function AppContent() {
             newSessions.set(task.id, chatMessages);
             return newSessions;
           });
+
+          // 🦆 FIX: Also save to store so useKanbanChatStore can read it
+          // This ensures the drawer shows complete messages from store
+          if (store) {
+            await store.set(`chat-${task.id}`, {
+              messages: chatMessages,
+              sessionId: task.sessionId,
+              timestamp: Date.now(),
+            });
+            await store.save();
+            console.log(`[loadKanbanChatSessions] Saved ${chatMessages.length} messages to store for task ${task.id}`);
+          }
 
           console.log(`[loadKanbanChatSessions] Restored ${chatMessages.length} messages (raw text) for task ${task.id} from Rust backend`);
         }
@@ -4591,40 +4692,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
-  const handleViewCommand = useCallback((command: SlashCommand) => {
-    if (!tauriAvailable) {
-      return;
-    }
-
-    try {
-      // Create a new tab for the command
-      const commandTabId = `command-${command.name}-${command.scope}`;
-
-      // Check if tab already exists
-      const existingTab = tabs.find(t => t.id === commandTabId);
-
-      if (existingTab) {
-        // Tab already exists, just switch to it
-        setActiveTabId(commandTabId);
-      } else {
-        // Create new command tab
-        const newTab: Tab = {
-          id: commandTabId,
-          label: command.name,
-          type: 'command',
-          closable: true,
-          command: command,
-          // icon removed - rendered directly in TabBar to avoid React serialization issues
-        };
-
-        setTabs(prevTabs => [...prevTabs, newTab]);
-        setActiveTabId(commandTabId);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to open command: ${message}`);
-    }
-  }, [tauriAvailable, tabs]);
 
   const handleClearAgent = useCallback(() => {
     setActiveAgent(null);
@@ -6387,6 +6454,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       clearTerminalAttention(id);
       clearIdleTimer(id);
 
+      // 🦆 Clear any active task for this agent when selecting from sidebar
+      // This returns to the agent's regular chat (not task chat)
+      setActiveTaskPerAgent(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(id);
+        return newMap;
+      });
+
       // Always open the chat tab when selecting a terminal from sidebar
       // This ensures consistent behavior - first tab is always the agent chat
       setActiveTabId('chat');
@@ -7020,13 +7095,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Handler for opening/focusing Kanban tab (toggle behavior with Cmd+K)
   // Refactored to avoid nested state updates which can cause race conditions
-  const handleOpenKanbanTab = useCallback(() => {
+  const handleOpenKanbanTab = useCallback(async () => {
+    // First, check if Kanban is popped out in a separate window
+    if (isTabPoppedOut('kanban-board')) {
+      console.log('[Quack] Kanban is popped out, focusing the popup window');
+      // Focus the popup window instead of opening a tab
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const allWindows = await WebviewWindow.getAll();
+      const kanbanPopout = allWindows.find(w => w.label.includes('kanban'));
+      if (kanbanPopout) {
+        await kanbanPopout.setFocus();
+        return;
+      }
+    }
+
     // Toggle: if already on Kanban tab, switch back to Chat
     if (activeTabId === 'kanban-board') {
       console.log('[Quack] Kanban tab toggled off, returning to chat');
       setActiveTabId('chat');
       return;
     }
+
+    // When opening full Kanban board, hide the mini-panel in sidebar
+    setShowKanbanMiniPanel(false);
 
     // Check if kanban tab already exists
     const existingTab = tabs.find(t => t.type === 'kanban');
@@ -7042,7 +7133,45 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setTabs(prevTabs => [...prevTabs, newTab]);
       setActiveTabId('kanban-board');
     }
-  }, [openKanbanTab, activeTabId, tabs]);
+  }, [openKanbanTab, activeTabId, tabs, isTabPoppedOut]);
+
+  // Open task in agent's main Chat tab (no separate tab created)
+  // This makes the task's chat appear in the agent's Chat tab, like an independent conversation
+  const openTaskTab = useCallback(async (task: KanbanTask) => {
+    // Task must have an assigned agent
+    if (!task.assignedAgent?.id) {
+      console.warn('[Quack] Cannot open task without assigned agent:', task.id);
+      return;
+    }
+
+    const agentId = task.assignedAgent.id;
+    const terminal = terminals.find(t => t.id === agentId);
+
+    if (terminal) {
+      // 1. Switch to the agent
+      setActiveId(agentId);
+      clearTerminalAttention(agentId);
+      clearIdleTimer(agentId);
+
+      // 2. Load the task's project directory (use task.projectPath, not terminal.cwd)
+      const projectPath = task.projectPath || terminal.cwd;
+      await loadDirectory(projectPath);
+
+      // 3. Set this task as active for the agent
+      setActiveTaskPerAgent(prev => {
+        const newMap = new Map(prev);
+        newMap.set(agentId, task.id);
+        return newMap;
+      });
+
+      // 4. Switch to 'chat' tab to show the task's conversation
+      setActiveTabId('chat');
+
+      console.log(`[Quack] Task "${task.title}" opened in agent ${terminal.label}'s Chat tab`);
+    } else {
+      console.warn(`[Quack] Agent terminal not found for task: ${task.assignedAgent.id}`);
+    }
+  }, [terminals, clearTerminalAttention, clearIdleTimer, loadDirectory]);
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
@@ -8628,6 +8757,9 @@ You have access to all Bash tools to execute git commands like:
           isKanbanTabActive={isKanbanTabActive}
           onOpenKanbanTab={handleOpenKanbanTab}
           inProgressTaskCount={inProgressTaskCount}
+          inProgressTasks={inProgressTasks}
+          onOpenTaskTab={openTaskTab}
+          activeTaskId={activeTaskId}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
           quackSoundEnabled={quackSoundEnabled}
@@ -8847,8 +8979,9 @@ You have access to all Bash tools to execute git commands like:
             />
 
             {/* Tab Bar - VSCode style (always shown) */}
+            {/* 🦆 Use displayTabs which shows task title when a task is active */}
             <TabBar
-              tabs={tabs}
+              tabs={displayTabs}
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}
@@ -8886,6 +9019,19 @@ You have access to all Bash tools to execute git commands like:
                       onOpenSessionInTerminal={openKanbanSessionInTerminal}
                       onToggleSidePanel={() => setKanbanSidePanelExpanded(!kanbanSidePanelExpanded)}
                       sidePanelExpanded={kanbanSidePanelExpanded}
+                      onToggleMiniPanel={() => {
+                        const newValue = !showKanbanMiniPanel;
+                        setShowKanbanMiniPanel(newValue);
+                        if (newValue) {
+                          // When activating mini-panel: return to chat tab and expand sidebar
+                          setActiveTabId('chat');
+                          if (sidePanelCollapsed) {
+                            setSidePanelCollapsed(false);
+                          }
+                        }
+                      }}
+                      showMiniPanel={showKanbanMiniPanel}
+                      onOpenTaskTab={openTaskTab}
                     />
                   );
                 }
@@ -8904,75 +9050,122 @@ You have access to all Bash tools to execute git commands like:
                 />
               )}
 
+              {/* NOTE: Task tabs removed - tasks now open in agent's main Chat tab via activeTaskPerAgent state */}
+
               {/* Chat View - shown when chat tab is active and Kanban is not active */}
-              {activeTabId === 'chat' && !isKanbanTabActive && (
-                <ChatView
-              key={activeId ?? 'no-agent'}
-              messages={currentAgentMessages}
-              isLoading={currentAgentLoading}
-              onSendMessage={sendMessageForAgent}
-              activeAgent={activeAgent}
-              onClearAgent={handleClearAgent}
-              agents={agents}
-              onSelectAgent={handleUseAgent}
-              onFilePathClick={handleFilePathClick}
-              onSessionIdClick={handleSessionIdClick}
-              onDiffClick={handleDiffClick} // NEW: Diff drawer handler
-              onEditsChange={handleEditsChange} // NEW: Track modified files
-              pendingAgentMention={pendingAgentMention}
-              onMentionInserted={() => setPendingAgentMention(null)}
-              pendingFileMention={pendingFileMention}
-              onFileMentionInserted={() => setPendingFileMention(null)}
-              pendingSlashCommand={pendingSlashCommand}
-              onCommandInserted={() => setPendingSlashCommand(null)}
-              basePath={explorerRoot ?? explorerPath}
-              // Agent Chat Settings - persistent per-agent state
-              inputDraft={currentSettings.inputDraft}
-              onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
-              model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
-              onModelChange={(model) => updateAgentSettings({ model })}
-              thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
-              onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
-              permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
-              onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
-              effort={currentSettings.effort || 'medium'}
-              onEffortChange={(effort) => updateAgentSettings({ effort })}
-              // Streaming control
-              onAbortStream={abortStreamForAgent}
-              lastPrompt={getLastPromptForAgent()}
-              // Conversation management
-              onClearConversation={clearCurrentAgentConversation}
-              onCompactConversation={compactCurrentAgentConversation}
-              onOpenSessionInTerminal={openSessionInTerminal}
-              // Token usage tracking
-              sessionTokens={currentAgentTokens}
-              // OpenAI API key for Whisper
-              openaiApiKey={openaiApiKey ?? undefined}
-              // Open Prompt Engineer
-              onOpenPromptEngineer={handleOpenPromptEngineer}
-              // Agent display info
-              agentName={activeTerminal?.label || 'Jack'}
-              agentAvatar={activeTerminal?.avatar}
-              // Project context
-              projectName={projectName}
-              gitBranch={gitBranch}
-              // Working on field
-              workingOn={activeTerminal?.workingOn}
-              onWorkingOnChange={(value) => {
-                // CRITICAL FIX: Don't update if modal is open for editing to prevent infinite loop
-                if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
-                  handleUpdateWorkingOn(activeTerminal.id, value);
-                }
-              }}
-              // Agent Rules - automatically loaded from personality
-              selectedRules={activeTerminal?.personality?.selectedRules}
-              onEditRules={activeTerminal ? () => {
-                // Open the edit modal with the current terminal
-                setEditingTerminal(activeTerminal);
-                setShowNewTerminalModal(true);
-              } : undefined}
-            />
-              )}
+              {/* 🦆 If activeTaskId exists, show task's chat; otherwise show agent's chat */}
+              {activeTabId === 'chat' && !isKanbanTabActive && (() => {
+                // Determine if we're showing a task's chat or agent's chat
+                const activeTask = activeTaskId ? kanbanTasks.find(t => t.id === activeTaskId) : null;
+                const isTaskChat = !!activeTask;
+
+                // Task chat data
+                const taskMessages = activeTaskId ? (chatSessions.get(activeTaskId) || []) : [];
+                const taskLoading = activeTaskId ? (chatLoadingMap.get(activeTaskId) || false) : false;
+
+                return (
+                  <ChatView
+                    key={isTaskChat ? `task-${activeTaskId}` : (activeId ?? 'no-agent')}
+                    messages={isTaskChat ? taskMessages : currentAgentMessages}
+                    isLoading={isTaskChat ? taskLoading : currentAgentLoading}
+                    onSendMessage={isTaskChat
+                      ? (content, opts) => sendMessageForTargetAgent(activeTaskId!, content, {
+                          ...opts,
+                          workingDirectory: activeTask?.projectPath || opts?.workingDirectory || '/',
+                        })
+                      : sendMessageForAgent
+                    }
+                    activeAgent={activeAgent}
+                    onClearAgent={isTaskChat
+                      ? () => {
+                          // Clear task selection, go back to agent's regular chat
+                          if (activeId) {
+                            setActiveTaskPerAgent(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(activeId);
+                              return newMap;
+                            });
+                          }
+                        }
+                      : handleClearAgent
+                    }
+                    agents={agents}
+                    onSelectAgent={handleUseAgent}
+                    onFilePathClick={handleFilePathClick}
+                    onSessionIdClick={handleSessionIdClick}
+                    onDiffClick={handleDiffClick}
+                    onEditsChange={handleEditsChange}
+                    pendingAgentMention={pendingAgentMention}
+                    onMentionInserted={() => setPendingAgentMention(null)}
+                    pendingFileMention={pendingFileMention}
+                    onFileMentionInserted={() => setPendingFileMention(null)}
+                    pendingSlashCommand={pendingSlashCommand}
+                    onCommandInserted={() => setPendingSlashCommand(null)}
+                    basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
+                    // Agent Chat Settings - persistent per-agent state
+                    inputDraft={currentSettings.inputDraft}
+                    onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
+                    model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                    onModelChange={(model) => updateAgentSettings({ model })}
+                    thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+                    onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
+                    permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                    onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
+                    effort={currentSettings.effort || 'medium'}
+                    onEffortChange={(effort) => updateAgentSettings({ effort })}
+                    // Streaming control
+                    onAbortStream={isTaskChat
+                      ? () => abortStreamForTargetAgent(activeTaskId!)
+                      : abortStreamForAgent
+                    }
+                    lastPrompt={isTaskChat
+                      ? (activeTask?.prompt || getLastPromptForTargetAgent(activeTaskId!) || undefined)
+                      : (getLastPromptForAgent() || undefined)
+                    }
+                    // Conversation management
+                    onClearConversation={isTaskChat
+                      ? () => clearConversationForTargetAgent(activeTaskId!)
+                      : clearCurrentAgentConversation
+                    }
+                    onCompactConversation={isTaskChat
+                      ? () => compactConversationForTargetAgent(activeTaskId!)
+                      : compactCurrentAgentConversation
+                    }
+                    onOpenSessionInTerminal={openSessionInTerminal}
+                    // Token usage tracking
+                    sessionTokens={isTaskChat ? chatTokensMap.get(activeTaskId!) : currentAgentTokens}
+                    // OpenAI API key for Whisper
+                    openaiApiKey={openaiApiKey ?? undefined}
+                    // Open Prompt Engineer
+                    onOpenPromptEngineer={handleOpenPromptEngineer}
+                    // Agent display info - show task title if task is active
+                    agentName={isTaskChat ? activeTask?.title : (activeTerminal?.label || 'Jack')}
+                    agentAvatar={isTaskChat ? activeTask?.assignedAgent?.avatar : activeTerminal?.avatar}
+                    // Project context
+                    projectName={isTaskChat ? activeTask?.projectName : projectName}
+                    gitBranch={isTaskChat ? activeTask?.branch : gitBranch}
+                    // Working on field
+                    workingOn={activeTerminal?.workingOn}
+                    onWorkingOnChange={(value) => {
+                      // CRITICAL FIX: Don't update if modal is open for editing to prevent infinite loop
+                      if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
+                        handleUpdateWorkingOn(activeTerminal.id, value);
+                      }
+                    }}
+                    // Agent Rules - automatically loaded from personality
+                    selectedRules={activeTerminal?.personality?.selectedRules}
+                    onEditRules={activeTerminal ? () => {
+                      // Open the edit modal with the current terminal
+                      setEditingTerminal(activeTerminal);
+                      setShowNewTerminalModal(true);
+                    } : undefined}
+                    // Open Kanban view callback
+                    onOpenKanban={handleOpenKanbanTab}
+                    // Hide Kanban tasks bar when viewing a task
+                    hideKanbanTasksBar={isTaskChat}
+                  />
+                );
+              })()}
 
               {/* File Preview - shown when file tab is active (hidden in Kanban mode) */}
               {activeTabId.startsWith('file-') && !isKanbanTabActive && (
@@ -9078,19 +9271,6 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Command Viewer - shown when command tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('command-') && !isKanbanTabActive && (() => {
-                const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'command' && activeTab.command) {
-                  return (
-                    <CommandViewer
-                      command={activeTab.command}
-                      onUseCommand={handleUseCommand}
-                    />
-                  );
-                }
-                return null;
-              })()}
 
               {/* Documentation Viewer - shown when docs tab is active (hidden in Kanban mode) */}
               {activeTabId.startsWith('docs-') && !isKanbanTabActive && (() => {
@@ -9231,7 +9411,6 @@ You have access to all Bash tools to execute git commands like:
           onToggleHook={handleToggleHook}
           // Commands props
           onUseCommand={handleUseCommand}
-          onViewCommand={handleViewCommand}
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={handleOpenContextDrawer}
@@ -9298,6 +9477,19 @@ You have access to all Bash tools to execute git commands like:
           isKanbanTabActive={isKanbanTabActive} // Used to show/hide toggle button
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
+          // Kanban Mini Panel props
+          chatLoadingMap={chatLoadingMap}
+          chatSessions={chatSessions}
+          onKanbanTaskClick={(taskId) => {
+            // Open Kanban tab and select the task
+            handleOpenKanbanTab();
+            // Select task in store
+            const { selectTask, openDrawer } = useKanbanStore.getState();
+            selectTask(taskId);
+            openDrawer();
+          }}
+          onOpenKanban={handleOpenKanbanTab}
+          showKanbanMiniPanel={showKanbanMiniPanel}
         />
 
         <NewTerminalModal

@@ -1,9 +1,18 @@
 /**
  * KanbanPopoutView Component
  *
+ * @deprecated This component is deprecated in favor of KanbanMiniPanel which shows
+ * a compact Kanban view in the sidebar. The popout window approach has been replaced
+ * with the "Kanban Tab + Mini Panel in Sidebar" pattern for better UX and performance.
+ *
+ * This component is kept for backward compatibility with existing popout windows
+ * but should not be used for new features. Use KanbanMiniPanel + KanbanTabView instead.
+ *
+ * Legacy description:
  * Standalone Kanban board for popout windows.
  * Includes full chat drawer functionality with standalone chat system.
- * Uses usePopoutKanbanChat hook for independent chat management.
+ * Uses usePopoutKanbanChat hook for chat operations (send, abort, clear).
+ * Uses useKanbanChatSync hook for synced state from main window (Working/Ready status).
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -26,9 +35,10 @@ import { emit } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
-import KanbanChatDrawer from './KanbanChatDrawer';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import { usePopoutKanbanChat } from '../../hooks/usePopoutKanbanChat';
+import { useKanbanChatSync } from '../../hooks/useKanbanChatSync';
+import { useKanbanPolling } from '../../hooks/useKanbanPolling';
 import type { KanbanTask, KanbanStatus } from '../../types';
 import { toast } from 'sonner';
 import './KanbanView.css';
@@ -48,10 +58,20 @@ export default function KanbanPopoutView() {
     closeDrawer,
   } = useKanbanStore();
 
-  // Standalone chat system for popout
+  // 🦆 SYNC: Get synced loading state from main window (for Working/Ready status on cards)
+  // Also listen for task changes to reload the board
+  // LIGHTWEIGHT: Only syncs loading status, not full chat sessions
+  const { chatLoadingMap: syncedLoadingMap } = useKanbanChatSync({
+    onTasksChanged: useCallback((changeType: string, _taskId?: string) => {
+      // Silent reload to avoid showing loading indicator
+      loadTasks({ silent: true });
+    }, [loadTasks]),
+  });
+
+  // Standalone chat system for popout (for chat drawer operations)
   const {
     chatSessions,
-    chatLoadingMap,
+    chatLoadingMap: localLoadingMap,
     sessionTokensMap,
     loadChatSession,
     sendMessage,
@@ -60,6 +80,9 @@ export default function KanbanPopoutView() {
     compactConversation,
     getLastPrompt,
   } = usePopoutKanbanChat();
+
+  // Use synced loading state for cards (from main window), local for fallback
+  const chatLoadingMap = syncedLoadingMap.size > 0 ? syncedLoadingMap : localLoadingMap;
 
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
@@ -84,6 +107,9 @@ export default function KanbanPopoutView() {
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  // 🦆 MCP SYNC: Poll for task changes from external sources (MCP server)
+  useKanbanPolling({ enabled: true, interval: 5000 }); // 5 second interval for low overhead
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -296,10 +322,11 @@ export default function KanbanPopoutView() {
               </svg>
             }
             tasks={todoTasks}
-            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             isDropTarget={overColumnId === 'todo'}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
           />
           <KanbanColumn
             id="in_progress"
@@ -311,10 +338,11 @@ export default function KanbanPopoutView() {
               </svg>
             }
             tasks={inProgressTasks}
-            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             isDropTarget={overColumnId === 'in_progress'}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
           />
           <KanbanColumn
             id="done"
@@ -326,10 +354,11 @@ export default function KanbanPopoutView() {
               </svg>
             }
             tasks={doneTasks}
-            selectedTaskId={selectedTaskId}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             isDropTarget={overColumnId === 'done'}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
           />
         </div>
 
@@ -341,21 +370,7 @@ export default function KanbanPopoutView() {
         </DragOverlay>
       </DndContext>
 
-      {/* Chat Drawer */}
-      <KanbanChatDrawer
-        task={selectedTask || null}
-        isOpen={isDrawerOpen}
-        onClose={handleCloseDrawer}
-        onTaskUpdate={handleTaskUpdate}
-        chatSessions={chatSessions}
-        chatLoadingMap={chatLoadingMap}
-        onSendMessage={handleSendMessage}
-        onAbortStream={handleAbortStream}
-        onClearConversation={handleClearConversation}
-        onCompactConversation={handleCompactConversation}
-        getLastPrompt={getLastPrompt}
-        sessionTokensMap={sessionTokensMap}
-      />
+      {/* Chat Drawer - Removed, use tab-based chat system instead */}
     </div>
   );
 }

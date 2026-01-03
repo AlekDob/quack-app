@@ -576,10 +576,6 @@ function AppRefactored() {
           onUseCommand={(command) => {
             setPendingSlashCommand(command);
           }}
-          onViewCommand={() => {
-            // TODO: Implement command viewing in refactored app
-            console.log('Command view not implemented in refactored app');
-          }}
 
           // Context props
           tauriAvailable={tauriAvailable}
