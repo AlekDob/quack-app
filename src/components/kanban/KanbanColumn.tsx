@@ -7,7 +7,7 @@
  * Uses @dnd-kit/core for drop functionality.
  */
 
-import { useState, useCallback, useMemo, type DragEvent } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect, type DragEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -18,7 +18,7 @@ import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
 import { groupTasksByCompletionDate, type DateGroup } from '../../utils/kanbanDateGrouping';
 
 // Types for In Progress column grouping by status
-type InProgressBucket = 'ready' | 'working';
+type InProgressBucket = 'ready' | 'working' | 'cold';
 
 interface TaskWithState {
   task: KanbanTask;
@@ -32,6 +32,17 @@ interface InProgressGroup {
   bucket: InProgressBucket;
   label: string;
   tasks: TaskWithState[];
+}
+
+/**
+ * Determine if an agent task is "cold" (never started, no messages at all)
+ */
+function isTaskCold(
+  task: KanbanTask,
+  hasMessages: boolean
+): boolean {
+  const isAgentTask = (task.type || 'agent') === 'agent';
+  return isAgentTask && !hasMessages;
 }
 
 /**
@@ -68,6 +79,11 @@ interface KanbanColumnProps {
   onSidebarAgentDrop?: (agentId: string, targetColumn: KanbanStatus) => void;
   // Handler for clearing all tasks in Done column
   onClearAll?: () => void;
+  // Infinite scroll props for Done column
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
+  totalCount?: number; // Total count of tasks (for showing "X of Y")
 }
 
 export default function KanbanColumn({
@@ -86,6 +102,10 @@ export default function KanbanColumn({
   isDropTarget = false,
   onSidebarAgentDrop,
   onClearAll,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
+  totalCount,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -98,6 +118,39 @@ export default function KanbanColumn({
   // Track native HTML5 drag-over state for sidebar agents
   const [isNativeDragOver, setIsNativeDragOver] = useState(false);
 
+  // Intersection Observer for infinite scroll (Done column only)
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Only set up observer for Done column with hasMore and onLoadMore
+    if (id !== 'done' || !hasMore || !onLoadMore) return;
+
+    // Capture sentinel ref to avoid stale closure
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        // Check entry.isIntersecting - isLoadingMore checked via onLoadMore guard
+        if (entry.isIntersecting) {
+          onLoadMore();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px', // Trigger slightly before reaching the sentinel
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.unobserve(sentinel);
+      observer.disconnect();
+    };
+  }, [id, hasMore, onLoadMore]);
+
   // Use parent-provided isDropTarget OR internal isOver OR native drag for highlighting
   const showDropHighlight = isDropTarget || isOver || isNativeDragOver;
 
@@ -109,12 +162,13 @@ export default function KanbanColumn({
     return [];
   }, [id, tasks]);
 
-  // Group tasks by status for In Progress column (Ready vs Working)
+  // Group tasks by status for In Progress column (Ready vs Working vs Cold)
   const inProgressGroups: InProgressGroup[] = useMemo(() => {
     if (id !== 'in_progress' || tasks.length === 0) return [];
 
     const ready: TaskWithState[] = [];
     const working: TaskWithState[] = [];
+    const cold: TaskWithState[] = [];
 
     tasks.forEach((task) => {
       const isLoading = chatLoadingMap?.get(task.id) || false;
@@ -132,8 +186,13 @@ export default function KanbanColumn({
         shellState,
       };
 
-      if (isTaskReady(task, isLoading, hasMessages, isDormant)) {
+      // Cold = never started (no messages at all)
+      if (isTaskCold(task, hasMessages)) {
+        cold.push(taskWithState);
+      // Ready = finished working, awaiting review
+      } else if (isTaskReady(task, isLoading, hasMessages, isDormant)) {
         ready.push(taskWithState);
+      // Working = currently being worked on
       } else {
         working.push(taskWithState);
       }
@@ -144,9 +203,13 @@ export default function KanbanColumn({
     if (ready.length > 0) {
       groups.push({ bucket: 'ready', label: 'READY', tasks: ready });
     }
-    // Working tasks below
+    // Working tasks in the middle
     if (working.length > 0) {
       groups.push({ bucket: 'working', label: 'WORKING', tasks: working });
+    }
+    // Cold tasks at the bottom (never started)
+    if (cold.length > 0) {
+      groups.push({ bucket: 'cold', label: 'COLD', tasks: cold });
     }
 
     return groups;
@@ -357,6 +420,40 @@ export default function KanbanColumn({
             })
           )}
         </SortableContext>
+
+        {/* Infinite scroll sentinel for Done column */}
+        {id === 'done' && hasMore && (
+          <div ref={sentinelRef} className="kanban-load-more-sentinel">
+            {isLoadingMore ? (
+              <div className="kanban-loading-spinner">
+                <svg className="spinner" viewBox="0 0 24 24" width="20" height="20">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeDasharray="31.4"
+                    strokeDashoffset="10"
+                  />
+                </svg>
+                <span>Loading more...</span>
+              </div>
+            ) : (
+              <div className="kanban-load-more-hint">
+                Scroll for more
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Show count info when there are paginated results */}
+        {id === 'done' && totalCount !== undefined && totalCount > tasks.length && (
+          <div className="kanban-pagination-info">
+            Showing {tasks.length} of {totalCount} tasks
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1974,6 +1974,11 @@
   animation: status-pulse-working 1.5s ease-in-out infinite;
 }
 
+.kanban-status-indicator--cold {
+  background-color: var(--kanban-cold-color, #3b82f6);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
 @keyframes status-pulse-ready {
   0%, 100% {
     opacity: 1;
@@ -2009,6 +2014,10 @@
   color: var(--kanban-progress-color, #f59e0b);
 }
 
+.kanban-status-group--cold .kanban-status-group-label {
+  color: var(--kanban-cold-color, #3b82f6);
+}
+
 .kanban-status-group-count {
   display: flex;
   align-items: center;
@@ -2031,6 +2040,11 @@
   color: var(--kanban-progress-color, #f59e0b);
 }
 
+.kanban-status-group--cold .kanban-status-group-count {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--kanban-cold-color, #3b82f6);
+}
+
 /* Separator line between status groups */
 .kanban-status-group:not(:first-child)::before {
   content: '';
@@ -2044,4 +2058,64 @@
     transparent 100%
   );
   margin-bottom: 8px;
+}
+
+/* ========================================
+   INFINITE SCROLL - Done Column
+   ======================================== */
+
+/* Sentinel element at bottom of Done column */
+.kanban-load-more-sentinel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px 8px;
+  min-height: 48px;
+}
+
+/* Loading spinner container */
+.kanban-loading-spinner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--kanban-text-secondary);
+  font-size: 12px;
+}
+
+.kanban-loading-spinner .spinner {
+  animation: kanban-spin 1s linear infinite;
+  color: var(--kanban-accent);
+}
+
+@keyframes kanban-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hint text when not loading */
+.kanban-load-more-hint {
+  color: var(--kanban-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Pagination info (showing X of Y) */
+.kanban-pagination-info {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  color: var(--kanban-text-muted);
+  font-size: 11px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  border-top: 1px solid var(--kanban-border);
+  margin-top: 8px;
 }

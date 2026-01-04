@@ -2469,7 +2469,21 @@ function AppContent() {
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
       const agentMessages = newSessions.get(targetAgentId) ?? [];
-      newSessions.set(targetAgentId, [...agentMessages, assistantMessage]);
+
+      // 🦆 EVENT BUFFER FIX: Flush buffered events to prevent race condition
+      // Same pattern as sendMessageForAgent (line ~1914-1940)
+      const bufferedEvents = eventBufferRef.current.get(targetAgentId) || [];
+      if (bufferedEvents.length > 0) {
+        console.log(`🦆 [sendMessageForTargetAgent] Flushing ${bufferedEvents.length} buffered events for ${targetAgentId}`);
+        eventBufferRef.current.delete(targetAgentId);
+        const messageWithBufferedEvents = {
+          ...assistantMessage,
+          events: bufferedEvents,
+        };
+        newSessions.set(targetAgentId, [...agentMessages, messageWithBufferedEvents]);
+      } else {
+        newSessions.set(targetAgentId, [...agentMessages, assistantMessage]);
+      }
       return newSessions;
     });
 
@@ -8766,6 +8780,7 @@ You have access to all Bash tools to execute git commands like:
           // Chat sessions
           chatSessions={chatSessions}
           lastReadTimestamps={lastReadTimestamps}
+          chatLoadingMap={chatLoadingMap}
           // Terminal props
           onAdd={handleOpenNewTerminalModal}
           onSelect={handleSelectTerminal}
@@ -9103,7 +9118,10 @@ You have access to all Bash tools to execute git commands like:
                     onCommandInserted={() => setPendingSlashCommand(null)}
                     basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
                     // Agent Chat Settings - persistent per-agent state
-                    inputDraft={currentSettings.inputDraft}
+                    // For task chat: pre-fill with task prompt ONLY on first message (empty conversation)
+                    inputDraft={isTaskChat && !currentSettings.inputDraft && taskMessages.length === 0
+                      ? (activeTask?.prompt || '')
+                      : currentSettings.inputDraft}
                     onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
                     model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
                     onModelChange={(model) => updateAgentSettings({ model })}

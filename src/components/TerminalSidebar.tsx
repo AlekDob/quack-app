@@ -55,6 +55,8 @@ interface SortableRepositoryGroupProps {
   inProgressTasks?: KanbanTask[];
   onOpenTaskTab?: (task: KanbanTask) => void;
   activeTaskId?: string | null;
+  // Chat loading state for task status indicators
+  chatLoadingMap?: Map<string, boolean>;
 }
 
 function SortableRepositoryGroup({
@@ -164,6 +166,7 @@ interface TerminalSidebarProps {
   // Chat sessions
   chatSessions?: Map<string, ChatMessage[]>;
   lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
+  chatLoadingMap?: Map<string, boolean>; // Loading state for task status indicators
   // Terminal props
   onAdd: () => void; // Will be used by "+" button for terminal creation
   onSelect: (id: string) => void;
@@ -209,6 +212,7 @@ export default function TerminalSidebar({
   // Chat sessions
   chatSessions,
   lastReadTimestamps,
+  chatLoadingMap,
   // Terminal props
   onAdd,
   onSelect,
@@ -814,6 +818,7 @@ export default function TerminalSidebar({
                     inProgressTasks={inProgressTasks}
                     onOpenTaskTab={onOpenTaskTab}
                     activeTaskId={activeTaskId}
+                    chatLoadingMap={chatLoadingMap}
                   />
                 );
               })}

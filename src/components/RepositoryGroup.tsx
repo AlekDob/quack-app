@@ -52,6 +52,8 @@ interface RepositoryGroupProps {
   inProgressTasks?: KanbanTask[];
   onOpenTaskTab?: (task: KanbanTask) => void;
   activeTaskId?: string | null;
+  // Chat loading state for task status indicators
+  chatLoadingMap?: Map<string, boolean>;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -139,6 +141,8 @@ interface SortableAgentProps {
   agentTasks?: KanbanTask[];
   onOpenTaskTab?: (task: KanbanTask) => void;
   activeTaskId?: string | null;
+  // Chat loading state for task status indicators
+  chatLoadingMap?: Map<string, boolean>;
 }
 
 function SortableAgent({
@@ -159,6 +163,7 @@ function SortableAgent({
   agentTasks = [],
   onOpenTaskTab,
   activeTaskId = null,
+  chatLoadingMap,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -930,6 +935,29 @@ function SortableAgent({
         }}>
           {agentTasks.map(task => {
             const isTaskSelected = activeTaskId === task.id;
+
+            // Calculate task status (same logic as KanbanColumn)
+            const taskType = task.type || 'agent';
+            const isAgentTask = taskType === 'agent';
+            const isLoading = chatLoadingMap?.get(task.id) || false;
+            const messages = chatSessions?.get(task.id) || [];
+            const hasMessages = messages.length > 0;
+            const hasUserMessage = messages.some(msg => msg.role === 'user');
+            const isDormant = !hasUserMessage;
+
+            // Cold = agent task with no messages at all (never started)
+            const isCold = isAgentTask && !hasMessages;
+
+            // Ready = agent task, in progress, has messages, not loading, not dormant
+            const isReady = isAgentTask &&
+              task.status === 'in_progress' &&
+              hasMessages &&
+              !isLoading &&
+              !isDormant;
+
+            // Status indicator colors: blue if cold, green if ready, orange if working
+            const statusColor = isCold ? '#3b82f6' : isReady ? '#22c55e' : '#f59e0b';
+
             return (
             <div
               key={task.id}
@@ -986,14 +1014,15 @@ function SortableAgent({
               }}>
                 {task.title.length > 30 ? task.title.substring(0, 30) + '...' : task.title}
               </span>
-              {/* In Progress indicator */}
+              {/* Status indicator - blue if cold, green if ready, orange if working */}
               <div style={{
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: '#f59e0b',
-                boxShadow: '0 0 6px #f59e0b',
-                animation: 'pulse 2s ease-in-out infinite',
+                background: statusColor,
+                boxShadow: `0 0 6px ${statusColor}`,
+                // Only pulse animation for working tasks (not cold or ready)
+                animation: (isCold || isReady) ? 'none' : 'pulse 2s ease-in-out infinite',
                 flexShrink: 0,
               }} />
             </div>
@@ -1036,7 +1065,8 @@ const MemoizedSortableAgent = memo(SortableAgent, (prevProps, nextProps) => {
     prevProps.onToggleKanbanView === nextProps.onToggleKanbanView &&
     prevProps.agentTasks === nextProps.agentTasks &&
     prevProps.onOpenTaskTab === nextProps.onOpenTaskTab &&
-    prevProps.activeTaskId === nextProps.activeTaskId
+    prevProps.activeTaskId === nextProps.activeTaskId &&
+    prevProps.chatLoadingMap === nextProps.chatLoadingMap
   )
 });
 
@@ -1062,6 +1092,7 @@ export default function RepositoryGroup({
   inProgressTasks = [],
   onOpenTaskTab,
   activeTaskId = null,
+  chatLoadingMap,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1703,6 +1734,7 @@ export default function RepositoryGroup({
                         agentTasks={inProgressTasks.filter(t => t.assignedAgent?.id === agent.id)}
                         onOpenTaskTab={onOpenTaskTab}
                         activeTaskId={activeTaskId}
+                        chatLoadingMap={chatLoadingMap}
                       />
                     ))}
                   </SortableContext>

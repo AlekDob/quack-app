@@ -36,6 +36,11 @@ interface KanbanState {
   // Task IDs currently being documented
   processingDocumentation: Set<string>;
 
+  // Pagination state for Done column (infinite scroll)
+  doneVisibleCount: number;
+  donePageSize: number;
+  isLoadingMoreDone: boolean;
+
   // Actions
   loadTasks: (options?: { silent?: boolean }) => Promise<void>;
   addTask: (task: Omit<KanbanTask, 'id' | 'createdAt'>) => Promise<KanbanTask>;
@@ -62,6 +67,12 @@ interface KanbanState {
   getTasksByProject: (projectPath: string) => KanbanTask[];
   getSelectedTask: () => KanbanTask | null;
   hasDocumentation: (taskId: string) => boolean;
+
+  // Pagination actions for Done column
+  loadMoreDone: () => void;
+  resetDonePagination: () => void;
+  getVisibleDoneTasks: () => KanbanTask[];
+  hasMoreDoneTasks: () => boolean;
 }
 
 /**
@@ -84,6 +95,11 @@ export const useKanbanStore = create<KanbanState>()(
         pendingNotification: null,
         isNewTaskModalRequested: false,
         processingDocumentation: new Set(),
+
+        // Pagination for Done column - show 20 tasks initially, load 20 more each time
+        doneVisibleCount: 20,
+        donePageSize: 20,
+        isLoadingMoreDone: false,
 
         // Load tasks from storage
         // Use { silent: true } for background polling to avoid showing loading indicator
@@ -297,6 +313,48 @@ export const useKanbanStore = create<KanbanState>()(
         hasDocumentation: (taskId) => {
           const task = get().tasks.find((t) => t.id === taskId);
           return !!(task?.docFilePath || task?.memoryEntityId);
+        },
+
+        // Pagination: Load more done tasks
+        loadMoreDone: () => {
+          const { doneVisibleCount, donePageSize, isLoadingMoreDone } = get();
+          if (isLoadingMoreDone) return;
+
+          set({ isLoadingMoreDone: true });
+
+          // Simulate small delay for smooth UX
+          setTimeout(() => {
+            set({
+              doneVisibleCount: doneVisibleCount + donePageSize,
+              isLoadingMoreDone: false,
+            });
+          }, 150);
+        },
+
+        // Pagination: Reset to initial count (when switching views)
+        resetDonePagination: () => {
+          set({ doneVisibleCount: 20, isLoadingMoreDone: false });
+        },
+
+        // Selector: Get visible done tasks (paginated)
+        getVisibleDoneTasks: () => {
+          const { tasks, doneVisibleCount } = get();
+          const doneTasks = tasks
+            .filter((t) => t.status === 'done')
+            .sort((a, b) => {
+              // Sort by completedAt descending (most recent first)
+              const aTime = a.completedAt || a.createdAt || 0;
+              const bTime = b.completedAt || b.createdAt || 0;
+              return bTime - aTime;
+            });
+          return doneTasks.slice(0, doneVisibleCount);
+        },
+
+        // Selector: Check if there are more done tasks to load
+        hasMoreDoneTasks: () => {
+          const { tasks, doneVisibleCount } = get();
+          const totalDone = tasks.filter((t) => t.status === 'done').length;
+          return totalDone > doneVisibleCount;
         },
       }),
       {

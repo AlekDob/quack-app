@@ -99,9 +99,11 @@ export function formatCompletionDate(timestamp: number): string {
  * Group tasks by completion date buckets
  * Returns groups sorted by recency (today first, older last)
  * Tasks within each group are sorted by completedAt (most recent first)
+ *
+ * @param tasks - Array of tasks to group
+ * @param now - Reference date for bucket calculation (defaults to current date)
  */
-export function groupTasksByCompletionDate(tasks: KanbanTask[]): DateGroup[] {
-  const now = new Date();
+export function groupTasksByCompletionDate(tasks: KanbanTask[], now: Date = new Date()): DateGroup[] {
 
   // Initialize buckets
   const buckets: Record<DateBucket, KanbanTask[]> = {

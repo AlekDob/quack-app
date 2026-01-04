@@ -132,7 +132,7 @@ describe('kanbanDateGrouping', () => {
         createMockTask('5', timestamps.thirtyDaysAgo),
       ];
 
-      const groups = groupTasksByCompletionDate(tasks);
+      const groups = groupTasksByCompletionDate(tasks, fixedNow);
 
       expect(groups.length).toBe(4); // today, yesterday, thisWeek, older
       expect(groups[0].bucket).toBe('today');
@@ -152,7 +152,7 @@ describe('kanbanDateGrouping', () => {
         createMockTask('3', timestamps.today - 500), // Middle
       ];
 
-      const groups = groupTasksByCompletionDate(tasks);
+      const groups = groupTasksByCompletionDate(tasks, fixedNow);
       const todayGroup = groups.find((g) => g.bucket === 'today');
 
       expect(todayGroup).toBeDefined();
@@ -186,7 +186,7 @@ describe('kanbanDateGrouping', () => {
         createMockTask('2', timestamps.threeDaysAgo),
       ];
 
-      const groups = groupTasksByCompletionDate(tasks);
+      const groups = groupTasksByCompletionDate(tasks, fixedNow);
       const buckets = groups.map((g) => g.bucket);
 
       expect(buckets).toContain('today');
@@ -203,7 +203,7 @@ describe('kanbanDateGrouping', () => {
         createMockTask('3', timestamps.threeDaysAgo), // thisWeek
       ];
 
-      const groups = groupTasksByCompletionDate(tasks);
+      const groups = groupTasksByCompletionDate(tasks, fixedNow);
       const bucketOrder = groups.map((g) => g.bucket);
 
       expect(bucketOrder).toEqual(['today', 'yesterday', 'thisWeek', 'lastWeek', 'older']);
@@ -212,7 +212,7 @@ describe('kanbanDateGrouping', () => {
     it('should use English labels', () => {
       const tasks: KanbanTask[] = [createMockTask('1', timestamps.today)];
 
-      const groups = groupTasksByCompletionDate(tasks);
+      const groups = groupTasksByCompletionDate(tasks, fixedNow);
       expect(groups[0].label).toBe('Today');
     });
   });

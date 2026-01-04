@@ -21,7 +21,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir, platform } from 'os';
 
@@ -375,6 +375,94 @@ function generateTaskId() {
   return `kanban-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 }
 
+function generateAttachmentId() {
+  return `att_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/**
+ * Guess MIME type from file extension
+ */
+function guessMimeType(filename) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const mimeTypes = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+  };
+  return ext ? mimeTypes[ext] : undefined;
+}
+
+/**
+ * Process attachments from MCP input
+ * Validates files exist and builds attachment objects compatible with UI
+ */
+function processAttachments(attachmentsInput) {
+  if (!attachmentsInput || !Array.isArray(attachmentsInput)) {
+    return [];
+  }
+
+  const processed = [];
+  const MAX_ATTACHMENTS = 4;
+
+  for (const att of attachmentsInput.slice(0, MAX_ATTACHMENTS)) {
+    if (!att.path) {
+      console.error(`[KanbanMCP] Skipping attachment without path`);
+      continue;
+    }
+
+    // Check if file exists
+    if (!existsSync(att.path)) {
+      console.error(`[KanbanMCP] Attachment file not found: ${att.path}`);
+      continue;
+    }
+
+    // Get file stats
+    let size = 0;
+    try {
+      const stats = statSync(att.path);
+      size = stats.size;
+    } catch (err) {
+      console.error(`[KanbanMCP] Error getting file stats: ${err.message}`);
+    }
+
+    // Extract filename from path
+    const name = att.name || att.path.split(/[\\/]/).pop() || 'attachment';
+
+    // Determine MIME type
+    const mimeType = att.mimeType || guessMimeType(name);
+
+    // Build preview URL (base64 data URL for images)
+    let previewUrl = undefined;
+    if (mimeType && mimeType.startsWith('image/')) {
+      try {
+        const MAX_PREVIEW_SIZE = 3 * 1024 * 1024; // 3MB
+        if (size <= MAX_PREVIEW_SIZE) {
+          const base64 = readFileSync(att.path).toString('base64');
+          previewUrl = `data:${mimeType};base64,${base64}`;
+        }
+      } catch (err) {
+        console.error(`[KanbanMCP] Error reading file for preview: ${err.message}`);
+      }
+    }
+
+    processed.push({
+      id: generateAttachmentId(),
+      name,
+      path: att.path,
+      size,
+      mimeType,
+      previewUrl,
+    });
+
+    console.error(`[KanbanMCP] Processed attachment: ${name} (${size} bytes)`);
+  }
+
+  return processed;
+}
+
 // =============================================================================
 // TOOL HANDLERS
 // =============================================================================
@@ -530,9 +618,12 @@ async function handleCreateTask(args) {
     }
   }
 
-  // Find and assign agent if specified
+  // Find and assign agent if specified, or use default agent
   let assignedAgent = null;
+  let usedDefaultAgent = false;
+
   if (args.assignedAgentId || args.assignedAgentName) {
+    // Agent explicitly specified - try to find it
     const agentIdentifier = args.assignedAgentId || args.assignedAgentName;
     const foundAgent = findAgent(agentIdentifier, args.projectPath);
 
@@ -551,6 +642,47 @@ async function handleCreateTask(args) {
       console.error(`[KanbanMCP] Warning: Could not find agent "${agentIdentifier}"`);
       // Don't fail - just create unassigned task
     }
+  } else {
+    // No agent specified - assign to default agent
+    const allAgents = loadAvailableAgents();
+
+    // Priority: 1. First agent matching projectPath, 2. First agent globally
+    let defaultAgent = null;
+
+    if (args.projectPath) {
+      // Try to find an agent for this specific project
+      defaultAgent = allAgents.find(a => a.projectPath === args.projectPath);
+      if (defaultAgent) {
+        console.error(`[KanbanMCP] Using default agent for project: ${defaultAgent.name}`);
+      }
+    }
+
+    // Fallback to first available agent
+    if (!defaultAgent && allAgents.length > 0) {
+      defaultAgent = allAgents[0];
+      console.error(`[KanbanMCP] Using first available agent as default: ${defaultAgent.name}`);
+    }
+
+    if (defaultAgent) {
+      assignedAgent = {
+        id: defaultAgent.id,
+        name: defaultAgent.name,
+        color: defaultAgent.color,
+        avatar: defaultAgent.avatar,
+        projectPath: defaultAgent.projectPath,
+        projectName: defaultAgent.projectName,
+        branch: defaultAgent.branch,
+      };
+      usedDefaultAgent = true;
+    } else {
+      console.error(`[KanbanMCP] Warning: No agents available to assign as default`);
+    }
+  }
+
+  // Process attachments if provided
+  const attachments = processAttachments(args.attachments);
+  if (attachments.length > 0) {
+    console.error(`[KanbanMCP] Task has ${attachments.length} attachment(s)`);
   }
 
   const newTask = {
@@ -563,6 +695,7 @@ async function handleCreateTask(args) {
     branch: args.branch,
     parentTaskId: args.parentTaskId,
     assignedAgent: assignedAgent,
+    attachments: attachments.length > 0 ? attachments : undefined,
     createdAt: Date.now(),
   };
 
@@ -584,12 +717,21 @@ async function handleCreateTask(args) {
 
   let resultMsg = `Created task "${newTask.title}" (ID: ${newTask.id}) in ${newTask.status}`;
   if (assignedAgent) {
-    resultMsg += `\nAssigned to: ${assignedAgent.name}`;
+    if (usedDefaultAgent) {
+      resultMsg += `\nAuto-assigned to default agent: ${assignedAgent.name}`;
+    } else {
+      resultMsg += `\nAssigned to: ${assignedAgent.name}`;
+    }
   } else if (args.assignedAgentId || args.assignedAgentName) {
     resultMsg += `\nWarning: Could not find agent "${args.assignedAgentId || args.assignedAgentName}" - task created unassigned`;
+  } else {
+    resultMsg += `\nWarning: No agents available - task created unassigned`;
   }
   if (args.parentTaskId) {
     resultMsg += `\nSubtask of: ${args.parentTaskId}`;
+  }
+  if (attachments.length > 0) {
+    resultMsg += `\nAttachments: ${attachments.length} image(s) attached`;
   }
 
   return resultMsg;
@@ -890,6 +1032,28 @@ const TOOLS = [
         assignedAgentName: {
           type: 'string',
           description: 'Name of agent to assign (e.g., "Magnus", "Mei", "Laura"). Supports fuzzy matching - will find "Agent Magnus" if you pass "Magnus".',
+        },
+        attachments: {
+          type: 'array',
+          description: 'Image attachments for the task. Each attachment should have path (absolute file path) and optionally name, mimeType. Images will be displayed in the task card.',
+          items: {
+            type: 'object',
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Absolute path to the image file',
+              },
+              name: {
+                type: 'string',
+                description: 'Display name for the attachment (defaults to filename)',
+              },
+              mimeType: {
+                type: 'string',
+                description: 'MIME type of the image (e.g., "image/png", "image/jpeg")',
+              },
+            },
+            required: ['path'],
+          },
         },
       },
       required: ['title', 'prompt', 'projectPath', 'projectName'],

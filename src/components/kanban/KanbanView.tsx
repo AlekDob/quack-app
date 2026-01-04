@@ -110,6 +110,11 @@ export default function KanbanView({
     updateTask,
     isNewTaskModalRequested,
     clearNewTaskModalRequest,
+    // Pagination for Done column
+    getVisibleDoneTasks,
+    hasMoreDoneTasks,
+    loadMoreDone,
+    isLoadingMoreDone,
   } = useKanbanStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -170,7 +175,10 @@ export default function KanbanView({
   // Show ALL tasks (cross-project view)
   const todoTasks = tasks.filter((t) => t.status === 'todo');
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const doneTasks = tasks.filter((t) => t.status === 'done');
+  // Use paginated Done tasks for infinite scroll
+  const visibleDoneTasks = getVisibleDoneTasks();
+  const totalDoneTasks = tasks.filter((t) => t.status === 'done').length;
+  const hasMoreDone = hasMoreDoneTasks();
 
   // Load tasks on mount, then load chat sessions from saved sessionIds
   useEffect(() => {
@@ -321,9 +329,10 @@ export default function KanbanView({
     }
   }, [deleteTask, clearOutput, selectedShellTaskId]);
 
-  // Handle clearing all done tasks
+  // Handle clearing all done tasks (uses ALL done tasks, not just visible ones)
   const handleClearDone = useCallback(async () => {
-    const doneCount = doneTasks.length;
+    const allDoneTasks = tasks.filter((t) => t.status === 'done');
+    const doneCount = allDoneTasks.length;
     if (doneCount === 0) return;
 
     const confirmed = await confirm(
@@ -336,13 +345,13 @@ export default function KanbanView({
 
     if (confirmed) {
       // Delete all done tasks
-      for (const task of doneTasks) {
+      for (const task of allDoneTasks) {
         deleteTask(task.id);
         clearOutput(task.id);
       }
       toast.success(`Cleared ${doneCount} completed task${doneCount > 1 ? 's' : ''}`);
     }
-  }, [doneTasks, deleteTask, clearOutput]);
+  }, [tasks, deleteTask, clearOutput]);
 
   // Handle task edit (open modal in edit mode)
   const handleTaskEdit = useCallback((task: KanbanTask) => {
@@ -586,7 +595,7 @@ export default function KanbanView({
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
             }
-            tasks={doneTasks}
+            tasks={visibleDoneTasks}
             onTaskClick={handleTaskClick}
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
@@ -598,6 +607,11 @@ export default function KanbanView({
             isDropTarget={overColumnId === 'done'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
             onClearAll={handleClearDone}
+            // Infinite scroll props
+            hasMore={hasMoreDone}
+            isLoadingMore={isLoadingMoreDone}
+            onLoadMore={loadMoreDone}
+            totalCount={totalDoneTasks}
           />
         </div>
 
