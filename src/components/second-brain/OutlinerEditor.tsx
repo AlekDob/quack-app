@@ -1,11 +1,42 @@
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
-import { Brain, RefreshCw, Search, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { useOutlineTree } from '../../hooks/useOutlineTree';
-import { useCurrentProject } from '../../hooks/useCurrentProject';
+import { Brain, RefreshCw, Search, X, PanelRightClose, PanelRightOpen, Check, AlertCircle, Database, FolderSync, Globe, Folder, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
+import { useOutlineTreeBrain } from '../../hooks/useOutlineTreeBrain';
+import { useTerminalStore } from '../../stores/terminalStore';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
 import type { MemoryScope } from '../../services/mcpMemoryService';
+import { brainService, listProjects, type MigrationStatus } from '../../services/brainService';
+import type { BrainProject } from '../../types/brain';
 import InlineOutliner from './InlineOutliner';
 import SecondBrainSidebar from './SecondBrainSidebar';
+
+/**
+ * Simple project info derived from terminal paths
+ */
+interface SimpleProject {
+  id: string;
+  name: string;
+  path: string;
+}
+
+/**
+ * Format relative time (e.g., "2 min ago", "just now")
+ */
+function formatRelativeTime(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 interface OutlinerEditorProps {
   initialNodeId?: string;
@@ -30,20 +61,208 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
     expandedNodes,
     search,
     filterByTag,
-  } = useOutlineTree();
+    lastSyncTime,
+    syncStatus,
+  } = useOutlineTreeBrain();
 
-  // Project detection
-  const { project: currentProject, refresh: refreshProject } = useCurrentProject(projectPath);
+  // Migration state
+  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
+  const [showMigrationPanel, setShowMigrationPanel] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  // Check migration status on mount
+  useEffect(() => {
+    const checkMigration = async () => {
+      try {
+        const status = await brainService.getMigrationStatus();
+        setMigrationStatus(status);
+        // Show migration panel if there's data to import and Brain is empty
+        if ((status.mcpMemoryCount > 0 || status.quackMemoryCount > 0) && status.brainEntityCount === 0) {
+          setShowMigrationPanel(true);
+        }
+      } catch (err) {
+        console.error('[OutlinerEditor] Failed to check migration status:', err);
+      }
+    };
+    checkMigration();
+  }, []);
+
+  // Handle import from MCP Memory
+  const handleImportMCP = useCallback(async () => {
+    setIsMigrating(true);
+    try {
+      const result = await brainService.importFromMCPMemory();
+      toast.success('MCP Memory imported', {
+        description: `${result.importedEntities} entities, ${result.importedRelations} relations`,
+      });
+      refresh();
+      // Update migration status
+      const status = await brainService.getMigrationStatus();
+      setMigrationStatus(status);
+    } catch (err) {
+      toast.error('Import failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  }, [refresh]);
+
+  // Handle import from Quack Memory
+  const handleImportQuack = useCallback(async () => {
+    setIsMigrating(true);
+    try {
+      const result = await brainService.importFromQuackMemory();
+      toast.success('Quack Memory imported', {
+        description: `${result.importedEntities} entities imported`,
+      });
+      refresh();
+      // Update migration status
+      const status = await brainService.getMigrationStatus();
+      setMigrationStatus(status);
+    } catch (err) {
+      toast.error('Import failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  }, [refresh]);
+
+  // Handle sync to markdown
+  const handleSyncMarkdown = useCallback(async () => {
+    try {
+      const result = await brainService.syncAllToMarkdown();
+      toast.success('Synced to Markdown', {
+        description: `${result.filesCreated} created, ${result.filesUpdated} updated`,
+      });
+      // Open folder
+      await brainService.openMarkdownFolder();
+    } catch (err) {
+      toast.error('Sync failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }, []);
+
+  // Show toast on sync completion
+  useEffect(() => {
+    if (syncStatus === 'success' && lastSyncTime) {
+      toast.success('Memory synced', {
+        description: `${totalNodes} nodes loaded`,
+        duration: 2000,
+      });
+    } else if (syncStatus === 'error' && error) {
+      toast.error('Sync failed', {
+        description: error,
+        duration: 3000,
+      });
+    }
+  }, [syncStatus, lastSyncTime, totalNodes, error]);
+
+  // Get projects from terminals (projectTerminals store)
+  const projectTerminals = useTerminalStore(state => state.projectTerminals);
+
+  // Combine Brain projects with terminal-derived projects
+  const [brainProjects, setBrainProjects] = useState<BrainProject[]>([]);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+
+  // Load registered Brain projects
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const projects = await listProjects();
+        setBrainProjects(projects);
+      } catch (err) {
+        console.error('[OutlinerEditor] Failed to load Brain projects:', err);
+      }
+    };
+    loadProjects();
+  }, []);
+
+  // Merge Brain projects with terminal-derived projects (unique by path)
+  const availableProjects = useMemo((): SimpleProject[] => {
+    const projectMap = new Map<string, SimpleProject>();
+
+    // Add Brain projects first
+    brainProjects.forEach(p => {
+      projectMap.set(p.path, {
+        id: p.id,
+        name: p.name,
+        path: p.path,
+      });
+    });
+
+    // Add terminal-derived projects (if not already present)
+    projectTerminals.forEach(t => {
+      if (t.projectPath && !projectMap.has(t.projectPath)) {
+        // Extract project name from path
+        const name = t.projectPath.split('/').pop() || t.projectPath;
+        projectMap.set(t.projectPath, {
+          id: t.projectPath, // Use path as ID for terminal-derived projects
+          name,
+          path: t.projectPath,
+        });
+      }
+    });
+
+    return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [brainProjects, projectTerminals]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [zoomedNode, setZoomedNode] = useState<OutlineNodeType | null>(null);
 
-  // Scope state for new memories (always global now)
-  const selectedScope: MemoryScope = 'global';
-  // Selected project name from detection
-  const selectedProjectName = currentProject?.name || null;
+  // Scope state for new memories
+  const [selectedScope, setSelectedScope] = useState<MemoryScope>('global');
+  // Selected project from dropdown (null = global)
+  const [selectedProject, setSelectedProject] = useState<SimpleProject | null>(null);
+  // Selected project name for InlineOutliner
+  const selectedProjectName = selectedProject?.name || null;
+
+  // Current project info (for InlineOutliner compatibility)
+  const currentProject = selectedProject ? {
+    root_path: selectedProject.path,
+    name: selectedProject.name,
+    markers: [],
+  } : null;
+
+  // Handle project selection from dropdown
+  const handleProjectSelect = useCallback((project: SimpleProject | null) => {
+    setSelectedProject(project);
+    setSelectedScope(project ? 'project' : 'global');
+    setShowProjectDropdown(false);
+  }, []);
+
+  // Toggle scope between global and project (when clicking the button)
+  const toggleScope = useCallback(() => {
+    if (selectedScope === 'global') {
+      // If there are projects, show dropdown to select one
+      if (availableProjects.length > 0) {
+        setShowProjectDropdown(!showProjectDropdown);
+      }
+    } else {
+      // Switch back to global
+      setSelectedScope('global');
+      setSelectedProject(null);
+    }
+  }, [selectedScope, availableProjects.length, showProjectDropdown]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showProjectDropdown) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.outliner-scope-wrapper')) {
+        setShowProjectDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProjectDropdown]);
 
   // Build breadcrumbs from zoomed node path
   const breadcrumbs = useMemo(() => {
@@ -187,16 +406,104 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
               )}
             </div>
 
-            {/* Refresh Button */}
+            {/* Scope Selector with Dropdown */}
+            <div className="outliner-scope-wrapper">
+              <button
+                type="button"
+                className={`outliner-scope-btn ${selectedScope}`}
+                onClick={toggleScope}
+                title={selectedScope === 'global'
+                  ? 'Click to select a project scope'
+                  : `Project scope - memories linked to ${selectedProject?.name || 'project'}. Click to switch to Global.`
+                }
+              >
+                {selectedScope === 'global' ? (
+                  <>
+                    <Globe size={14} />
+                    <span>Global</span>
+                    {availableProjects.length > 0 && <ChevronDown size={12} />}
+                  </>
+                ) : (
+                  <>
+                    <Folder size={14} />
+                    <span>{selectedProject?.name || 'Project'}</span>
+                  </>
+                )}
+              </button>
+
+              {/* Project Dropdown */}
+              {showProjectDropdown && availableProjects.length > 0 && (
+                <div className="outliner-scope-dropdown">
+                  <button
+                    type="button"
+                    className="scope-dropdown-item global"
+                    onClick={() => handleProjectSelect(null)}
+                  >
+                    <Globe size={14} />
+                    <span>Global</span>
+                    <span className="scope-hint">Visible everywhere</span>
+                  </button>
+                  <div className="scope-dropdown-divider" />
+                  {availableProjects.map((project) => (
+                    <button
+                      type="button"
+                      key={project.id}
+                      className={`scope-dropdown-item project ${selectedProject?.id === project.id ? 'selected' : ''}`}
+                      onClick={() => handleProjectSelect(project)}
+                    >
+                      <Folder size={14} />
+                      <span>{project.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Export to Markdown */}
             <button
               type="button"
-              className="outliner-refresh-btn"
-              onClick={refresh}
-              disabled={isLoading}
-              title="Refresh"
+              className="outliner-action-btn"
+              onClick={handleSyncMarkdown}
+              title="Export to Markdown (Obsidian)"
             >
-              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+              <FolderSync size={14} />
             </button>
+
+            {/* Migration Toggle */}
+            {migrationStatus && (migrationStatus.mcpMemoryCount > 0 || migrationStatus.quackMemoryCount > 0) && (
+              <button
+                type="button"
+                className={`outliner-action-btn ${showMigrationPanel ? 'active' : ''}`}
+                onClick={() => setShowMigrationPanel(!showMigrationPanel)}
+                title="Import data from legacy storage"
+              >
+                <Database size={14} />
+              </button>
+            )}
+
+            {/* Sync Status & Refresh Button */}
+            <div className="outliner-sync-group">
+              {lastSyncTime && (
+                <span className="outliner-sync-time" title={new Date(lastSyncTime).toLocaleString()}>
+                  {formatRelativeTime(lastSyncTime)}
+                </span>
+              )}
+              <button
+                type="button"
+                className={`outliner-refresh-btn ${syncStatus === 'success' ? 'success' : ''} ${syncStatus === 'error' ? 'error' : ''}`}
+                onClick={refresh}
+                disabled={isLoading || syncStatus === 'syncing'}
+                title={syncStatus === 'syncing' ? 'Syncing...' : 'Sync memory'}
+              >
+                {syncStatus === 'success' ? (
+                  <Check size={14} />
+                ) : syncStatus === 'error' ? (
+                  <AlertCircle size={14} />
+                ) : (
+                  <RefreshCw size={14} className={isLoading || syncStatus === 'syncing' ? 'animate-spin' : ''} />
+                )}
+              </button>
+            </div>
 
             {/* Sidebar Toggle */}
             <button
@@ -209,6 +516,66 @@ export function OutlinerEditor({ initialNodeId, projectPath }: OutlinerEditorPro
             </button>
           </div>
         </div>
+
+        {/* Migration Panel */}
+        {showMigrationPanel && migrationStatus && (
+          <div className="outliner-migration-panel">
+            <div className="migration-header">
+              <Database size={16} />
+              <span>Import Legacy Data</span>
+              <button
+                type="button"
+                className="migration-close"
+                onClick={() => setShowMigrationPanel(false)}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="migration-content">
+              <p className="migration-description">
+                Import your existing memories into the new SQLite-based storage.
+                This is a one-time migration - duplicates will be skipped.
+              </p>
+              <div className="migration-sources">
+                {migrationStatus.mcpMemoryAvailable && migrationStatus.mcpMemoryCount > 0 && (
+                  <div className="migration-source">
+                    <div className="source-info">
+                      <span className="source-name">MCP Memory</span>
+                      <span className="source-count">{migrationStatus.mcpMemoryCount} entities</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="migration-import-btn"
+                      onClick={handleImportMCP}
+                      disabled={isMigrating}
+                    >
+                      {isMigrating ? <RefreshCw size={12} className="animate-spin" /> : 'Import'}
+                    </button>
+                  </div>
+                )}
+                {migrationStatus.quackMemoryCount > 0 && (
+                  <div className="migration-source">
+                    <div className="source-info">
+                      <span className="source-name">Quack Memory</span>
+                      <span className="source-count">{migrationStatus.quackMemoryCount} memories</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="migration-import-btn"
+                      onClick={handleImportQuack}
+                      disabled={isMigrating}
+                    >
+                      {isMigrating ? <RefreshCw size={12} className="animate-spin" /> : 'Import'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="migration-status">
+                <span>Current Brain: {migrationStatus.brainEntityCount} entities</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="outliner-content">

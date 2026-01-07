@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useRef } from 'react';
-import type { ChatMessage as ChatMessageType } from '../types';
+import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
 import ThinkingBlock from './ThinkingBlock';
@@ -49,9 +49,13 @@ interface ChatMessageProps {
   gitBranch?: string;
   isLastUserMessage?: boolean;
   workingDirectory?: string;
+  // AskUserQuestion support
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  pendingQuestionIds?: Set<string>;
+  answeredQuestions?: Map<string, AskUserQuestionAnswers>;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -522,6 +526,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                     agentName={agentName}
                     agentAvatar={agentAvatar}
                     workingDirectory={workingDirectory}
+                    onUserQuestionAnswer={onUserQuestionAnswer}
+                    pendingQuestionIds={pendingQuestionIds}
+                    answeredQuestions={answeredQuestions}
                   />
                 );
               });

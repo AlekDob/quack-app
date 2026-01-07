@@ -1,0 +1,529 @@
+/**
+ * Project Dashboard Styles
+ *
+ * Dark theme with glassmorphism effects following Quack brand guidelines
+ * Orange accent: #f28c52
+ */
+
+/* Main Container */
+.project-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  padding: 24px;
+  background: transparent;
+  overflow-y: auto;
+  gap: 24px;
+}
+
+/* Header */
+.project-dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, rgba(242, 140, 82, 0.08) 0%, rgba(242, 140, 82, 0.02) 100%);
+  border-radius: 10px;
+  border: 1px solid rgba(128, 132, 150, 0.2);
+}
+
+.project-dashboard-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(242, 140, 82, 0.15);
+  border-radius: 10px;
+  color: #f28c52;
+  flex-shrink: 0;
+}
+
+.project-dashboard-header-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-dashboard-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #e7ebf3;
+  line-height: 1.2;
+}
+
+.project-dashboard-path {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.project-dashboard-branch-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(242, 140, 82, 0.15);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 8px;
+  color: #f28c52;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  flex-shrink: 0;
+}
+
+/* Grid Layout */
+.project-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Cards */
+.project-dashboard-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(128, 132, 150, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.project-dashboard-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(128, 132, 150, 0.3);
+}
+
+.project-dashboard-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(128, 132, 150, 0.2);
+}
+
+.project-dashboard-card-header svg {
+  color: #f28c52;
+  flex-shrink: 0;
+}
+
+.project-dashboard-card-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e7ebf3;
+}
+
+.project-dashboard-card-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Git Stats */
+.project-dashboard-git-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.project-dashboard-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.project-dashboard-stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.project-dashboard-stat-value {
+  font-size: 13px;
+  color: #e7ebf3;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-weight: 500;
+}
+
+.project-dashboard-stat-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.project-dashboard-stat-badge.clean {
+  background: rgba(77, 212, 179, 0.15);
+  color: #4dd4b3;
+}
+
+.project-dashboard-stat-badge.dirty {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.project-dashboard-stat-badge.ready {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+/* Staged/Unstaged values */
+.project-dashboard-stat-value--staged {
+  color: #22c55e;
+}
+
+.project-dashboard-stat-value--unstaged {
+  color: #f59e0b;
+}
+
+/* Highlight stat row (e.g., Ready to Commit) */
+.project-dashboard-stat--highlight {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+/* Commits */
+.project-dashboard-commits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-dashboard-commits-title {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.project-dashboard-commits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-dashboard-commit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.project-dashboard-commit:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.project-dashboard-commit-hash {
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #f28c52;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.project-dashboard-commit-message {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Task Counts */
+.project-dashboard-task-counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.project-dashboard-task-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  gap: 6px;
+}
+
+.project-dashboard-task-count-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #e7ebf3;
+  line-height: 1;
+}
+
+.project-dashboard-task-count-value--progress {
+  color: #f59e0b;
+}
+
+.project-dashboard-task-count-value--done {
+  color: #4dd4b3;
+}
+
+.project-dashboard-task-count-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Progress Bar */
+.project-dashboard-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-dashboard-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-dashboard-progress-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.project-dashboard-progress-percentage {
+  font-size: 13px;
+  color: #4dd4b3;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.project-dashboard-progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.project-dashboard-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4dd4b3 0%, #22c55e 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Worktrees */
+.project-dashboard-worktrees {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-dashboard-worktree {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-dashboard-worktree-branch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #e7ebf3;
+  font-weight: 500;
+}
+
+.project-dashboard-worktree-branch svg {
+  color: #f28c52;
+  flex-shrink: 0;
+}
+
+.project-dashboard-worktree-current {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: rgba(77, 212, 179, 0.15);
+  color: #4dd4b3;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.project-dashboard-worktree-path {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  padding-left: 20px;
+}
+
+/* Quick Actions */
+.project-dashboard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-dashboard-action-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(242, 140, 82, 0.1);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  border-radius: 8px;
+  color: #f28c52;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project-dashboard-action-button:hover {
+  background: rgba(242, 140, 82, 0.15);
+  border-color: rgba(242, 140, 82, 0.5);
+  transform: translateY(-1px);
+}
+
+.project-dashboard-action-button:active {
+  transform: translateY(0);
+}
+
+.project-dashboard-action-button svg {
+  flex-shrink: 0;
+  color: inherit;
+  stroke: currentColor;
+}
+
+/* Empty State */
+.project-dashboard-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.project-dashboard-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Loading State */
+.project-dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  gap: 20px;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(15, 17, 21, 0.5);
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+.project-dashboard-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(128, 132, 150, 0.2);
+  border-top-color: #f28c52;
+  border-radius: 50%;
+  animation: project-dashboard-spin 0.8s linear infinite;
+}
+
+@keyframes project-dashboard-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.project-dashboard-loading p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* Error State */
+.project-dashboard-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.project-dashboard-error svg {
+  color: #ef4444;
+}
+
+.project-dashboard-error h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e7ebf3;
+}
+
+.project-dashboard-error p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 400px;
+}
+
+/* Scrollbar Styling */
+.project-dashboard::-webkit-scrollbar,
+.project-dashboard-card-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.project-dashboard::-webkit-scrollbar-track,
+.project-dashboard-card-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-dashboard::-webkit-scrollbar-thumb,
+.project-dashboard-card-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.project-dashboard::-webkit-scrollbar-thumb:hover,
+.project-dashboard-card-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .project-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -45,11 +45,12 @@ interface RepositoryGroupProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onCreateAgent?: () => void; // Create new agent associated with this project
+  onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   // Kanban mode props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
-  // Kanban tasks to show under agents
-  inProgressTasks?: KanbanTask[];
+  // Kanban tasks to show under agents (TODO + in_progress)
+  agentTasks?: KanbanTask[];
   onOpenTaskTab?: (task: KanbanTask) => void;
   activeTaskId?: string | null;
   // Chat loading state for task status indicators
@@ -945,8 +946,11 @@ function SortableAgent({
             const hasUserMessage = messages.some(msg => msg.role === 'user');
             const isDormant = !hasUserMessage;
 
-            // Cold = agent task with no messages at all (never started)
-            const isCold = isAgentTask && !hasMessages;
+            // TODO = task hasn't been started yet (in Kanban TODO column)
+            const isTodo = task.status === 'todo';
+
+            // Cold = agent task with no messages at all (never started, but in_progress)
+            const isCold = isAgentTask && !hasMessages && !isTodo;
 
             // Ready = agent task, in progress, has messages, not loading, not dormant
             const isReady = isAgentTask &&
@@ -955,8 +959,12 @@ function SortableAgent({
               !isLoading &&
               !isDormant;
 
-            // Status indicator colors: blue if cold, green if ready, orange if working
-            const statusColor = isCold ? '#3b82f6' : isReady ? '#22c55e' : '#f59e0b';
+            // Status indicator colors:
+            // - Gray (#6b7280) for TODO tasks (not yet started)
+            // - Blue (#3b82f6) for cold tasks (in_progress but no messages)
+            // - Green (#22c55e) for ready tasks (completed response)
+            // - Orange (#f59e0b) for working tasks (loading/in progress)
+            const statusColor = isTodo ? '#6b7280' : isCold ? '#3b82f6' : isReady ? '#22c55e' : '#f59e0b';
 
             return (
             <div
@@ -1087,9 +1095,10 @@ export default function RepositoryGroup({
   onOpenTerminalWindow,
   gitRefreshTrigger,
   onCreateAgent,
+  onOpenDashboard,
   isKanbanViewActive = false,
   onToggleKanbanView,
-  inProgressTasks = [],
+  agentTasks = [],
   onOpenTaskTab,
   activeTaskId = null,
   chatLoadingMap,
@@ -1490,9 +1499,7 @@ export default function RepositoryGroup({
       {/* Repository Header - Minimal and clean */}
       <div
         className="repository-header"
-        onClick={onToggle}
         style={{
-          cursor: 'pointer',
           padding: '10px 12px',
           marginBottom: '8px',
           background: 'rgba(255, 255, 255, 0.02)',
@@ -1508,15 +1515,49 @@ export default function RepositoryGroup({
       >
         <div className="flex w-full items-center justify-between">
           <div className="flex items-center gap-2">
-            <svg
-              className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            {/* Chevron - click to toggle collapse */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '2px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+              }}
+              title={isCollapsed ? 'Expand' : 'Collapse'}
+              className="hover:bg-white/10"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="font-semibold text-sm text-white/90">
+              <svg
+                className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            {/* Project name - click to open dashboard */}
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenDashboard) {
+                  onOpenDashboard(repoPath, repoName);
+                } else {
+                  onToggle();
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+              className="font-semibold text-sm text-white/90 hover:text-orange-400 transition-colors"
+              title="Open Project Dashboard"
+            >
               {displayName}
             </span>
           </div>
@@ -1731,7 +1772,7 @@ export default function RepositoryGroup({
                         isDraggingAny={isDraggingAny}
                         isKanbanViewActive={isKanbanViewActive}
                         onToggleKanbanView={onToggleKanbanView}
-                        agentTasks={inProgressTasks.filter(t => t.assignedAgent?.id === agent.id)}
+                        agentTasks={agentTasks.filter(t => t.assignedAgent?.id === agent.id)}
                         onOpenTaskTab={onOpenTaskTab}
                         activeTaskId={activeTaskId}
                         chatLoadingMap={chatLoadingMap}

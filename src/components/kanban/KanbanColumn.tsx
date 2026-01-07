@@ -67,6 +67,7 @@ interface KanbanColumnProps {
   onTaskDelete: (taskId: string) => void | Promise<void>;
   onTaskEdit?: (task: KanbanTask) => void;
   onTaskKill?: (taskId: string) => void; // Kill shell/watch process
+  onTaskStart?: (task: KanbanTask) => void; // Start TODO task: move to in_progress, open chat, send prompt
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
@@ -95,6 +96,7 @@ export default function KanbanColumn({
   onTaskDelete,
   onTaskEdit,
   onTaskKill,
+  onTaskStart,
   onProjectClick,
   chatLoadingMap,
   chatSessions,
@@ -414,6 +416,7 @@ export default function KanbanColumn({
                   onDelete={() => onTaskDelete(task.id)}
                   onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
                   onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
+                  onStart={onTaskStart ? () => onTaskStart(task) : undefined}
                   onProjectClick={onProjectClick}
                 />
               );

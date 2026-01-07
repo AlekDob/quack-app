@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
-import type { ChatMessage as ChatMessageType } from '../types';
+import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import './MessageList.css';
 
 interface MessageListProps {
@@ -15,9 +15,13 @@ interface MessageListProps {
   projectName?: string;
   gitBranch?: string;
   workingDirectory?: string;
+  // AskUserQuestion support
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  pendingQuestionIds?: Set<string>;
+  answeredQuestions?: Map<string, AskUserQuestionAnswers>;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -199,6 +203,9 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
             gitBranch={gitBranch}
             isLastUserMessage={index === lastUserMessageIndex}
             workingDirectory={workingDirectory}
+            onUserQuestionAnswer={onUserQuestionAnswer}
+            pendingQuestionIds={pendingQuestionIds}
+            answeredQuestions={answeredQuestions}
           />
         ))}
         {loading && <SkeletonMessage />}

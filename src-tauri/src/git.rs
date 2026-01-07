@@ -65,6 +65,11 @@ pub fn git_unstage(path: String, root_path: Option<String>) -> Result<(), String
 }
 
 #[tauri::command]
+pub fn git_stage_all(root_path: Option<String>) -> Result<(), String> {
+    git_stage_all_impl(root_path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn git_commit(message: String, root_path: Option<String>) -> Result<(), String> {
     git_commit_impl(message, root_path).map_err(|err| err.to_string())
 }
@@ -235,6 +240,13 @@ fn git_unstage_impl(path: String, root_path: Option<String>) -> Result<()> {
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;
     run_git(&root, &["reset", "HEAD", "--", &path], false)?;
+    Ok(())
+}
+
+fn git_stage_all_impl(root_path: Option<String>) -> Result<()> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+    run_git(&root, &["add", "-A"], false)?;
     Ok(())
 }
 
@@ -853,6 +865,43 @@ fn git_delete_branch_impl(
     let flag = if force.unwrap_or(false) { "-D" } else { "-d" };
     run_git(&root, &["branch", flag, &branch_name], false)?;
 
+    Ok(())
+}
+
+// ==================== GIT STASH ====================
+
+#[tauri::command]
+pub fn git_stash_push(
+    message: Option<String>,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_stash_push_impl(message, root_path).map_err(|err| err.to_string())
+}
+
+fn git_stash_push_impl(message: Option<String>, root_path: Option<String>) -> Result<()> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    let mut args = vec!["stash", "push"];
+    if let Some(msg) = &message {
+        args.push("-m");
+        args.push(msg.as_str());
+    }
+
+    run_git(&root, &args, false)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn git_stash_pop(root_path: Option<String>) -> Result<(), String> {
+    git_stash_pop_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_stash_pop_impl(root_path: Option<String>) -> Result<()> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    run_git(&root, &["stash", "pop"], false)?;
     Ok(())
 }
 

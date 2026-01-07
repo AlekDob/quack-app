@@ -140,7 +140,7 @@
   background: rgba(242, 140, 82, 0.15);
   border-radius: 4px;
   font-size: 10px;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   color: #f28c52;
   flex-shrink: 0;
 }
@@ -165,7 +165,7 @@
   background: rgba(77, 212, 179, 0.15);
   border-radius: 4px;
   font-size: 10px;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   color: #4dd4b3;
 }
 
@@ -217,7 +217,7 @@
 }
 
 .file-path {
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   color: rgba(255, 255, 255, 0.45);
 }
 
@@ -329,7 +329,7 @@
 
 .chat-input-agent-name {
   color: rgba(255, 255, 255, 0.9);
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
 }
 
 .chat-input-agent-remove {
@@ -415,7 +415,7 @@
 
 .chat-input-mention-name {
   color: rgba(255, 255, 255, 0.95);
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
   line-height: 1;
 }
 
@@ -445,7 +445,11 @@
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(242, 140, 82, 0.4);
   box-shadow: 0 0 0 2px rgba(242, 140, 82, 0.08);
-  max-height: 120px;
+}
+
+.chat-input-field.expanded {
+  height: 200px;
+  max-height: 600px;
 }
 
 .chat-input-field:disabled {
@@ -558,20 +562,27 @@
   border-radius: 6px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.1s ease, transform 0.1s ease;
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease;
   z-index: 10000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .chat-input-action-btn[data-tooltip]::after,
 .chat-input-send[data-tooltip]::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: calc(100% + 2px); /* Changed from top to bottom */
   left: 50%;
   transform: translateX(-50%);
   border: 4px solid transparent;
-  border-top-color: rgba(0, 0, 0, 0.95); /* Changed from border-bottom to border-top */
+  border-top-color: rgba(
+    0,
+    0,
+    0,
+    0.95
+  ); /* Changed from border-bottom to border-top */
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.1s ease;
@@ -614,7 +625,8 @@
 }
 
 @keyframes pulse-indicator {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
@@ -629,10 +641,14 @@
   bottom: calc(100% + 12px);
   right: 0;
   width: 320px;
-  background: linear-gradient(145deg, rgba(20, 25, 45, 0.98), rgba(15, 20, 38, 0.98));
+  background: linear-gradient(
+    145deg,
+    rgba(20, 25, 45, 0.98),
+    rgba(15, 20, 38, 0.98)
+  );
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 12px;
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.5),
     0 0 20px rgba(139, 92, 246, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -654,7 +670,7 @@
 }
 
 .working-on-popover::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 100%;
   right: 12px;
@@ -663,7 +679,7 @@
 }
 
 .working-on-popover::after {
-  content: '';
+  content: "";
   position: absolute;
   top: calc(100% - 1px);
   right: 13px;
@@ -694,7 +710,7 @@
   font-family: inherit;
   outline: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 
+  box-shadow:
     0 0 12px rgba(139, 92, 246, 0.12),
     inset 0 1px 2px rgba(139, 92, 246, 0.08);
 }
@@ -706,7 +722,7 @@
 .working-on-popover-input:focus {
   border-color: rgba(139, 92, 246, 0.7);
   background: rgba(14, 20, 38, 0.95);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(139, 92, 246, 0.25),
     0 0 0 2px rgba(139, 92, 246, 0.15),
     inset 0 1px 2px rgba(139, 92, 246, 0.12);
@@ -748,7 +764,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

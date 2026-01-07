@@ -16,21 +16,22 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  createMCPEntity,
-  createProjectScopedEntity,
-  ensureProjectEntity,
-  deleteMCPEntity,
-  createMCPRelation,
-  deleteMCPRelation,
-  addMCPObservations,
-  updateMCPObservations,
-  updateMCPEntityType,
+  createBrainEntity,
+  createBrainProjectScopedEntity,
+  ensureBrainProjectEntity,
+  deleteBrainEntity,
+  createBrainRelation,
+  deleteBrainRelation,
+  addBrainObservations,
+  updateBrainObservations,
+  updateBrainEntityType,
   generateEntityName,
   categoryToEntityType,
   categoryToRelationType,
-  mcpMemoryService,
-  type MemoryScope,
-} from '../../services/mcpMemoryService';
+  getKnowledgeGraph,
+  refreshKnowledgeGraph,
+} from '../../services/brainService';
+import type { MemoryScope } from '../../services/mcpMemoryService';
 import type { ProjectInfo } from '../../hooks/useCurrentProject';
 import { parseMentions, parseSupertag } from '../../services/outlineTreeBuilder';
 import type { OutlineNode as OutlineNodeType } from '../../services/outlineTreeBuilder';
@@ -105,7 +106,7 @@ function getAutocompleteItems(trigger: '@' | '#', query: string): AutocompleteIt
     return filtered;
   }
 
-  const graph = mcpMemoryService.getKnowledgeGraph();
+  const graph = getKnowledgeGraph();
   if (!graph) return [];
 
   return graph.entities
@@ -113,7 +114,7 @@ function getAutocompleteItems(trigger: '@' | '#', query: string): AutocompleteIt
     .slice(0, 8)
     .map(e => ({
       value: e.name,
-      label: e.observations[0] || e.name,
+      label: e.observations[0]?.content || e.name,
       color: getEntityColor(e.entityType),
       entityType: e.entityType,
     }));
@@ -975,13 +976,13 @@ export function InlineOutliner({
         if (zoomedNode && !supertag && !isZoomedOnProject) {
           // Plain text on non-project → add as observation to zoomed entity
           if (cleanedContent) {
-            await addMCPObservations(zoomedNode.id, [cleanedContent]);
+            await addBrainObservations(zoomedNode.id, [cleanedContent]);
             toast.success('Observation added');
           }
 
           // @mentions → create relations from zoomed entity
           for (const mention of mentions) {
-            await createMCPRelation({
+            await createBrainRelation({
               from: zoomedNode.id,
               to: mention,
               relationType: 'relates_to',
@@ -1009,9 +1010,9 @@ export function InlineOutliner({
           // SPECIAL CASE: Zoomed on a project → auto-relate to that project
           if (isZoomedOnProject && zoomedNode) {
             // Create entity first (global)
-            await createMCPEntity(entityData);
+            await createBrainEntity(entityData);
             // Then add belongs_to_project relation to the zoomed project
-            await createMCPRelation({
+            await createBrainRelation({
               from: entityName,
               to: zoomedNode.id,
               relationType: 'belongs_to_project',
@@ -1025,19 +1026,19 @@ export function InlineOutliner({
             const projectToUse = selectedProjectName || currentProject?.name;
             if (selectedScope === 'project' && projectToUse) {
               // Ensure project entity exists first (use currentProject.root_path if available)
-              await ensureProjectEntity(projectToUse, currentProject?.root_path || '');
+              await ensureBrainProjectEntity(projectToUse, currentProject?.root_path || '');
               // Create entity with project relation
-              await createProjectScopedEntity(entityData, projectToUse);
+              await createBrainProjectScopedEntity(entityData, projectToUse);
               console.log('[InlineOutliner] Created project-scoped entity:', entityName, '->', projectToUse);
             } else {
               // Create global entity (no project relation)
-              await createMCPEntity(entityData);
+              await createBrainEntity(entityData);
               console.log('[InlineOutliner] Created global entity:', entityName);
             }
 
             // If we're zoomed on non-project, also create "contains" relation
             if (zoomedNode) {
-              await createMCPRelation({
+              await createBrainRelation({
                 from: zoomedNode.id,
                 to: entityName,
                 relationType: 'contains',
@@ -1047,7 +1048,7 @@ export function InlineOutliner({
 
           // Create relations for @mentions
           for (const mention of mentions) {
-            await createMCPRelation({
+            await createBrainRelation({
               from: entityName,
               to: mention,
               relationType: categoryToRelationType(entityType),
@@ -1077,7 +1078,7 @@ export function InlineOutliner({
 
   const handleDelete = useCallback(async (nodeId: string) => {
     try {
-      await deleteMCPEntity(nodeId);
+      await deleteBrainEntity(nodeId);
       await onRefresh();
 
       // Focus previous node
@@ -1118,10 +1119,10 @@ export function InlineOutliner({
         console.log('[InlineOutliner] Tag detected:', newTag, '-> entityType:', newEntityType, 'current:', node.entityType);
 
         // Always try to update if tag is present (handles custom tags too)
-        const typeSuccess = await updateMCPEntityType(nodeId, newEntityType);
+        const typeSuccess = await updateBrainEntityType(nodeId, newEntityType);
         if (typeSuccess) {
           // Also update observations with cleaned content
-          await updateMCPObservations(nodeId, newObservations);
+          await updateBrainObservations(nodeId, newObservations);
           toast.success(`Updated to #${newTag}`);
           await onRefresh(); // Refresh to see the new type
           return;
@@ -1129,7 +1130,7 @@ export function InlineOutliner({
       }
 
       // No tag - just update observations
-      const obsSuccess = await updateMCPObservations(nodeId, newObservations);
+      const obsSuccess = await updateBrainObservations(nodeId, newObservations);
       if (obsSuccess) {
         toast.success('Updated');
         await onRefresh();
@@ -1153,11 +1154,11 @@ export function InlineOutliner({
 
       // Remove existing parent relation if any
       if (node.parentId) {
-        await deleteMCPRelation(node.parentId, nodeId);
+        await deleteBrainRelation(node.parentId, nodeId);
       }
 
       // Create new "contains" relation: newParent contains this node
-      await createMCPRelation({
+      await createBrainRelation({
         from: newParentId,
         to: nodeId,
         relationType: 'contains',
@@ -1183,11 +1184,11 @@ export function InlineOutliner({
       const parentNode = allNodes.find(n => n.id === currentParentId);
 
       // Remove current parent relation
-      await deleteMCPRelation(currentParentId, nodeId);
+      await deleteBrainRelation(currentParentId, nodeId);
 
       // If parent has a parent (grandparent), create relation to grandparent
       if (parentNode?.parentId) {
-        await createMCPRelation({
+        await createBrainRelation({
           from: parentNode.parentId,
           to: nodeId,
           relationType: 'contains',
@@ -1245,13 +1246,13 @@ export function InlineOutliner({
 
       // Remove existing parent relation
       if (draggedNode.parentId) {
-        await deleteMCPRelation(draggedNode.parentId, draggedNodeId);
+        await deleteBrainRelation(draggedNode.parentId, draggedNodeId);
       }
 
       // If target has a parent, add dragged node to same parent
       // This keeps it as a sibling to the target
       if (targetNode.parentId) {
-        await createMCPRelation({
+        await createBrainRelation({
           from: targetNode.parentId,
           to: draggedNodeId,
           relationType: 'contains',
@@ -1372,7 +1373,7 @@ export function InlineOutliner({
                     const input = e.target as HTMLInputElement;
                     const value = input.value.trim();
                     if (value) {
-                      await addMCPObservations(zoomedNode.id, [value]);
+                      await addBrainObservations(zoomedNode.id, [value]);
                       input.value = '';
                       await onRefresh();
                       toast.success('Detail added');

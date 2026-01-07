@@ -9,6 +9,7 @@ use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Manage
 mod agency;
 mod agency_setup;
 mod ai;
+mod brain; // 🧠 Quack Brain - Local-first knowledge graph
 mod browser;
 mod claude_auth;
 mod claude_cli;
@@ -44,6 +45,7 @@ mod terminal;
 mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
+mod semantic_search; // 🔍 Semantic code search file watcher
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -157,6 +159,8 @@ pub fn run() {
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(background_tasks::KanbanShellManager::new()) // Register Kanban shell manager
+        .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
+        .manage(brain::VaultWatcherManager::new()) // Register Brain vault watcher for Obsidian sync
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -213,6 +217,12 @@ pub fn run() {
             if let Err(e) = slash_commands::install_bundled_commands() {
                 log::warn!("⚠️ Failed to install bundled commands: {}", e);
             }
+
+            // 🧠 Initialize Quack Brain database
+            if let Err(e) = brain::init_database() {
+                log::warn!("⚠️ Failed to initialize Quack Brain database: {}", e);
+            }
+
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {
@@ -521,6 +531,7 @@ pub fn run() {
             git::git_diff,
             git::git_stage,
             git::git_unstage,
+            git::git_stage_all,
             git::git_commit,
             git::git_commit_history,
             git::git_repository_root,
@@ -530,6 +541,8 @@ pub fn run() {
             git::git_switch_branch,
             git::git_merge_branch,
             git::git_delete_branch,
+            git::git_stash_push,
+            git::git_stash_pop,
             git::git_abort_merge,
             git::git_resolve_conflict,
             git::git_get_conflicts,
@@ -680,7 +693,63 @@ pub fn run() {
             claude_assets::copy_claude_asset,
             claude_assets::delete_claude_asset,
             claude_assets::move_claude_asset,
-            claude_assets::read_claude_asset
+            claude_assets::read_claude_asset,
+            // 🔍 Semantic Search commands
+            semantic_search::start_semantic_watcher,
+            semantic_search::stop_semantic_watcher,
+            semantic_search::is_semantic_watcher_active,
+            semantic_search::get_watched_semantic_projects,
+            semantic_search::stop_all_semantic_watchers,
+            semantic_search::semantic_search_index_project,
+            semantic_search::semantic_search_code,
+            semantic_search::semantic_search_get_status,
+            semantic_search::semantic_search_generate_embeddings,
+            // 🧠 Quack Brain commands
+            brain::brain_init,
+            brain::brain_create_entity,
+            brain::brain_update_entity,
+            brain::brain_delete_entity,
+            brain::brain_get_entity,
+            brain::brain_list_entities,
+            brain::brain_search,
+            brain::brain_add_observation,
+            brain::brain_delete_observation,
+            brain::brain_create_relation,
+            brain::brain_delete_relation,
+            brain::brain_get_graph,
+            brain::brain_register_project,
+            brain::brain_list_projects,
+            brain::brain_import_mcp_memory,
+            brain::brain_import_quack_memory,
+            brain::brain_get_migration_status,
+            // 🧠 Quack Brain - Markdown Sync
+            brain::brain_sync_entity_to_md,
+            brain::brain_sync_all_to_md,
+            brain::brain_get_markdown_path,
+            brain::brain_open_markdown_folder,
+            // 🧠 Quack Brain - Semantic Search
+            brain::brain_store_embedding,
+            brain::brain_get_embedding,
+            brain::brain_get_entities_without_embeddings,
+            brain::brain_semantic_search,
+            brain::brain_hybrid_search,
+            // 🧠 Quack Brain - Settings & Obsidian Sync
+            brain::brain_get_settings,
+            brain::brain_set_setting,
+            brain::brain_get_setting,
+            brain::brain_update_settings,
+            brain::brain_get_sync_status,
+            brain::brain_update_sync_metadata,
+            brain::brain_get_entities_needing_sync,
+            // 🧠 Quack Brain - Vault Watcher (Obsidian)
+            brain::brain_start_vault_watcher,
+            brain::brain_stop_vault_watcher,
+            brain::brain_is_vault_watching,
+            brain::brain_get_vault_path,
+            brain::brain_parse_markdown_file,
+            brain::brain_import_markdown_file,
+            brain::brain_scan_vault,
+            brain::brain_import_vault
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

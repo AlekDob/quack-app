@@ -6,6 +6,7 @@ import GeneralSettings from './categories/GeneralSettings';
 import ClaudeCodeSettings from './categories/ClaudeCodeSettings';
 import AIAssistantSettings from './categories/AIAssistantSettings';
 import AgentModesSettings from './categories/AgentModesSettings';
+import SecondBrainSettings from './categories/SecondBrainSettings';
 import IDESettings from './categories/IDESettings';
 import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
@@ -49,6 +50,8 @@ export default function UnifiedSettings({
         return <AIAssistantSettings />;
       case 'agent-modes':
         return <AgentModesSettings />;
+      case 'second-brain':
+        return <SecondBrainSettings />;
       case 'ide':
         return <IDESettings />;
       case 'license':

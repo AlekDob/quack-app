@@ -61,7 +61,8 @@ interface AddKanbanTaskModalProps {
     projectName: string,
     branch: string | undefined,
     agent: KanbanAssignedAgent | undefined,
-    attachments: ChatAttachment[]
+    attachments: ChatAttachment[],
+    useWorktree?: boolean
   ) => void;
   terminals: TerminalInfo[];
   // Callback to create a new agent with a specific project path
@@ -121,12 +122,16 @@ export default function AddKanbanTaskModal({
   const [selectedProjectPath, setSelectedProjectPath] = useState<string>('');
   const [selectedBranch, setSelectedBranch] = useState<string>('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [useWorktree, setUseWorktree] = useState(false);
 
   // Attachments state
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 🦆 Prevent double-click submission
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Avatar URL cache for custom avatars
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
@@ -270,6 +275,8 @@ export default function AddKanbanTaskModal({
     // Mark as initialized
     isInitializedRef.current = true;
     setAttachmentError(null);
+    // 🦆 Reset submitting state when modal opens
+    setIsSubmitting(false);
 
     if (editTask) {
       // Edit mode: populate with existing task data
@@ -278,6 +285,7 @@ export default function AddKanbanTaskModal({
       setSelectedProjectPath(editTask.projectPath);
       setSelectedBranch(editTask.branch || '');
       setSelectedAgentId(editTask.assignedAgent?.id || '');
+      setUseWorktree(editTask.useWorktree || false);
       // Load existing attachments
       setAttachments(editTask.attachments || []);
       // Reset droids/skills selection for edit mode
@@ -291,6 +299,7 @@ export default function AddKanbanTaskModal({
       setSelectedProjectPath(initialValues.projectPath || '');
       setSelectedBranch(initialValues.branch || '');
       setSelectedAgentId(initialValues.agentId || '');
+      setUseWorktree(false);
       setAttachments([]);
       setSelectedDroids([]);
       setSelectedSkills([]);
@@ -301,6 +310,7 @@ export default function AddKanbanTaskModal({
       setSelectedProjectPath(draft.projectPath);
       setSelectedBranch(draft.branch);
       setSelectedAgentId(draft.agentId);
+      setUseWorktree(false);
       setAttachments(draft.attachments);
       setSelectedDroids([]);
       setSelectedSkills([]);
@@ -311,6 +321,7 @@ export default function AddKanbanTaskModal({
       setSelectedProjectPath('');
       setSelectedBranch('');
       setSelectedAgentId('');
+      setUseWorktree(false);
       setAttachments([]);
       setSelectedDroids([]);
       setSelectedSkills([]);
@@ -611,10 +622,16 @@ export default function AddKanbanTaskModal({
 
   // Handle form submission
   const handleSubmit = useCallback(() => {
+    // 🦆 Prevent double-click submission
+    if (isSubmitting) return;
+
     const trimmedTitle = title.trim();
     let trimmedPrompt = prompt.trim();
 
     if (!trimmedTitle || !trimmedPrompt || !selectedProjectPath) return;
+
+    // 🦆 Set submitting state immediately to prevent double-clicks
+    setIsSubmitting(true);
 
     // Append selected droids to prompt
     if (selectedDroids.length > 0) {
@@ -666,7 +683,8 @@ export default function AddKanbanTaskModal({
       projectName,
       selectedBranch || undefined,
       assignedAgent,
-      attachments
+      attachments,
+      useWorktree
     );
   }, [
     title,
@@ -682,6 +700,8 @@ export default function AddKanbanTaskModal({
     selectedSkills,
     availableDroids,
     availableSkills,
+    useWorktree,
+    isSubmitting, // 🦆 Add to prevent stale closure
   ]);
 
   // Handle keyboard events
@@ -793,6 +813,38 @@ export default function AddKanbanTaskModal({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Worktree Toggle */}
+          {currentProject && (
+            <div className="kanban-form-field kanban-form-checkbox">
+              <label htmlFor="task-worktree" className="kanban-checkbox-label">
+                <input
+                  type="checkbox"
+                  id="task-worktree"
+                  checked={useWorktree}
+                  onChange={(e) => setUseWorktree(e.target.checked)}
+                />
+                <span className="kanban-checkbox-custom">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </span>
+                <span className="kanban-checkbox-text">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="6" y1="3" x2="6" y2="15" />
+                    <circle cx="18" cy="6" r="3" />
+                    <circle cx="6" cy="18" r="3" />
+                    <path d="M18 9a9 9 0 0 1-9 9" />
+                    <line x1="18" y1="9" x2="18" y2="21" />
+                  </svg>
+                  Use isolated worktree
+                </span>
+              </label>
+              <span className="kanban-form-hint-block">
+                Creates a separate Git worktree for this task. Changes are isolated and merge automatically when done.
+              </span>
             </div>
           )}
 
@@ -1105,15 +1157,20 @@ export default function AddKanbanTaskModal({
 
         {/* Footer */}
         <div className="kanban-modal-footer">
-          <button className="kanban-modal-button secondary" onClick={onClose}>
+          <button className="kanban-modal-button secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </button>
           <button
             className="kanban-modal-button primary"
             onClick={handleSubmit}
-            disabled={!isValid}
+            disabled={!isValid || isSubmitting}
           >
-            {isEditMode ? 'Save Changes' : 'Create Task'}
+            {isSubmitting ? (
+              <>
+                <span className="kanban-button-spinner" />
+                Creating...
+              </>
+            ) : isEditMode ? 'Save Changes' : 'Create Task'}
           </button>
         </div>
       </div>

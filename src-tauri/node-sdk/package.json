@@ -5,10 +5,26 @@
   "description": "Node.js SDK wrapper for Claude Agent SDK used by Rust backend",
   "main": "stream-claude.js",
   "scripts": {
-    "test": "node stream-claude.js"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:chunker": "node lib/code-chunker.test.js",
+    "test:chunker:integration": "node lib/code-chunker-integration.test.js",
+    "test:embeddings": "node lib/embeddings.test.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.62",
-    "@modelcontextprotocol/sdk": "^1.25.1"
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@xenova/transformers": "^2.17.2",
+    "better-sqlite3": "^11.7.0",
+    "glob": "^13.0.0",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-javascript": "^0.21.4",
+    "tree-sitter-typescript": "^0.21.2"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^2.1.8",
+    "vitest": "^2.1.8"
   }
 }

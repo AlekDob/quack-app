@@ -139,31 +139,88 @@ console.error(`[DEBUG] Raw config received:`, JSON.stringify(config, null, 2).su
 console.error(`[DEBUG] allowedTools from config:`, allowedTools);
 
 /**
+ * Load global MCP servers from ~/.quack/mcp/.mcp.json
+ * These are Quack's built-in servers available in ALL projects
+ * Returns: { [serverName]: { command, args, env } } or {}
+ */
+function loadGlobalMCPServers() {
+  const globalMcpPath = join(homedir(), '.quack', 'mcp', '.mcp.json');
+
+  console.error(`[MCP] Looking for global MCP servers at: ${globalMcpPath}`);
+
+  if (!existsSync(globalMcpPath)) {
+    console.error(`[MCP] No global .mcp.json found`);
+    return {};
+  }
+
+  try {
+    const globalConfig = JSON.parse(readFileSync(globalMcpPath, 'utf8'));
+
+    if (!globalConfig.mcpServers || typeof globalConfig.mcpServers !== 'object') {
+      return {};
+    }
+
+    const servers = {};
+
+    for (const [name, config] of Object.entries(globalConfig.mcpServers)) {
+      if (config.type === 'sse' || config.type === 'http') {
+        servers[name] = {
+          type: config.type,
+          url: config.url,
+          headers: config.headers,
+        };
+        console.error(`  - ${name} (${config.type}, global): ${config.url}`);
+      } else {
+        servers[name] = {
+          command: config.command,
+          args: config.args || [],
+          env: config.env,
+        };
+        console.error(`  - ${name} (stdio, global): ${config.command} ${(config.args || []).join(' ')}`);
+      }
+    }
+
+    console.error(`[MCP] Loaded ${Object.keys(servers).length} global MCP servers`);
+    return servers;
+  } catch (error) {
+    console.error(`[MCP] Error reading global .mcp.json: ${error.message}`);
+    return {};
+  }
+}
+
+/**
  * Load MCP servers from .mcp.json file in the working directory
+ * Also loads global servers from ~/.quack/mcp/.mcp.json
+ * Project-local servers override global servers with same name
  * Returns: { [serverName]: { command, args, env } } or undefined
  */
 function loadMCPServersFromFile(workingDir) {
+  // First load global servers (available in all projects)
+  const globalServers = loadGlobalMCPServers();
+
   const mcpJsonPath = join(workingDir || process.cwd(), '.mcp.json');
 
-  console.error(`[MCP] Looking for .mcp.json at: ${mcpJsonPath}`);
+  console.error(`[MCP] Looking for project .mcp.json at: ${mcpJsonPath}`);
 
   if (!existsSync(mcpJsonPath)) {
-    console.error(`[MCP] .mcp.json not found at ${mcpJsonPath}`);
-    return undefined;
+    console.error(`[MCP] Project .mcp.json not found at ${mcpJsonPath}`);
+    // Return global servers if any
+    return Object.keys(globalServers).length > 0 ? globalServers : undefined;
   }
 
   try {
     const mcpConfig = JSON.parse(readFileSync(mcpJsonPath, 'utf8'));
 
     if (!mcpConfig.mcpServers || typeof mcpConfig.mcpServers !== 'object') {
-      console.error(`[MCP] .mcp.json found but no mcpServers configured`);
-      return undefined;
+      console.error(`[MCP] Project .mcp.json found but no mcpServers configured`);
+      return Object.keys(globalServers).length > 0 ? globalServers : undefined;
     }
 
-    const servers = {};
+    // Start with global servers
+    const servers = { ...globalServers };
     const serverNames = Object.keys(mcpConfig.mcpServers);
 
-    console.error(`[MCP] Found ${serverNames.length} MCP servers in .mcp.json:`);
+    console.error(`[MCP] Found ${serverNames.length} MCP servers in project .mcp.json:`);
 
     for (const [name, config] of Object.entries(mcpConfig.mcpServers)) {
       // Handle different transport types
@@ -188,8 +245,8 @@ function loadMCPServersFromFile(workingDir) {
 
     return Object.keys(servers).length > 0 ? servers : undefined;
   } catch (error) {
-    console.error(`[MCP] Error reading .mcp.json: ${error.message}`);
-    return undefined;
+    console.error(`[MCP] Error reading project .mcp.json: ${error.message}`);
+    return Object.keys(globalServers).length > 0 ? globalServers : undefined;
   }
 }
 
@@ -397,10 +454,28 @@ async function main() {
       model: modelId,
       // Enable automatic reading of CLAUDE.md and project settings
       settingSources: ['project', 'user', 'local'],
-      // Enable Skills + all standard tools for full SDK capabilities
-      // Skills require explicit "Skill" in allowedTools to be loaded and invoked
-      // See: https://platform.claude.com/docs/en/agent-sdk/skills
+
+      // =============================================================================
+      // TOOLS CONFIGURATION (SDK v0.1.76)
+      //
+      // Using the claude_code preset for ALL default tools (55+)
+      // AskUserQuestion is handled via canUseTool callback when Claude invokes it.
+      //
+      // From SDK docs:
+      // - `tools`: { type: 'preset', preset: 'claude_code' } for default tools
+      // - `allowedTools`: filters which tools Claude can actually use
+      // - `canUseTool`: permission callback fires when tools need approval
+      // =============================================================================
+
+      // Use preset to get all Claude Code tools
+      tools: {
+        type: 'preset',
+        preset: 'claude_code'
+      },
+
+      // allowedTools filters from the preset - includes AskUserQuestion
       allowedTools: resolvedAllowedTools,
+
       // 🗣️ Inject AskUserQuestion instructions into ALL projects via system prompt append
       systemPrompt: {
         type: 'preset',
@@ -409,20 +484,26 @@ async function main() {
 
 ## Interactive Questions (AskUserQuestion Tool)
 
-When you need user input to make a decision, USE the AskUserQuestion tool instead of asking in plain text.
+You have access to the AskUserQuestion tool. USE IT when you need user input to make a decision instead of asking in plain text.
 
-**Use AskUserQuestion when:**
+**ALWAYS use AskUserQuestion when:**
 - User must choose between 2-4 implementation approaches
 - Selecting technologies, libraries, or patterns
 - Confirming potentially destructive actions
 - Getting preferences for ambiguous requirements
+- The user asks you to help them choose something
 
 **Do NOT use it for:**
-- Open-ended questions needing detailed text
+- Open-ended questions needing detailed text responses
 - Questions with more than 4 options
 - Simple confirmations inferrable from context
 
-Example: If user asks "help me choose a database", use AskUserQuestion with options like PostgreSQL, MongoDB, SQLite rather than listing them in text.
+**Example:** If user asks "help me choose a database", you MUST use AskUserQuestion with options like:
+- PostgreSQL (relational, ACID compliant)
+- MongoDB (document-based, flexible schema)
+- SQLite (lightweight, embedded)
+
+IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.
 `
       },
 
@@ -541,16 +622,18 @@ Example: If user asks "help me choose a database", use AskUserQuestion with opti
       resolvedMcpServers = loadMCPServersFromFile(cwd);
     }
 
-    // Always add Kanban Tools and IDE Tools MCP servers (stdio-based for reliability)
+    // Always add Kanban Tools, IDE Tools, and Semantic Search MCP servers (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
     const kanbanMcpServerPath = join(__dirname, 'kanban-mcp-server.js');
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
+    const semanticSearchMcpServerPath = join(__dirname, 'semantic-search-mcp-server.js');
     console.error(`[MCP] Kanban MCP server path: ${kanbanMcpServerPath}`);
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
+    console.error(`[MCP] Semantic Search MCP server path: ${semanticSearchMcpServerPath}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (kanban, ide)
+    // Merge MCP servers: file-based servers + built-in Quack servers (kanban, ide, semantic-search)
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
       'kanban-tools': {
@@ -561,13 +644,17 @@ Example: If user asks "help me choose a database", use AskUserQuestion with opti
         command: 'node',
         args: [ideMcpServerPath],
       },
+      'semantic-search': {
+        command: 'node',
+        args: [semanticSearchMcpServerPath],
+      },
     };
 
-    const builtInServerCount = 2; // kanban-tools + ide-tools
+    const builtInServerCount = 3; // kanban-tools + ide-tools + semantic-search
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (kanban-tools, ide-tools)`);
+      console.error(`[MCP] Using built-in MCP servers only (kanban-tools, ide-tools, semantic-search)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

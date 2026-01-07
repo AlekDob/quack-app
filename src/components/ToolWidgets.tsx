@@ -25,12 +25,15 @@ function createDiffFromStrings(oldString: string, newString: string, fileName?: 
 export const getToolColor = (toolName: string): string => {
   const name = toolName.toLowerCase();
   if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
-  // MCP Memory tools get vibrant rose color
-  if (name.startsWith('mcp__memory') || name.startsWith('mcp_memory')) return '#E84A7F'; // vibrant rose
+  // Brain tools get vibrant rose color (inherited from old memory style)
+  if (name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F'; // vibrant rose
+  // Semantic Search tools get indigo/violet
+  if (name.startsWith('mcp__semantic-search') || name.startsWith('mcp_semantic-search')) return '#818cf8'; // indigo
   // Kanban tools get cyan/teal color
   if (name.startsWith('mcp__kanban') || name.startsWith('mcp_kanban')) return '#06b6d4'; // cyan
   // IDE tools get purple color
   if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7'; // purple
+  // MCP Memory and other MCP tools get orange (generic MCP)
   if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316'; // orange (other MCP tools)
   if (name === 'task') return '#8b5cf6'; // purple
   if (name === 'bash' || name === 'bashoutput' || name === 'killshell') return '#f59e0b'; // amber
@@ -46,11 +49,12 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
 
   // Determine color based on tool type
   const isWebTool = toolName === 'webfetch' || toolName === 'websearch';
-  const isMcpMemoryTool = toolName.startsWith('mcp__memory') || toolName.startsWith('mcp_memory');
+  const isMcpBrainTool = toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
+  const isMcpSemanticSearchTool = toolName.startsWith('mcp__semantic-search') || toolName.startsWith('mcp_semantic-search');
   const isMcpKanbanTool = toolName.startsWith('mcp__kanban') || toolName.startsWith('mcp_kanban');
   const isMcpIdeTool = toolName.startsWith('mcp__ide') || toolName.startsWith('mcp_ide');
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
-  const iconColor = isWebTool ? '#10b981' : isMcpMemoryTool ? '#E84A7F' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isMcpTool ? '#f97316' : 'currentColor';
+  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpSemanticSearchTool ? '#818cf8' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isMcpTool ? '#f97316' : 'currentColor';
 
   if (toolName === 'read') {
     return (
@@ -174,8 +178,8 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
     );
   }
 
-  // MCP Memory tools - brain icon
-  if (isMcpMemoryTool) {
+  // MCP Brain tools - brain icon (special treatment like old memory)
+  if (isMcpBrainTool) {
     return (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
@@ -187,6 +191,21 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
         <path d="M19.938 10.5a4 4 0 0 1 .585.396"/>
         <path d="M6 18a4 4 0 0 1-1.967-.516"/>
         <path d="M19.967 17.484A4 4 0 0 1 18 18"/>
+      </svg>
+    );
+  }
+
+  // MCP Semantic Search tools - sparkle/search icon
+  if (isMcpSemanticSearchTool) {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="m21 21-4.3-4.3"/>
+        <path d="M11 8a3 3 0 1 0 0 6"/>
+        <path d="M20 4v.01"/>
+        <path d="M20 8v.01"/>
+        <path d="M16 4v.01"/>
+        <path d="M4 20v.01"/>
       </svg>
     );
   }
@@ -308,11 +327,12 @@ export const SystemInitializedWidget: React.FC<{
             {tools.map((tool, i) => {
               const toolNameLower = tool.toLowerCase();
               const isWebTool = toolNameLower === 'webfetch' || toolNameLower === 'websearch';
-              const isMcpMemoryTool = toolNameLower.startsWith('mcp__memory') || toolNameLower.startsWith('mcp_memory');
+              const isMcpBrainTool = toolNameLower.startsWith('mcp__brain') || toolNameLower.startsWith('mcp_brain');
+              const isMcpSemanticSearchTool = toolNameLower.startsWith('mcp__semantic-search') || toolNameLower.startsWith('mcp_semantic-search');
               const isMcpKanbanTool = toolNameLower.startsWith('mcp__kanban') || toolNameLower.startsWith('mcp_kanban');
               const isMcpIdeTool = toolNameLower.startsWith('mcp__ide') || toolNameLower.startsWith('mcp_ide');
               const isMcpTool = toolNameLower.startsWith('mcp__') || toolNameLower.startsWith('mcp_');
-              const textColor = isWebTool ? '#10b981' : isMcpMemoryTool ? '#E84A7F' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isMcpTool ? '#f97316' : undefined;
+              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpSemanticSearchTool ? '#818cf8' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isMcpTool ? '#f97316' : undefined;
 
               return (
                 <span key={i} className="system-init-tool-badge" style={{ color: textColor }}>

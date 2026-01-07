@@ -841,6 +841,27 @@
   margin-top: 4px;
 }
 
+/* ===== Status Value ===== */
+.settings-status-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #9ca3af;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.settings-status-warning {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.settings-status-warning:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
 /* ===== Scrollbar Styling ===== */
 .settings-sidebar::-webkit-scrollbar,
 .settings-content::-webkit-scrollbar {

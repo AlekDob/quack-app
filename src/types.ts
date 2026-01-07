@@ -1410,6 +1410,9 @@ export interface KanbanTask {
   projectPath: string;                // Which project this task belongs to
   projectName: string;                // Display name for the project
   branch?: string;                    // Git branch for the task
+  useWorktree?: boolean;              // Whether to use isolated Git worktree
+  worktreePath?: string;              // Git worktree path for isolated task work
+  targetBranch?: string;              // Branch to merge into when done (default: main)
 
   // Session management (for agent tasks)
   sessionId?: string;                 // Claude SDK session ID for resume

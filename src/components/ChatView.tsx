@@ -11,7 +11,7 @@ import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { useKanbanTaskCounts } from '../hooks/useKanbanTaskCounts';
 import { useAgentRules } from '../hooks/useAgentRules';
-import type { ChatMessage, AgentInfo, ChatAttachment } from '../types';
+import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers } from '../types';
 import type {
   ChatSendOptions,
   ThinkingMode,
@@ -105,6 +105,10 @@ interface ChatViewProps {
   hideKanbanTasksBar?: boolean;
   // Callback to open Kanban view (passed from App.tsx)
   onOpenKanban?: () => void;
+  // AskUserQuestion support
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  pendingQuestionIds?: Set<string>;
+  answeredQuestions?: Map<string, AskUserQuestionAnswers>;
 }
 
 export default function ChatView({
@@ -168,6 +172,10 @@ export default function ChatView({
   hideKanbanTasksBar = false,
   // Callback to open Kanban view
   onOpenKanban,
+  // AskUserQuestion support
+  onUserQuestionAnswer,
+  pendingQuestionIds,
+  answeredQuestions,
 }: ChatViewProps) {
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
@@ -471,6 +479,9 @@ export default function ChatView({
         agentAvatar={agentAvatar}
         projectName={projectName}
         gitBranch={gitBranch}
+        onUserQuestionAnswer={onUserQuestionAnswer}
+        pendingQuestionIds={pendingQuestionIds}
+        answeredQuestions={answeredQuestions}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar

@@ -17,6 +17,9 @@ import {
 /** Scope view filter type */
 export type ScopeViewFilter = 'all' | 'global' | 'project';
 
+/** Sync status for memory operations */
+export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+
 interface UseOutlineTreeReturn {
   tree: OutlineTree | null;
   roots: OutlineNode[];
@@ -31,6 +34,10 @@ interface UseOutlineTreeReturn {
   filterByScope: (scope: ScopeViewFilter, projectName?: string) => OutlineNode[];
   expandedNodes: Set<string>;
   setExpandedNodes: React.Dispatch<React.SetStateAction<Set<string>>>;
+  /** Last successful sync timestamp */
+  lastSyncTime: number | null;
+  /** Current sync status */
+  syncStatus: SyncStatus;
 }
 
 /**
@@ -42,10 +49,13 @@ export function useOutlineTree(): UseOutlineTreeReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
 
   const loadTree = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setSyncStatus('syncing');
 
     try {
       const graph = await loadMCPMemoryFromFile();
@@ -67,9 +77,20 @@ export function useOutlineTree(): UseOutlineTreeReturn {
           totalNodes: 0,
         });
       }
+
+      // Update sync status on success
+      setLastSyncTime(Date.now());
+      setSyncStatus('success');
+
+      // Reset to idle after showing success
+      setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load outline tree');
       setTree(null);
+      setSyncStatus('error');
+
+      // Reset to idle after showing error
+      setTimeout(() => setSyncStatus('idle'), 3000);
     } finally {
       setIsLoading(false);
     }
@@ -164,5 +185,7 @@ export function useOutlineTree(): UseOutlineTreeReturn {
     filterByScope,
     expandedNodes,
     setExpandedNodes,
+    lastSyncTime,
+    syncStatus,
   };
 }

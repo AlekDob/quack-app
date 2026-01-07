@@ -39,6 +39,7 @@ interface KanbanCardProps {
   onDelete?: () => void | Promise<void>;
   onEdit?: () => void;
   onKill?: () => void;        // Kill running shell/watch process
+  onStart?: () => void;       // Start task: move to in_progress, open chat, send prompt
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
 }
 
@@ -62,6 +63,7 @@ export default function KanbanCard({
   onDelete,
   onEdit,
   onKill,
+  onStart,
   onProjectClick,
 }: KanbanCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -243,6 +245,22 @@ export default function KanbanCard({
             </h4>
           </div>
           <div className="kanban-card-actions">
+            {/* Start button - only for TODO agent tasks */}
+            {isAgentTask && task.status === 'todo' && onStart && (
+              <button
+                className="kanban-card-start"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStart();
+                }}
+                title="Start task"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Start
+              </button>
+            )}
             {/* Documentation badge - show if doc exists or is being processed */}
             {(task.docFilePath || isProcessingDoc) && (
               <button
@@ -329,6 +347,17 @@ export default function KanbanCard({
               <span className="kanban-card-separator">/</span>
               <span className="kanban-card-branch">{task.branch}</span>
             </>
+          )}
+          {task.useWorktree && (
+            <span className="kanban-card-worktree-badge" title={task.worktreePath || 'Isolated worktree'}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="6" y1="3" x2="6" y2="15" />
+                <circle cx="18" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <path d="M18 9a9 9 0 0 1-9 9" />
+                <line x1="18" y1="9" x2="18" y2="21" />
+              </svg>
+            </span>
           )}
           <svg className="kanban-card-project-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 18l6-6-6-6"/>

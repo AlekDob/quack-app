@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'semantic-search' | 'project-dashboard';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -345,11 +345,25 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
               🧠
             </span>
           )}
+          {tab.type === 'semantic-search' && (
+            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
+              🔍
+            </span>
+          )}
           {tab.type === 'kanban' && (
             <span className="tab-icon" aria-hidden="true">
               {/* Kanban board icon */}
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                 <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7V7h5v10zm6 0h-4v-6h4v6z"/>
+              </svg>
+            </span>
+          )}
+          {tab.type === 'project-dashboard' && (
+            <span className="tab-icon" aria-hidden="true">
+              {/* Project dashboard icon - house/home */}
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
             </span>
           )}

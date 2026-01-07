@@ -14,6 +14,11 @@ import {
   saveKanbanTasks,
   loadKanbanTasks,
 } from '../services/kanbanStorage';
+import {
+  ensureWorktree,
+  mergeAndCleanup,
+  generateBranchName,
+} from '../services/worktreeService';
 
 // Notification for showing "Open Kanban" bar after background task creation
 export interface KanbanNotification {
@@ -164,8 +169,46 @@ export const useKanbanStore = create<KanbanState>()(
           // Set timestamps based on status change
           if (newStatus === 'in_progress' && task.status === 'todo') {
             updates.startedAt = Date.now();
+
+            // Create worktree when task starts (if useWorktree is enabled)
+            if (task.useWorktree && !task.worktreePath) {
+              try {
+                console.log('[kanbanStore] Creating worktree for task:', task.id);
+                const worktreePath = await ensureWorktree(task);
+                const branchName = generateBranchName(task);
+                updates.worktreePath = worktreePath;
+                updates.branch = branchName;
+                console.log('[kanbanStore] Worktree created:', { worktreePath, branchName });
+              } catch (error) {
+                console.error('[kanbanStore] Failed to create worktree:', error);
+                // Continue without worktree - don't block task start
+              }
+            }
           } else if (newStatus === 'done' && task.status !== 'done') {
             updates.completedAt = Date.now();
+
+            // Merge and cleanup worktree when task completes (if it has a worktree)
+            if (task.useWorktree && task.worktreePath) {
+              try {
+                console.log('[kanbanStore] Merging worktree for task:', task.id);
+                const mergeResult = await mergeAndCleanup(task, {
+                  defaultTargetBranch: task.targetBranch || 'main',
+                });
+                if (mergeResult.success) {
+                  console.log('[kanbanStore] Worktree merged successfully');
+                  // Clear worktree path after successful merge
+                  updates.worktreePath = undefined;
+                } else if (mergeResult.hasConflicts) {
+                  console.warn('[kanbanStore] Merge has conflicts:', mergeResult.conflictedFiles);
+                  // Keep worktreePath so user can resolve conflicts
+                } else {
+                  console.error('[kanbanStore] Merge failed:', mergeResult.error);
+                }
+              } catch (error) {
+                console.error('[kanbanStore] Failed to merge worktree:', error);
+                // Don't block task completion
+              }
+            }
           }
           // Reset completedAt when task moves OUT of done status
           if (task.status === 'done' && newStatus !== 'done') {

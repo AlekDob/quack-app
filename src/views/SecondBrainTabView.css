@@ -153,6 +153,20 @@
   height: 14px;
 }
 
+/* Sync Group Container */
+.outliner-sync-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Last Sync Time */
+.outliner-sync-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+
 /* Refresh Button */
 .outliner-refresh-btn {
   display: flex;
@@ -178,6 +192,158 @@
 .outliner-refresh-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Sync Success State */
+.outliner-refresh-btn.success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+/* Sync Error State */
+.outliner-refresh-btn.error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+/* Scope Selector Button */
+.outliner-scope-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.outliner-scope-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.outliner-scope-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Global scope style */
+.outliner-scope-btn.global {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+}
+
+.outliner-scope-btn.global:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Project scope style */
+.outliner-scope-btn.project {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+.outliner-scope-btn.project:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.outliner-scope-btn span {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Scope Selector Wrapper (for dropdown positioning) */
+.outliner-scope-wrapper {
+  position: relative;
+}
+
+/* Project Dropdown */
+.outliner-scope-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  max-width: 280px;
+  background: rgba(30, 30, 35, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+}
+
+.scope-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.scope-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.scope-dropdown-item.global {
+  color: #3b82f6;
+}
+
+.scope-dropdown-item.global:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.scope-dropdown-item.project {
+  color: #22c55e;
+}
+
+.scope-dropdown-item.project:hover {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.scope-dropdown-item.selected {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.scope-dropdown-item span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.scope-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 0;
 }
 
 /* Sidebar Toggle Button */
@@ -2184,4 +2350,164 @@
   font-size: 10px;
   color: rgba(255, 255, 255, 0.3);
   font-style: italic;
+}
+
+/* ===================================
+   ACTION BUTTONS
+   =================================== */
+
+.outliner-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.outliner-action-btn:hover {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.outliner-action-btn.active {
+  background: rgba(232, 74, 127, 0.15);
+  border-color: rgba(232, 74, 127, 0.3);
+  color: #E84A7F;
+}
+
+/* ===================================
+   MIGRATION PANEL
+   =================================== */
+
+.outliner-migration-panel {
+  background: rgba(232, 74, 127, 0.05);
+  border-bottom: 1px solid rgba(232, 74, 127, 0.15);
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+.migration-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #E84A7F;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.migration-header svg {
+  width: 16px;
+  height: 16px;
+}
+
+.migration-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.migration-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.migration-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.migration-description {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.migration-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.migration-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.source-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.source-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.source-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.migration-import-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #E84A7F 0%, #e91e63 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.migration-import-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d63e6f 0%, #d81b60 100%);
+  transform: translateY(-1px);
+}
+
+.migration-import-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.migration-import-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.migration-status {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }

@@ -518,19 +518,19 @@ export default function ChatInput({
     }, 0);
   }, [input, slashCommandStart, setInput]);
 
-  // Auto-resize textarea
+  // Auto-resize textarea - use class toggle to let CSS handle the animation
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     if (isFocused) {
-      // When focused, expand to 120px regardless of content
-      textarea.style.height = '120px';
+      // Add focused class for CSS-driven expansion with animation
+      textarea.classList.add('expanded');
     } else {
-      // When not focused, remove inline height to let CSS min-height take control
-      textarea.style.height = '';
+      // Remove class to collapse with animation
+      textarea.classList.remove('expanded');
     }
-  }, [input, isFocused]);
+  }, [isFocused]);
 
   // Insert agent mention when requested from panel
   useEffect(() => {

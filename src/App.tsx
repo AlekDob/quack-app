@@ -61,13 +61,17 @@ import { useDocsTab } from "./hooks/useDocsTab";
 import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
+import { useSemanticSearchTab } from "./hooks/useSemanticSearchTab";
 import { useKanbanTab } from "./hooks/useKanbanTab";
 import { useKanbanChatSync } from "./hooks/useKanbanChatSync";
+import { useProjectDashboardTab } from "./hooks/useProjectDashboardTab";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
 import SecondBrainTabView from "./views/SecondBrainTabView";
+import SemanticSearchTabView from "./views/SemanticSearchTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
+import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -153,6 +157,7 @@ import type {
   SavedAgent,
   HookConfig,
   KanbanTask,
+  AskUserQuestionAnswers,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
 
@@ -285,20 +290,27 @@ function AppContent() {
   // Memory Graph tab management
   const { openMemoryGraphTab } = useMemoryGraphTab();
 
+  // Semantic Search tab management
+  const { openSemanticSearchTab } = useSemanticSearchTab();
+
   // Kanban state from store (no longer using isKanbanTabActive overlay)
   const { loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
 
   // Count tasks in progress for badge
   const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
 
-  // Get in-progress tasks to show under agents in sidebar
-  const inProgressTasks = kanbanTasks.filter(t => t.status === 'in_progress');
+  // Get active tasks (TODO + in_progress) to show under agents in sidebar
+  // Done tasks are not shown - users can see them in Kanban board
+  const agentTasks = kanbanTasks.filter(t => t.status !== 'done');
 
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
 
   // Kanban tab management
   const { openKanbanTab } = useKanbanTab();
+
+  // Project Dashboard tab management
+  const { openProjectDashboardTab } = useProjectDashboardTab();
 
   // Kanban sync - emit loading state and task changes to popout windows
   const { emitLoadingState, emitTasksChanged } = useKanbanChatSync();
@@ -605,6 +617,8 @@ function AppContent() {
 
   const [gitSummary, setGitSummary] = useState<GitStatusSummary | null>(null);
   const [loadingGit, setLoadingGit] = useState(false);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
   const [gitError, setGitError] = useState<string | null>(null);
   const [selectedGitPath, setSelectedGitPath] = useState<string | null>(null);
   const [diffContent, setDiffContent] = useState("");
@@ -780,6 +794,10 @@ function AppContent() {
 
   // Session ID tracking per agent - for resuming sessions in terminal
   const [chatSessionIds, setChatSessionIds] = useState<Map<string, string>>(new Map());
+
+  // 🗣️ AskUserQuestion state - track pending and answered questions per agent
+  const [pendingQuestionIdsMap, setPendingQuestionIdsMap] = useState<Map<string, Set<string>>>(new Map());
+  const [answeredQuestionsMap, setAnsweredQuestionsMap] = useState<Map<string, Map<string, AskUserQuestionAnswers>>>(new Map());
 
   // 🦆 KANBAN SYNC: Emit loading state to popout windows for real-time sync
   // LIGHTWEIGHT: Only triggers when chatLoadingMap changes (not during streaming)
@@ -2412,6 +2430,23 @@ function AppContent() {
       console.log(`[sendMessageForTargetAgent] Resuming session ${existingSessionId} for task ${targetAgentId}`);
     }
 
+    // 🦆 AUTO-TRANSITION: If task is in TODO status, move it to in_progress when user sends first message
+    if (kanbanTask && kanbanTask.status === 'todo') {
+      console.log(`[sendMessageForTargetAgent] Auto-transitioning task ${targetAgentId} from TODO to in_progress`);
+      const { moveTask } = useKanbanStore.getState();
+      await moveTask(targetAgentId, 'in_progress');
+    }
+
+    // 🦆 Re-fetch task after potential status change to get updated worktreePath
+    // When task moves to in_progress, worktree might be created in kanbanStore.moveTask
+    const updatedKanbanState = useKanbanStore.getState();
+    const taskWithWorktree = updatedKanbanState.tasks.find(t => t.id === targetAgentId);
+
+    // 🦆 WORKTREE ISOLATION: Use worktreePath if available, otherwise projectPath
+    // This ensures Claude SDK operates in the isolated worktree when enabled
+    const effectiveWorkingDirectory = taskWithWorktree?.worktreePath || taskWithWorktree?.projectPath || options?.workingDirectory || '/';
+    console.log(`[sendMessageForTargetAgent] Using working directory: ${effectiveWorkingDirectory} (worktree: ${!!taskWithWorktree?.worktreePath})`)
+
     // Save the prompt for restoration on abort
     lastPromptsRef.current.set(targetAgentId, content);
 
@@ -2528,7 +2563,8 @@ function AppContent() {
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
             attachments: (options?.attachments || []).map(att => att.path).filter(Boolean),
-            cwd: options?.workingDirectory || '/',
+            // 🦆 WORKTREE ISOLATION: Use effectiveWorkingDirectory which prioritizes worktreePath
+            cwd: effectiveWorkingDirectory,
             sessionId: existingSessionId, // 🦆 Pass existing sessionId for conversation continuity
             effort: options?.effort,
             // 🗣️ Enable interactive tools like AskUserQuestion (SDK v0.1.71+)
@@ -3070,6 +3106,93 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId]);
 
+  // 🗣️ AskUserQuestion: Answer a question from Claude for the current agent
+  const answerUserQuestionForAgent = useCallback(async (
+    toolUseId: string,
+    answers: AskUserQuestionAnswers
+  ) => {
+    if (!activeId) {
+      console.error('[App] Cannot answer question: no active agent');
+      return;
+    }
+
+    const sessionId = chatSessionIds.get(activeId);
+    if (!sessionId) {
+      console.error('[App] Cannot answer question: no active session for agent', activeId);
+      toast.error('No active session to answer question');
+      return;
+    }
+
+    console.log('[App] 🗣️ Answering user question:', { activeId, toolUseId, answers });
+
+    // Mark question as answered immediately for UI feedback
+    setAnsweredQuestionsMap(prev => {
+      const newMap = new Map(prev);
+      const agentAnswers = new Map(newMap.get(activeId) || new Map());
+      agentAnswers.set(toolUseId, answers);
+      newMap.set(activeId, agentAnswers);
+      return newMap;
+    });
+
+    // Remove from pending
+    setPendingQuestionIdsMap(prev => {
+      const newMap = new Map(prev);
+      const pending = new Set<string>(newMap.get(activeId) || new Set<string>());
+      pending.delete(toolUseId);
+      newMap.set(activeId, pending);
+      return newMap;
+    });
+
+    try {
+      // Format the answer as a tool result
+      const formattedAnswer = Object.entries(answers)
+        .map(([header, value]) => {
+          const valueStr = Array.isArray(value) ? value.join(', ') : value;
+          return `${header}: ${valueStr}`;
+        })
+        .join('\n');
+
+      // Dynamic import to avoid circular dependencies
+      const { sendToolResult } = await import('./services/claudeSDK');
+
+      // Send the tool result to continue the conversation
+      await sendToolResult(
+        sessionId,
+        toolUseId,
+        formattedAnswer,
+        activeTerminal?.cwd || explorerPath
+      );
+
+      console.log('[App] 🗣️ Question answered successfully');
+
+      // Track analytics
+      posthog.capture('user_question_answered', {
+        question_count: Object.keys(answers).length,
+        tool_use_id: toolUseId,
+        agent_id: activeId,
+      });
+    } catch (err) {
+      console.error('[App] Failed to send question answer:', err);
+      toast.error(`Failed to submit answer: ${err}`);
+
+      // Revert the answered state on error
+      setAnsweredQuestionsMap(prev => {
+        const newMap = new Map(prev);
+        const agentAnswers = new Map(newMap.get(activeId) || new Map());
+        agentAnswers.delete(toolUseId);
+        newMap.set(activeId, agentAnswers);
+        return newMap;
+      });
+      setPendingQuestionIdsMap(prev => {
+        const newMap = new Map(prev);
+        const pending = new Set<string>(newMap.get(activeId) || new Set<string>());
+        pending.add(toolUseId);
+        newMap.set(activeId, pending);
+        return newMap;
+      });
+    }
+  }, [activeId, chatSessionIds, activeTerminal?.cwd, explorerPath]);
+
   // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
     if (!activeId) return;
@@ -3201,6 +3324,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const currentAgentLoading = useMemo(() => {
     return activeId ? (chatLoadingMap.get(activeId) ?? false) : false;
   }, [activeId, chatLoadingMap]);
+
+  // 🦆 FIX: Task messages need useMemo to trigger re-renders when chatSessions changes
+  // Previously calculated inline which didn't properly track Map changes
+  const activeTaskMessages = useMemo(() => {
+    if (!activeTaskId) return [];
+    const messages = chatSessions.get(activeTaskId) ?? [];
+    console.log(`[ChatView] Loading task messages for activeTaskId="${activeTaskId}": ${messages.length} messages`);
+    return messages;
+  }, [activeTaskId, chatSessions]);
+
+  const activeTaskLoading = useMemo(() => {
+    return activeTaskId ? (chatLoadingMap.get(activeTaskId) ?? false) : false;
+  }, [activeTaskId, chatLoadingMap]);
+
+  const activeTaskTokens = useMemo(() => {
+    return activeTaskId ? chatTokensMap.get(activeTaskId) : undefined;
+  }, [activeTaskId, chatTokensMap]);
 
   const currentAgentTokens = useMemo(() => {
     const tokens = activeId ? (chatTokensMap.get(activeId) ?? {
@@ -5884,6 +6024,26 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Don't add newId - let it be created fresh on first interaction
     );
 
+    // 8. Update Kanban tasks that reference the old agent ID
+    // This prevents "Agent terminal not found" errors when opening tasks after reset
+    const { tasks, updateTask } = useKanbanStore.getState();
+    const affectedTasks = tasks.filter(t => t.assignedAgent?.id === oldId);
+
+    for (const task of affectedTasks) {
+      if (task.assignedAgent) {
+        await updateTask(task.id, {
+          assignedAgent: {
+            ...task.assignedAgent,
+            id: newId,
+          }
+        });
+      }
+    }
+
+    if (affectedTasks.length > 0) {
+      console.log(`🔄 [Reset Agent] Updated ${affectedTasks.length} Kanban task(s) to new agent ID`);
+    }
+
     console.log(`✅ [Reset Agent] Complete! "${terminal.label}" now has fresh ID: ${newId}`);
     toast.success(`Agent reset: ${terminal.label} - Fresh context, stamina 100%! 🦆`);
   }, [chatSessionIds, tauriAvailable]);
@@ -7065,6 +7225,32 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, [openDocsTab]);
 
+  // Handler to open Semantic Search tab
+  const handleOpenSemanticSearchTab = useCallback(() => {
+    // Get current project path (from any terminal CWD or home directory)
+    // First try active terminal, then first available terminal
+    let projectPath = '';
+    const activeTerminal = terminals.find(t => t.id === activeTabId);
+    if (activeTerminal?.cwd) {
+      projectPath = activeTerminal.cwd;
+    } else if (terminals.length > 0 && terminals[0].cwd) {
+      projectPath = terminals[0].cwd;
+    }
+
+    const newTab = openSemanticSearchTab(projectPath);
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
+
+    // Auto-close side-panel when opening semantic search
+    setSidePanelCollapsed(true);
+
+    console.log('🔍 Semantic Search tab opened:', newTab.id, 'Project:', projectPath);
+    toast.success('Code Search opened! 🔍', {
+      description: 'Search your codebase by meaning',
+      duration: 2000,
+    });
+  }, [openSemanticSearchTab, terminals, activeTabId]);
+
   // Handler for opening Knowledge Graph tab
   const handleOpenMemoryGraphTab = useCallback(() => {
     // Check if memory graph tab already exists
@@ -7149,8 +7335,56 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openKanbanTab, activeTabId, tabs, isTabPoppedOut]);
 
+  // Handler for opening Git Drawer with fullscreen loader
+  const handleOpenGitDrawer = useCallback(() => {
+    // Show fullscreen loader immediately if we don't have data yet
+    if (!gitSummary) {
+      setLoadingGit(true);
+      // Delay opening the drawer to let the loader paint first
+      setTimeout(() => {
+        setShowGitDrawer(true);
+      }, 50);
+    } else {
+      // Data already cached, open immediately
+      setShowGitDrawer(true);
+    }
+  }, [gitSummary]);
+
+  // Handler for opening Project Dashboard tab
+  const handleOpenProjectDashboard = useCallback((projectPath: string, projectName: string) => {
+    const tabId = `project-dashboard-${projectPath.replace(/\//g, '-')}`;
+
+    // ALWAYS show fullscreen loader IMMEDIATELY when clicking on a project
+    setLoadingDashboard(true);
+
+    // Use setTimeout to yield to the browser's event loop, ensuring the loader
+    // can paint before we trigger heavy state updates and component rendering.
+    // This is more reliable than requestAnimationFrame for ensuring visual feedback.
+    setTimeout(() => {
+      // Increment refresh key to force data reload even if tab exists
+      setDashboardRefreshKey(prev => prev + 1);
+
+      // Check if tab already exists
+      const existingTab = tabs.find(t => t.id === tabId);
+
+      if (existingTab) {
+        // Tab exists, just focus it
+        console.log('[Quack] Project Dashboard tab exists, focusing it:', tabId);
+        setActiveTabId(tabId);
+      } else {
+        // Create new project dashboard tab and insert as FIRST tab
+        const newTab = openProjectDashboardTab(projectPath, projectName);
+        console.log('[Quack] Project Dashboard tab created (as first):', newTab.id);
+        setTabs(prevTabs => [newTab, ...prevTabs]);
+        setActiveTabId(tabId);
+      }
+    }, 50); // Small delay ensures browser has time to paint the loader
+  }, [openProjectDashboardTab, tabs]);
+
   // Open task in agent's main Chat tab (no separate tab created)
   // This makes the task's chat appear in the agent's Chat tab, like an independent conversation
+  // 🦆 FIX: Load task messages BEFORE updating activeTaskPerAgent to prevent race condition
+  // Bug: When clicking rapidly between tasks, chatSessions could show stale/wrong data
   const openTaskTab = useCallback(async (task: KanbanTask) => {
     // Task must have an assigned agent
     if (!task.assignedAgent?.id) {
@@ -7159,22 +7393,96 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     const agentId = task.assignedAgent.id;
-    const terminal = terminals.find(t => t.id === agentId);
+    let terminal = terminals.find(t => t.id === agentId);
+
+    // Fallback: search by agent name if UUID not found (handles stale references after agent reset)
+    if (!terminal && task.assignedAgent?.name) {
+      terminal = terminals.find(t => t.label === task.assignedAgent!.name);
+      if (terminal) {
+        console.warn(`[Quack] Agent UUID changed for "${task.assignedAgent.name}". Auto-fixing task reference...`);
+        // Auto-fix: update the task with the new UUID
+        useKanbanStore.getState().updateTask(task.id, {
+          assignedAgent: { ...task.assignedAgent!, id: terminal.id }
+        });
+      }
+    }
 
     if (terminal) {
+      // Use the terminal's actual ID (may differ from agentId if fallback was used)
+      const actualAgentId = terminal.id;
+
       // 1. Switch to the agent
-      setActiveId(agentId);
-      clearTerminalAttention(agentId);
-      clearIdleTimer(agentId);
+      setActiveId(actualAgentId);
+      clearTerminalAttention(actualAgentId);
+      clearIdleTimer(actualAgentId);
 
       // 2. Load the task's project directory (use task.projectPath, not terminal.cwd)
       const projectPath = task.projectPath || terminal.cwd;
       await loadDirectory(projectPath);
 
-      // 3. Set this task as active for the agent
+      // 🦆 FIX RACE CONDITION: Load task messages BEFORE updating activeTaskPerAgent
+      // This ensures chatSessions has the correct data when React re-renders ChatView
+      // Previously, activeTaskPerAgent was updated first, causing ChatView to see stale data
+      try {
+        const store = await Store.load('quack-chats.json');
+        const savedChat = await store.get<{
+          messages: ChatMessage[];
+          tokens?: { inputTokens: number; outputTokens: number; cacheCreationTokens?: number; cacheReadTokens?: number; totalCost?: number };
+          sessionId?: string;
+          timestamp?: number;
+        }>(`chat-${task.id}`);
+
+        if (savedChat?.messages) {
+          // Update chatSessions with task messages FIRST
+          setChatSessions(prev => {
+            const newSessions = new Map(prev);
+            newSessions.set(task.id, savedChat.messages);
+            return newSessions;
+          });
+
+          // Also restore tokens if available
+          if (savedChat.tokens) {
+            setChatTokensMap(prev => {
+              const newMap = new Map(prev);
+              newMap.set(task.id, {
+                inputTokens: savedChat.tokens!.inputTokens || 0,
+                outputTokens: savedChat.tokens!.outputTokens || 0,
+                cacheCreationTokens: savedChat.tokens!.cacheCreationTokens || 0,
+                cacheReadTokens: savedChat.tokens!.cacheReadTokens || 0,
+                totalCost: savedChat.tokens!.totalCost || 0,
+              });
+              return newMap;
+            });
+          }
+
+          console.log(`[Quack] Loaded ${savedChat.messages.length} messages for task "${task.title}" before switch`);
+        } else {
+          // Task has no messages yet - ensure empty array is in chatSessions
+          setChatSessions(prev => {
+            const newSessions = new Map(prev);
+            if (!newSessions.has(task.id)) {
+              newSessions.set(task.id, []);
+            }
+            return newSessions;
+          });
+          console.log(`[Quack] Task "${task.title}" has no messages yet, initialized empty array`);
+        }
+      } catch (error) {
+        console.warn(`[Quack] Failed to load messages for task ${task.id}:`, error);
+        // On error, still ensure task has an entry to prevent undefined issues
+        setChatSessions(prev => {
+          const newSessions = new Map(prev);
+          if (!newSessions.has(task.id)) {
+            newSessions.set(task.id, []);
+          }
+          return newSessions;
+        });
+      }
+
+      // 3. Set this task as active for the agent (NOW safe - messages are loaded)
       setActiveTaskPerAgent(prev => {
         const newMap = new Map(prev);
-        newMap.set(agentId, task.id);
+        newMap.set(actualAgentId, task.id);
         return newMap;
       });
 
@@ -7795,6 +8103,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setLoadingGit(true);
     setGitError(null);
     setHistoryError(null);
+
+    // Minimum loading time for smooth UX
+    const loadingStartTime = Date.now();
+    const MIN_LOADING_TIME = 400;
+
     try {
       const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
       const [statusResult, historyResult] = await Promise.allSettled([
@@ -7838,6 +8151,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setHistoryError(message);
       }
     } finally {
+      // Ensure minimum loading time for smooth UX
+      const elapsed = Date.now() - loadingStartTime;
+      if (elapsed < MIN_LOADING_TIME) {
+        await new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
+      }
       setLoadingGit(false);
     }
   }, [activeTerminal, explorerPath, tauriAvailable]);
@@ -8723,7 +9041,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -8771,7 +9089,7 @@ You have access to all Bash tools to execute git commands like:
           isKanbanTabActive={isKanbanTabActive}
           onOpenKanbanTab={handleOpenKanbanTab}
           inProgressTaskCount={inProgressTaskCount}
-          inProgressTasks={inProgressTasks}
+          agentTasks={agentTasks}
           onOpenTaskTab={openTaskTab}
           activeTaskId={activeTaskId}
           // Quack sound props
@@ -8792,14 +9110,15 @@ You have access to all Bash tools to execute git commands like:
           onToggleGroup={handleToggleGroup}
           onReorder={handleReorderTerminals}
           onOpenSettings={() => setShowSettings(true)}
-          onOpenGitPanel={() => setShowGitDrawer(true)}
+          onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
+          onOpenDashboard={handleOpenProjectDashboard}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
         />
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
-        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') ? 'full-width-tab' : ''}`}>
+        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') ? 'full-width-tab' : ''}`}>
           {terminals.length === 0 ? (
             /* Empty state when no agents - show image or guide */
             <div
@@ -8965,6 +9284,7 @@ You have access to all Bash tools to execute git commands like:
               onMemoryGraphClick={handleOpenMemoryGraphTab}
               onSecondBrainClick={handleOpenSecondBrainTab}
               onClaudeAssetsClick={openClaudeAssetsTab}
+              onSemanticSearchClick={handleOpenSemanticSearchTab}
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
@@ -9067,6 +9387,30 @@ You have access to all Bash tools to execute git commands like:
 
               {/* NOTE: Task tabs removed - tasks now open in agent's main Chat tab via activeTaskPerAgent state */}
 
+              {/* Project Dashboard Tab View - shown when project-dashboard tab is active */}
+              {activeTabId.startsWith('project-dashboard-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'project-dashboard') {
+                  return (
+                    <ProjectDashboardTabView
+                      key={`dashboard-${dashboardRefreshKey}`}
+                      tab={activeTab}
+                      isActive={true}
+                      onOpenKanban={handleOpenKanbanTab}
+                      onOpenGitPanel={handleOpenGitDrawer}
+                      onNewTask={() => {
+                        // Open kanban and trigger new task creation
+                        handleOpenKanbanTab();
+                        // The kanban view will handle the new task flow
+                        console.log('[Quack] New Task requested for project:', activeTab.filePath);
+                      }}
+                      onLoadingChange={setLoadingDashboard}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
               {/* Chat View - shown when chat tab is active and Kanban is not active */}
               {/* 🦆 If activeTaskId exists, show task's chat; otherwise show agent's chat */}
               {activeTabId === 'chat' && !isKanbanTabActive && (() => {
@@ -9074,15 +9418,14 @@ You have access to all Bash tools to execute git commands like:
                 const activeTask = activeTaskId ? kanbanTasks.find(t => t.id === activeTaskId) : null;
                 const isTaskChat = !!activeTask;
 
-                // Task chat data
-                const taskMessages = activeTaskId ? (chatSessions.get(activeTaskId) || []) : [];
-                const taskLoading = activeTaskId ? (chatLoadingMap.get(activeTaskId) || false) : false;
+                // 🦆 FIX: Use memoized task data instead of inline calculation
+                // This ensures React properly tracks Map changes and triggers re-renders
 
                 return (
                   <ChatView
                     key={isTaskChat ? `task-${activeTaskId}` : (activeId ?? 'no-agent')}
-                    messages={isTaskChat ? taskMessages : currentAgentMessages}
-                    isLoading={isTaskChat ? taskLoading : currentAgentLoading}
+                    messages={isTaskChat ? activeTaskMessages : currentAgentMessages}
+                    isLoading={isTaskChat ? activeTaskLoading : currentAgentLoading}
                     onSendMessage={isTaskChat
                       ? (content, opts) => sendMessageForTargetAgent(activeTaskId!, content, {
                           ...opts,
@@ -9119,7 +9462,7 @@ You have access to all Bash tools to execute git commands like:
                     basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
                     // Agent Chat Settings - persistent per-agent state
                     // For task chat: pre-fill with task prompt ONLY on first message (empty conversation)
-                    inputDraft={isTaskChat && !currentSettings.inputDraft && taskMessages.length === 0
+                    inputDraft={isTaskChat && !currentSettings.inputDraft && activeTaskMessages.length === 0
                       ? (activeTask?.prompt || '')
                       : currentSettings.inputDraft}
                     onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
@@ -9149,9 +9492,12 @@ You have access to all Bash tools to execute git commands like:
                       ? () => compactConversationForTargetAgent(activeTaskId!)
                       : compactCurrentAgentConversation
                     }
-                    onOpenSessionInTerminal={openSessionInTerminal}
+                    onOpenSessionInTerminal={isTaskChat
+                      ? () => openKanbanSessionInTerminal(activeTaskId!)
+                      : openSessionInTerminal
+                    }
                     // Token usage tracking
-                    sessionTokens={isTaskChat ? chatTokensMap.get(activeTaskId!) : currentAgentTokens}
+                    sessionTokens={isTaskChat ? activeTaskTokens : currentAgentTokens}
                     // OpenAI API key for Whisper
                     openaiApiKey={openaiApiKey ?? undefined}
                     // Open Prompt Engineer
@@ -9181,6 +9527,10 @@ You have access to all Bash tools to execute git commands like:
                     onOpenKanban={handleOpenKanbanTab}
                     // Hide Kanban tasks bar when viewing a task
                     hideKanbanTasksBar={isTaskChat}
+                    // 🗣️ AskUserQuestion support
+                    onUserQuestionAnswer={answerUserQuestionForAgent}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
+                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
                   />
                 );
               })()}
@@ -9354,6 +9704,15 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+              {/* Semantic Code Search - shown when semantic-search tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('semantic-search-') && !isKanbanTabActive && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'semantic-search') {
+                  return <SemanticSearchTabView tab={activeTab} isActive={true} />;
+                }
+                return null;
+              })()}
+
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility (hidden in Kanban mode) */}
               {tabs.some(t => t.type === 'agent-terminal') && !isKanbanTabActive && (
                 <div style={{
@@ -9481,9 +9840,9 @@ You have access to all Bash tools to execute git commands like:
           // Sessions props
           onSelectSession={handleSelectSession}
           sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets) are active
+          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets, project-dashboard) are active
           // In Kanban mode: use kanbanSidePanelExpanded to control visibility
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || (isKanbanTabActive && !kanbanSidePanelExpanded)}
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded)}
           onToggleCollapse={() => {
             if (isKanbanTabActive) {
               // In Kanban mode, toggle kanbanSidePanelExpanded
@@ -9607,45 +9966,52 @@ You have access to all Bash tools to execute git commands like:
                 ✕
               </button>
             </header>
-            <GitPanel
-              summary={gitSummary}
-              loading={loadingGit}
-              error={gitError}
-              history={commitHistory}
-              historyLoading={loadingGit}
-              historyError={historyError}
-              selected={selectedGitEntry}
-              onRefresh={refreshGitSummary}
-              onSelect={handleSelectGitEntry}
-              onStageAll={handleStageAll}
-              onOpenFile={handleOpenFileFromGit}
-              commitMessage={commitMessage}
-              onCommitMessageChange={setCommitMessage}
-              onCommit={handleCommit}
-              committing={committing}
-              onGenerateCommitMessage={handleGenerateCommitMessage}
-              rootPath={explorerPath}
-              terminals={terminals}
-              onBranchSwitch={async (branchName) => {
-                // Switch to the branch
-                try {
-                  await invoke('git_switch_branch', {
-                    branchName: branchName,
-                    rootPath: explorerPath,
-                  });
+            {loadingGit && !gitSummary ? (
+              <div className="git-drawer-loading">
+                <div className="git-drawer-spinner" />
+                <p>Loading Git status...</p>
+              </div>
+            ) : (
+              <GitPanel
+                summary={gitSummary}
+                loading={loadingGit}
+                error={gitError}
+                history={commitHistory}
+                historyLoading={loadingGit}
+                historyError={historyError}
+                selected={selectedGitEntry}
+                onRefresh={refreshGitSummary}
+                onSelect={handleSelectGitEntry}
+                onStageAll={handleStageAll}
+                onOpenFile={handleOpenFileFromGit}
+                commitMessage={commitMessage}
+                onCommitMessageChange={setCommitMessage}
+                onCommit={handleCommit}
+                committing={committing}
+                onGenerateCommitMessage={handleGenerateCommitMessage}
+                rootPath={explorerPath}
+                terminals={terminals}
+                onBranchSwitch={async (branchName) => {
+                  // Switch to the branch
+                  try {
+                    await invoke('git_switch_branch', {
+                      branchName: branchName,
+                      rootPath: explorerPath,
+                    });
 
-                  // Close diff drawer if open
-                  setShowDiffDrawer(false);
-                  setSelectedGitPath(null);
+                    // Close diff drawer if open
+                    setShowDiffDrawer(false);
+                    setSelectedGitPath(null);
 
-                  // Refresh git status and reload branches
-                  await refreshGitSummary();
-                } catch (error) {
-                  console.error('Failed to switch branch:', error);
-                  alert(`Failed to switch branch: ${error}`);
-                }
-              }}
-            />
+                    // Refresh git status and reload branches
+                    await refreshGitSummary();
+                  } catch (error) {
+                    console.error('Failed to switch branch:', error);
+                    alert(`Failed to switch branch: ${error}`);
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -9724,6 +10090,16 @@ You have access to all Bash tools to execute git commands like:
           <UnifiedSettings
             onClose={() => setShowSettings(false)}
           />
+        )}
+
+        {/* Fullscreen Loading Overlay for Dashboard/Git */}
+        {(loadingDashboard || (loadingGit && showGitDrawer && !gitSummary)) && (
+          <div className="fullscreen-loader-overlay">
+            <div className="fullscreen-loader-content">
+              <div className="fullscreen-loader-spinner" />
+              <p>{loadingDashboard ? 'Loading project dashboard...' : 'Loading Git status...'}</p>
+            </div>
+          </div>
         )}
 
         {showPerformanceMonitor && <PerformanceMonitor />}

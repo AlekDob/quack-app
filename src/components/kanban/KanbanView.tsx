@@ -310,6 +310,24 @@ export default function KanbanView({
     }
   }, [onOpenTaskTab]);
 
+  // Handle Start button click - move to in_progress, open chat, send prompt
+  const handleStartTask = useCallback(async (task: KanbanTask) => {
+    // 1. Move task to in_progress
+    await moveTask(task.id, 'in_progress');
+
+    // 2. Open task in new tab
+    if (onOpenTaskTab) {
+      onOpenTaskTab(task);
+    }
+
+    // 3. Send the initial prompt after a short delay to ensure tab is open
+    if (task.prompt) {
+      setTimeout(() => {
+        onSendMessage(task.id, task.prompt);
+      }, 100);
+    }
+  }, [moveTask, onOpenTaskTab, onSendMessage]);
+
   // Handle task deletion with async Tauri dialog
   const handleTaskDelete = useCallback(async (taskId: string) => {
     const confirmed = await confirm('Are you sure you want to delete this task?', {
@@ -368,7 +386,8 @@ export default function KanbanView({
     projectName: string,
     branch: string | undefined,
     agent: KanbanAssignedAgent | undefined,
-    attachments: ChatAttachment[]
+    attachments: ChatAttachment[],
+    useWorktree?: boolean
   ) => {
     if (editingTask) {
       // Update existing task
@@ -380,6 +399,7 @@ export default function KanbanView({
         branch,
         assignedAgent: agent,
         attachments,
+        useWorktree,
       });
     } else {
       // Create new task (default to agent type)
@@ -393,6 +413,7 @@ export default function KanbanView({
         assignedAgent: agent,
         attachments,
         type: 'agent',
+        useWorktree,
       });
     }
     setIsModalOpen(false);
@@ -556,6 +577,7 @@ export default function KanbanView({
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
             onTaskKill={handleCardKill}
+            onTaskStart={handleStartTask}
             onProjectClick={onProjectClick}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}

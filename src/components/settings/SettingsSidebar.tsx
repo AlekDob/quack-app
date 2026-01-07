@@ -5,6 +5,7 @@ export type SettingsCategory =
   | 'claude-code'
   | 'ai-assistant'
   | 'agent-modes'
+  | 'second-brain'
   | 'ide'
   | 'license'
   | 'notifications'
@@ -29,6 +30,7 @@ const categories: CategoryItem[] = [
   { id: 'claude-code', label: 'Claude Code' },
   { id: 'ai-assistant', label: 'AI Assistant' },
   { id: 'agent-modes', label: 'Agent Modes' },
+  { id: 'second-brain', label: 'Second Brain' },
   { id: 'ide', label: 'External IDE' },
   { id: 'license', label: 'License' },
   { id: 'notifications', label: 'Notifications' },

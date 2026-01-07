@@ -65,6 +65,16 @@ export default defineConfig(({ mode }) => {
       port: 5174,
       strictPort: true,
       host: process.env.TAURI_DEV_HOST,
+      // Watch configuration - exclude worktrees to prevent page reload when creating task worktrees
+      watch: {
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.worktrees/**',  // Ignore Git worktrees created for Kanban tasks
+          '**/dist/**',
+          '**/.quack/**',
+        ],
+      },
     },
 
     envPrefix: ['VITE_', 'TAURI_'],
