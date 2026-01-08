@@ -26,6 +26,76 @@ import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutpu
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
 
+/**
+ * CollapsibleToolWidget - A collapsible widget for generic MCP tools
+ * Shows tool name in header, collapsed by default, expandable to show input
+ */
+interface CollapsibleToolWidgetProps {
+  toolName: string;
+  toolColor: string;
+  input: any;
+  isLoading: boolean;
+}
+
+const CollapsibleToolWidget: React.FC<CollapsibleToolWidgetProps> = ({
+  toolName,
+  toolColor,
+  input,
+  isLoading,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Get friendly display name
+  const getDisplayName = (name: string): string => {
+    // Remove mcp__ prefix and clean up
+    return name.replace(/^mcp__\w+__/, '').replace(/_/g, ' ');
+  };
+
+  return (
+    <div
+      className="tool-widget collapsible-tool-widget"
+      style={{ borderColor: toolColor }}
+    >
+      <div
+        className="tool-widget-header collapsible-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="tool-widget-title" style={{ color: toolColor }}>
+          <ToolIcon name={toolName} />
+          <span>{getDisplayName(toolName)}</span>
+        </div>
+        <div className="tool-widget-actions">
+          {isLoading && (
+            <div className="tool-widget-loading">
+              <div className="spinner"></div>
+            </div>
+          )}
+          <svg
+            className={`collapse-chevron ${isExpanded ? 'expanded' : ''}`}
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            style={{
+              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              opacity: 0.6,
+            }}
+          >
+            <path d="M4.427 6.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 6H4.604a.25.25 0 00-.177.427z" />
+          </svg>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="tool-widget-content">
+          <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
@@ -333,26 +403,19 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             }
 
             // Generic fallback for MCP and other tools
+            // GIF is OUTSIDE the widget with caption
             const toolColor = getToolColor(content.name || '');
             return (
               <React.Fragment key={idx}>
+                {/* GIF outside with caption */}
                 <ToolGifInline toolName={content.name || 'unknown'} toolId={toolId} />
-                <div className="tool-widget unknown-tool-widget" style={{ borderColor: toolColor }}>
-                  <div className="tool-widget-header">
-                    <div className="tool-widget-title" style={{ color: toolColor }}>
-                      <ToolIcon name={content.name || ''} />
-                      <span>Tool: {content.name}</span>
-                    </div>
-                    {!toolResult && (
-                      <div className="tool-widget-loading">
-                        <div className="spinner"></div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="tool-widget-content">
-                    <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>
-                  </div>
-                </div>
+                {/* Collapsible tool widget */}
+                <CollapsibleToolWidget
+                  toolName={content.name || 'unknown'}
+                  toolColor={toolColor}
+                  input={input}
+                  isLoading={!toolResult}
+                />
               </React.Fragment>
             );
           }

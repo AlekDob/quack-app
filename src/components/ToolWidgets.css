@@ -398,3 +398,84 @@
   border-left: 2px solid rgba(139, 92, 246, 0.3);
   padding-left: 12px;
 }
+
+/* Tool Widget with GIF - Compact WhatsApp style */
+.tool-widget-with-gif {
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.2s ease;
+}
+
+.tool-widget-with-gif:hover {
+  border-color: rgba(255, 107, 53, 0.25);
+}
+
+.tool-widget-with-gif .tool-widget-header {
+  padding: 8px 12px;
+}
+
+.tool-widget-with-gif .tool-widget-title {
+  font-size: 11px;
+}
+
+.tool-widget-with-gif .tool-widget-content {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.tool-widget-with-gif .tool-widget-code {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* Collapsible Tool Widget - Compact, collapsed by default */
+.collapsible-tool-widget {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.collapsible-tool-widget:hover {
+  border-color: rgba(255, 107, 53, 0.2);
+}
+
+.collapsible-tool-widget .collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.1);
+  user-select: none;
+}
+
+.collapsible-tool-widget .collapsible-header:hover {
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.collapsible-tool-widget .tool-widget-title {
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.collapsible-tool-widget .tool-widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapsible-tool-widget .tool-widget-content {
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  max-height: 300px;
+  overflow: auto;
+}
+
+.collapsible-tool-widget .tool-widget-code {
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 10px 12px;
+  margin: 0;
+}

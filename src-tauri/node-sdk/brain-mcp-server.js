@@ -146,6 +146,10 @@ function syncEntityToMarkdown(entity) {
     if (entity.entityType === 'diary') {
       // Diary entries go directly to diary folder
       filePath = join(vaultPath, 'QuackBrain', 'diary', `${date}.md`);
+    } else if (entity.entityType === 'project') {
+      // Project main file goes in projects/{project-name}/{project-name}.md
+      const projectName = slugify(entity.name);
+      filePath = join(vaultPath, 'QuackBrain', 'projects', projectName, `${projectName}.md`);
     } else if (entity.entityType === 'human' || !entity.projectId) {
       // Global entities (human or no project)
       if (tagFolder) {
@@ -169,9 +173,11 @@ function syncEntityToMarkdown(entity) {
     }
 
     // Build markdown content with new schema
+    // - Tag moved to body as #hashtag
+    // - Date as WikiLink
+    // - No H1 title (Obsidian shows filename)
     let md = '---\n';
     md += `id: "${entity.id}"\n`;
-    md += `tag: ${entity.entityType}\n`;
 
     if (entity.projectId) {
       md += `project: ${entity.projectId}\n`;
@@ -180,11 +186,13 @@ function syncEntityToMarkdown(entity) {
       md += `file: ${entity.sourceFile}\n`;
     }
 
-    md += `date: ${date}\n`;
-    md += `daily: "[[${date}]]"\n`;
+    // Date as WikiLink for Obsidian linking
+    md += `date: "[[${date}]]"\n`;
 
     if (entity.author) {
       md += `author: ${entity.author}\n`;
+    } else {
+      md += `author: claude\n`;  // Default author
     }
     md += `status: ${entity.status || 'active'}\n`;
     md += `confidence: ${entity.confidence || 'high'}\n`;
@@ -197,7 +205,16 @@ function syncEntityToMarkdown(entity) {
     }
 
     md += '---\n\n';
-    md += `# ${entity.name}\n\n`;
+
+    // Tag as #hashtag in body (Obsidian native tags)
+    md += `#${entity.entityType}\n\n`;
+
+    // Project WikiLink - every project-scoped note links to the project
+    if (entity.projectId) {
+      md += `**Project:** [[${entity.projectId}]]\n\n`;
+    }
+
+    // NO H1 title - Obsidian shows filename as title, avoid duplication
 
     if (entity.observations && entity.observations.length > 0) {
       md += '## Observations\n\n';
@@ -299,7 +316,21 @@ function ensureDiaryExists(vaultPath, date) {
 
   const diaryPath = join(diaryDir, `${date}.md`);
   if (!existsSync(diaryPath)) {
-    const content = `---\ntag: diary\ndate: ${date}\n---\n\n# ${date}\n\n## Notes Created Today\n\n`;
+    // Create diary note with template:
+    // - Tag in body as #diary
+    // - Date as WikiLink
+    // - No H1 (Obsidian shows filename)
+    const content = `---
+id: "diary-${date}"
+date: "[[${date}]]"
+author: system
+---
+
+#diary
+
+## Notes Created Today
+
+`;
     writeFileSync(diaryPath, content, 'utf-8');
     console.error(`[BrainMCP] Created diary for ${date}: ${diaryPath}`);
   }
@@ -969,6 +1000,353 @@ async function handleBrainGetBacklinks(args) {
   }
 }
 
+// =============================================================================
+// CANVAS HELPERS
+// =============================================================================
+
+/**
+ * Obsidian Canvas color mapping
+ * Colors 1-6 are Obsidian's preset colors
+ */
+const CANVAS_COLORS = {
+  1: 'red',
+  2: 'orange',
+  3: 'yellow',
+  4: 'green',
+  5: 'cyan',
+  6: 'purple',
+};
+
+/**
+ * Reverse color mapping for creating nodes
+ */
+const COLOR_TO_NUMBER = {
+  'red': '1',
+  'orange': '2',
+  'yellow': '3',
+  'green': '4',
+  'cyan': '5',
+  'purple': '6',
+};
+
+/**
+ * Generate a random hex ID for canvas nodes/edges
+ */
+function generateCanvasId() {
+  return [...Array(16)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+
+/**
+ * Read and parse an Obsidian canvas file
+ */
+function readCanvasFile(canvasPath) {
+  if (!existsSync(canvasPath)) {
+    return null;
+  }
+  const content = readFileSync(canvasPath, 'utf-8');
+  return JSON.parse(content);
+}
+
+/**
+ * Write canvas data to file
+ */
+function writeCanvasFile(canvasPath, canvasData) {
+  const dir = dirname(canvasPath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(canvasPath, JSON.stringify(canvasData, null, '\t'), 'utf-8');
+}
+
+/**
+ * Handle brain_read_canvas tool
+ * Read and parse an Obsidian canvas file
+ */
+async function handleBrainReadCanvas(args) {
+  const { canvasPath, projectId } = args;
+
+  console.error(`[BrainMCP] Reading canvas: ${canvasPath || `project ${projectId}`}`);
+
+  try {
+    let fullPath = canvasPath;
+
+    // If projectId provided, look for canvas in project folder
+    if (!fullPath && projectId) {
+      const vaultPath = getVaultPath();
+      if (!vaultPath) {
+        return JSON.stringify({
+          success: false,
+          error: 'No vault path configured',
+        }, null, 2);
+      }
+      // Look for any .canvas files in the project folder
+      const projectDir = join(vaultPath, 'QuackBrain', 'projects', projectId);
+      if (existsSync(projectDir)) {
+        const files = require('fs').readdirSync(projectDir);
+        const canvasFiles = files.filter(f => f.endsWith('.canvas'));
+        if (canvasFiles.length > 0) {
+          fullPath = join(projectDir, canvasFiles[0]);
+        }
+      }
+    }
+
+    if (!fullPath) {
+      return JSON.stringify({
+        success: false,
+        error: 'Canvas path required or no canvas found in project',
+      }, null, 2);
+    }
+
+    const canvasData = readCanvasFile(fullPath);
+
+    if (!canvasData) {
+      return JSON.stringify({
+        success: false,
+        error: 'Canvas file not found',
+        path: fullPath,
+      }, null, 2);
+    }
+
+    // Enrich nodes with color names
+    const enrichedNodes = (canvasData.nodes || []).map(node => ({
+      ...node,
+      colorName: node.color ? CANVAS_COLORS[node.color] || 'unknown' : null,
+    }));
+
+    console.error(`[BrainMCP] Read canvas with ${enrichedNodes.length} nodes, ${(canvasData.edges || []).length} edges`);
+
+    return JSON.stringify({
+      success: true,
+      path: fullPath,
+      canvas: {
+        nodes: enrichedNodes,
+        edges: canvasData.edges || [],
+      },
+      stats: {
+        nodeCount: enrichedNodes.length,
+        edgeCount: (canvasData.edges || []).length,
+        textNodes: enrichedNodes.filter(n => n.type === 'text').length,
+        fileNodes: enrichedNodes.filter(n => n.type === 'file').length,
+      },
+    }, null, 2);
+
+  } catch (error) {
+    console.error(`[BrainMCP] Read canvas error: ${error.message}`);
+    return JSON.stringify({
+      success: false,
+      error: 'Read canvas failed',
+      message: error.message,
+    }, null, 2);
+  }
+}
+
+/**
+ * Handle brain_create_canvas tool
+ * Create a new Obsidian canvas file
+ */
+async function handleBrainCreateCanvas(args) {
+  const { name, projectId, nodes = [], edges = [] } = args;
+
+  console.error(`[BrainMCP] Creating canvas: ${name} (project: ${projectId || 'global'})`);
+
+  try {
+    const vaultPath = getVaultPath();
+    if (!vaultPath) {
+      return JSON.stringify({
+        success: false,
+        error: 'No vault path configured',
+      }, null, 2);
+    }
+
+    // Determine path
+    let canvasPath;
+    if (projectId) {
+      canvasPath = join(vaultPath, 'QuackBrain', 'projects', projectId, `${slugify(name)}.canvas`);
+    } else {
+      canvasPath = join(vaultPath, 'QuackBrain', 'global', 'canvases', `${slugify(name)}.canvas`);
+    }
+
+    // Process nodes - convert color names to numbers, add IDs
+    const processedNodes = nodes.map(node => {
+      const processed = {
+        id: node.id || generateCanvasId(),
+        x: node.x || 0,
+        y: node.y || 0,
+        width: node.width || 250,
+        height: node.height || 60,
+        type: node.type || 'text',
+      };
+
+      if (node.type === 'text') {
+        processed.text = node.text || '';
+      } else if (node.type === 'file') {
+        processed.file = node.file || '';
+      }
+
+      // Handle color - accept name or number
+      if (node.color) {
+        if (typeof node.color === 'string' && COLOR_TO_NUMBER[node.color]) {
+          processed.color = COLOR_TO_NUMBER[node.color];
+        } else {
+          processed.color = String(node.color);
+        }
+      }
+
+      return processed;
+    });
+
+    // Process edges - add IDs
+    const processedEdges = edges.map(edge => ({
+      id: edge.id || generateCanvasId(),
+      fromNode: edge.fromNode,
+      fromSide: edge.fromSide || 'right',
+      toNode: edge.toNode,
+      toSide: edge.toSide || 'left',
+    }));
+
+    const canvasData = {
+      nodes: processedNodes,
+      edges: processedEdges,
+    };
+
+    writeCanvasFile(canvasPath, canvasData);
+
+    console.error(`[BrainMCP] Created canvas: ${canvasPath}`);
+
+    return JSON.stringify({
+      success: true,
+      message: `Canvas "${name}" created successfully`,
+      path: canvasPath,
+      canvas: canvasData,
+    }, null, 2);
+
+  } catch (error) {
+    console.error(`[BrainMCP] Create canvas error: ${error.message}`);
+    return JSON.stringify({
+      success: false,
+      error: 'Create canvas failed',
+      message: error.message,
+    }, null, 2);
+  }
+}
+
+/**
+ * Handle brain_update_canvas tool
+ * Update an existing Obsidian canvas (add/remove/modify nodes and edges)
+ */
+async function handleBrainUpdateCanvas(args) {
+  const { canvasPath, addNodes = [], removeNodeIds = [], updateNodes = [], addEdges = [], removeEdgeIds = [] } = args;
+
+  console.error(`[BrainMCP] Updating canvas: ${canvasPath}`);
+
+  try {
+    // Read existing canvas
+    const canvasData = readCanvasFile(canvasPath);
+    if (!canvasData) {
+      return JSON.stringify({
+        success: false,
+        error: 'Canvas file not found',
+        path: canvasPath,
+      }, null, 2);
+    }
+
+    let nodes = canvasData.nodes || [];
+    let edges = canvasData.edges || [];
+
+    // Remove nodes by ID
+    if (removeNodeIds.length > 0) {
+      const removeSet = new Set(removeNodeIds);
+      nodes = nodes.filter(n => !removeSet.has(n.id));
+      // Also remove edges connected to removed nodes
+      edges = edges.filter(e => !removeSet.has(e.fromNode) && !removeSet.has(e.toNode));
+    }
+
+    // Update existing nodes
+    for (const update of updateNodes) {
+      const nodeIndex = nodes.findIndex(n => n.id === update.id);
+      if (nodeIndex !== -1) {
+        // Handle color conversion
+        if (update.color && typeof update.color === 'string' && COLOR_TO_NUMBER[update.color]) {
+          update.color = COLOR_TO_NUMBER[update.color];
+        }
+        nodes[nodeIndex] = { ...nodes[nodeIndex], ...update };
+      }
+    }
+
+    // Add new nodes
+    for (const node of addNodes) {
+      const newNode = {
+        id: node.id || generateCanvasId(),
+        x: node.x || 0,
+        y: node.y || 0,
+        width: node.width || 250,
+        height: node.height || 60,
+        type: node.type || 'text',
+      };
+
+      if (node.type === 'text') {
+        newNode.text = node.text || '';
+      } else if (node.type === 'file') {
+        newNode.file = node.file || '';
+      }
+
+      if (node.color) {
+        if (typeof node.color === 'string' && COLOR_TO_NUMBER[node.color]) {
+          newNode.color = COLOR_TO_NUMBER[node.color];
+        } else {
+          newNode.color = String(node.color);
+        }
+      }
+
+      nodes.push(newNode);
+    }
+
+    // Remove edges by ID
+    if (removeEdgeIds.length > 0) {
+      const removeSet = new Set(removeEdgeIds);
+      edges = edges.filter(e => !removeSet.has(e.id));
+    }
+
+    // Add new edges
+    for (const edge of addEdges) {
+      edges.push({
+        id: edge.id || generateCanvasId(),
+        fromNode: edge.fromNode,
+        fromSide: edge.fromSide || 'right',
+        toNode: edge.toNode,
+        toSide: edge.toSide || 'left',
+      });
+    }
+
+    const updatedCanvas = { nodes, edges };
+    writeCanvasFile(canvasPath, updatedCanvas);
+
+    console.error(`[BrainMCP] Updated canvas: ${nodes.length} nodes, ${edges.length} edges`);
+
+    return JSON.stringify({
+      success: true,
+      message: 'Canvas updated successfully',
+      path: canvasPath,
+      canvas: updatedCanvas,
+      changes: {
+        nodesAdded: addNodes.length,
+        nodesRemoved: removeNodeIds.length,
+        nodesUpdated: updateNodes.length,
+        edgesAdded: addEdges.length,
+        edgesRemoved: removeEdgeIds.length,
+      },
+    }, null, 2);
+
+  } catch (error) {
+    console.error(`[BrainMCP] Update canvas error: ${error.message}`);
+    return JSON.stringify({
+      success: false,
+      error: 'Update canvas failed',
+      message: error.message,
+    }, null, 2);
+  }
+}
+
 /**
  * Handle brain_get_wikilinks tool
  * Get all WikiLinks FROM a given entity
@@ -1036,7 +1414,7 @@ async function handleBrainGetWikilinks(args) {
 
 const TOOLS = [
   {
-    name: 'brain_search',
+    name: 'search',
     description: 'Search entities in the Quack Brain knowledge graph using full-text search. Use this to find memories, patterns, decisions, and other stored knowledge.',
     inputSchema: {
       type: 'object',
@@ -1055,7 +1433,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_create_entity',
+    name: 'create_entity',
     description: 'Create a new entity in the Quack Brain knowledge graph. Use this to save new memories, patterns, decisions, or other knowledge. Entities are auto-synced to Obsidian vault with daily diary integration.',
     inputSchema: {
       type: 'object',
@@ -1114,7 +1492,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_add_observation',
+    name: 'add_observation',
     description: 'Add a new observation (fact/note) to an existing entity. Use this to append new information to existing knowledge.',
     inputSchema: {
       type: 'object',
@@ -1136,7 +1514,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_get_graph',
+    name: 'get_graph',
     description: 'Get the full knowledge graph including all entities and relations. Use this to understand the current state of stored knowledge.',
     inputSchema: {
       type: 'object',
@@ -1150,7 +1528,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_create_relation',
+    name: 'create_relation',
     description: 'Create a relation between two entities in the knowledge graph. Use this to link related knowledge.',
     inputSchema: {
       type: 'object',
@@ -1180,7 +1558,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_list_entities',
+    name: 'list_entities',
     description: 'List entities in the knowledge graph with optional filters. Use this to browse stored knowledge by type or project.',
     inputSchema: {
       type: 'object',
@@ -1202,7 +1580,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_get_backlinks',
+    name: 'get_backlinks',
     description: 'Get all entities that link TO a given entity via [[WikiLinks]]. This is useful for Obsidian-style graph navigation and understanding how knowledge is connected. Backlinks show which entities reference the target entity.',
     inputSchema: {
       type: 'object',
@@ -1216,7 +1594,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'brain_get_wikilinks',
+    name: 'get_wikilinks',
     description: 'Get all [[WikiLinks]] FROM a given entity. This shows what other entities this entity references. Useful for understanding the outgoing connections from a piece of knowledge.',
     inputSchema: {
       type: 'object',
@@ -1232,6 +1610,147 @@ const TOOLS = [
       },
     },
   },
+  // Canvas tools
+  {
+    name: 'read_canvas',
+    description: 'Read and parse an Obsidian canvas file (.canvas). Returns all nodes (text/file cards) and edges (connections) with their positions, sizes, colors, and content. Colors are returned as both number (1-6) and name (red, orange, yellow, green, cyan, purple).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        canvasPath: {
+          type: 'string',
+          description: 'Full path to the .canvas file to read.',
+        },
+        projectId: {
+          type: 'string',
+          description: 'Alternative: project ID to find canvas files in. Will return first .canvas found in project folder.',
+        },
+      },
+    },
+  },
+  {
+    name: 'create_canvas',
+    description: 'Create a new Obsidian canvas file with nodes and edges. Use this to create visual diagrams, mind maps, or flowcharts. Supports text nodes, file embeds, colors (red, orange, yellow, green, cyan, purple), and connections between nodes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name for the canvas file (will be slugified).',
+        },
+        projectId: {
+          type: 'string',
+          description: 'Project ID to create canvas in. If omitted, creates in global/canvases/.',
+        },
+        nodes: {
+          type: 'array',
+          description: 'Array of nodes to create.',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Optional node ID (auto-generated if omitted).' },
+              type: { type: 'string', enum: ['text', 'file'], description: 'Node type: text for notes, file for embedding markdown files.' },
+              x: { type: 'number', description: 'X position on canvas.' },
+              y: { type: 'number', description: 'Y position on canvas.' },
+              width: { type: 'number', description: 'Node width (default: 250).' },
+              height: { type: 'number', description: 'Node height (default: 60).' },
+              text: { type: 'string', description: 'Text content (for type=text).' },
+              file: { type: 'string', description: 'Path to file relative to vault (for type=file).' },
+              color: { type: 'string', description: 'Node color: red, orange, yellow, green, cyan, purple (or 1-6).' },
+            },
+          },
+        },
+        edges: {
+          type: 'array',
+          description: 'Array of edges (connections) between nodes.',
+          items: {
+            type: 'object',
+            properties: {
+              fromNode: { type: 'string', description: 'Source node ID.' },
+              toNode: { type: 'string', description: 'Target node ID.' },
+              fromSide: { type: 'string', enum: ['top', 'right', 'bottom', 'left'], description: 'Side of source node (default: right).' },
+              toSide: { type: 'string', enum: ['top', 'right', 'bottom', 'left'], description: 'Side of target node (default: left).' },
+            },
+            required: ['fromNode', 'toNode'],
+          },
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'update_canvas',
+    description: 'Update an existing Obsidian canvas file. Add, remove, or modify nodes and edges. When removing nodes, connected edges are automatically removed too.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        canvasPath: {
+          type: 'string',
+          description: 'Full path to the .canvas file to update.',
+        },
+        addNodes: {
+          type: 'array',
+          description: 'Nodes to add to the canvas.',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              type: { type: 'string', enum: ['text', 'file'] },
+              x: { type: 'number' },
+              y: { type: 'number' },
+              width: { type: 'number' },
+              height: { type: 'number' },
+              text: { type: 'string' },
+              file: { type: 'string' },
+              color: { type: 'string' },
+            },
+          },
+        },
+        removeNodeIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'IDs of nodes to remove. Connected edges are also removed.',
+        },
+        updateNodes: {
+          type: 'array',
+          description: 'Nodes to update (partial update, only specified fields are changed).',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'ID of node to update (required).' },
+              x: { type: 'number' },
+              y: { type: 'number' },
+              width: { type: 'number' },
+              height: { type: 'number' },
+              text: { type: 'string' },
+              color: { type: 'string' },
+            },
+            required: ['id'],
+          },
+        },
+        addEdges: {
+          type: 'array',
+          description: 'Edges to add.',
+          items: {
+            type: 'object',
+            properties: {
+              fromNode: { type: 'string' },
+              toNode: { type: 'string' },
+              fromSide: { type: 'string', enum: ['top', 'right', 'bottom', 'left'] },
+              toSide: { type: 'string', enum: ['top', 'right', 'bottom', 'left'] },
+            },
+            required: ['fromNode', 'toNode'],
+          },
+        },
+        removeEdgeIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'IDs of edges to remove.',
+        },
+      },
+      required: ['canvasPath'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -1240,7 +1759,7 @@ const TOOLS = [
 
 const server = new Server(
   {
-    name: 'brain-tools',
+    name: 'quack-brain',
     version: '1.0.0',
   },
   {
@@ -1263,29 +1782,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let result;
 
     switch (name) {
-      case 'brain_search':
+      case 'search':
         result = await handleBrainSearch(args);
         break;
-      case 'brain_create_entity':
+      case 'create_entity':
         result = await handleBrainCreateEntity(args);
         break;
-      case 'brain_add_observation':
+      case 'add_observation':
         result = await handleBrainAddObservation(args);
         break;
-      case 'brain_get_graph':
+      case 'get_graph':
         result = await handleBrainGetGraph(args);
         break;
-      case 'brain_create_relation':
+      case 'create_relation':
         result = await handleBrainCreateRelation(args);
         break;
-      case 'brain_list_entities':
+      case 'list_entities':
         result = await handleBrainListEntities(args);
         break;
-      case 'brain_get_backlinks':
+      case 'get_backlinks':
         result = await handleBrainGetBacklinks(args);
         break;
-      case 'brain_get_wikilinks':
+      case 'get_wikilinks':
         result = await handleBrainGetWikilinks(args);
+        break;
+      case 'read_canvas':
+        result = await handleBrainReadCanvas(args);
+        break;
+      case 'create_canvas':
+        result = await handleBrainCreateCanvas(args);
+        break;
+      case 'update_canvas':
+        result = await handleBrainUpdateCanvas(args);
         break;
       default:
         return {

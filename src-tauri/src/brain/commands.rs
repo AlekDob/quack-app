@@ -964,10 +964,9 @@ fn entity_to_markdown(entity: &BrainEntity) -> String {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let date = entity.date.as_ref().unwrap_or(&today);
 
-    // YAML frontmatter
+    // YAML frontmatter (minimal - tag moved to body as #hashtag)
     md.push_str("---\n");
     md.push_str(&format!("id: \"{}\"\n", entity.id));
-    md.push_str(&format!("tag: {}\n", entity.entity_type));  // Changed from "type:" to "tag:"
 
     if let Some(ref project_id) = entity.project_id {
         md.push_str(&format!("project: {}\n", project_id));
@@ -976,8 +975,8 @@ fn entity_to_markdown(entity: &BrainEntity) -> String {
         md.push_str(&format!("file: {}\n", source_file));
     }
 
-    md.push_str(&format!("date: {}\n", date));
-    md.push_str(&format!("daily: \"[[{}]]\"\n", date));
+    // Date as WikiLink for Obsidian linking
+    md.push_str(&format!("date: \"[[{}]]\"\n", date));
 
     if let Some(ref author) = entity.author {
         md.push_str(&format!("author: {}\n", author));
@@ -1008,8 +1007,15 @@ fn entity_to_markdown(entity: &BrainEntity) -> String {
 
     md.push_str("---\n\n");
 
-    // Title
-    md.push_str(&format!("# {}\n\n", entity.name));
+    // Tag as #hashtag in body (Obsidian native tags)
+    md.push_str(&format!("#{}\n\n", entity.entity_type));
+
+    // Project WikiLink - every project-scoped note links to the project
+    if let Some(ref project_id) = entity.project_id {
+        md.push_str(&format!("**Project:** [[{}]]\n\n", project_id));
+    }
+
+    // NO H1 title - Obsidian shows filename as title, avoid duplication
 
     // Observations
     if !entity.observations.is_empty() {
@@ -1054,21 +1060,22 @@ fn ensure_diary_exists(md_dir: &std::path::Path, date: &str) -> Result<std::path
 
     if !diary_path.exists() {
         // Create diary note with template
+        // - Tag in body as #diary
+        // - Date as WikiLink
+        // - No H1 (Obsidian shows filename)
         let diary_content = format!(
 r#"---
 id: "diary-{}"
-tag: diary
-date: {}
-daily: "[[{}]]"
+date: "[[{}]]"
 author: system
 ---
 
-# {}
+#diary
 
 ## Notes Created Today
 
 "#,
-            date, date, date, date
+            date, date
         );
 
         let mut file = std::fs::File::create(&diary_path)
@@ -1209,6 +1216,13 @@ pub fn brain_sync_entity_to_md(entity_id: String) -> Result<String, String> {
             let diary_dir = md_dir.join("diary");
             std::fs::create_dir_all(&diary_dir).map_err(|e| format!("Dir error: {}", e))?;
             diary_dir.join(format!("{}.md", slugify(&entity.name)))
+        },
+        // Project main file goes in projects/{project-name}/{project-name}.md
+        "project" => {
+            let project_name = slugify(&entity.name);
+            let project_dir = md_dir.join("projects").join(&project_name);
+            std::fs::create_dir_all(&project_dir).map_err(|e| format!("Dir error: {}", e))?;
+            project_dir.join(format!("{}.md", project_name))
         },
         // Human is always in global/humans/
         "human" => {

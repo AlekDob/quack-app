@@ -22,6 +22,15 @@ interface TerminalSettings {
   theme: string;
 }
 
+// Tool GIF category settings
+interface ToolGifCategories {
+  brain: boolean;      // MCP Brain tools (search, create, etc.)
+  fileOps: boolean;    // Read, Write, Edit
+  shell: boolean;      // Bash, terminal commands
+  search: boolean;     // Grep, Glob, WebSearch
+  agents: boolean;     // Task/subagent tools
+}
+
 interface GeneralSettings {
   autoSave: boolean;
   autoSaveInterval: number;
@@ -31,6 +40,7 @@ interface GeneralSettings {
   showWelcomeOnStartup: boolean;
   language: 'en' | 'it';
   enableToolGifs: boolean; // Show GIF reactions when tools execute
+  toolGifCategories: ToolGifCategories; // Per-category toggle
 }
 
 interface SettingsState {
@@ -79,6 +89,14 @@ const defaultTerminalSettings: TerminalSettings = {
   theme: 'dark',
 };
 
+const defaultToolGifCategories: ToolGifCategories = {
+  brain: true,      // Brain/Memory tools - always fun
+  fileOps: true,    // File operations
+  shell: true,      // Bash commands
+  search: false,    // Search tools - often too frequent
+  agents: true,     // Subagent tasks
+};
+
 const defaultGeneralSettings: GeneralSettings = {
   autoSave: true,
   autoSaveInterval: 30,
@@ -88,6 +106,7 @@ const defaultGeneralSettings: GeneralSettings = {
   showWelcomeOnStartup: true,
   language: 'en',
   enableToolGifs: true, // GIF reactions enabled by default
+  toolGifCategories: defaultToolGifCategories,
 };
 
 const defaultClaudeSettings: ClaudeSettings = {

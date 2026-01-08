@@ -24,9 +24,9 @@ Quack Brain uses a **bidirectional sync** system:
 
 ```typescript
 // Search examples
-mcp__brain__brain_search({ query: "authentication pattern" })
-mcp__brain__brain_search({ query: "bug fix dropdown" })
-mcp__brain__brain_search({ query: "user preference" })
+mcp__quack-brain__search({ query: "authentication pattern" })
+mcp__quack-brain__search({ query: "bug fix dropdown" })
+mcp__quack-brain__search({ query: "user preference" })
 ```
 
 ## When to SAVE to Brain (Write)
@@ -43,7 +43,7 @@ mcp__brain__brain_search({ query: "user preference" })
 
 ```typescript
 // Create new entity
-mcp__brain__brain_create_entity({
+mcp__quack-brain__create_entity({
   name: "pattern_react_error_boundary",
   entityType: "pattern",
   observations: ["Wrap providers individually with ErrorBoundary for graceful degradation"],
@@ -51,7 +51,7 @@ mcp__brain__brain_create_entity({
 })
 
 // Add observation to existing entity
-mcp__brain__brain_add_observation({
+mcp__quack-brain__add_observation({
   entityName: "pattern_react_error_boundary",
   content: "[2025-01-07] Added global unhandledrejection handler for Promise errors"
 })
@@ -66,14 +66,17 @@ mcp__brain__brain_add_observation({
 
 | Tool | Purpose |
 |------|---------|
-| `mcp__brain__brain_search` | Full-text search across entities and observations |
-| `mcp__brain__brain_get_graph` | Read entire knowledge graph |
-| `mcp__brain__brain_create_entity` | Create new brain entity |
-| `mcp__brain__brain_add_observation` | Add observation to existing entity |
-| `mcp__brain__brain_create_relation` | Create relations between entities |
-| `mcp__brain__brain_list_entities` | List entities with optional filters |
-| `mcp__brain__brain_get_backlinks` | Get entities that link TO a given entity via [[WikiLinks]] |
-| `mcp__brain__brain_get_wikilinks` | Get all [[WikiLinks]] FROM a given entity |
+| `mcp__quack-brain__search` | Full-text search across entities and observations |
+| `mcp__quack-brain__get_graph` | Read entire knowledge graph |
+| `mcp__quack-brain__create_entity` | Create new brain entity |
+| `mcp__quack-brain__add_observation` | Add observation to existing entity |
+| `mcp__quack-brain__create_relation` | Create relations between entities |
+| `mcp__quack-brain__list_entities` | List entities with optional filters |
+| `mcp__quack-brain__get_backlinks` | Get entities that link TO a given entity via [[WikiLinks]] |
+| `mcp__quack-brain__get_wikilinks` | Get all [[WikiLinks]] FROM a given entity |
+| `mcp__quack-brain__read_canvas` | Read Obsidian canvas files (.canvas) with nodes and edges |
+| `mcp__quack-brain__create_canvas` | Create new canvas diagrams with text/file nodes and connections |
+| `mcp__quack-brain__update_canvas` | Update existing canvas (add/remove/modify nodes and edges) |
 
 ## Entity Types (Tags)
 
@@ -159,15 +162,78 @@ Use `[[NoteName]]` syntax to create relations between notes. These are tracked a
 **Use backlinks to discover connections:**
 ```typescript
 // Find all notes that mention "React Hooks"
-mcp__brain__brain_get_backlinks({ entityName: "React Hooks" })
+mcp__quack-brain__get_backlinks({ entityName: "React Hooks" })
 
 // Get all outgoing links from an entity
-mcp__brain__brain_get_wikilinks({ entityName: "pattern_error_handling" })
+mcp__quack-brain__get_wikilinks({ entityName: "pattern_error_handling" })
 ```
+
+## Obsidian Canvas Support
+
+The Brain MCP can read and write Obsidian Canvas files (.canvas) for visual diagrams, mind maps, and flowcharts.
+
+### Canvas Colors
+
+Obsidian uses numbers 1-6 for colors. The MCP accepts both number and name:
+
+| Number | Name | Use for |
+|--------|------|---------|
+| 1 | red | Important, warnings, blockers |
+| 2 | orange | Needs attention, questions |
+| 3 | yellow | Ideas, notes |
+| 4 | green | Done, approved, success |
+| 5 | cyan | Info, reference |
+| 6 | purple | Special, creative |
+
+### Node Types
+
+- **text**: Text cards with markdown content
+- **file**: Embedded markdown files from the vault
+
+### Creating Canvas Diagrams
+
+```typescript
+// Create a flowchart
+mcp__quack-brain__create_canvas({
+  name: "Architecture Overview",
+  projectId: "quack-app",
+  nodes: [
+    { id: "n1", type: "text", x: 0, y: 0, text: "Frontend\nReact + TypeScript", color: "cyan" },
+    { id: "n2", type: "text", x: 300, y: 0, text: "Backend\nTauri + Rust", color: "purple" },
+    { id: "n3", type: "text", x: 150, y: 150, text: "MCP Server", color: "green" },
+  ],
+  edges: [
+    { fromNode: "n1", toNode: "n3", fromSide: "bottom", toSide: "top" },
+    { fromNode: "n2", toNode: "n3", fromSide: "bottom", toSide: "top" },
+  ]
+})
+
+// Read existing canvas
+mcp__quack-brain__read_canvas({
+  canvasPath: "/path/to/vault/QuackBrain/projects/quack-app/diagram.canvas"
+})
+
+// Update canvas - add a new node with connection
+mcp__quack-brain__update_canvas({
+  canvasPath: "/path/to/canvas.canvas",
+  addNodes: [
+    { id: "n4", type: "text", x: 150, y: 300, text: "Database", color: "orange" }
+  ],
+  addEdges: [
+    { fromNode: "n3", toNode: "n4", fromSide: "bottom", toSide: "top" }
+  ]
+})
+```
+
+### Canvas File Location
+
+- **Project canvases**: `QuackBrain/projects/{project-id}/*.canvas`
+- **Global canvases**: `QuackBrain/global/canvases/*.canvas`
 
 ## Critical Behavior
 
 1. **During Analysis**: Search brain for relevant context BEFORE starting work
 2. **After completing tasks**: Save important discoveries to brain
 3. **Date observations**: Prefix with `[YYYY-MM-DD]` for temporal context
-4. **This is the user's Second Brain** - use it actively, not passively!
+4. **Create diagrams**: Use canvas tools to visualize architecture and flows
+5. **This is the user's Second Brain** - use it actively, not passively!

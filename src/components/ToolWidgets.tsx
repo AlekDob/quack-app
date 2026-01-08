@@ -26,13 +26,17 @@ export const getToolColor = (toolName: string): string => {
   const name = toolName.toLowerCase();
   if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
   // Brain tools get vibrant rose color (inherited from old memory style)
-  if (name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F'; // vibrant rose
+  if (name.startsWith('mcp__quack-brain') || name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F'; // vibrant rose
   // Semantic Search tools get indigo/violet
   if (name.startsWith('mcp__semantic-search') || name.startsWith('mcp_semantic-search')) return '#818cf8'; // indigo
   // Kanban tools get cyan/teal color
   if (name.startsWith('mcp__kanban') || name.startsWith('mcp_kanban')) return '#06b6d4'; // cyan
   // IDE tools get purple color
   if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7'; // purple
+  // Skill tool gets gold/amber color
+  if (name === 'skill') return '#fbbf24'; // gold/amber
+  // Plan Mode tools get emerald color
+  if (name === 'enterplanmode' || name === 'exitplanmode') return '#34d399'; // emerald
   // MCP Memory and other MCP tools get orange (generic MCP)
   if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316'; // orange (other MCP tools)
   if (name === 'task') return '#8b5cf6'; // purple
@@ -49,12 +53,14 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
 
   // Determine color based on tool type
   const isWebTool = toolName === 'webfetch' || toolName === 'websearch';
-  const isMcpBrainTool = toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
+  const isMcpBrainTool = toolName.startsWith('mcp__quack-brain') || toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
   const isMcpSemanticSearchTool = toolName.startsWith('mcp__semantic-search') || toolName.startsWith('mcp_semantic-search');
   const isMcpKanbanTool = toolName.startsWith('mcp__kanban') || toolName.startsWith('mcp_kanban');
   const isMcpIdeTool = toolName.startsWith('mcp__ide') || toolName.startsWith('mcp_ide');
+  const isSkillTool = toolName === 'skill';
+  const isPlanModeTool = toolName === 'enterplanmode' || toolName === 'exitplanmode';
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
-  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpSemanticSearchTool ? '#818cf8' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isMcpTool ? '#f97316' : 'currentColor';
+  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpSemanticSearchTool ? '#818cf8' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : 'currentColor';
 
   if (toolName === 'read') {
     return (
@@ -166,6 +172,24 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
     return (
       <svg width="16" height="16" viewBox="0 0 16 16" fill={iconColor}>
         <path d="M9.504.43a1.516 1.516 0 012.437 1.713L5.683 15.502a1.516 1.516 0 01-2.437-1.713L9.504.43z"/>
+      </svg>
+    );
+  }
+
+  // Skill tool - magic wand icon (gold/amber)
+  if (toolName === 'skill') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill={iconColor}>
+        <path d="M10.5 1.5L9 0L7.5 1.5L6 0L4.5 1.5L3 0v2.5L1.5 4L3 5.5 1.5 7 3 8.5 1.5 10l1.5 1.5L1.5 13 3 14.5 4.5 13 6 14.5 7.5 13 9 14.5 10.5 13 12 14.5 13.5 13l-1.5-1.5L13.5 10 12 8.5 13.5 7 12 5.5 13.5 4 12 2.5V0l-1.5 1.5zM8 4a1 1 0 100 2 1 1 0 000-2zm0 6a1 1 0 100 2 1 1 0 000-2zm-3-3a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/>
+      </svg>
+    );
+  }
+
+  // EnterPlanMode - clipboard/plan icon (emerald)
+  if (toolName === 'enterplanmode') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill={iconColor}>
+        <path d="M5.75 0a.75.75 0 01.75.75V2h3V.75a.75.75 0 011.5 0V2H12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2h1V.75A.75.75 0 015.75 0zM4 3.5a.5.5 0 00-.5.5v10a.5.5 0 00.5.5h8a.5.5 0 00.5-.5V4a.5.5 0 00-.5-.5H4zm1.25 3a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4a.75.75 0 01-.75-.75zm.75 2.25a.75.75 0 000 1.5h4a.75.75 0 000-1.5h-4zm0 3a.75.75 0 000 1.5h2a.75.75 0 000-1.5h-2z"/>
       </svg>
     );
   }
@@ -327,12 +351,14 @@ export const SystemInitializedWidget: React.FC<{
             {tools.map((tool, i) => {
               const toolNameLower = tool.toLowerCase();
               const isWebTool = toolNameLower === 'webfetch' || toolNameLower === 'websearch';
-              const isMcpBrainTool = toolNameLower.startsWith('mcp__brain') || toolNameLower.startsWith('mcp_brain');
+              const isMcpBrainTool = toolNameLower.startsWith('mcp__quack-brain') || toolNameLower.startsWith('mcp__brain') || toolNameLower.startsWith('mcp_brain');
               const isMcpSemanticSearchTool = toolNameLower.startsWith('mcp__semantic-search') || toolNameLower.startsWith('mcp_semantic-search');
               const isMcpKanbanTool = toolNameLower.startsWith('mcp__kanban') || toolNameLower.startsWith('mcp_kanban');
               const isMcpIdeTool = toolNameLower.startsWith('mcp__ide') || toolNameLower.startsWith('mcp_ide');
+              const isSkillTool = toolNameLower === 'skill';
+              const isPlanModeTool = toolNameLower === 'enterplanmode' || toolNameLower === 'exitplanmode';
               const isMcpTool = toolNameLower.startsWith('mcp__') || toolNameLower.startsWith('mcp_');
-              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpSemanticSearchTool ? '#818cf8' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isMcpTool ? '#f97316' : undefined;
+              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpSemanticSearchTool ? '#818cf8' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : undefined;
 
               return (
                 <span key={i} className="system-init-tool-badge" style={{ color: textColor }}>

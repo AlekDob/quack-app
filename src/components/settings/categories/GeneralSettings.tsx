@@ -12,6 +12,18 @@ export default function GeneralSettings() {
   // GIF reactions settings
   const enableToolGifs = useSettingsStore((s) => s.general.enableToolGifs);
   const toggleToolGifs = useSettingsStore((s) => s.toggleToolGifs);
+  const toolGifCategories = useSettingsStore((s) => s.general.toolGifCategories);
+  const updateGeneralSettings = useSettingsStore((s) => s.updateGeneralSettings);
+
+  // Toggle a specific GIF category
+  const toggleGifCategory = (category: 'brain' | 'fileOps' | 'shell' | 'search' | 'agents') => {
+    updateGeneralSettings({
+      toolGifCategories: {
+        ...toolGifCategories,
+        [category]: !toolGifCategories[category],
+      },
+    });
+  };
 
   useEffect(() => {
     loadPreferences();
@@ -73,6 +85,64 @@ export default function GeneralSettings() {
             />
           }
         />
+
+        {/* Category toggles - only show if GIFs are enabled */}
+        {enableToolGifs && (
+          <>
+            <div style={{ paddingLeft: '16px', borderLeft: '2px solid rgba(255, 107, 53, 0.3)', marginLeft: '8px' }}>
+              <SettingsRow
+                label="Brain/Memory Tools"
+                description="Show GIFs for brain search and memory operations"
+                control={
+                  <IOSSwitch
+                    checked={toolGifCategories?.brain ?? true}
+                    onChange={() => toggleGifCategory('brain')}
+                  />
+                }
+              />
+              <SettingsRow
+                label="File Operations"
+                description="Show GIFs for Read, Write, Edit tools"
+                control={
+                  <IOSSwitch
+                    checked={toolGifCategories?.fileOps ?? true}
+                    onChange={() => toggleGifCategory('fileOps')}
+                  />
+                }
+              />
+              <SettingsRow
+                label="Shell Commands"
+                description="Show GIFs for Bash and terminal commands"
+                control={
+                  <IOSSwitch
+                    checked={toolGifCategories?.shell ?? true}
+                    onChange={() => toggleGifCategory('shell')}
+                  />
+                }
+              />
+              <SettingsRow
+                label="Search Tools"
+                description="Show GIFs for Grep, Glob, WebSearch"
+                control={
+                  <IOSSwitch
+                    checked={toolGifCategories?.search ?? false}
+                    onChange={() => toggleGifCategory('search')}
+                  />
+                }
+              />
+              <SettingsRow
+                label="AI Agents"
+                description="Show GIFs for subagent/Task tools"
+                control={
+                  <IOSSwitch
+                    checked={toolGifCategories?.agents ?? true}
+                    onChange={() => toggleGifCategory('agents')}
+                  />
+                }
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <SectionHeader

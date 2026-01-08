@@ -132,8 +132,13 @@ export function getKeywordsForTool(toolName: string): string[] {
   return TOOL_GIF_KEYWORDS.default;
 }
 
+// Minimum aspect ratio for landscape GIFs (width/height)
+// 1.2 means width must be at least 20% greater than height
+const MIN_LANDSCAPE_RATIO = 1.2;
+
 /**
- * Search for a GIF on Giphy
+ * Search for a LANDSCAPE GIF on Giphy
+ * Fetches multiple results and filters for horizontal aspect ratio
  */
 export async function searchGif(keyword: string): Promise<GiphyGif | null> {
   // API key is always available (bundled with app)
@@ -157,10 +162,11 @@ export async function searchGif(keyword: string): Promise<GiphyGif | null> {
   lastRequestTime = now;
 
   try {
+    // Fetch more results to find a landscape GIF
     const params = new URLSearchParams({
       api_key: GIPHY_API_KEY,
       q: keyword,
-      limit: '1',
+      limit: '15', // Fetch 15 to find a good landscape one
       rating: 'g', // Family-friendly only
       lang: 'en',
     });
@@ -179,14 +185,37 @@ export async function searchGif(keyword: string): Promise<GiphyGif | null> {
       return null;
     }
 
-    const gif = data.data[0];
+    // Find the first landscape GIF (width > height * MIN_LANDSCAPE_RATIO)
+    let selectedGif = null;
+    for (const gif of data.data) {
+      const width = parseInt(gif.images.fixed_height.width, 10);
+      const height = parseInt(gif.images.fixed_height.height, 10);
+      const aspectRatio = width / height;
+
+      if (aspectRatio >= MIN_LANDSCAPE_RATIO) {
+        selectedGif = gif;
+        console.log(`[GiphyService] Found landscape GIF: ${width}x${height} (ratio: ${aspectRatio.toFixed(2)})`);
+        break;
+      }
+    }
+
+    // If no landscape found, use the widest one available
+    if (!selectedGif) {
+      console.warn('[GiphyService] No landscape GIF found, selecting widest available');
+      selectedGif = data.data.reduce((best, current) => {
+        const bestRatio = parseInt(best.images.fixed_height.width, 10) / parseInt(best.images.fixed_height.height, 10);
+        const currentRatio = parseInt(current.images.fixed_height.width, 10) / parseInt(current.images.fixed_height.height, 10);
+        return currentRatio > bestRatio ? current : best;
+      });
+    }
+
     const result: GiphyGif = {
-      id: gif.id,
-      url: gif.images.fixed_height.url,
-      previewUrl: gif.images.fixed_height_small?.url || gif.images.preview_gif?.url || gif.images.fixed_height.url,
-      title: gif.title,
-      width: parseInt(gif.images.fixed_height.width, 10),
-      height: parseInt(gif.images.fixed_height.height, 10),
+      id: selectedGif.id,
+      url: selectedGif.images.fixed_height.url,
+      previewUrl: selectedGif.images.fixed_height_small?.url || selectedGif.images.preview_gif?.url || selectedGif.images.fixed_height.url,
+      title: selectedGif.title,
+      width: parseInt(selectedGif.images.fixed_height.width, 10),
+      height: parseInt(selectedGif.images.fixed_height.height, 10),
     };
 
     // Cache the result
