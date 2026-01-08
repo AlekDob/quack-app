@@ -7,6 +7,7 @@ pub mod commands;
 pub mod watcher;
 
 pub use db::init_database;
+pub use db::setup_mcp_server;
 pub use types::*;
 pub use commands::*;
 pub use watcher::*;

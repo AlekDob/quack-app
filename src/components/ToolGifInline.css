@@ -1,0 +1,95 @@
+/**
+ * ToolGifInline Styles
+ *
+ * WhatsApp-style inline GIF that appears as a chat bubble
+ */
+
+.tool-gif-inline {
+  display: flex;
+  justify-content: flex-start;
+  margin: 8px 0;
+  padding-left: 40px; /* Align with assistant messages */
+}
+
+.tool-gif-inline__container {
+  position: relative;
+  max-width: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.05));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tool-gif-inline__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+/* Loading skeleton */
+.tool-gif-inline--loading .tool-gif-inline__skeleton {
+  width: 150px;
+  height: 100px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary, rgba(255, 255, 255, 0.05)) 25%,
+    var(--bg-tertiary, rgba(255, 255, 255, 0.1)) 50%,
+    var(--bg-secondary, rgba(255, 255, 255, 0.05)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Giphy attribution */
+.tool-gif-inline__attribution {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  font-size: 8px;
+  opacity: 0.8;
+}
+
+.tool-gif-inline__powered-by {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tool-gif-inline__giphy-logo {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .tool-gif-inline__image {
+    /* Show first frame only */
+    animation-play-state: paused !important;
+  }
+
+  .tool-gif-inline--loading .tool-gif-inline__skeleton {
+    animation: none;
+    background: var(--bg-tertiary, rgba(255, 255, 255, 0.1));
+  }
+}

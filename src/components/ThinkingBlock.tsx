@@ -1,28 +1,63 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import './ThinkingBlock.css';
 
 interface ThinkingBlockProps {
   content: string;
+  /** Controlled expanded state (optional) */
+  isExpanded?: boolean;
+  /** Callback when expanded state changes */
+  onExpandedChange?: (expanded: boolean) => void;
+  /** Default expanded state for uncontrolled mode */
   defaultExpanded?: boolean;
+  /** Reset key - when this changes, reset to defaultExpanded */
+  resetKey?: string | number;
 }
 
-function ThinkingBlock({ content, defaultExpanded = false }: ThinkingBlockProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+function ThinkingBlock({
+  content,
+  isExpanded: controlledExpanded,
+  onExpandedChange,
+  defaultExpanded = false,
+  resetKey
+}: ThinkingBlockProps) {
+  // Internal state for uncontrolled mode
+  const [localExpanded, setLocalExpanded] = useState(defaultExpanded);
+
+  // Reset local state when resetKey changes
+  useEffect(() => {
+    if (resetKey !== undefined) {
+      setLocalExpanded(defaultExpanded);
+    }
+  }, [resetKey, defaultExpanded]);
+
+  // Use controlled state if provided, otherwise use local state
+  const expanded = controlledExpanded !== undefined ? controlledExpanded : localExpanded;
 
   // Count lines for preview
   const lines = content.split('\n');
   const previewLines = lines.slice(0, 3).join('\n');
   const hasMore = lines.length > 3;
 
+  // Handle toggle - update both controlled and uncontrolled
+  const handleToggle = () => {
+    const newExpanded = !expanded;
+
+    // Always update local state (for uncontrolled mode)
+    setLocalExpanded(newExpanded);
+
+    // Notify parent if callback provided (for controlled mode)
+    onExpandedChange?.(newExpanded);
+  };
+
   return (
-    <div className={`thinking-block ${isExpanded ? 'expanded' : 'collapsed'}`}>
+    <div className={`thinking-block ${expanded ? 'expanded' : 'collapsed'}`}>
       <button
         className="thinking-block-header"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggle}
         type="button"
       >
         <span className="thinking-block-icon">
-          {isExpanded ? (
+          {expanded ? (
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="6 9 12 15 18 9" />
             </svg>
@@ -34,12 +69,12 @@ function ThinkingBlock({ content, defaultExpanded = false }: ThinkingBlockProps)
         </span>
         <span className="thinking-block-label">Thinking</span>
         <span className="thinking-block-hint">
-          {isExpanded ? 'click to collapse' : 'click to expand'}
+          {expanded ? 'click to collapse' : 'click to expand'}
         </span>
       </button>
 
       <div className="thinking-block-content">
-        {isExpanded ? (
+        {expanded ? (
           <pre className="thinking-block-text">{content}</pre>
         ) : (
           <pre className="thinking-block-preview">

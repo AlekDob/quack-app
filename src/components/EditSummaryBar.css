@@ -341,6 +341,80 @@
   color: rgba(242, 140, 82, 0.8);
 }
 
+/* ============================================
+   MARKDOWN FILES - Purple/Violet Theme
+   ============================================ */
+
+/* Markdown-only bar - when only documentation files */
+.edit-summary-bar-markdown-only {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(167, 139, 250, 0.08) 100%);
+  border-top: 1px solid rgba(139, 92, 246, 0.25);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.edit-summary-bar-markdown-only .edit-summary-bar-header:hover {
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.edit-summary-bar-markdown-only .edit-summary-bar-chevron {
+  color: rgba(139, 92, 246, 0.7);
+}
+
+/* Markdown icon in header */
+.edit-summary-bar-markdown-icon {
+  color: rgba(139, 92, 246, 0.8) !important;
+}
+
+/* Markdown label in header */
+.edit-summary-bar-label-markdown {
+  color: rgba(139, 92, 246, 1);
+}
+
+/* Markdown badge in header */
+.edit-summary-bar-badge-markdown {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: rgba(139, 92, 246, 1);
+}
+
+/* Markdown section title */
+.edit-summary-bar-section-markdown .edit-summary-bar-section-title {
+  color: rgba(139, 92, 246, 0.9);
+}
+
+/* Markdown file items - purple theme */
+.edit-summary-bar-file-markdown {
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.edit-summary-bar-file-markdown:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.edit-summary-bar-file-markdown .edit-summary-bar-file-info svg {
+  color: rgba(139, 92, 246, 0.7);
+}
+
+/* Markdown edit count */
+.edit-summary-bar-file-count-markdown {
+  color: rgba(139, 92, 246, 0.8);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+/* Markdown Open button - purple theme */
+.edit-summary-bar-open-btn-markdown {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+}
+
+.edit-summary-bar-open-btn-markdown:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #c4b5fd;
+}
+
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .edit-summary-bar-file {
@@ -349,5 +423,13 @@
 
   .edit-summary-bar-file:hover {
     background: rgba(34, 197, 94, 0.08);
+  }
+
+  .edit-summary-bar-file-markdown {
+    background: rgba(139, 92, 246, 0.03);
+  }
+
+  .edit-summary-bar-file-markdown:hover {
+    background: rgba(139, 92, 246, 0.08);
   }
 }

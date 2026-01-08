@@ -14,6 +14,7 @@ import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
+import { autoMemorySearch, closeDb as closeMemoryDb } from './memory-prompt-hook.js';
 
 // Get the directory of this script for kanban-mcp-server.js path
 const __filename = fileURLToPath(import.meta.url);
@@ -132,6 +133,7 @@ const {
   effort, // Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
   mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
   allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
+  autoMemorySearchEnabled = true, // Auto memory search from Brain (SDK 0.2.1+)
 } = config;
 
 // DEBUG: Log what we received from Rust
@@ -476,11 +478,42 @@ async function main() {
       // allowedTools filters from the preset - includes AskUserQuestion
       allowedTools: resolvedAllowedTools,
 
-      // 🗣️ Inject AskUserQuestion instructions into ALL projects via system prompt append
-      systemPrompt: {
-        type: 'preset',
-        preset: 'claude_code',
-        append: `
+      // 🧠 Auto Memory Search: Inject relevant knowledge from Second Brain
+      // This searches the Brain SQLite DB for memories related to the user's prompt
+      // and injects them into the system prompt for better context awareness
+      systemPrompt: (() => {
+        let memoryContext = '';
+
+        // Only search if enabled and we have a prompt
+        if (autoMemorySearchEnabled && prompt) {
+          console.error(`[DEBUG] Auto Memory Search enabled, searching Brain...`);
+          const memorySearchResult = autoMemorySearch(prompt, {
+            enabled: true,
+            maxMemories: 5,
+          });
+          memoryContext = memorySearchResult.context || '';
+
+          // Store result for later emission (after system event)
+          // We can't emit here because the streaming message doesn't exist yet
+          if (memorySearchResult.memories && memorySearchResult.memories.length > 0) {
+            console.error(`[DEBUG] Memory context found (${memorySearchResult.memories.length} memories, ${memoryContext.length} chars)`);
+            // Store in global for emission after first event
+            globalThis.__pendingMemoryContext = {
+              type: 'memory_context',
+              memories: memorySearchResult.memories,
+              keywords: memorySearchResult.keywords,
+              durationMs: memorySearchResult.durationMs,
+              count: memorySearchResult.memories.length,
+            };
+          }
+        } else {
+          console.error(`[DEBUG] Auto Memory Search: enabled=${autoMemorySearchEnabled}, prompt=${!!prompt}`);
+        }
+
+        return {
+          type: 'preset',
+          preset: 'claude_code',
+          append: `
 
 ## Interactive Questions (AskUserQuestion Tool)
 
@@ -504,8 +537,9 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.
-`
-      },
+${memoryContext}`
+        };
+      })(),
 
       // =============================================================================
       // PERMISSION CALLBACK - Handles AskUserQuestion and other permission requests
@@ -617,10 +651,20 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
 
     // Load MCP servers: priority is passed config > .mcp.json file
     let resolvedMcpServers = mcpServers;
+    console.error(`[MCP] === MCP SERVER LOADING ===`);
+    console.error(`[MCP] mcpServers from config: ${mcpServers ? JSON.stringify(Object.keys(mcpServers)) : 'null'}`);
+    console.error(`[MCP] cwd: ${cwd || 'null'}`);
+
     if (!resolvedMcpServers && cwd) {
       console.error(`[MCP] No mcpServers in config, loading from .mcp.json...`);
       resolvedMcpServers = loadMCPServersFromFile(cwd);
+    } else if (!resolvedMcpServers && !cwd) {
+      console.error(`[MCP] No cwd provided, loading global MCP servers only...`);
+      resolvedMcpServers = loadGlobalMCPServers();
     }
+
+    console.error(`[MCP] resolvedMcpServers: ${resolvedMcpServers ? JSON.stringify(Object.keys(resolvedMcpServers)) : 'null'}`);
+    console.error(`[MCP] === END MCP SERVER LOADING ===`);
 
     // Always add Kanban Tools, IDE Tools, and Semantic Search MCP servers (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
@@ -674,6 +718,8 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     });
 
     // Stream events
+    let memoryContextEmitted = false;
+
     for await (const event of stream) {
       // Log slash command info from system events
       if (event.type === 'system' && event.subtype === 'init') {
@@ -707,6 +753,14 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
       }
 
       emitEvent(event);
+
+      // 🧠 Emit pending memory context AFTER first event (so streaming message exists)
+      if (!memoryContextEmitted && globalThis.__pendingMemoryContext) {
+        console.error(`[DEBUG] Emitting pending memory_context event`);
+        emitEvent(globalThis.__pendingMemoryContext);
+        delete globalThis.__pendingMemoryContext;
+        memoryContextEmitted = true;
+      }
     }
 
     // Success - emit final complete event
@@ -714,10 +768,16 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
       type: 'complete',
     });
 
+    // 🧠 Cleanup memory hook database connection
+    closeMemoryDb();
+
     // 🦆 IMPORTANT: Exit process cleanly to avoid hanging
     // MCP servers may keep event loop open, so we need explicit exit
     process.exit(0);
   } catch (error) {
+    // 🧠 Cleanup memory hook database connection on error
+    closeMemoryDb();
+
     emitError(error);
     process.exit(1);
   }

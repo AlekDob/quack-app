@@ -3,10 +3,15 @@ import { invoke } from '@tauri-apps/api/core';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
 export default function GeneralSettings() {
   const [performanceMonitor, setPerformanceMonitor] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // GIF reactions settings
+  const enableToolGifs = useSettingsStore((s) => s.general.enableToolGifs);
+  const toggleToolGifs = useSettingsStore((s) => s.toggleToolGifs);
 
   useEffect(() => {
     loadPreferences();
@@ -48,6 +53,23 @@ export default function GeneralSettings() {
               checked={performanceMonitor}
               onChange={handleTogglePerformanceMonitor}
               disabled={loading}
+            />
+          }
+        />
+      </div>
+
+      <SectionHeader
+        title="Chat Experience"
+        description="Customize your AI chat experience"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="GIF Reactions"
+          description="Show animated GIF reactions when AI tools execute"
+          control={
+            <IOSSwitch
+              checked={enableToolGifs}
+              onChange={() => toggleToolGifs()}
             />
           }
         />

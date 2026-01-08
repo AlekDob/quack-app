@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import * as syncService from '../services/obsidianSyncService';
-import type { BrainSettings, SyncConflict, FileChangeEvent } from '../types/brainSync';
+import type { BrainSettings, SyncConflict, FileChangeEvent, SyncStatus } from '../types/brainSync';
 
 /**
  * Hook return type
@@ -17,14 +17,16 @@ import type { BrainSettings, SyncConflict, FileChangeEvent } from '../types/brai
 interface UseObsidianSyncReturn {
   /** Current sync settings */
   settings: BrainSettings | null;
+  /** Current sync status */
+  syncStatus: SyncStatus | null;
   /** Whether vault watcher is active */
   isWatching: boolean;
   /** Unresolved conflicts */
   conflicts: SyncConflict[];
   /** Whether sync operation is in progress */
   isSyncing: boolean;
-  /** Last sync timestamp (Unix ms) */
-  lastSyncTime: number | null;
+  /** Error message if operation failed */
+  error: string | null;
   /** Update a single setting */
   updateSetting: (key: keyof BrainSettings, value: string | boolean) => Promise<void>;
   /** Start vault file watcher */
@@ -37,6 +39,8 @@ interface UseObsidianSyncReturn {
   importAllFromVault: () => Promise<void>;
   /** Resolve a conflict */
   resolveConflict: (entityId: string, resolution: 'brain' | 'obsidian') => Promise<void>;
+  /** Resolve all conflicts with same resolution */
+  resolveAllConflicts: (resolution: 'brain' | 'obsidian') => Promise<void>;
   /** Open vault folder in file browser */
   openVaultFolder: () => Promise<void>;
   /** Refresh settings and status */
@@ -123,19 +127,23 @@ interface UseObsidianSyncReturn {
  */
 export function useObsidianSync(): UseObsidianSyncReturn {
   const [settings, setSettings] = useState<BrainSettings | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [isWatching, setIsWatching] = useState(false);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   /**
    * Load settings from backend
    */
   const loadSettings = useCallback(async () => {
     try {
+      setError(null);
       const s = await syncService.getSettings();
       setSettings(s);
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to load settings';
+      setError(errMsg);
       console.error('[useObsidianSync] Failed to load settings:', err);
     }
   }, []);
@@ -145,9 +153,12 @@ export function useObsidianSync(): UseObsidianSyncReturn {
    */
   const checkWatcherStatus = useCallback(async () => {
     try {
+      setError(null);
       const watching = await syncService.isVaultWatching();
       setIsWatching(watching);
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to check watcher status';
+      setError(errMsg);
       console.error('[useObsidianSync] Failed to check watcher status:', err);
     }
   }, []);
@@ -189,6 +200,36 @@ export function useObsidianSync(): UseObsidianSyncReturn {
   }, [loadSettings, checkWatcherStatus]);
 
   /**
+   * Auto-start watcher when sync is enabled and vault path is set
+   */
+  useEffect(() => {
+    const autoStartWatcher = async () => {
+      // Only auto-start if:
+      // 1. Settings are loaded
+      // 2. Sync is enabled
+      // 3. Vault path is configured
+      // 4. Watcher is not already running
+      if (
+        settings?.syncEnabled &&
+        settings?.vaultPath &&
+        settings?.autoSyncFromVault &&
+        !isWatching
+      ) {
+        console.log('[useObsidianSync] Auto-starting vault watcher...');
+        try {
+          await syncService.startVaultWatcher();
+          setIsWatching(true);
+          console.log('[useObsidianSync] Vault watcher auto-started successfully');
+        } catch (err) {
+          console.error('[useObsidianSync] Failed to auto-start vault watcher:', err);
+        }
+      }
+    };
+
+    autoStartWatcher();
+  }, [settings?.syncEnabled, settings?.vaultPath, settings?.autoSyncFromVault, isWatching]);
+
+  /**
    * Subscribe to file changes
    */
   useEffect(() => {
@@ -221,18 +262,29 @@ export function useObsidianSync(): UseObsidianSyncReturn {
 
     const handleSyncCompleted = (e: Event) => {
       setIsSyncing(false);
-      setLastSyncTime(Date.now());
+      setError(null);
 
       const detail = (e as CustomEvent).detail;
       if (detail?.conflicts) {
         setConflicts(detail.conflicts);
       }
+
+      // Update sync status
+      setSyncStatus({
+        lastSyncTime: Date.now(),
+        entityCount: detail?.entitiesSynced || 0,
+        conflictCount: detail?.conflicts?.length || 0,
+        isGeneratingEmbeddings: false,
+        embeddingProgress: 0,
+      });
     };
 
     const handleSyncError = (e: Event) => {
       setIsSyncing(false);
       const detail = (e as CustomEvent).detail;
-      console.error('[useObsidianSync] Sync error:', detail?.error);
+      const errMsg = detail?.error || 'Sync error occurred';
+      setError(errMsg);
+      console.error('[useObsidianSync] Sync error:', errMsg);
     };
 
     window.addEventListener(syncService.SYNC_EVENTS.SYNC_STARTED, handleSyncStarted);
@@ -251,8 +303,16 @@ export function useObsidianSync(): UseObsidianSyncReturn {
    */
   const updateSetting = useCallback(
     async (key: keyof BrainSettings, value: string | boolean) => {
-      await syncService.setSetting(key, value);
-      await loadSettings();
+      try {
+        setError(null);
+        await syncService.setSetting(key, value);
+        await loadSettings();
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Failed to update setting';
+        setError(errMsg);
+        console.error('[useObsidianSync] Failed to update setting:', err);
+        throw err;
+      }
     },
     [loadSettings]
   );
@@ -262,9 +322,12 @@ export function useObsidianSync(): UseObsidianSyncReturn {
    */
   const startWatcher = useCallback(async () => {
     try {
+      setError(null);
       await syncService.startVaultWatcher();
       setIsWatching(true);
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to start watcher';
+      setError(errMsg);
       console.error('[useObsidianSync] Failed to start watcher:', err);
       throw err;
     }
@@ -275,9 +338,12 @@ export function useObsidianSync(): UseObsidianSyncReturn {
    */
   const stopWatcher = useCallback(async () => {
     try {
+      setError(null);
       await syncService.stopVaultWatcher();
       setIsWatching(false);
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to stop watcher';
+      setError(errMsg);
       console.error('[useObsidianSync] Failed to stop watcher:', err);
       throw err;
     }
@@ -288,13 +354,25 @@ export function useObsidianSync(): UseObsidianSyncReturn {
    */
   const syncAllToVault = useCallback(async () => {
     setIsSyncing(true);
+    setError(null);
     try {
       const result = await syncService.syncAllToVault();
-      setLastSyncTime(Date.now());
+
       if (result.conflicts.length > 0) {
         setConflicts(result.conflicts);
       }
+
+      // Update sync status
+      setSyncStatus({
+        lastSyncTime: Date.now(),
+        entityCount: result.entitiesSynced,
+        conflictCount: result.conflicts.length,
+        isGeneratingEmbeddings: false,
+        embeddingProgress: 0,
+      });
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Sync to vault failed';
+      setError(errMsg);
       console.error('[useObsidianSync] Sync to vault failed:', err);
       throw err;
     } finally {
@@ -307,13 +385,25 @@ export function useObsidianSync(): UseObsidianSyncReturn {
    */
   const importAllFromVault = useCallback(async () => {
     setIsSyncing(true);
+    setError(null);
     try {
       const result = await syncService.importAllFromVault();
-      setLastSyncTime(Date.now());
+
       if (result.conflicts.length > 0) {
         setConflicts(result.conflicts);
       }
+
+      // Update sync status
+      setSyncStatus({
+        lastSyncTime: Date.now(),
+        entityCount: result.entitiesSynced,
+        conflictCount: result.conflicts.length,
+        isGeneratingEmbeddings: false,
+        embeddingProgress: 0,
+      });
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Import from vault failed';
+      setError(errMsg);
       console.error('[useObsidianSync] Import from vault failed:', err);
       throw err;
     } finally {
@@ -327,9 +417,12 @@ export function useObsidianSync(): UseObsidianSyncReturn {
   const resolveConflict = useCallback(
     async (entityId: string, resolution: 'brain' | 'obsidian') => {
       try {
+        setError(null);
         await syncService.resolveConflict(entityId, resolution);
         setConflicts((prev) => prev.filter((c) => c.entityId !== entityId));
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Failed to resolve conflict';
+        setError(errMsg);
         console.error('[useObsidianSync] Failed to resolve conflict:', err);
         throw err;
       }
@@ -338,12 +431,40 @@ export function useObsidianSync(): UseObsidianSyncReturn {
   );
 
   /**
+   * Resolve all conflicts with same resolution
+   */
+  const resolveAllConflicts = useCallback(
+    async (resolution: 'brain' | 'obsidian') => {
+      try {
+        setError(null);
+
+        // Resolve each conflict sequentially
+        for (const conflict of conflicts) {
+          await syncService.resolveConflict(conflict.entityId, resolution);
+        }
+
+        // Clear all conflicts
+        setConflicts([]);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Failed to resolve all conflicts';
+        setError(errMsg);
+        console.error('[useObsidianSync] Failed to resolve all conflicts:', err);
+        throw err;
+      }
+    },
+    [conflicts]
+  );
+
+  /**
    * Open vault folder
    */
   const openVaultFolder = useCallback(async () => {
     try {
+      setError(null);
       await syncService.openVaultFolder();
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to open vault folder';
+      setError(errMsg);
       console.error('[useObsidianSync] Failed to open vault folder:', err);
       throw err;
     }
@@ -359,16 +480,18 @@ export function useObsidianSync(): UseObsidianSyncReturn {
 
   return {
     settings,
+    syncStatus,
     isWatching,
     conflicts,
     isSyncing,
-    lastSyncTime,
+    error,
     updateSetting,
     startWatcher,
     stopWatcher,
     syncAllToVault,
     importAllFromVault,
     resolveConflict,
+    resolveAllConflicts,
     openVaultFolder,
     refresh,
   };

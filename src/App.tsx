@@ -79,6 +79,7 @@ import { useKanbanStore } from "./stores/kanbanStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
+import ObsidianSyncInitializer from "./components/ObsidianSyncInitializer";
 import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
@@ -9013,6 +9014,9 @@ You have access to all Bash tools to execute git commands like:
 
   return (
     <>
+      {/* Obsidian Sync Initializer - Auto-starts vault watcher when sync is enabled */}
+      <ObsidianSyncInitializer />
+
       {/* Drag region removed - now using data-tauri-drag-region on sidebar-header only */}
 
       {/* 🔐 Claude Auth Banner - Fixed at bottom when CLI not available */}
@@ -9367,6 +9371,16 @@ You have access to all Bash tools to execute git commands like:
                       }}
                       showMiniPanel={showKanbanMiniPanel}
                       onOpenTaskTab={openTaskTab}
+                      onOpenTerminal={async (path, label) => {
+                        // Open terminal in specified directory (worktree or project path)
+                        const projectName = label || path.split('/').pop() || 'Terminal';
+                        const uniqueProjects = [{ path, name: projectName }];
+                        await openTerminalWindow(uniqueProjects, {
+                          projectPath: path,
+                          command: '', // No initial command, just open in directory
+                          terminalLabel: label,
+                        });
+                      }}
                     />
                   );
                 }

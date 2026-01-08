@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import MessageList from './MessageList';
@@ -177,6 +177,9 @@ export default function ChatView({
   pendingQuestionIds,
   answeredQuestions,
 }: ChatViewProps) {
+  // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
+  const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
+
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
 
@@ -335,6 +338,38 @@ export default function ChatView({
     // Check if message has events (ClaudeEvent[] format)
     if (lastAssistantMessage.events && Array.isArray(lastAssistantMessage.events)) {
       lastAssistantMessage.events.forEach((event: any) => {
+        // Track Brain MCP tool results (mdFilePath is in the result, not input)
+        if (event.type === 'user' && event.message?.content && Array.isArray(event.message.content)) {
+          event.message.content.forEach((item: any) => {
+            if (item.type === 'tool_result' && item.content) {
+              try {
+                // Parse tool result content (could be string or already parsed)
+                const resultContent = typeof item.content === 'string'
+                  ? JSON.parse(item.content)
+                  : item.content;
+
+                // Check for mdFilePath from brain_create_entity or brain_add_observation
+                if (resultContent.mdFilePath && resultContent.mdFilePath.endsWith('.md')) {
+                  const mdPath = resultContent.mdFilePath;
+                  console.log('[ChatView] Detected brain MCP created file:', mdPath);
+
+                  if (!fileEdits.has(mdPath)) {
+                    fileEdits.set(mdPath, {
+                      filePath: mdPath,
+                      editCount: 1,
+                      lineNumbers: [],
+                      lineChanges: [],
+                      status: 'created',
+                    });
+                  }
+                }
+              } catch {
+                // Not JSON, skip
+              }
+            }
+          });
+        }
+
         if (event.type === 'assistant' && event.message?.content) {
           const content = event.message.content;
           if (Array.isArray(content)) {
@@ -440,6 +475,9 @@ export default function ChatView({
         const nextIndex = (currentIndex + 1) % modes.length;
         onThinkingModeChange(modes[nextIndex]);
 
+        // Increment reset counter to re-expand all ThinkingBlocks
+        setThinkingModeResetCounter(prev => prev + 1);
+
         console.log(`Switched to ${modes[nextIndex]} thinking mode`);
       }
 
@@ -479,6 +517,7 @@ export default function ChatView({
         agentAvatar={agentAvatar}
         projectName={projectName}
         gitBranch={gitBranch}
+        thinkingModeResetKey={thinkingModeResetCounter}
         onUserQuestionAnswer={onUserQuestionAnswer}
         pendingQuestionIds={pendingQuestionIds}
         answeredQuestions={answeredQuestions}

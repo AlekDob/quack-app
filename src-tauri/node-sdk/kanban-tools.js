@@ -263,6 +263,22 @@ const kanbanMoveTask = tool(
 );
 
 /**
+ * Attachment schema for images
+ */
+const attachmentSchema = z.object({
+  path: z.string().describe('Absolute path to the image file'),
+  name: z.string().optional().describe('Display name for the attachment (defaults to filename)'),
+  mimeType: z.string().optional().describe('MIME type of the image (e.g., "image/png", "image/jpeg")'),
+});
+
+/**
+ * Generate unique attachment ID
+ */
+function generateAttachmentId() {
+  return `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+}
+
+/**
  * Tool: kanban_create_task
  * Purpose: Claude can create subtasks for task decomposition
  */
@@ -281,6 +297,8 @@ const kanbanCreateTask = tool(
       .describe('ID of parent task if this is a subtask'),
     assignedAgentId: z.string().optional()
       .describe('ID of agent to assign. Omit to leave unassigned.'),
+    attachments: z.array(attachmentSchema).optional()
+      .describe('Image attachments for the task. Each attachment should have path (absolute file path) and optionally name, mimeType. Images will be displayed in the task card.'),
   },
   async (args) => {
     const tasks = loadKanbanTasks();
@@ -298,6 +316,19 @@ const kanbanCreateTask = tool(
       }
     }
 
+    // Process attachments - add IDs and extract filename if name not provided
+    const processedAttachments = args.attachments?.map(att => ({
+      id: generateAttachmentId(),
+      name: att.name || att.path.split('/').pop() || 'attachment',
+      path: att.path,
+      size: 0, // Size unknown from path alone
+      mimeType: att.mimeType || (att.path.toLowerCase().endsWith('.png') ? 'image/png' :
+                                  att.path.toLowerCase().endsWith('.jpg') || att.path.toLowerCase().endsWith('.jpeg') ? 'image/jpeg' :
+                                  att.path.toLowerCase().endsWith('.gif') ? 'image/gif' :
+                                  att.path.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/png'),
+      previewUrl: `file://${att.path}`, // Use file:// protocol for local images
+    })) || [];
+
     // Create new task
     const newTask = {
       id: generateTaskId(),
@@ -308,7 +339,9 @@ const kanbanCreateTask = tool(
       projectName: args.projectName,
       branch: args.branch,
       parentTaskId: args.parentTaskId,
+      attachments: processedAttachments.length > 0 ? processedAttachments : undefined,
       createdAt: Date.now(),
+      type: 'agent', // Default to agent task
       // assignedAgent will be set by frontend when agent picks up task
     };
 
@@ -335,11 +368,16 @@ const kanbanCreateTask = tool(
       parentTaskId: args.parentTaskId,
     });
 
+    const attachmentInfo = processedAttachments.length > 0
+      ? `\nAttachments: ${processedAttachments.length} image(s)`
+      : '';
+
     return {
       content: [{
         type: 'text',
         text: `Created task "${newTask.title}" (ID: ${newTask.id}) in ${args.status}` +
-              (args.parentTaskId ? `\nSubtask of: ${args.parentTaskId}` : ''),
+              (args.parentTaskId ? `\nSubtask of: ${args.parentTaskId}` : '') +
+              attachmentInfo,
       }],
     };
   }

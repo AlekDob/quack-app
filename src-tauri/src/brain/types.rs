@@ -12,6 +12,14 @@ pub struct BrainEntity {
     pub created_at: i64,
     pub updated_at: i64,
     pub md_file_path: Option<String>,
+    // Obsidian sync metadata
+    pub source_file: Option<String>,        // Path to source file
+    pub date: Option<String>,               // YYYY-MM-DD format
+    pub daily_link: Option<String>,         // WikiLink to diary e.g. "[[2026-01-08]]"
+    pub author: Option<String>,             // Who created e.g. "agent-jack"
+    pub status: Option<String>,             // active|deprecated|draft|archived
+    pub confidence: Option<String>,         // high|medium|low|outdated
+    pub aliases: Option<Vec<String>>,       // Alternative names
 }
 
 /// Observation attached to an entity (like MCP Memory)
@@ -31,6 +39,16 @@ pub struct BrainRelation {
     pub from_entity_id: String,
     pub to_entity_id: String,
     pub relation_type: String,
+    pub created_at: i64,
+}
+
+/// WikiLink extracted from markdown content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WikiLink {
+    pub id: String,
+    pub from_entity_id: String,
+    pub to_entity_name: String,  // Name, not ID - may not exist yet
     pub created_at: i64,
 }
 
@@ -183,4 +201,36 @@ pub struct BrainEntityWithSync {
     pub last_synced_at: Option<i64>,
     pub sync_source: Option<String>,
     pub vault_relative_path: Option<String>,
+    // Obsidian sync metadata
+    pub source_file: Option<String>,
+    pub date: Option<String>,
+    pub daily_link: Option<String>,
+    pub author: Option<String>,
+    pub status: Option<String>,
+    pub confidence: Option<String>,
+    pub aliases: Option<Vec<String>>,
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+/// Map entity type tag to Obsidian folder name
+pub fn get_folder_for_tag(tag: &str) -> &'static str {
+    match tag {
+        "component" => "components",
+        "function" => "functions",
+        "api" => "api",
+        "pattern" => "patterns",
+        "bug" | "bug_fix" => "bugs",
+        "decision" => "decisions",
+        "task" => "tasks",
+        "config" => "config",
+        "idea" => "ideas",
+        "todo" => "todos",
+        "human" => "humans",
+        "note" => "notes",
+        "diary" => "diary",
+        _ => "notes",  // default fallback
+    }
 }

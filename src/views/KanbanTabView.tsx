@@ -34,6 +34,8 @@ interface KanbanTabViewProps {
   showMiniPanel?: boolean;
   // Task tab handling
   onOpenTaskTab?: (task: KanbanTask) => void;
+  // Open terminal in specified directory (for worktree tasks)
+  onOpenTerminal?: (path: string, label?: string) => void;
 }
 
 /**
@@ -66,6 +68,7 @@ function KanbanTabView({
   onToggleMiniPanel,
   showMiniPanel,
   onOpenTaskTab,
+  onOpenTerminal,
 }: KanbanTabViewProps) {
   if (!isActive || tab.type !== 'kanban') {
     return null;
@@ -97,6 +100,7 @@ function KanbanTabView({
         onToggleMiniPanel={onToggleMiniPanel}
         showMiniPanel={showMiniPanel}
         onOpenTaskTab={onOpenTaskTab}
+        onOpenTerminal={onOpenTerminal}
       />
     </div>
   );

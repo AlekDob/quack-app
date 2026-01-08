@@ -16,6 +16,7 @@ import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
 import { TaskWidget } from './TaskWidget';
 import AskUserQuestionWidget from './AskUserQuestionWidget';
+import ToolGifInline from './ToolGifInline';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent, AskUserQuestionAnswers } from '../types';
@@ -182,6 +183,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             const toolId = content.id;
             const toolResult = toolResults.get(toolId);
 
+            // 🦆 DEBUG: Log every tool_use being processed
+            console.log(`🔧 [StreamMessage] TOOL_USE detected: name="${content.name}" id="${toolId}" toolName="${toolName}"`);
+
             // Debug logging for Task tool
             if (toolName === 'task') {
               console.log('🎯 [StreamMessage] Task tool detected!', {
@@ -196,67 +200,77 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             // Edit tool
             if (toolName === 'edit' && input?.file_path) {
               return (
-                <EditWidget
-                  key={idx}
-                  file_path={input.file_path}
-                  old_string={input.old_string}
-                  new_string={input.new_string}
-                  result={toolResult}
-                  onFilePathClick={onFilePathClick}
-                />
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'edit'} toolId={toolId} />
+                  <EditWidget
+                    file_path={input.file_path}
+                    old_string={input.old_string}
+                    new_string={input.new_string}
+                    result={toolResult}
+                    onFilePathClick={onFilePathClick}
+                  />
+                </React.Fragment>
               );
             }
 
             // Write tool
             if (toolName === 'write' && input?.file_path && input?.content) {
               return (
-                <WriteWidget
-                  key={idx}
-                  filePath={input.file_path}
-                  content={input.content}
-                  result={toolResult}
-                  onFilePathClick={onFilePathClick}
-                />
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'write'} toolId={toolId} />
+                  <WriteWidget
+                    filePath={input.file_path}
+                    content={input.content}
+                    result={toolResult}
+                    onFilePathClick={onFilePathClick}
+                  />
+                </React.Fragment>
               );
             }
 
             // Bash tool
             if (toolName === 'bash' && input?.command) {
               return (
-                <BashWidget
-                  key={idx}
-                  command={input.command}
-                  description={input.description}
-                  result={toolResult}
-                />
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'bash'} toolId={toolId} />
+                  <BashWidget
+                    command={input.command}
+                    description={input.description}
+                    result={toolResult}
+                  />
+                </React.Fragment>
               );
             }
 
             // Read tool
             if (toolName === 'read' && input?.file_path) {
               return (
-                <ReadWidget
-                  key={idx}
-                  filePath={input.file_path}
-                  result={toolResult}
-                  onFilePathClick={onFilePathClick}
-                />
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
+                  <ReadWidget
+                    filePath={input.file_path}
+                    result={toolResult}
+                    onFilePathClick={onFilePathClick}
+                  />
+                </React.Fragment>
               );
             }
 
             // Grep tool
             if (toolName === 'grep' && input?.pattern) {
               return (
-                <GrepWidget
-                  key={idx}
-                  pattern={input.pattern}
-                  path={input.path}
-                  result={toolResult}
-                />
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'grep'} toolId={toolId} />
+                  <GrepWidget
+                    pattern={input.pattern}
+                    path={input.path}
+                    result={toolResult}
+                  />
+                </React.Fragment>
               );
             }
 
-            // TodoWrite tool
+            // TodoWrite tool - no GIF (skipped in ToolGifInline)
             if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
               return (
                 <TodoWriteWidget
@@ -267,7 +281,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // ExitPlanMode tool
+            // ExitPlanMode tool - no GIF
             if (toolName === 'exitplanmode' && input?.plan) {
               return (
                 <ExitPlanModeWidget
@@ -279,7 +293,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // AskUserQuestion tool - interactive questions from agent
+            // AskUserQuestion tool - no GIF (skipped in ToolGifInline)
             if (toolName === 'askuserquestion' && input?.questions && Array.isArray(input.questions)) {
               const isPending = pendingQuestionIds?.has(toolId);
               const existingAnswer = answeredQuestions?.get(toolId);
@@ -306,34 +320,40 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               console.log('🤖 [StreamMessage] RENDERING Task widget for droid:', subagentType);
 
               return (
-                <TaskWidget
-                  key={idx}
-                  subagentType={subagentType}
-                  description={description}
-                  isLoading={!toolResult}
-                  workingDirectory={workingDirectory}
-                />
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'task'} toolId={toolId} />
+                  <TaskWidget
+                    subagentType={subagentType}
+                    description={description}
+                    isLoading={!toolResult}
+                    workingDirectory={workingDirectory}
+                  />
+                </React.Fragment>
               );
             }
 
+            // Generic fallback for MCP and other tools
             const toolColor = getToolColor(content.name || '');
             return (
-              <div key={idx} className="tool-widget unknown-tool-widget" style={{ borderColor: toolColor }}>
-                <div className="tool-widget-header">
-                  <div className="tool-widget-title" style={{ color: toolColor }}>
-                    <ToolIcon name={content.name || ''} />
-                    <span>Tool: {content.name}</span>
-                  </div>
-                  {!toolResult && (
-                    <div className="tool-widget-loading">
-                      <div className="spinner"></div>
+              <React.Fragment key={idx}>
+                <ToolGifInline toolName={content.name || 'unknown'} toolId={toolId} />
+                <div className="tool-widget unknown-tool-widget" style={{ borderColor: toolColor }}>
+                  <div className="tool-widget-header">
+                    <div className="tool-widget-title" style={{ color: toolColor }}>
+                      <ToolIcon name={content.name || ''} />
+                      <span>Tool: {content.name}</span>
                     </div>
-                  )}
+                    {!toolResult && (
+                      <div className="tool-widget-loading">
+                        <div className="spinner"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="tool-widget-content">
+                    <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>
+                  </div>
                 </div>
-                <div className="tool-widget-content">
-                  <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>
-                </div>
-              </div>
+              </React.Fragment>
             );
           }
 

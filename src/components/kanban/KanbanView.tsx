@@ -72,6 +72,8 @@ interface KanbanViewProps {
   showMiniPanel?: boolean;
   // Open task in new tab
   onOpenTaskTab?: (task: KanbanTask) => void;
+  // Open terminal in specified directory (for worktree tasks)
+  onOpenTerminal?: (path: string, label?: string) => void;
 }
 
 export default function KanbanView({
@@ -99,6 +101,7 @@ export default function KanbanView({
   onToggleMiniPanel,
   showMiniPanel = false,
   onOpenTaskTab,
+  onOpenTerminal,
 }: KanbanViewProps) {
   const {
     tasks,
@@ -579,6 +582,7 @@ export default function KanbanView({
             onTaskKill={handleCardKill}
             onTaskStart={handleStartTask}
             onProjectClick={onProjectClick}
+            onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
             shellOutputs={shellOutputsForColumns}
@@ -601,6 +605,7 @@ export default function KanbanView({
             onTaskEdit={handleTaskEdit}
             onTaskKill={handleCardKill}
             onProjectClick={onProjectClick}
+            onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
             shellOutputs={shellOutputsForColumns}
@@ -623,6 +628,7 @@ export default function KanbanView({
             onTaskEdit={handleTaskEdit}
             onTaskKill={handleCardKill}
             onProjectClick={onProjectClick}
+            onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
             shellOutputs={shellOutputsForColumns}

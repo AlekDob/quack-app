@@ -69,6 +69,7 @@ interface KanbanColumnProps {
   onTaskKill?: (taskId: string) => void; // Kill shell/watch process
   onTaskStart?: (task: KanbanTask) => void; // Start TODO task: move to in_progress, open chat, send prompt
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
+  onOpenTerminal?: (path: string, label?: string) => void; // Open terminal in specified directory (for worktree tasks)
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
   chatSessions?: Map<string, ChatMessage[]>;
@@ -98,6 +99,7 @@ export default function KanbanColumn({
   onTaskKill,
   onTaskStart,
   onProjectClick,
+  onOpenTerminal,
   chatLoadingMap,
   chatSessions,
   shellOutputs,
@@ -341,6 +343,7 @@ export default function KanbanColumn({
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
                       onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
                       onProjectClick={onProjectClick}
+                      onOpenTerminal={onOpenTerminal}
                     />
                   );
                 })}
@@ -379,6 +382,7 @@ export default function KanbanColumn({
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
                       onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
                       onProjectClick={onProjectClick}
+                      onOpenTerminal={onOpenTerminal}
                     />
                   );
                 })}
@@ -418,6 +422,7 @@ export default function KanbanColumn({
                   onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
                   onStart={onTaskStart ? () => onTaskStart(task) : undefined}
                   onProjectClick={onProjectClick}
+                  onOpenTerminal={onOpenTerminal}
                 />
               );
             })

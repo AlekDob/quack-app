@@ -23,8 +23,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import Database from 'better-sqlite3';
 
@@ -58,8 +58,414 @@ function getDb() {
 }
 
 // =============================================================================
+// SETTINGS & AUTO-SYNC
+// =============================================================================
+
+/**
+ * Get a setting from brain_settings table
+ */
+function getSetting(key, defaultValue = '') {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT value FROM brain_settings WHERE key = ?').get(key);
+    return row ? row.value : defaultValue;
+  } catch (error) {
+    console.error(`[BrainMCP] Error getting setting ${key}:`, error.message);
+    return defaultValue;
+  }
+}
+
+/**
+ * Check if auto-sync to vault is enabled
+ * Returns true only if ALL conditions are met:
+ * 1. sync_enabled = 'true'
+ * 2. auto_sync_to_vault = 'true'
+ * 3. vault_path is non-empty
+ */
+function shouldAutoSyncToVault() {
+  const syncEnabledRaw = getSetting('sync_enabled', 'false');
+  const autoSyncRaw = getSetting('auto_sync_to_vault', 'false');
+  const vaultPath = getSetting('vault_path', '');
+
+  const syncEnabled = syncEnabledRaw === 'true';
+  const autoSyncToVault = autoSyncRaw === 'true';
+  const hasVaultPath = vaultPath.length > 0;
+
+  // Detailed logging for debugging
+  console.error(`[BrainMCP] === AUTO-SYNC CHECK ===`);
+  console.error(`[BrainMCP]   sync_enabled: raw="${syncEnabledRaw}" => ${syncEnabled}`);
+  console.error(`[BrainMCP]   auto_sync_to_vault: raw="${autoSyncRaw}" => ${autoSyncToVault}`);
+  console.error(`[BrainMCP]   vault_path: "${vaultPath}" => hasPath=${hasVaultPath}`);
+
+  const result = syncEnabled && autoSyncToVault && hasVaultPath;
+  console.error(`[BrainMCP]   RESULT: ${result ? 'WILL SYNC' : 'WILL NOT SYNC'}`);
+  console.error(`[BrainMCP] === END CHECK ===`);
+
+  return result;
+}
+
+/**
+ * Get the markdown directory path based on settings
+ */
+function getMarkdownDir() {
+  const vaultPath = getSetting('vault_path', '');
+  if (!vaultPath) {
+    return join(homedir(), '.quack', 'brain', 'markdown');
+  }
+
+  const syncStructure = getSetting('sync_structure', 'subfolder');
+  if (syncStructure === 'subfolder') {
+    return join(vaultPath, 'QuackBrain');
+  }
+  return vaultPath;
+}
+
+/**
+ * Sync an entity to markdown file (new Obsidian schema)
+ */
+function syncEntityToMarkdown(entity) {
+  if (!shouldAutoSyncToVault()) {
+    console.error('[BrainMCP] Auto-sync disabled, skipping markdown creation');
+    return null;
+  }
+
+  try {
+    const vaultPath = getVaultPath();
+    if (!vaultPath) {
+      console.error('[BrainMCP] No vault path configured, skipping markdown sync');
+      return null;
+    }
+
+    const today = getTodayDate();
+    const date = entity.date || today;
+
+    // Determine folder based on tag and project
+    const tagFolder = getTagFolder(entity.entityType);
+    let filePath;
+
+    if (entity.entityType === 'diary') {
+      // Diary entries go directly to diary folder
+      filePath = join(vaultPath, 'QuackBrain', 'diary', `${date}.md`);
+    } else if (entity.entityType === 'human' || !entity.projectId) {
+      // Global entities (human or no project)
+      if (tagFolder) {
+        filePath = join(vaultPath, 'QuackBrain', 'global', tagFolder, `${slugify(entity.name)}.md`);
+      } else {
+        filePath = join(vaultPath, 'QuackBrain', 'global', `${slugify(entity.name)}.md`);
+      }
+    } else {
+      // Project-scoped entities
+      if (tagFolder) {
+        filePath = join(vaultPath, 'QuackBrain', 'projects', entity.projectId, tagFolder, `${slugify(entity.name)}.md`);
+      } else {
+        filePath = join(vaultPath, 'QuackBrain', 'projects', entity.projectId, `${slugify(entity.name)}.md`);
+      }
+    }
+
+    // Ensure directory exists
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    // Build markdown content with new schema
+    let md = '---\n';
+    md += `id: "${entity.id}"\n`;
+    md += `tag: ${entity.entityType}\n`;
+
+    if (entity.projectId) {
+      md += `project: ${entity.projectId}\n`;
+    }
+    if (entity.sourceFile) {
+      md += `file: ${entity.sourceFile}\n`;
+    }
+
+    md += `date: ${date}\n`;
+    md += `daily: "[[${date}]]"\n`;
+
+    if (entity.author) {
+      md += `author: ${entity.author}\n`;
+    }
+    md += `status: ${entity.status || 'active'}\n`;
+    md += `confidence: ${entity.confidence || 'high'}\n`;
+
+    if (entity.aliases && entity.aliases.length > 0) {
+      md += 'aliases:\n';
+      for (const alias of entity.aliases) {
+        md += `  - ${alias}\n`;
+      }
+    }
+
+    md += '---\n\n';
+    md += `# ${entity.name}\n\n`;
+
+    if (entity.observations && entity.observations.length > 0) {
+      md += '## Observations\n\n';
+      for (const obs of entity.observations) {
+        md += `- ${obs.content || obs}\n`;
+      }
+      md += '\n';
+    }
+
+    // Write file
+    writeFileSync(filePath, md, 'utf-8');
+    console.error(`[BrainMCP] Synced entity to markdown: ${filePath}`);
+
+    // Update md_file_path in database
+    const db = getDb();
+    db.prepare('UPDATE entities SET md_file_path = ? WHERE id = ?').run(filePath, entity.id);
+
+    // Ensure diary exists and add entry (skip for diary entities themselves)
+    if (entity.entityType !== 'diary') {
+      ensureDiaryExists(vaultPath, date);
+      appendToDiary(vaultPath, date, entity.name, entity.entityType, getEntityDescription(entity));
+    }
+
+    return filePath;
+  } catch (error) {
+    console.error(`[BrainMCP] Error syncing to markdown:`, error.message);
+    return null;
+  }
+}
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Get the vault path from settings
+ */
+function getVaultPath() {
+  return getSetting('vault_path', '');
+}
+
+/**
+ * Map entity type (tag) to folder name
+ */
+function getTagFolder(tag) {
+  const mapping = {
+    'component': 'components',
+    'function': 'functions',
+    'api': 'api',
+    'pattern': 'patterns',
+    'bug': 'bugs',
+    'bug_fix': 'bugs',
+    'decision': 'decisions',
+    'task': 'tasks',
+    'config': 'config',
+    'idea': 'ideas',
+    'todo': 'todos',
+    'human': 'humans',
+    'note': 'notes',
+    'diary': 'diary',
+    'glossary': '',
+    'preference': 'preferences',
+    'fact': 'facts',
+    'person': 'people',
+    'project': 'projects',
+    'document': 'documents',
+    'gotcha': 'gotchas',
+    'tool': 'tools',
+    'technology': 'technologies',
+  };
+  return mapping[tag] || 'notes';
+}
+
+/**
+ * Convert entity name to URL-friendly slug
+ */
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+/**
+ * Get current date in YYYY-MM-DD format
+ */
+function getTodayDate() {
+  return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Ensure diary file exists for a given date
+ */
+function ensureDiaryExists(vaultPath, date) {
+  const diaryDir = join(vaultPath, 'QuackBrain', 'diary');
+  if (!existsSync(diaryDir)) {
+    mkdirSync(diaryDir, { recursive: true });
+  }
+
+  const diaryPath = join(diaryDir, `${date}.md`);
+  if (!existsSync(diaryPath)) {
+    const content = `---\ntag: diary\ndate: ${date}\n---\n\n# ${date}\n\n## Notes Created Today\n\n`;
+    writeFileSync(diaryPath, content, 'utf-8');
+    console.error(`[BrainMCP] Created diary for ${date}: ${diaryPath}`);
+  }
+}
+
+/**
+ * Append an entry to the daily diary
+ */
+function appendToDiary(vaultPath, date, noteName, tag, description) {
+  const diaryPath = join(vaultPath, 'QuackBrain', 'diary', `${date}.md`);
+
+  if (!existsSync(diaryPath)) {
+    ensureDiaryExists(vaultPath, date);
+  }
+
+  let content = readFileSync(diaryPath, 'utf-8');
+
+  const entry = `- [[${noteName}]] - #${tag} - ${description}`;
+
+  // Check if entry already exists
+  if (content.includes(`[[${noteName}]]`)) {
+    console.error(`[BrainMCP] Diary entry already exists for: ${noteName}`);
+    return; // Already added
+  }
+
+  // Find Notes Created Today section
+  const sectionMarker = '## Notes Created Today';
+  const sectionIndex = content.indexOf(sectionMarker);
+
+  if (sectionIndex !== -1) {
+    const afterSection = sectionIndex + sectionMarker.length;
+    const nextSection = content.indexOf('\n## ', afterSection);
+    const insertPos = nextSection !== -1 ? nextSection : content.length;
+
+    // Find last entry in section
+    const sectionContent = content.substring(afterSection, insertPos);
+    const lastNewline = sectionContent.lastIndexOf('\n');
+    const actualInsertPos = afterSection + lastNewline + 1;
+
+    content = content.slice(0, actualInsertPos) + entry + '\n' + content.slice(actualInsertPos);
+  } else {
+    content += `\n${sectionMarker}\n\n${entry}\n`;
+  }
+
+  writeFileSync(diaryPath, content, 'utf-8');
+  console.error(`[BrainMCP] Added diary entry for: ${noteName}`);
+}
+
+/**
+ * Get a short description from entity for diary entry
+ */
+function getEntityDescription(entity) {
+  if (entity.observations && entity.observations.length > 0) {
+    const first = entity.observations[0];
+    const content = first.content || first;
+    return content.substring(0, 50) + (content.length > 50 ? '...' : '');
+  }
+  return entity.name;
+}
+
+// =============================================================================
+// WIKILINKS PARSING
+// =============================================================================
+
+/**
+ * Parse [[WikiLinks]] from markdown content
+ *
+ * Supports two formats:
+ * - [[NoteName]] - Simple link
+ * - [[NoteName|Display Text]] - Link with custom display text
+ *
+ * @param {string} content - Markdown content to parse
+ * @returns {Array<{targetName: string, displayText: string|null}>} Parsed WikiLinks
+ */
+function parseWikiLinks(content) {
+  const links = [];
+  const seen = new Set();
+
+  // Regex pattern: [[target]] or [[target|display]]
+  const regex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    const targetName = match[1].trim();
+    const displayText = match[2] ? match[2].trim() : null;
+
+    if (targetName && !seen.has(targetName.toLowerCase())) {
+      seen.add(targetName.toLowerCase());
+      links.push({ targetName, displayText });
+    }
+  }
+
+  return links;
+}
+
+/**
+ * Store WikiLinks for an entity in the database
+ *
+ * Clears existing WikiLinks for the entity and inserts new ones.
+ *
+ * @param {string} entityId - Entity ID
+ * @param {Array<{targetName: string}>} wikilinks - Parsed WikiLinks
+ * @returns {number} Number of WikiLinks stored
+ */
+function storeWikiLinks(entityId, wikilinks) {
+  const db = getDb();
+  const timestamp = now();
+
+  // Delete existing WikiLinks for this entity
+  db.prepare('DELETE FROM wikilinks WHERE from_entity_id = ?').run(entityId);
+
+  // Insert new WikiLinks
+  const insertStmt = db.prepare(`
+    INSERT INTO wikilinks (id, from_entity_id, to_entity_name, created_at)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  let inserted = 0;
+  for (const link of wikilinks) {
+    const linkId = uuid();
+    insertStmt.run(linkId, entityId, link.targetName, timestamp);
+    inserted++;
+  }
+
+  console.error(`[BrainMCP] Stored ${inserted} wikilinks for entity ${entityId}`);
+  return inserted;
+}
+
+/**
+ * Extract and store WikiLinks from entity observations
+ *
+ * @param {string} entityId - Entity ID
+ * @returns {number} Number of WikiLinks stored
+ */
+function extractAndStoreWikiLinksForEntity(entityId) {
+  const db = getDb();
+
+  // Get entity name to filter self-links
+  const entity = db.prepare('SELECT name FROM entities WHERE id = ?').get(entityId);
+  if (!entity) return 0;
+
+  // Get all observations for the entity
+  const observations = db.prepare(
+    'SELECT content FROM observations WHERE entity_id = ?'
+  ).all(entityId);
+
+  // Parse WikiLinks from all observations
+  const allLinks = [];
+  for (const obs of observations) {
+    const links = parseWikiLinks(obs.content);
+    allLinks.push(...links);
+  }
+
+  // Filter out self-links and duplicates
+  const seen = new Set();
+  const filteredLinks = allLinks.filter(link => {
+    const key = link.targetName.toLowerCase();
+    if (key === entity.name.toLowerCase()) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Store the WikiLinks
+  return storeWikiLinks(entityId, filteredLinks);
+}
 
 /**
  * Generate UUID v4
@@ -173,7 +579,18 @@ async function handleBrainSearch(args) {
  * Create a new entity with observations
  */
 async function handleBrainCreateEntity(args) {
-  const { name, entityType, observations = [], projectId = null } = args;
+  const {
+    name,
+    entityType,
+    observations = [],
+    projectId = null,
+    author = 'claude',
+    date = null,
+    status = 'active',
+    confidence = 'high',
+    sourceFile = null,
+    aliases = [],
+  } = args;
 
   console.error(`[BrainMCP] Creating entity: "${name}" (type: ${entityType})`);
 
@@ -181,6 +598,7 @@ async function handleBrainCreateEntity(args) {
     const db = getDb();
     const entityId = uuid();
     const timestamp = now();
+    const entityDate = date || getTodayDate();
 
     // Insert entity
     db.prepare(`
@@ -197,14 +615,37 @@ async function handleBrainCreateEntity(args) {
       `).run(obsId, entityId, content, timestamp);
     }
 
-    const entity = getEntityWithObservations(entityId);
+    // Get base entity with observations
+    const baseEntity = getEntityWithObservations(entityId);
+
+    // Extend with new fields for markdown sync
+    const entity = {
+      ...baseEntity,
+      author,
+      date: entityDate,
+      status,
+      confidence,
+      sourceFile,
+      aliases,
+    };
 
     console.error(`[BrainMCP] Created entity: ${entityId}`);
+
+    // Extract and store WikiLinks from observations
+    let wikilinksCount = 0;
+    if (observations && observations.length > 0) {
+      wikilinksCount = extractAndStoreWikiLinksForEntity(entityId);
+    }
+
+    // Auto-sync to markdown if enabled
+    const mdFilePath = syncEntityToMarkdown(entity);
 
     return JSON.stringify({
       success: true,
       message: `Entity "${name}" created successfully`,
       entity,
+      mdFilePath,
+      wikilinksExtracted: wikilinksCount,
     }, null, 2);
 
   } catch (error) {
@@ -266,6 +707,12 @@ async function handleBrainAddObservation(args) {
 
     console.error(`[BrainMCP] Added observation to: ${targetEntityId}`);
 
+    // Extract and update WikiLinks (re-process all observations)
+    const wikilinksCount = extractAndStoreWikiLinksForEntity(targetEntityId);
+
+    // Auto-sync to markdown if enabled
+    const mdFilePath = syncEntityToMarkdown(entity);
+
     return JSON.stringify({
       success: true,
       message: 'Observation added successfully',
@@ -275,6 +722,8 @@ async function handleBrainAddObservation(args) {
         content,
         createdAt: timestamp,
       },
+      mdFilePath,
+      wikilinksExtracted: wikilinksCount,
     }, null, 2);
 
   } catch (error) {
@@ -472,6 +921,115 @@ async function handleBrainListEntities(args) {
   }
 }
 
+/**
+ * Handle brain_get_backlinks tool
+ * Get all entities that link TO a given entity name via [[WikiLinks]]
+ */
+async function handleBrainGetBacklinks(args) {
+  const { entityName } = args;
+
+  console.error(`[BrainMCP] Getting backlinks for: "${entityName}"`);
+
+  try {
+    const db = getDb();
+
+    // Query WikiLinks table for all links pointing to this entity name
+    // Join with entities table to get full entity info
+    const backlinks = db.prepare(`
+      SELECT w.from_entity_id, e.name, e.entity_type, w.created_at
+      FROM wikilinks w
+      JOIN entities e ON w.from_entity_id = e.id
+      WHERE LOWER(w.to_entity_name) = LOWER(?)
+      ORDER BY w.created_at DESC
+    `).all(entityName);
+
+    const formattedBacklinks = backlinks.map(b => ({
+      fromEntityId: b.from_entity_id,
+      fromEntityName: b.name,
+      fromEntityType: b.entity_type,
+      createdAt: b.created_at,
+    }));
+
+    console.error(`[BrainMCP] Found ${formattedBacklinks.length} backlinks for "${entityName}"`);
+
+    return JSON.stringify({
+      success: true,
+      targetName: entityName,
+      count: formattedBacklinks.length,
+      backlinks: formattedBacklinks,
+    }, null, 2);
+
+  } catch (error) {
+    console.error(`[BrainMCP] Get backlinks error: ${error.message}`);
+    return JSON.stringify({
+      success: false,
+      error: 'Get backlinks failed',
+      message: error.message,
+    }, null, 2);
+  }
+}
+
+/**
+ * Handle brain_get_wikilinks tool
+ * Get all WikiLinks FROM a given entity
+ */
+async function handleBrainGetWikilinks(args) {
+  const { entityId, entityName } = args;
+
+  console.error(`[BrainMCP] Getting wikilinks for: ${entityId || entityName}`);
+
+  try {
+    const db = getDb();
+
+    // Resolve entity ID from name if needed
+    let targetEntityId = entityId;
+    if (!targetEntityId && entityName) {
+      const entity = db.prepare('SELECT id FROM entities WHERE name = ?').get(entityName);
+      if (entity) targetEntityId = entity.id;
+    }
+
+    if (!targetEntityId) {
+      return JSON.stringify({
+        success: false,
+        error: 'Entity not found',
+        message: `No entity found with ID "${entityId}" or name "${entityName}"`,
+      }, null, 2);
+    }
+
+    // Get all WikiLinks from this entity
+    const wikilinks = db.prepare(`
+      SELECT id, from_entity_id, to_entity_name, created_at
+      FROM wikilinks
+      WHERE from_entity_id = ?
+      ORDER BY created_at ASC
+    `).all(targetEntityId);
+
+    const formattedWikilinks = wikilinks.map(w => ({
+      id: w.id,
+      fromEntityId: w.from_entity_id,
+      toEntityName: w.to_entity_name,
+      createdAt: w.created_at,
+    }));
+
+    console.error(`[BrainMCP] Found ${formattedWikilinks.length} wikilinks from entity`);
+
+    return JSON.stringify({
+      success: true,
+      entityId: targetEntityId,
+      count: formattedWikilinks.length,
+      wikilinks: formattedWikilinks,
+    }, null, 2);
+
+  } catch (error) {
+    console.error(`[BrainMCP] Get wikilinks error: ${error.message}`);
+    return JSON.stringify({
+      success: false,
+      error: 'Get wikilinks failed',
+      message: error.message,
+    }, null, 2);
+  }
+}
+
 // =============================================================================
 // TOOL DEFINITIONS
 // =============================================================================
@@ -498,7 +1056,7 @@ const TOOLS = [
   },
   {
     name: 'brain_create_entity',
-    description: 'Create a new entity in the Quack Brain knowledge graph. Use this to save new memories, patterns, decisions, or other knowledge.',
+    description: 'Create a new entity in the Quack Brain knowledge graph. Use this to save new memories, patterns, decisions, or other knowledge. Entities are auto-synced to Obsidian vault with daily diary integration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -508,7 +1066,7 @@ const TOOLS = [
         },
         entityType: {
           type: 'string',
-          description: 'Type of entity: preference, fact, decision, pattern, bug_fix, person, project, diary, document, gotcha, tool, technology.',
+          description: 'Type of entity: preference, fact, decision, pattern, bug_fix, person, project, diary, document, gotcha, tool, technology, component, function, api, task, config, idea, todo, human, note, glossary.',
         },
         observations: {
           type: 'array',
@@ -518,7 +1076,38 @@ const TOOLS = [
         },
         projectId: {
           type: 'string',
-          description: 'Optional project ID to scope this entity to a specific project.',
+          description: 'Optional project ID to scope this entity to a specific project. Project entities go to projects/<projectId>/<tagFolder>/, global entities go to global/<tagFolder>/.',
+        },
+        author: {
+          type: 'string',
+          default: 'claude',
+          description: 'Author of the entity (e.g., "claude", "alek", "system"). Defaults to "claude".',
+        },
+        date: {
+          type: 'string',
+          description: 'Date for the entity in YYYY-MM-DD format. Defaults to today. Used for daily diary linking.',
+        },
+        status: {
+          type: 'string',
+          enum: ['active', 'archived', 'draft', 'deprecated'],
+          default: 'active',
+          description: 'Status of the entity. Defaults to "active".',
+        },
+        confidence: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          default: 'high',
+          description: 'Confidence level of the knowledge. Defaults to "high".',
+        },
+        sourceFile: {
+          type: 'string',
+          description: 'Optional source file path that this entity relates to.',
+        },
+        aliases: {
+          type: 'array',
+          items: { type: 'string' },
+          default: [],
+          description: 'Alternative names for this entity (for Obsidian aliases).',
         },
       },
       required: ['name', 'entityType'],
@@ -612,6 +1201,37 @@ const TOOLS = [
       },
     },
   },
+  {
+    name: 'brain_get_backlinks',
+    description: 'Get all entities that link TO a given entity via [[WikiLinks]]. This is useful for Obsidian-style graph navigation and understanding how knowledge is connected. Backlinks show which entities reference the target entity.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entityName: {
+          type: 'string',
+          description: 'Name of the entity to find backlinks for. Case-insensitive matching.',
+        },
+      },
+      required: ['entityName'],
+    },
+  },
+  {
+    name: 'brain_get_wikilinks',
+    description: 'Get all [[WikiLinks]] FROM a given entity. This shows what other entities this entity references. Useful for understanding the outgoing connections from a piece of knowledge.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entityId: {
+          type: 'string',
+          description: 'ID of the entity to get wikilinks from.',
+        },
+        entityName: {
+          type: 'string',
+          description: 'Name of the entity (alternative to entityId).',
+        },
+      },
+    },
+  },
 ];
 
 // =============================================================================
@@ -660,6 +1280,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'brain_list_entities':
         result = await handleBrainListEntities(args);
+        break;
+      case 'brain_get_backlinks':
+        result = await handleBrainGetBacklinks(args);
+        break;
+      case 'brain_get_wikilinks':
+        result = await handleBrainGetWikilinks(args);
         break;
       default:
         return {

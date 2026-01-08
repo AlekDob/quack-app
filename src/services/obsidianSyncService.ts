@@ -53,7 +53,21 @@ export const SYNC_EVENTS = {
  * ```
  */
 export async function getSettings(): Promise<BrainSettings> {
-  return invoke<BrainSettings>('brain_get_settings');
+  try {
+    return await invoke<BrainSettings>('brain_get_settings');
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to get settings, using defaults:', err);
+    return {
+      syncEnabled: false,
+      vaultPath: '',
+      syncStructure: 'subfolder',
+      autoSyncToVault: false,
+      autoSyncFromVault: false,
+      conflictPolicy: 'ask',
+      autoEmbed: false,
+      markdownEditor: 'default',
+    };
+  }
 }
 
 /**
@@ -73,8 +87,13 @@ export async function getSettings(): Promise<BrainSettings> {
  * ```
  */
 export async function setSetting(key: keyof BrainSettings, value: string | boolean): Promise<void> {
-  await invoke('brain_set_setting', { key, value: String(value) });
-  console.log('[ObsidianSync] Setting updated:', key, '=', value);
+  try {
+    await invoke('brain_set_setting', { key, value: String(value) });
+    console.log('[ObsidianSync] Setting updated:', key, '=', value);
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to set setting:', key, '=', value, err);
+    throw err;
+  }
 }
 
 /**
@@ -91,7 +110,12 @@ export async function setSetting(key: keyof BrainSettings, value: string | boole
  * ```
  */
 export async function setVaultPath(path: string): Promise<void> {
-  await setSetting('vaultPath', path);
+  try {
+    await setSetting('vaultPath', path);
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to set vault path:', path, err);
+    throw err;
+  }
 }
 
 // ============================================================================
@@ -114,8 +138,13 @@ export async function setVaultPath(path: string): Promise<void> {
  * ```
  */
 export async function startVaultWatcher(): Promise<void> {
-  await invoke('brain_start_vault_watcher');
-  console.log('[ObsidianSync] Vault watcher started');
+  try {
+    await invoke('brain_start_vault_watcher');
+    console.log('[ObsidianSync] Vault watcher started');
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to start vault watcher:', err);
+    throw err;
+  }
 }
 
 /**
@@ -131,8 +160,13 @@ export async function startVaultWatcher(): Promise<void> {
  * ```
  */
 export async function stopVaultWatcher(): Promise<void> {
-  await invoke('brain_stop_vault_watcher');
-  console.log('[ObsidianSync] Vault watcher stopped');
+  try {
+    await invoke('brain_stop_vault_watcher');
+    console.log('[ObsidianSync] Vault watcher stopped');
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to stop vault watcher:', err);
+    // Don't throw - stopping watcher should be non-critical
+  }
 }
 
 /**
@@ -151,7 +185,12 @@ export async function stopVaultWatcher(): Promise<void> {
  * ```
  */
 export async function isVaultWatching(): Promise<boolean> {
-  return invoke<boolean>('brain_is_vault_watching');
+  try {
+    return await invoke<boolean>('brain_is_vault_watching');
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to check vault watcher status, assuming not watching:', err);
+    return false;
+  }
 }
 
 // ============================================================================
@@ -176,9 +215,14 @@ export async function isVaultWatching(): Promise<boolean> {
  * ```
  */
 export async function syncEntityToVault(entityId: string): Promise<string> {
-  const path = await invoke<string>('brain_sync_entity_to_md', { entityId });
-  console.log('[ObsidianSync] Entity synced to vault:', path);
-  return path;
+  try {
+    const path = await invoke<string>('brain_sync_entity_to_md', { entityId });
+    console.log('[ObsidianSync] Entity synced to vault:', path);
+    return path;
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to sync entity to vault:', entityId, err);
+    throw err;
+  }
 }
 
 /**
@@ -247,9 +291,14 @@ export async function syncAllToVault(): Promise<SyncResult> {
  * ```
  */
 export async function importFromVault(filePath: string): Promise<BrainEntity> {
-  const entity = await invoke<BrainEntity>('brain_import_markdown_file', { filePath });
-  console.log('[ObsidianSync] Imported from vault:', entity.name);
-  return entity;
+  try {
+    const entity = await invoke<BrainEntity>('brain_import_markdown_file', { filePath });
+    console.log('[ObsidianSync] Imported from vault:', entity.name);
+    return entity;
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to import from vault:', filePath, err);
+    throw err;
+  }
 }
 
 /**
@@ -311,8 +360,13 @@ export async function resolveConflict(
   entityId: string,
   resolution: 'brain' | 'obsidian'
 ): Promise<void> {
-  await invoke('brain_resolve_conflict', { entityId, resolution });
-  console.log('[ObsidianSync] Conflict resolved:', entityId, '->', resolution);
+  try {
+    await invoke('brain_resolve_conflict', { entityId, resolution });
+    console.log('[ObsidianSync] Conflict resolved:', entityId, '->', resolution);
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to resolve conflict:', entityId, resolution, err);
+    throw err;
+  }
 }
 
 // ============================================================================
@@ -380,12 +434,17 @@ export async function openInEditor(
  * ```
  */
 export async function openVaultFolder(): Promise<void> {
-  const settings = await getSettings();
-  if (settings.vaultPath) {
-    await openPath(settings.vaultPath);
-    console.log('[ObsidianSync] Opened vault folder:', settings.vaultPath);
-  } else {
-    console.warn('[ObsidianSync] No vault path configured');
+  try {
+    const settings = await getSettings();
+    if (settings.vaultPath) {
+      await openPath(settings.vaultPath);
+      console.log('[ObsidianSync] Opened vault folder:', settings.vaultPath);
+    } else {
+      console.warn('[ObsidianSync] No vault path configured');
+    }
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to open vault folder:', err);
+    throw err;
   }
 }
 
@@ -420,24 +479,30 @@ let fileChangeListeners: UnlistenFn[] = [];
 export async function subscribeToFileChanges(
   onFileChange: (event: FileChangeEvent) => void
 ): Promise<() => void> {
-  const unlisteners = await Promise.all([
-    listen<{ path: string }>(SYNC_EVENTS.FILE_CREATED, (e) =>
-      onFileChange({ path: e.payload.path, eventType: 'created' })
-    ),
-    listen<{ path: string }>(SYNC_EVENTS.FILE_CHANGED, (e) =>
-      onFileChange({ path: e.payload.path, eventType: 'modified' })
-    ),
-    listen<{ path: string }>(SYNC_EVENTS.FILE_DELETED, (e) =>
-      onFileChange({ path: e.payload.path, eventType: 'deleted' })
-    ),
-  ]);
+  try {
+    const unlisteners = await Promise.all([
+      listen<{ path: string }>(SYNC_EVENTS.FILE_CREATED, (e) =>
+        onFileChange({ path: e.payload.path, eventType: 'created' })
+      ),
+      listen<{ path: string }>(SYNC_EVENTS.FILE_CHANGED, (e) =>
+        onFileChange({ path: e.payload.path, eventType: 'modified' })
+      ),
+      listen<{ path: string }>(SYNC_EVENTS.FILE_DELETED, (e) =>
+        onFileChange({ path: e.payload.path, eventType: 'deleted' })
+      ),
+    ]);
 
-  fileChangeListeners = unlisteners;
+    fileChangeListeners = unlisteners;
 
-  return () => {
-    unlisteners.forEach((unlisten) => unlisten());
-    fileChangeListeners = [];
-  };
+    return () => {
+      unlisteners.forEach((unlisten) => unlisten());
+      fileChangeListeners = [];
+    };
+  } catch (err) {
+    console.error('[ObsidianSync] Failed to subscribe to file changes, returning no-op cleanup:', err);
+    // Return no-op cleanup function to prevent crashes
+    return () => {};
+  }
 }
 
 // ============================================================================

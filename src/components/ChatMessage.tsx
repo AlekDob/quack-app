@@ -49,13 +49,15 @@ interface ChatMessageProps {
   gitBranch?: string;
   isLastUserMessage?: boolean;
   workingDirectory?: string;
+  // Thinking mode reset key (changes when mode cycles via Tab)
+  thinkingModeResetKey?: string | number;
   // AskUserQuestion support
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -425,12 +427,19 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
         </div>
         {/* Show thinking block if present (SDK 0.1.54+ extended thinking) */}
         {!isUser && message.thinkingContent && (
-          <ThinkingBlock content={message.thinkingContent} />
+          <ThinkingBlock
+            content={message.thinkingContent}
+            resetKey={thinkingModeResetKey}
+            defaultExpanded={true}
+          />
         )}
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
             {(() => {
+              // 🦆 DEBUG: Log events being processed
+              console.log(`[ChatMessage] 📋 Processing ${message.events?.length || 0} events for message "${message.id}"`);
+
               // 🦆 FIX: FORCED deduplication at render layer as final safeguard
               // This prevents UI duplicates even if backend deduplication fails
               const seenKeys = new Set<string>();
@@ -458,8 +467,13 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                   if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
                     return `system-${event.subtype}-${event.session_id}`;
                   }
+                  // 🦆 FIX: For assistant events, include content types in the key
+                  // This ensures events with different content (tool_use vs text) are not deduplicated
                   if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-                    return `assistant-${event.message.id}`;
+                    const contentTypes = event.message.content
+                      ?.map((c: any) => `${c.type}-${c.id || c.name || ''}`)
+                      .join('|') || '';
+                    return `assistant-${event.message.id}-${contentTypes}`;
                   }
                   if (event.type === 'result' && 'session_id' in event) {
                     return `result-${event.session_id}`;
@@ -489,6 +503,13 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
 
               console.log(`[ChatMessage] Rendered ${uniqueEvents.length} unique events (sorted by priority, ${message.events.length - uniqueEvents.length} duplicates removed)`);
 
+              // 🦆 DEBUG: Log events being rendered
+              console.log(`[ChatMessage] 🎯 About to render ${uniqueEvents.length} events:`, uniqueEvents.map(e => ({
+                type: e.type,
+                hasMessage: !!(e as any).message,
+                contentTypes: (e as any).message?.content?.map((c: any) => c.type) || []
+              })));
+
               return uniqueEvents.map((event, idx) => {
                 // Generate key again for React (stable key generation)
                 const eventKey = (() => {
@@ -496,9 +517,13 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                   if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
                     return `system-${event.subtype}-${event.session_id}`;
                   }
-                  // Assistant events: Use message ID if available
+                  // 🦆 FIX: For assistant events, include content types in the key
+                  // This ensures events with different content (tool_use vs text) have unique keys
                   if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-                    return `assistant-${event.message.id}`;
+                    const contentTypes = event.message.content
+                      ?.map((c: any) => `${c.type}-${c.id || c.name || ''}`)
+                      .join('|') || '';
+                    return `assistant-${event.message.id}-${contentTypes}`;
                   }
                   // Result events: Use session_id (only one result per session)
                   if (event.type === 'result' && 'session_id' in event) {

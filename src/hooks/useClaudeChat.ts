@@ -212,25 +212,28 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
           return `system-${event.subtype}`;
         }
 
-        // For assistant events: use message.id if available, otherwise hash content
+        // For assistant events: ALWAYS include content types in the key
+        // 🦆 FIX: Two events with same message.id but different content (tool_use vs text)
+        // must be treated as DIFFERENT events, not duplicates!
         if (event.type === 'assistant' && 'message' in event) {
-          if (event.message?.id) {
-            return `assistant-${event.message.id}`;
-          }
-          // Fallback: hash the content blocks to detect duplicates
-          // 🦆 FIX: Include tool_use.id for unique identification of Task tool invocations
+          // Generate content hash that includes tool_use IDs for uniqueness
           const contentHash = event.message?.content
             ?.map((b: any) => {
-              let id = `${b.type}-${b.text?.substring(0, 20) || b.name || ''}`;
-              // Include tool_use.id to ensure unique IDs for each tool invocation
-              // This fixes the bug where multiple Task tools (droids) got the same ID
-              if (b.type === 'tool_use' && b.id) {
-                id += `-${b.id}`;
+              let id = `${b.type}`;
+              // Include tool_use.id and name for unique identification
+              if (b.type === 'tool_use') {
+                id += `-${b.id || ''}-${b.name || ''}`;
+              } else if (b.type === 'text') {
+                // Include first 30 chars of text to differentiate
+                id += `-${(b.text || '').substring(0, 30)}`;
               }
               return id;
             })
             .join('|') || '';
-          return `assistant-${contentHash.substring(0, 80)}`;
+
+          // Use message.id + content hash for complete uniqueness
+          const messageId = event.message?.id || 'no-id';
+          return `assistant-${messageId}-${contentHash.substring(0, 100)}`;
         }
 
         // For user events: hash the tool results content

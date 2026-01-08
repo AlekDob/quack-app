@@ -41,6 +41,7 @@ interface KanbanCardProps {
   onKill?: () => void;        // Kill running shell/watch process
   onStart?: () => void;       // Start task: move to in_progress, open chat, send prompt
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
+  onOpenTerminal?: (path: string, label?: string) => void; // Open terminal in specified directory (for worktree)
 }
 
 // Helper function to get avatar image URL
@@ -65,6 +66,7 @@ export default function KanbanCard({
   onKill,
   onStart,
   onProjectClick,
+  onOpenTerminal,
 }: KanbanCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -401,6 +403,39 @@ export default function KanbanCard({
           </div>
         )}
 
+        {/* Image attachments preview (show first 3 images as thumbnails) */}
+        {task.attachments && task.attachments.length > 0 && (
+          <div className="kanban-card-attachments">
+            {task.attachments
+              .filter(att => att.mimeType?.startsWith('image/'))
+              .slice(0, 3)
+              .map((attachment) => (
+                <div key={attachment.id} className="kanban-card-attachment-thumb">
+                  {attachment.previewUrl ? (
+                    <img
+                      src={attachment.previewUrl}
+                      alt={attachment.name}
+                      className="kanban-card-attachment-img"
+                    />
+                  ) : (
+                    <div className="kanban-card-attachment-placeholder">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              ))}
+            {task.attachments.filter(att => att.mimeType?.startsWith('image/')).length > 3 && (
+              <div className="kanban-card-attachment-more">
+                +{task.attachments.filter(att => att.mimeType?.startsWith('image/')).length - 3}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Agent info row - agent on left, ready badge on right */}
         {isAgentTask && task.assignedAgent && (
           <div className="kanban-card-agent-row">
@@ -514,6 +549,28 @@ export default function KanbanCard({
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
               Edit
+            </button>
+          )}
+          {/* Open Terminal - available for tasks with worktree or any task in progress */}
+          {onOpenTerminal && task.status === 'in_progress' && (
+            <button
+              className="kanban-context-menu-item"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowContextMenu(false);
+                // Use worktreePath if available, otherwise projectPath
+                const terminalPath = task.worktreePath || task.projectPath;
+                const terminalLabel = task.worktreePath
+                  ? `Worktree: ${task.title.slice(0, 20)}`
+                  : task.projectName;
+                onOpenTerminal(terminalPath, terminalLabel);
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+              {task.worktreePath ? 'Open Terminal in Worktree' : 'Open Terminal'}
             </button>
           )}
           {onDelete && (

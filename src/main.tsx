@@ -77,6 +77,29 @@ async function setupContextMenuProtection() {
 // Setup context menu protection
 setupContextMenuProtection();
 
+// Global error handlers for crash debugging
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[CrashGuard] Unhandled Promise rejection:', event.reason);
+  localStorage.setItem('quack_last_crash', JSON.stringify({
+    type: 'unhandledrejection',
+    error: event.reason?.message || String(event.reason),
+    stack: event.reason?.stack,
+    timestamp: new Date().toISOString()
+  }));
+});
+
+window.addEventListener('error', (event) => {
+  console.error('[CrashGuard] Uncaught error:', event.error);
+  localStorage.setItem('quack_last_crash', JSON.stringify({
+    type: 'error',
+    error: event.error?.message || event.message,
+    stack: event.error?.stack,
+    filename: event.filename,
+    lineno: event.lineno,
+    timestamp: new Date().toISOString()
+  }));
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>

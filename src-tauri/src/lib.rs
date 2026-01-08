@@ -223,6 +223,12 @@ pub fn run() {
                 log::warn!("⚠️ Failed to initialize Quack Brain database: {}", e);
             }
 
+            // 🧠 Setup MCP Brain server (installs brain-mcp-server.js and dependencies)
+            // This ensures the MCP server works on all Mac users by rebuilding better-sqlite3
+            if let Err(e) = brain::setup_mcp_server() {
+                log::warn!("⚠️ Failed to setup MCP Brain server: {}", e);
+            }
+
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {
@@ -737,6 +743,7 @@ pub fn run() {
             brain::brain_get_settings,
             brain::brain_set_setting,
             brain::brain_get_setting,
+            brain::brain_debug_settings,
             brain::brain_update_settings,
             brain::brain_get_sync_status,
             brain::brain_update_sync_metadata,
@@ -749,7 +756,19 @@ pub fn run() {
             brain::brain_parse_markdown_file,
             brain::brain_import_markdown_file,
             brain::brain_scan_vault,
-            brain::brain_import_vault
+            brain::brain_import_vault,
+            // 🧠 Quack Brain - Obsidian Sync Advanced Commands
+            brain::brain_resolve_conflict,
+            brain::brain_get_global_sync_status,
+            brain::brain_sync_to_vault,
+            brain::brain_import_from_vault,
+            brain::brain_open_vault,
+            brain::brain_generate_embeddings_batch,
+            brain::brain_generate_all_embeddings,
+            // 🧠 Quack Brain - WikiLinks & Backlinks
+            brain::brain_get_backlinks,
+            brain::brain_get_wikilinks,
+            brain::brain_reprocess_all_wikilinks
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

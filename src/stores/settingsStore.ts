@@ -30,6 +30,7 @@ interface GeneralSettings {
   enableSounds: boolean;
   showWelcomeOnStartup: boolean;
   language: 'en' | 'it';
+  enableToolGifs: boolean; // Show GIF reactions when tools execute
 }
 
 interface SettingsState {
@@ -55,6 +56,7 @@ interface SettingsState {
   toggleAutoSave: () => void;
   toggleNotifications: () => void;
   toggleSounds: () => void;
+  toggleToolGifs: () => void;
 
   // Actions - Global
   resetAllSettings: () => void;
@@ -85,6 +87,7 @@ const defaultGeneralSettings: GeneralSettings = {
   enableSounds: true,
   showWelcomeOnStartup: true,
   language: 'en',
+  enableToolGifs: true, // GIF reactions enabled by default
 };
 
 const defaultClaudeSettings: ClaudeSettings = {
@@ -165,6 +168,10 @@ export const useSettingsStore = create<SettingsState>()(
 
         toggleSounds: () => set((state) => ({
           general: { ...state.general, enableSounds: !state.general.enableSounds },
+        })),
+
+        toggleToolGifs: () => set((state) => ({
+          general: { ...state.general, enableToolGifs: !state.general.enableToolGifs },
         })),
 
         // Global actions

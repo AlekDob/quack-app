@@ -202,6 +202,9 @@ pub struct ClaudeCliRequest {
     pub setting_sources: Option<Vec<String>>,
     // 🗣️ Allowed tools list (SDK v0.1.57+) - enables specific tools like AskUserQuestion
     pub allowed_tools: Option<Vec<String>>,
+    // 🧠 Auto Memory Search - search Brain before each query (SDK 0.2.1+)
+    // Default: true (enabled). Set to false to disable.
+    pub auto_memory_search_enabled: Option<bool>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -954,6 +957,7 @@ pub async fn send_message_via_sdk_streaming(
         effort, // ✅ Extract effort parameter (SDK 0.1.54+)
         setting_sources, // ✅ Extract setting_sources to control prompt length
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
+        auto_memory_search_enabled, // 🧠 Auto Memory Search (SDK 0.2.1+)
     } = request;
 
     // Use provided cwd or fallback to current directory
@@ -1067,6 +1071,12 @@ pub async fn send_message_via_sdk_streaming(
         );
         log::info!("[SDK DEBUG] Adding allowedTools to config: {:?}", tools);
     }
+
+    // 🧠 Add autoMemorySearchEnabled (SDK 0.2.1+)
+    // Default: true (enabled). Only add to config if explicitly set to false.
+    let auto_memory_enabled = auto_memory_search_enabled.unwrap_or(true);
+    config["autoMemorySearchEnabled"] = serde_json::Value::Bool(auto_memory_enabled);
+    log::info!("[SDK DEBUG] Auto Memory Search enabled: {}", auto_memory_enabled);
 
     let config_str = config.to_string();
 

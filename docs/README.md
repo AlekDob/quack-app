@@ -139,6 +139,7 @@ npm run test:coverage # Coverage report
 
 **Core Features:**
 - **`kanban-board.md`** ✅ - Kanban Board with 8 MCP tools, Cmd+K toggle, fuzzy agent matching, drag-agent-to-kanban, session context
+- **`git-worktree-isolation.md`** ✅ - Git Worktree Isolation for tasks (parallel development, auto-merge, terminal access)
 - **`background-tasks.md`** ✅ - Background task system (`/background` command, priority queue, real-time logs)
 - **`second-brain.md`** ✅ - Tana/Logseq-style outliner for knowledge graph (inline editing, @mentions, #supertags)
 - **`mcp-memory-integration.md`** ✅ - MCP Memory system (MCP-only architecture, knowledge graph)
@@ -148,6 +149,7 @@ npm run test:coverage # Coverage report
 - **`quack-memory-architecture.md`** - Quack Memory system architecture & design
 - **`quack-memory-foundation-implementation.md`** ✅ - Quack Memory foundation layer (types, storage, extraction)
 - **`memoryEmbedder-implementation.md`** ✅ - Memory Embedder service (local embeddings with Transformers.js)
+- **`quack-brain-schema-migration.md`** ✅ - Database schema migration for Obsidian sync (metadata, wikilinks, lifecycle)
 - **`memory-ui.md`** - Memory UI components & design system
 
 **AI & Agents:**

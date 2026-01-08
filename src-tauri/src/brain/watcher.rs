@@ -546,6 +546,13 @@ pub fn brain_import_markdown_file(file_path: String) -> Result<super::types::Bra
         created_at,
         updated_at,
         md_file_path: Some(file_path),
+        source_file: None,
+        date: None,
+        daily_link: None,
+        author: None,
+        status: Some("active".to_string()),
+        confidence: Some("high".to_string()),
+        aliases: None,
     })
 }
 

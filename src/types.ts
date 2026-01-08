@@ -473,7 +473,7 @@ export interface AgentModePresets {
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
-  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop';
+  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'memory_context';
 }
 
 export interface ClaudeSystemEvent extends ClaudeEventBase {
@@ -596,6 +596,20 @@ export interface ClaudeContentBlockStopEvent extends ClaudeEventBase {
   session_id?: string;
 }
 
+// Memory Context Event (Auto Memory Search - SDK 0.2.1+)
+export interface ClaudeMemoryContextEvent extends ClaudeEventBase {
+  type: 'memory_context';
+  memories: Array<{
+    name: string;
+    type: string;
+    projectId?: string;
+    observations: string[];
+  }>;
+  keywords: string[];
+  durationMs: number;
+  count: number;
+}
+
 export type ClaudeEvent =
   | ClaudeSystemEvent
   | ClaudeAssistantEvent
@@ -608,7 +622,8 @@ export type ClaudeEvent =
   | ClaudeMessageStopEvent
   | ClaudeContentBlockStartEvent
   | ClaudeContentBlockDeltaEvent
-  | ClaudeContentBlockStopEvent;
+  | ClaudeContentBlockStopEvent
+  | ClaudeMemoryContextEvent;
 
 // ============================================
 // AskUserQuestion Types (SDK v0.1.71+)
@@ -714,6 +729,7 @@ export interface AgentChatSettings {
   thinkingMode: string; // Thinking mode setting
   permissionMode: string; // Permission mode ('plan', 'act', 'bypass')
   effort?: EffortLevel; // SDK 0.1.54+ - Controls quality vs speed/cost tradeoff
+  autoMemorySearch?: boolean; // SDK 0.2.1+ - Auto search Brain before each query (default: true)
 }
 
 // MCP (Model Context Protocol) Server types

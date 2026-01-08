@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
-import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
+import { MemoryIndicator, type MemoryInfo } from './MemoryIndicator';
+import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers, ClaudeMemoryContextEvent } from '../types';
 import './MessageList.css';
 
 interface MessageListProps {
@@ -15,13 +16,15 @@ interface MessageListProps {
   projectName?: string;
   gitBranch?: string;
   workingDirectory?: string;
+  // Thinking mode reset key (changes when mode cycles)
+  thinkingModeResetKey?: string | number;
   // AskUserQuestion support
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -173,6 +176,39 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
     prevMessagesLengthRef.current = messages.length;
   }, [messages, loading, checkIfAtBottom]);
 
+  // Find the last user message
+  const lastUserMessageIndex = messages.reduce((lastIndex, msg, index) => {
+    return msg.role === 'user' ? index : lastIndex;
+  }, -1);
+
+  // Extract memory context from assistant messages following user messages
+  // Maps user message index -> memory info from the following assistant message
+  const memoryContextByUserIndex = useMemo(() => {
+    const memoryMap = new Map<number, { memories: MemoryInfo[]; keywords: string[]; durationMs: number }>();
+
+    messages.forEach((msg, index) => {
+      // For each user message, look at the next message
+      if (msg.role === 'user' && index < messages.length - 1) {
+        const nextMsg = messages[index + 1];
+        // If next message is assistant and has events, look for memory_context
+        if (nextMsg && nextMsg.role === 'assistant' && nextMsg.events) {
+          const memoryEvent = nextMsg.events.find(
+            (e): e is ClaudeMemoryContextEvent => e.type === 'memory_context'
+          );
+          if (memoryEvent && memoryEvent.memories.length > 0) {
+            memoryMap.set(index, {
+              memories: memoryEvent.memories,
+              keywords: memoryEvent.keywords,
+              durationMs: memoryEvent.durationMs,
+            });
+          }
+        }
+      }
+    });
+
+    return memoryMap;
+  }, [messages]);
+
   if (messages.length === 0 && !loading) {
     return (
       <div className="message-list-empty">
@@ -183,31 +219,42 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
     );
   }
 
-  // Find the last user message
-  const lastUserMessageIndex = messages.reduce((lastIndex, msg, index) => {
-    return msg.role === 'user' ? index : lastIndex;
-  }, -1);
-
   return (
     <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
       <div className="message-list-content">
-        {messages.map((message, index) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            onFilePathClick={onFilePathClick}
-            onSessionIdClick={onSessionIdClick}
-            agentName={agentName}
-            agentAvatar={agentAvatar}
-            projectName={projectName}
-            gitBranch={gitBranch}
-            isLastUserMessage={index === lastUserMessageIndex}
-            workingDirectory={workingDirectory}
-            onUserQuestionAnswer={onUserQuestionAnswer}
-            pendingQuestionIds={pendingQuestionIds}
-            answeredQuestions={answeredQuestions}
-          />
-        ))}
+        {messages.map((message, index) => {
+          const memoryContext = message.role === 'user' ? memoryContextByUserIndex.get(index) : null;
+
+          return (
+            <div key={message.id} className="message-wrapper">
+              <ChatMessage
+                message={message}
+                onFilePathClick={onFilePathClick}
+                onSessionIdClick={onSessionIdClick}
+                agentName={agentName}
+                agentAvatar={agentAvatar}
+                projectName={projectName}
+                gitBranch={gitBranch}
+                isLastUserMessage={index === lastUserMessageIndex}
+                workingDirectory={workingDirectory}
+                thinkingModeResetKey={thinkingModeResetKey}
+                onUserQuestionAnswer={onUserQuestionAnswer}
+                pendingQuestionIds={pendingQuestionIds}
+                answeredQuestions={answeredQuestions}
+              />
+              {/* Show memory indicator below user messages when memories were used */}
+              {memoryContext && (
+                <div className="memory-indicator-wrapper">
+                  <MemoryIndicator
+                    memories={memoryContext.memories}
+                    keywords={memoryContext.keywords}
+                    durationMs={memoryContext.durationMs}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
         {loading && <SkeletonMessage />}
       </div>
       {showScrollButton && (

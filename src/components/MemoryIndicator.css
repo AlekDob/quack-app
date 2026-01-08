@@ -1,0 +1,200 @@
+/**
+ * MemoryIndicator Styles
+ *
+ * Colorful badge/chip for displaying injected memories
+ */
+
+.memory-indicator {
+  display: inline-flex;
+  flex-direction: column;
+  margin: 4px 0;
+}
+
+.memory-indicator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 16px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.memory-indicator-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.memory-indicator-badge:active {
+  transform: translateY(0);
+}
+
+.memory-indicator-icon {
+  font-size: 14px;
+}
+
+.memory-indicator-count {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.memory-indicator-label {
+  opacity: 0.9;
+}
+
+.memory-indicator-chevron {
+  font-size: 10px;
+  opacity: 0.8;
+  transition: transform 0.2s ease;
+}
+
+.memory-indicator-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+/* Expanded Details */
+.memory-indicator-details {
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(102, 126, 234, 0.08);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 8px;
+  max-width: 400px;
+}
+
+.memory-indicator-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+.memory-indicator-keywords-label {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  font-weight: 500;
+}
+
+.memory-indicator-keyword {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(102, 126, 234, 0.15);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--text-primary, #fff);
+}
+
+.memory-indicator-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memory-indicator-item {
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+
+.memory-indicator-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.memory-indicator-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  word-break: break-word;
+}
+
+.memory-indicator-item-type {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* Type-specific colors */
+.memory-indicator-item-type.type-pattern {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.memory-indicator-item-type.type-bug_fix {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.memory-indicator-item-type.type-decision {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.memory-indicator-item-type.type-preference {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+}
+
+.memory-indicator-item-type.type-gotcha {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.memory-indicator-item-type.type-fact {
+  background: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+}
+
+.memory-indicator-item-type.type-project {
+  background: rgba(236, 72, 153, 0.2);
+  color: #ec4899;
+}
+
+.memory-indicator-item-type.type-technology {
+  background: rgba(14, 165, 233, 0.2);
+  color: #0ea5e9;
+}
+
+.memory-indicator-observations {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.memory-indicator-observations li {
+  font-size: 11px;
+  color: var(--text-secondary, #aaa);
+  margin: 2px 0;
+  line-height: 1.4;
+}
+
+.memory-indicator-observations .memory-indicator-more {
+  color: var(--text-tertiary, #666);
+  font-style: italic;
+  list-style: none;
+  margin-left: -16px;
+}
+
+.memory-indicator-duration {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(102, 126, 234, 0.15);
+  font-size: 10px;
+  color: var(--text-tertiary, #666);
+  text-align: right;
+}
