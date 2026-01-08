@@ -144,7 +144,22 @@ QuackBrain/
 
 ### Daily Diary Integration
 
-Every note automatically links to its creation day's diary via `[[YYYY-MM-DD]]` WikiLink. When creating entities, the diary is auto-updated with the new note.
+Every note links to its creation day via `[[YYYY-MM-DD]]` WikiLink in frontmatter. However, **only temporal notes are added to the diary**:
+
+**Temporal notes (appear in diary):**
+- `bug` / `bug_fix` - Bug fixes and resolutions
+- `task` - Completed tasks
+- `decision` - Decisions made
+- `todo` - Completed todos
+- `gotcha` - Discovered pitfalls
+- `event` - Events that happened
+
+**Structural notes (NOT in diary):**
+- `pattern`, `component`, `function`, `api` - Code documentation
+- `idea`, `config`, `note` - Reference material
+- `human`, `preference`, `fact` - Static knowledge
+
+This keeps the diary clean and focused on "what happened today" rather than cluttering it with every note created.
 
 ### WikiLinks
 
@@ -188,7 +203,13 @@ Obsidian uses numbers 1-6 for colors. The MCP accepts both number and name:
 ### Node Types
 
 - **text**: Text cards with markdown content
-- **file**: Embedded markdown files from the vault
+- **file**: Embedded vault files (markdown notes, other canvases, local images like .png, .jpg)
+- **link**: External URLs (GIF URLs from Giphy, web images, external resources)
+
+### Canvas Location
+
+**Canvas files are ALWAYS created in the project folder** (projectId is required):
+- `QuackBrain/projects/{project-name}/*.canvas`
 
 ### Creating Canvas Diagrams
 
@@ -223,12 +244,29 @@ mcp__quack-brain__update_canvas({
     { fromNode: "n3", toNode: "n4", fromSide: "bottom", toSide: "top" }
   ]
 })
+
+// Canvas with embedded files and GIFs
+mcp__quack-brain__create_canvas({
+  name: "Project Overview",
+  projectId: "quack-app",
+  nodes: [
+    // Text node
+    { id: "title", type: "text", x: 0, y: 0, text: "# Project Overview", color: "green" },
+    // Embedded markdown note
+    { id: "note1", type: "file", x: 0, y: 100, file: "projects/quack-app/patterns/auth-pattern.md", width: 300, height: 200 },
+    // Embedded canvas (canvas-in-canvas)
+    { id: "diagram", type: "file", x: 350, y: 100, file: "projects/quack-app/architecture.canvas", width: 400, height: 300 },
+    // Embedded local image
+    { id: "logo", type: "file", x: 0, y: 350, file: "assets/logo.png", width: 200, height: 200 },
+    // External GIF from Giphy
+    { id: "gif", type: "link", x: 250, y: 350, url: "https://media.giphy.com/media/.../giphy.gif", width: 200, height: 200 },
+  ]
+})
 ```
 
 ### Canvas File Location
 
-- **Project canvases**: `QuackBrain/projects/{project-id}/*.canvas`
-- **Global canvases**: `QuackBrain/global/canvases/*.canvas`
+- **Project canvases**: `QuackBrain/projects/{project-id}/*.canvas` (ALWAYS here, projectId required)
 
 ## Critical Behavior
 

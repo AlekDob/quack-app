@@ -23,7 +23,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import Database from 'better-sqlite3';
@@ -232,8 +232,9 @@ function syncEntityToMarkdown(entity) {
     const db = getDb();
     db.prepare('UPDATE entities SET md_file_path = ? WHERE id = ?').run(filePath, entity.id);
 
-    // Ensure diary exists and add entry (skip for diary entities themselves)
-    if (entity.entityType !== 'diary') {
+    // Only add TEMPORAL entities to diary (bugs, tasks, decisions, events)
+    // Structural entities (patterns, components, ideas) don't clutter the diary
+    if (entity.entityType !== 'diary' && shouldAddToDiary(entity.entityType)) {
       ensureDiaryExists(vaultPath, date);
       appendToDiary(vaultPath, date, entity.name, entity.entityType, getEntityDescription(entity));
     }
@@ -254,6 +255,30 @@ function syncEntityToMarkdown(entity) {
  */
 function getVaultPath() {
   return getSetting('vault_path', '');
+}
+
+/**
+ * Entity types that should appear in daily diary
+ * These are "temporal" notes - things that happened on a specific day
+ * (bug fixes, task completions, decisions made, events, todos done)
+ */
+const TEMPORAL_ENTITY_TYPES = new Set([
+  'bug',
+  'bug_fix',
+  'task',
+  'decision',
+  'todo',
+  'gotcha',
+  'event',
+]);
+
+/**
+ * Check if an entity type should be added to the daily diary
+ * Only temporal notes (things that happened today) go in diary
+ * Structural notes (patterns, components, ideas) don't clutter the diary
+ */
+function shouldAddToDiary(entityType) {
+  return TEMPORAL_ENTITY_TYPES.has(entityType);
 }
 
 /**
@@ -380,15 +405,40 @@ function appendToDiary(vaultPath, date, noteName, tag, description) {
 }
 
 /**
- * Get a short description from entity for diary entry
+ * Get a narrative description for diary entry
+ * Creates readable, full descriptions - no truncation for Obsidian
+ * These should read like mini-articles, easy to understand
  */
 function getEntityDescription(entity) {
+  const type = entity.entityType;
+
+  // Collect ALL observations as a narrative
+  let fullDescription = '';
+
   if (entity.observations && entity.observations.length > 0) {
-    const first = entity.observations[0];
-    const content = first.content || first;
-    return content.substring(0, 50) + (content.length > 50 ? '...' : '');
+    // Join all observations into a flowing narrative
+    const cleanedObs = entity.observations.map(obs => {
+      const content = obs.content || obs;
+      // Remove date prefix if present
+      return content.replace(/^\[[\d-]+\]\s*/, '');
+    });
+
+    fullDescription = cleanedObs.join(' ');
   }
-  return entity.name;
+
+  // Create narrative prefix based on entity type
+  const narratives = {
+    'bug': 'Fixed: ',
+    'bug_fix': 'Resolved: ',
+    'task': 'Completed: ',
+    'decision': 'Decision: ',
+    'todo': 'Done: ',
+    'gotcha': 'Gotcha: ',
+    'event': '',
+  };
+
+  const prefix = narratives[type] || '';
+  return prefix + (fullDescription || entity.name);
 }
 
 // =============================================================================
@@ -1082,7 +1132,7 @@ async function handleBrainReadCanvas(args) {
       // Look for any .canvas files in the project folder
       const projectDir = join(vaultPath, 'QuackBrain', 'projects', projectId);
       if (existsSync(projectDir)) {
-        const files = require('fs').readdirSync(projectDir);
+        const files = readdirSync(projectDir);
         const canvasFiles = files.filter(f => f.endsWith('.canvas'));
         if (canvasFiles.length > 0) {
           fullPath = join(projectDir, canvasFiles[0]);
@@ -1147,7 +1197,15 @@ async function handleBrainReadCanvas(args) {
 async function handleBrainCreateCanvas(args) {
   const { name, projectId, nodes = [], edges = [] } = args;
 
-  console.error(`[BrainMCP] Creating canvas: ${name} (project: ${projectId || 'global'})`);
+  // projectId is required - canvas must always go in a project folder
+  if (!projectId) {
+    return JSON.stringify({
+      success: false,
+      error: 'projectId is required. Canvas files must be created in a project folder.',
+    }, null, 2);
+  }
+
+  console.error(`[BrainMCP] Creating canvas: ${name} (project: ${projectId})`);
 
   try {
     const vaultPath = getVaultPath();
@@ -1158,15 +1216,11 @@ async function handleBrainCreateCanvas(args) {
       }, null, 2);
     }
 
-    // Determine path
-    let canvasPath;
-    if (projectId) {
-      canvasPath = join(vaultPath, 'QuackBrain', 'projects', projectId, `${slugify(name)}.canvas`);
-    } else {
-      canvasPath = join(vaultPath, 'QuackBrain', 'global', 'canvases', `${slugify(name)}.canvas`);
-    }
+    // Canvas always goes in the project folder (not in a canvases/ subfolder)
+    const canvasPath = join(vaultPath, 'QuackBrain', 'projects', projectId, `${slugify(name)}.canvas`);
 
     // Process nodes - convert color names to numbers, add IDs
+    // Supports: text, file (markdown/canvas/images), link (external URLs like GIFs)
     const processedNodes = nodes.map(node => {
       const processed = {
         id: node.id || generateCanvasId(),
@@ -1180,7 +1234,11 @@ async function handleBrainCreateCanvas(args) {
       if (node.type === 'text') {
         processed.text = node.text || '';
       } else if (node.type === 'file') {
+        // File embed: markdown notes, other canvases, local images
         processed.file = node.file || '';
+      } else if (node.type === 'link') {
+        // External URL: GIFs, web images, external resources
+        processed.url = node.url || '';
       }
 
       // Handle color - accept name or number
@@ -1287,7 +1345,11 @@ async function handleBrainUpdateCanvas(args) {
       if (node.type === 'text') {
         newNode.text = node.text || '';
       } else if (node.type === 'file') {
+        // File embed: markdown notes, other canvases, local images
         newNode.file = node.file || '';
+      } else if (node.type === 'link') {
+        // External URL: GIFs, web images, external resources
+        newNode.url = node.url || '';
       }
 
       if (node.color) {
@@ -1630,7 +1692,7 @@ const TOOLS = [
   },
   {
     name: 'create_canvas',
-    description: 'Create a new Obsidian canvas file with nodes and edges. Use this to create visual diagrams, mind maps, or flowcharts. Supports text nodes, file embeds, colors (red, orange, yellow, green, cyan, purple), and connections between nodes.',
+    description: 'Create a new Obsidian canvas file with nodes and edges. Use this to create visual diagrams, mind maps, or flowcharts. Canvas is always created in the project folder (projectId required). Supports: text nodes, file embeds (markdown, canvas, images), link nodes (external URLs like GIFs), colors (red, orange, yellow, green, cyan, purple), and connections between nodes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1640,7 +1702,7 @@ const TOOLS = [
         },
         projectId: {
           type: 'string',
-          description: 'Project ID to create canvas in. If omitted, creates in global/canvases/.',
+          description: 'REQUIRED. Project ID to create canvas in. Canvas files are always created in the project folder.',
         },
         nodes: {
           type: 'array',
@@ -1649,13 +1711,14 @@ const TOOLS = [
             type: 'object',
             properties: {
               id: { type: 'string', description: 'Optional node ID (auto-generated if omitted).' },
-              type: { type: 'string', enum: ['text', 'file'], description: 'Node type: text for notes, file for embedding markdown files.' },
+              type: { type: 'string', enum: ['text', 'file', 'link'], description: 'Node type: text for notes, file for embedding vault files (markdown, canvas, images), link for external URLs (GIFs, web images).' },
               x: { type: 'number', description: 'X position on canvas.' },
               y: { type: 'number', description: 'Y position on canvas.' },
               width: { type: 'number', description: 'Node width (default: 250).' },
               height: { type: 'number', description: 'Node height (default: 60).' },
               text: { type: 'string', description: 'Text content (for type=text).' },
-              file: { type: 'string', description: 'Path to file relative to vault (for type=file).' },
+              file: { type: 'string', description: 'Path to file relative to vault (for type=file). Can be .md, .canvas, .png, .jpg, etc.' },
+              url: { type: 'string', description: 'External URL (for type=link). Can be GIF URLs from Giphy, web images, etc.' },
               color: { type: 'string', description: 'Node color: red, orange, yellow, green, cyan, purple (or 1-6).' },
             },
           },
@@ -1675,7 +1738,7 @@ const TOOLS = [
           },
         },
       },
-      required: ['name'],
+      required: ['name', 'projectId'],
     },
   },
   {
@@ -1695,13 +1758,14 @@ const TOOLS = [
             type: 'object',
             properties: {
               id: { type: 'string' },
-              type: { type: 'string', enum: ['text', 'file'] },
+              type: { type: 'string', enum: ['text', 'file', 'link'] },
               x: { type: 'number' },
               y: { type: 'number' },
               width: { type: 'number' },
               height: { type: 'number' },
               text: { type: 'string' },
               file: { type: 'string' },
+              url: { type: 'string', description: 'External URL for link nodes (GIFs, web images)' },
               color: { type: 'string' },
             },
           },
