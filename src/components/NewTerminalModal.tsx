@@ -1,11 +1,12 @@
 /**
- * New Terminal Modal - SIMPLIFIED with 3-Step Process
+ * New Terminal Modal - PROJECT-FIRST Flow
  *
- * Step 1: Project Context (Directory + Git Branch)
- * Step 2: Agent Basics (Name, Color, Avatar, Personality)
- * Step 3: Rules Selection (Claude Code rules to follow)
+ * Step 1: Project Selection (Choose project + Git Branch)
+ * Step 2: Agent Selection (Use existing or create new)
+ * Step 3: Agent Basics (Name, Color, Avatar, Personality) - only for Create/Edit
+ * Step 4: Rules Selection (Claude Code rules to follow) - only for Create/Edit
  *
- * This version uses modular step components and the new Rules system.
+ * Key UX change: "Use" on existing agent = direct confirmation (project already selected)
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -27,10 +28,10 @@ import { normalizeRulePaths, areRulePathsEqual } from '../utils/rulePathUtils';
 
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
-import { StepProjectContext } from './modal-steps/StepProjectContext';
+import { StepProjectSelection } from './modal-steps/StepProjectSelection';
 import { StepAgentBasics } from './modal-steps/StepAgentBasics';
 import { StepRules } from './modal-steps/StepRules';
-import type { ModalStep } from './modal-steps/types';
+import type { ModalStep, ActiveProject } from './modal-steps/types';
 
 // Styles
 import './modal-steps/ModalSteps.css';
@@ -50,7 +51,12 @@ interface NewTerminalModalProps {
   selectingDirectory: boolean
   creating: boolean
   error: string | null
+  // Active projects from sidebar (for project-first flow)
+  activeProjects?: ActiveProject[]
+  // Initial step to skip to (e.g., 'agent' when clicking + on a project)
+  initialStep?: 'project' | 'agent'
   onNameChange: (value: string) => void
+  onPathChange?: (path: string) => void  // NEW: for project selection
   onColorChange: (color: string) => void
   onWorkingOnChange?: (value: string) => void
   onAvatarChange?: (avatar: string) => void
@@ -62,8 +68,6 @@ interface NewTerminalModalProps {
   onConfirm: (agentData?: SavedAgent) => void
   onOpenDroidFactory?: () => void
 }
-
-type AgentMode = 'select' | 'create';
 
 function NewTerminalModal({
   open,
@@ -80,7 +84,10 @@ function NewTerminalModal({
   selectingDirectory,
   creating,
   error,
+  activeProjects = [],
+  initialStep = 'project',
   onNameChange,
+  onPathChange,
   onColorChange,
   onWorkingOnChange,
   onAvatarChange,
@@ -92,13 +99,13 @@ function NewTerminalModal({
   onConfirm,
   onOpenDroidFactory,
 }: NewTerminalModalProps) {
-  // Step management
-  const [currentStep, setCurrentStep] = useState<ModalStep>('context');
+  // Step management - PROJECT-FIRST FLOW
+  // Normal: project → agent → basics → rules
+  // Edit mode: basics → rules (skip project + agent)
+  const [currentStep, setCurrentStep] = useState<ModalStep>('project');
   const [completedSteps, setCompletedSteps] = useState<ModalStep[]>([]);
-  const [agentMode, setAgentMode] = useState<AgentMode>('select');
   const [isEditingAgent, setIsEditingAgent] = useState(false); // Track internal edit mode
-  const [isUsingAgent, setIsUsingAgent] = useState(false); // Track "Use" flow (only Step 1)
-  const [usingAgentData, setUsingAgentData] = useState<SavedAgent | null>(null); // Agent being used
+  const [selectedProjectColor, setSelectedProjectColor] = useState<string>(''); // Color from project selection
 
   // Git branch state
   const [availableBranches, setAvailableBranches] = useState<GitBranch[]>([]);
@@ -142,12 +149,10 @@ function NewTerminalModal({
       hasInitializedRef.current = true;
 
       // If isEditing prop is true (editing from external source like sidebar),
-      // skip agent selection and go directly to Step 2 (Basics)
+      // skip project + agent selection and go directly to Basics step
       if (isEditing) {
         setCurrentStep('basics');
-        setAgentMode('create');
         setIsEditingAgent(true);
-        setIsUsingAgent(false);
         // Create synthetic agent data from props to trigger skills/droids restore
         setEditingAgentData({
           id: 'editing-from-external',
@@ -161,24 +166,24 @@ function NewTerminalModal({
           usageCount: 0,
         });
       } else {
-        setCurrentStep('context');
-        setAgentMode('select');
+        // PROJECT-FIRST FLOW: Start with project selection or agent (if initialStep is 'agent')
+        setCurrentStep(initialStep);
         setIsEditingAgent(false);
-        setIsUsingAgent(false);
         setEditingAgentData(null);
+        // If starting at 'agent' step (from sidebar +), mark 'project' as completed
+        setCompletedSteps(initialStep === 'agent' ? ['project'] : []);
       }
-      setCompletedSteps([]);
-      setUsingAgentData(null);
       setLocalPersonality(personality || {});
       setSelectedRules([]);
       setMissingRules([]);
+      setSelectedProjectColor('');
     }
 
     // Reset the ref when modal closes
     if (!open) {
       hasInitializedRef.current = false;
     }
-  }, [open, isEditing]); // Depend on 'open' and 'isEditing' to ensure correct initialization
+  }, [open, isEditing, initialStep]); // Depend on 'open', 'isEditing', and 'initialStep' to ensure correct initialization
 
   // Load data when modal opens
   useEffect(() => {
@@ -414,15 +419,10 @@ function NewTerminalModal({
     }
   }
 
-  // ===== Agent Selection Functions =====
+  // ===== Agent Selection Functions (Step 2: Agent) =====
 
+  // "Use" an existing agent - PROJECT-FIRST: project already selected, so confirm directly!
   function handleUseAgent(agent: SavedAgent) {
-    // Store the agent data and show Step 1 for project/branch selection
-    setUsingAgentData(agent);
-    setIsUsingAgent(true);
-    setCurrentStep('context');
-    setAgentMode('create');
-
     // Pre-populate fields from the agent
     onNameChange(agent.name);
     onColorChange(agent.color);
@@ -430,29 +430,26 @@ function NewTerminalModal({
     onWorkingOnChange?.(agent.workingOn || '');
     onPersonalityChange?.(agent.personality || {});
     setLocalPersonality(agent.personality || {});
-  }
 
-  // Confirm the agent after Step 1 in "Use" flow
-  function handleUseConfirm() {
-    if (!usingAgentData) return;
-
-    markAgentAsUsed(usingAgentData.id);
-
+    // Mark as used and save
+    markAgentAsUsed(agent.id);
     try {
       saveAgent({
-        name: usingAgentData.name,
-        avatar: usingAgentData.avatar || '',
-        color: usingAgentData.color,
-        workingOn: usingAgentData.workingOn,
-        personality: usingAgentData.personality || {}
+        name: agent.name,
+        avatar: agent.avatar || '',
+        color: agent.color,
+        workingOn: agent.workingOn,
+        personality: agent.personality || {}
       });
     } catch (err) {
       console.warn('Failed to save agent to storage:', err);
     }
 
-    onConfirm(usingAgentData);
+    // DIRECT CONFIRMATION - project is already selected in Step 1!
+    onConfirm(agent);
   }
 
+  // "Edit" an existing agent - go to basics step
   function handleEditAgent(agent: SavedAgent) {
     onNameChange(agent.name);
     onColorChange(agent.color);
@@ -467,18 +464,23 @@ function NewTerminalModal({
     // Store original agent data to restore rules after loading
     setEditingAgentData(agent);
 
-    // Skip Step 1 when editing - go directly to Basics
+    // Go to Basics step for editing
     setIsEditingAgent(true);
+    setCompletedSteps(prev => [...prev, 'agent']);
     setCurrentStep('basics');
-    setAgentMode('create');
   }
 
+  // "Create New" agent - go to basics step with fresh state
   function handleCreateNewAgent() {
-    setAgentMode('create');
+    setIsEditingAgent(false);
+    setCompletedSteps(prev => [...prev, 'agent']);
+    setCurrentStep('basics');
   }
 
+  // Back to agent selection from basics
   function handleBackToAgentSelection() {
-    setAgentMode('select');
+    setCurrentStep('agent');
+    setCompletedSteps(prev => prev.filter(s => s !== 'agent'));
   }
 
   // ===== Personality Change Handler =====
@@ -497,15 +499,25 @@ function NewTerminalModal({
 
   // ===== Step Navigation =====
 
-  function handleContextNext() {
+  // Step 1: Project Selection → Step 2: Agent Selection
+  function handleProjectNext() {
     if (!path.trim()) {
       alert('Please select a working directory');
       return;
     }
-    setCompletedSteps(prev => [...prev, 'context']);
-    setCurrentStep('basics');
+    setCompletedSteps(prev => [...prev, 'project']);
+    setCurrentStep('agent');
   }
 
+  // Handle project selection from StepProjectSelection
+  function handleSelectProject(selectedPath: string, projectColor: string) {
+    onPathChange?.(selectedPath);
+    setSelectedProjectColor(projectColor);
+    // Also trigger git repository check for the new path
+    checkGitRepository();
+  }
+
+  // Step 3: Basics → Step 4: Rules
   function handleBasicsNext() {
     if (!name.trim()) {
       alert('Please enter an agent name');
@@ -515,19 +527,21 @@ function NewTerminalModal({
     setCurrentStep('rules');
   }
 
+  // Back from Basics
   function handleBasicsBack() {
-    if (isEditingAgent) {
-      // In edit mode, go back to agent selector (not Step 1)
-      setAgentMode('select');
-      setIsEditingAgent(false);
-      setCurrentStep('context'); // Reset for potential future create
+    if (isEditingAgent && isEditing) {
+      // External edit mode (from sidebar) - just cancel
+      onCancel();
     } else {
-      setCurrentStep('context');
+      // Go back to agent selection
+      handleBackToAgentSelection();
     }
   }
 
+  // Back from Rules
   function handleRulesBack() {
     setCurrentStep('basics');
+    setCompletedSteps(prev => prev.filter(s => s !== 'basics'));
   }
 
   // ===== Rules Selection =====
@@ -616,59 +630,36 @@ function NewTerminalModal({
     return null;
   }
 
-  // Render agent selector first (before step creation)
-  if (agentMode === 'select') {
-    return (
-      <div className="modal-backdrop" role="dialog" aria-modal="true">
-        <div className="modal-panel agent-modal">
-          {/* Header */}
-          <div className="modal-header">
-            <div>
-              <h2>✨ Create new agent</h2>
-              <p className="modal-subtitle">Choose existing or create new</p>
-            </div>
-            <button
-              type="button"
-              className="modal-close-button"
-              onClick={onCancel}
-              aria-label="Close"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
+  // Determine modal title and subtitle based on current step
+  const getModalHeader = () => {
+    if (isEditing || isEditingAgent) {
+      return { title: 'Edit Agent', subtitle: 'Update agent configuration' };
+    }
+    switch (currentStep) {
+      case 'project':
+        return { title: 'Select Project', subtitle: 'Choose your workspace' };
+      case 'agent':
+        return { title: 'Select Agent', subtitle: 'Use existing or create new' };
+      case 'basics':
+        return { title: 'Configure Agent', subtitle: 'Set name, color, and personality' };
+      case 'rules':
+        return { title: 'Select Rules', subtitle: 'Choose Claude Code rules' };
+      default:
+        return { title: 'New Agent', subtitle: 'Step-by-step configuration' };
+    }
+  };
 
-          <AgentSelector
-            onUseAgent={handleUseAgent}
-            onEditAgent={handleEditAgent}
-            onCreateNew={handleCreateNewAgent}
-          />
+  const header = getModalHeader();
 
-          <div className="modal-actions">
-            <button type="button" className="secondary" onClick={onCancel}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render step-by-step creation
+  // Render the modal with project-first flow
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel agent-modal">
         {/* Header */}
         <div className="modal-header">
           <div>
-            <h2>
-              {isUsingAgent ? 'Use agent' : isEditingAgent ? 'Agent editor' : 'Create new agent'}
-            </h2>
-            <p className="modal-subtitle">
-              {isUsingAgent ? 'Select project and branch' : 'Step-by-step configuration'}
-            </p>
+            <h2>{header.title}</h2>
+            <p className="modal-subtitle">{header.subtitle}</p>
           </div>
           <button
             type="button"
@@ -683,34 +674,57 @@ function NewTerminalModal({
           </button>
         </div>
 
-        {/* Progress Indicator - hide in "Use" flow (single step) */}
-        {!isUsingAgent && (
+        {/* Progress Indicator - show for multi-step flows */}
+        {!isEditing && (
           <StepProgress currentStep={currentStep} completedSteps={completedSteps} isEditing={isEditingAgent} />
         )}
 
-        {/* Step 1: Project Context */}
-        {currentStep === 'context' && (
-          <StepProjectContext
-            path={path}
-            branch={branch}
+        {/* Step 1: Project Selection (NEW - Project First!) */}
+        {currentStep === 'project' && (
+          <StepProjectSelection
+            activeProjects={activeProjects}
+            selectedPath={path}
+            selectedBranch={branch}
             useWorktree={useWorktree}
             availableBranches={availableBranches}
             loadingBranches={loadingBranches}
             isGitRepository={isGitRepository}
             initializingGit={initializingGit}
             selectingDirectory={selectingDirectory}
+            onSelectProject={handleSelectProject}
             onBrowse={onBrowse}
             onBranchChange={onBranchChange || (() => {})}
             onUseWorktreeChange={onUseWorktreeChange || (() => {})}
             onGitInit={handleGitInit}
-            onNext={handleContextNext}
+            onNext={handleProjectNext}
             onCancel={onCancel}
-            isUsing={isUsingAgent}
-            onUseConfirm={handleUseConfirm}
           />
         )}
 
-        {/* Step 2: Agent Basics */}
+        {/* Step 2: Agent Selection */}
+        {currentStep === 'agent' && (
+          <>
+            <AgentSelector
+              onUseAgent={handleUseAgent}
+              onEditAgent={handleEditAgent}
+              onCreateNew={handleCreateNewAgent}
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setCurrentStep('project');
+                  setCompletedSteps(prev => prev.filter(s => s !== 'project'));
+                }}
+              >
+                Back
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Step 3: Agent Basics */}
         {currentStep === 'basics' && (
           <StepAgentBasics
             name={name}
@@ -722,11 +736,11 @@ function NewTerminalModal({
             loadingAvatars={loadingAvatars}
             uploadingAvatar={uploadingAvatar}
             uploadError={uploadError}
-            personality={localPersonality} // ✅ Use local state
+            personality={localPersonality}
             onNameChange={onNameChange}
             onColorChange={onColorChange}
             onAvatarChange={onAvatarChange || (() => {})}
-            onPersonalityChange={handlePersonalityChangeLocal} // ✅ Use local handler
+            onPersonalityChange={handlePersonalityChangeLocal}
             onAvatarUpload={handleAvatarUpload}
             onDeleteCustomAvatar={handleDeleteCustomAvatar}
             fileInputRef={fileInputRef}
@@ -735,7 +749,7 @@ function NewTerminalModal({
           />
         )}
 
-        {/* Step 3: Rules Selection */}
+        {/* Step 4: Rules Selection */}
         {currentStep === 'rules' && (
           <StepRules
             availableRules={rules}

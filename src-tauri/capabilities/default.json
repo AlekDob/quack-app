@@ -34,6 +34,14 @@
     "shell:allow-execute",
     "shell:allow-spawn",
     {
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "path": "^((mailto:\\w+)|(tel:\\w+)|(https?://\\w+)|(obsidian://\\w+)|(vscode://\\w+)|(cursor://\\w+)|(file://\\w+)).+"
+        }
+      ]
+    },
+    {
       "identifier": "shell:allow-execute",
       "allow": [
         {

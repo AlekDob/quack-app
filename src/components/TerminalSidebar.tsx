@@ -28,6 +28,24 @@ import DragHandle from "./DragHandle";
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo, KanbanTask } from "../types";
 
+// Storage format for project order and colors
+interface ProjectStorageData {
+  order: string[];
+  colors: Record<string, string>;
+}
+
+// Default color palette for auto-assignment
+const DEFAULT_PROJECT_COLORS = [
+  '#FF6B35', // Orange (Quack primary)
+  '#4DA6FF', // Blue
+  '#9B59B6', // Purple
+  '#2ECC71', // Green
+  '#E74C3C', // Red
+  '#F39C12', // Yellow
+  '#1ABC9C', // Teal
+  '#E84393', // Pink
+];
+
 // Sortable Repository Group wrapper
 interface SortableRepositoryGroupProps {
   repoKey: string;
@@ -37,6 +55,7 @@ interface SortableRepositoryGroupProps {
   worktreeAgents: TerminalInfo[];
   isCollapsed: boolean;
   activeId: string | null;
+  projectColor?: string; // Color for visual identification
   chatSessions?: Map<string, ChatMessage[]>;
   lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
   onToggle: () => void;
@@ -47,7 +66,7 @@ interface SortableRepositoryGroupProps {
   onOpenGitPanel?: () => void;
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number;
-  onCreateAgent?: () => void; // Create new agent associated with this project
+  onCreateAgent?: (projectPath?: string) => void; // Create new agent, optionally with pre-selected project path
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   // Kanban tab props
   isKanbanTabActive?: boolean;
@@ -62,10 +81,11 @@ interface SortableRepositoryGroupProps {
 
 function SortableRepositoryGroup({
   repoKey,
+  projectColor,
   ...props
 }: SortableRepositoryGroupProps) {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   const {
     attributes,
     listeners,
@@ -80,6 +100,8 @@ function SortableRepositoryGroup({
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
+    backgroundColor: projectColor ? `${projectColor}12` : undefined, // ~7% opacity hex
+    borderLeft: projectColor ? `3px solid ${projectColor}` : undefined,
   };
 
   return (
@@ -149,7 +171,7 @@ interface TerminalSidebarProps {
   onSelectAgentChat: (agentChatId: string | null) => void;
   onDeleteAgentChat: (agentChatId: string) => void;
   onUpdateAgentChat: (agentChatId: string, updates: Partial<Omit<AgentChat, 'id'>>) => void;
-  onCreateAgent: () => void; // NEW: Create AgentChat only (no terminal)
+  onCreateAgent: (projectPath?: string) => void; // Create AgentChat - optional project path to skip to agent selection
   // PiP props
   onTogglePip?: () => void;
   isPipOpen?: boolean;
@@ -183,6 +205,7 @@ interface TerminalSidebarProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
+  onCreateTask?: (terminal: TerminalInfo) => void; // Create Kanban task for this agent
 }
 
 export default function TerminalSidebar({
@@ -230,6 +253,7 @@ export default function TerminalSidebar({
   onOpenTerminalWindow,
   gitRefreshTrigger,
   onOpenDashboard,
+  onCreateTask,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -248,6 +272,7 @@ export default function TerminalSidebar({
   const { updateAvailable, latestRelease } = useUpdateChecker();
   // Metro style is now the only option (removed useMetroStyle state)
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
+  const [projectColors, setProjectColors] = useState<Record<string, string>>({});
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
@@ -277,27 +302,55 @@ export default function TerminalSidebar({
     useSensor(KeyboardSensor)
   );
 
-  // Load saved repository order on mount
+  // Load saved repository order and colors on mount
   useEffect(() => {
-    const loadOrder = async () => {
+    const loadOrderAndColors = async () => {
       try {
         const store = await Store.load('.quack-repo-order.dat');
-        const savedOrder = await store.get<string[]>('repository-order');
-        if (savedOrder) {
-          setRepositoryOrder(savedOrder);
+
+        // Try new format first (with colors)
+        const savedData = await store.get<ProjectStorageData | string[]>('repository-order');
+
+        if (savedData) {
+          // Check if it's old format (array) or new format (object)
+          if (Array.isArray(savedData)) {
+            // Old format - migrate to new format
+            console.log('Migrating old repository order format to new format with colors');
+            const migratedData: ProjectStorageData = {
+              order: savedData,
+              colors: {},
+            };
+
+            // Auto-assign colors to existing projects
+            savedData.forEach((repoKey, index) => {
+              migratedData.colors[repoKey] = DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+            });
+
+            // Save migrated data
+            await store.set('repository-order', migratedData);
+            await store.save();
+
+            setRepositoryOrder(migratedData.order);
+            setProjectColors(migratedData.colors);
+          } else {
+            // New format - use directly
+            setRepositoryOrder(savedData.order);
+            setProjectColors(savedData.colors);
+          }
         }
       } catch (error) {
         console.error('Failed to load repository order:', error);
       }
     };
-    loadOrder();
+    loadOrderAndColors();
   }, []);
 
-  // Save repository order
-  const saveRepositoryOrder = useCallback(async (order: string[]) => {
+  // Save repository order and colors
+  const saveRepositoryOrder = useCallback(async (order: string[], colors: Record<string, string>) => {
     try {
       const store = await Store.load('.quack-repo-order.dat');
-      await store.set('repository-order', order);
+      const data: ProjectStorageData = { order, colors };
+      await store.set('repository-order', data);
       await store.save();
     } catch (error) {
       console.error('Failed to save repository order:', error);
@@ -315,7 +368,7 @@ export default function TerminalSidebar({
   const handleRepoDragEnd = (event: DragEndEvent) => {
     // Remove dragging class to re-enable animations
     document.body.classList.remove('dragging-active');
-    
+
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
@@ -329,7 +382,7 @@ export default function TerminalSidebar({
     if (activeIndex !== -1 && overIndex !== -1) {
       const newOrder = arrayMove(repositoryOrder, activeIndex, overIndex);
       setRepositoryOrder(newOrder);
-      saveRepositoryOrder(newOrder);
+      saveRepositoryOrder(newOrder, projectColors);
     } else {
       // If not in saved order, create new order from current groups
       const currentOrder = repositoryGroups.map(([name]) => `repo-${name}`);
@@ -339,7 +392,17 @@ export default function TerminalSidebar({
       if (activeIdx !== -1 && overIdx !== -1) {
         const newOrder = arrayMove(currentOrder, activeIdx, overIdx);
         setRepositoryOrder(newOrder);
-        saveRepositoryOrder(newOrder);
+
+        // Auto-assign colors to new projects not in the map
+        const updatedColors = { ...projectColors };
+        newOrder.forEach((repoKey, index) => {
+          if (!updatedColors[repoKey]) {
+            updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+          }
+        });
+        setProjectColors(updatedColors);
+
+        saveRepositoryOrder(newOrder, updatedColors);
       }
     }
 
@@ -424,7 +487,7 @@ export default function TerminalSidebar({
     return Array.from(repoMap.entries());
   }, [filteredTerminals]);
 
-  // Apply custom ordering to repository groups
+  // Apply custom ordering to repository groups and auto-assign colors to new projects
   const orderedRepositoryGroups = useMemo(() => {
     if (repositoryOrder.length === 0) {
       return repositoryGroups;
@@ -447,15 +510,35 @@ export default function TerminalSidebar({
     }
 
     // Then add any new repositories not in the saved order
+    const newRepos: string[] = [];
     for (const [name, group] of repositoryGroups) {
       const repoKey = `repo-${name}`;
       if (!added.has(repoKey)) {
         ordered.push([name, group]);
+        newRepos.push(repoKey);
       }
     }
 
+    // Auto-assign colors to new projects
+    if (newRepos.length > 0) {
+      const updatedColors = { ...projectColors };
+      const updatedOrder = [...repositoryOrder, ...newRepos];
+
+      newRepos.forEach((repoKey, index) => {
+        if (!updatedColors[repoKey]) {
+          const colorIndex = (repositoryOrder.length + index) % DEFAULT_PROJECT_COLORS.length;
+          updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[colorIndex];
+        }
+      });
+
+      // Update state and persist
+      setProjectColors(updatedColors);
+      setRepositoryOrder(updatedOrder);
+      saveRepositoryOrder(updatedOrder, updatedColors);
+    }
+
     return ordered;
-  }, [repositoryGroups, repositoryOrder]);
+  }, [repositoryGroups, repositoryOrder, projectColors, saveRepositoryOrder]);
 
   // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
@@ -703,7 +786,7 @@ export default function TerminalSidebar({
               <button
                 type="button"
                 className="sidebar-button"
-                onClick={onCreateAgent}
+                onClick={() => onCreateAgent()}
                 disabled={creating}
               >
                 {creating ? "Creating…" : "New"}
@@ -794,6 +877,7 @@ export default function TerminalSidebar({
               {orderedRepositoryGroups.map(([repoName, group]) => {
                 const repoKey = `repo-${repoName}`;
                 const isCollapsed = collapsedGroups.has(repoKey);
+                const projectColor = projectColors[repoKey];
 
                 return (
                   <SortableRepositoryGroup
@@ -805,6 +889,7 @@ export default function TerminalSidebar({
                     worktreeAgents={group.worktreeAgents}
                     isCollapsed={isCollapsed}
                     activeId={activeId}
+                    projectColor={projectColor}
                     chatSessions={chatSessions}
                     lastReadTimestamps={lastReadTimestamps}
                     onToggle={() => onToggleGroup(repoKey)}
@@ -867,7 +952,7 @@ export default function TerminalSidebar({
               </p>
               <button
                 type="button"
-                onClick={onCreateAgent}
+                onClick={() => onCreateAgent()}
                 className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 animated-button"
                 title="Start to Quack"
                 style={{
@@ -912,6 +997,7 @@ export default function TerminalSidebar({
           onDuplicate={() => onDuplicate(contextMenu.terminal)}
           onReset={() => onReset(contextMenu.terminal)}
           onCloseTerminal={() => onClose(contextMenu.terminal.id)}
+          onCreateTask={onCreateTask ? () => onCreateTask(contextMenu.terminal) : undefined}
         />
       )}
 

@@ -4,6 +4,13 @@
  * Hybrid search combining semantic (vector) and keyword-based search
  * with Reciprocal Rank Fusion (RRF) for optimal results.
  *
+ * @deprecated This service uses keyword extraction which fails with multilingual content.
+ * **USE `mcp__brain__smart_search` INSTEAD** - The AI-driven approach where Claude
+ * decides WHEN and WHAT to search using natural language queries.
+ *
+ * This service is part of the legacy QuackMemory system (localStorage + embeddings).
+ * The new Brain MCP system (SQLite + FTS5) is preferred for AI interactions.
+ *
  * @module services/memorySearch
  */
 

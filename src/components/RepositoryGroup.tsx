@@ -43,7 +43,7 @@ interface RepositoryGroupProps {
   onOpenGitPanel?: () => void; // Function to open Git Panel drawer
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
-  onCreateAgent?: () => void; // Create new agent associated with this project
+  onCreateAgent?: (projectPath: string) => void; // Create new agent associated with this project (passes project path)
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   // Kanban mode props
   isKanbanViewActive?: boolean;
@@ -1476,7 +1476,7 @@ export default function RepositoryGroup({
             {onCreateAgent && (
               <button
                 type="button"
-                onClick={onCreateAgent}
+                onClick={() => onCreateAgent(repoPath)}
                 title="New Agent"
                 className="repo-action-btn"
               >

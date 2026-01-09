@@ -479,3 +479,135 @@
   padding: 10px 12px;
   margin: 0;
 }
+
+/* ====================================
+   TaskOutput Widget - Background Task Results
+   ==================================== */
+.task-output-widget {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.task-output-widget:hover {
+  filter: brightness(1.05);
+}
+
+/* Header with task info */
+.task-output-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.task-output-widget .tool-widget-title {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Task ID Badge */
+.task-output-id-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.task-output-id-badge code {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Status Badge */
+.task-output-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.task-output-status-badge .spinner {
+  border-width: 2px;
+}
+
+/* Content area */
+.task-output-content {
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Config info row */
+.task-output-config {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.task-output-config-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Output result */
+.task-output-result {
+  margin-top: 8px;
+}
+
+.task-output-pre {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.task-output-pre.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: rgba(239, 68, 68, 1);
+}
+
+/* Error section */
+.task-output-error {
+  margin-top: 10px;
+}
+
+.task-output-error-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(239, 68, 68, 0.9);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-output-error-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: rgba(239, 68, 68, 0.8);
+  border-radius: 50%;
+}

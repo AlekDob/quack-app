@@ -1,10 +1,17 @@
 /**
  * Memory Prompt Hook - Auto Memory Search for SDK 0.2.1
  *
- * Automatically searches the Brain (Second Brain SQLite) before each query
- * and injects relevant context into the system prompt.
+ * @deprecated This module uses a naive stopword-based keyword extraction that fails with:
+ * - Multilingual content (Italian, French, etc.)
+ * - Domain-specific terms that look like stopwords
+ * - Generic queries that get filtered entirely
  *
- * Flow:
+ * **USE `mcp__brain__smart_search` INSTEAD** - The AI-driven approach where Claude
+ * decides WHEN and WHAT to search using natural language queries.
+ *
+ * See: .claude/rules/use-mcp-memory-second-brain.md for usage examples.
+ *
+ * Original Flow (deprecated):
  * User message → Extract keywords → Brain FTS search → Format results → Inject in systemPrompt.append
  */
 
@@ -86,6 +93,9 @@ function getDb() {
 /**
  * Extract meaningful keywords from user prompt
  * Filters out stop words and short words
+ *
+ * @deprecated Use `mcp__brain__smart_search` instead - Claude formulates
+ * natural language queries that work with ANY language.
  *
  * @param {string} prompt - User's message
  * @returns {string[]} Array of keywords
@@ -225,6 +235,14 @@ function formatMemoryContext(memories) {
 
 /**
  * Auto Memory Search Hook
+ *
+ * @deprecated This automatic search approach has been replaced by AI-driven search.
+ * Claude now decides WHEN and WHAT to search using `mcp__brain__smart_search`.
+ *
+ * Problems with this approach:
+ * - Keywords extracted are often useless (common words)
+ * - Stopword filtering is English-biased
+ * - Searches happen even when not needed
  *
  * Call this before sending a query to Claude.
  * Returns result object with context and metadata about found memories.

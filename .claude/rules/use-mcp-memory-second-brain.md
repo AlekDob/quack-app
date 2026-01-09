@@ -14,6 +14,10 @@ Quack Brain uses a **bidirectional sync** system:
 
 ## When to SEARCH Brain (Read)
 
+**USE `smart_search` - The AI-Driven Approach:**
+
+Unlike automatic keyword extraction (which fails with multilingual content), **YOU decide WHEN and WHAT to search**. Use natural language queries that describe what you need.
+
 **ALWAYS search brain during the Analysis phase:**
 
 - Before answering questions you're unsure about
@@ -23,11 +27,31 @@ Quack Brain uses a **bidirectional sync** system:
 - When you need context about patterns used in the project
 
 ```typescript
-// Search examples
-mcp__quack-brain__search({ query: "authentication pattern" })
-mcp__quack-brain__search({ query: "bug fix dropdown" })
-mcp__quack-brain__search({ query: "user preference" })
+// ✅ CORRECT: Use smart_search with natural language queries
+mcp__brain__smart_search({
+  query: "authentication patterns and security decisions",
+  context: "investigating auth flow for new feature"
+})
+
+mcp__brain__smart_search({
+  query: "dropdown bugs and fixes",
+  context: "user reported dropdown issue"
+})
+
+mcp__brain__smart_search({
+  query: "user coding preferences and style",
+  context: "need to follow user's preferred patterns"
+})
+
+// ❌ AVOID: Don't use basic search with single keywords
+// mcp__brain__search({ query: "auth" }) // Too vague!
 ```
+
+**Why `smart_search` is better:**
+- Works with ANY language (Italian, English, mixed)
+- Prefix matching: "auth" finds "authentication", "authorize", etc.
+- You formulate semantic queries, not keyword lists
+- Include context to help with debugging
 
 ## When to SAVE to Brain (Write)
 
@@ -43,7 +67,7 @@ mcp__quack-brain__search({ query: "user preference" })
 
 ```typescript
 // Create new entity
-mcp__quack-brain__create_entity({
+mcp__brain__create_entity({
   name: "pattern_react_error_boundary",
   entityType: "pattern",
   observations: ["Wrap providers individually with ErrorBoundary for graceful degradation"],
@@ -51,7 +75,7 @@ mcp__quack-brain__create_entity({
 })
 
 // Add observation to existing entity
-mcp__quack-brain__add_observation({
+mcp__brain__add_observation({
   entityName: "pattern_react_error_boundary",
   content: "[2025-01-07] Added global unhandledrejection handler for Promise errors"
 })
@@ -66,17 +90,18 @@ mcp__quack-brain__add_observation({
 
 | Tool | Purpose |
 |------|---------|
-| `mcp__quack-brain__search` | Full-text search across entities and observations |
-| `mcp__quack-brain__get_graph` | Read entire knowledge graph |
-| `mcp__quack-brain__create_entity` | Create new brain entity |
-| `mcp__quack-brain__add_observation` | Add observation to existing entity |
-| `mcp__quack-brain__create_relation` | Create relations between entities |
-| `mcp__quack-brain__list_entities` | List entities with optional filters |
-| `mcp__quack-brain__get_backlinks` | Get entities that link TO a given entity via [[WikiLinks]] |
-| `mcp__quack-brain__get_wikilinks` | Get all [[WikiLinks]] FROM a given entity |
-| `mcp__quack-brain__read_canvas` | Read Obsidian canvas files (.canvas) with nodes and edges |
-| `mcp__quack-brain__create_canvas` | Create new canvas diagrams with text/file nodes and connections |
-| `mcp__quack-brain__update_canvas` | Update existing canvas (add/remove/modify nodes and edges) |
+| `mcp__brain__smart_search` | **PRIMARY** - AI-driven semantic search with natural language queries |
+| `mcp__brain__search` | Basic FTS5 search (use smart_search instead) |
+| `mcp__brain__get_graph` | Read entire knowledge graph |
+| `mcp__brain__create_entity` | Create new brain entity |
+| `mcp__brain__add_observation` | Add observation to existing entity |
+| `mcp__brain__create_relation` | Create relations between entities |
+| `mcp__brain__list_entities` | List entities with optional filters |
+| `mcp__brain__get_backlinks` | Get entities that link TO a given entity via [[WikiLinks]] |
+| `mcp__brain__get_wikilinks` | Get all [[WikiLinks]] FROM a given entity |
+| `mcp__brain__read_canvas` | Read Obsidian canvas files (.canvas) with nodes and edges |
+| `mcp__brain__create_canvas` | Create new canvas diagrams with text/file nodes and connections |
+| `mcp__brain__update_canvas` | Update existing canvas (add/remove/modify nodes and edges) |
 
 ## Entity Types (Tags)
 
@@ -177,10 +202,10 @@ Use `[[NoteName]]` syntax to create relations between notes. These are tracked a
 **Use backlinks to discover connections:**
 ```typescript
 // Find all notes that mention "React Hooks"
-mcp__quack-brain__get_backlinks({ entityName: "React Hooks" })
+mcp__brain__get_backlinks({ entityName: "React Hooks" })
 
 // Get all outgoing links from an entity
-mcp__quack-brain__get_wikilinks({ entityName: "pattern_error_handling" })
+mcp__brain__get_wikilinks({ entityName: "pattern_error_handling" })
 ```
 
 ## Obsidian Canvas Support
@@ -215,7 +240,7 @@ Obsidian uses numbers 1-6 for colors. The MCP accepts both number and name:
 
 ```typescript
 // Create a flowchart
-mcp__quack-brain__create_canvas({
+mcp__brain__create_canvas({
   name: "Architecture Overview",
   projectId: "quack-app",
   nodes: [
@@ -230,12 +255,12 @@ mcp__quack-brain__create_canvas({
 })
 
 // Read existing canvas
-mcp__quack-brain__read_canvas({
+mcp__brain__read_canvas({
   canvasPath: "/path/to/vault/QuackBrain/projects/quack-app/diagram.canvas"
 })
 
 // Update canvas - add a new node with connection
-mcp__quack-brain__update_canvas({
+mcp__brain__update_canvas({
   canvasPath: "/path/to/canvas.canvas",
   addNodes: [
     { id: "n4", type: "text", x: 150, y: 300, text: "Database", color: "orange" }
@@ -246,7 +271,7 @@ mcp__quack-brain__update_canvas({
 })
 
 // Canvas with embedded files and GIFs
-mcp__quack-brain__create_canvas({
+mcp__brain__create_canvas({
   name: "Project Overview",
   projectId: "quack-app",
   nodes: [

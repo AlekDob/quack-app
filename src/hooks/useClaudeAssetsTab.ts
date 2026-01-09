@@ -6,7 +6,7 @@
  * because App.tsx manages its own tab state independently.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Tab } from '../components/TabBar';
 
 interface UseClaudeAssetsTabParams {
@@ -25,15 +25,19 @@ export function useClaudeAssetsTab({
   setTabs,
   setActiveTabId,
 }: UseClaudeAssetsTabParams): UseClaudeAssetsTabReturn {
-  // Check if Claude Assets tab is already open
-  const existingTab = tabs.find(t => t.type === 'claude-assets');
-  const isClaudeAssetsTabOpen = !!existingTab;
+  // Memoize the existing tab ID to avoid object reference changes
+  // causing infinite dependency loops in useCallback
+  const existingTabId = useMemo(
+    () => tabs.find(t => t.type === 'claude-assets')?.id,
+    [tabs]
+  );
+  const isClaudeAssetsTabOpen = !!existingTabId;
 
   // Open or focus the Claude Assets tab
   const openClaudeAssetsTab = useCallback(() => {
     // If tab already exists, just focus it
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
+    if (existingTabId) {
+      setActiveTabId(existingTabId);
       return;
     }
 
@@ -47,7 +51,7 @@ export function useClaudeAssetsTab({
 
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
-  }, [existingTab, setTabs, setActiveTabId]);
+  }, [existingTabId, setTabs, setActiveTabId]);
 
   return {
     openClaudeAssetsTab,

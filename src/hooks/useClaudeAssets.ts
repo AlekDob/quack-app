@@ -82,15 +82,19 @@ export function useClaudeAssets(initialProjectPaths?: string[]): UseClaudeAssets
       setProjects(validProjects);
 
       // Auto-select first project if none selected
-      if (!selectedProjectPath && validProjects.length > 0) {
-        setSelectedProjectPath(validProjects[0].path);
-      }
+      // Use functional update to avoid stale closure and dependency cycle
+      setSelectedProjectPath(prev => {
+        if (!prev && validProjects.length > 0) {
+          return validProjects[0].path;
+        }
+        return prev;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
     } finally {
       setLoading(false);
     }
-  }, [loadProjectAssets, selectedProjectPath]);
+  }, [loadProjectAssets]); // Removed selectedProjectPath - using functional update instead
 
   // Select a project
   const selectProject = useCallback((projectPath: string | null) => {

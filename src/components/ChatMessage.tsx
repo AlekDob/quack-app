@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef } from 'react';
+import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
@@ -238,6 +238,31 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
     ? isTruncated(message.content, 30, 250)
     : false;
 
+  // 🦆 FIX: Stable event key generator - extracted outside render for reusability
+  const getStableEventKey = (event: any): string => {
+    if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
+      return `system-${event.subtype}-${event.session_id}`;
+    }
+    if (event.type === 'assistant' && 'message' in event && event.message?.id) {
+      const contentTypes = event.message.content
+        ?.map((c: any) => `${c.type}-${c.id || c.name || ''}`)
+        .join('|') || '';
+      return `assistant-${event.message.id}-${contentTypes}`;
+    }
+    if (event.type === 'result' && 'session_id' in event) {
+      return `result-${event.session_id}`;
+    }
+    if ('session_id' in event && event.session_id) {
+      const contentHash = JSON.stringify(event).substring(0, 100);
+      return `${event.type}-${event.session_id}-${contentHash}`;
+    }
+    const eventHash = JSON.stringify(event)
+      .split('')
+      .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
+      .toString(36);
+    return `${event.type}-${message.id}-${eventHash}`;
+  };
+
   // Render text with @mentions as inline chips and clickable Session ID
   const renderTextWithMentions = (text: string) => {
     // If this is a resume message with sessionId, make it clickable
@@ -443,128 +468,20 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {(() => {
-              // 🦆 DEBUG: Log events being processed
-              console.log(`[ChatMessage] 📋 Processing ${message.events?.length || 0} events for message "${message.id}"`);
-
-              // 🦆 FIX: FORCED deduplication at render layer as final safeguard
-              // This prevents UI duplicates even if backend deduplication fails
-              const seenKeys = new Set<string>();
-              const uniqueEvents: typeof message.events = [];
-
-              // 🦆 FIX: Define event type priority for correct ordering
-              // system.init should ALWAYS be first, result should ALWAYS be last
-              const getEventPriority = (event: any): number => {
-                if (event.type === 'system' && event.subtype === 'init') return 0; // First
-                if (event.type === 'system') return 1;
-                if (event.type === 'assistant') return 2;
-                if (event.type === 'user') return 3;
-                if (event.type === 'result') return 99; // Last
-                return 50; // Default middle priority
-              };
-
-              // Sort events by priority BEFORE deduplication
-              const sortedEvents = [...message.events].sort((a, b) =>
-                getEventPriority(a) - getEventPriority(b)
-              );
-
-              for (const event of sortedEvents) {
-                // Generate unique key (same logic as before)
-                const eventKey = (() => {
-                  if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
-                    return `system-${event.subtype}-${event.session_id}`;
-                  }
-                  // 🦆 FIX: For assistant events, include content types in the key
-                  // This ensures events with different content (tool_use vs text) are not deduplicated
-                  if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-                    const contentTypes = event.message.content
-                      ?.map((c: any) => `${c.type}-${c.id || c.name || ''}`)
-                      .join('|') || '';
-                    return `assistant-${event.message.id}-${contentTypes}`;
-                  }
-                  if (event.type === 'result' && 'session_id' in event) {
-                    return `result-${event.session_id}`;
-                  }
-                  if ('session_id' in event && event.session_id) {
-                    // Use content hash for uniqueness instead of index
-                    const contentHash = JSON.stringify(event).substring(0, 100);
-                    return `${event.type}-${event.session_id}-${contentHash}`;
-                  }
-                  // Last resort: hash the event
-                  const eventHash = JSON.stringify(event)
-                    .split('')
-                    .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
-                    .toString(36);
-                  return `${event.type}-${message.id}-${eventHash}`;
-                })();
-
-                // Skip if already seen
-                if (seenKeys.has(eventKey)) {
-                  console.warn('[ChatMessage] 🦆 DUPLICATE DETECTED IN RENDER LAYER - Key:', eventKey.substring(0, 50));
-                  continue;
-                }
-
-                seenKeys.add(eventKey);
-                uniqueEvents.push(event);
-              }
-
-              console.log(`[ChatMessage] Rendered ${uniqueEvents.length} unique events (sorted by priority, ${message.events.length - uniqueEvents.length} duplicates removed)`);
-
-              // 🦆 DEBUG: Log events being rendered
-              console.log(`[ChatMessage] 🎯 About to render ${uniqueEvents.length} events:`, uniqueEvents.map(e => ({
-                type: e.type,
-                hasMessage: !!(e as any).message,
-                contentTypes: (e as any).message?.content?.map((c: any) => c.type) || []
-              })));
-
-              return uniqueEvents.map((event, idx) => {
-                // Generate key again for React (stable key generation)
-                const eventKey = (() => {
-                  // System events: Use subtype + session_id (guaranteed unique)
-                  if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
-                    return `system-${event.subtype}-${event.session_id}`;
-                  }
-                  // 🦆 FIX: For assistant events, include content types in the key
-                  // This ensures events with different content (tool_use vs text) have unique keys
-                  if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-                    const contentTypes = event.message.content
-                      ?.map((c: any) => `${c.type}-${c.id || c.name || ''}`)
-                      .join('|') || '';
-                    return `assistant-${event.message.id}-${contentTypes}`;
-                  }
-                  // Result events: Use session_id (only one result per session)
-                  if (event.type === 'result' && 'session_id' in event) {
-                    return `result-${event.session_id}`;
-                  }
-                  // User events: Use session_id + content hash (no index!)
-                  if ('session_id' in event && event.session_id) {
-                    const contentHash = JSON.stringify(event).substring(0, 100);
-                    return `${event.type}-${event.session_id}-${contentHash}`;
-                  }
-                  // Fallback: Use message ID + content hash (no index!)
-                  const eventHash = JSON.stringify(event)
-                    .split('')
-                    .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
-                    .toString(36);
-                  return `${event.type}-${message.id}-${eventHash}`;
-                })();
-
-                return (
-                  <StreamMessage
-                    key={eventKey}
-                    message={event}
-                    streamMessages={message.events || []}
-                    onFilePathClick={onFilePathClick}
-                    agentName={agentName}
-                    agentAvatar={agentAvatar}
-                    workingDirectory={workingDirectory}
-                    onUserQuestionAnswer={onUserQuestionAnswer}
-                    pendingQuestionIds={pendingQuestionIds}
-                    answeredQuestions={answeredQuestions}
-                  />
-                );
-              });
-            })()}
+            {message.events.map((event) => (
+              <StreamMessage
+                key={getStableEventKey(event)}
+                message={event}
+                streamMessages={message.events || []}
+                onFilePathClick={onFilePathClick}
+                agentName={agentName}
+                agentAvatar={agentAvatar}
+                workingDirectory={workingDirectory}
+                onUserQuestionAnswer={onUserQuestionAnswer}
+                pendingQuestionIds={pendingQuestionIds}
+                answeredQuestions={answeredQuestions}
+              />
+            ))}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>

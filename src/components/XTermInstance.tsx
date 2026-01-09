@@ -211,7 +211,7 @@ export function XTermInstance({ terminalId, color, isActive }: XTermInstanceProp
         selectionBackground: '#ffffff30',
       },
       allowTransparency: false,
-      scrollback: 10000,
+      scrollback: 1000,
     });
 
     const fitAddon = new FitAddon();

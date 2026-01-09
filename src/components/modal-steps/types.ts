@@ -1,13 +1,25 @@
 /**
  * Shared types for multi-step agent creation modal
- * Simplified flow: context → basics → rules
+ * Project-first flow: project → agent → basics → rules
  */
 
 import type { AgentPersonality, GitBranch, Rule, RuleScope } from '../../types';
 import type { CustomAvatarInfo } from '../../utils/customAvatarStorage';
 
-// Step identifier - simplified to 3 steps
-export type ModalStep = 'context' | 'basics' | 'rules';
+// Step identifier - project-first flow
+// - 'project': Select project (path + branch) - FIRST STEP
+// - 'agent': Select existing agent or create new - renamed from 'select' mode
+// - 'basics': Agent configuration (name, color, avatar, personality)
+// - 'rules': Rules selection
+export type ModalStep = 'project' | 'agent' | 'basics' | 'rules';
+
+// Active project from sidebar (derived from terminals)
+export interface ActiveProject {
+  name: string;      // e.g., "quack-app"
+  path: string;      // e.g., "/Users/alekdob/Desktop/Dev/Personal/quack-app"
+  color: string;     // e.g., "#FF6B35"
+  agentCount: number;
+}
 
 // Props for StepProjectContext
 export interface StepProjectContextProps {

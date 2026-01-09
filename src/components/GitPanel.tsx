@@ -196,7 +196,7 @@ function GitPanel({
   const [branches, setBranches] = useState<GitBranch[]>([])
   const [worktrees, setWorktrees] = useState<GitWorktree[]>([])
 
-  // Load branches
+  // Load branches (only when rootPath changes, not on every summary update)
   useEffect(() => {
     const loadBranches = async () => {
       if (!rootPath) return
@@ -212,9 +212,9 @@ function GitPanel({
     }
 
     loadBranches()
-  }, [rootPath, summary]) // Reload when summary changes (e.g., after branch switch)
+  }, [rootPath]) // Only reload when rootPath changes (branches rarely change)
 
-  // Load worktrees
+  // Load worktrees (only when rootPath changes, not on every summary update)
   useEffect(() => {
     const loadWorktrees = async () => {
       if (!rootPath) return
@@ -230,7 +230,7 @@ function GitPanel({
     }
 
     loadWorktrees()
-  }, [rootPath, summary]) // Reload when summary changes
+  }, [rootPath]) // Only reload when rootPath changes (worktrees rarely change)
 
   const handlePush = async () => {
     if (!rootPath || !summary?.branch) return

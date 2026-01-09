@@ -113,6 +113,8 @@ export default function KanbanView({
     updateTask,
     isNewTaskModalRequested,
     clearNewTaskModalRequest,
+    pendingTaskInitialValues,
+    clearPendingTaskInitialValues,
     // Pagination for Done column
     getVisibleDoneTasks,
     hasMoreDoneTasks,
@@ -199,13 +201,19 @@ export default function KanbanView({
   // This ensures the Kanban UI stays in sync when tasks are created/modified via MCP tools
   useKanbanPolling({ enabled: true, interval: 5000 }); // 5 second interval for low overhead
 
-  // Handle keyboard shortcut request to open new task modal
+  // Handle keyboard shortcut or context menu request to open new task modal
   useEffect(() => {
     if (isNewTaskModalRequested) {
+      // If there are pending initial values (from context menu), use them
+      if (pendingTaskInitialValues) {
+        setModalInitialValues(pendingTaskInitialValues);
+        setModalDraft(null); // Clear draft when opening with initial values
+        clearPendingTaskInitialValues();
+      }
       setIsModalOpen(true);
       clearNewTaskModalRequest();
     }
-  }, [isNewTaskModalRequested, clearNewTaskModalRequest]);
+  }, [isNewTaskModalRequested, clearNewTaskModalRequest, pendingTaskInitialValues, clearPendingTaskInitialValues]);
 
   // Auto-start shell tasks that are in_progress but not yet running
   useEffect(() => {

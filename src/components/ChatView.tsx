@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import MessageList from './MessageList';
@@ -9,6 +9,7 @@ import EditSummaryBar from './EditSummaryBar';
 import KanbanTasksBar from './KanbanTasksBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
+import { useChatStore } from '../stores/chatStore';
 import { useKanbanTaskCounts } from '../hooks/useKanbanTaskCounts';
 import { useAgentRules } from '../hooks/useAgentRules';
 import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers } from '../types';
@@ -189,6 +190,21 @@ export default function ChatView({
 
   // Kanban task counts for the tasks bar
   const { todoCount, inProgressCount } = useKanbanTaskCounts(basePath);
+
+  // Persistent attachments via chat store
+  const getAttachments = useChatStore((state) => state.getAttachments);
+  const setStoreAttachments = useChatStore((state) => state.setAttachments);
+  const clearStoreAttachments = useChatStore((state) => state.clearAttachments);
+
+  // Get current attachments from store (only if we have a sessionId)
+  const sessionAttachments = currentSessionId ? getAttachments(currentSessionId) : [];
+
+  // Handler to update attachments in store
+  const handleAttachmentsChange = useCallback((newAttachments: ChatAttachment[]) => {
+    if (currentSessionId) {
+      setStoreAttachments(currentSessionId, newAttachments);
+    }
+  }, [currentSessionId, setStoreAttachments]);
 
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -645,6 +661,9 @@ export default function ChatView({
           // Controlled input draft
           inputValue={inputDraft}
           onInputChange={onInputDraftChange}
+          // Controlled attachments (persist across tab switches)
+          attachments={currentSessionId ? sessionAttachments : undefined}
+          onAttachmentsChange={currentSessionId ? handleAttachmentsChange : undefined}
           // Streaming control
           isStreaming={isLoading}
           onAbort={onAbortStream}
@@ -656,7 +675,7 @@ export default function ChatView({
           // Working on field
           workingOn={workingOn}
           onWorkingOnChange={onWorkingOnChange}
-          // Initial attachments (from Kanban task)
+          // Initial attachments (from Kanban task) - fallback for uncontrolled mode
           initialAttachments={initialAttachments}
         />
       </div>

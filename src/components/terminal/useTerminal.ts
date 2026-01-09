@@ -73,6 +73,37 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
   // Track if terminal is initialized to prevent double initialization
   const isInitializedRef = useRef(false);
 
+  // Refs for throttled write with requestAnimationFrame
+  const writeBufferRef = useRef<string[]>([]);
+  const rafScheduledRef = useRef(false);
+
+  /**
+   * Flush buffered writes to terminal (called via requestAnimationFrame)
+   */
+  const flushWrites = useCallback(() => {
+    if (writeBufferRef.current.length > 0 && xtermRef.current && isMountedRef.current) {
+      const chunk = writeBufferRef.current.join('');
+      xtermRef.current.write(chunk);
+      writeBufferRef.current = [];
+    }
+    rafScheduledRef.current = false;
+  }, []);
+
+  /**
+   * Throttled write using requestAnimationFrame
+   * Batches multiple writes into a single render frame
+   */
+  const throttledWrite = useCallback(
+    (data: string) => {
+      writeBufferRef.current.push(data);
+      if (!rafScheduledRef.current) {
+        rafScheduledRef.current = true;
+        requestAnimationFrame(flushWrites);
+      }
+    },
+    [flushWrites]
+  );
+
   /**
    * Initialize XTerm instance - runs ONCE on mount
    */
@@ -103,7 +134,7 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
         cursor: cursorColor || theme.cursor,
       },
       allowTransparency: false,
-      scrollback: 10000,
+      scrollback: 1000,
       convertEol: true,
       fastScrollModifier: 'shift',
       allowProposedApi: true,
@@ -137,8 +168,9 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
 
       // Listen for terminal output from backend
       const unlistenData = await listen<{ id: string; data: string }>('terminal-data', (event) => {
-        if (event.payload.id === terminalId && xtermRef.current && isMountedRef.current) {
-          xtermRef.current.write(event.payload.data);
+        if (event.payload.id === terminalId && isMountedRef.current) {
+          // Use throttledWrite instead of direct write for better performance
+          throttledWrite(event.payload.data);
         }
       });
       unlistenDataRef.current = unlistenData;
@@ -201,6 +233,12 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
     return () => {
       console.log(`[useTerminal] Cleaning up terminal: ${terminalId}`);
       isMountedRef.current = false;
+
+      // Clear RAF for throttled writes
+      if (rafScheduledRef.current) {
+        rafScheduledRef.current = false;
+        writeBufferRef.current = [];
+      }
 
       // Clear timers
       if (resizeTimerRef.current) {

@@ -1504,13 +1504,14 @@ export interface ShortcutConfig {
  * Initial values when creating a Kanban task from drag-drop or /background command
  */
 export interface KanbanTaskInitialValues {
-  projectPath: string;
-  projectName: string;
+  projectPath?: string;
+  projectName?: string;
   branch?: string;
   agentId?: string;
   agentName?: string;
   agentAvatar?: string;
   agentColor?: string;
+  targetStatus?: 'todo' | 'in_progress' | 'done'; // Target column when creating task
   // New fields for shell/watch tasks
   type?: KanbanTaskType;              // Task type (default: 'agent')
   command?: string;                   // Shell command for shell/watch tasks

@@ -656,6 +656,98 @@ async function handleBrainSearch(args) {
 }
 
 /**
+ * Handle brain_smart_search tool
+ *
+ * AI-DRIVEN SEARCH: Claude decides WHEN to search and WHAT to search for.
+ * No automatic keyword extraction - the query is the semantic intent.
+ *
+ * This is the PRIMARY search tool for AI agents. Use when:
+ * - Investigating bugs or issues
+ * - Making architectural decisions
+ * - Looking for patterns or past solutions
+ * - Answering questions about project history
+ *
+ * The query should be natural language describing what you need.
+ * FTS5 handles the matching against entity names and observations.
+ */
+async function handleBrainSmartSearch(args) {
+  const { query, context, limit = 5, projectId } = args;
+
+  console.error(`[BrainMCP] === SMART SEARCH ===`);
+  console.error(`[BrainMCP] Query: "${query}"`);
+  console.error(`[BrainMCP] Context: "${context || 'none'}"`);
+  console.error(`[BrainMCP] Project: ${projectId || 'all'}`);
+  console.error(`[BrainMCP] Limit: ${limit}`);
+
+  try {
+    const db = getDb();
+
+    // Prepare query for FTS5
+    // Keep the semantic query intact - FTS5 will match against full-text
+    // Remove special characters that break FTS5 syntax
+    const sanitizedQuery = query
+      .replace(/[^\w\s]/g, ' ')  // Remove special chars
+      .replace(/\s+/g, ' ')      // Normalize whitespace
+      .trim();
+
+    // Use prefix matching for partial words (e.g., "auth" matches "authentication")
+    // Split into terms and add wildcard for better recall
+    const terms = sanitizedQuery.split(' ').filter(t => t.length > 0);
+    const ftsQuery = terms.map(t => `${t}*`).join(' OR ');
+
+    console.error(`[BrainMCP] FTS5 query: "${ftsQuery}"`);
+
+    let sql = `
+      SELECT e.id, e.name, e.entity_type, e.project_id, rank
+      FROM entities e
+      JOIN entities_fts fts ON e.rowid = fts.rowid
+      WHERE entities_fts MATCH ?
+    `;
+    const params = [ftsQuery];
+
+    // Filter by project if specified
+    if (projectId) {
+      sql += ' AND e.project_id = ?';
+      params.push(projectId);
+    }
+
+    sql += ' ORDER BY rank LIMIT ?';
+    params.push(limit);
+
+    const results = db.prepare(sql).all(...params);
+
+    // Get full entities with observations
+    const entities = results.map(r => {
+      const entity = getEntityWithObservations(r.id);
+      return {
+        ...entity,
+        relevance: Math.abs(r.rank), // FTS5 rank is negative, take absolute value
+      };
+    });
+
+    console.error(`[BrainMCP] Found ${entities.length} results`);
+    console.error(`[BrainMCP] === END SMART SEARCH ===`);
+
+    return JSON.stringify({
+      success: true,
+      query,
+      context: context || null,
+      searchTerms: terms, // What was actually searched (for debugging)
+      count: entities.length,
+      entities,
+    }, null, 2);
+
+  } catch (error) {
+    console.error(`[BrainMCP] Smart search error: ${error.message}`);
+    return JSON.stringify({
+      success: false,
+      error: 'Smart search failed',
+      message: error.message,
+    }, null, 2);
+  }
+}
+
+/**
  * Handle brain_create_entity tool
  * Create a new entity with observations
  */
@@ -1495,6 +1587,33 @@ const TOOLS = [
     },
   },
   {
+    name: 'smart_search',
+    description: 'Search the brain with a semantic query using natural language. Use this when you need context from past conversations, patterns, decisions, or stored knowledge. Formulate your query in natural language describing what you are looking for.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Natural language query describing what you are looking for (e.g., "authentication patterns", "how we handle errors", "performance optimizations")',
+        },
+        context: {
+          type: 'string',
+          description: 'Brief context about why you need this information (helps improve search relevance and is logged for debugging)',
+        },
+        limit: {
+          type: 'number',
+          default: 5,
+          description: 'Maximum number of results to return (default: 5)',
+        },
+        projectId: {
+          type: 'string',
+          description: 'Optional project ID to scope the search to a specific project',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'create_entity',
     description: 'Create a new entity in the Quack Brain knowledge graph. Use this to save new memories, patterns, decisions, or other knowledge. Entities are auto-synced to Obsidian vault with daily diary integration.',
     inputSchema: {
@@ -1848,6 +1967,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'search':
         result = await handleBrainSearch(args);
+        break;
+      case 'smart_search':
+        result = await handleBrainSmartSearch(args);
         break;
       case 'create_entity':
         result = await handleBrainCreateEntity(args);

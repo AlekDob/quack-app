@@ -124,7 +124,8 @@ import { dispatchMCPMemoryUpdate, type MCPKnowledgeGraph } from "./hooks/useUnif
 import { calculateProjectOverhead } from "./services/conversationRecovery";
 import { getDuckdroidUrl } from "./utils/agentAvatars";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
-import type { DroidMetadata } from "./components/modal-steps/types";
+import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
+import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
 // import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
 import {
@@ -165,6 +166,7 @@ import type {
   SavedAgent,
   HookConfig,
   KanbanTask,
+  KanbanTaskInitialValues,
   AskUserQuestionAnswers,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
@@ -366,10 +368,38 @@ function AppContent() {
   // Derived state - moved here to fix TypeScript hoisting errors
   const [activeAgent, setActiveAgent] = useState<AgentInfo | null>(null); // Agent currently used in chat (Quack Agency)
 
+  // Project colors for project-first modal flow (must be before useMemo that uses it)
+  const [projectColors, setProjectColors] = useState<Record<string, string>>({});
+
   const activeTerminal = useMemo(
     () => terminals.find((terminal) => terminal.id === activeId) ?? null,
     [activeId, terminals]
   );
+
+  // Derive active projects from terminals for project-first modal
+  const activeProjects: ActiveProject[] = useMemo(() => {
+    const projectMap = new Map<string, { name: string; path: string; agentCount: number }>();
+
+    terminals.forEach(terminal => {
+      const path = terminal.cwd;
+      const name = path.split('/').pop() || path;
+
+      if (!projectMap.has(path)) {
+        projectMap.set(path, { name, path, agentCount: 0 });
+      }
+      const project = projectMap.get(path)!;
+      project.agentCount++;
+    });
+
+    // Convert to array with colors
+    return Array.from(projectMap.values()).map((project, index) => {
+      const repoKey = `repo-${project.name}`;
+      return {
+        ...project,
+        color: getProjectColor(repoKey, projectColors, index),
+      };
+    });
+  }, [terminals, projectColors]);
 
   // Project context for chat header
   const [projectName, setProjectName] = useState<string>('');
@@ -460,6 +490,7 @@ function AppContent() {
   // OpenAI API Key for Whisper
   const [openaiApiKey, setOpenaiApiKey] = useState<string | null>(null);
   const [showNewTerminalModal, setShowNewTerminalModal] = useState(false);
+  const [initialModalStep, setInitialModalStep] = useState<'project' | 'agent'>('project'); // Step to start modal at
   const [newTerminalName, setNewTerminalName] = useState("");
   const [newTerminalPath, setNewTerminalPath] = useState("");
   const [newTerminalColor, setNewTerminalColor] = useState<string>(TERMINAL_COLORS[0]);
@@ -5403,6 +5434,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         // This prevents crashes from incompatible data formats after app updates
         await checkStorageVersion();
 
+        // Load project colors for project-first modal
+        const colors = await loadProjectColors();
+        setProjectColors(colors);
+
         // Try to load saved terminals
         const savedMetadata = await loadTerminalsFromStorage();
 
@@ -6166,7 +6201,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
-  const handleOpenNewTerminalModal = useCallback(() => {
+  const handleOpenNewTerminalModal = useCallback((projectPath?: string) => {
     if (!tauriAvailable) {
       setExplorerError("Terminals available only via desktop app.");
       return;
@@ -6197,8 +6232,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       skills: [],
       expressions: [],
     });
-    const fallbackPath = activeTerminal?.cwd ?? explorerPath ?? "";
-    setNewTerminalPath(fallbackPath);
+
+    // If projectPath is provided (from sidebar +), pre-select project and skip to agent step
+    if (projectPath) {
+      setNewTerminalPath(projectPath);
+      setInitialModalStep('agent');
+    } else {
+      const fallbackPath = activeTerminal?.cwd ?? explorerPath ?? "";
+      setNewTerminalPath(fallbackPath);
+      setInitialModalStep('project');
+    }
     setShowNewTerminalModal(true);
   }, [activeTerminal, explorerPath, tauriAvailable, terminals.length]);
 
@@ -7490,6 +7533,30 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }, 50); // Small delay ensures browser has time to paint the loader
   }, [openProjectDashboardTab, tabs]);
 
+  // Handler for creating a Kanban task from the context menu (right-click on agent)
+  // Opens the Kanban tab and the new task modal with pre-populated agent data
+  const handleCreateTaskFromAgent = useCallback((terminal: TerminalInfo) => {
+    // Extract project name from path
+    const pathParts = terminal.cwd.split('/');
+    const projectName = pathParts[pathParts.length - 1];
+
+    // Build initial values for the task modal
+    const initialValues: KanbanTaskInitialValues = {
+      projectPath: terminal.cwd,
+      projectName,
+      branch: terminal.branch,
+      agentId: terminal.id,
+      agentName: terminal.label,
+      agentAvatar: terminal.avatar,
+      agentColor: terminal.color,
+      targetStatus: 'todo', // Always start in TODO
+    };
+
+    // Open Kanban tab first, then request the modal with initial values
+    handleOpenKanbanTab();
+    requestNewTaskModal(initialValues);
+  }, [handleOpenKanbanTab, requestNewTaskModal]);
+
   // Open task in agent's main Chat tab (no separate tab created)
   // This makes the task's chat appear in the agent's Chat tab, like an independent conversation
   // 🦆 FIX: Load task messages BEFORE updating activeTaskPerAgent to prevent race condition
@@ -8247,10 +8314,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setGitError(null);
     setHistoryError(null);
 
-    // Minimum loading time for smooth UX
-    const loadingStartTime = Date.now();
-    const MIN_LOADING_TIME = 400;
-
     try {
       const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
       const [statusResult, historyResult] = await Promise.allSettled([
@@ -8294,11 +8357,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setHistoryError(message);
       }
     } finally {
-      // Ensure minimum loading time for smooth UX
-      const elapsed = Date.now() - loadingStartTime;
-      if (elapsed < MIN_LOADING_TIME) {
-        await new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
-      }
       setLoadingGit(false);
     }
   }, [activeTerminal, explorerPath, tauriAvailable]);
@@ -9267,6 +9325,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           onOpenDashboard={handleOpenProjectDashboard}
+          onCreateTask={handleCreateTaskFromAgent}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
         />
@@ -10063,7 +10122,10 @@ You have access to all Bash tools to execute git commands like:
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
           error={newTerminalError}
+          activeProjects={activeProjects}
+          initialStep={initialModalStep}
           onNameChange={setNewTerminalName}
+          onPathChange={setNewTerminalPath}
           onColorChange={setNewTerminalColor}
           onWorkingOnChange={setNewTerminalWorkingOn}
           onAvatarChange={setNewTerminalAvatar}

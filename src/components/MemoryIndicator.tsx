@@ -22,13 +22,20 @@ export interface MemoryInfo {
 
 export interface MemoryIndicatorProps {
   memories: MemoryInfo[];
+  /** @deprecated Use `query` instead for AI-driven search */
   keywords?: string[];
+  /** AI-driven search query (natural language) */
+  query?: string;
+  /** Search context explaining why this search was performed */
+  searchContext?: string;
   durationMs?: number;
 }
 
 export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
   memories,
   keywords = [],
+  query,
+  searchContext,
   durationMs,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -58,7 +65,19 @@ export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
 
       {isExpanded && (
         <div className="memory-indicator-details">
-          {keywords.length > 0 && (
+          {/* AI-driven query display (preferred) */}
+          {query && (
+            <div className="memory-indicator-query">
+              <span className="memory-indicator-query-label">Search:</span>
+              <span className="memory-indicator-query-text">"{query}"</span>
+              {searchContext && (
+                <span className="memory-indicator-query-context">({searchContext})</span>
+              )}
+            </div>
+          )}
+
+          {/* Fallback to legacy keywords if no query */}
+          {!query && keywords.length > 0 && (
             <div className="memory-indicator-keywords">
               <span className="memory-indicator-keywords-label">Keywords:</span>
               {keywords.map((keyword, idx) => (

@@ -194,6 +194,14 @@ const EXTRACTION_PATTERNS: ExtractionPattern[] = [
 /**
  * Extracts keywords from text for search indexing
  *
+ * @deprecated This function uses a naive stopword-based approach that fails with:
+ * - Non-English text (only 30 English stopwords)
+ * - Multilingual content (Italian, French, etc.)
+ * - Domain-specific terms that look like stopwords
+ *
+ * **Use `mcp__brain__smart_search` instead** - Claude decides WHEN and WHAT to search
+ * using natural language queries. This is the AI-driven approach.
+ *
  * Removes common stop words and extracts meaningful terms.
  * Returns unique keywords in lowercase.
  *
@@ -202,6 +210,9 @@ const EXTRACTION_PATTERNS: ExtractionPattern[] = [
  *
  * @example
  * ```typescript
+ * // DEPRECATED - use smart_search instead:
+ * // mcp__brain__smart_search({ query: "TypeScript preferences and coding style" })
+ *
  * const keywords = extractKeywords("I prefer TypeScript strict mode");
  * // Returns: ["prefer", "typescript", "strict", "mode"]
  * ```

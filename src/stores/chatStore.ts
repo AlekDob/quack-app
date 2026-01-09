@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { ChatMessage, AgentChat, SessionUsage, AgentInfo } from '../types';
+import type { ChatMessage, AgentChat, SessionUsage, AgentInfo, ChatAttachment } from '../types';
 
 interface ChatState {
   // State
@@ -8,6 +8,7 @@ interface ChatState {
   agentChats: AgentChat[];
   chatLoadingMap: Map<string, boolean>;
   chatTokensMap: Map<string, SessionUsage>;
+  pendingAttachments: Map<string, ChatAttachment[]>; // Pending attachments per session
   activeAgent: AgentInfo | null;
   streamingMessage: ChatMessage | null;
 
@@ -25,12 +26,17 @@ interface ChatState {
   updateAgentChat: (id: string, updates: Partial<AgentChat>) => void;
   removeAgentChat: (id: string) => void;
 
+  // Attachment actions
+  setAttachments: (sessionId: string, attachments: ChatAttachment[]) => void;
+  clearAttachments: (sessionId: string) => void;
+
   // Selectors
   getSession: (sessionId: string) => ChatMessage[];
   getLastMessage: (sessionId: string) => ChatMessage | undefined;
   isSessionLoading: (sessionId: string) => boolean;
   getSessionTokens: (sessionId: string) => SessionUsage | undefined;
   getAgentChatById: (id: string) => AgentChat | undefined;
+  getAttachments: (sessionId: string) => ChatAttachment[];
 }
 
 export const useChatStore = create<ChatState>()(
@@ -39,6 +45,7 @@ export const useChatStore = create<ChatState>()(
     agentChats: [],
     chatLoadingMap: new Map(),
     chatTokensMap: new Map(),
+    pendingAttachments: new Map(),
     activeAgent: null,
     streamingMessage: null,
 
@@ -66,10 +73,13 @@ export const useChatStore = create<ChatState>()(
       newLoadingMap.delete(sessionId);
       const newTokensMap = new Map(state.chatTokensMap);
       newTokensMap.delete(sessionId);
+      const newAttachments = new Map(state.pendingAttachments);
+      newAttachments.delete(sessionId);
       return {
         chatSessions: newSessions,
         chatLoadingMap: newLoadingMap,
         chatTokensMap: newTokensMap,
+        pendingAttachments: newAttachments,
         streamingMessage: null
       };
     }),
@@ -109,6 +119,23 @@ export const useChatStore = create<ChatState>()(
       agentChats: state.agentChats.filter((c) => c.id !== id),
     })),
 
+    // Attachment actions
+    setAttachments: (sessionId, attachments) => set((state) => {
+      const newAttachments = new Map(state.pendingAttachments);
+      if (attachments.length > 0) {
+        newAttachments.set(sessionId, attachments);
+      } else {
+        newAttachments.delete(sessionId);
+      }
+      return { pendingAttachments: newAttachments };
+    }),
+
+    clearAttachments: (sessionId) => set((state) => {
+      const newAttachments = new Map(state.pendingAttachments);
+      newAttachments.delete(sessionId);
+      return { pendingAttachments: newAttachments };
+    }),
+
     // Selectors
     getSession: (sessionId) => {
       const state = get();
@@ -133,6 +160,11 @@ export const useChatStore = create<ChatState>()(
     getAgentChatById: (id) => {
       const state = get();
       return state.agentChats.find((c) => c.id === id);
+    },
+
+    getAttachments: (sessionId) => {
+      const state = get();
+      return state.pendingAttachments.get(sessionId) || [];
     },
   }), { name: 'chat-store' })
 );

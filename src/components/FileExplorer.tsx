@@ -129,16 +129,20 @@ function FileExplorer({
     });
   }, [rootPath]);
 
-  // Auto-refresh: Reload expanded directories every 3 seconds
+  // Auto-refresh: Reload expanded directories every 10 seconds (reduced from 3s)
   useEffect(() => {
     if (!rootPath) {
       return;
     }
 
     const interval = setInterval(() => {
-      // Reload all expanded directories to detect filesystem changes
+      // Reload expanded directories to detect filesystem changes
       const expandedPaths = Array.from(expanded);
-      for (const path of expandedPaths) {
+
+      // Limit to max 5 directories per refresh to reduce load
+      const pathsToRefresh = expandedPaths.slice(0, 5);
+
+      for (const path of pathsToRefresh) {
         // Skip if already loading
         if (loadingNodes.has(path)) {
           continue;
@@ -148,7 +152,7 @@ function FileExplorer({
           // Ignore errors during auto-refresh
         });
       }
-    }, 3000); // Refresh every 3 seconds
+    }, 10000); // Refresh every 10 seconds (increased from 3s)
 
     return () => clearInterval(interval);
   }, [rootPath, expanded, loadingNodes, onLoadChildren]);

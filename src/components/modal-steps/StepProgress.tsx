@@ -1,21 +1,23 @@
 /**
  * Step Progress Indicator
  * Shows current step and completed steps in the agent creation flow
+ * Project-first flow: project → agent → basics → rules
  */
 
 import type { StepProgressProps, ModalStep } from './types';
 
-// Simplified 3-step flow: context → basics → rules
+// Project-first 4-step flow: project → agent → basics → rules
 const STEPS: Array<{ id: ModalStep; label: string; icon: string }> = [
-  { id: 'context', label: 'Project', icon: '📁' },
+  { id: 'project', label: 'Project', icon: '📁' },
+  { id: 'agent', label: 'Agent', icon: '🤖' },
   { id: 'basics', label: 'Basics', icon: '🎨' },
   { id: 'rules', label: 'Rules', icon: '📋' },
 ];
 
 export function StepProgress({ currentStep, completedSteps, isEditing }: StepProgressProps) {
-  // Filter out Step 1 (context) when editing
+  // Filter out Step 1 & 2 (project + agent) when editing externally
   const stepsToShow = isEditing
-    ? STEPS.filter(s => s.id !== 'context')
+    ? STEPS.filter(s => s.id !== 'project' && s.id !== 'agent')
     : STEPS;
 
   const currentIndex = stepsToShow.findIndex(s => s.id === currentStep);

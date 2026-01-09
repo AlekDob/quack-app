@@ -21,8 +21,10 @@ import { SnippetModal } from './SnippetModal';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // Claude API limit is 5MB
 const MAX_PREVIEW_SIZE = 3 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 8000; // Claude API max dimension (8000x8000 pixels)
+const RECOMMENDED_IMAGE_DIMENSION = 1568; // Claude recommended for performance
 
 // Agent color mapping
 const AGENT_COLORS: Record<string, string> = {
@@ -59,6 +61,9 @@ interface ChatInputProps {
   // Controlled input value
   inputValue?: string;
   onInputChange?: (value: string) => void;
+  // Controlled attachments (for persistence across tab switches)
+  attachments?: ChatAttachment[];
+  onAttachmentsChange?: (attachments: ChatAttachment[]) => void;
   // Streaming control
   isStreaming?: boolean;
   onAbort?: () => void;
@@ -70,7 +75,7 @@ interface ChatInputProps {
   // Working on field
   workingOn?: string;
   onWorkingOnChange?: (value: string) => void;
-  // Initial attachments (from Kanban task)
+  // Initial attachments (from Kanban task) - DEPRECATED, use attachments prop instead
   initialAttachments?: ChatAttachment[];
 }
 
@@ -88,6 +93,8 @@ export default function ChatInput({
   basePath,
   inputValue: controlledInputValue,
   onInputChange: controlledOnInputChange,
+  attachments: controlledAttachments,
+  onAttachmentsChange: controlledOnAttachmentsChange,
   isStreaming = false,
   onAbort,
   lastPrompt,
@@ -99,22 +106,47 @@ export default function ChatInput({
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
-  const [attachments, setAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
+  const [localAttachments, setLocalAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize attachments from prop (for Kanban tasks)
+  // Initialize attachments from prop (for Kanban tasks) - only for uncontrolled mode
   useEffect(() => {
-    if (initialAttachments && initialAttachments.length > 0) {
-      setAttachments(initialAttachments);
+    if (initialAttachments && initialAttachments.length > 0 && !controlledAttachments) {
+      setLocalAttachments(initialAttachments);
     }
-  }, [initialAttachments]);
+  }, [initialAttachments, controlledAttachments]);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Determine if controlled or uncontrolled
+  // Determine if controlled or uncontrolled for input
   const isControlled = controlledInputValue !== undefined && controlledOnInputChange !== undefined;
   const input = isControlled ? controlledInputValue : localInput;
   const setInput = isControlled ? controlledOnInputChange : setLocalInput;
+
+  // Determine if controlled or uncontrolled for attachments
+  const isAttachmentsControlled = controlledAttachments !== undefined && controlledOnAttachmentsChange !== undefined;
+  const attachments = isAttachmentsControlled ? controlledAttachments : localAttachments;
+
+  // Wrapper to support both direct value and callback setter pattern
+  const setAttachments = useCallback((valueOrUpdater: ChatAttachment[] | ((prev: ChatAttachment[]) => ChatAttachment[])) => {
+    if (typeof valueOrUpdater === 'function') {
+      // Callback pattern: (prev) => newValue
+      const currentAttachments = isAttachmentsControlled ? controlledAttachments : localAttachments;
+      const newValue = valueOrUpdater(currentAttachments);
+      if (isAttachmentsControlled && controlledOnAttachmentsChange) {
+        controlledOnAttachmentsChange(newValue);
+      } else {
+        setLocalAttachments(newValue);
+      }
+    } else {
+      // Direct value pattern
+      if (isAttachmentsControlled && controlledOnAttachmentsChange) {
+        controlledOnAttachmentsChange(valueOrUpdater);
+      } else {
+        setLocalAttachments(valueOrUpdater);
+      }
+    }
+  }, [isAttachmentsControlled, controlledAttachments, controlledOnAttachmentsChange, localAttachments]);
 
   // Load slash commands
   const { commands: commandsResponse } = useSlashCommands(basePath || '');
@@ -751,6 +783,43 @@ export default function ChatInput({
     }
   }, []);
 
+  // Validate image dimensions (Claude API max is 8000x8000 pixels)
+  const validateImageDimensions = useCallback(async (
+    dataUrl: string,
+    fileName: string
+  ): Promise<{ valid: boolean; width?: number; height?: number; error?: string }> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+
+      img.onload = () => {
+        const { width, height } = img;
+
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          resolve({
+            valid: false,
+            width,
+            height,
+            error: `Image "${fileName}" is too large (${width}x${height}). Max dimensions: ${MAX_IMAGE_DIMENSION}x${MAX_IMAGE_DIMENSION} pixels.`
+          });
+        } else {
+          // Log if image is larger than recommended (for future optimization hints)
+          if (width > RECOMMENDED_IMAGE_DIMENSION || height > RECOMMENDED_IMAGE_DIMENSION) {
+            console.info(`[Image] ${fileName} (${width}x${height}) exceeds recommended ${RECOMMENDED_IMAGE_DIMENSION}px - may be slow to process`);
+          }
+          resolve({ valid: true, width, height });
+        }
+      };
+
+      img.onerror = () => {
+        // If we can't load the image, allow it through (might be a valid format we don't support in browser)
+        console.warn(`[Image] Could not validate dimensions for ${fileName}`);
+        resolve({ valid: true });
+      };
+
+      img.src = dataUrl;
+    });
+  }, []);
+
   const createAttachmentFromPath = useCallback(
     async (path: string): Promise<ChatAttachment | null> => {
       try {
@@ -762,13 +831,22 @@ export default function ChatInput({
         }
 
         if (metadata.size && metadata.size > MAX_FILE_SIZE) {
-          setError(`File ${path.split(/[\\/]/).pop() ?? path} is larger than 15MB.`);
+          setError(`File ${path.split(/[\\/]/).pop() ?? path} is larger than 5MB (Claude API limit).`);
           return null;
         }
 
         const name = path.split(/[\\/]/).pop() ?? path;
         const mimeType = guessMimeType(name);
         const previewUrl = await buildPreviewUrl(path, mimeType, metadata.size ?? undefined);
+
+        // Validate image dimensions for image files
+        if (mimeType?.startsWith('image/') && previewUrl) {
+          const validation = await validateImageDimensions(previewUrl, name);
+          if (!validation.valid) {
+            setError(validation.error ?? 'Image dimensions exceed Claude API limits.');
+            return null;
+          }
+        }
 
         return {
           id: generateId(),
@@ -784,7 +862,7 @@ export default function ChatInput({
         return null;
       }
     },
-    [buildPreviewUrl, generateId, guessMimeType]
+    [buildPreviewUrl, generateId, guessMimeType, validateImageDimensions]
   );
 
   const handleAttach = useCallback(async () => {
@@ -903,7 +981,7 @@ export default function ChatInput({
         }
 
         if (file.size > MAX_FILE_SIZE) {
-          setError(`Clipboard file ${file.name || '(unnamed)'} is larger than 15MB.`);
+          setError(`Clipboard file ${file.name || '(unnamed)'} is larger than 5MB (Claude API limit).`);
           continue;
         }
 
@@ -940,6 +1018,8 @@ export default function ChatInput({
       if (entries.length > 0) {
         setAttachments((prev) => [...prev, ...entries]);
         setError(null);
+        // Note: We don't insert filename in text anymore as it confuses AI agents
+        // who try to read it as a file path. The image is visible in the attachment preview.
       }
     },
     [attachments.length, createAttachmentFromPath, disabled, mimeToExtension, readFileAsBase64]
@@ -1240,7 +1320,7 @@ export default function ChatInput({
           }
 
           if (file.size > MAX_FILE_SIZE) {
-            setError(`Image ${file.name} is larger than 15MB.`);
+            setError(`Image ${file.name} is larger than 5MB (Claude API limit).`);
             continue;
           }
 

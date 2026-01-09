@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, memo } from 'react';
 import './ToolWidgets.css';
 import {
   SystemInitializedWidget,
@@ -15,6 +15,7 @@ import {
 import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
 import { TaskWidget } from './TaskWidget';
+import { TaskOutputWidget } from './TaskOutputWidget';
 import AskUserQuestionWidget from './AskUserQuestionWidget';
 import ToolGifInline from './ToolGifInline';
 import { getAvatarUrl } from '../utils/agentAvatars';
@@ -25,6 +26,18 @@ import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutpu
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
+
+// Memoized tool widget components for performance
+const MemoizedEditWidget = memo(EditWidget);
+const MemoizedWriteWidget = memo(WriteWidget);
+const MemoizedBashWidget = memo(BashWidget);
+const MemoizedReadWidget = memo(ReadWidget);
+const MemoizedGrepWidget = memo(GrepWidget);
+const MemoizedTaskWidget = memo(TaskWidget);
+const MemoizedTaskOutputWidget = memo(TaskOutputWidget);
+const MemoizedTodoWriteWidget = memo(TodoWriteWidget);
+const MemoizedExitPlanModeWidget = memo(ExitPlanModeWidget);
+const MemoizedAskUserQuestionWidget = memo(AskUserQuestionWidget);
 
 /**
  * CollapsibleToolWidget - A collapsible widget for generic MCP tools
@@ -272,7 +285,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'edit'} toolId={toolId} />
-                  <EditWidget
+                  <MemoizedEditWidget
                     file_path={input.file_path}
                     old_string={input.old_string}
                     new_string={input.new_string}
@@ -288,7 +301,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'write'} toolId={toolId} />
-                  <WriteWidget
+                  <MemoizedWriteWidget
                     filePath={input.file_path}
                     content={input.content}
                     result={toolResult}
@@ -303,7 +316,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'bash'} toolId={toolId} />
-                  <BashWidget
+                  <MemoizedBashWidget
                     command={input.command}
                     description={input.description}
                     result={toolResult}
@@ -317,7 +330,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
-                  <ReadWidget
+                  <MemoizedReadWidget
                     filePath={input.file_path}
                     result={toolResult}
                     onFilePathClick={onFilePathClick}
@@ -331,7 +344,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'grep'} toolId={toolId} />
-                  <GrepWidget
+                  <MemoizedGrepWidget
                     pattern={input.pattern}
                     path={input.path}
                     result={toolResult}
@@ -343,7 +356,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             // TodoWrite tool - no GIF (skipped in ToolGifInline)
             if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
               return (
-                <TodoWriteWidget
+                <MemoizedTodoWriteWidget
                   key={idx}
                   todos={input.todos}
                   defaultExpanded={true}
@@ -354,7 +367,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             // ExitPlanMode tool - no GIF
             if (toolName === 'exitplanmode' && input?.plan) {
               return (
-                <ExitPlanModeWidget
+                <MemoizedExitPlanModeWidget
                   key={idx}
                   plan={input.plan}
                   workingDirectory={workingDirectory}
@@ -370,7 +383,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               const isAnswered = !!existingAnswer || !!toolResult;
 
               return (
-                <AskUserQuestionWidget
+                <MemoizedAskUserQuestionWidget
                   key={idx}
                   questions={input.questions}
                   toolUseId={toolId}
@@ -381,8 +394,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // Default fallback for unknown tools
-            // Special handling for Task tool (subagent invocation)
+            // Task tool (subagent invocation) - launches droids
             if (toolName === 'task' && input?.subagent_type) {
               const subagentType = input.subagent_type;
               const description = input.description || 'Running task';
@@ -392,11 +404,49 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'task'} toolId={toolId} />
-                  <TaskWidget
+                  <MemoizedTaskWidget
                     subagentType={subagentType}
                     description={description}
                     isLoading={!toolResult}
                     workingDirectory={workingDirectory}
+                  />
+                </React.Fragment>
+              );
+            }
+
+            // TaskOutput tool - retrieves output from background tasks
+            if (toolName === 'taskoutput' && input?.task_id) {
+              // Parse status from tool result if available
+              let status: 'pending' | 'running' | 'completed' | 'error' | 'unknown' = 'unknown';
+              let output: string | undefined;
+              let error: string | undefined;
+
+              if (toolResult) {
+                try {
+                  // toolResult might be a string or parsed object
+                  const result = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
+                  status = result.status || 'completed';
+                  output = result.output || result.result || (typeof toolResult === 'string' ? toolResult : JSON.stringify(result, null, 2));
+                  error = result.error;
+                } catch {
+                  // If parsing fails, use the raw result as output
+                  output = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
+                  status = 'completed';
+                }
+              }
+
+              return (
+                <React.Fragment key={idx}>
+                  <ToolGifInline toolName={content.name || 'taskoutput'} toolId={toolId} />
+                  <MemoizedTaskOutputWidget
+                    taskId={input.task_id}
+                    status={status}
+                    output={output}
+                    error={error}
+                    block={input.block}
+                    timeout={input.timeout}
+                    isLoading={!toolResult}
+                    defaultExpanded={true}
                   />
                 </React.Fragment>
               );
@@ -621,4 +671,4 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   return null;
 };
 
-export default StreamMessage;
+export default memo(StreamMessage);

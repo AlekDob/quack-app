@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { KanbanTask, KanbanStatus, KanbanAssignedAgent, TaskCompletionResult } from '../types';
+import type { KanbanTask, KanbanStatus, KanbanAssignedAgent, TaskCompletionResult, KanbanTaskInitialValues } from '../types';
 import {
   saveKanbanTasks,
   loadKanbanTasks,
@@ -36,8 +36,10 @@ interface KanbanState {
   isLoading: boolean;
   // Notification state for "Open Kanban" bar
   pendingNotification: KanbanNotification | null;
-  // Flag to trigger new task modal opening (from keyboard shortcut)
+  // Flag to trigger new task modal opening (from keyboard shortcut or context menu)
   isNewTaskModalRequested: boolean;
+  // Initial values for new task modal (from context menu "Create Task")
+  pendingTaskInitialValues: KanbanTaskInitialValues | null;
   // Task IDs currently being documented
   processingDocumentation: Set<string>;
 
@@ -60,9 +62,10 @@ interface KanbanState {
   // Notification actions
   showNotification: (notification: KanbanNotification) => void;
   dismissNotification: () => void;
-  // New task modal actions (for keyboard shortcut)
-  requestNewTaskModal: () => void;
+  // New task modal actions (for keyboard shortcut or context menu)
+  requestNewTaskModal: (initialValues?: KanbanTaskInitialValues) => void;
   clearNewTaskModalRequest: () => void;
+  clearPendingTaskInitialValues: () => void;
   // Task completion documentation tracking
   markDocumentationProcessing: (taskId: string) => void;
   markDocumentationComplete: (taskId: string, result: TaskCompletionResult) => void;
@@ -99,6 +102,7 @@ export const useKanbanStore = create<KanbanState>()(
         isLoading: false,
         pendingNotification: null,
         isNewTaskModalRequested: false,
+        pendingTaskInitialValues: null,
         processingDocumentation: new Set(),
 
         // Pagination for Done column - show 20 tasks initially, load 20 more each time
@@ -292,14 +296,22 @@ export const useKanbanStore = create<KanbanState>()(
           set({ pendingNotification: null });
         },
 
-        // Request new task modal to open (triggered by keyboard shortcut)
-        requestNewTaskModal: () => {
-          set({ isNewTaskModalRequested: true });
+        // Request new task modal to open (triggered by keyboard shortcut or context menu)
+        requestNewTaskModal: (initialValues?: KanbanTaskInitialValues) => {
+          set({
+            isNewTaskModalRequested: true,
+            pendingTaskInitialValues: initialValues || null,
+          });
         },
 
         // Clear the request after modal has been opened
         clearNewTaskModalRequest: () => {
           set({ isNewTaskModalRequested: false });
+        },
+
+        // Clear pending initial values after they've been consumed
+        clearPendingTaskInitialValues: () => {
+          set({ pendingTaskInitialValues: null });
         },
 
         // Mark task as being documented

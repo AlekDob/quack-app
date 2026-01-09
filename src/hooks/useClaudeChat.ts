@@ -75,9 +75,17 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   const seenEventIdsRef = useRef<Set<string>>(new Set());
   const currentTaskIdRef = useRef<string | undefined>(options?.taskId);
 
+  // 🦆 FIX: Stable ref for messages.length to avoid re-creating sendMessage callback
+  const messagesLengthRef = useRef<number>(messages.length);
+
   // 🗣️ AskUserQuestion: Track pending questions and answered questions
   const [pendingQuestionIds, setPendingQuestionIds] = useState<Set<string>>(new Set());
   const [answeredQuestions, setAnsweredQuestions] = useState<Map<string, AskUserQuestionAnswers>>(new Map());
+
+  // 🦆 FIX: Update messagesLengthRef when messages.length changes
+  useEffect(() => {
+    messagesLengthRef.current = messages.length;
+  }, [messages.length]);
 
   // 🦆 FIX: Clear event deduplication AND abort active stream when taskId changes
   // This prevents events from Task A being incorrectly flagged as duplicates in Task B
@@ -171,7 +179,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     }
 
     // Legacy check (kept for backwards compatibility)
-    if (messages.length > 20) {
+    // 🦆 FIX: Use messagesLengthRef.current instead of messages.length to avoid dependency
+    if (messagesLengthRef.current > 20) {
       console.warn('[useClaudeChat] ⚠️ Conversation is getting long. Consider using /compact or clearing conversation.');
     }
 
@@ -525,7 +534,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       setIsLoading(false);
       abortControllerRef.current = null; // Clean up
     }
-  }, [isLoading, messages.length]);
+    // 🦆 FIX: Removed messages.length from dependencies - using messagesLengthRef.current instead
+  }, [isLoading]);
 
   // Abort current streaming
   const abortStream = useCallback(() => {

@@ -129,13 +129,23 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAs
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
 
   // Load repository order from store (same store used by TerminalSidebar)
+  // NOTE: The store now uses new format { order: string[], colors: Record<string, string> }
+  // but we need to handle both old (array) and new (object) formats for backwards compatibility
   useEffect(() => {
     const loadOrder = async () => {
       try {
         const store = await Store.load('.quack-repo-order.dat');
-        const savedOrder = await store.get<string[]>('repository-order');
-        if (savedOrder) {
-          setRepositoryOrder(savedOrder);
+        const savedData = await store.get<{ order: string[]; colors: Record<string, string> } | string[]>('repository-order');
+
+        if (savedData) {
+          // Handle both old format (array) and new format (object with order property)
+          if (Array.isArray(savedData)) {
+            // Old format - array of repo keys
+            setRepositoryOrder(savedData);
+          } else if (savedData.order && Array.isArray(savedData.order)) {
+            // New format - object with order property
+            setRepositoryOrder(savedData.order);
+          }
         }
       } catch (error) {
         console.error('Failed to load repository order:', error);
