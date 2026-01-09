@@ -833,7 +833,7 @@ export default function TerminalSidebar({
               {activeRepoId ? (() => {
                 const activeRepo = orderedRepositoryGroups.find(([name]) => `repo-${name}` === activeRepoId);
                 if (!activeRepo) return null;
-                
+
                 const [repoName] = activeRepo;
                 return (
                   <div

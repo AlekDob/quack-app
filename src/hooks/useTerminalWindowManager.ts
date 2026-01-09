@@ -38,13 +38,11 @@ export function useTerminalWindowManager() {
       const existingWindow = allWindows.find(w => w.label === TERMINAL_WINDOW_LABEL);
 
       if (existingWindow) {
-        // Focus existing window
-        await existingWindow.setFocus();
         setIsOpen(true);
         setWindowInstance(existingWindow); // Keep reference in sync
 
+        // Send commands FIRST (non-blocking)
         // Always send updated projects when focusing existing window
-        // Use emitTo to send event TO the terminal window (not FROM it)
         await emitTo(TERMINAL_WINDOW_LABEL, 'terminal-window-projects-update', projects);
         console.log('[TerminalWindowManager] Sent projects update to existing window:', projects.length, 'projects');
 
@@ -52,6 +50,12 @@ export function useTerminalWindowManager() {
         if (initialCommand) {
           await emitTo(TERMINAL_WINDOW_LABEL, 'terminal-window-execute-command', initialCommand);
         }
+
+        // Focus LAST (fire-and-forget, don't block UI)
+        existingWindow.setFocus().catch(err => {
+          console.warn('[TerminalWindowManager] Focus failed but commands sent:', err);
+        });
+
         return;
       }
 

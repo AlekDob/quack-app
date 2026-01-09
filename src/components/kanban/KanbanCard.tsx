@@ -19,6 +19,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { FileText } from 'lucide-react';
 import type { KanbanTask } from '../../types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
+import { useAgentAvatar } from '../../hooks/useAgentAvatar';
 
 // Task type colors
 const TASK_TYPE_COLORS = {
@@ -50,6 +51,38 @@ function getAvatarUrl(avatarName: string): string {
     return convertFileSrc(`/images/ducks/new-avatars/${avatarName}`, 'asset');
   }
   return `/images/ducks/new-avatars/${avatarName}`;
+}
+
+/**
+ * MiniAgentAvatar - Small circular avatar for task headers
+ */
+interface MiniAgentAvatarProps {
+  agentName: string;
+  avatarFilename?: string;
+  agentColor?: string;
+}
+
+function MiniAgentAvatar({ agentName, avatarFilename, agentColor }: MiniAgentAvatarProps) {
+  const avatarUrl = useAgentAvatar(agentName, avatarFilename);
+
+  return (
+    <div className="kanban-mini-avatar" style={{ borderColor: agentColor || '#6b7280' }}>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={agentName}
+          className="kanban-mini-avatar-img"
+        />
+      ) : (
+        <div
+          className="kanban-mini-avatar-placeholder"
+          style={{ backgroundColor: agentColor || '#6b7280' }}
+        >
+          {agentName.charAt(0).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function KanbanCard({
@@ -233,6 +266,14 @@ export default function KanbanCard({
         {/* Header with title, type badge, status badge, and delete button */}
         <div className="kanban-card-header">
           <div className="kanban-card-title-row">
+            {/* Mini agent avatar - shown for all tasks with assigned agent */}
+            {task.assignedAgent && (
+              <MiniAgentAvatar
+                agentName={task.assignedAgent.name}
+                avatarFilename={task.assignedAgent.avatar}
+                agentColor={task.assignedAgent.color}
+              />
+            )}
             {/* Task type badge for non-agent tasks */}
             {!isAgentTask && (
               <span
@@ -436,35 +477,13 @@ export default function KanbanCard({
           </div>
         )}
 
-        {/* Agent info row - agent on left, ready badge on right */}
-        {isAgentTask && task.assignedAgent && (
-          <div className="kanban-card-agent-row">
-            <div className="kanban-card-agent">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={task.assignedAgent.name}
-                  className="kanban-card-avatar"
-                />
-              ) : (
-                <div
-                  className="kanban-card-avatar-placeholder"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  {task.assignedAgent.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="kanban-card-agent-name">
-                {task.assignedAgent.name}
-              </span>
-            </div>
-            {/* Ready indicator - shows when agent finished and awaiting review */}
-            {isReady && (
-              <span className="kanban-ready-badge">
-                <span className="kanban-ready-dot" />
-                Ready
-              </span>
-            )}
+        {/* Ready indicator - shows when agent finished and awaiting review */}
+        {isAgentTask && isReady && (
+          <div className="kanban-card-ready-row">
+            <span className="kanban-ready-badge">
+              <span className="kanban-ready-dot" />
+              Ready
+            </span>
           </div>
         )}
 
@@ -625,6 +644,14 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
       />
       <div className="kanban-card-content">
         <div className="kanban-card-title-row">
+          {/* Mini agent avatar for drag overlay */}
+          {task.assignedAgent && (
+            <MiniAgentAvatar
+              agentName={task.assignedAgent.name}
+              avatarFilename={task.assignedAgent.avatar}
+              agentColor={task.assignedAgent.color}
+            />
+          )}
           {!isAgentTask && (
             <span
               className="kanban-task-type-badge"
@@ -638,13 +665,6 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
         <div className="kanban-card-project">
           <span>{task.projectName}</span>
         </div>
-        {isAgentTask && task.assignedAgent && (
-          <div className="kanban-card-agent">
-            <span className="kanban-card-agent-name">
-              {task.assignedAgent.name}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

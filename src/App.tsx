@@ -109,6 +109,13 @@ import {
   saveAgentChatsToStorage,
   loadAgentChatsFromStorage,
 } from "./services/agentChatStorage";
+import {
+  saveAgentSessionId,
+  saveAgentMessages,
+  loadAllAgentSessions,
+  loadAgentMessages,
+  deleteAgentData,
+} from "./services/agentChatPersistence";
 import { extractAndSaveMemories, extractManualMemoryFromInput } from "./services/memoryIntegration";
 import { getMemorySettings, addMemory } from "./services/memoryStorage";
 import { generateMemoryId } from "./services/memoryExtractor";
@@ -775,6 +782,9 @@ function AppContent() {
 
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
+
+  // Task Input Drafts - isolated input state per task ID (fixes input bleeding between tasks)
+  const [taskInputDrafts, setTaskInputDrafts] = useState<Map<string, string>>(new Map());
 
   // Usage tracking - cost and token usage from Claude Agent SDK
   const [usageSessions, setUsageSessions] = useState<SessionUsage[]>([]);
@@ -2009,9 +2019,9 @@ function AppContent() {
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
-            // 🦆 SIMPLIFIED: No sessionId = always new conversation
-            // Users can resume via Sessions panel instead
-            sessionId: undefined,
+            // 🦆 SESSION PERSISTENCE: Use saved sessionId to automatically resume conversations
+            // This allows agent chats to persist across app restarts
+            sessionId: chatSessionIds.get(activeId),
             // ✅ New SDK 0.1.54+ features
             outputFormat: options?.outputFormat, // Structured outputs (beta)
             effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
@@ -2095,6 +2105,20 @@ function AppContent() {
           return agent;
         });
       });
+
+      // 🦆 CHAT PERSISTENCE: Save sessionId and messages to storage
+      try {
+        await saveAgentSessionId(activeId, response.session_id);
+
+        // Get current messages for this agent
+        const currentMessages = chatSessions.get(activeId) || [];
+        await saveAgentMessages(activeId, response.session_id, currentMessages);
+
+        console.log(`[sendMessageForAgent] 💾 Saved session and ${currentMessages.length} messages for agent ${activeId}`);
+      } catch (persistErr) {
+        // Non-critical, don't block chat
+        console.warn('[sendMessageForAgent] Failed to persist chat data:', persistErr);
+      }
 
       // Track usage from Claude Agent SDK (with full token details!)
       const agentLabel = activeTerminal?.label || activeAgent?.name || 'AI Assistant';
@@ -5520,6 +5544,41 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               setChatSessionIds(initialSessionIds);
               console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
             }
+
+            // 🦆 CHAT PERSISTENCE: Restore messages for all agents
+            const initialChatSessions = new Map<string, ChatMessage[]>();
+            let totalRestoredMessages = 0;
+
+            for (const agent of existingChats) {
+              try {
+                const storedMessages = await loadAgentMessages(agent.id);
+                if (storedMessages && storedMessages.messages.length > 0) {
+                  // Convert stored messages to ChatMessage format
+                  const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
+                    id: `msg-restored-${agent.id}-${index}`,
+                    role: msg.role as 'user' | 'assistant' | 'system',
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    status: 'complete' as const,
+                  }));
+
+                  initialChatSessions.set(agent.id, chatMessages);
+                  totalRestoredMessages += chatMessages.length;
+                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for agent ${agent.id}`);
+                }
+              } catch (err) {
+                console.warn(`[Chat Persistence] Failed to restore messages for agent ${agent.id}:`, err);
+              }
+            }
+
+            if (initialChatSessions.size > 0) {
+              setChatSessions(initialChatSessions);
+              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} agents`);
+              toast.success(`Restored ${totalRestoredMessages} chat messages`, {
+                description: `${initialChatSessions.size} agent conversations restored`,
+                duration: 3000,
+              });
+            }
           }
 
           // Load tabs by terminal from storage
@@ -5577,6 +5636,41 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             if (initialSessionIds.size > 0) {
               setChatSessionIds(initialSessionIds);
               console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
+            }
+
+            // 🦆 CHAT PERSISTENCE: Restore messages for all agents
+            const initialChatSessions = new Map<string, ChatMessage[]>();
+            let totalRestoredMessages = 0;
+
+            for (const agent of existingChats) {
+              try {
+                const storedMessages = await loadAgentMessages(agent.id);
+                if (storedMessages && storedMessages.messages.length > 0) {
+                  // Convert stored messages to ChatMessage format
+                  const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
+                    id: `msg-restored-${agent.id}-${index}`,
+                    role: msg.role as 'user' | 'assistant' | 'system',
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    status: 'complete' as const,
+                  }));
+
+                  initialChatSessions.set(agent.id, chatMessages);
+                  totalRestoredMessages += chatMessages.length;
+                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for agent ${agent.id}`);
+                }
+              } catch (err) {
+                console.warn(`[Chat Persistence] Failed to restore messages for agent ${agent.id}:`, err);
+              }
+            }
+
+            if (initialChatSessions.size > 0) {
+              setChatSessions(initialChatSessions);
+              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} agents`);
+              toast.success(`Restored ${totalRestoredMessages} chat messages`, {
+                description: `${initialChatSessions.size} agent conversations restored`,
+                duration: 3000,
+              });
             }
           }
         }
@@ -6024,6 +6118,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       prev.filter((chat) => chat.id !== oldId)
       // Don't add newId - let it be created fresh on first interaction
     );
+
+    // 7.5. 🦆 FIX: Update activeTaskPerAgent key from oldId to newId
+    // This preserves the active task when agent is reset (task chat is independent)
+    setActiveTaskPerAgent((prev) => {
+      const activeTaskForOldAgent = prev.get(oldId);
+      if (activeTaskForOldAgent) {
+        const newMap = new Map(prev);
+        newMap.delete(oldId);
+        newMap.set(newId, activeTaskForOldAgent);
+        console.log(`🦆 [Reset Agent] Preserved active task "${activeTaskForOldAgent}" under new agent ID`);
+        return newMap;
+      }
+      return prev;
+    });
 
     // 8. Update Kanban tasks that reference the old agent ID
     // This prevents "Agent terminal not found" errors when opening tasks after reset
@@ -7386,6 +7494,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // This makes the task's chat appear in the agent's Chat tab, like an independent conversation
   // 🦆 FIX: Load task messages BEFORE updating activeTaskPerAgent to prevent race condition
   // Bug: When clicking rapidly between tasks, chatSessions could show stale/wrong data
+  // 🦆 FIX: Save CURRENT task messages before switching to preserve streaming responses
   const openTaskTab = useCallback(async (task: KanbanTask) => {
     // Task must have an assigned agent
     if (!task.assignedAgent?.id) {
@@ -7395,6 +7504,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const agentId = task.assignedAgent.id;
     let terminal = terminals.find(t => t.id === agentId);
+
+    // 🦆 FIX: Save current task's messages BEFORE switching to preserve any streaming data
+    // This prevents message loss when switching tasks mid-response
+    const currentActiveTaskId = activeId ? activeTaskPerAgent.get(activeId) : null;
+    if (currentActiveTaskId && currentActiveTaskId !== task.id) {
+      const currentMessages = chatSessions.get(currentActiveTaskId);
+      if (currentMessages && currentMessages.length > 0) {
+        console.log(`[openTaskTab] 💾 Saving ${currentMessages.length} messages for current task ${currentActiveTaskId} before switching...`);
+        try {
+          await saveKanbanChatSession(currentActiveTaskId, currentMessages);
+        } catch (err) {
+          console.warn(`[openTaskTab] Failed to save current task messages:`, err);
+        }
+      }
+    }
 
     // Fallback: search by agent name if UUID not found (handles stale references after agent reset)
     if (!terminal && task.assignedAgent?.name) {
@@ -7424,6 +7548,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // 🦆 FIX RACE CONDITION: Load task messages BEFORE updating activeTaskPerAgent
       // This ensures chatSessions has the correct data when React re-renders ChatView
       // Previously, activeTaskPerAgent was updated first, causing ChatView to see stale data
+      // 🦆 FIX MESSAGE LOSS: Don't overwrite in-memory messages with disk if they're more recent
+      // In-memory messages may include streaming responses not yet saved to disk
       try {
         const store = await Store.load('quack-chats.json');
         const savedChat = await store.get<{
@@ -7433,15 +7559,25 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           timestamp?: number;
         }>(`chat-${task.id}`);
 
-        if (savedChat?.messages) {
-          // Update chatSessions with task messages FIRST
-          setChatSessions(prev => {
-            const newSessions = new Map(prev);
-            newSessions.set(task.id, savedChat.messages);
-            return newSessions;
-          });
+        // Check if we already have messages in-memory for this task
+        const existingMessages = chatSessions.get(task.id);
+        const hasInMemoryMessages = existingMessages && existingMessages.length > 0;
 
-          // Also restore tokens if available
+        if (savedChat?.messages) {
+          // If we have in-memory messages, they might be more recent (streaming in progress)
+          // Only load from disk if we have NO in-memory messages OR disk has more messages
+          if (!hasInMemoryMessages || savedChat.messages.length > existingMessages.length) {
+            setChatSessions(prev => {
+              const newSessions = new Map(prev);
+              newSessions.set(task.id, savedChat.messages);
+              return newSessions;
+            });
+            console.log(`[Quack] Loaded ${savedChat.messages.length} messages from disk for task "${task.title}"`);
+          } else {
+            console.log(`[Quack] Keeping ${existingMessages.length} in-memory messages for task "${task.title}" (more recent than disk)`);
+          }
+
+          // Always restore tokens if available
           if (savedChat.tokens) {
             setChatTokensMap(prev => {
               const newMap = new Map(prev);
@@ -7455,22 +7591,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               return newMap;
             });
           }
-
-          console.log(`[Quack] Loaded ${savedChat.messages.length} messages for task "${task.title}" before switch`);
         } else {
-          // Task has no messages yet - ensure empty array is in chatSessions
-          setChatSessions(prev => {
-            const newSessions = new Map(prev);
-            if (!newSessions.has(task.id)) {
+          // Task has no messages on disk - only initialize if also no in-memory messages
+          if (!hasInMemoryMessages) {
+            setChatSessions(prev => {
+              const newSessions = new Map(prev);
               newSessions.set(task.id, []);
-            }
-            return newSessions;
-          });
-          console.log(`[Quack] Task "${task.title}" has no messages yet, initialized empty array`);
+              return newSessions;
+            });
+            console.log(`[Quack] Task "${task.title}" has no messages, initialized empty array`);
+          } else {
+            console.log(`[Quack] Task "${task.title}" has ${existingMessages.length} in-memory messages (not on disk yet)`);
+          }
         }
       } catch (error) {
         console.warn(`[Quack] Failed to load messages for task ${task.id}:`, error);
-        // On error, still ensure task has an entry to prevent undefined issues
+        // On error, only initialize if no in-memory messages exist
         setChatSessions(prev => {
           const newSessions = new Map(prev);
           if (!newSessions.has(task.id)) {
@@ -7479,6 +7615,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           return newSessions;
         });
       }
+
+      // 🦆 FIX: Pre-create listener for task BEFORE setting it as active
+      // This ensures the listener is ready to receive events when user sends messages
+      // Previously, listener was only created on first message send, causing potential event loss
+      await ensureListenerReady(task.id);
+      console.log(`[Quack] Listener pre-created for task "${task.title}" (${task.id})`);
 
       // 3. Set this task as active for the agent (NOW safe - messages are loaded)
       setActiveTaskPerAgent(prev => {
@@ -7494,7 +7636,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } else {
       console.warn(`[Quack] Agent terminal not found for task: ${task.assignedAgent.id}`);
     }
-  }, [terminals, clearTerminalAttention, clearIdleTimer, loadDirectory]);
+  }, [terminals, clearTerminalAttention, clearIdleTimer, loadDirectory, activeId, activeTaskPerAgent, chatSessions, saveKanbanChatSession]);
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
@@ -9061,7 +9203,7 @@ You have access to all Bash tools to execute git commands like:
             console.log('[onSelectAgentChat] Available agentChats:', agentChats);
             setActiveAgentChatId(chatId);
           }}
-          onDeleteAgentChat={(chatId) => {
+          onDeleteAgentChat={async (chatId) => {
             // 🦆 Clean up listener for this agent
             const unlisten = activeListenersRef.current.get(chatId);
             if (unlisten) {
@@ -9078,6 +9220,14 @@ You have access to all Bash tools to execute git commands like:
             setAgentChats(prev => prev.filter(chat => chat.id !== chatId));
             if (activeAgentChatId === chatId) {
               setActiveAgentChatId(null);
+            }
+
+            // 🦆 CHAT PERSISTENCE: Delete stored data for this agent
+            try {
+              await deleteAgentData(chatId);
+              console.log(`[onDeleteAgentChat] 💾 Deleted persisted data for agent: ${chatId}`);
+            } catch (err) {
+              console.warn(`[onDeleteAgentChat] Failed to delete persisted data:`, err);
             }
           }}
           onUpdateAgentChat={(chatId, updates) => {
@@ -9475,11 +9625,24 @@ You have access to all Bash tools to execute git commands like:
                     onCommandInserted={() => setPendingSlashCommand(null)}
                     basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
                     // Agent Chat Settings - persistent per-agent state
-                    // For task chat: pre-fill with task prompt ONLY on first message (empty conversation)
-                    inputDraft={isTaskChat && !currentSettings.inputDraft && activeTaskMessages.length === 0
-                      ? (activeTask?.prompt || '')
+                    // For task chat: use task-specific input draft (isolated per task ID)
+                    // For agent chat: use agent-specific input draft
+                    inputDraft={isTaskChat
+                      ? (taskInputDrafts.get(activeTaskId!) || (activeTaskMessages.length === 0 ? (activeTask?.prompt || '') : ''))
                       : currentSettings.inputDraft}
-                    onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
+                    onInputDraftChange={(draft) => {
+                      if (isTaskChat && activeTaskId) {
+                        // Store draft per task ID to prevent bleeding between tasks
+                        setTaskInputDrafts(prev => {
+                          const newMap = new Map(prev);
+                          newMap.set(activeTaskId, draft);
+                          return newMap;
+                        });
+                      } else {
+                        // Store draft per agent ID for regular agent chat
+                        updateAgentSettings({ inputDraft: draft });
+                      }
+                    }}
                     model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
                     onModelChange={(model) => updateAgentSettings({ model })}
                     thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
@@ -9545,6 +9708,8 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
+                    // Current session ID for display
+                    currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
                   />
                 );
               })()}

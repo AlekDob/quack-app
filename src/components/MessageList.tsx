@@ -22,9 +22,11 @@ interface MessageListProps {
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
+  // Current session ID for display in chat header
+  currentSessionId?: string;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -241,6 +243,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
                 onUserQuestionAnswer={onUserQuestionAnswer}
                 pendingQuestionIds={pendingQuestionIds}
                 answeredQuestions={answeredQuestions}
+                currentSessionId={currentSessionId}
               />
               {/* Show memory indicator below user messages when memories were used */}
               {memoryContext && (

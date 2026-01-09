@@ -4,6 +4,7 @@ import ToolCallCard from './ToolCallCard';
 import StreamMessage from './StreamMessage';
 import ThinkingBlock from './ThinkingBlock';
 import MessageSettingsBadges from './MessageSettingsBadges';
+import SessionIdDisplay from './SessionIdDisplay';
 import { AgentMentionChip } from './AgentMentionChip';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
@@ -55,9 +56,11 @@ interface ChatMessageProps {
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
+  // Session ID for display in header
+  currentSessionId?: string;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -385,6 +388,10 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
           {/* Show settings badges for assistant messages (SDK 0.1.54+) */}
           {!isUser && message.settings && (
             <MessageSettingsBadges settings={message.settings} />
+          )}
+          {/* Show session ID for assistant messages */}
+          {!isUser && currentSessionId && (
+            <SessionIdDisplay sessionId={currentSessionId} />
           )}
           {isLastUserMessage && isUser && (
             <div className="sticky-message-actions">

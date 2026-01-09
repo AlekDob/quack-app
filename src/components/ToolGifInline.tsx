@@ -124,7 +124,7 @@ export const ToolGifInline: React.FC<ToolGifInlineProps> = ({ toolName, toolId }
   const [hasError, setHasError] = useState(false);
 
   // Get settings - use individual selectors to avoid object recreation
-  const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? false);
+  const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? true);
   const brainEnabled = useSettingsStore((s) => s.general?.toolGifCategories?.brain ?? true);
   const fileOpsEnabled = useSettingsStore((s) => s.general?.toolGifCategories?.fileOps ?? true);
   const shellEnabled = useSettingsStore((s) => s.general?.toolGifCategories?.shell ?? true);
@@ -166,12 +166,12 @@ export const ToolGifInline: React.FC<ToolGifInlineProps> = ({ toolName, toolId }
       return;
     }
 
-    // Fetch GIF
+    // Fetch GIF - pass toolId for caching
     pendingFetches.add(toolId);
     setIsLoading(true);
     setHasError(false);
 
-    getGifForTool(toolName)
+    getGifForTool(toolName, toolId)
       .then((result) => {
         fetchedGifs.set(toolId, result);
         setGif(result);

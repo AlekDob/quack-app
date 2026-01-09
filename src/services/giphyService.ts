@@ -10,8 +10,13 @@
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'w9lZ6fgXmVo8lFFSdlFRJ1qHpEzYfvAX';
 const GIPHY_API_URL = 'https://api.giphy.com/v1/gifs';
 
-// Cache GIFs to avoid repeated API calls for same tools
+// Cache GIFs by toolId (unique per invocation) to avoid refetching on re-renders
+// But allows variety between different tool invocations
 const gifCache = new Map<string, GiphyGif>();
+
+// Track which keywords we've used recently to avoid repetition
+const recentKeywords: string[] = [];
+const MAX_RECENT_KEYWORDS = 10;
 
 // Rate limiting: track last request time
 let lastRequestTime = 0;
@@ -137,19 +142,18 @@ export function getKeywordsForTool(toolName: string): string[] {
 const MIN_LANDSCAPE_RATIO = 1.2;
 
 /**
- * Search for a LANDSCAPE GIF on Giphy
- * Fetches multiple results and filters for horizontal aspect ratio
+ * Search for a LANDSCAPE GIF on Giphy with variety
+ * Fetches multiple results and selects randomly from landscape options
  */
-export async function searchGif(keyword: string): Promise<GiphyGif | null> {
+export async function searchGif(keyword: string, cacheKey?: string): Promise<GiphyGif | null> {
   // API key is always available (bundled with app)
   if (!GIPHY_API_KEY) {
     console.warn('[GiphyService] API key not available');
     return null;
   }
 
-  // Check cache first
-  const cacheKey = keyword.toLowerCase();
-  if (gifCache.has(cacheKey)) {
+  // Check cache by cacheKey (toolId) if provided
+  if (cacheKey && gifCache.has(cacheKey)) {
     return gifCache.get(cacheKey)!;
   }
 
@@ -162,11 +166,15 @@ export async function searchGif(keyword: string): Promise<GiphyGif | null> {
   lastRequestTime = now;
 
   try {
+    // Use random offset to get variety in results
+    const randomOffset = Math.floor(Math.random() * 50); // Random offset 0-49
+
     // Fetch more results to find a landscape GIF
     const params = new URLSearchParams({
       api_key: GIPHY_API_KEY,
       q: keyword,
-      limit: '15', // Fetch 15 to find a good landscape one
+      limit: '25', // Fetch 25 for more variety
+      offset: randomOffset.toString(), // Random offset for variety
       rating: 'g', // Family-friendly only
       lang: 'en',
     });
@@ -185,28 +193,36 @@ export async function searchGif(keyword: string): Promise<GiphyGif | null> {
       return null;
     }
 
-    // Find the first landscape GIF (width > height * MIN_LANDSCAPE_RATIO)
-    let selectedGif = null;
-    for (const gif of data.data) {
+    // Collect all landscape GIFs
+    const landscapeGifs = data.data.filter((gif) => {
       const width = parseInt(gif.images.fixed_height.width, 10);
       const height = parseInt(gif.images.fixed_height.height, 10);
       const aspectRatio = width / height;
+      return aspectRatio >= MIN_LANDSCAPE_RATIO;
+    });
 
-      if (aspectRatio >= MIN_LANDSCAPE_RATIO) {
-        selectedGif = gif;
-        console.log(`[GiphyService] Found landscape GIF: ${width}x${height} (ratio: ${aspectRatio.toFixed(2)})`);
-        break;
-      }
+    let selectedGif = null;
+
+    if (landscapeGifs.length > 0) {
+      // Pick a random one from the landscape options for variety
+      const randomIndex = Math.floor(Math.random() * landscapeGifs.length);
+      selectedGif = landscapeGifs[randomIndex];
+      const width = parseInt(selectedGif.images.fixed_height.width, 10);
+      const height = parseInt(selectedGif.images.fixed_height.height, 10);
+      console.log(`[GiphyService] Selected random landscape GIF (${randomIndex + 1}/${landscapeGifs.length}): ${width}x${height}`);
     }
 
-    // If no landscape found, use the widest one available
+    // If no landscape found, use a random one from the widest available
     if (!selectedGif) {
-      console.warn('[GiphyService] No landscape GIF found, selecting widest available');
-      selectedGif = data.data.reduce((best, current) => {
-        const bestRatio = parseInt(best.images.fixed_height.width, 10) / parseInt(best.images.fixed_height.height, 10);
-        const currentRatio = parseInt(current.images.fixed_height.width, 10) / parseInt(current.images.fixed_height.height, 10);
-        return currentRatio > bestRatio ? current : best;
+      console.warn('[GiphyService] No landscape GIF found, selecting from widest available');
+      // Sort by aspect ratio and pick randomly from top 5
+      const sortedByRatio = [...data.data].sort((a, b) => {
+        const ratioA = parseInt(a.images.fixed_height.width, 10) / parseInt(a.images.fixed_height.height, 10);
+        const ratioB = parseInt(b.images.fixed_height.width, 10) / parseInt(b.images.fixed_height.height, 10);
+        return ratioB - ratioA;
       });
+      const topGifs = sortedByRatio.slice(0, 5);
+      selectedGif = topGifs[Math.floor(Math.random() * topGifs.length)];
     }
 
     const result: GiphyGif = {
@@ -218,8 +234,10 @@ export async function searchGif(keyword: string): Promise<GiphyGif | null> {
       height: parseInt(selectedGif.images.fixed_height.height, 10),
     };
 
-    // Cache the result
-    gifCache.set(cacheKey, result);
+    // Cache by toolId if provided (for re-render stability)
+    if (cacheKey) {
+      gifCache.set(cacheKey, result);
+    }
 
     return result;
   } catch (error) {
@@ -229,16 +247,36 @@ export async function searchGif(keyword: string): Promise<GiphyGif | null> {
 }
 
 /**
- * Get a random GIF for a tool
- * Selects a random keyword from the tool's keyword list
+ * Get a random GIF for a tool with variety
+ * Selects a keyword that hasn't been used recently, and uses random offset
+ *
+ * @param toolName - The tool name
+ * @param toolId - Unique ID for this tool invocation (used for caching)
  */
-export async function getGifForTool(toolName: string): Promise<GiphyGif | null> {
+export async function getGifForTool(toolName: string, toolId?: string): Promise<GiphyGif | null> {
   const keywords = getKeywordsForTool(toolName);
-  const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
 
-  console.log(`[GiphyService] Searching GIF for tool "${toolName}" with keyword "${randomKeyword}"`);
+  // Try to pick a keyword we haven't used recently
+  let selectedKeyword = keywords[0];
+  const unusedKeywords = keywords.filter(k => !recentKeywords.includes(k));
 
-  return searchGif(randomKeyword);
+  if (unusedKeywords.length > 0) {
+    // Pick from unused keywords
+    selectedKeyword = unusedKeywords[Math.floor(Math.random() * unusedKeywords.length)];
+  } else {
+    // All keywords used recently, just pick a random one
+    selectedKeyword = keywords[Math.floor(Math.random() * keywords.length)];
+  }
+
+  // Track this keyword as recently used
+  recentKeywords.push(selectedKeyword);
+  if (recentKeywords.length > MAX_RECENT_KEYWORDS) {
+    recentKeywords.shift(); // Remove oldest
+  }
+
+  console.log(`[GiphyService] Searching GIF for tool "${toolName}" with keyword "${selectedKeyword}" (toolId: ${toolId || 'none'})`);
+
+  return searchGif(selectedKeyword, toolId);
 }
 
 /**

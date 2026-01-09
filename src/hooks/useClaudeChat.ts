@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, EffortLevel, AskUserQuestionAnswers, PendingUserQuestion } from '../types';
 import { streamClaudeMessage, abortSessionStream, sendToolResult } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
@@ -41,6 +41,7 @@ export interface UseClaudeChatOptions {
     cacheCreationTokens: number;
     cacheReadTokens: number;
   };
+  taskId?: string; // Optional task ID for per-task event deduplication
 }
 
 export function useClaudeChat(options?: UseClaudeChatOptions) {
@@ -68,15 +69,51 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   // Store last prompt for restoration on abort
   const lastPromptRef = useRef<string>('');
 
-  // 🦆 FIX: Persistent event deduplication across ALL message streams
-  // This Set persists for the entire hook lifecycle to prevent duplicates
-  // even if React re-renders or state updates trigger multiple renders
-  // IMPORTANT: Never clear this Set - it's the source of truth for deduplication
+  // 🦆 FIX: Per-task event deduplication to prevent cross-task contamination
+  // This Set is scoped to the current taskId to ensure events from different tasks
+  // are not incorrectly flagged as duplicates
   const seenEventIdsRef = useRef<Set<string>>(new Set());
+  const currentTaskIdRef = useRef<string | undefined>(options?.taskId);
 
   // 🗣️ AskUserQuestion: Track pending questions and answered questions
   const [pendingQuestionIds, setPendingQuestionIds] = useState<Set<string>>(new Set());
   const [answeredQuestions, setAnsweredQuestions] = useState<Map<string, AskUserQuestionAnswers>>(new Map());
+
+  // 🦆 FIX: Clear event deduplication AND abort active stream when taskId changes
+  // This prevents events from Task A being incorrectly flagged as duplicates in Task B
+  // AND ensures the old stream doesn't continue updating stale state
+  useEffect(() => {
+    const newTaskId = options?.taskId;
+
+    // If taskId changed, abort active stream, clear deduplication Set and reset session
+    if (newTaskId !== currentTaskIdRef.current) {
+      console.log('[useClaudeChat] TaskId changed, aborting active stream and clearing state:', {
+        oldTaskId: currentTaskIdRef.current,
+        newTaskId,
+        previousEventCount: seenEventIdsRef.current.size,
+        hadActiveStream: !!abortControllerRef.current
+      });
+
+      // 🦆 FIX: Abort any active stream BEFORE switching tasks
+      // This prevents the race condition where old stream updates stale state
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        console.log('[useClaudeChat] Aborting stream due to task switch...');
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
+      seenEventIdsRef.current.clear();
+      currentTaskIdRef.current = newTaskId;
+
+      // Reset session ID unless explicitly provided in options
+      if (!options?.initialSessionId) {
+        claudeSessionId.current = undefined;
+      }
+
+      // Reset loading state since we aborted the stream
+      setIsLoading(false);
+    }
+  }, [options?.taskId, options?.initialSessionId]);
 
   // Initialize (SDK doesn't need initialization)
   const initialize = useCallback(async () => {

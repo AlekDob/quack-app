@@ -22,9 +22,8 @@ import {
 import TerminalActivityBar from './TerminalActivityBar';
 import CommitHistoryModal from './CommitHistoryModal';
 import RevealInFinderButton from './RevealInFinderButton';
-import TaskContextMenu from './TaskContextMenu';
+import TasksSidebarSection from './TasksSidebarSection';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
-import { useKanbanStore } from '../stores/kanbanStore';
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult, KanbanTask } from '../types';
 
@@ -138,12 +137,6 @@ interface SortableAgentProps {
   // Kanban mode props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
-  // Kanban tasks assigned to this agent
-  agentTasks?: KanbanTask[];
-  onOpenTaskTab?: (task: KanbanTask) => void;
-  activeTaskId?: string | null;
-  // Chat loading state for task status indicators
-  chatLoadingMap?: Map<string, boolean>;
 }
 
 function SortableAgent({
@@ -161,24 +154,12 @@ function SortableAgent({
   isDraggingAny = false,
   isKanbanViewActive = false,
   onToggleKanbanView,
-  agentTasks = [],
-  onOpenTaskTab,
-  activeTaskId = null,
-  chatLoadingMap,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showQuackTooltip, setShowQuackTooltip] = useState(false);
   // 🦆 Force re-render every minute to update relative time
   const [tick, setTick] = useState(0);
-  // Task context menu state
-  const [taskContextMenu, setTaskContextMenu] = useState<{
-    task: KanbanTask;
-    position: { x: number; y: number };
-  } | null>(null);
-
-  // Kanban store actions
-  const { moveTask, deleteTask } = useKanbanStore();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -389,32 +370,6 @@ function SortableAgent({
     onGitMenuToggle(showGitMenu ? null : agent.id);
   }, [onGitMenuToggle, showGitMenu, agent.id]);
 
-  // Task context menu handlers
-  const handleTaskContextMenu = useCallback((e: React.MouseEvent, task: KanbanTask) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setTaskContextMenu({
-      task,
-      position: { x: e.clientX, y: e.clientY },
-    });
-  }, []);
-
-  const handleTaskMarkDone = useCallback(async () => {
-    if (!taskContextMenu) return;
-    await moveTask(taskContextMenu.task.id, 'done');
-    toast.success('Task marked as done');
-  }, [taskContextMenu, moveTask]);
-
-  const handleTaskDelete = useCallback(async () => {
-    if (!taskContextMenu) return;
-    await deleteTask(taskContextMenu.task.id);
-    toast.success('Task deleted');
-  }, [taskContextMenu, deleteTask]);
-
-  const handleTaskContextMenuClose = useCallback(() => {
-    setTaskContextMenu(null);
-  }, []);
-
   // Native HTML5 drag handler for dragging agent to Kanban board
   const handleNativeDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     // Mark that we started dragging - will prevent click on drag end
@@ -450,7 +405,7 @@ function SortableAgent({
       ref={setNodeRef}
       style={{
         ...style,
-        marginBottom: agentTasks.length > 0 ? '4px' : '8px',
+        marginBottom: '8px',
       }}
       className="group"
     >
@@ -927,128 +882,6 @@ function SortableAgent({
       )}
       </div>
       {/* End of Agent Row */}
-
-      {/* 🎯 Kanban Tasks assigned to this agent */}
-      {agentTasks.length > 0 && (
-        <div className="agent-tasks" style={{
-          marginLeft: '47px',
-          marginTop: '4px',
-        }}>
-          {agentTasks.map(task => {
-            const isTaskSelected = activeTaskId === task.id;
-
-            // Calculate task status (same logic as KanbanColumn)
-            const taskType = task.type || 'agent';
-            const isAgentTask = taskType === 'agent';
-            const isLoading = chatLoadingMap?.get(task.id) || false;
-            const messages = chatSessions?.get(task.id) || [];
-            const hasMessages = messages.length > 0;
-            const hasUserMessage = messages.some(msg => msg.role === 'user');
-            const isDormant = !hasUserMessage;
-
-            // TODO = task hasn't been started yet (in Kanban TODO column)
-            const isTodo = task.status === 'todo';
-
-            // Cold = agent task with no messages at all (never started, but in_progress)
-            const isCold = isAgentTask && !hasMessages && !isTodo;
-
-            // Ready = agent task, in progress, has messages, not loading, not dormant
-            const isReady = isAgentTask &&
-              task.status === 'in_progress' &&
-              hasMessages &&
-              !isLoading &&
-              !isDormant;
-
-            // Status indicator colors:
-            // - Gray (#6b7280) for TODO tasks (not yet started)
-            // - Blue (#3b82f6) for cold tasks (in_progress but no messages)
-            // - Green (#22c55e) for ready tasks (completed response)
-            // - Orange (#f59e0b) for working tasks (loading/in progress)
-            const statusColor = isTodo ? '#6b7280' : isCold ? '#3b82f6' : isReady ? '#22c55e' : '#f59e0b';
-
-            return (
-            <div
-              key={task.id}
-              className={`agent-task-item ${isTaskSelected ? 'selected' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                // openTaskTab handles both agent switch and tab opening
-                onOpenTaskTab?.(task);
-              }}
-              onContextMenu={(e) => handleTaskContextMenu(e, task)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 10px',
-                marginBottom: '4px',
-                background: isTaskSelected ? `${agent.color}35` : `${agent.color}15`,
-                border: isTaskSelected
-                  ? `2px solid ${agent.color}`
-                  : `1px solid ${agent.color}33`,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: isTaskSelected ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.85)',
-                transition: 'all 0.2s ease',
-                boxShadow: isTaskSelected ? `0 0 8px ${agent.color}55` : 'none',
-              }}
-              onMouseEnter={(e) => {
-                if (!isTaskSelected) {
-                  e.currentTarget.style.background = `${agent.color}25`;
-                  e.currentTarget.style.borderColor = `${agent.color}55`;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isTaskSelected) {
-                  e.currentTarget.style.background = `${agent.color}15`;
-                  e.currentTarget.style.borderColor = `${agent.color}33`;
-                }
-              }}
-            >
-              {/* Task icon */}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={agent.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}>
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="9" y1="9" x2="15" y2="9" />
-                <line x1="9" y1="13" x2="15" y2="13" />
-                <line x1="9" y1="17" x2="12" y2="17" />
-              </svg>
-              {/* Task title */}
-              <span style={{
-                flex: 1,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {task.title.length > 30 ? task.title.substring(0, 30) + '...' : task.title}
-              </span>
-              {/* Status indicator - blue if cold, green if ready, orange if working */}
-              <div style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: statusColor,
-                boxShadow: `0 0 6px ${statusColor}`,
-                // Only pulse animation for working tasks (not cold or ready)
-                animation: (isCold || isReady) ? 'none' : 'pulse 2s ease-in-out infinite',
-                flexShrink: 0,
-              }} />
-            </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Task Context Menu */}
-      {taskContextMenu && (
-        <TaskContextMenu
-          position={taskContextMenu.position}
-          task={taskContextMenu.task}
-          onMarkDone={handleTaskMarkDone}
-          onDelete={handleTaskDelete}
-          onClose={handleTaskContextMenuClose}
-        />
-      )}
     </div>
   );
 }
@@ -1070,11 +903,7 @@ const MemoizedSortableAgent = memo(SortableAgent, (prevProps, nextProps) => {
     prevProps.chatSessions === nextProps.chatSessions &&
     prevProps.lastReadTimestamps === nextProps.lastReadTimestamps &&
     prevProps.isKanbanViewActive === nextProps.isKanbanViewActive &&
-    prevProps.onToggleKanbanView === nextProps.onToggleKanbanView &&
-    prevProps.agentTasks === nextProps.agentTasks &&
-    prevProps.onOpenTaskTab === nextProps.onOpenTaskTab &&
-    prevProps.activeTaskId === nextProps.activeTaskId &&
-    prevProps.chatLoadingMap === nextProps.chatLoadingMap
+    prevProps.onToggleKanbanView === nextProps.onToggleKanbanView
   )
 });
 
@@ -1772,10 +1601,6 @@ export default function RepositoryGroup({
                         isDraggingAny={isDraggingAny}
                         isKanbanViewActive={isKanbanViewActive}
                         onToggleKanbanView={onToggleKanbanView}
-                        agentTasks={agentTasks.filter(t => t.assignedAgent?.id === agent.id)}
-                        onOpenTaskTab={onOpenTaskTab}
-                        activeTaskId={activeTaskId}
-                        chatLoadingMap={chatLoadingMap}
                       />
                     ))}
                   </SortableContext>
@@ -2536,6 +2361,18 @@ export default function RepositoryGroup({
                 ));
               })()}
             </div>
+          )}
+
+          {/* Project Tasks Section - Shows all tasks for this project */}
+          {agentTasks && agentTasks.length > 0 && onOpenTaskTab && (
+            <TasksSidebarSection
+              tasks={agentTasks.filter(task => task.projectPath === repoPath)}
+              activeTaskId={activeTaskId}
+              onOpenTaskTab={onOpenTaskTab}
+              chatSessions={chatSessions}
+              chatLoadingMap={chatLoadingMap}
+              currentProjectPath={repoPath}
+            />
           )}
         </div>
       )}

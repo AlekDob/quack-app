@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Wrench, Brain, Network, Package } from 'lucide-react';
+import { Wrench, Package } from 'lucide-react';
 import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import './ActionIcons.css';
 
@@ -12,16 +12,16 @@ interface ActionIconsProps {
   onTerminalClick: () => void;
   onBrowserClick: () => void;
   onDroidFactoryClick: () => void;
+  onMemoryGraphClick?: () => void;
+  onSecondBrainClick?: () => void;
   onGuideClick: () => void;
-  onMemoryGraphClick: () => void;
-  onSecondBrainClick: () => void;
   onClaudeAssetsClick?: () => void;
   onSemanticSearchClick?: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
-  secondBrainOpen?: boolean;
   claudeAssetsOpen?: boolean;
+  secondBrainOpen?: boolean;
   // Authentication status
   isAuthenticated?: boolean;
   onLoginClick?: () => void;
@@ -37,14 +37,11 @@ function ActionIcons({
   onBrowserClick,
   onDroidFactoryClick,
   onGuideClick,
-  onMemoryGraphClick,
-  onSecondBrainClick,
   onClaudeAssetsClick,
   onSemanticSearchClick,
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
-  secondBrainOpen = false,
   claudeAssetsOpen = false,
   isAuthenticated = true,
   onLoginClick,
@@ -254,31 +251,6 @@ function ActionIcons({
       >
         <Wrench className="w-4 h-4" />
         <span className="action-icon-tooltip">Droid Factory</span>
-      </button>
-
-      {/* Memory Graph Icon */}
-      <button
-        type="button"
-        className="action-icon"
-        onClick={onMemoryGraphClick}
-        aria-label="Open Knowledge Graph"
-        data-tooltip="Knowledge Graph"
-      >
-        <Brain className="w-4 h-4" />
-        <span className="action-icon-tooltip">Knowledge Graph</span>
-      </button>
-
-      {/* Second Brain Icon */}
-      <button
-        type="button"
-        className={`action-icon second-brain-icon ${secondBrainOpen ? 'active' : ''}`}
-        onClick={onSecondBrainClick}
-        aria-label="Open Second Brain"
-        data-tooltip="Second Brain"
-        style={secondBrainOpen ? { color: '#E84A7F' } : undefined}
-      >
-        <Network className="w-4 h-4" />
-        <span className="action-icon-tooltip">Second Brain</span>
       </button>
 
       {/* Claude Assets Icon */}

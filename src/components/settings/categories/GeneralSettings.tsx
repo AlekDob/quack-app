@@ -10,17 +10,27 @@ export default function GeneralSettings() {
   const [loading, setLoading] = useState(false);
 
   // GIF reactions settings
-  const enableToolGifs = useSettingsStore((s) => s.general.enableToolGifs);
+  const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? true);
   const toggleToolGifs = useSettingsStore((s) => s.toggleToolGifs);
-  const toolGifCategories = useSettingsStore((s) => s.general.toolGifCategories);
+  const toolGifCategories = useSettingsStore((s) => s.general?.toolGifCategories);
   const updateGeneralSettings = useSettingsStore((s) => s.updateGeneralSettings);
+
+  // Default categories if not initialized
+  const defaultCategories = {
+    brain: true,
+    fileOps: true,
+    shell: true,
+    search: false,
+    agents: true,
+  };
 
   // Toggle a specific GIF category
   const toggleGifCategory = (category: 'brain' | 'fileOps' | 'shell' | 'search' | 'agents') => {
+    const currentCategories = toolGifCategories || defaultCategories;
     updateGeneralSettings({
       toolGifCategories: {
-        ...toolGifCategories,
-        [category]: !toolGifCategories[category],
+        ...currentCategories,
+        [category]: !currentCategories[category],
       },
     });
   };

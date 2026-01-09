@@ -109,6 +109,8 @@ interface ChatViewProps {
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
+  // Current session ID for display
+  currentSessionId?: string;
 }
 
 export default function ChatView({
@@ -176,6 +178,8 @@ export default function ChatView({
   onUserQuestionAnswer,
   pendingQuestionIds,
   answeredQuestions,
+  // Current session ID
+  currentSessionId,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -521,6 +525,7 @@ export default function ChatView({
         onUserQuestionAnswer={onUserQuestionAnswer}
         pendingQuestionIds={pendingQuestionIds}
         answeredQuestions={answeredQuestions}
+        currentSessionId={currentSessionId}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar

@@ -1440,12 +1440,52 @@
   min-width: 0;
 }
 
-/* Agent row - contains agent info on left, ready badge on right */
-.kanban-card-agent-row {
+/* Mini avatar for task header */
+.kanban-mini-avatar {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease;
+}
+
+.kanban-card:hover .kanban-mini-avatar {
+  box-shadow: 0 0 8px currentColor;
+  transform: scale(1.05);
+}
+
+.kanban-mini-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.kanban-mini-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+}
+
+/* Ready row - shows ready badge when agent finished */
+.kanban-card-ready-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 /* Ready badge - shows when agent task finished and awaiting review */

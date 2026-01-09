@@ -1,26 +1,61 @@
-# Second Brain - Tana/Logseq-style Outliner
+# Second Brain - Knowledge Graph Integration
 
-**Status**: Implemented
-**Date**: December 2025
-**Version**: 1.0
+**Status**: Migrated to Obsidian
+**Date**: January 2026
+**Version**: 2.0
+
+> **Note**: As of January 2026, the in-app Second Brain UI has been deprecated. The Knowledge Graph and Second Brain icons have been removed from the ActionIcons toolbar. **Obsidian is now the primary interface** for managing your Second Brain, with bidirectional sync via Quack Brain MCP.
 
 ## Overview
 
-Second Brain is a **Tana/Logseq-inspired outliner** that provides a hierarchical view of your knowledge graph. Every bullet point is an MCP Memory entity, enabling seamless integration between manual note-taking and AI-powered memory.
+Second Brain is now powered by **Obsidian vault sync** with the Quack Brain MCP server. This provides a superior editing experience with Obsidian's rich markdown editor, graph view, and plugin ecosystem, while maintaining full integration with AI agents via MCP tools.
 
-## Key Features
+## Current Architecture (v2.0 - Obsidian Integration)
+
+```
++------------------------------------------------------------------+
+|                    Quack Brain System                             |
++------------------------------------------------------------------+
+|  Storage                                                          |
+|  +-- SQLite Database (~/.quack/brain.db) - Primary storage       |
+|  +-- Obsidian Vault (QuackBrain/) - Human-readable markdown      |
++------------------------------------------------------------------+
+|  MCP Server                                                       |
+|  +-- brain-mcp-server.js - Exposes brain to Claude Code          |
+|  +-- Tools: search, create_entity, add_observation, etc.         |
+|  +-- Canvas support: read_canvas, create_canvas, update_canvas   |
++------------------------------------------------------------------+
+|  Sync                                                             |
+|  +-- Bidirectional: SQLite <-> Obsidian markdown files           |
+|  +-- WikiLinks: [[NoteName]] tracked and visible in Graph View   |
+|  +-- Daily Diary: Temporal notes linked to daily entries         |
++------------------------------------------------------------------+
+```
+
+## Key Features (Obsidian-Based)
 
 | Feature | Description |
 |---------|-------------|
-| **Inline Editing** | Click any bullet to edit directly, no separate forms |
-| **Zoom/Focus Mode** | Click bullet point to "zoom in" - node becomes page title |
-| **Breadcrumb Navigation** | Path shows `Home > Parent > Current` for easy navigation |
-| **@mentions** | Create relations by typing `@EntityName` |
-| **#supertags** | Define entity type with `#fact`, `#pattern`, `#project`, etc. |
-| **Observations as Details** | When zoomed, new text adds observations, not new entities |
-| **Custom Tags** | Create new entity types with `#custom-tag` |
-| **Autocomplete** | Dropdown suggestions for @ and # while typing |
-| **Bidirectional Sync** | AI-created entities appear automatically |
+| **Obsidian Graph View** | Visual knowledge graph with connections |
+| **WikiLinks** | `[[NoteName]]` syntax for relations |
+| **Daily Diary** | Temporal notes (bugs, tasks, decisions) linked to daily entries |
+| **Tag-Based Folders** | Automatic organization by entity type |
+| **Canvas Support** | Visual diagrams with text, file, and link nodes |
+| **MCP Integration** | AI agents can read/write brain via tools |
+| **Bidirectional Sync** | Edit in Obsidian or via MCP, changes sync both ways |
+
+## Deprecated Features (v1.0 - In-App UI)
+
+The following in-app features have been removed in favor of Obsidian:
+
+| Feature | Replacement |
+|---------|-------------|
+| **Inline Editing** | Edit markdown files in Obsidian |
+| **Zoom/Focus Mode** | Open notes directly in Obsidian |
+| **Breadcrumb Navigation** | Use Obsidian's backlinks panel |
+| **@mentions** | Use `[[WikiLinks]]` in Obsidian |
+| **#supertags** | Entity types determined by folder location |
+| **ActionIcons buttons** | Open Obsidian vault directly |
 
 ## Architecture
 
@@ -306,23 +341,24 @@ Project-scoped memories use the `belongs_to_project` relation:
 
 ## Related Documentation
 
+- [Quack Brain MCP Rules](/.claude/rules/use-mcp-memory-second-brain.md) - MCP tools and entity types
 - [MCP Memory Integration](./mcp-memory-integration.md) - Memory system architecture
-- [Memory UI](./memory-ui.md) - Memory panel components
 
 ## Changelog
 
+### January 2026
+- **Migrated to Obsidian**: In-app UI deprecated, Obsidian is now the primary interface
+  - Removed Second Brain icon (Network) from ActionIcons
+  - Removed Knowledge Graph icon (Brain) from ActionIcons
+  - Added Obsidian vault bidirectional sync
+  - Canvas support with text, file, and link nodes
+  - Daily diary integration with selective temporal notes
+  - Narrative descriptions for diary entries (unlimited length)
+
 ### December 2025
 - **Project-Scoped Memories**: Memories can now be Global or Project-specific
-  - Scope selector dropdown in sidebar
-  - View filters (All/Global/Project)
-  - Auto project detection via marker files
   - `belongs_to_project` relation for project scoping
-- Initial implementation of Second Brain tab
+  - Auto project detection via marker files
+- Initial implementation of Second Brain tab (v1.0 - now deprecated)
 - Tana/Logseq-style inline editing
-- Zoom/focus mode with breadcrumbs
-- Observations as details when zoomed
-- @mentions for relations, #tags for types
-- Autocomplete for tags and mentions
-- Integration with Knowledge Graph (click to open)
-- Dynamic colors based on entity type
-- Side panel collapse for full-width view
+- Integration with Knowledge Graph
