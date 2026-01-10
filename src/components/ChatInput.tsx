@@ -18,6 +18,7 @@ import { useMicRecorder } from '../hooks/useMicRecorder';
 import { useSnippets, getCursorPosition, removeCursorMarker } from '../hooks/useSnippets';
 import VoiceRecordingModal from './VoiceRecordingModal';
 import { SnippetModal } from './SnippetModal';
+import EquipBar from './chat/EquipBar';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
@@ -77,6 +78,15 @@ interface ChatInputProps {
   onWorkingOnChange?: (value: string) => void;
   // Initial attachments (from Kanban task) - DEPRECATED, use attachments prop instead
   initialAttachments?: ChatAttachment[];
+  // Fullscreen mode
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+  // Agent toolkit for EquipBar
+  agentToolkit?: {
+    skills: string[];
+    droids: string[];
+    commands: string[];
+  };
 }
 
 export default function ChatInput({
@@ -103,6 +113,9 @@ export default function ChatInput({
   workingOn = '',
   onWorkingOnChange,
   initialAttachments,
+  isFullscreen = false,
+  onToggleFullscreen,
+  agentToolkit,
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
@@ -1604,7 +1617,7 @@ export default function ChatInput({
 
   return (
     <div
-      className={`chat-input-container ${isDragOver ? 'drag-over' : ''}`}
+      className={`chat-input-container ${isDragOver ? 'drag-over' : ''} ${isFocused ? 'focused' : ''} ${isFullscreen ? 'fullscreen' : ''}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -1792,23 +1805,6 @@ export default function ChatInput({
           );
         })()}
         <div className="chat-input-field-row">
-          <textarea
-            ref={textareaRef}
-            className="chat-input-field"
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder={
-              isFocused
-                ? `⇧ + ↵ new line | ↵ send | @ to mention droids or files | / to invoke commands`
-                : placeholder
-            }
-            disabled={disabled}
-            rows={1}
-          />
           <div className="chat-input-actions">
           <button
             type="button"
@@ -1880,6 +1876,27 @@ export default function ChatInput({
                 </div>
               )}
             </div>
+          )}
+          {/* Fullscreen toggle button */}
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              className={`chat-input-action-btn ${isFullscreen ? 'active' : ''}`}
+              onClick={onToggleFullscreen}
+              disabled={disabled}
+              data-tooltip={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
+            >
+              {isFullscreen ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2L2 2L2 6M10 2L14 2L14 6M6 14L2 14L2 10M10 14L14 14L14 10"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 6L2 2L6 2M14 6L14 2L10 2M2 10L2 14L6 14M14 10L14 14L10 14"/>
+                </svg>
+              )}
+            </button>
           )}
           <button
             type="button"
@@ -2019,6 +2036,23 @@ export default function ChatInput({
             </div>
           )}
           </div>
+          <textarea
+            ref={textareaRef}
+            className="chat-input-field"
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={
+              isFocused
+                ? `⇧ + ↵ new line | ↵ send | @ to mention droids or files | / to invoke commands`
+                : placeholder
+            }
+            disabled={disabled}
+            rows={1}
+          />
         </div>
       </div>
       {attachments.length > 0 && (
@@ -2057,6 +2091,20 @@ export default function ChatInput({
         </div>
       )}
       {error && <div className="chat-input-error">{error}</div>}
+
+      {/* EquipBar - Agent toolkit quick-access (shown below input when focused) */}
+      {isFocused && agentToolkit && (agentToolkit.skills.length > 0 || agentToolkit.droids.length > 0 || agentToolkit.commands.length > 0) && (
+        <div className="chat-input-equip-bar-wrapper">
+          <EquipBar
+            skills={agentToolkit.skills}
+            droids={agentToolkit.droids}
+            commands={agentToolkit.commands}
+            onInsertSkill={(skill) => setInput(input + `@skill:${skill} `)}
+            onInsertDroid={(droid) => setInput(input + `@droid:${droid} `)}
+            onInsertCommand={(command) => setInput(input + `/${command} `)}
+          />
+        </div>
+      )}
 
       {/* Voice Recording Modal */}
       <VoiceRecordingModal

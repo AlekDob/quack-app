@@ -559,6 +559,8 @@ function AppContent() {
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  // Chat fullscreen mode - hides side panel and expands chat
+  const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   // Track sidebar state before Kanban view to restore it on exit
   const sidePanelCollapsedBeforeKanbanRef = useRef<boolean | null>(null);
   // Track if user wants side panel expanded while in Kanban mode (e.g., clicked on project name)
@@ -9245,7 +9247,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || isChatFullscreen || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -9752,6 +9754,24 @@ You have access to all Bash tools to execute git commands like:
                         handleUpdateWorkingOn(activeTerminal.id, value);
                       }
                     }}
+                    // Agent Toolkit - quick-access tools for EquipBar
+                    agentToolkit={activeTerminal?.personality?.toolkit}
+                    onInsertAtCursor={(text) => {
+                      // Insert text at cursor by appending to current input draft
+                      const currentDraft = isTaskChat
+                        ? (taskInputDrafts.get(activeTaskId!) || '')
+                        : currentSettings.inputDraft;
+                      const newDraft = currentDraft + text;
+                      if (isTaskChat && activeTaskId) {
+                        setTaskInputDrafts(prev => {
+                          const newMap = new Map(prev);
+                          newMap.set(activeTaskId, newDraft);
+                          return newMap;
+                        });
+                      } else {
+                        updateAgentSettings({ inputDraft: newDraft });
+                      }
+                    }}
                     // Agent Rules - automatically loaded from personality
                     selectedRules={activeTerminal?.personality?.selectedRules}
                     onEditRules={activeTerminal ? () => {
@@ -9769,6 +9789,9 @@ You have access to all Bash tools to execute git commands like:
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
                     // Current session ID for display
                     currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
+                    // Fullscreen mode
+                    isFullscreen={isChatFullscreen}
+                    onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
                   />
                 );
               })()}

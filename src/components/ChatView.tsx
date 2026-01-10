@@ -112,6 +112,17 @@ interface ChatViewProps {
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
   // Current session ID for display
   currentSessionId?: string;
+  // Agent toolkit - quick-access tools from agent personality
+  agentToolkit?: {
+    skills: string[];
+    droids: string[];
+    commands: string[];
+  };
+  // Handler for inserting text at cursor in ChatInput
+  onInsertAtCursor?: (text: string) => void;
+  // Fullscreen mode - hides side panel and expands chat
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 export default function ChatView({
@@ -181,6 +192,12 @@ export default function ChatView({
   answeredQuestions,
   // Current session ID
   currentSessionId,
+  // Agent toolkit
+  agentToolkit,
+  onInsertAtCursor,
+  // Fullscreen mode
+  isFullscreen = false,
+  onToggleFullscreen,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -677,6 +694,11 @@ export default function ChatView({
           onWorkingOnChange={onWorkingOnChange}
           // Initial attachments (from Kanban task) - fallback for uncontrolled mode
           initialAttachments={initialAttachments}
+          // Agent toolkit for EquipBar
+          agentToolkit={agentToolkit}
+          // Fullscreen mode
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={onToggleFullscreen}
         />
       </div>
     </div>

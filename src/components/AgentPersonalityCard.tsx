@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
-import type { AgentPersonality } from '../types';
+import type { AgentPersonality, SavedAgent } from '../types';
 import './AgentPersonalityCard.css';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import PowerBadge from './PowerBadge';
+import { useBundleOperations } from '../hooks/useBundleOperations';
 
 interface AgentPersonalityCardProps {
   personality: AgentPersonality | null;
   agentName?: string | null;
   agentAvatar?: string | null;
   agentWorkingOn?: string | null;
+  agentColor?: string | null;
+  agentId?: string | null;
+  onImportAgent?: (agent: SavedAgent) => void;
 }
 
 const COMMUNICATION_STYLES_MAP: Record<string, string> = {
@@ -57,8 +62,39 @@ export default function AgentPersonalityCard({
   agentName,
   agentAvatar,
   agentWorkingOn,
+  agentColor,
+  agentId,
+  onImportAgent,
 }: AgentPersonalityCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { exporting, importing, error, exportAgent, importBundle, clearError } = useBundleOperations();
+
+  // Handle export button click
+  async function handleExport() {
+    if (!personality || !agentName) return;
+
+    const agent: SavedAgent = {
+      id: agentId || `agent-${Date.now()}`,
+      name: agentName,
+      avatar: agentAvatar || '',
+      color: agentColor || '#00D4FF',
+      workingOn: agentWorkingOn || '',
+      personality,
+      createdAt: Date.now(),
+      lastUsed: Date.now(),
+      usageCount: 0,
+    };
+
+    await exportAgent(agent);
+  }
+
+  // Handle import button click
+  async function handleImport() {
+    const imported = await importBundle();
+    if (imported && onImportAgent) {
+      onImportAgent(imported);
+    }
+  }
 
   // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
   useEffect(() => {
@@ -160,6 +196,42 @@ export default function AgentPersonalityCard({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Power Rating Badge */}
+      <PowerBadge
+        skillCount={personality.skills?.length || 0}
+        droidCount={0} // TODO: Get from Protocol Droids count when available
+        ruleCount={personality.selectedRules?.length || 0}
+        commandCount={0} // TODO: Get from slash commands count when available
+        compact={true}
+      />
+
+      {/* Bundle Export/Import Actions */}
+      <div className="personality-section bundle-actions">
+        <div className="bundle-buttons">
+          <button
+            className="bundle-btn bundle-btn-export"
+            onClick={handleExport}
+            disabled={exporting}
+            title="Export agent as bundle"
+          >
+            {exporting ? 'Exporting...' : 'Export Bundle'}
+          </button>
+          <button
+            className="bundle-btn bundle-btn-import"
+            onClick={handleImport}
+            disabled={importing}
+            title="Import agent from bundle"
+          >
+            {importing ? 'Importing...' : 'Import Bundle'}
+          </button>
+        </div>
+        {error && (
+          <div className="bundle-error" onClick={clearError}>
+            {error}
+          </div>
+        )}
       </div>
 
       {personality.technicalContext && (

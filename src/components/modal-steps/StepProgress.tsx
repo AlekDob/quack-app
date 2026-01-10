@@ -1,17 +1,18 @@
 /**
  * Step Progress Indicator
  * Shows current step and completed steps in the agent creation flow
- * Project-first flow: project → agent → basics → rules
+ * Project-first flow: project → agent → basics → rules → toolkit
  */
 
 import type { StepProgressProps, ModalStep } from './types';
 
-// Project-first 4-step flow: project → agent → basics → rules
+// Project-first 5-step flow: project → agent → basics → rules → toolkit
 const STEPS: Array<{ id: ModalStep; label: string; icon: string }> = [
   { id: 'project', label: 'Project', icon: '📁' },
   { id: 'agent', label: 'Agent', icon: '🤖' },
   { id: 'basics', label: 'Basics', icon: '🎨' },
   { id: 'rules', label: 'Rules', icon: '📋' },
+  { id: 'toolkit', label: 'Toolkit', icon: '🛠️' },
 ];
 
 export function StepProgress({ currentStep, completedSteps, isEditing }: StepProgressProps) {
