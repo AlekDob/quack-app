@@ -1497,7 +1497,22 @@ export interface KanbanTask {
 /**
  * Available shortcut action IDs
  */
-export type ShortcutActionId = 'toggleKanban' | 'openTerminalWindow' | 'toggleSidePanel' | 'newAgent' | 'focusFileSearch' | 'newKanbanTask';
+export type ShortcutActionId =
+  | 'toggleKanban'
+  | 'openTerminalWindow'
+  | 'toggleSidePanel'
+  | 'newAgent'
+  | 'focusFileSearch'
+  | 'newKanbanTask'
+  | 'chatAttachFile'
+  | 'chatMentionAgent'
+  | 'chatToggleLock'
+  | 'chatToggleFullscreen'
+  | 'chatVoiceRecord'
+  | 'chatSendMessage'
+  | 'chatOpenSnippets'
+  | 'chatOpenDroids'
+  | 'chatOpenCommands';
 
 /**
  * Configuration for a single keyboard shortcut

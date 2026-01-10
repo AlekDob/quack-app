@@ -19,6 +19,8 @@ import { useSnippets, getCursorPosition, removeCursorMarker } from '../hooks/use
 import VoiceRecordingModal from './VoiceRecordingModal';
 import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
+import CodeEditorCodeMirror from './CodeEditorCodeMirror';
+import { useShortcutsStore } from '../stores/shortcutsStore';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
@@ -269,6 +271,9 @@ export default function ChatInput({
       }
     },
   });
+
+  // Get shortcuts from store
+  const { shortcuts, formatShortcut } = useShortcutsStore();
 
   const generateId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -1118,6 +1123,55 @@ export default function ChatInput({
     stopListening();
   }, [stopListening]);
 
+  // Global keyboard shortcuts for chat actions
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      // Build key string (e.g., "Meta+U", "Meta+Shift+F")
+      const keys: string[] = [];
+      if (e.metaKey || e.ctrlKey) keys.push('Meta');
+      if (e.shiftKey) keys.push('Shift');
+      if (e.altKey) keys.push('Alt');
+      if (e.key && e.key.length === 1) {
+        keys.push(e.key.toUpperCase());
+      } else if (e.key === 'Enter') {
+        keys.push('Enter');
+      } else if (e.key === '/') {
+        keys.push('/');
+      }
+      const keyCombo = keys.join('+');
+
+      // Match against shortcuts
+      if (keyCombo === shortcuts.chatAttachFile?.currentKeys) {
+        e.preventDefault();
+        void handleAttach();
+      } else if (keyCombo === shortcuts.chatMentionAgent?.currentKeys) {
+        e.preventDefault();
+        // Focus input and insert @
+        textareaRef.current?.focus();
+        setInput(input + '@');
+      } else if (keyCombo === shortcuts.chatToggleFullscreen?.currentKeys && onToggleFullscreen) {
+        e.preventDefault();
+        onToggleFullscreen();
+      } else if (keyCombo === shortcuts.chatVoiceRecord?.currentKeys) {
+        e.preventDefault();
+        handleVoiceClick();
+      } else if (keyCombo === shortcuts.chatSendMessage?.currentKeys && !disabled) {
+        e.preventDefault();
+        void handleSend();
+      } else if (keyCombo === shortcuts.chatOpenSnippets?.currentKeys) {
+        e.preventDefault();
+        setShowSnippetPopover(true);
+      } else if (keyCombo === shortcuts.chatOpenCommands?.currentKeys) {
+        e.preventDefault();
+        textareaRef.current?.focus();
+        setInput(input + '/');
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [shortcuts, input, disabled, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput]);
+
   // Snippet insertion handler
   const handleInsertSnippet = useCallback((content: string, cursorOffset?: number) => {
     if (!textareaRef.current) return;
@@ -1811,7 +1865,7 @@ export default function ChatInput({
             className="chat-input-action-btn"
             onClick={handleAttach}
             disabled={disabled}
-            data-tooltip="Attach files"
+            data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
             aria-label="Attach files"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1884,7 +1938,7 @@ export default function ChatInput({
               className={`chat-input-action-btn ${isFullscreen ? 'active' : ''}`}
               onClick={onToggleFullscreen}
               disabled={disabled}
-              data-tooltip={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
+              data-tooltip={isFullscreen ? `Exit fullscreen (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})` : `Fullscreen mode (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})`}
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
             >
               {isFullscreen ? (
@@ -1903,7 +1957,7 @@ export default function ChatInput({
             className="chat-input-action-btn"
             onClick={handleVoiceClick}
             disabled={disabled || !isSpeechSupported}
-            data-tooltip={isSpeechSupported ? "Voice input" : "Voice input not supported"}
+            data-tooltip={isSpeechSupported ? `Voice input (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice input not supported"}
             aria-label="Voice input"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1916,7 +1970,7 @@ export default function ChatInput({
             className="chat-input-send"
             onClick={() => void handleSend()}
             disabled={disabled || (!input.trim() && attachments.length === 0)}
-            data-tooltip="Send (⌘+Enter)"
+            data-tooltip={`Send (${formatShortcut(shortcuts.chatSendMessage?.currentKeys || '')})`}
             aria-label="Send message"
           >
             <svg
@@ -1949,7 +2003,7 @@ export default function ChatInput({
                   setShowSnippetPopover(!showSnippetPopover);
                 }}
                 disabled={disabled}
-                data-tooltip="Prompt Snippets"
+                data-tooltip={`Prompt Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
                 aria-label="Prompt Snippets"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2053,6 +2107,20 @@ export default function ChatInput({
             disabled={disabled}
             rows={1}
           />
+
+        {/* EquipBar - Agent toolkit quick-access (shown below textarea when focused) */}
+        {isFocused && agentToolkit && (agentToolkit.skills.length > 0 || agentToolkit.droids.length > 0 || agentToolkit.commands.length > 0) && (
+          <div className="chat-input-equip-bar-wrapper">
+            <EquipBar
+              skills={agentToolkit.skills}
+              droids={agentToolkit.droids}
+              commands={agentToolkit.commands}
+              onInsertSkill={(skill) => setInput(input + `@skill:${skill} `)}
+              onInsertDroid={(droid) => setInput(input + `@droid:${droid} `)}
+              onInsertCommand={(command) => setInput(input + `/${command} `)}
+            />
+          </div>
+        )}
         </div>
       </div>
       {attachments.length > 0 && (
@@ -2092,20 +2160,6 @@ export default function ChatInput({
       )}
       {error && <div className="chat-input-error">{error}</div>}
 
-      {/* EquipBar - Agent toolkit quick-access (shown below input when focused) */}
-      {isFocused && agentToolkit && (agentToolkit.skills.length > 0 || agentToolkit.droids.length > 0 || agentToolkit.commands.length > 0) && (
-        <div className="chat-input-equip-bar-wrapper">
-          <EquipBar
-            skills={agentToolkit.skills}
-            droids={agentToolkit.droids}
-            commands={agentToolkit.commands}
-            onInsertSkill={(skill) => setInput(input + `@skill:${skill} `)}
-            onInsertDroid={(droid) => setInput(input + `@droid:${droid} `)}
-            onInsertCommand={(command) => setInput(input + `/${command} `)}
-          />
-        </div>
-      )}
-
       {/* Voice Recording Modal */}
       <VoiceRecordingModal
         isOpen={showVoiceModal}
@@ -2124,6 +2178,54 @@ export default function ChatInput({
         onClose={() => setShowSnippetPopover(false)}
         onInsertSnippet={handleInsertSnippet}
       />
+
+      {/* Fullscreen Drawer */}
+      {isFullscreen && (
+        <div className="chat-fullscreen-drawer">
+          <div className="chat-fullscreen-drawer-content">
+            {/* Header */}
+            <div className="chat-fullscreen-drawer-header">
+              <h3 className="chat-fullscreen-drawer-title">Compose Message</h3>
+              <button
+                type="button"
+                className="chat-fullscreen-drawer-close"
+                onClick={onToggleFullscreen}
+                aria-label="Close fullscreen"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M4 4l12 12M16 4L4 16"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* CodeMirror Editor */}
+            <div className="chat-fullscreen-drawer-editor">
+              <CodeEditorCodeMirror
+                content={input}
+                filename="message.md"
+                language="markdown"
+                readOnly={disabled}
+                onChange={(value) => setInput(value)}
+              />
+            </div>
+
+            {/* Footer with Send button */}
+            <div className="chat-fullscreen-drawer-footer">
+              <button
+                type="button"
+                className="chat-fullscreen-send-btn"
+                onClick={() => void handleSend()}
+                disabled={disabled || (!input.trim() && attachments.length === 0)}
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 8L14 2L8 14L6.5 9.5L2 8Z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Send Message</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
