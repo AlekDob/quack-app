@@ -6,6 +6,7 @@ import { open as openDialog, confirm } from '@tauri-apps/plugin-dialog';
 import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
+import { useSystemWakeHandler } from '../hooks/useSystemWakeHandler';
 import type { ProjectTerminal } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
 import './TerminalWindowApp.css';
@@ -39,6 +40,9 @@ interface ContextMenuState {
  * Projects come from main window (via URL params) + terminals in Zustand store
  */
 export function TerminalWindowApp() {
+  // System wake handler - prevents blank screen after macOS standby
+  useSystemWakeHandler({ debug: true });
+
   // Projects passed from main window (agentChats)
   const [urlProjects, setUrlProjects] = useState<ProjectInfo[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);

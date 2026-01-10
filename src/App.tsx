@@ -95,6 +95,7 @@ import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
+import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
 import {
   saveTerminalsToStorage,
@@ -298,6 +299,9 @@ function AppContent() {
     setDroidFactoryOpen,
     userStats,
   } = useDroidFactory();
+
+  // System wake handler - prevents blank screen after macOS standby
+  useSystemWakeHandler({ debug: true });
 
   // Old Background Agents initialization - removed, using Kanban shell tasks now
   // useBackgroundAgentInit();
