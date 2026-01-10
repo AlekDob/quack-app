@@ -282,12 +282,26 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
           return `assistant-${messageId}-${contentHash.substring(0, 100)}`;
         }
 
-        // For user events: hash the tool results content
+        // For user events: hash the tool results content + timestamp for uniqueness
+        // User events don't have message.id, so we use tool_use_ids which should be unique
         if (event.type === 'user' && 'message' in event) {
+          // tool_use_ids are UUIDs and should be globally unique
+          const toolUseIds = event.message?.content
+            ?.filter((b: any) => b.tool_use_id)
+            ?.map((b: any) => b.tool_use_id)
+            .join('-') || '';
+
+          // If we have tool_use_ids, use them (they're UUIDs and unique)
+          // Otherwise fallback to content hash with timestamp
+          if (toolUseIds) {
+            return `user-${toolUseIds}`;
+          }
+
+          // Fallback for user events without tool results
           const contentHash = event.message?.content
-            ?.map((b: any) => `${b.type}-${b.tool_use_id || ''}`)
+            ?.map((b: any) => `${b.type}-${b.text?.substring(0, 50) || ''}`)
             .join('|') || '';
-          return `user-${contentHash.substring(0, 50)}`;
+          return `user-${contentHash}-${Date.now()}`;
         }
 
         // For result events: use session_id if available, otherwise timestamp

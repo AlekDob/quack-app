@@ -211,6 +211,186 @@ pub fn delete_rule(
     Ok(())
 }
 
+/// Detailed rule information for the RuleViewer component
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleDetails {
+    pub name: String,
+    pub content: String,
+    pub description: Option<String>,
+    pub globs: Option<Vec<String>>,
+    pub scope: String,
+    pub file_path: String,
+}
+
+/// Parse frontmatter from rule markdown file
+fn parse_rule_frontmatter(content: &str) -> (Option<String>, Option<Vec<String>>, String) {
+    let lines: Vec<&str> = content.lines().collect();
+
+    if lines.is_empty() || lines[0] != "---" {
+        // No frontmatter
+        return (None, None, content.to_string());
+    }
+
+    let mut description: Option<String> = None;
+    let mut globs: Option<Vec<String>> = None;
+    let mut end_index = 1;
+    let mut in_globs = false;
+    let mut globs_list: Vec<String> = Vec::new();
+
+    for (i, line) in lines.iter().enumerate().skip(1) {
+        if *line == "---" {
+            end_index = i + 1;
+            break;
+        }
+
+        // Check if we're collecting glob entries
+        if in_globs {
+            if line.trim().starts_with("- ") {
+                let glob = line.trim().trim_start_matches("- ").trim_matches('"').to_string();
+                globs_list.push(glob);
+                continue;
+            } else {
+                in_globs = false;
+            }
+        }
+
+        if let Some((key, value)) = line.split_once(':') {
+            let key = key.trim();
+            let value = value.trim();
+
+            match key {
+                "description" => description = Some(value.trim_matches('"').to_string()),
+                "globs" => {
+                    // Check if globs is inline array or multi-line
+                    if value.starts_with('[') {
+                        // Inline array
+                        let parsed: Vec<String> = value
+                            .trim_matches(|c| c == '[' || c == ']')
+                            .split(',')
+                            .map(|s| s.trim().trim_matches('"').to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                        if !parsed.is_empty() {
+                            globs = Some(parsed);
+                        }
+                    } else if value.is_empty() {
+                        // Multi-line globs
+                        in_globs = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Set globs from collected list if any
+    if !globs_list.is_empty() {
+        globs = Some(globs_list);
+    }
+
+    let body = if end_index < lines.len() {
+        lines[end_index..].join("\n").trim().to_string()
+    } else {
+        String::new()
+    };
+
+    (description, globs, body)
+}
+
+/// Get detailed information about a specific rule
+#[tauri::command]
+pub fn get_rule_details(
+    _app: AppHandle,
+    name: String,
+    working_dir: Option<String>,
+    scope: String,
+) -> Result<RuleDetails, String> {
+    let rules_dir = if scope == "global" {
+        let home_dir = std::env::var("HOME")
+            .map_err(|_| "Could not determine home directory")?;
+        PathBuf::from(home_dir).join(".claude/rules")
+    } else {
+        let base = working_dir.ok_or("Working directory is required for project rules")?;
+        PathBuf::from(&base).join(".claude/rules")
+    };
+
+    let file_path = rules_dir.join(format!("{}.md", name));
+
+    if !file_path.exists() {
+        return Err(format!("Rule '{}' not found", name));
+    }
+
+    let full_content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read rule file: {}", e))?;
+
+    let (description, globs, body) = parse_rule_frontmatter(&full_content);
+
+    Ok(RuleDetails {
+        name,
+        content: body,
+        description,
+        globs,
+        scope,
+        file_path: file_path.to_string_lossy().to_string(),
+    })
+}
+
+/// Save rule content (create or update)
+#[tauri::command]
+pub fn save_rule_content(
+    _app: AppHandle,
+    name: String,
+    content: String,
+    description: Option<String>,
+    globs: Option<Vec<String>>,
+    scope: String,
+    working_dir: Option<String>,
+) -> Result<(), String> {
+    let rules_dir = if scope == "global" {
+        let home_dir = std::env::var("HOME")
+            .map_err(|_| "Could not determine home directory")?;
+        PathBuf::from(home_dir).join(".claude/rules")
+    } else {
+        let base = working_dir.ok_or("Working directory is required for project rules")?;
+        PathBuf::from(&base).join(".claude/rules")
+    };
+
+    // Create directory if it doesn't exist
+    if !rules_dir.exists() {
+        fs::create_dir_all(&rules_dir)
+            .map_err(|e| format!("Failed to create rules directory: {}", e))?;
+    }
+
+    let file_path = rules_dir.join(format!("{}.md", name));
+
+    // Build content with frontmatter if description or globs exist
+    let full_content = if description.is_some() || globs.is_some() {
+        let mut frontmatter_lines = vec!["---".to_string()];
+        if let Some(desc) = &description {
+            frontmatter_lines.push(format!("description: \"{}\"", desc));
+        }
+        if let Some(g) = &globs {
+            if !g.is_empty() {
+                frontmatter_lines.push("globs:".to_string());
+                for glob in g {
+                    frontmatter_lines.push(format!("  - \"{}\"", glob));
+                }
+            }
+        }
+        frontmatter_lines.push("---".to_string());
+        format!("{}\n\n{}", frontmatter_lines.join("\n"), content)
+    } else {
+        content
+    };
+
+    fs::write(&file_path, full_content)
+        .map_err(|e| format!("Failed to write rule file: {}", e))?;
+
+    log::info!("🦆 Saved {} rule: {}", scope, name);
+
+    Ok(())
+}
+
 /// Bundled rule definition for automatic installation
 struct BundledRule {
     name: &'static str,

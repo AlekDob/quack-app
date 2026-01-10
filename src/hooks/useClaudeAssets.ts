@@ -11,6 +11,7 @@ import type {
   ClaudeAssetType,
   AssetFilters,
   AssetOperationResult,
+  GroupedSearchResults,
 } from '../types/claudeAssets';
 
 interface UseClaudeAssetsReturn {
@@ -19,6 +20,8 @@ interface UseClaudeAssetsReturn {
   selectedProject: ClaudeProject | null;
   selectedAsset: ClaudeAsset | null;
   filteredAssets: ClaudeAsset[];
+  globalSearchResults: GroupedSearchResults[];  // Cross-project search results
+  isGlobalSearch: boolean;  // True when search is active (searching all projects)
   filters: AssetFilters;
   loading: boolean;
   error: string | null;
@@ -261,47 +264,45 @@ export function useClaudeAssets(initialProjectPaths?: string[]): UseClaudeAssets
     await loadMultipleProjects(projectPaths);
   }, [projects, loadMultipleProjects]);
 
-  // Filter and sort assets based on current filters
-  const filteredAssets = (() => {
-    if (!selectedProject) return [];
+  // Check if we're in global search mode (search query is active)
+  const isGlobalSearch = filters.searchQuery.trim().length > 0;
 
-    // Collect all assets of the selected type
-    let assets: ClaudeAsset[] = [];
-
+  // Helper function to get all assets from a project with type filter
+  const getProjectAssets = (project: ClaudeProject): ClaudeAsset[] => {
     if (filters.type === 'all') {
-      assets = [
-        ...selectedProject.assets.droids,
-        ...selectedProject.assets.commands,
-        ...selectedProject.assets.rules,
-        ...selectedProject.assets.skills,
-        ...selectedProject.assets.mcps,
-        ...selectedProject.assets.hooks,
+      return [
+        ...project.assets.droids,
+        ...project.assets.commands,
+        ...project.assets.rules,
+        ...project.assets.skills,
+        ...project.assets.mcps,
+        ...project.assets.hooks,
       ];
-    } else {
-      const typeMap: Record<ClaudeAssetType, ClaudeAsset[]> = {
-        droid: selectedProject.assets.droids,
-        command: selectedProject.assets.commands,
-        rule: selectedProject.assets.rules,
-        skill: selectedProject.assets.skills,
-        mcp: selectedProject.assets.mcps,
-        hook: selectedProject.assets.hooks,
-      };
-      assets = typeMap[filters.type] || [];
     }
+    const typeMap: Record<ClaudeAssetType, ClaudeAsset[]> = {
+      droid: project.assets.droids,
+      command: project.assets.commands,
+      rule: project.assets.rules,
+      skill: project.assets.skills,
+      mcp: project.assets.mcps,
+      hook: project.assets.hooks,
+    };
+    return typeMap[filters.type] || [];
+  };
 
-    // Apply search filter
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase();
-      assets = assets.filter(a =>
-        a.name.toLowerCase().includes(query) ||
-        a.metadata.description?.toLowerCase().includes(query)
-      );
-    }
+  // Helper function to filter assets by search query
+  const filterByQuery = (assets: ClaudeAsset[], query: string): ClaudeAsset[] => {
+    const lowerQuery = query.toLowerCase();
+    return assets.filter(a =>
+      a.name.toLowerCase().includes(lowerQuery) ||
+      a.metadata.description?.toLowerCase().includes(lowerQuery)
+    );
+  };
 
-    // Apply sorting
-    assets.sort((a, b) => {
+  // Helper function to sort assets
+  const sortAssets = (assets: ClaudeAsset[]): ClaudeAsset[] => {
+    return [...assets].sort((a, b) => {
       let comparison = 0;
-
       switch (filters.sortBy) {
         case 'name':
           comparison = a.name.localeCompare(b.name);
@@ -313,11 +314,49 @@ export function useClaudeAssets(initialProjectPaths?: string[]): UseClaudeAssets
           comparison = a.type.localeCompare(b.type);
           break;
       }
-
       return filters.sortOrder === 'asc' ? comparison : -comparison;
     });
+  };
 
-    return assets;
+  // Global search results - search across ALL projects when query is active
+  const globalSearchResults: GroupedSearchResults[] = (() => {
+    if (!isGlobalSearch) return [];
+
+    const query = filters.searchQuery.trim();
+    const results: GroupedSearchResults[] = [];
+
+    for (const project of projects) {
+      const allAssets = getProjectAssets(project);
+      const matchingAssets = filterByQuery(allAssets, query);
+
+      if (matchingAssets.length > 0) {
+        results.push({
+          projectName: project.name,
+          projectPath: project.path,
+          assets: sortAssets(matchingAssets),
+          totalCount: matchingAssets.length,
+        });
+      }
+    }
+
+    // Sort projects by number of results (most first)
+    results.sort((a, b) => b.totalCount - a.totalCount);
+
+    return results;
+  })();
+
+  // Filter and sort assets based on current filters (single project mode)
+  const filteredAssets = (() => {
+    if (!selectedProject) return [];
+
+    const assets = getProjectAssets(selectedProject);
+
+    // Apply search filter (only in single project mode)
+    const filtered = filters.searchQuery
+      ? filterByQuery(assets, filters.searchQuery)
+      : assets;
+
+    return sortAssets(filtered);
   })();
 
   // Load initial projects on mount
@@ -333,6 +372,8 @@ export function useClaudeAssets(initialProjectPaths?: string[]): UseClaudeAssets
     selectedProject,
     selectedAsset,
     filteredAssets,
+    globalSearchResults,
+    isGlobalSearch,
     filters,
     loading,
     error,

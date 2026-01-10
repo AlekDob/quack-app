@@ -50,7 +50,8 @@ export function useSlashCommands(basePath: string) {
     name: string,
     description: string,
     content: string,
-    parameters: string[] = []
+    parameters: string[] = [],
+    scope: 'project' | 'global' = 'project'
   ): Promise<void> => {
     if (!basePath) throw new Error('No base path set');
 
@@ -69,7 +70,8 @@ export function useSlashCommands(basePath: string) {
     await invoke('create_slash_command', {
       basePath,
       name,
-      content: fullContent
+      content: fullContent,
+      scope
     });
 
     // Reload commands after creation
@@ -81,7 +83,8 @@ export function useSlashCommands(basePath: string) {
     name: string,
     description: string,
     content: string,
-    parameters: string[] = []
+    parameters: string[] = [],
+    scope: 'project' | 'global' = 'project'
   ): Promise<void> => {
     if (!basePath) throw new Error('No base path set');
 
@@ -100,7 +103,8 @@ export function useSlashCommands(basePath: string) {
     await invoke('update_slash_command', {
       basePath,
       name,
-      content: fullContent
+      content: fullContent,
+      scope
     });
 
     // Reload commands after update
@@ -108,12 +112,13 @@ export function useSlashCommands(basePath: string) {
   }, [basePath, loadCommands]);
 
   // Delete custom command
-  const deleteCommand = useCallback(async (name: string): Promise<void> => {
+  const deleteCommand = useCallback(async (name: string, scope?: string): Promise<void> => {
     if (!basePath) throw new Error('No base path set');
 
     await invoke('delete_slash_command', {
       basePath,
-      name
+      name,
+      scope
     });
 
     // Reload commands after deletion

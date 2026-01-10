@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import type { SlashCommand } from '../hooks/useSlashCommands';
+import CodeEditorMonaco from './CodeEditorMonaco';
 
 interface CommandEditorProps {
   isOpen: boolean;
   command?: SlashCommand; // If provided, we're editing; otherwise creating
   onClose: () => void;
-  onSave: (name: string, description: string, content: string, parameters: string[]) => Promise<void>;
+  onSave: (name: string, description: string, content: string, parameters: string[], scope: 'project' | 'global') => Promise<void>;
 }
 
 export function CommandEditor({ isOpen, command, onClose, onSave }: CommandEditorProps) {
@@ -13,6 +14,7 @@ export function CommandEditor({ isOpen, command, onClose, onSave }: CommandEdito
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
   const [parameters, setParameters] = useState('');
+  const [scope, setScope] = useState<'project' | 'global'>('project');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,11 +28,13 @@ export function CommandEditor({ isOpen, command, onClose, onSave }: CommandEdito
         setDescription(command.description);
         setContent(command.content);
         setParameters(command.parameters?.join(', ') || '');
+        setScope(command.scope === 'global' ? 'global' : 'project');
       } else {
         setName('');
         setDescription('');
         setContent('');
         setParameters('');
+        setScope('project');
       }
       setError(null);
     }
@@ -60,7 +64,7 @@ export function CommandEditor({ isOpen, command, onClose, onSave }: CommandEdito
     try {
       setSaving(true);
       setError(null);
-      await onSave(name.trim(), description.trim(), content.trim(), parsedParams);
+      await onSave(name.trim(), description.trim(), content.trim(), parsedParams, scope);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save command');
@@ -138,18 +142,73 @@ export function CommandEditor({ isOpen, command, onClose, onSave }: CommandEdito
             </p>
           </div>
 
+          {/* Scope Selector */}
+          {!isEditing && (
+            <div>
+              <label className="block text-xs font-medium text-white/70 mb-2">
+                Command Scope
+              </label>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="project"
+                    checked={scope === 'project'}
+                    onChange={() => setScope('project')}
+                    className="w-4 h-4 accent-blue-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm text-white/80">Project</span>
+                    <span className="text-xs text-white/50">Only in this project (.claude/commands/)</span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="global"
+                    checked={scope === 'global'}
+                    onChange={() => setScope('global')}
+                    className="w-4 h-4 accent-blue-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm text-white/80">Global</span>
+                    <span className="text-xs text-white/50">Available in all projects (~/.claude/commands/)</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+          {isEditing && (
+            <div>
+              <label className="block text-xs font-medium text-white/70 mb-2">
+                Command Scope
+              </label>
+              <div className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg">
+                <span className="text-sm text-white/60">
+                  {command?.scope === 'global' ? 'Global (~/.claude/commands/)' : 'Project (.claude/commands/)'}
+                </span>
+              </div>
+              <p className="text-xs text-white/30 mt-1">Scope cannot be changed when editing</p>
+            </div>
+          )}
+
           {/* Content */}
           <div>
             <label className="block text-xs font-medium text-white/70 mb-2">
               Command Content
             </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Enter the command instructions in markdown format..."
-              rows={12}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 font-mono resize-none"
-            />
+            <div className="border border-white/10 rounded-lg overflow-hidden" style={{ height: '300px' }}>
+              <CodeEditorMonaco
+                content={content}
+                filename="command.md"
+                language="markdown"
+                readOnly={false}
+                onChange={setContent}
+                showMinimap={false}
+              />
+            </div>
             <p className="text-xs text-white/30 mt-1">
               This content will be sent to Claude when the command is executed
             </p>

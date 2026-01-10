@@ -28,6 +28,9 @@ import './ClaudeAssetsPanel.css';
 interface ClaudeAssetsPanelProps {
   projectPaths: string[];
   onOpenFile?: (path: string) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
 }
 
 // Asset type labels - icons rendered as SVG
@@ -101,12 +104,14 @@ const AssetTypeIcon = ({ type, size = 14 }: { type: ClaudeAssetType | 'all'; siz
   return icons[type] || icons.all;
 };
 
-export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAssetsPanelProps) {
+export default function ClaudeAssetsPanel({ projectPaths, onOpenFile, onSelectCommand, onSelectRule, onSelectDroid }: ClaudeAssetsPanelProps) {
   const {
     projects,
     selectedProject,
     selectedAsset,
     filteredAssets,
+    globalSearchResults,
+    isGlobalSearch,
     filters,
     loading,
     error,
@@ -115,7 +120,6 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAs
     selectAsset,
     setFilters,
     copyAsset,
-    moveAsset,
     deleteAsset,
     readAssetContent,
     refreshAll,
@@ -262,8 +266,32 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAs
     setDropTargetProject(null);
   };
 
-  // Handle asset preview
+  // Handle asset preview - opens tab for commands/rules/droids, modal for others
   const handlePreview = async (asset: ClaudeAsset) => {
+    // Determine scope from asset path - global if path includes home directory pattern
+    // Global assets typically have path like /Users/*/.<something> or ~/.claude
+    const isGlobal = asset.projectName === 'global' || asset.path.match(/\/Users\/[^/]+\/\./);
+    const scope: 'global' | 'project' = isGlobal ? 'global' : 'project';
+
+    // For droids/agents, open in dedicated tab
+    if (asset.type === 'droid' && onSelectDroid) {
+      onSelectDroid(asset.name, scope);
+      return;
+    }
+
+    // For commands, open in dedicated tab
+    if (asset.type === 'command' && onSelectCommand) {
+      onSelectCommand(asset.name, scope);
+      return;
+    }
+
+    // For rules, open in dedicated tab
+    if (asset.type === 'rule' && onSelectRule) {
+      onSelectRule(asset.name, scope);
+      return;
+    }
+
+    // For other asset types, show preview modal
     try {
       // For directory assets (like skills), we need to modify the asset path
       const assetToRead = asset.isDirectory
@@ -303,8 +331,15 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAs
     }
   };
 
-  // Get total asset count for selected project
-  const totalAssets = selectedProject?.assetCounts.total || 0;
+  // Get total asset count - show global results count when searching
+  const totalAssets = isGlobalSearch
+    ? globalSearchResults.reduce((sum, g) => sum + g.totalCount, 0)
+    : selectedProject?.assetCounts.total || 0;
+
+  // Count for header - show search results or project total
+  const headerCount = isGlobalSearch
+    ? `${totalAssets} result${totalAssets !== 1 ? 's' : ''}`
+    : `${totalAssets} asset${totalAssets !== 1 ? 's' : ''}`;
 
   return (
     <div className="claude-assets-panel">
@@ -312,7 +347,7 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAs
       <div className="claude-assets-header">
         <div className="claude-assets-title">
           <h2>Claude Assets</h2>
-          <span className="asset-count">{totalAssets} assets</span>
+          <span className="asset-count">{headerCount}</span>
         </div>
         <div className="claude-assets-actions">
           <input
@@ -412,6 +447,12 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile }: ClaudeAs
               onSelectAsset={selectAsset}
               onPreview={handlePreview}
               onDelete={handleDelete}
+              isGlobalSearch={isGlobalSearch}
+              globalSearchResults={globalSearchResults}
+              onSelectProject={(projectPath) => {
+                selectProject(projectPath);
+                setSearchQuery(''); // Clear search when selecting a project from results
+              }}
             />
           </div>
         </div>

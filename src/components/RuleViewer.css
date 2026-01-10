@@ -1,0 +1,563 @@
+/* RuleViewer - Quack Design System */
+
+.rule-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background-primary, #0f1115);
+  color: var(--text-primary, #e7ebf3);
+  font-family: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Loading & Error States
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-loading,
+.rule-viewer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 3rem;
+  text-align: center;
+  gap: 1rem;
+}
+
+.rule-viewer-loading {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.rule-viewer-error p {
+  color: #ef4444;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VIEW MODE - Header
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, rgba(242, 140, 82, 0.06) 0%, rgba(255, 178, 111, 0.04) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rule-viewer-icon-section {
+  flex-shrink: 0;
+}
+
+.rule-viewer-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
+}
+
+.rule-viewer-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.rule-viewer-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.rule-viewer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rule-viewer-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--text-primary, #e7ebf3);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.rule-viewer-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  flex-wrap: wrap;
+}
+
+.rule-viewer-description {
+  flex: 1;
+  min-width: 200px;
+  line-height: 1.4;
+}
+
+.rule-viewer-scope {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a78bfa;
+}
+
+/* Globs Display */
+.rule-viewer-globs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}
+
+.rule-viewer-glob-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1875rem 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.rule-viewer-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Buttons - Icon Buttons (Edit/Delete)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rule-viewer-icon-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary, #e7ebf3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.rule-viewer-icon-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.rule-viewer-icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rule-viewer-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rule-viewer-icon-button.rule-viewer-edit:hover:not(:disabled) {
+  background: rgba(242, 140, 82, 0.12);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.rule-viewer-icon-button.rule-viewer-delete:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VIEW MODE - Content
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.rule-viewer-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rule-viewer-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rule-viewer-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.rule-viewer-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VIEW MODE - Footer
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rule-viewer-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.6875rem;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+  letter-spacing: 0.01em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIT MODE - Container
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-edit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIT MODE - Header
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(167, 139, 250, 0.06) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rule-viewer-edit-header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary, #e7ebf3);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.rule-viewer-edit-actions {
+  display: flex;
+  gap: 0.625rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIT MODE - Action Buttons
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.rule-viewer-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.rule-viewer-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rule-viewer-cancel {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+}
+
+.rule-viewer-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.rule-viewer-save {
+  background: linear-gradient(135deg, #f28c52 0%, #ffb26f 100%);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.25);
+}
+
+.rule-viewer-save:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e17940 0%, #ffa05d 100%);
+  box-shadow: 0 6px 16px rgba(242, 140, 82, 0.35);
+  transform: translateY(-1px);
+}
+
+.rule-viewer-save:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIT MODE - Form Fields
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  padding: 1.5rem 2rem;
+  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rule-viewer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rule-viewer-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rule-viewer-input {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary, #e7ebf3);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.rule-viewer-input::placeholder {
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.4));
+}
+
+.rule-viewer-input:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.rule-viewer-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rule-viewer-field-hint {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIT MODE - Scope Selector (Radio Group)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-radio-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.rule-viewer-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  cursor: pointer;
+  padding: 0.625rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.rule-viewer-radio-label:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.rule-viewer-radio-label input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.rule-viewer-radio-label input[type="radio"]:checked {
+  border-color: #a78bfa;
+  background: #a78bfa;
+}
+
+.rule-viewer-radio-label input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
+}
+
+.rule-viewer-radio-label span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.75));
+}
+
+.rule-viewer-radio-label:has(input:checked) {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.rule-viewer-radio-label:has(input:checked) span {
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIT MODE - Code Editor Section
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rule-viewer-editor-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 300px;
+}
+
+.rule-viewer-editor-header {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rule-viewer-editor-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rule-viewer-editor {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 0 1.5rem 1.5rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rule-viewer-editor > * {
+  flex: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Responsive Adjustments
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .rule-viewer-header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .rule-viewer-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .rule-viewer-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .rule-viewer-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .rule-viewer-edit-fields {
+    grid-template-columns: 1fr;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .rule-viewer-content,
+  .rule-viewer-footer {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}

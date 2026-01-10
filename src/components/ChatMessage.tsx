@@ -238,29 +238,36 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
     ? isTruncated(message.content, 30, 250)
     : false;
 
-  // 🦆 FIX: Stable event key generator - extracted outside render for reusability
-  const getStableEventKey = (event: any): string => {
-    if (event.type === 'system' && 'subtype' in event && 'session_id' in event) {
-      return `system-${event.subtype}-${event.session_id}`;
+  // 🦆 FIX: Stable event key generator - ALWAYS uses index for guaranteed uniqueness
+  const getStableEventKey = (event: any, index: number): string => {
+    // System events: include index to handle multiple status events
+    if (event.type === 'system' && 'subtype' in event) {
+      return `system-${event.subtype}-${index}`;
     }
+    // Assistant events: include index to handle edge cases
     if (event.type === 'assistant' && 'message' in event && event.message?.id) {
-      const contentTypes = event.message.content
-        ?.map((c: any) => `${c.type}-${c.id || c.name || ''}`)
-        .join('|') || '';
-      return `assistant-${event.message.id}-${contentTypes}`;
+      return `assistant-${event.message.id}-${index}`;
+    }
+    // 🦆 FIX: Handle user events - use tool_use_ids which are unique UUIDs
+    if (event.type === 'user' && 'message' in event) {
+      const toolUseIds = event.message?.content
+        ?.filter((c: any) => c.tool_use_id)
+        ?.map((c: any) => c.tool_use_id)
+        .join('-') || '';
+      if (toolUseIds) {
+        return `user-${toolUseIds}`;
+      }
+      // Fallback: use message.id + index for uniqueness
+      return `user-${message.id}-${index}`;
     }
     if (event.type === 'result' && 'session_id' in event) {
-      return `result-${event.session_id}`;
+      return `result-${event.session_id}-${index}`;
     }
     if ('session_id' in event && event.session_id) {
-      const contentHash = JSON.stringify(event).substring(0, 100);
-      return `${event.type}-${event.session_id}-${contentHash}`;
+      return `${event.type}-${event.session_id}-${index}`;
     }
-    const eventHash = JSON.stringify(event)
-      .split('')
-      .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
-      .toString(36);
-    return `${event.type}-${message.id}-${eventHash}`;
+    // Fallback: use message.id + event type + index for guaranteed uniqueness
+    return `${event.type}-${message.id}-${index}`;
   };
 
   // Render text with @mentions as inline chips and clickable Session ID
@@ -468,9 +475,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {message.events.map((event) => (
+            {message.events.map((event, eventIndex) => (
               <StreamMessage
-                key={getStableEventKey(event)}
+                key={getStableEventKey(event, eventIndex)}
                 message={event}
                 streamMessages={message.events || []}
                 onFilePathClick={onFilePathClick}

@@ -669,6 +669,11 @@ async function handleBrainSearch(args) {
  *
  * The query should be natural language describing what you need.
  * FTS5 handles the matching against entity names and observations.
+ *
+ * WEIGHTED RANKING (when projectId is provided):
+ * Results are sorted with project-scoped entities first, then global entities.
+ * This ensures the most relevant context appears at the top while still
+ * including potentially useful global knowledge.
  */
 async function handleBrainSmartSearch(args) {
   const { query, context, limit = 5, projectId } = args;
@@ -697,43 +702,81 @@ async function handleBrainSmartSearch(args) {
 
     console.error(`[BrainMCP] FTS5 query: "${ftsQuery}"`);
 
-    let sql = `
-      SELECT e.id, e.name, e.entity_type, e.project_id, rank
-      FROM entities e
-      JOIN entities_fts fts ON e.rowid = fts.rowid
-      WHERE entities_fts MATCH ?
-    `;
-    const params = [ftsQuery];
+    let sql;
+    let params;
 
-    // Filter by project if specified
     if (projectId) {
-      sql += ' AND e.project_id = ?';
-      params.push(projectId);
+      // WEIGHTED RANKING: Project-scoped search with weighted results
+      // 1 = Current project (highest priority)
+      // 2 = Global entities (NULL project_id)
+      // 3 = Other projects (lowest priority, excluded by default)
+      sql = `
+        SELECT e.id, e.name, e.entity_type, e.project_id, rank,
+          CASE
+            WHEN e.project_id = ? THEN 1
+            WHEN e.project_id IS NULL THEN 2
+            ELSE 3
+          END as scope_priority,
+          CASE
+            WHEN e.project_id = ? THEN 'project'
+            WHEN e.project_id IS NULL THEN 'global'
+            ELSE 'other'
+          END as scope
+        FROM entities e
+        JOIN entities_fts fts ON e.rowid = fts.rowid
+        WHERE entities_fts MATCH ?
+          AND (e.project_id = ? OR e.project_id IS NULL)
+        ORDER BY scope_priority ASC, rank ASC
+        LIMIT ?
+      `;
+      params = [projectId, projectId, ftsQuery, projectId, limit];
+    } else {
+      // No project filter - return all results ordered by FTS rank
+      sql = `
+        SELECT e.id, e.name, e.entity_type, e.project_id, rank,
+          CASE
+            WHEN e.project_id IS NULL THEN 'global'
+            ELSE 'project'
+          END as scope
+        FROM entities e
+        JOIN entities_fts fts ON e.rowid = fts.rowid
+        WHERE entities_fts MATCH ?
+        ORDER BY rank ASC
+        LIMIT ?
+      `;
+      params = [ftsQuery, limit];
     }
-
-    sql += ' ORDER BY rank LIMIT ?';
-    params.push(limit);
 
     const results = db.prepare(sql).all(...params);
 
-    // Get full entities with observations
+    // Get full entities with observations and scope info
     const entities = results.map(r => {
       const entity = getEntityWithObservations(r.id);
       return {
         ...entity,
         relevance: Math.abs(r.rank), // FTS5 rank is negative, take absolute value
+        scope: r.scope, // 'project' | 'global' | 'other'
       };
     });
 
-    console.error(`[BrainMCP] Found ${entities.length} results`);
+    // Count by scope for stats
+    const projectCount = entities.filter(e => e.scope === 'project').length;
+    const globalCount = entities.filter(e => e.scope === 'global').length;
+
+    console.error(`[BrainMCP] Found ${entities.length} results (project: ${projectCount}, global: ${globalCount})`);
     console.error(`[BrainMCP] === END SMART SEARCH ===`);
 
     return JSON.stringify({
       success: true,
       query,
       context: context || null,
+      projectId: projectId || null,
       searchTerms: terms, // What was actually searched (for debugging)
       count: entities.length,
+      scopeCounts: {
+        project: projectCount,
+        global: globalCount,
+      },
       entities,
     }, null, 2);
 

@@ -2,25 +2,21 @@ import { useState } from 'react';
 import { useRules } from '../hooks/useRules';
 import type { Rule } from '../types';
 import { RulesList } from './RulesList';
-import { RuleEditor } from './RuleEditor';
 
 interface RulesPanelProps {
   basePath: string;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
 }
 
-export function RulesPanel({ basePath }: RulesPanelProps) {
+export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
   const {
     rules,
     loading,
     error,
-    createRule,
-    updateRule,
     deleteRule,
     loadRules
   } = useRules(basePath);
 
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<Rule | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter rules based on search
@@ -37,13 +33,17 @@ export function RulesPanel({ basePath }: RulesPanelProps) {
   const filteredGlobal = filterRules(rules.global);
 
   const handleNewRule = () => {
-    setEditingRule(undefined);
-    setEditorOpen(true);
+    // Open new rule tab with default scope 'project'
+    if (onSelectRule) {
+      onSelectRule('', 'project', true);
+    }
   };
 
   const handleEditRule = (rule: Rule) => {
-    setEditingRule(rule);
-    setEditorOpen(true);
+    // Open rule in tab for editing
+    if (onSelectRule) {
+      onSelectRule(rule.name, rule.scope as 'global' | 'project');
+    }
   };
 
   const handleDeleteRule = async (rule: Rule) => {
@@ -57,20 +57,6 @@ export function RulesPanel({ basePath }: RulesPanelProps) {
     } catch (err) {
       console.error('Failed to delete rule:', err);
       alert('Failed to delete rule. Please try again.');
-    }
-  };
-
-  const handleSaveRule = async (
-    name: string,
-    content: string,
-    scope: 'project' | 'global',
-    description?: string,
-    globs?: string[]
-  ) => {
-    if (editingRule) {
-      await updateRule(name, content, scope);
-    } else {
-      await createRule(name, content, scope, description, globs);
     }
   };
 
@@ -162,14 +148,6 @@ export function RulesPanel({ basePath }: RulesPanelProps) {
           />
         )}
       </div>
-
-      {/* Rule Editor Modal */}
-      <RuleEditor
-        isOpen={editorOpen}
-        rule={editingRule}
-        onClose={() => setEditorOpen(false)}
-        onSave={handleSaveRule}
-      />
     </div>
   );
 }

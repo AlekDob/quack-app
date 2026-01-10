@@ -176,8 +176,21 @@ pub fn create_slash_command(
     base_path: String,
     name: String,
     content: String,
+    scope: Option<String>,
 ) -> Result<(), String> {
-    let commands_dir = PathBuf::from(&base_path).join(".claude/commands");
+    // Determine target directory based on scope
+    let commands_dir = match scope.as_deref() {
+        Some("global") => {
+            // Global: ~/.claude/commands/
+            let home_dir = std::env::var("HOME")
+                .map_err(|_| "Could not determine home directory")?;
+            PathBuf::from(home_dir).join(".claude/commands")
+        }
+        _ => {
+            // Project (default): <base_path>/.claude/commands/
+            PathBuf::from(&base_path).join(".claude/commands")
+        }
+    };
 
     // Create directory if it doesn't exist
     if !commands_dir.exists() {
@@ -195,6 +208,8 @@ pub fn create_slash_command(
     fs::write(&file_path, content)
         .map_err(|e| format!("Failed to write command file: {}", e))?;
 
+    log::info!("🦆 Created {:?} command: {}", scope.as_deref().unwrap_or("project"), name);
+
     Ok(())
 }
 
@@ -205,8 +220,20 @@ pub fn update_slash_command(
     base_path: String,
     name: String,
     content: String,
+    scope: Option<String>,
 ) -> Result<(), String> {
-    let commands_dir = PathBuf::from(&base_path).join(".claude/commands");
+    // Determine target directory based on scope
+    let commands_dir = match scope.as_deref() {
+        Some("global") => {
+            let home_dir = std::env::var("HOME")
+                .map_err(|_| "Could not determine home directory")?;
+            PathBuf::from(home_dir).join(".claude/commands")
+        }
+        _ => {
+            PathBuf::from(&base_path).join(".claude/commands")
+        }
+    };
+
     let file_path = commands_dir.join(format!("{}.md", name));
 
     if !file_path.exists() {
@@ -216,13 +243,31 @@ pub fn update_slash_command(
     fs::write(&file_path, content)
         .map_err(|e| format!("Failed to update command file: {}", e))?;
 
+    log::info!("🦆 Updated {:?} command: {}", scope.as_deref().unwrap_or("project"), name);
+
     Ok(())
 }
 
 /// Delete a custom command
 #[tauri::command]
-pub fn delete_slash_command(_app: AppHandle, base_path: String, name: String) -> Result<(), String> {
-    let commands_dir = PathBuf::from(&base_path).join(".claude/commands");
+pub fn delete_slash_command(
+    _app: AppHandle,
+    base_path: String,
+    name: String,
+    scope: Option<String>,
+) -> Result<(), String> {
+    // Determine target directory based on scope
+    let commands_dir = match scope.as_deref() {
+        Some("global") => {
+            let home_dir = std::env::var("HOME")
+                .map_err(|_| "Could not determine home directory")?;
+            PathBuf::from(home_dir).join(".claude/commands")
+        }
+        _ => {
+            PathBuf::from(&base_path).join(".claude/commands")
+        }
+    };
+
     let file_path = commands_dir.join(format!("{}.md", name));
 
     if !file_path.exists() {
@@ -231,6 +276,8 @@ pub fn delete_slash_command(_app: AppHandle, base_path: String, name: String) ->
 
     fs::remove_file(&file_path)
         .map_err(|e| format!("Failed to delete command file: {}", e))?;
+
+    log::info!("🦆 Deleted {:?} command: {}", scope.as_deref().unwrap_or("project"), name);
 
     Ok(())
 }
@@ -319,6 +366,105 @@ Execute the command according to the instructions in <command-context> above."#,
     log::info!("🦆 Expanded command with context ({} chars)", final_content.len());
 
     Ok(final_content)
+}
+
+/// Detailed command information for the CommandViewer component
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandDetails {
+    pub name: String,
+    pub description: String,
+    pub content: String,
+    pub parameters: Option<Vec<String>>,
+    pub scope: String,
+    pub file_path: String,
+}
+
+/// Get detailed information about a specific command
+#[tauri::command]
+pub fn get_command_details(
+    _app: AppHandle,
+    name: String,
+    working_dir: Option<String>,
+    scope: String,
+) -> Result<CommandDetails, String> {
+    let commands_dir = if scope == "global" {
+        let home_dir = std::env::var("HOME")
+            .map_err(|_| "Could not determine home directory")?;
+        PathBuf::from(home_dir).join(".claude/commands")
+    } else {
+        let base = working_dir.ok_or("Working directory is required for project commands")?;
+        PathBuf::from(&base).join(".claude/commands")
+    };
+
+    let file_path = commands_dir.join(format!("{}.md", name));
+
+    if !file_path.exists() {
+        return Err(format!("Command '{}' not found", name));
+    }
+
+    let full_content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read command file: {}", e))?;
+
+    let (parsed_name, description, parameters, body) = parse_frontmatter(&full_content);
+
+    Ok(CommandDetails {
+        name: parsed_name.unwrap_or_else(|| name.clone()),
+        description: description.unwrap_or_else(|| "Custom command".to_string()),
+        content: body,
+        parameters,
+        scope,
+        file_path: file_path.to_string_lossy().to_string(),
+    })
+}
+
+/// Save command content (create or update)
+#[tauri::command]
+pub fn save_command_content(
+    _app: AppHandle,
+    name: String,
+    content: String,
+    description: String,
+    parameters: Option<Vec<String>>,
+    scope: String,
+    working_dir: Option<String>,
+) -> Result<(), String> {
+    let commands_dir = if scope == "global" {
+        let home_dir = std::env::var("HOME")
+            .map_err(|_| "Could not determine home directory")?;
+        PathBuf::from(home_dir).join(".claude/commands")
+    } else {
+        let base = working_dir.ok_or("Working directory is required for project commands")?;
+        PathBuf::from(&base).join(".claude/commands")
+    };
+
+    // Create directory if it doesn't exist
+    if !commands_dir.exists() {
+        fs::create_dir_all(&commands_dir)
+            .map_err(|e| format!("Failed to create commands directory: {}", e))?;
+    }
+
+    let file_path = commands_dir.join(format!("{}.md", name));
+
+    // Build frontmatter
+    let mut frontmatter_lines = vec!["---".to_string()];
+    frontmatter_lines.push(format!("name: {}", name));
+    frontmatter_lines.push(format!("description: {}", description));
+    if let Some(params) = &parameters {
+        if !params.is_empty() {
+            frontmatter_lines.push(format!("parameters: [{}]", params.join(", ")));
+        }
+    }
+    frontmatter_lines.push("---".to_string());
+    frontmatter_lines.push(String::new());
+
+    let full_content = format!("{}\n{}", frontmatter_lines.join("\n"), content);
+
+    fs::write(&file_path, full_content)
+        .map_err(|e| format!("Failed to write command file: {}", e))?;
+
+    log::info!("🦆 Saved {} command: {}", scope, name);
+
+    Ok(())
 }
 
 /// Bundled command definition for automatic installation

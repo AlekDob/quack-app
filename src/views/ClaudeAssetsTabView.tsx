@@ -12,6 +12,9 @@ interface ClaudeAssetsTabViewProps {
   isActive: boolean;
   terminals: TerminalInfo[];
   onOpenFile?: (path: string) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
 }
 
 export default function ClaudeAssetsTabView({
@@ -19,6 +22,9 @@ export default function ClaudeAssetsTabView({
   isActive,
   terminals,
   onOpenFile,
+  onSelectCommand,
+  onSelectRule,
+  onSelectDroid,
 }: ClaudeAssetsTabViewProps) {
   // Don't render if not active or wrong tab type
   if (!isActive || tab.type !== 'claude-assets') return null;
@@ -42,6 +48,9 @@ export default function ClaudeAssetsTabView({
       <ClaudeAssetsPanel
         projectPaths={projectPaths}
         onOpenFile={onOpenFile}
+        onSelectCommand={onSelectCommand}
+        onSelectRule={onSelectRule}
+        onSelectDroid={onSelectDroid}
       />
     </div>
   );

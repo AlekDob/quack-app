@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { AgentInfo, AgentDetails } from "../types";
-import { NewAgentModal } from "./NewAgentModal";
 
 /**
  * Agents Panel - Inline list view of agents
- * Compact version without modal overlay
+ * Uses tab-based editing like Commands and Rules
  */
 
 interface AgentsPanelProps {
@@ -27,6 +26,7 @@ interface AgentsPanelProps {
     workingOn?: string,
     avatar?: string
   ) => Promise<void>;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
 }
 
 // Drag handler for droid/agent items
@@ -51,12 +51,11 @@ export default function AgentsPanel({
   onSelectAgent,
   onUseAgent,
   onRefresh,
-  onCreateAgent,
+  onSelectDroid,
 }: AgentsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
 
   // Filter agents based on search query
   const filteredAgents = agents.filter(agent =>
@@ -69,19 +68,21 @@ export default function AgentsPanel({
     return [...agentsToSort].sort((a, b) => a.name.localeCompare(b.name));
   };
 
-  const handleCreateAgent = async (
-    name: string,
-    description: string,
-    model: string,
-    color: string,
-    content: string,
-    scope: 'global' | 'project',
-    workingOn?: string,
-    avatar?: string
-  ) => {
-    await onCreateAgent(name, description, model, color, content, scope, workingOn, avatar);
-    setModalOpen(false);
-    onRefresh();
+  // Handle new droid creation via tab (like Commands/Rules)
+  const handleNewDroid = () => {
+    if (onSelectDroid) {
+      onSelectDroid('', 'project', true);
+    }
+  };
+
+  // Handle editing an existing droid via tab
+  const handleEditDroid = (agent: AgentInfo) => {
+    if (onSelectDroid) {
+      onSelectDroid(agent.name, agent.scope as 'global' | 'project', false);
+    } else {
+      // Fallback to onSelectAgent
+      onSelectAgent(agent);
+    }
   };
 
   return (
@@ -107,7 +108,7 @@ export default function AgentsPanel({
             </button>
             <button
               type="button"
-              onClick={() => setModalOpen(true)}
+              onClick={handleNewDroid}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200"
             >
               + New Droid
@@ -264,7 +265,7 @@ export default function AgentsPanel({
                       <div
                         key={`project-${agent.name}`}
                         className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
-                        onClick={() => onSelectAgent(agent)}
+                        onClick={() => handleEditDroid(agent)}
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
@@ -334,7 +335,7 @@ export default function AgentsPanel({
                       <div
                         key={`global-${agent.name}`}
                         className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
-                        onClick={() => onSelectAgent(agent)}
+                        onClick={() => handleEditDroid(agent)}
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
@@ -404,13 +405,6 @@ export default function AgentsPanel({
         </div>
       )}
 
-      {/* New Agent Modal */}
-      <NewAgentModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleCreateAgent}
-        existingAgents={agents}
-      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ interface AgentViewerProps {
   agentScope: 'global' | 'project';
   workingDir?: string;
   onRefresh?: () => void;
+  isNewAgent?: boolean; // If true, start in edit mode for creating new agent
 }
 
 // Agent color mapping for consistent styling
@@ -75,26 +76,52 @@ export default function AgentViewer({
   agentScope,
   workingDir,
   onRefresh,
+  isNewAgent = false,
 }: AgentViewerProps) {
   const [agent, setAgent] = useState<AgentDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isNewAgent);
   const [error, setError] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isNewAgent);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Edit form state
+  const [editName, setEditName] = useState("");
   const [editContent, setEditContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
-  const [editModel, setEditModel] = useState("");
+  const [editModel, setEditModel] = useState("sonnet");
   const [originalModel, setOriginalModel] = useState("");
-  const [editColor, setEditColor] = useState("");
+  const [editColor, setEditColor] = useState("blue");
   const [originalColor, setOriginalColor] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [originalDescription, setOriginalDescription] = useState("");
+  const [editScope, setEditScope] = useState<'global' | 'project'>(agentScope);
 
   // Load agent details
   useEffect(() => {
+    if (isNewAgent) {
+      // Initialize empty agent for creation mode
+      setAgent({
+        name: "",
+        description: "",
+        model: "sonnet",
+        color: "blue",
+        content: "",
+        file_path: "",
+        scope: agentScope,
+      });
+      // Initialize edit form states for new agent
+      setEditName("");
+      setEditDescription("");
+      setEditModel("sonnet");
+      setEditColor("blue");
+      setEditContent("");
+      setEditScope(agentScope);
+      setHasChanges(true); // Enable save button for new agents
+      setLoading(false);
+      return;
+    }
+
     const loadAgent = async () => {
       setLoading(true);
       setError(null);
@@ -116,7 +143,7 @@ export default function AgentViewer({
     };
 
     void loadAgent();
-  }, [agentName, agentScope, workingDir]);
+  }, [agentName, agentScope, workingDir, isNewAgent]);
 
   const getAgentColor = (colorName: string): string => {
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
@@ -139,6 +166,13 @@ export default function AgentViewer({
   };
 
   const handleCancelEdit = () => {
+    if (isNewAgent) {
+      // Close the tab when canceling new agent creation
+      if (onRefresh) {
+        onRefresh();
+      }
+      return;
+    }
     setIsEditing(false);
     setHasChanges(false);
   };
@@ -184,35 +218,46 @@ export default function AgentViewer({
   };
 
   const handleSave = async () => {
-    if (!agent) return;
+    if (!agent && !isNewAgent) return;
 
     setIsSaving(true);
 
     try {
+      const nameToUse = isNewAgent ? editName : agent!.name;
+      const scopeToUse = isNewAgent ? editScope : agentScope;
+
       await invoke("save_agent_content", {
-        name: agent.name,
+        name: nameToUse,
         content: editContent,
         model: editModel,
         color: editColor,
         description: editDescription,
-        scope: agentScope,
+        scope: scopeToUse,
         workingDir,
       });
 
-      // Refresh agent details
-      const updatedDetails = await invoke<AgentDetails>("get_agent_details", {
-        name: agentName,
-        workingDir,
-        scope: agentScope,
-      });
+      if (isNewAgent) {
+        // For new agents, just close and refresh the list
+        setIsEditing(false);
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        // Refresh agent details
+        const updatedDetails = await invoke<AgentDetails>("get_agent_details", {
+          name: agentName,
+          workingDir,
+          scope: agentScope,
+        });
 
-      setAgent(updatedDetails);
-      setIsEditing(false);
-      setHasChanges(false);
+        setAgent(updatedDetails);
+        setIsEditing(false);
+        setHasChanges(false);
 
-      // Notify parent to refresh agents list
-      if (onRefresh) {
-        onRefresh();
+        // Notify parent to refresh agents list
+        if (onRefresh) {
+          onRefresh();
+        }
       }
     } catch (error) {
       console.error("Failed to save agent:", error);
@@ -256,11 +301,11 @@ export default function AgentViewer({
     );
   }
 
-  if (error || !agent) {
+  if (error || (!agent && !isNewAgent)) {
     return (
       <div className="agent-viewer">
         <div className="agent-viewer-error">
-          <p>❌ {error || "Agent not found"}</p>
+          <p>{error || "Agent not found"}</p>
         </div>
       </div>
     );
@@ -268,7 +313,7 @@ export default function AgentViewer({
 
   return (
     <div className="agent-viewer">
-      {!isEditing ? (
+      {!isEditing && agent ? (
         <>
           {/* Header with avatar and metadata */}
           <div className="agent-viewer-header">
@@ -295,7 +340,7 @@ export default function AgentViewer({
               <div className="agent-viewer-meta">
                 <span className="agent-viewer-model">Model: {getModelDisplayName(agent.model)}</span>
                 <span className="agent-viewer-scope">
-                  {agentScope === 'global' ? '🌍 Global' : '📁 Project'}
+                  {agentScope === 'global' ? 'Global' : 'Project'}
                 </span>
               </div>
             </div>
@@ -337,10 +382,10 @@ export default function AgentViewer({
             <RevealInFinderButton path={agent.file_path} iconOnly />
           </div>
         </>
-      ) : (
+      ) : isEditing ? (
         <div className="agent-viewer-edit">
           <div className="agent-viewer-edit-header">
-            <h2>Edit Agent Documentation</h2>
+            <h2>{isNewAgent ? 'Create New Agent' : 'Edit Agent Documentation'}</h2>
             <div className="agent-viewer-edit-actions">
               <button
                 type="button"
@@ -354,16 +399,60 @@ export default function AgentViewer({
                 type="button"
                 className="agent-viewer-button agent-viewer-save"
                 onClick={handleSave}
-                disabled={isSaving || !hasChanges}
+                disabled={isSaving || (!hasChanges && !isNewAgent) || (isNewAgent && !editName.trim())}
               >
                 {icons.save}
-                <span>{isSaving ? "Saving..." : "Save"}</span>
+                <span>{isSaving ? "Saving..." : (isNewAgent ? "Create" : "Save")}</span>
               </button>
             </div>
           </div>
 
           {/* Edit Fields */}
           <div className="agent-viewer-edit-fields">
+            {isNewAgent && (
+              <>
+                <div className="agent-viewer-field">
+                  <label className="agent-viewer-label">Name:</label>
+                  <input
+                    type="text"
+                    className="agent-viewer-input"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    disabled={isSaving}
+                    placeholder="agent-name"
+                  />
+                </div>
+
+                <div className="agent-viewer-field">
+                  <label className="agent-viewer-label">Scope:</label>
+                  <div className="agent-viewer-radio-group">
+                    <label className="agent-viewer-radio-label">
+                      <input
+                        type="radio"
+                        name="scope"
+                        value="project"
+                        checked={editScope === 'project'}
+                        onChange={(e) => setEditScope(e.target.value as 'global' | 'project')}
+                        disabled={isSaving}
+                      />
+                      <span>Project</span>
+                    </label>
+                    <label className="agent-viewer-radio-label">
+                      <input
+                        type="radio"
+                        name="scope"
+                        value="global"
+                        checked={editScope === 'global'}
+                        onChange={(e) => setEditScope(e.target.value as 'global' | 'project')}
+                        disabled={isSaving}
+                      />
+                      <span>Global</span>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="agent-viewer-field">
               <label className="agent-viewer-label">Description:</label>
               <textarea
@@ -418,18 +507,23 @@ export default function AgentViewer({
             </div>
           </div>
 
-          {/* Code Editor */}
-          <div className="agent-viewer-editor">
-            <CodeEditorCodeMirror
-              content={editContent}
-              filename={`${agent.name}.md`}
-              onChange={handleContentChange}
-              language="markdown"
-              readOnly={false}
-            />
+          {/* Code Editor Section */}
+          <div className="agent-viewer-editor-section">
+            <div className="agent-viewer-editor-header">
+              <span className="agent-viewer-editor-label">Content (Markdown)</span>
+            </div>
+            <div className="agent-viewer-editor">
+              <CodeEditorCodeMirror
+                content={editContent}
+                filename={`${isNewAgent ? editName || 'new-agent' : agent?.name || 'agent'}.md`}
+                onChange={handleContentChange}
+                language="markdown"
+                readOnly={false}
+              />
+            </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

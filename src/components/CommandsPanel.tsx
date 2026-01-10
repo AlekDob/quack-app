@@ -2,26 +2,22 @@ import { useState } from 'react';
 import { useSlashCommands } from '../hooks/useSlashCommands';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import { CommandsList } from './CommandsList';
-import { CommandEditor } from './CommandEditor';
 
 interface CommandsPanelProps {
   basePath: string;
   onUseCommand: (command: SlashCommand) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
 }
 
-export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
+export function CommandsPanel({ basePath, onUseCommand, onSelectCommand }: CommandsPanelProps) {
   const {
     commands,
     loading,
     error,
-    createCommand,
-    updateCommand,
     deleteCommand,
     loadCommands
   } = useSlashCommands(basePath);
 
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingCommand, setEditingCommand] = useState<SlashCommand | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter commands based on search
@@ -31,13 +27,17 @@ export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
   );
 
   const handleNewCommand = () => {
-    setEditingCommand(undefined);
-    setEditorOpen(true);
+    // Open new command tab with default scope 'project'
+    if (onSelectCommand) {
+      onSelectCommand('', 'project', true);
+    }
   };
 
   const handleEditCommand = (command: SlashCommand) => {
-    setEditingCommand(command);
-    setEditorOpen(true);
+    // Open command in tab for editing
+    if (onSelectCommand) {
+      onSelectCommand(command.name, command.scope as 'global' | 'project');
+    }
   };
 
   const handleDeleteCommand = async (command: SlashCommand) => {
@@ -46,25 +46,10 @@ export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
     }
 
     try {
-      await deleteCommand(command.name);
+      await deleteCommand(command.name, command.scope);
     } catch (err) {
       console.error('Failed to delete command:', err);
       alert('Failed to delete command. Please try again.');
-    }
-  };
-
-  const handleSaveCommand = async (
-    name: string,
-    description: string,
-    content: string,
-    parameters: string[]
-  ) => {
-    if (editingCommand) {
-      // Update existing command
-      await updateCommand(name, description, content, parameters);
-    } else {
-      // Create new command
-      await createCommand(name, description, content, parameters);
     }
   };
 
@@ -132,14 +117,6 @@ export function CommandsPanel({ basePath, onUseCommand }: CommandsPanelProps) {
           />
         )}
       </div>
-
-      {/* Command Editor Modal */}
-      <CommandEditor
-        isOpen={editorOpen}
-        command={editingCommand}
-        onClose={() => setEditorOpen(false)}
-        onSave={handleSaveCommand}
-      />
     </div>
   );
 }

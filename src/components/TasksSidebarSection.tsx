@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, memo, type MouseEvent } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { isCustomAvatar, getCustomAvatarUrl } from '../utils/customAvatarStorage';
+import { useKanbanStore } from '../stores/kanbanStore';
 import type { KanbanTask, ChatMessage } from '../types';
 
 interface TasksSidebarSectionProps {
@@ -26,10 +27,12 @@ interface TaskItemProps {
   isSelected: boolean;
   statusColor: string;
   agentColor: string;
+  isWaitingForInput: boolean; // Green status = waiting for user input
   onClick: () => void;
+  onContextMenu: (event: MouseEvent) => void;
 }
 
-function TaskItem({ task, isSelected, statusColor, agentColor, onClick }: TaskItemProps) {
+const TaskItem = memo(function TaskItem({ task, isSelected, statusColor, agentColor, isWaitingForInput, onClick, onContextMenu }: TaskItemProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const avatarName = task.assignedAgent?.avatar;
 
@@ -78,13 +81,16 @@ function TaskItem({ task, isSelected, statusColor, agentColor, onClick }: TaskIt
     <div
       className="task-item"
       onClick={onClick}
+      onContextMenu={onContextMenu}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         padding: '6px 10px',
+        paddingRight: isWaitingForInput ? '20px' : '10px', // Extra space for quack indicator
         marginBottom: '4px',
         marginLeft: '8px',
+        marginRight: isWaitingForInput ? '8px' : '0', // Extra margin when showing quack
         background: isSelected ? `${agentColor}35` : `${agentColor}15`,
         border: isSelected
           ? `2px solid ${agentColor}`
@@ -95,6 +101,8 @@ function TaskItem({ task, isSelected, statusColor, agentColor, onClick }: TaskIt
         color: isSelected ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.85)',
         transition: 'all 0.2s ease',
         boxShadow: isSelected ? `0 0 8px ${agentColor}55` : 'none',
+        position: 'relative', // For absolute positioning of quack indicator
+        overflow: 'visible', // Allow quack to overflow
       }}
       onMouseEnter={(e) => {
         if (!isSelected) {
@@ -181,9 +189,33 @@ function TaskItem({ task, isSelected, statusColor, agentColor, onClick }: TaskIt
           flexShrink: 0,
         }}
       />
+
+      {/* Quack Quack Indicator - shows when task is waiting for input */}
+      {isWaitingForInput && (
+        <div
+          style={{
+            position: 'absolute',
+            right: '-12px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 100,
+            pointerEvents: 'none', // Allow clicks to pass through
+          }}
+        >
+          <span
+            style={{
+              fontSize: '16px',
+              animation: 'quackBounce 1s ease-in-out infinite',
+              display: 'block',
+            }}
+          >
+            💬
+          </span>
+        </div>
+      )}
     </div>
   );
-}
+});
 
 /**
  * Calculate status color based on task state
@@ -215,12 +247,83 @@ function getTaskStatusColor(
 }
 
 /**
+ * Task Context Menu Component
+ */
+interface TaskContextMenuProps {
+  position: { x: number; y: number };
+  task: KanbanTask;
+  onClose: () => void;
+  onMarkDone: () => void;
+}
+
+function TaskContextMenu({ position, task, onClose, onMarkDone }: TaskContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: globalThis.MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      className="context-menu"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+      }}
+    >
+      <button
+        type="button"
+        className="context-menu-item"
+        onClick={() => {
+          onMarkDone();
+          onClose();
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ marginRight: '8px', opacity: 0.7 }}
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span>Mark as Done</span>
+      </button>
+    </div>
+  );
+}
+
+/**
  * Tasks Sidebar Section
  *
  * Shows all active tasks (todo + in_progress) independently from agents.
  * Each task displays: mini avatar + title + status indicator.
  */
-export default function TasksSidebarSection({
+function TasksSidebarSection({
   tasks,
   activeTaskId,
   onOpenTaskTab,
@@ -229,18 +332,48 @@ export default function TasksSidebarSection({
   currentProjectPath,
 }: TasksSidebarSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    position: { x: number; y: number };
+    task: KanbanTask;
+  } | null>(null);
 
-  // Filter tasks: only active (not done)
+  const moveTask = useKanbanStore((state) => state.moveTask);
+
+  // Context menu handlers
+  const handleContextMenu = (event: MouseEvent, task: KanbanTask) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      position: { x: event.clientX, y: event.clientY },
+      task,
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleMarkDone = async (task: KanbanTask) => {
+    await moveTask(task.id, 'done');
+  };
+
+  // Filter and sort tasks: only active (not done), in_progress first
   // Show ALL active tasks regardless of project (users can see all their work)
   const activeTasks = useMemo(() => {
-    console.log('[TasksSidebarSection] All tasks:', tasks.length, 'currentProjectPath:', currentProjectPath);
     const filtered = tasks.filter(task => {
       // Only show todo + in_progress (not done)
       if (task.status === 'done') return false;
       return true; // Show all active tasks, regardless of project
     });
-    console.log('[TasksSidebarSection] Active tasks after filter:', filtered.length);
-    return filtered;
+
+    // Sort: in_progress tasks first, then todo
+    const sorted = [...filtered].sort((a, b) => {
+      if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
+      if (b.status === 'in_progress' && a.status !== 'in_progress') return 1;
+      return 0;
+    });
+
+    return sorted;
   }, [tasks, currentProjectPath]);
 
   // Don't render section if no active tasks
@@ -309,6 +442,8 @@ export default function TasksSidebarSection({
             const isLoading = chatLoadingMap?.get(task.id) || false;
             const statusColor = getTaskStatusColor(task, messages, isLoading);
             const agentColor = task.assignedAgent?.color || '#8b5cf6';
+            // Task is waiting for input when status is green (#22c55e)
+            const isWaitingForInput = statusColor === '#22c55e';
 
             return (
               <TaskItem
@@ -317,12 +452,90 @@ export default function TasksSidebarSection({
                 isSelected={isSelected}
                 statusColor={statusColor}
                 agentColor={agentColor}
+                isWaitingForInput={isWaitingForInput}
                 onClick={() => onOpenTaskTab(task)}
+                onContextMenu={(e) => handleContextMenu(e, task)}
               />
             );
           })}
         </div>
       )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <TaskContextMenu
+          position={contextMenu.position}
+          task={contextMenu.task}
+          onClose={closeContextMenu}
+          onMarkDone={() => handleMarkDone(contextMenu.task)}
+        />
+      )}
     </div>
   );
 }
+
+/**
+ * Custom comparison function for memo
+ * Only re-render when relevant props change
+ */
+function arePropsEqual(
+  prevProps: TasksSidebarSectionProps,
+  nextProps: TasksSidebarSectionProps
+): boolean {
+  // Check activeTaskId
+  if (prevProps.activeTaskId !== nextProps.activeTaskId) {
+    return false;
+  }
+
+  // Check currentProjectPath
+  if (prevProps.currentProjectPath !== nextProps.currentProjectPath) {
+    return false;
+  }
+
+  // Check tasks array (by reference first, then length and IDs)
+  if (prevProps.tasks === nextProps.tasks) {
+    // Same reference, check chatLoadingMap for active tasks only
+    const prevTaskIds = prevProps.tasks.map(t => t.id);
+    const prevLoading = prevTaskIds.map(id => prevProps.chatLoadingMap?.get(id) ?? false);
+    const nextLoading = prevTaskIds.map(id => nextProps.chatLoadingMap?.get(id) ?? false);
+
+    if (prevLoading.some((loading, i) => loading !== nextLoading[i])) {
+      return false;
+    }
+
+    return true; // No changes
+  }
+
+  // Different reference, check length and task IDs
+  if (prevProps.tasks.length !== nextProps.tasks.length) {
+    return false;
+  }
+
+  // Check if task IDs and statuses are the same
+  const prevTaskData = prevProps.tasks.map(t => ({ id: t.id, status: t.status, title: t.title }));
+  const nextTaskData = nextProps.tasks.map(t => ({ id: t.id, status: t.status, title: t.title }));
+
+  for (let i = 0; i < prevTaskData.length; i++) {
+    if (
+      prevTaskData[i].id !== nextTaskData[i].id ||
+      prevTaskData[i].status !== nextTaskData[i].status ||
+      prevTaskData[i].title !== nextTaskData[i].title
+    ) {
+      return false;
+    }
+  }
+
+  // Check chatLoadingMap for relevant task IDs
+  const taskIds = prevProps.tasks.map(t => t.id);
+  const prevLoading = taskIds.map(id => prevProps.chatLoadingMap?.get(id) ?? false);
+  const nextLoading = taskIds.map(id => nextProps.chatLoadingMap?.get(id) ?? false);
+
+  if (prevLoading.some((loading, i) => loading !== nextLoading[i])) {
+    return false;
+  }
+
+  // All checks passed - props are equal
+  return true;
+}
+
+export default memo(TasksSidebarSection, arePropsEqual);

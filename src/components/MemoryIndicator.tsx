@@ -13,11 +13,15 @@
 import React, { useState } from 'react';
 import './MemoryIndicator.css';
 
+export type MemoryScope = 'project' | 'global' | 'other';
+
 export interface MemoryInfo {
   name: string;
   type: string;
   projectId?: string;
   observations: string[];
+  /** Scope of the memory: 'project' (current project), 'global', or 'other' */
+  scope?: MemoryScope;
 }
 
 export interface MemoryIndicatorProps {
@@ -29,6 +33,11 @@ export interface MemoryIndicatorProps {
   /** Search context explaining why this search was performed */
   searchContext?: string;
   durationMs?: number;
+  /** Scope counts from the search result */
+  scopeCounts?: {
+    project: number;
+    global: number;
+  };
 }
 
 export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
@@ -37,6 +46,7 @@ export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
   query,
   searchContext,
   durationMs,
+  scopeCounts,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -46,18 +56,38 @@ export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
 
   const toggleExpanded = () => setIsExpanded(!isExpanded);
 
+  // Build scope summary for badge
+  const hasScopeCounts = scopeCounts && (scopeCounts.project > 0 || scopeCounts.global > 0);
+  const scopeSummary = hasScopeCounts
+    ? `${scopeCounts.project} project, ${scopeCounts.global} global`
+    : null;
+
   return (
     <div className="memory-indicator">
       <button
         className="memory-indicator-badge"
         onClick={toggleExpanded}
-        title={`${memories.length} memories from Second Brain`}
+        title={`${memories.length} memories from Second Brain${scopeSummary ? ` (${scopeSummary})` : ''}`}
       >
         <span className="memory-indicator-icon">🧠</span>
         <span className="memory-indicator-count">{memories.length}</span>
         <span className="memory-indicator-label">
           {memories.length === 1 ? 'memory' : 'memories'}
         </span>
+        {hasScopeCounts && (
+          <span className="memory-indicator-scope-counts">
+            {scopeCounts.project > 0 && (
+              <span className="memory-indicator-scope-badge scope-project">
+                {scopeCounts.project}P
+              </span>
+            )}
+            {scopeCounts.global > 0 && (
+              <span className="memory-indicator-scope-badge scope-global">
+                {scopeCounts.global}G
+              </span>
+            )}
+          </span>
+        )}
         <span className={`memory-indicator-chevron ${isExpanded ? 'expanded' : ''}`}>
           ▾
         </span>
@@ -93,9 +123,16 @@ export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
               <div key={idx} className="memory-indicator-item">
                 <div className="memory-indicator-item-header">
                   <span className="memory-indicator-item-name">{memory.name}</span>
-                  <span className={`memory-indicator-item-type type-${memory.type}`}>
-                    {memory.type}
-                  </span>
+                  <div className="memory-indicator-item-badges">
+                    {memory.scope && (
+                      <span className={`memory-indicator-item-scope scope-${memory.scope}`}>
+                        {memory.scope === 'project' ? 'Project' : 'Global'}
+                      </span>
+                    )}
+                    <span className={`memory-indicator-item-type type-${memory.type}`}>
+                      {memory.type}
+                    </span>
+                  </div>
                 </div>
                 {memory.observations.length > 0 && (
                   <ul className="memory-indicator-observations">

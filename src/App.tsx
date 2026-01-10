@@ -55,6 +55,8 @@ import { useTerminalWindowManager } from "./hooks/useTerminalWindowManager";
 import { TerminalIcon } from "./components/TerminalIcon";
 import AgentViewer from "./components/AgentViewer";
 import SkillViewer from "./components/SkillViewer";
+import CommandViewer from "./components/CommandViewer";
+import RuleViewer from "./components/RuleViewer";
 import BrowserManager from "./components/BrowserManager";
 import KanbanToast from "./components/KanbanToast";
 import { useDocsTab } from "./hooks/useDocsTab";
@@ -241,6 +243,19 @@ const checkStorageVersion = async (): Promise<boolean> => {
 // ============================================
 // NO migration needed! Terminals are independent entities, grouped only by cwd in the UI
 
+// ============================================
+// Store Cache
+// ============================================
+// Cache Store instances to avoid repeated disk reads
+const storeCache = new Map<string, Awaited<ReturnType<typeof Store.load>>>();
+
+async function getCachedStore(filename: string) {
+  if (!storeCache.has(filename)) {
+    storeCache.set(filename, await Store.load(filename));
+  }
+  return storeCache.get(filename)!;
+}
+
 function AppContent() {
   // Load assets INSIDE the component, not at module level
   const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
@@ -345,9 +360,9 @@ function AppContent() {
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // 🦆 Active Task per Agent: When a task is selected, its chat is shown in the agent's main Chat tab
-  // Key: agentId, Value: taskId (or null if no task is active)
-  const [activeTaskPerAgent, setActiveTaskPerAgent] = useState<Map<string, string>>(new Map());
+  // 🦆 Active Task ID: Tasks are now first-class citizens, completely independent from agents
+  // When a task is selected, it opens in its own tab - NOT tied to any agent
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   // 🗣️ AskUserQuestion: Track pending requests from canUseTool callback
   // Maps requestId -> { agentId, questions } for responding via stdin
@@ -577,58 +592,11 @@ function AppContent() {
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
 
-  // Derived state: which task is currently active for the current agent (for sidebar highlighting)
-  // Tasks are now shown in the agent's Chat tab, not in separate tabs
-  const activeTaskId = activeId ? (activeTaskPerAgent.get(activeId) || null) : null;
-
-  // 🦆 Display tabs: when a task is active, show the task title in the first tab instead of agent name
-  // Also filters out any old task tabs (type: 'task') that may be persisted from before the refactor
+  // 🦆 Display tabs: Task tabs are now real tabs in the tabs array (type: 'task')
+  // No need to transform 'chat' tab anymore - tasks have their own dedicated tabs
   const displayTabs = useMemo(() => {
-    // 🦆 CLEANUP: Filter out any old task tabs that were created before the refactor
-    // Tasks are now shown in the agent's Chat tab, not as separate tabs
-    const cleanedTabs = tabs.filter(tab => tab.type !== 'task');
-
-    // If no active task, just return cleaned tabs
-    if (!activeTaskId) return cleanedTabs;
-
-    // Find the active task to get its title
-    const activeTask = kanbanTasks.find(t => t.id === activeTaskId);
-    if (!activeTask) return cleanedTabs;
-
-    // Replace the 'chat' tab with task info (changes type to 'task' to get task icon)
-    return cleanedTabs.map(tab => {
-      if (tab.id === 'chat') {
-        const taskLabel = activeTask.title.length > 25
-          ? activeTask.title.substring(0, 25) + '...'
-          : activeTask.title;
-        return {
-          ...tab,
-          type: 'task' as const, // Change type so TabBar shows task icon
-          label: taskLabel,
-          color: activeTask.assignedAgent?.color,
-          taskId: activeTaskId,
-        };
-      }
-      return tab;
-    });
-  }, [tabs, activeTaskId, kanbanTasks]);
-
-  // 🦆 CLEANUP EFFECT: Remove any old task tabs from state permanently
-  // This runs once when the component mounts to clean up any persisted task tabs
-  const hasCleanedOldTaskTabs = useRef(false);
-  useEffect(() => {
-    if (hasCleanedOldTaskTabs.current) return;
-    hasCleanedOldTaskTabs.current = true;
-
-    setTabs(prev => {
-      const taskTabs = prev.filter(tab => tab.type === 'task');
-      if (taskTabs.length > 0) {
-        console.log(`[Quack] Cleaning up ${taskTabs.length} old task tabs from previous refactor`);
-        return prev.filter(tab => tab.type !== 'task');
-      }
-      return prev;
-    });
-  }, []);
+    return tabs;
+  }, [tabs]);
 
   // Track last active tab per terminal/agent
   const lastActiveTabPerTerminal = useRef<Map<string, string>>(new Map());
@@ -4661,6 +4629,53 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable, tabs]);
 
+  // Handler for creating a new agent via tab
+  const handleCreateNewAgent = useCallback((scope: 'global' | 'project' = 'project') => {
+    const agentTabId = `agent-new-${Date.now()}`;
+
+    const newTab: Tab = {
+      id: agentTabId,
+      label: 'New Agent',
+      type: 'agent',
+      closable: true,
+      agentName: '',
+      agentScope: scope,
+      isNewAgent: true,
+    };
+
+    setTabs(prevTabs => [...prevTabs, newTab]);
+    setActiveTabId(agentTabId);
+  }, []);
+
+  // Handler for selecting or creating a droid via Claude Assets panel
+  const handleSelectDroid = useCallback((agentName: string, agentScope: 'global' | 'project', isNew = false) => {
+    if (isNew) {
+      handleCreateNewAgent(agentScope);
+      return;
+    }
+
+    const agentTabId = `agent-${agentName}-${agentScope}`;
+
+    // Check if tab already exists
+    const existingTab = tabs.find(t => t.id === agentTabId);
+
+    if (existingTab) {
+      setActiveTabId(agentTabId);
+    } else {
+      const newTab: Tab = {
+        id: agentTabId,
+        label: agentName.replace(/-/g, ' '),
+        type: 'agent',
+        closable: true,
+        agentName,
+        agentScope,
+      };
+
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId(agentTabId);
+    }
+  }, [tabs, handleCreateNewAgent]);
+
   const handleUseAgent = useCallback((agentInfo: AgentInfo) => {
     // Set the agent as active for the chat tab
     setActiveAgent(agentInfo);
@@ -4673,6 +4688,54 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       duration: 2000,
     });
   }, []);
+
+  // Command tab handler
+  const handleSelectCommand = useCallback((commandName: string, commandScope: 'global' | 'project', isNew = false) => {
+    const commandTabId = isNew ? `command-new-${Date.now()}` : `command-${commandName}-${commandScope}`;
+
+    // Check if tab already exists
+    const existingTab = tabs.find(t => t.id === commandTabId);
+
+    if (existingTab) {
+      setActiveTabId(commandTabId);
+    } else {
+      const newTab: Tab = {
+        id: commandTabId,
+        label: isNew ? 'New Command' : `/${commandName}`,
+        type: 'command',
+        closable: true,
+        commandName,
+        commandScope,
+        isNewCommand: isNew,
+      };
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId(commandTabId);
+    }
+  }, [tabs]);
+
+  // Rule tab handler
+  const handleSelectRule = useCallback((ruleName: string, ruleScope: 'global' | 'project', isNew = false) => {
+    const ruleTabId = isNew ? `rule-new-${Date.now()}` : `rule-${ruleName}-${ruleScope}`;
+
+    // Check if tab already exists
+    const existingTab = tabs.find(t => t.id === ruleTabId);
+
+    if (existingTab) {
+      setActiveTabId(ruleTabId);
+    } else {
+      const newTab: Tab = {
+        id: ruleTabId,
+        label: isNew ? 'New Rule' : ruleName,
+        type: 'rule',
+        closable: true,
+        ruleName,
+        ruleScope,
+        isNewRule: isNew,
+      };
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId(ruleTabId);
+    }
+  }, [tabs]);
 
   // Skills handlers
   const loadSkills = useCallback(async () => {
@@ -6154,19 +6217,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Don't add newId - let it be created fresh on first interaction
     );
 
-    // 7.5. 🦆 FIX: Update activeTaskPerAgent key from oldId to newId
-    // This preserves the active task when agent is reset (task chat is independent)
-    setActiveTaskPerAgent((prev) => {
-      const activeTaskForOldAgent = prev.get(oldId);
-      if (activeTaskForOldAgent) {
-        const newMap = new Map(prev);
-        newMap.delete(oldId);
-        newMap.set(newId, activeTaskForOldAgent);
-        console.log(`🦆 [Reset Agent] Preserved active task "${activeTaskForOldAgent}" under new agent ID`);
-        return newMap;
-      }
-      return prev;
-    });
+    // 7.5. Tasks are now independent from agents - no need to update activeTaskPerAgent
+    // (activeTaskId is now a direct state, not tied to any agent)
 
     // 8. Update Kanban tasks that reference the old agent ID
     // This prevents "Agent terminal not found" errors when opening tasks after reset
@@ -6780,13 +6832,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       clearTerminalAttention(id);
       clearIdleTimer(id);
 
-      // 🦆 Clear any active task for this agent when selecting from sidebar
-      // This returns to the agent's regular chat (not task chat)
-      setActiveTaskPerAgent(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(id);
-        return newMap;
-      });
+      // 🦆 Clear activeTaskId when selecting agent from sidebar
+      // This ensures user sees the agent's chat, not a task
+      // Tasks are now independent - this just ensures proper tab focus
+      setActiveTaskId(null);
 
       // Always open the chat tab when selecting a terminal from sidebar
       // This ensures consistent behavior - first tab is always the agent chat
@@ -7559,11 +7608,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Open task in agent's main Chat tab (no separate tab created)
   // This makes the task's chat appear in the agent's Chat tab, like an independent conversation
-  // 🦆 FIX: Load task messages BEFORE updating activeTaskPerAgent to prevent race condition
-  // Bug: When clicking rapidly between tasks, chatSessions could show stale/wrong data
-  // 🦆 FIX: Save CURRENT task messages before switching to preserve streaming responses
+  // 🦆 PERFORMANCE: Optimized with parallel operations and immediate UI updates
+  // - UI updates happen FIRST (optimistic update)
+  // - Independent operations run in parallel (Promise.all)
+  // - Store cache prevents repeated disk reads
   const openTaskTab = useCallback(async (task: KanbanTask) => {
-    // Task must have an assigned agent
+    // Task must have an assigned agent (needed for running the agent)
     if (!task.assignedAgent?.id) {
       console.warn('[Quack] Cannot open task without assigned agent:', task.id);
       return;
@@ -7571,21 +7621,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const agentId = task.assignedAgent.id;
     let terminal = terminals.find(t => t.id === agentId);
-
-    // 🦆 FIX: Save current task's messages BEFORE switching to preserve any streaming data
-    // This prevents message loss when switching tasks mid-response
-    const currentActiveTaskId = activeId ? activeTaskPerAgent.get(activeId) : null;
-    if (currentActiveTaskId && currentActiveTaskId !== task.id) {
-      const currentMessages = chatSessions.get(currentActiveTaskId);
-      if (currentMessages && currentMessages.length > 0) {
-        console.log(`[openTaskTab] 💾 Saving ${currentMessages.length} messages for current task ${currentActiveTaskId} before switching...`);
-        try {
-          await saveKanbanChatSession(currentActiveTaskId, currentMessages);
-        } catch (err) {
-          console.warn(`[openTaskTab] Failed to save current task messages:`, err);
-        }
-      }
-    }
 
     // Fallback: search by agent name if UUID not found (handles stale references after agent reset)
     if (!terminal && task.assignedAgent?.name) {
@@ -7599,111 +7634,153 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     }
 
-    if (terminal) {
-      // Use the terminal's actual ID (may differ from agentId if fallback was used)
-      const actualAgentId = terminal.id;
+    if (!terminal) {
+      console.warn(`[Quack] Agent terminal not found for task: ${task.assignedAgent.id}`);
+      return;
+    }
 
-      // 1. Switch to the agent
-      setActiveId(actualAgentId);
-      clearTerminalAttention(actualAgentId);
-      clearIdleTimer(actualAgentId);
+    const projectPath = task.projectPath || terminal.cwd;
+    const taskTabId = `task-${task.id}`;
 
-      // 2. Load the task's project directory (use task.projectPath, not terminal.cwd)
-      const projectPath = task.projectPath || terminal.cwd;
-      await loadDirectory(projectPath);
+    // ========================================
+    // STEP 1: CREATE/FOCUS TASK TAB (Optimistic UI)
+    // ========================================
+    // Tasks are now FIRST-CLASS CITIZENS with their own dedicated tabs
+    // DO NOT activate the agent - task is independent!
 
-      // 🦆 FIX RACE CONDITION: Load task messages BEFORE updating activeTaskPerAgent
-      // This ensures chatSessions has the correct data when React re-renders ChatView
-      // Previously, activeTaskPerAgent was updated first, causing ChatView to see stale data
-      // 🦆 FIX MESSAGE LOSS: Don't overwrite in-memory messages with disk if they're more recent
-      // In-memory messages may include streaming responses not yet saved to disk
-      try {
-        const store = await Store.load('quack-chats.json');
-        const savedChat = await store.get<{
-          messages: ChatMessage[];
-          tokens?: { inputTokens: number; outputTokens: number; cacheCreationTokens?: number; cacheReadTokens?: number; totalCost?: number };
-          sessionId?: string;
-          timestamp?: number;
-        }>(`chat-${task.id}`);
+    // Check if task tab already exists
+    const existingTaskTab = tabs.find(t => t.id === taskTabId);
 
-        // Check if we already have messages in-memory for this task
-        const existingMessages = chatSessions.get(task.id);
-        const hasInMemoryMessages = existingMessages && existingMessages.length > 0;
+    if (!existingTaskTab) {
+      // Create new task tab
+      const taskLabel = task.title.length > 25
+        ? task.title.substring(0, 25) + '...'
+        : task.title;
 
-        if (savedChat?.messages) {
-          // If we have in-memory messages, they might be more recent (streaming in progress)
-          // Only load from disk if we have NO in-memory messages OR disk has more messages
-          if (!hasInMemoryMessages || savedChat.messages.length > existingMessages.length) {
-            setChatSessions(prev => {
-              const newSessions = new Map(prev);
-              newSessions.set(task.id, savedChat.messages);
-              return newSessions;
-            });
-            console.log(`[Quack] Loaded ${savedChat.messages.length} messages from disk for task "${task.title}"`);
-          } else {
-            console.log(`[Quack] Keeping ${existingMessages.length} in-memory messages for task "${task.title}" (more recent than disk)`);
-          }
+      const newTaskTab: Tab = {
+        id: taskTabId,
+        label: taskLabel,
+        type: 'task',
+        closable: true,
+        color: task.assignedAgent?.color,
+        taskId: task.id,
+      };
 
-          // Always restore tokens if available
-          if (savedChat.tokens) {
-            setChatTokensMap(prev => {
-              const newMap = new Map(prev);
-              newMap.set(task.id, {
-                inputTokens: savedChat.tokens!.inputTokens || 0,
-                outputTokens: savedChat.tokens!.outputTokens || 0,
-                cacheCreationTokens: savedChat.tokens!.cacheCreationTokens || 0,
-                cacheReadTokens: savedChat.tokens!.cacheReadTokens || 0,
-                totalCost: savedChat.tokens!.totalCost || 0,
-              });
-              return newMap;
-            });
-          }
-        } else {
-          // Task has no messages on disk - only initialize if also no in-memory messages
-          if (!hasInMemoryMessages) {
-            setChatSessions(prev => {
-              const newSessions = new Map(prev);
-              newSessions.set(task.id, []);
-              return newSessions;
-            });
-            console.log(`[Quack] Task "${task.title}" has no messages, initialized empty array`);
-          } else {
-            console.log(`[Quack] Task "${task.title}" has ${existingMessages.length} in-memory messages (not on disk yet)`);
+      setTabs(prev => [...prev, newTaskTab]);
+      console.log(`[Quack] Created new task tab for "${task.title}"`);
+    }
+
+    // Activate task tab and set activeTaskId
+    setActiveTabId(taskTabId);
+    setActiveTaskId(task.id);
+
+    // ========================================
+    // STEP 2: PARALLEL OPERATIONS
+    // ========================================
+    // Run independent operations in parallel to reduce total wait time
+    const previousTaskId = activeTaskId;
+
+    const [, chatLoadResult] = await Promise.all([
+      // Operation 1: Load project directory (file system I/O)
+      loadDirectory(projectPath).catch(err => {
+        console.warn(`[openTaskTab] Failed to load directory:`, err);
+        return null;
+      }),
+
+      // Operation 2: Load chat messages from disk (Store I/O)
+      (async () => {
+        try {
+          const store = await getCachedStore('quack-chats.json');
+          const savedChat = await store.get<{
+            messages: ChatMessage[];
+            tokens?: { inputTokens: number; outputTokens: number; cacheCreationTokens?: number; cacheReadTokens?: number; totalCost?: number };
+            sessionId?: string;
+            timestamp?: number;
+          }>(`chat-${task.id}`);
+
+          return savedChat;
+        } catch (error) {
+          console.warn(`[openTaskTab] Failed to load messages for task ${task.id}:`, error);
+          return null;
+        }
+      })(),
+
+      // Operation 3: Save previous task messages (Store I/O)
+      // This runs in parallel with loading new task data
+      (async () => {
+        if (previousTaskId && previousTaskId !== task.id) {
+          const currentMessages = chatSessions.get(previousTaskId);
+          if (currentMessages && currentMessages.length > 0) {
+            console.log(`[openTaskTab] Saving ${currentMessages.length} messages for previous task ${previousTaskId} before switching...`);
+            try {
+              await saveKanbanChatSession(previousTaskId, currentMessages);
+            } catch (err) {
+              console.warn(`[openTaskTab] Failed to save previous task messages:`, err);
+            }
           }
         }
-      } catch (error) {
-        console.warn(`[Quack] Failed to load messages for task ${task.id}:`, error);
-        // On error, only initialize if no in-memory messages exist
+      })(),
+    ]);
+
+    // ========================================
+    // STEP 3: PROCESS LOADED DATA
+    // ========================================
+    // Update chat sessions with loaded messages
+    const existingMessages = chatSessions.get(task.id);
+    const hasInMemoryMessages = existingMessages && existingMessages.length > 0;
+
+    if (chatLoadResult?.messages) {
+      // If we have in-memory messages, they might be more recent (streaming in progress)
+      // Only load from disk if we have NO in-memory messages OR disk has more messages
+      if (!hasInMemoryMessages || chatLoadResult.messages.length > existingMessages.length) {
         setChatSessions(prev => {
           const newSessions = new Map(prev);
-          if (!newSessions.has(task.id)) {
-            newSessions.set(task.id, []);
-          }
+          newSessions.set(task.id, chatLoadResult.messages);
           return newSessions;
         });
+        console.log(`[Quack] Loaded ${chatLoadResult.messages.length} messages from disk for task "${task.title}"`);
+      } else {
+        console.log(`[Quack] Keeping ${existingMessages.length} in-memory messages for task "${task.title}" (more recent than disk)`);
       }
 
-      // 🦆 FIX: Pre-create listener for task BEFORE setting it as active
-      // This ensures the listener is ready to receive events when user sends messages
-      // Previously, listener was only created on first message send, causing potential event loss
-      await ensureListenerReady(task.id);
-      console.log(`[Quack] Listener pre-created for task "${task.title}" (${task.id})`);
-
-      // 3. Set this task as active for the agent (NOW safe - messages are loaded)
-      setActiveTaskPerAgent(prev => {
-        const newMap = new Map(prev);
-        newMap.set(actualAgentId, task.id);
-        return newMap;
-      });
-
-      // 4. Switch to 'chat' tab to show the task's conversation
-      setActiveTabId('chat');
-
-      console.log(`[Quack] Task "${task.title}" opened in agent ${terminal.label}'s Chat tab`);
+      // Always restore tokens if available
+      if (chatLoadResult.tokens) {
+        setChatTokensMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(task.id, {
+            inputTokens: chatLoadResult.tokens!.inputTokens || 0,
+            outputTokens: chatLoadResult.tokens!.outputTokens || 0,
+            cacheCreationTokens: chatLoadResult.tokens!.cacheCreationTokens || 0,
+            cacheReadTokens: chatLoadResult.tokens!.cacheReadTokens || 0,
+            totalCost: chatLoadResult.tokens!.totalCost || 0,
+          });
+          return newMap;
+        });
+      }
     } else {
-      console.warn(`[Quack] Agent terminal not found for task: ${task.assignedAgent.id}`);
+      // Task has no messages on disk - only initialize if also no in-memory messages
+      if (!hasInMemoryMessages) {
+        setChatSessions(prev => {
+          const newSessions = new Map(prev);
+          newSessions.set(task.id, []);
+          return newSessions;
+        });
+        console.log(`[Quack] Task "${task.title}" has no messages, initialized empty array`);
+      } else {
+        console.log(`[Quack] Task "${task.title}" has ${existingMessages.length} in-memory messages (not on disk yet)`);
+      }
     }
-  }, [terminals, clearTerminalAttention, clearIdleTimer, loadDirectory, activeId, activeTaskPerAgent, chatSessions, saveKanbanChatSession]);
+
+    console.log(`[Quack] Task "${task.title}" opened in dedicated task tab (independent from agent)`);
+
+    // Pre-create listener AFTER state updates (non-blocking for UI)
+    // This can be async because the UI is already showing the correct messages
+    ensureListenerReady(task.id).then(() => {
+      console.log(`[Quack] Listener pre-created for task "${task.title}" (${task.id})`);
+    }).catch(err => {
+      console.warn(`[Quack] Failed to pre-create listener for task "${task.title}":`, err);
+    });
+  }, [terminals, tabs, loadDirectory, activeTaskId, chatSessions, saveKanbanChatSession]);
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
@@ -7754,6 +7831,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const handleTabClose = useCallback(async (tabId: string) => {
     // Don't close the chat tab
     if (tabId === 'chat') return;
+
+    // Check if this is a task tab - reset activeTaskId when closing
+    if (tabId.startsWith('task-')) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab?.taskId === activeTaskId) {
+        setActiveTaskId(null);
+      }
+    }
 
     // Check if this is an agent-terminal tab
     const tab = tabs.find(t => t.id === tabId);
@@ -7817,7 +7902,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return updated;
       });
     }
-  }, [activeTabId, activeId, tabs, handleTabClick]);
+  }, [activeTabId, activeId, tabs, activeTaskId, handleTabClick]);
 
   // Handle tab reorder via drag and drop
   const handleTabReorder = useCallback((reorderedTabs: Tab[]) => {
@@ -9635,41 +9720,104 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Chat View - shown when chat tab is active and Kanban is not active */}
-              {/* 🦆 If activeTaskId exists, show task's chat; otherwise show agent's chat */}
-              {activeTabId === 'chat' && !isKanbanTabActive && (() => {
-                // Determine if we're showing a task's chat or agent's chat
-                const activeTask = activeTaskId ? kanbanTasks.find(t => t.id === activeTaskId) : null;
-                const isTaskChat = !!activeTask;
+              {/* Agent's main chat - only shown when activeTabId is 'chat' (not task tabs) */}
+              {activeTabId === 'chat' && !isKanbanTabActive && (
+                <ChatView
+                  key={activeId ?? 'no-agent'}
+                  messages={currentAgentMessages}
+                  isLoading={currentAgentLoading}
+                  onSendMessage={sendMessageForAgent}
+                  activeAgent={activeAgent}
+                  onClearAgent={handleClearAgent}
+                  agents={agents}
+                  onSelectAgent={handleUseAgent}
+                  onFilePathClick={handleFilePathClick}
+                  onSessionIdClick={handleSessionIdClick}
+                  onDiffClick={handleDiffClick}
+                  onEditsChange={handleEditsChange}
+                  pendingAgentMention={pendingAgentMention}
+                  onMentionInserted={() => setPendingAgentMention(null)}
+                  pendingFileMention={pendingFileMention}
+                  onFileMentionInserted={() => setPendingFileMention(null)}
+                  pendingSlashCommand={pendingSlashCommand}
+                  onCommandInserted={() => setPendingSlashCommand(null)}
+                  basePath={explorerRoot ?? explorerPath}
+                  inputDraft={currentSettings.inputDraft}
+                  onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
+                  model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                  onModelChange={(model) => updateAgentSettings({ model })}
+                  thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+                  onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
+                  permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                  onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
+                  effort={currentSettings.effort || 'medium'}
+                  onEffortChange={(effort) => updateAgentSettings({ effort })}
+                  onAbortStream={abortStreamForAgent}
+                  lastPrompt={getLastPromptForAgent() || undefined}
+                  onClearConversation={clearCurrentAgentConversation}
+                  onCompactConversation={compactCurrentAgentConversation}
+                  onOpenSessionInTerminal={openSessionInTerminal}
+                  sessionTokens={currentAgentTokens}
+                  openaiApiKey={openaiApiKey ?? undefined}
+                  onOpenPromptEngineer={handleOpenPromptEngineer}
+                  agentName={activeTerminal?.label || 'Jack'}
+                  agentAvatar={activeTerminal?.avatar}
+                  projectName={projectName}
+                  gitBranch={gitBranch}
+                  workingOn={activeTerminal?.workingOn}
+                  onWorkingOnChange={(value) => {
+                    if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
+                      handleUpdateWorkingOn(activeTerminal.id, value);
+                    }
+                  }}
+                  selectedRules={activeTerminal?.personality?.selectedRules}
+                  onEditRules={activeTerminal ? () => {
+                    setEditingTerminal(activeTerminal);
+                    setShowNewTerminalModal(true);
+                  } : undefined}
+                  onOpenKanban={handleOpenKanbanTab}
+                  hideKanbanTasksBar={false}
+                  onUserQuestionAnswer={answerUserQuestionForAgent}
+                  pendingQuestionIds={pendingQuestionIdsMap.get(activeId ?? '') || new Set()}
+                  answeredQuestions={answeredQuestionsMap.get(activeId ?? '') || new Map()}
+                  currentSessionId={activeId ? chatSessionIds.get(activeId) : undefined}
+                />
+              )}
 
-                // 🦆 FIX: Use memoized task data instead of inline calculation
-                // This ensures React properly tracks Map changes and triggers re-renders
+              {/* Task Chat View - shown when a task tab is active */}
+              {/* Tasks are FIRST-CLASS CITIZENS with their own dedicated tabs */}
+              {activeTabId.startsWith('task-') && !isKanbanTabActive && (() => {
+                // Get task from the tab's taskId
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                const taskId = activeTab?.taskId;
+                const activeTask = taskId ? kanbanTasks.find(t => t.id === taskId) : null;
+
+                if (!activeTask) {
+                  return (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)' }}>
+                      Task not found
+                    </div>
+                  );
+                }
+
+                const taskMessages = chatSessions.get(taskId!) ?? [];
+                const taskLoading = chatLoadingMap.get(taskId!) ?? false;
+                const taskTokens = chatTokensMap.get(taskId!);
 
                 return (
                   <ChatView
-                    key={isTaskChat ? `task-${activeTaskId}` : (activeId ?? 'no-agent')}
-                    messages={isTaskChat ? activeTaskMessages : currentAgentMessages}
-                    isLoading={isTaskChat ? activeTaskLoading : currentAgentLoading}
-                    onSendMessage={isTaskChat
-                      ? (content, opts) => sendMessageForTargetAgent(activeTaskId!, content, {
-                          ...opts,
-                          workingDirectory: activeTask?.projectPath || opts?.workingDirectory || '/',
-                        })
-                      : sendMessageForAgent
-                    }
+                    key={`task-${taskId}`}
+                    messages={taskMessages}
+                    isLoading={taskLoading}
+                    onSendMessage={(content, opts) => sendMessageForTargetAgent(taskId!, content, {
+                      ...opts,
+                      workingDirectory: activeTask.projectPath || opts?.workingDirectory || '/',
+                    })}
                     activeAgent={activeAgent}
-                    onClearAgent={isTaskChat
-                      ? () => {
-                          // Clear task selection, go back to agent's regular chat
-                          if (activeId) {
-                            setActiveTaskPerAgent(prev => {
-                              const newMap = new Map(prev);
-                              newMap.delete(activeId);
-                              return newMap;
-                            });
-                          }
-                        }
-                      : handleClearAgent
-                    }
+                    onClearAgent={() => {
+                      // Close the task tab when clearing
+                      handleTabClose(activeTabId);
+                    }}
                     agents={agents}
                     onSelectAgent={handleUseAgent}
                     onFilePathClick={handleFilePathClick}
@@ -9682,25 +9830,14 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
-                    basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
-                    // Agent Chat Settings - persistent per-agent state
-                    // For task chat: use task-specific input draft (isolated per task ID)
-                    // For agent chat: use agent-specific input draft
-                    inputDraft={isTaskChat
-                      ? (taskInputDrafts.get(activeTaskId!) || (activeTaskMessages.length === 0 ? (activeTask?.prompt || '') : ''))
-                      : currentSettings.inputDraft}
+                    basePath={activeTask.projectPath || explorerRoot || explorerPath}
+                    inputDraft={taskInputDrafts.get(taskId!) || (taskMessages.length === 0 ? (activeTask.prompt || '') : '')}
                     onInputDraftChange={(draft) => {
-                      if (isTaskChat && activeTaskId) {
-                        // Store draft per task ID to prevent bleeding between tasks
-                        setTaskInputDrafts(prev => {
-                          const newMap = new Map(prev);
-                          newMap.set(activeTaskId, draft);
-                          return newMap;
-                        });
-                      } else {
-                        // Store draft per agent ID for regular agent chat
-                        updateAgentSettings({ inputDraft: draft });
-                      }
+                      setTaskInputDrafts(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(taskId!, draft);
+                        return newMap;
+                      });
                     }}
                     model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
                     onModelChange={(model) => updateAgentSettings({ model })}
@@ -9710,65 +9847,28 @@ You have access to all Bash tools to execute git commands like:
                     onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
                     effort={currentSettings.effort || 'medium'}
                     onEffortChange={(effort) => updateAgentSettings({ effort })}
-                    // Streaming control
-                    onAbortStream={isTaskChat
-                      ? () => abortStreamForTargetAgent(activeTaskId!)
-                      : abortStreamForAgent
-                    }
-                    lastPrompt={isTaskChat
-                      ? (activeTask?.prompt || getLastPromptForTargetAgent(activeTaskId!) || undefined)
-                      : (getLastPromptForAgent() || undefined)
-                    }
-                    // Conversation management
-                    onClearConversation={isTaskChat
-                      ? () => clearConversationForTargetAgent(activeTaskId!)
-                      : clearCurrentAgentConversation
-                    }
-                    onCompactConversation={isTaskChat
-                      ? () => compactConversationForTargetAgent(activeTaskId!)
-                      : compactCurrentAgentConversation
-                    }
-                    onOpenSessionInTerminal={isTaskChat
-                      ? () => openKanbanSessionInTerminal(activeTaskId!)
-                      : openSessionInTerminal
-                    }
-                    // Token usage tracking
-                    sessionTokens={isTaskChat ? activeTaskTokens : currentAgentTokens}
-                    // OpenAI API key for Whisper
+                    onAbortStream={() => abortStreamForTargetAgent(taskId!)}
+                    lastPrompt={activeTask.prompt || getLastPromptForTargetAgent(taskId!) || undefined}
+                    onClearConversation={() => clearConversationForTargetAgent(taskId!)}
+                    onCompactConversation={() => compactConversationForTargetAgent(taskId!)}
+                    onOpenSessionInTerminal={() => openKanbanSessionInTerminal(taskId!)}
+                    sessionTokens={taskTokens}
                     openaiApiKey={openaiApiKey ?? undefined}
-                    // Open Prompt Engineer
                     onOpenPromptEngineer={handleOpenPromptEngineer}
-                    // Agent display info - show task title if task is active
-                    agentName={isTaskChat ? activeTask?.title : (activeTerminal?.label || 'Jack')}
-                    agentAvatar={isTaskChat ? activeTask?.assignedAgent?.avatar : activeTerminal?.avatar}
-                    // Project context
-                    projectName={isTaskChat ? activeTask?.projectName : projectName}
-                    gitBranch={isTaskChat ? activeTask?.branch : gitBranch}
-                    // Working on field
-                    workingOn={activeTerminal?.workingOn}
-                    onWorkingOnChange={(value) => {
-                      // CRITICAL FIX: Don't update if modal is open for editing to prevent infinite loop
-                      if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
-                        handleUpdateWorkingOn(activeTerminal.id, value);
-                      }
-                    }}
-                    // Agent Rules - automatically loaded from personality
-                    selectedRules={activeTerminal?.personality?.selectedRules}
-                    onEditRules={activeTerminal ? () => {
-                      // Open the edit modal with the current terminal
-                      setEditingTerminal(activeTerminal);
-                      setShowNewTerminalModal(true);
-                    } : undefined}
-                    // Open Kanban view callback
+                    agentName={activeTask.title}
+                    agentAvatar={activeTask.assignedAgent?.avatar}
+                    projectName={activeTask.projectName}
+                    gitBranch={activeTask.branch}
+                    workingOn={undefined}
+                    onWorkingOnChange={() => {}}
+                    selectedRules={undefined}
+                    onEditRules={undefined}
                     onOpenKanban={handleOpenKanbanTab}
-                    // Hide Kanban tasks bar when viewing a task
-                    hideKanbanTasksBar={isTaskChat}
-                    // 🗣️ AskUserQuestion support
+                    hideKanbanTasksBar={true}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
-                    // Current session ID for display
-                    currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(taskId!) || new Set()}
+                    answeredQuestions={answeredQuestionsMap.get(taskId!) || new Map()}
+                    currentSessionId={activeTask.sessionId}
                   />
                 );
               })()}
@@ -9839,13 +9939,22 @@ You have access to all Bash tools to execute git commands like:
               {/* Agent Viewer - shown when agent tab is active (hidden in Kanban mode) */}
               {activeTabId.startsWith('agent-') && !isKanbanTabActive && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'agent' && activeTab.agentName && activeTab.agentScope) {
+                // For new agents, agentName is empty string but we still need to render
+                if (activeTab?.type === 'agent' && activeTab.agentScope && (activeTab.agentName !== undefined)) {
                   return (
                     <AgentViewer
+                      key={activeTab.id} // Force new instance when tab changes
                       agentName={activeTab.agentName}
                       agentScope={activeTab.agentScope}
                       workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
-                      onRefresh={loadAgents}
+                      onRefresh={() => {
+                        // Close tab after delete or cancel new agent
+                        if (activeTab.isNewAgent) {
+                          handleTabClose(activeTab.id);
+                        }
+                        loadAgents();
+                      }}
+                      isNewAgent={activeTab.isNewAgent}
                     />
                   );
                 }
@@ -9877,6 +9986,49 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+              {/* Command Viewer - shown when command tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('command-') && !isKanbanTabActive && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                // For new commands, commandName is empty string but we still need to render
+                if (activeTab?.type === 'command' && activeTab.commandScope && (activeTab.commandName !== undefined)) {
+                  return (
+                    <CommandViewer
+                      key={activeTab.id} // Force new instance when tab changes
+                      commandName={activeTab.commandName}
+                      commandScope={activeTab.commandScope}
+                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      onRefresh={() => {
+                        // Close tab after delete or cancel new command
+                        handleTabClose(activeTab.id);
+                      }}
+                      isNewCommand={activeTab.isNewCommand}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Rule Viewer - shown when rule tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('rule-') && !isKanbanTabActive && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                // For new rules, ruleName is empty string but we still need to render
+                if (activeTab?.type === 'rule' && activeTab.ruleScope && (activeTab.ruleName !== undefined)) {
+                  return (
+                    <RuleViewer
+                      key={activeTab.id} // Force new instance when tab changes
+                      ruleName={activeTab.ruleName}
+                      ruleScope={activeTab.ruleScope}
+                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      onRefresh={() => {
+                        // Close tab after delete or cancel new rule
+                        handleTabClose(activeTab.id);
+                      }}
+                      isNewRule={activeTab.isNewRule}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Documentation Viewer - shown when docs tab is active (hidden in Kanban mode) */}
               {activeTabId.startsWith('docs-') && !isKanbanTabActive && (() => {
@@ -9936,6 +10088,9 @@ You have access to all Bash tools to execute git commands like:
                           setActiveTabId(newTab.id);
                         }
                       }}
+                      onSelectCommand={handleSelectCommand}
+                      onSelectRule={handleSelectRule}
+                      onSelectDroid={handleSelectDroid}
                     />
                   );
                 }
@@ -10026,6 +10181,11 @@ You have access to all Bash tools to execute git commands like:
           onToggleHook={handleToggleHook}
           // Commands props
           onUseCommand={handleUseCommand}
+          onSelectCommand={handleSelectCommand}
+          // Rules props
+          onSelectRule={handleSelectRule}
+          // Droids props
+          onSelectDroid={handleSelectDroid}
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={handleOpenContextDrawer}

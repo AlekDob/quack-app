@@ -192,12 +192,15 @@ export default function ChatView({
   const { todoCount, inProgressCount } = useKanbanTaskCounts(basePath);
 
   // Persistent attachments via chat store
-  const getAttachments = useChatStore((state) => state.getAttachments);
   const setStoreAttachments = useChatStore((state) => state.setAttachments);
   const clearStoreAttachments = useChatStore((state) => state.clearAttachments);
+  const pendingAttachments = useChatStore((state) => state.pendingAttachments);
 
-  // Get current attachments from store (only if we have a sessionId)
-  const sessionAttachments = currentSessionId ? getAttachments(currentSessionId) : [];
+  // Derive current session attachments (reactive via pendingAttachments subscription)
+  const sessionAttachments = useMemo(() => {
+    if (!currentSessionId) return [];
+    return pendingAttachments.get(currentSessionId) || [];
+  }, [currentSessionId, pendingAttachments]);
 
   // Handler to update attachments in store
   const handleAttachmentsChange = useCallback((newAttachments: ChatAttachment[]) => {

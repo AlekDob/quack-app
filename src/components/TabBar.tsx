@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'semantic-search' | 'project-dashboard';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'semantic-search' | 'project-dashboard';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -15,10 +15,17 @@ export interface Tab {
   icon?: React.ReactNode; // DEPRECATED: Icon is now rendered based on tab.type to avoid React serialization issues
   agentName?: string; // Agent name for agent tabs
   agentScope?: 'global' | 'project'; // Agent scope for agent tabs
+  isNewAgent?: boolean; // Whether this is a new agent being created
   url?: string; // Current URL for browser tabs
   skillName?: string; // Skill name for skill tabs
   skillScope?: 'global' | 'project'; // Skill scope for skill tabs
   command?: SlashCommand; // Full command object for command tabs
+  commandName?: string; // Command name for command viewer tabs
+  commandScope?: 'global' | 'project'; // Command scope for command viewer tabs
+  isNewCommand?: boolean; // Whether this is a new command being created
+  ruleName?: string; // Rule name for rule viewer tabs
+  ruleScope?: 'global' | 'project'; // Rule scope for rule viewer tabs
+  isNewRule?: boolean; // Whether this is a new rule being created
   docsPath?: string; // Path to docs page for docs tabs
   initialNodeId?: string; // Initial node to zoom into for second-brain tabs
   taskId?: string; // Reference to Kanban task for task tabs

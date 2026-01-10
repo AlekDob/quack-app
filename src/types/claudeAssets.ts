@@ -140,3 +140,11 @@ export interface ClaudeAssetsTab {
   closable: boolean;
   selectedProject?: string;
 }
+
+// Grouped search results by project
+export interface GroupedSearchResults {
+  projectName: string;
+  projectPath: string;
+  assets: ClaudeAsset[];
+  totalCount: number;
+}

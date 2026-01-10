@@ -408,6 +408,13 @@ interface SidePanelProps {
 
   // Commands props
   onUseCommand: (command: SlashCommand) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
+
+  // Rules props
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
+
+  // Droids props
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
 
   // Context props
   tauriAvailable: boolean;
@@ -510,6 +517,13 @@ export default function SidePanel({
 
   // Commands
   onUseCommand,
+  onSelectCommand,
+
+  // Rules
+  onSelectRule,
+
+  // Droids
+  onSelectDroid,
 
   // Context
   tauriAvailable,
@@ -830,6 +844,7 @@ export default function SidePanel({
               onUseAgent={onUseAgent}
               onRefresh={onRefreshAgents}
               onCreateAgent={onCreateAgent}
+              onSelectDroid={onSelectDroid}
             />
           </div>
         )}
@@ -873,13 +888,17 @@ export default function SidePanel({
             <CommandsPanel
               basePath={rootPath || ''}
               onUseCommand={onUseCommand}
+              onSelectCommand={onSelectCommand}
             />
           </div>
         )}
 
         {activeTab === "rules" && (
           <div className="side-panel-pane">
-            <RulesPanel basePath={rootPath || ''} />
+            <RulesPanel
+              basePath={rootPath || ''}
+              onSelectRule={onSelectRule}
+            />
           </div>
         )}
 
