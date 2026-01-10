@@ -123,6 +123,20 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = {
     defaultKeys: "Meta+/",
     currentKeys: "Meta+/",
   },
+  chatInsertXml: {
+    id: "chatInsertXml",
+    label: "Insert XML Tag",
+    description: "Insert smart XML tag at cursor",
+    defaultKeys: "Meta+Shift+X",
+    currentKeys: "Meta+Shift+X",
+  },
+  chatNewLine: {
+    id: "chatNewLine",
+    label: "New Line with _",
+    description: "Insert new line with underscore prefix",
+    defaultKeys: "Meta+Shift+L",
+    currentKeys: "Meta+Shift+L",
+  },
 };
 
 /**

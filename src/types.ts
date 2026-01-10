@@ -1512,7 +1512,9 @@ export type ShortcutActionId =
   | 'chatSendMessage'
   | 'chatOpenSnippets'
   | 'chatOpenDroids'
-  | 'chatOpenCommands';
+  | 'chatOpenCommands'
+  | 'chatInsertXml'
+  | 'chatNewLine';
 
 /**
  * Configuration for a single keyboard shortcut
