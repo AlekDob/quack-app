@@ -7789,6 +7789,133 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, [terminals, tabs, loadDirectory, activeTaskId, chatSessions, saveKanbanChatSession]);
 
+  // ========================================
+  // SELECT TASK (like selecting an agent - no new tabs)
+  // ========================================
+  // When clicking a task in the sidebar, show its chat in the main area
+  // This behaves like selecting an agent - no tab creation
+  const selectTask = useCallback(async (task: KanbanTask) => {
+    // Task must have an assigned agent
+    if (!task.assignedAgent?.id) {
+      console.warn('[Quack] Cannot select task without assigned agent:', task.id);
+      return;
+    }
+
+    const agentId = task.assignedAgent.id;
+    let terminal = terminals.find(t => t.id === agentId);
+
+    // Fallback: search by agent name if UUID not found
+    if (!terminal && task.assignedAgent?.name) {
+      terminal = terminals.find(t => t.label === task.assignedAgent!.name);
+      if (terminal) {
+        console.warn(`[Quack] Agent UUID changed for "${task.assignedAgent.name}". Auto-fixing task reference...`);
+        useKanbanStore.getState().updateTask(task.id, {
+          assignedAgent: { ...task.assignedAgent!, id: terminal.id }
+        });
+      }
+    }
+
+    if (!terminal) {
+      console.warn(`[Quack] Agent terminal not found for task: ${task.assignedAgent.id}`);
+      return;
+    }
+
+    const projectPath = task.projectPath || terminal.cwd;
+
+    // Set the assigned agent as active (shows Agent Personality in side panel)
+    setActiveId(terminal.id);
+    // Set task as active (this will show task chat in the main area)
+    setActiveTaskId(task.id);
+    // Switch to chat tab (not a task-specific tab)
+    setActiveTabId('chat');
+
+    // Load task messages if not already loaded
+    const existingMessages = chatSessions.get(task.id) || [];
+    const hasInMemoryMessages = existingMessages.length > 0;
+
+    // Load directory for file explorer
+    loadDirectory(projectPath).catch(err => {
+      console.warn(`[selectTask] Failed to load directory:`, err);
+    });
+
+    // Switch to task's branch if specified (same as agent selection)
+    if (task.branch) {
+      try {
+        console.log(`[selectTask] Switching to branch: ${task.branch}`);
+        await invoke('git_switch_branch', {
+          branchName: task.branch,
+          rootPath: projectPath
+        });
+      } catch (err) {
+        console.warn(`[selectTask] Failed to switch to branch ${task.branch}:`, err);
+      }
+    }
+
+    // Load and inject agent personality into CLAUDE.md (same as agent selection)
+    try {
+      console.log(`[selectTask] Loading personality for agent "${terminal.label}" (ID: ${terminal.id})`);
+      const personality = await invoke<AgentPersonality>('load_agent_personality', {
+        projectPath: terminal.cwd,
+        personalityId: terminal.id,
+      });
+
+      // Inject into CLAUDE.md
+      await invoke('inject_personality_to_claude_md', {
+        projectPath: terminal.cwd,
+        personality,
+      });
+
+      console.log(`[selectTask] ✅ Injected personality for "${terminal.label}" into CLAUDE.md`);
+    } catch (error) {
+      console.warn(`[selectTask] Failed to inject personality:`, error);
+    }
+
+    // Load chat messages from disk if needed
+    if (!hasInMemoryMessages) {
+      try {
+        const store = await getCachedStore('quack-chats.json');
+        const savedChat = await store.get<{
+          messages: ChatMessage[];
+          tokens?: { inputTokens: number; outputTokens: number; cacheCreationTokens?: number; cacheReadTokens?: number; totalCost?: number };
+          sessionId?: string;
+          timestamp?: number;
+        }>(`chat-${task.id}`);
+
+        if (savedChat && savedChat.messages && savedChat.messages.length > 0) {
+          setChatSessions(prev => {
+            const newSessions = new Map(prev);
+            newSessions.set(task.id, savedChat.messages);
+            return newSessions;
+          });
+          console.log(`[Quack] Loaded ${savedChat.messages.length} messages for task "${task.title}"`);
+
+          if (savedChat.tokens) {
+            setChatTokensMap(prev => {
+              const newMap = new Map(prev);
+              newMap.set(task.id, {
+                inputTokens: savedChat.tokens!.inputTokens || 0,
+                outputTokens: savedChat.tokens!.outputTokens || 0,
+                cacheCreationTokens: savedChat.tokens!.cacheCreationTokens || 0,
+                cacheReadTokens: savedChat.tokens!.cacheReadTokens || 0,
+                totalCost: savedChat.tokens!.totalCost || 0,
+              });
+              return newMap;
+            });
+          }
+        }
+      } catch (error) {
+        console.warn(`[selectTask] Failed to load messages for task ${task.id}:`, error);
+      }
+    }
+
+    // Pre-create listener
+    ensureListenerReady(task.id).catch(err => {
+      console.warn(`[Quack] Failed to pre-create listener for task:`, err);
+    });
+
+    console.log(`[Quack] Task "${task.title}" selected (showing in main chat area)`);
+  }, [terminals, chatSessions, loadDirectory]);
+
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
     toggleKanban: handleOpenKanbanTab,
@@ -9397,7 +9524,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenKanbanTab={handleOpenKanbanTab}
           inProgressTaskCount={inProgressTaskCount}
           agentTasks={agentTasks}
-          onOpenTaskTab={openTaskTab}
+          onOpenTaskTab={selectTask}
           activeTaskId={activeTaskId}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
@@ -9674,7 +9801,7 @@ You have access to all Bash tools to execute git commands like:
                         }
                       }}
                       showMiniPanel={showKanbanMiniPanel}
-                      onOpenTaskTab={openTaskTab}
+                      onOpenTaskTab={selectTask}
                       onOpenTerminal={async (path, label) => {
                         // Open terminal in specified directory (worktree or project path)
                         const projectName = label || path.split('/').pop() || 'Terminal';
@@ -9730,69 +9857,117 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Chat View - shown when chat tab is active and Kanban is not active */}
-              {/* Agent's main chat - only shown when activeTabId is 'chat' (not task tabs) */}
-              {activeTabId === 'chat' && !isKanbanTabActive && (
-                <ChatView
-                  key={activeId ?? 'no-agent'}
-                  messages={currentAgentMessages}
-                  isLoading={currentAgentLoading}
-                  onSendMessage={sendMessageForAgent}
-                  activeAgent={activeAgent}
-                  onClearAgent={handleClearAgent}
-                  agents={agents}
-                  onSelectAgent={handleUseAgent}
-                  onFilePathClick={handleFilePathClick}
-                  onSessionIdClick={handleSessionIdClick}
-                  onDiffClick={handleDiffClick}
-                  onEditsChange={handleEditsChange}
-                  pendingAgentMention={pendingAgentMention}
-                  onMentionInserted={() => setPendingAgentMention(null)}
-                  pendingFileMention={pendingFileMention}
-                  onFileMentionInserted={() => setPendingFileMention(null)}
-                  pendingSlashCommand={pendingSlashCommand}
-                  onCommandInserted={() => setPendingSlashCommand(null)}
-                  basePath={explorerRoot ?? explorerPath}
-                  inputDraft={currentSettings.inputDraft}
-                  onInputDraftChange={(draft) => updateAgentSettings({ inputDraft: draft })}
-                  model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
-                  onModelChange={(model) => updateAgentSettings({ model })}
-                  thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
-                  onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
-                  permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
-                  onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
-                  effort={currentSettings.effort || 'medium'}
-                  onEffortChange={(effort) => updateAgentSettings({ effort })}
-                  onAbortStream={abortStreamForAgent}
-                  lastPrompt={getLastPromptForAgent() || undefined}
-                  onClearConversation={clearCurrentAgentConversation}
-                  onCompactConversation={compactCurrentAgentConversation}
-                  onOpenSessionInTerminal={openSessionInTerminal}
-                  sessionTokens={currentAgentTokens}
-                  openaiApiKey={openaiApiKey ?? undefined}
-                  onOpenPromptEngineer={handleOpenPromptEngineer}
-                  agentName={activeTerminal?.label || 'Jack'}
-                  agentAvatar={activeTerminal?.avatar}
-                  projectName={projectName}
-                  gitBranch={gitBranch}
-                  workingOn={activeTerminal?.workingOn}
-                  onWorkingOnChange={(value) => {
-                    if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
-                      handleUpdateWorkingOn(activeTerminal.id, value);
+              {/* Shows either task chat (if activeTaskId is set) or agent chat */}
+              {activeTabId === 'chat' && !isKanbanTabActive && (() => {
+                // Check if we have an active task
+                const activeTask = activeTaskId ? kanbanTasks.find(t => t.id === activeTaskId) : null;
+                const isTaskChat = !!activeTask;
+
+                // Task-specific data
+                const taskMessages = activeTaskId ? (chatSessions.get(activeTaskId) ?? []) : [];
+                const taskLoading = activeTaskId ? (chatLoadingMap.get(activeTaskId) ?? false) : false;
+                const taskTokens = activeTaskId ? chatTokensMap.get(activeTaskId) : undefined;
+
+                return (
+                  <ChatView
+                    key={isTaskChat ? `task-${activeTaskId}` : (activeId ?? 'no-agent')}
+                    messages={isTaskChat ? taskMessages : currentAgentMessages}
+                    isLoading={isTaskChat ? taskLoading : currentAgentLoading}
+                    onSendMessage={isTaskChat
+                      ? (content, opts) => sendMessageForTargetAgent(activeTaskId!, content, {
+                          ...opts,
+                          workingDirectory: activeTask?.projectPath || opts?.workingDirectory || '/',
+                        })
+                      : sendMessageForAgent
                     }
-                  }}
-                  selectedRules={activeTerminal?.personality?.selectedRules}
-                  onEditRules={activeTerminal ? () => {
-                    setEditingTerminal(activeTerminal);
-                    setShowNewTerminalModal(true);
-                  } : undefined}
-                  onOpenKanban={handleOpenKanbanTab}
-                  hideKanbanTasksBar={false}
-                  onUserQuestionAnswer={answerUserQuestionForAgent}
-                  pendingQuestionIds={pendingQuestionIdsMap.get(activeId ?? '') || new Set()}
-                  answeredQuestions={answeredQuestionsMap.get(activeId ?? '') || new Map()}
-                  currentSessionId={activeId ? chatSessionIds.get(activeId) : undefined}
-                />
-              )}
+                    activeAgent={activeAgent}
+                    onClearAgent={isTaskChat
+                      ? () => setActiveTaskId(null) // Just deselect task, don't close anything
+                      : handleClearAgent
+                    }
+                    agents={agents}
+                    onSelectAgent={handleUseAgent}
+                    onFilePathClick={handleFilePathClick}
+                    onSessionIdClick={handleSessionIdClick}
+                    onDiffClick={handleDiffClick}
+                    onEditsChange={handleEditsChange}
+                    pendingAgentMention={pendingAgentMention}
+                    onMentionInserted={() => setPendingAgentMention(null)}
+                    pendingFileMention={pendingFileMention}
+                    onFileMentionInserted={() => setPendingFileMention(null)}
+                    pendingSlashCommand={pendingSlashCommand}
+                    onCommandInserted={() => setPendingSlashCommand(null)}
+                    basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
+                    inputDraft={isTaskChat
+                      ? (taskInputDrafts.get(activeTaskId!) || (taskMessages.length === 0 ? (activeTask?.prompt || '') : ''))
+                      : currentSettings.inputDraft
+                    }
+                    onInputDraftChange={(draft) => {
+                      if (isTaskChat && activeTaskId) {
+                        setTaskInputDrafts(prev => {
+                          const newMap = new Map(prev);
+                          newMap.set(activeTaskId, draft);
+                          return newMap;
+                        });
+                      } else {
+                        updateAgentSettings({ inputDraft: draft });
+                      }
+                    }}
+                    model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                    onModelChange={(model) => updateAgentSettings({ model })}
+                    thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+                    onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
+                    permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                    onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
+                    effort={currentSettings.effort || 'medium'}
+                    onEffortChange={(effort) => updateAgentSettings({ effort })}
+                    onAbortStream={isTaskChat ? () => abortStreamForTargetAgent(activeTaskId!) : abortStreamForAgent}
+                    lastPrompt={isTaskChat
+                      ? (activeTask?.prompt || getLastPromptForTargetAgent(activeTaskId!) || undefined)
+                      : (getLastPromptForAgent() || undefined)
+                    }
+                    onClearConversation={isTaskChat
+                      ? () => clearConversationForTargetAgent(activeTaskId!)
+                      : clearCurrentAgentConversation
+                    }
+                    onCompactConversation={isTaskChat
+                      ? () => compactConversationForTargetAgent(activeTaskId!)
+                      : compactCurrentAgentConversation
+                    }
+                    onOpenSessionInTerminal={isTaskChat
+                      ? () => openKanbanSessionInTerminal(activeTaskId!)
+                      : openSessionInTerminal
+                    }
+                    sessionTokens={isTaskChat ? taskTokens : currentAgentTokens}
+                    openaiApiKey={openaiApiKey ?? undefined}
+                    onOpenPromptEngineer={handleOpenPromptEngineer}
+                    agentName={isTaskChat ? (activeTask?.title || 'Task') : (activeTerminal?.label || 'Jack')}
+                    agentAvatar={isTaskChat ? activeTask?.assignedAgent?.avatar : activeTerminal?.avatar}
+                    projectName={isTaskChat ? (activeTask?.projectName || projectName) : projectName}
+                    gitBranch={isTaskChat ? (activeTask?.branch || gitBranch) : gitBranch}
+                    workingOn={activeTerminal?.workingOn}
+                    onWorkingOnChange={(value) => {
+                      if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
+                        handleUpdateWorkingOn(activeTerminal.id, value);
+                      }
+                    }}
+                    selectedRules={activeTerminal?.personality?.selectedRules}
+                    onEditRules={activeTerminal ? () => {
+                      setEditingTerminal(activeTerminal);
+                      setShowNewTerminalModal(true);
+                    } : undefined}
+                    onOpenKanban={handleOpenKanbanTab}
+                    hideKanbanTasksBar={false}
+                    onUserQuestionAnswer={answerUserQuestionForAgent}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
+                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
+                    currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
+                    // Fullscreen mode
+                    isFullscreen={isChatFullscreen}
+                    onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
+                  />
+                );
+              })()}
 
               {/* Task Chat View - shown when a task tab is active */}
               {/* Tasks are FIRST-CLASS CITIZENS with their own dedicated tabs */}
@@ -9865,12 +10040,12 @@ You have access to all Bash tools to execute git commands like:
                     sessionTokens={taskTokens}
                     openaiApiKey={openaiApiKey ?? undefined}
                     onOpenPromptEngineer={handleOpenPromptEngineer}
-                    // Agent display info - show task title if task is active
-                    agentName={isTaskChat ? activeTask?.title : (activeTerminal?.label || 'Jack')}
-                    agentAvatar={isTaskChat ? activeTask?.assignedAgent?.avatar : activeTerminal?.avatar}
+                    // Agent display info - show task title for task chat
+                    agentName={activeTask.title || 'Task'}
+                    agentAvatar={activeTask.assignedAgent?.avatar}
                     // Project context
-                    projectName={isTaskChat ? activeTask?.projectName : projectName}
-                    gitBranch={isTaskChat ? activeTask?.branch : gitBranch}
+                    projectName={activeTask.projectName || projectName}
+                    gitBranch={activeTask.branch || gitBranch}
                     // Working on field
                     workingOn={activeTerminal?.workingOn}
                     onWorkingOnChange={(value) => {
@@ -9883,19 +10058,13 @@ You have access to all Bash tools to execute git commands like:
                     agentToolkit={activeTerminal?.personality?.toolkit}
                     onInsertAtCursor={(text) => {
                       // Insert text at cursor by appending to current input draft
-                      const currentDraft = isTaskChat
-                        ? (taskInputDrafts.get(activeTaskId!) || '')
-                        : currentSettings.inputDraft;
+                      const currentDraft = taskInputDrafts.get(taskId!) || '';
                       const newDraft = currentDraft + text;
-                      if (isTaskChat && activeTaskId) {
-                        setTaskInputDrafts(prev => {
-                          const newMap = new Map(prev);
-                          newMap.set(activeTaskId, newDraft);
-                          return newMap;
-                        });
-                      } else {
-                        updateAgentSettings({ inputDraft: newDraft });
-                      }
+                      setTaskInputDrafts(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(taskId!, newDraft);
+                        return newMap;
+                      });
                     }}
                     // Agent Rules - automatically loaded from personality
                     selectedRules={activeTerminal?.personality?.selectedRules}
@@ -9908,10 +10077,10 @@ You have access to all Bash tools to execute git commands like:
                     onOpenKanban={handleOpenKanbanTab}
                     hideKanbanTasksBar={true}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(taskId!) || new Set()}
+                    answeredQuestions={answeredQuestionsMap.get(taskId!) || new Map()}
                     // Current session ID for display
-                    currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
+                    currentSessionId={activeTask.sessionId}
                     // Fullscreen mode
                     isFullscreen={isChatFullscreen}
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
