@@ -5,6 +5,7 @@
  * Step 2: Agent Selection (Use existing or create new)
  * Step 3: Agent Basics (Name, Color, Avatar, Personality) - only for Create/Edit
  * Step 4: Rules Selection (Claude Code rules to follow) - only for Create/Edit
+ * Step 5: Toolkit Selection (Skills, droids, commands) - only for Create/Edit
  *
  * Key UX change: "Use" on existing agent = direct confirmation (project already selected)
  */
@@ -25,13 +26,17 @@ import {
 import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
 import { useRules } from '../hooks/useRules';
 import { normalizeRulePaths, areRulePathsEqual } from '../utils/rulePathUtils';
+import { loadAvailableSkills, loadAvailableDroids, loadAvailableCommands } from '../utils/skillsAndDroidsLoader';
 
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
 import { StepProjectSelection } from './modal-steps/StepProjectSelection';
 import { StepAgentBasics } from './modal-steps/StepAgentBasics';
 import { StepRules } from './modal-steps/StepRules';
-import type { ModalStep, ActiveProject } from './modal-steps/types';
+import type { ModalStep, ActiveProject, SkillMetadata, DroidMetadata } from './modal-steps/types';
+
+// Cyberpunk Agent Bundle Editor
+import { AgentBundleEditor } from './agent-bundle';
 
 // Styles
 import './modal-steps/ModalSteps.css';
@@ -100,12 +105,20 @@ function NewTerminalModal({
   onOpenDroidFactory,
 }: NewTerminalModalProps) {
   // Step management - PROJECT-FIRST FLOW
-  // Normal: project → agent → basics → rules
-  // Edit mode: basics → rules (skip project + agent)
+  // Normal: project → agent → basics → rules → toolkit
+  // Edit mode: basics directly
   const [currentStep, setCurrentStep] = useState<ModalStep>('project');
   const [completedSteps, setCompletedSteps] = useState<ModalStep[]>([]);
   const [isEditingAgent, setIsEditingAgent] = useState(false); // Track internal edit mode
   const [selectedProjectColor, setSelectedProjectColor] = useState<string>(''); // Color from project selection
+
+  // Toolkit loading state
+  const [loadingEquipment, setLoadingEquipment] = useState(false);
+
+  // Available equipment for Cyberpunk Editor (loaded from filesystem)
+  const [skillsMetadata, setSkillsMetadata] = useState<SkillMetadata[]>([]);
+  const [droidsMetadata, setDroidsMetadata] = useState<DroidMetadata[]>([]);
+  const [commandsMetadata, setCommandsMetadata] = useState<string[]>([]);
 
   // Git branch state
   const [availableBranches, setAvailableBranches] = useState<GitBranch[]>([]);
@@ -244,6 +257,37 @@ function NewTerminalModal({
   }, []);
 
   // ===== Data Loading Functions =====
+
+  /**
+   * Load available equipment (skills, droids, commands) for the Toolkit Editor
+   */
+  async function loadEquipmentForToolkitEditor(projectPath: string) {
+    if (!projectPath) return;
+
+    setLoadingEquipment(true);
+    try {
+      console.log('[NewTerminalModal] Loading equipment for Toolkit Editor...');
+
+      // Load skills, droids, and commands in parallel
+      const [skills, droids, commands] = await Promise.all([
+        loadAvailableSkills(projectPath),
+        loadAvailableDroids(projectPath),
+        loadAvailableCommands(projectPath),
+      ]);
+
+      console.log('[NewTerminalModal] Loaded skills:', skills.length);
+      console.log('[NewTerminalModal] Loaded droids:', droids.length);
+      console.log('[NewTerminalModal] Loaded commands:', commands.length);
+
+      setSkillsMetadata(skills);
+      setDroidsMetadata(droids);
+      setCommandsMetadata(commands);
+    } catch (err) {
+      console.error('[NewTerminalModal] Failed to load equipment:', err);
+    } finally {
+      setLoadingEquipment(false);
+    }
+  }
 
   async function loadCustomAvatars() {
     setLoadingAvatars(true);
@@ -470,11 +514,56 @@ function NewTerminalModal({
     setCurrentStep('basics');
   }
 
-  // "Create New" agent - go to basics step with fresh state
+  // "Create New" agent - go to Basics step first, then Rules, then Toolkit
   function handleCreateNewAgent() {
     setIsEditingAgent(false);
     setCompletedSteps(prev => [...prev, 'agent']);
+    // Load equipment in background for later steps
+    loadEquipmentForToolkitEditor(path);
+    // Go to Basics step first (avatar, name, color)
     setCurrentStep('basics');
+  }
+
+  // Handle save from Toolkit Editor
+  function handleToolkitSave(agent: SavedAgent) {
+    console.log('[NewTerminalModal] Toolkit Editor save:', agent);
+
+    // Normalize rule paths for portable storage
+    const normalizedRules = agent.personality?.selectedRules?.length
+      ? normalizeRulePaths(agent.personality.selectedRules, path)
+      : undefined;
+
+    // Build complete agent with normalized rules
+    const completeAgent: SavedAgent = {
+      ...agent,
+      personality: {
+        ...agent.personality,
+        selectedRules: normalizedRules,
+      },
+    };
+
+    // Save to storage
+    try {
+      saveAgent({
+        name: completeAgent.name,
+        avatar: completeAgent.avatar || '',
+        color: completeAgent.color,
+        workingOn: completeAgent.workingOn,
+        personality: completeAgent.personality,
+      });
+    } catch (err) {
+      console.warn('Failed to save agent to storage:', err);
+    }
+
+    // Confirm and close
+    onConfirm(completeAgent);
+  }
+
+  // Handle cancel from Toolkit Editor - go back to Rules step
+  function handleToolkitCancel() {
+    // Go back to Rules step
+    setCurrentStep('rules');
+    setCompletedSteps(prev => prev.filter(s => s !== 'rules'));
   }
 
   // Back to agent selection from basics
@@ -517,13 +606,14 @@ function NewTerminalModal({
     checkGitRepository();
   }
 
-  // Step 3: Basics → Step 4: Rules
+  // Step 3: Basics → Rules
   function handleBasicsNext() {
     if (!name.trim()) {
       alert('Please enter an agent name');
       return;
     }
     setCompletedSteps(prev => [...prev, 'basics']);
+    // Go to Rules step
     setCurrentStep('rules');
   }
 
@@ -542,6 +632,13 @@ function NewTerminalModal({
   function handleRulesBack() {
     setCurrentStep('basics');
     setCompletedSteps(prev => prev.filter(s => s !== 'basics'));
+  }
+
+  // Step 4: Rules → Toolkit
+  function handleRulesNext() {
+    setCompletedSteps(prev => [...prev, 'rules']);
+    // Go to Toolkit step
+    setCurrentStep('toolkit');
   }
 
   // ===== Rules Selection =====
@@ -573,9 +670,9 @@ function NewTerminalModal({
     setSelectedRules(prev => [...prev, expectedPath]);
   }
 
-  // ===== Final Confirmation =====
+  // ===== Rules Confirmation - Goes to Toolkit =====
 
-  async function handleFinalConfirm() {
+  async function handleRulesConfirm() {
     // Normalize rule paths for portable storage
     // - Project rules: `.claude/rules/name.md` (relative)
     // - Global rules: `~/.claude/rules/name.md` (tilde notation)
@@ -590,40 +687,16 @@ function NewTerminalModal({
     };
 
     // DEBUG: Log what we're sending
-    console.log('[MODAL] handleFinalConfirm called');
+    console.log('[MODAL] handleRulesConfirm called');
     console.log('[MODAL] Selected rules (original):', selectedRules);
     console.log('[MODAL] Selected rules (normalized):', normalizedRules);
     console.log('[MODAL] Updated personality:', JSON.stringify(updatedPersonality, null, 2));
 
     onPersonalityChange?.(updatedPersonality);
+    setLocalPersonality(updatedPersonality);
 
-    // Save agent to storage
-    try {
-      saveAgent({
-        name,
-        avatar: avatar || '',
-        color,
-        workingOn,
-        personality: updatedPersonality
-      });
-    } catch (err) {
-      console.warn('Failed to save agent to storage:', err);
-    }
-
-    // Create terminal - pass complete agent data with updated personality
-    const completeAgentData: SavedAgent = {
-      id: `agent-${Date.now()}`,
-      name,
-      avatar: avatar || '',
-      color,
-      workingOn,
-      personality: updatedPersonality,
-      createdAt: Date.now(),
-      lastUsed: Date.now(),
-      usageCount: 0,
-    };
-
-    onConfirm(completeAgentData);
+    // Move to Toolkit step
+    handleRulesNext();
   }
 
   if (!open) {
@@ -644,6 +717,8 @@ function NewTerminalModal({
         return { title: 'Configure Agent', subtitle: 'Set name, color, and personality' };
       case 'rules':
         return { title: 'Select Rules', subtitle: 'Choose Claude Code rules' };
+      case 'toolkit':
+        return { title: 'Agent Toolkit', subtitle: 'Select your quick-access tools' };
       default:
         return { title: 'New Agent', subtitle: 'Step-by-step configuration' };
     }
@@ -651,10 +726,13 @@ function NewTerminalModal({
 
   const header = getModalHeader();
 
+  // Determine if we need a wider modal (toolkit step)
+  const isToolkitStep = currentStep === 'toolkit';
+
   // Render the modal with project-first flow
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal-panel agent-modal">
+      <div className={`modal-panel agent-modal ${isToolkitStep ? 'equipment-step-wide' : ''}`}>
         {/* Header */}
         <div className="modal-header">
           <div>
@@ -759,10 +837,48 @@ function NewTerminalModal({
             onRuleToggle={handleRuleToggle}
             onCreateRule={handleCreateRule}
             onBack={handleRulesBack}
-            onConfirm={handleFinalConfirm}
+            onConfirm={handleRulesConfirm}
             creating={creating}
             isEditing={isEditingAgent}
           />
+        )}
+
+        {/* Step 5: Toolkit Editor (Fallout Style) */}
+        {currentStep === 'toolkit' && (
+          <>
+            {(() => {
+              // Convert metadata arrays to string arrays for the editor
+              const availableSkillNames = skillsMetadata.map(s => s.name);
+              const availableDroidNames = droidsMetadata.map(d => d.name);
+              const availableRuleNames = rules.project.concat(rules.global).map(r => r.name);
+              const availableCommandNames: string[] = commandsMetadata;
+
+              // Create agent object from Basics step data
+              const agentFromBasics: SavedAgent = {
+                id: `agent-${Date.now()}`,
+                name,
+                avatar: avatar || '',
+                color,
+                workingOn,
+                personality: localPersonality,
+                createdAt: Date.now(),
+                lastUsed: Date.now(),
+                usageCount: 0,
+              };
+
+              return (
+                <AgentBundleEditor
+                  agent={agentFromBasics}
+                  availableSkills={availableSkillNames}
+                  availableDroids={availableDroidNames}
+                  availableRules={availableRuleNames}
+                  availableCommands={availableCommandNames}
+                  onSave={handleToolkitSave}
+                  onCancel={handleToolkitCancel}
+                />
+              );
+            })()}
+          </>
         )}
 
         {/* Error Display */}

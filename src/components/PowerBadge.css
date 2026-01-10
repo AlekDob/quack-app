@@ -1,0 +1,197 @@
+.power-badge {
+  background: rgba(0, 212, 255, 0.05);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.power-badge.compact {
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+
+/* Power Header */
+.power-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.power-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.power-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+}
+
+.power-number {
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-shadow:
+    0 0 8px currentColor,
+    0 0 12px currentColor;
+  animation: powerGlow 2s ease-in-out infinite;
+}
+
+.power-badge.compact .power-number {
+  font-size: 0.95rem;
+}
+
+.power-tier {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+/* Progress Bar */
+.power-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.power-badge.compact .power-bar {
+  height: 4px;
+  margin-bottom: 0;
+}
+
+.power-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.power-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* Breakdown */
+.power-breakdown {
+  display: flex;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.breakdown-item {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.breakdown-label {
+  opacity: 0.7;
+}
+
+.breakdown-value {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Animations */
+@keyframes powerGlow {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Hover Effect */
+.power-badge:hover {
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(0, 212, 255, 0.08);
+}
+
+.power-badge:hover .power-number {
+  filter: brightness(1.2);
+}
+
+/* ========== Fallout Style ========== */
+.power-badge.fallout-style {
+  background: rgba(20, 255, 0, 0.05);
+  border: 1px solid rgba(20, 255, 0, 0.3);
+  border-radius: 4px;
+}
+
+.power-badge.fallout-style:hover {
+  border-color: #14FF00;
+  background: rgba(20, 255, 0, 0.1);
+  box-shadow: 0 0 12px rgba(20, 255, 0, 0.3);
+}
+
+.power-badge.fallout-style .power-value {
+  font-family: 'VT323', 'Share Tech Mono', 'Fira Code', monospace;
+}
+
+.power-badge.fallout-style .power-label {
+  color: #0A8800;
+}
+
+.power-badge.fallout-style .power-number {
+  color: #14FF00;
+  text-shadow:
+    0 0 8px rgba(20, 255, 0, 0.6),
+    0 0 16px rgba(20, 255, 0, 0.4);
+}
+
+.power-badge.fallout-style .power-tier {
+  color: #14FF00;
+  text-shadow: 0 0 6px rgba(20, 255, 0, 0.4);
+}
+
+.power-badge.fallout-style .power-bar {
+  background: rgba(20, 255, 0, 0.1);
+  border: 1px solid rgba(20, 255, 0, 0.2);
+}
+
+.power-badge.fallout-style .power-bar-fill {
+  background: #14FF00;
+  box-shadow: 0 0 8px rgba(20, 255, 0, 0.5);
+}
+
+.power-badge.fallout-style .breakdown-label {
+  color: #0A8800;
+}
+
+.power-badge.fallout-style .breakdown-value {
+  color: #14FF00;
+}

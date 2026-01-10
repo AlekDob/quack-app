@@ -165,3 +165,55 @@ export function formatDroidsForClaudeMd(droids: DroidMetadata[], selectedIds: st
 
   return selectedDroids.map(d => `- droid: ${d.path}`).join('\n');
 }
+
+/**
+ * Load all available slash commands from project and global directories
+ */
+export async function loadAvailableCommands(projectPath: string): Promise<string[]> {
+  const commands: string[] = [];
+
+  try {
+    // Load project commands from .claude/commands/
+    const projectCommandsPath = `${projectPath}/.claude/commands`;
+    try {
+      const projectFiles = await invoke<string[]>('list_directory_files', {
+        path: projectCommandsPath,
+        extension: 'md'
+      });
+
+      for (const file of projectFiles) {
+        // Remove .md extension to get command name
+        const commandName = file.replace('.md', '');
+        commands.push(commandName);
+      }
+    } catch (err) {
+      console.warn('No project commands directory found:', err);
+    }
+
+    // Load global commands from ~/.claude/commands/
+    try {
+      const homeDir = await invoke<string>('get_home_directory');
+      const globalCommandsPath = `${homeDir}/.claude/commands`;
+
+      const globalFiles = await invoke<string[]>('list_directory_files', {
+        path: globalCommandsPath,
+        extension: 'md'
+      });
+
+      for (const file of globalFiles) {
+        // Remove .md extension to get command name
+        const commandName = file.replace('.md', '');
+        // Avoid duplicates (project commands take precedence)
+        if (!commands.includes(commandName)) {
+          commands.push(commandName);
+        }
+      }
+    } catch (err) {
+      console.warn('No global commands directory found:', err);
+    }
+  } catch (err) {
+    console.error('Failed to load commands:', err);
+  }
+
+  return commands;
+}

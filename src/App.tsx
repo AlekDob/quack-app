@@ -579,6 +579,8 @@ function AppContent() {
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  // Chat fullscreen mode - hides side panel and expands chat
+  const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   // Track sidebar state before Kanban view to restore it on exit
   const sidePanelCollapsedBeforeKanbanRef = useRef<boolean | null>(null);
   // Track if user wants side panel expanded while in Kanban mode (e.g., clicked on project name)
@@ -9338,7 +9340,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -9863,20 +9865,56 @@ You have access to all Bash tools to execute git commands like:
                     sessionTokens={taskTokens}
                     openaiApiKey={openaiApiKey ?? undefined}
                     onOpenPromptEngineer={handleOpenPromptEngineer}
-                    agentName={activeTask.title}
-                    agentAvatar={activeTask.assignedAgent?.avatar}
-                    projectName={activeTask.projectName}
-                    gitBranch={activeTask.branch}
-                    workingOn={undefined}
-                    onWorkingOnChange={() => {}}
-                    selectedRules={undefined}
-                    onEditRules={undefined}
+                    // Agent display info - show task title if task is active
+                    agentName={isTaskChat ? activeTask?.title : (activeTerminal?.label || 'Jack')}
+                    agentAvatar={isTaskChat ? activeTask?.assignedAgent?.avatar : activeTerminal?.avatar}
+                    // Project context
+                    projectName={isTaskChat ? activeTask?.projectName : projectName}
+                    gitBranch={isTaskChat ? activeTask?.branch : gitBranch}
+                    // Working on field
+                    workingOn={activeTerminal?.workingOn}
+                    onWorkingOnChange={(value) => {
+                      // CRITICAL FIX: Don't update if modal is open for editing to prevent infinite loop
+                      if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
+                        handleUpdateWorkingOn(activeTerminal.id, value);
+                      }
+                    }}
+                    // Agent Toolkit - quick-access tools for EquipBar
+                    agentToolkit={activeTerminal?.personality?.toolkit}
+                    onInsertAtCursor={(text) => {
+                      // Insert text at cursor by appending to current input draft
+                      const currentDraft = isTaskChat
+                        ? (taskInputDrafts.get(activeTaskId!) || '')
+                        : currentSettings.inputDraft;
+                      const newDraft = currentDraft + text;
+                      if (isTaskChat && activeTaskId) {
+                        setTaskInputDrafts(prev => {
+                          const newMap = new Map(prev);
+                          newMap.set(activeTaskId, newDraft);
+                          return newMap;
+                        });
+                      } else {
+                        updateAgentSettings({ inputDraft: newDraft });
+                      }
+                    }}
+                    // Agent Rules - automatically loaded from personality
+                    selectedRules={activeTerminal?.personality?.selectedRules}
+                    onEditRules={activeTerminal ? () => {
+                      // Open the edit modal with the current terminal
+                      setEditingTerminal(activeTerminal);
+                      setShowNewTerminalModal(true);
+                    } : undefined}
+                    // Open Kanban view callback
                     onOpenKanban={handleOpenKanbanTab}
                     hideKanbanTasksBar={true}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(taskId!) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(taskId!) || new Map()}
-                    currentSessionId={activeTask.sessionId}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
+                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
+                    // Current session ID for display
+                    currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
+                    // Fullscreen mode
+                    isFullscreen={isChatFullscreen}
+                    onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
                   />
                 );
               })()}

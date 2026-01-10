@@ -1,0 +1,314 @@
+/* ============================================
+   EQUIPMENT PICKER MODAL - Clean Modern Style
+   ============================================ */
+
+/* Brand Colors */
+:root {
+  --primary-orange: #f28c52;
+  --dark-bg: rgba(18, 20, 27, 0.97);
+  --panel-bg: rgba(30, 33, 45, 0.95);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666666;
+}
+
+/* ========== Overlay ========== */
+.equipment-picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ========== Modal Container ========== */
+.equipment-picker-modal {
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  background: var(--dark-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ========== Header ========== */
+.picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.picker-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.picker-counter {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.counter-current {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary-orange);
+}
+
+.counter-divider {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+}
+
+.counter-max {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+}
+
+.counter-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+  text-transform: lowercase;
+  letter-spacing: 0.01em;
+}
+
+/* ========== Search Input ========== */
+.picker-search {
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.picker-search-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.picker-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.picker-search-input:focus {
+  outline: none;
+  border-color: var(--primary-orange);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* ========== Items List ========== */
+.picker-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 2rem;
+  min-height: 200px;
+  max-height: 400px;
+}
+
+.picker-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.picker-items::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.picker-items::-webkit-scrollbar-thumb {
+  background: var(--primary-orange);
+  border-radius: 3px;
+}
+
+.picker-items::-webkit-scrollbar-thumb:hover {
+  background: #ff9d6b;
+}
+
+.picker-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ========== Picker Item ========== */
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.picker-item:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+}
+
+.picker-item.selected {
+  background: rgba(242, 140, 82, 0.08);
+  border-color: var(--primary-orange);
+}
+
+.picker-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.picker-item.disabled:hover {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: transparent;
+}
+
+/* ========== Checkbox ========== */
+.picker-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.picker-checkbox.checked {
+  border-color: var(--primary-orange);
+  background: var(--primary-orange);
+}
+
+.checkbox-check {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ========== Item Name ========== */
+.picker-item-name {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+/* ========== Actions ========== */
+.picker-actions {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.picker-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.picker-btn-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.picker-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.picker-btn-confirm {
+  background: var(--primary-orange);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.picker-btn-confirm:hover {
+  background: #ff9d6b;
+  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.3);
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+  .equipment-picker-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .picker-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .picker-search,
+  .picker-items,
+  .picker-actions {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .picker-actions {
+    flex-direction: column;
+  }
+
+  .picker-btn {
+    width: 100%;
+  }
+}

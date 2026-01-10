@@ -1,0 +1,207 @@
+/* ===================================
+   EquipBar - Equipment picker for chat footer
+   =================================== */
+
+.equip-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.equip-bar-item {
+  position: relative;
+}
+
+/* ===================================
+   Buttons - Secondary style with subtle accent
+   =================================== */
+
+.equip-bar-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  white-space: nowrap;
+}
+
+.equip-bar-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(242, 140, 82, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.equip-bar-button.active {
+  background: rgba(242, 140, 82, 0.12);
+  border-color: rgba(242, 140, 82, 0.5);
+  color: #f28c52;
+}
+
+.equip-bar-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.equip-bar-button svg {
+  flex-shrink: 0;
+}
+
+.equip-bar-button svg:last-child {
+  opacity: 0.5;
+  margin-left: -2px;
+}
+
+/* ===================================
+   Popover - Dark background with subtle border
+   =================================== */
+
+.equip-bar-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  min-width: 180px;
+  max-width: 240px;
+  background: rgba(18, 20, 27, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  padding: 6px;
+  animation: slideUp 0.15s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================
+   Popover List - Scrollable container
+   =================================== */
+
+.equip-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar for popover list */
+.equip-bar-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.equip-bar-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.equip-bar-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.equip-bar-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ===================================
+   Item Buttons - Clickable list items
+   =================================== */
+
+.equip-bar-item-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  width: 100%;
+}
+
+.equip-bar-item-button:hover {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+.equip-bar-item-button:active {
+  background: rgba(242, 140, 82, 0.25);
+  transform: scale(0.98);
+}
+
+.equip-bar-item-button svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.equip-bar-item-button:hover svg {
+  opacity: 1;
+}
+
+.equip-bar-item-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===================================
+   Empty State
+   =================================== */
+
+.equip-bar-empty {
+  padding: 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* ===================================
+   Responsive Adjustments
+   =================================== */
+
+@media (max-width: 768px) {
+  .equip-bar {
+    gap: 6px;
+  }
+
+  .equip-bar-button {
+    padding: 0 8px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .equip-bar-button span {
+    display: none; /* Hide text labels on small screens */
+  }
+
+  .equip-bar-popover {
+    min-width: 160px;
+  }
+}

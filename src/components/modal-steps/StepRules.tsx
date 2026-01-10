@@ -315,9 +315,7 @@ export function StepRules({
           onClick={onConfirm}
           disabled={creating}
         >
-          {creating
-            ? (isEditing ? 'Saving...' : 'Creating...')
-            : (isEditing ? 'Save Agent' : 'Create Agent')}
+          Continue
         </button>
       </div>
 

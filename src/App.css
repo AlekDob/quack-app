@@ -31,6 +31,15 @@
   grid-template-columns: 850px minmax(0, 1fr) 0px; /* ← 0px, toggle button is fixed */
 }
 
+/* Chat fullscreen mode - hide side panel and expand chat */
+.app-shell.chat-fullscreen {
+  grid-template-columns: 850px minmax(0, 1fr) 0px;
+}
+
+.app-shell.chat-fullscreen aside.side-panel {
+  display: none;
+}
+
 /* Full-width tabs (docs, second-brain) should expand to fill the space */
 .app-shell.side-panel-collapsed .terminal-pane.full-width-tab {
   grid-column: 2 / 4; /* Extend to cover both column 2 and 3 */
@@ -175,6 +184,12 @@
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+}
+
+/* Cyberpunk fullscreen backdrop for Agent Bundle Editor */
+.modal-backdrop.cyberpunk-backdrop {
+  background: #0A0A12;
+  padding: 0;
 }
 
 .modal-panel {
@@ -9124,6 +9139,12 @@ button.directory-chooser:hover {
 .agent-modal {
   max-width: 720px;
   animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Wider modal for Equipment step (Fallout-style UI) */
+.agent-modal.equipment-step-wide {
+  max-width: 900px;
+  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .agent-modal .modal-header {

@@ -306,3 +306,67 @@
   color: rgba(255, 255, 255, 0.8);
   line-height: 1.4;
 }
+
+/* Bundle Export/Import Actions */
+.bundle-actions {
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bundle-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bundle-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid;
+}
+
+.bundle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bundle-btn-export {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.3);
+  color: #00D4FF;
+}
+
+.bundle-btn-export:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.2);
+  border-color: rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+}
+
+.bundle-btn-import {
+  background: rgba(255, 51, 102, 0.1);
+  border-color: rgba(255, 51, 102, 0.3);
+  color: #FF3366;
+}
+
+.bundle-btn-import:hover:not(:disabled) {
+  background: rgba(255, 51, 102, 0.2);
+  border-color: rgba(255, 51, 102, 0.5);
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.2);
+}
+
+.bundle-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  color: #FF3366;
+  background: rgba(255, 51, 102, 0.1);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+}

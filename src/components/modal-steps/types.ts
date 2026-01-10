@@ -10,8 +10,9 @@ import type { CustomAvatarInfo } from '../../utils/customAvatarStorage';
 // - 'project': Select project (path + branch) - FIRST STEP
 // - 'agent': Select existing agent or create new - renamed from 'select' mode
 // - 'basics': Agent configuration (name, color, avatar, personality)
-// - 'rules': Rules selection
-export type ModalStep = 'project' | 'agent' | 'basics' | 'rules';
+// - 'rules': Rules selection - Claude Code rules to follow
+// - 'toolkit': Equipment selection (skills, droids, commands) - Fallout-style UI
+export type ModalStep = 'project' | 'agent' | 'basics' | 'rules' | 'toolkit';
 
 // Active project from sidebar (derived from terminals)
 export interface ActiveProject {

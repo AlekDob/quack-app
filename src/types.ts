@@ -283,6 +283,9 @@ export interface AgentPersonality {
   // Selected Claude Code rules (file paths from .claude/rules/)
   selectedRules?: string[]; // Array of rule file paths to follow
 
+  // Quick-access tools for this agent (shown in chat EquipBar)
+  toolkit?: AgentToolkit;
+
   // Legacy fields (kept for backwards compatibility during migration)
   personality?: string;
   quirks?: string;
@@ -290,6 +293,13 @@ export interface AgentPersonality {
   skills?: string[];
   expressions?: string[];
   intro?: string;
+}
+
+/** Agent toolkit - quick-access tools shown in chat EquipBar */
+export interface AgentToolkit {
+  skills: string[];
+  droids: string[];
+  commands: string[];
 }
 
 // Saved Agent types (for agent reusability across projects)
@@ -1487,7 +1497,24 @@ export interface KanbanTask {
 /**
  * Available shortcut action IDs
  */
-export type ShortcutActionId = 'toggleKanban' | 'openTerminalWindow' | 'toggleSidePanel' | 'newAgent' | 'focusFileSearch' | 'newKanbanTask';
+export type ShortcutActionId =
+  | 'toggleKanban'
+  | 'openTerminalWindow'
+  | 'toggleSidePanel'
+  | 'newAgent'
+  | 'focusFileSearch'
+  | 'newKanbanTask'
+  | 'chatAttachFile'
+  | 'chatMentionAgent'
+  | 'chatToggleLock'
+  | 'chatToggleFullscreen'
+  | 'chatVoiceRecord'
+  | 'chatSendMessage'
+  | 'chatOpenSnippets'
+  | 'chatOpenDroids'
+  | 'chatOpenCommands'
+  | 'chatInsertXml'
+  | 'chatNewLine';
 
 /**
  * Configuration for a single keyboard shortcut
@@ -1576,4 +1603,113 @@ export interface TaskSummary {
   toolsUsed: string[];
   /** Duration in milliseconds */
   durationMs?: number;
+}
+
+// ==========================================
+// Agent Bundle Types (Quack Agent System)
+// ==========================================
+
+/**
+ * Equipment item reference in a bundle
+ */
+export interface BundleEquipment {
+  id: string;
+  required: boolean;
+}
+
+/**
+ * Bundle manifest metadata
+ */
+export interface BundleAuthor {
+  name: string;
+  github?: string;
+  email?: string;
+}
+
+/**
+ * Agent personality configuration for bundle
+ */
+export interface BundlePersonality {
+  role: string;
+  class: string;
+  communicationStyle: string;
+  quirks?: string;
+  avatar: string;
+  color: string;
+}
+
+/**
+ * Equipment configuration for bundle
+ */
+export interface BundleEquipmentConfig {
+  skills: BundleEquipment[];
+  droids: BundleEquipment[];
+  rules: BundleEquipment[];
+  commands: BundleEquipment[];
+}
+
+/**
+ * Compatibility requirements for bundle
+ */
+export interface BundleCompatibility {
+  quackVersion: string;
+  claudeCodeVersion: string;
+}
+
+/**
+ * Marketplace metadata for bundle
+ */
+export interface BundleMarketplaceMetadata {
+  category: string;
+  tags: string[];
+  featured: boolean;
+  verified: boolean;
+  downloads?: number;
+}
+
+/**
+ * Complete bundle manifest (manifest.json)
+ */
+export interface AgentBundleManifest {
+  $schema: string;
+  id: string;
+  version: string;
+  name: string;
+  displayName: string;
+  description: string;
+  author: BundleAuthor;
+  license: string;
+  repository?: string;
+  personality: BundlePersonality;
+  equipment: BundleEquipmentConfig;
+  compatibility: BundleCompatibility;
+  marketplace: BundleMarketplaceMetadata;
+}
+
+/**
+ * Complete agent bundle structure
+ */
+export interface AgentBundle {
+  manifest: AgentBundleManifest;
+  skillsFiles: { id: string; content: string; path: string }[];
+  droidsFiles: { id: string; content: string; path: string }[];
+  rulesFiles: { id: string; content: string; path: string }[];
+  commandsFiles: { id: string; content: string; path: string }[];
+  assetsFiles: { id: string; content: Uint8Array; path: string }[];
+}
+
+/**
+ * Power rating breakdown for display
+ */
+export interface PowerRatingBreakdown {
+  total: number;
+  base: number;
+  skills: number;
+  droids: number;
+  rules: number;
+  commands: number;
+  skillCount: number;
+  droidCount: number;
+  ruleCount: number;
+  commandCount: number;
 }

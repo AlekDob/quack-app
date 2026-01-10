@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
   type ClipboardEvent as ReactClipboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
@@ -18,6 +19,9 @@ import { useMicRecorder } from '../hooks/useMicRecorder';
 import { useSnippets, getCursorPosition, removeCursorMarker } from '../hooks/useSnippets';
 import VoiceRecordingModal from './VoiceRecordingModal';
 import { SnippetModal } from './SnippetModal';
+import EquipBar from './chat/EquipBar';
+import CodeEditorCodeMirror from './CodeEditorCodeMirror';
+import { useShortcutsStore } from '../stores/shortcutsStore';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
@@ -77,6 +81,15 @@ interface ChatInputProps {
   onWorkingOnChange?: (value: string) => void;
   // Initial attachments (from Kanban task) - DEPRECATED, use attachments prop instead
   initialAttachments?: ChatAttachment[];
+  // Fullscreen mode
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+  // Agent toolkit for EquipBar
+  agentToolkit?: {
+    skills: string[];
+    droids: string[];
+    commands: string[];
+  };
 }
 
 export default function ChatInput({
@@ -103,6 +116,9 @@ export default function ChatInput({
   workingOn = '',
   onWorkingOnChange,
   initialAttachments,
+  isFullscreen = false,
+  onToggleFullscreen,
+  agentToolkit,
 }: ChatInputProps) {
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
@@ -256,6 +272,9 @@ export default function ChatInput({
       }
     },
   });
+
+  // Get shortcuts from store
+  const { shortcuts, formatShortcut } = useShortcutsStore();
 
   const generateId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -1105,6 +1124,104 @@ export default function ChatInput({
     stopListening();
   }, [stopListening]);
 
+  // Global keyboard shortcuts for chat actions
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      // ESC closes focus mode
+      if (e.key === 'Escape' && isFullscreen && onToggleFullscreen) {
+        e.preventDefault();
+        onToggleFullscreen();
+        return;
+      }
+
+      // Build key string (e.g., "Meta+U", "Meta+Shift+F")
+      const keys: string[] = [];
+      if (e.metaKey || e.ctrlKey) keys.push('Meta');
+      if (e.shiftKey) keys.push('Shift');
+      if (e.altKey) keys.push('Alt');
+      if (e.key && e.key.length === 1) {
+        keys.push(e.key.toUpperCase());
+      } else if (e.key === 'Enter') {
+        keys.push('Enter');
+      } else if (e.key === '/') {
+        keys.push('/');
+      }
+      const keyCombo = keys.join('+');
+
+      // Match against shortcuts
+      if (keyCombo === shortcuts.chatAttachFile?.currentKeys) {
+        e.preventDefault();
+        void handleAttach();
+      } else if (keyCombo === shortcuts.chatMentionAgent?.currentKeys) {
+        e.preventDefault();
+        // Focus input and insert @
+        textareaRef.current?.focus();
+        setInput(input + '@');
+      } else if (keyCombo === shortcuts.chatToggleFullscreen?.currentKeys && onToggleFullscreen) {
+        e.preventDefault();
+        onToggleFullscreen();
+      } else if (keyCombo === shortcuts.chatVoiceRecord?.currentKeys) {
+        e.preventDefault();
+        handleVoiceClick();
+      } else if (keyCombo === shortcuts.chatSendMessage?.currentKeys && !disabled) {
+        e.preventDefault();
+        void handleSend();
+      } else if (keyCombo === shortcuts.chatOpenSnippets?.currentKeys) {
+        e.preventDefault();
+        setShowSnippetPopover(true);
+      } else if (keyCombo === shortcuts.chatOpenCommands?.currentKeys) {
+        e.preventDefault();
+        textareaRef.current?.focus();
+        setInput(input + '/');
+      } else if (keyCombo === shortcuts.chatInsertXml?.currentKeys) {
+        e.preventDefault();
+        if (!textareaRef.current) return;
+        const cursorPos = textareaRef.current.selectionStart;
+        const beforeCursor = input.substring(0, cursorPos);
+        const afterCursor = input.substring(cursorPos);
+        const openTagMatch = beforeCursor.match(/<(\w+)(?:\s[^>]*)?>(?![\s\S]*<\/\1>)/);
+        if (openTagMatch) {
+          const tagName = openTagMatch[1];
+          setInput(beforeCursor + `</${tagName}>` + afterCursor);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              const newCursorPos = cursorPos + tagName.length + 3;
+              textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+          }, 0);
+        } else {
+          setInput(beforeCursor + '<tag>' + afterCursor);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              const startPos = cursorPos + 1;
+              const endPos = cursorPos + 4;
+              textareaRef.current.setSelectionRange(startPos, endPos);
+            }
+          }, 0);
+        }
+      } else if (keyCombo === shortcuts.chatNewLine?.currentKeys) {
+        e.preventDefault();
+        if (!textareaRef.current) return;
+        const cursorPos = textareaRef.current.selectionStart;
+        const beforeCursor = input.substring(0, cursorPos);
+        const afterCursor = input.substring(cursorPos);
+        setInput(beforeCursor + '\n_ ' + afterCursor);
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            const newCursorPos = cursorPos + 3;
+            textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          }
+        }, 0);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [shortcuts, input, disabled, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput]);
+
   // Snippet insertion handler
   const handleInsertSnippet = useCallback((content: string, cursorOffset?: number) => {
     if (!textareaRef.current) return;
@@ -1604,7 +1721,7 @@ export default function ChatInput({
 
   return (
     <div
-      className={`chat-input-container ${isDragOver ? 'drag-over' : ''}`}
+      className={`chat-input-container ${isDragOver ? 'drag-over' : ''} ${isFocused ? 'focused' : ''} ${isFullscreen ? 'fullscreen' : ''}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -1792,30 +1909,14 @@ export default function ChatInput({
           );
         })()}
         <div className="chat-input-field-row">
-          <textarea
-            ref={textareaRef}
-            className="chat-input-field"
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder={
-              isFocused
-                ? `⇧ + ↵ new line | ↵ send | @ to mention droids or files | / to invoke commands`
-                : placeholder
-            }
-            disabled={disabled}
-            rows={1}
-          />
-          <div className="chat-input-actions">
+          <div className="chat-input-actions" onMouseDown={(e) => e.preventDefault()}>
+          <div className="chat-input-actions-left">
           <button
             type="button"
             className="chat-input-action-btn"
             onClick={handleAttach}
             disabled={disabled}
-            data-tooltip="Attach files"
+            data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
             aria-label="Attach files"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1881,12 +1982,33 @@ export default function ChatInput({
               )}
             </div>
           )}
+          {/* Fullscreen toggle button */}
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              className={`chat-input-action-btn ${isFullscreen ? 'active' : ''}`}
+              onClick={onToggleFullscreen}
+              disabled={disabled}
+              data-tooltip={isFullscreen ? `Exit fullscreen (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})` : `Fullscreen mode (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})`}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
+            >
+              {isFullscreen ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2L2 2L2 6M10 2L14 2L14 6M6 14L2 14L2 10M10 14L14 14L14 10"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 6L2 2L6 2M14 6L14 2L10 2M2 10L2 14L6 14M14 10L14 14L10 14"/>
+                </svg>
+              )}
+            </button>
+          )}
           <button
             type="button"
             className="chat-input-action-btn"
             onClick={handleVoiceClick}
             disabled={disabled || !isSpeechSupported}
-            data-tooltip={isSpeechSupported ? "Voice input" : "Voice input not supported"}
+            data-tooltip={isSpeechSupported ? `Voice input (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice input not supported"}
             aria-label="Voice input"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1894,35 +2016,10 @@ export default function ChatInput({
               <path d="M4 7v1a4 4 0 0 0 8 0V7h1v1a5 5 0 0 1-4.5 4.975V15h3v1h-7v-1h3v-2.025A5 5 0 0 1 3 8V7h1Z"/>
             </svg>
           </button>
-          <button
-            type="button"
-            className="chat-input-send"
-            onClick={() => void handleSend()}
-            disabled={disabled || (!input.trim() && attachments.length === 0)}
-            data-tooltip="Send (⌘+Enter)"
-            aria-label="Send message"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
           {/* Focus-only helper icons - at end so they wrap to top with wrap-reverse */}
           {/* Keep visible when snippet popover is open to prevent it from unmounting */}
           {(isFocused || showSnippetPopover) && (
-            <div className="focus-helper-icon-wrapper">
+            <div className="focus-helper-icon-wrapper" onMouseDown={(e) => e.preventDefault()}>
               {/* Snippet button - opens modal */}
               <button
                 type="button"
@@ -1932,7 +2029,7 @@ export default function ChatInput({
                   setShowSnippetPopover(!showSnippetPopover);
                 }}
                 disabled={disabled}
-                data-tooltip="Prompt Snippets"
+                data-tooltip={`Prompt Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
                 aria-label="Prompt Snippets"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1961,7 +2058,7 @@ export default function ChatInput({
                   }, 0);
                 }}
                 disabled={disabled}
-                data-tooltip="New line with _ "
+                data-tooltip={`New line with _ (${formatShortcut(shortcuts.chatNewLine?.currentKeys || '')})`}
                 aria-label="New line with underscore"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -2009,7 +2106,7 @@ export default function ChatInput({
                   }
                 }}
                 disabled={disabled}
-                data-tooltip="XML tag (smart)"
+                data-tooltip={`XML tag (${formatShortcut(shortcuts.chatInsertXml?.currentKeys || '')})`}
                 aria-label="XML tag"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -2019,6 +2116,77 @@ export default function ChatInput({
             </div>
           )}
           </div>
+          {/* Send button - aligned to right */}
+          <div className="chat-input-actions-right">
+            <button
+              type="button"
+              className="chat-input-send"
+              onClick={() => void handleSend()}
+              disabled={disabled || (!input.trim() && attachments.length === 0)}
+              data-tooltip={`Send (${formatShortcut(shortcuts.chatSendMessage?.currentKeys || '')})`}
+              aria-label="Send message"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
+                  fill="currentColor"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+          </div>
+          <textarea
+            ref={textareaRef}
+            className="chat-input-field"
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => setIsFocused(true)}
+            onBlur={(e) => {
+              // Keep focus state if clicking inside chat-view-footer (parent component)
+              const relatedTarget = e.relatedTarget as HTMLElement | null;
+              if (relatedTarget) {
+                const chatFooter = relatedTarget.closest('.chat-view-footer');
+                if (chatFooter) {
+                  // Click is inside chat-view-footer, don't collapse
+                  return;
+                }
+              }
+              setIsFocused(false);
+            }}
+            placeholder={
+              isFocused
+                ? `⇧ + ↵ new line | ↵ send | @ to mention droids or files | / to invoke commands`
+                : placeholder
+            }
+            disabled={disabled}
+            rows={1}
+          />
+
+        {/* EquipBar - Agent toolkit quick-access (shown below textarea when focused) */}
+        {isFocused && agentToolkit && (agentToolkit.skills.length > 0 || agentToolkit.droids.length > 0 || agentToolkit.commands.length > 0) && (
+          <div className="chat-input-equip-bar-wrapper" onMouseDown={(e) => e.preventDefault()}>
+            <EquipBar
+              skills={agentToolkit.skills}
+              droids={agentToolkit.droids}
+              commands={agentToolkit.commands}
+              onInsertSkill={(skill) => setInput(input + `use this skill: ${skill}\n`)}
+              onInsertDroid={(droid) => setInput(input + `@${droid} `)}
+              onInsertCommand={(command) => setInput(input + `/${command} `)}
+            />
+          </div>
+        )}
         </div>
       </div>
       {attachments.length > 0 && (
@@ -2076,6 +2244,174 @@ export default function ChatInput({
         onClose={() => setShowSnippetPopover(false)}
         onInsertSnippet={handleInsertSnippet}
       />
+
+      {/* Focus Mode - Distraction-free writing - Uses Portal to escape CSS containment */}
+      {isFullscreen && createPortal(
+        <>
+          <div className="chat-focus-overlay" onClick={onToggleFullscreen} />
+          <div className="chat-focus-mode">
+            <div className="chat-focus-card">
+              {/* Header */}
+              <div className="chat-focus-header">
+                <div className="chat-focus-header-left">
+                  <div className="chat-focus-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                      <path d="M2 2l7.586 7.586"/>
+                      <circle cx="11" cy="11" r="2"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="chat-focus-title">Focus Mode</h3>
+                    <p className="chat-focus-subtitle">Write your prompt with full concentration</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="chat-focus-close"
+                  onClick={onToggleFullscreen}
+                  aria-label="Close focus mode"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* CodeMirror Editor */}
+              <div className="chat-focus-editor">
+                <CodeEditorCodeMirror
+                  content={input}
+                  filename="message.md"
+                  language="markdown"
+                  readOnly={disabled}
+                  onChange={(value) => setInput(value)}
+                />
+              </div>
+
+              {/* Footer with Attachments, EquipBar, Actions and Send */}
+              <div className="chat-focus-footer">
+                {/* Attachments Preview */}
+                {attachments.length > 0 && (
+                  <div className="chat-focus-attachments">
+                    {attachments.map((attachment) => (
+                      <div key={attachment.id} className="chat-focus-attachment">
+                        {attachment.mimeType.startsWith('image/') && attachment.preview ? (
+                          <img
+                            src={attachment.preview}
+                            alt={attachment.name}
+                            className="chat-focus-attachment-preview"
+                          />
+                        ) : (
+                          <div className="chat-focus-attachment-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z" opacity="0.5"/>
+                              <path d="M13 2v7h7"/>
+                            </svg>
+                          </div>
+                        )}
+                        <span className="chat-focus-attachment-name">{attachment.name}</span>
+                        <button
+                          type="button"
+                          className="chat-focus-attachment-remove"
+                          onClick={() => handleRemoveAttachment(attachment.id)}
+                          aria-label="Remove attachment"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                            <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* EquipBar Chips */}
+                {agentToolkit && (agentToolkit.skills.length > 0 || agentToolkit.droids.length > 0 || agentToolkit.commands.length > 0) && (
+                  <div className="chat-focus-chips" onMouseDown={(e) => e.preventDefault()}>
+                    <EquipBar
+                      skills={agentToolkit.skills}
+                      droids={agentToolkit.droids}
+                      commands={agentToolkit.commands}
+                      onInsertSkill={(skill) => setInput(input + `use this skill: ${skill}\n`)}
+                      onInsertDroid={(droid) => setInput(input + `@${droid} `)}
+                      onInsertCommand={(command) => setInput(input + `/${command} `)}
+                    />
+                  </div>
+                )}
+
+                {/* Actions Row */}
+                <div className="chat-focus-actions-row">
+                  <div className="chat-focus-actions-left" onMouseDown={(e) => e.preventDefault()}>
+                    {/* Attach */}
+                    <button
+                      type="button"
+                      className="chat-input-action-btn"
+                      onClick={handleAttach}
+                      disabled={disabled}
+                      data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
+                      </svg>
+                    </button>
+                    {/* Snippets */}
+                    <button
+                      type="button"
+                      className="chat-input-action-btn"
+                      onClick={() => setShowSnippetPopover(!showSnippetPopover)}
+                      disabled={disabled}
+                      data-tooltip={`Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4z"/>
+                        <path d="M5 5h6v1H5zM5 7.5h4v1H5zM5 10h5v1H5z"/>
+                      </svg>
+                    </button>
+                    {/* Voice */}
+                    <button
+                      type="button"
+                      className="chat-input-action-btn"
+                      onClick={handleVoiceClick}
+                      disabled={disabled || !isSpeechSupported}
+                      data-tooltip={isSpeechSupported ? `Voice (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice not supported"}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z"/>
+                        <path d="M4 7v1a4 4 0 0 0 8 0V7h1v1a5 5 0 0 1-4.5 4.975V15h3v1h-7v-1h3v-2.025A5 5 0 0 1 3 8V7h1Z"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="chat-focus-actions-right">
+                    <div className="chat-focus-hints">
+                      <span className="chat-focus-hint">
+                        <kbd>Esc</kbd> close
+                      </span>
+                      <span className="chat-focus-hint">
+                        <kbd>Cmd</kbd>+<kbd>Enter</kbd> send
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="chat-focus-send-btn"
+                      onClick={() => void handleSend()}
+                      disabled={disabled || (!input.trim() && attachments.length === 0)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M2 8L14 2L8 14L6.5 9.5L2 8Z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span>Send</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
