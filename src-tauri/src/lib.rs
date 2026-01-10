@@ -46,6 +46,7 @@ mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
+mod kanban_watcher; // 📋 Kanban tasks file watcher for MCP sync
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -161,6 +162,7 @@ pub fn run() {
         .manage(background_tasks::KanbanShellManager::new()) // Register Kanban shell manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
         .manage(brain::VaultWatcherManager::new()) // Register Brain vault watcher for Obsidian sync
+        .manage(kanban_watcher::KanbanWatcherManager::new()) // Register Kanban watcher for MCP sync
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -758,6 +760,11 @@ pub fn run() {
             brain::brain_is_vault_watching,
             brain::brain_get_vault_path,
             brain::brain_parse_markdown_file,
+            // 📋 Kanban Tasks File Watcher (MCP Sync)
+            kanban_watcher::kanban_start_watcher,
+            kanban_watcher::kanban_stop_watcher,
+            kanban_watcher::kanban_is_watching,
+            kanban_watcher::kanban_get_watched_path,
             brain::brain_import_markdown_file,
             brain::brain_scan_vault,
             brain::brain_import_vault,

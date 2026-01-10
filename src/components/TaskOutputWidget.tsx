@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { ToolIcon } from './ToolWidgets';
+import { JsonViewer } from './JsonViewer';
 
 interface TaskOutputWidgetProps {
   taskId: string;
@@ -165,7 +166,7 @@ export const TaskOutputWidget: React.FC<TaskOutputWidgetProps> = ({
           {/* Output */}
           {output && (
             <div className="task-output-result">
-              <pre className="task-output-pre">{output}</pre>
+              <JsonViewer data={output} maxHeight="500px" />
             </div>
           )}
 
@@ -173,7 +174,7 @@ export const TaskOutputWidget: React.FC<TaskOutputWidgetProps> = ({
           {error && (
             <div className="task-output-error">
               <div className="task-output-error-label">Error</div>
-              <pre className="task-output-pre error">{error}</pre>
+              <JsonViewer data={error} maxHeight="300px" />
             </div>
           )}
         </div>

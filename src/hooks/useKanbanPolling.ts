@@ -1,37 +1,39 @@
 /**
  * useKanbanPolling Hook
  *
- * Provides automatic polling for Kanban tasks to detect changes made by
- * external sources (MCP server, other windows, etc.)
+ * Event-driven + fallback polling system for Kanban tasks.
+ * Detects changes made by MCP server via file watcher events (primary)
+ * and periodic polling (fallback for reliability).
  *
  * Features:
- * - Polls every N seconds (default 3s)
+ * - EVENT-DRIVEN: Listens to kanban:tasks-changed events (immediate updates)
+ * - FALLBACK POLLING: Polls every 30s (safety net, not primary mechanism)
  * - Pauses when document is hidden (tab not visible)
- * - Pauses when disabled via parameter
  * - Uses fingerprint comparison to avoid unnecessary reloads
  *
  * Usage:
  * ```tsx
  * // In KanbanTabView or KanbanPopoutView
- * useKanbanPolling({ enabled: true, interval: 3000 });
+ * useKanbanPolling({ enabled: true, interval: 30000 });
  * ```
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { useKanbanStore } from '../stores/kanbanStore';
 
 interface UseKanbanPollingOptions {
   /** Whether polling is enabled (default: true) */
   enabled?: boolean;
-  /** Polling interval in milliseconds (default: 3000) */
+  /** Fallback polling interval in milliseconds (default: 30000 = 30s) */
   interval?: number;
 }
 
 /**
- * Hook for automatic Kanban task polling
+ * Hook for event-driven Kanban task updates with fallback polling
  */
 export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
-  const { enabled = true, interval = 3000 } = options;
+  const { enabled = true, interval = 30000 } = options; // 30s fallback (not 3s!)
 
   const loadTasks = useKanbanStore((state) => state.loadTasks);
   const tasks = useKanbanStore((state) => state.tasks);
@@ -54,7 +56,55 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
     lastFingerprintRef.current = createFingerprint(tasks);
   }, [tasks, createFingerprint]);
 
-  // Polling logic
+  // === PRIMARY: Event Listener (immediate updates) ===
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    let unlisten: (() => void) | null = null;
+
+    // Setup event listener for kanban:tasks-changed
+    const setupListener = async () => {
+      try {
+        unlisten = await listen<{ path: string; event_type: string }>('kanban:tasks-changed', (event) => {
+          console.log('[useKanbanPolling] Received kanban:tasks-changed event:', event.payload);
+
+          // Skip if already loading
+          if (isPollingRef.current) {
+            console.log('[useKanbanPolling] Already reloading, skipping event');
+            return;
+          }
+
+          // Reload tasks immediately
+          isPollingRef.current = true;
+          loadTasks({ silent: true })
+            .catch((error) => {
+              console.error('[useKanbanPolling] Failed to reload from event:', error);
+            })
+            .finally(() => {
+              isPollingRef.current = false;
+            });
+        });
+
+        console.log('[useKanbanPolling] Event listener registered for kanban:tasks-changed');
+      } catch (error) {
+        console.error('[useKanbanPolling] Failed to setup event listener:', error);
+      }
+    };
+
+    setupListener();
+
+    // Cleanup listener on unmount
+    return () => {
+      if (unlisten) {
+        unlisten();
+        console.log('[useKanbanPolling] Event listener cleaned up');
+      }
+    };
+  }, [enabled, loadTasks]);
+
+  // === FALLBACK: Polling (30s safety net) ===
   useEffect(() => {
     if (!enabled) {
       return;
@@ -90,12 +140,14 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
     // Handle visibility changes - poll immediately when tab becomes visible
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('[useKanbanPolling] Tab visible, polling...');
+        console.log('[useKanbanPolling] Tab visible, polling (fallback)...');
         poll();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    console.log(`[useKanbanPolling] Fallback polling enabled (interval: ${interval}ms = ${interval / 1000}s)`);
 
     return () => {
       clearTimeout(initialTimeout);

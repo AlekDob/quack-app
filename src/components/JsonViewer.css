@@ -1,0 +1,62 @@
+/* JsonViewer.css - Syntax highlighting for JSON output */
+
+.json-viewer {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  overflow: auto;
+  font-family: 'Fira Code', 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+.json-viewer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.json-viewer::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.json-viewer::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.json-viewer::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Syntax highlighting colors */
+.json-key {
+  color: #82aaff; /* Blue for keys */
+  font-weight: 500;
+}
+
+.json-string {
+  color: #c3e88d; /* Green for string values */
+}
+
+.json-number {
+  color: #f78c6c; /* Orange for numbers */
+}
+
+.json-boolean {
+  color: #c792ea; /* Purple for booleans */
+  font-weight: 500;
+}
+
+.json-null {
+  color: #697098; /* Gray for null */
+  font-style: italic;
+}
+
+/* Plain text fallback */
+.json-plain {
+  color: #b0b0b0;
+}

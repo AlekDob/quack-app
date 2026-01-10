@@ -82,6 +82,7 @@ import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
 import ObsidianSyncInitializer from "./components/ObsidianSyncInitializer";
+import KanbanWatcherInitializer from "./components/KanbanWatcherInitializer";
 import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
@@ -9301,6 +9302,9 @@ You have access to all Bash tools to execute git commands like:
     <>
       {/* Obsidian Sync Initializer - Auto-starts vault watcher when sync is enabled */}
       <ObsidianSyncInitializer />
+
+      {/* Kanban Watcher Initializer - Auto-starts file watcher for MCP sync (event-driven architecture) */}
+      <KanbanWatcherInitializer />
 
       {/* Drag region removed - now using data-tauri-drag-region on sidebar-header only */}
 
