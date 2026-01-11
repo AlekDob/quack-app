@@ -14,14 +14,7 @@ import { useEffect, useCallback } from "react";
 import { useShortcutsStore } from "../stores/shortcutsStore";
 import type { ShortcutActionId } from "../types";
 
-interface ShortcutActions {
-  toggleKanban?: () => void;
-  openTerminalWindow?: () => void;
-  newAgent?: () => void;
-  toggleSidePanel?: () => void;
-  focusFileSearch?: () => void;
-  newKanbanTask?: () => void;
-}
+type ShortcutActions = Partial<Record<ShortcutActionId, () => void>>;
 
 /**
  * Check if focus is in an editable element where shortcuts should be ignored

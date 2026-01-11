@@ -16,7 +16,6 @@ interface ActionIconsProps {
   onSecondBrainClick?: () => void;
   onGuideClick: () => void;
   onClaudeAssetsClick?: () => void;
-  onSemanticSearchClick?: () => void;
   onToggleSidePanel: () => void;
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
@@ -38,7 +37,6 @@ function ActionIcons({
   onDroidFactoryClick,
   onGuideClick,
   onClaudeAssetsClick,
-  onSemanticSearchClick,
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
@@ -267,24 +265,6 @@ function ActionIcons({
           <span className="action-icon-tooltip">Claude Assets</span>
         </button>
       )}
-
-      {/* Semantic Search Icon - TEMPORARILY HIDDEN
-      {onSemanticSearchClick && (
-        <button
-          type="button"
-          className="action-icon"
-          onClick={onSemanticSearchClick}
-          aria-label="Semantic Code Search"
-          data-tooltip="Code Search"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" />
-            <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="action-icon-tooltip">Code Search</span>
-        </button>
-      )}
-      */}
 
       {/* Guide/Documentation Icon */}
       <button

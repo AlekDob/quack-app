@@ -2297,9 +2297,9 @@ export default function ChatInput({
                   <div className="chat-focus-attachments">
                     {attachments.map((attachment) => (
                       <div key={attachment.id} className="chat-focus-attachment">
-                        {attachment.mimeType.startsWith('image/') && attachment.preview ? (
+                        {attachment.mimeType?.startsWith('image/') && attachment.previewUrl ? (
                           <img
-                            src={attachment.preview}
+                            src={attachment.previewUrl}
                             alt={attachment.name}
                             className="chat-focus-attachment-preview"
                           />

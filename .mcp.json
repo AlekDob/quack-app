@@ -35,16 +35,9 @@
         "${FLOW_POSTGRES_URL}"
       ]
     },
-    "semantic-search": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "src-tauri/node-sdk/semantic-search-mcp-server.js"
-      ]
-    },
     "brain": {
       "type": "stdio",
-      "command": "node",
+      "command": "/Users/alekdob/.nvm/versions/node/v22.21.0/bin/node",
       "args": [
         "src-tauri/node-sdk/brain-mcp-server.js"
       ]

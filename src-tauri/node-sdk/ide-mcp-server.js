@@ -378,47 +378,83 @@ function arrangeWindowsSideBySide(ideId) {
     return 'Window arrangement only supported on macOS';
   }
 
-  // AppleScript to arrange windows side-by-side
+  // Use a more reliable approach: NSScreen for screen size, separate commands for each window
+  // This avoids issues with Finder's desktop bounds which can fail in some configurations
   const script = `
-    tell application "Finder"
-      set screenSize to bounds of window of desktop
-      set screenWidth to item 3 of screenSize
-      set screenHeight to item 4 of screenSize
-    end tell
+    use framework "Foundation"
+    use framework "AppKit"
+    use scripting additions
+
+    -- Get screen size using NSScreen (more reliable than Finder)
+    set mainScreen to current application's NSScreen's mainScreen()
+    set screenFrame to mainScreen's frame()
+    set screenWidth to (item 1 of item 2 of screenFrame) as integer
+    set screenHeight to (item 2 of item 2 of screenFrame) as integer
+
+    -- Menu bar height offset
+    set menuBarHeight to 25
+
+    -- Calculate window dimensions
+    set halfWidth to screenWidth / 2
+    set windowHeight to screenHeight - menuBarHeight
+
+    -- First, activate Quack to ensure it has a window
+    tell application "Quack" to activate
+    delay 0.2
 
     -- Position Quack on left half
     tell application "System Events"
-      tell process "Quack"
-        try
-          set position of window 1 to {0, 25}
-          set size of window 1 to {screenWidth / 2, screenHeight - 25}
-        end try
-      end tell
+      try
+        tell process "Quack"
+          if exists window 1 then
+            set position of window 1 to {0, menuBarHeight}
+            set size of window 1 to {halfWidth, windowHeight}
+          end if
+        end tell
+      on error errMsg
+        log "Quack positioning error: " & errMsg
+      end try
     end tell
 
-    -- Position IDE on right half
-    tell application "${ide.name}"
-      activate
-    end tell
+    -- Activate and position IDE on right half
+    tell application "${ide.name}" to activate
+    delay 0.2
 
     tell application "System Events"
-      tell process "${ide.name}"
-        try
-          set position of window 1 to {screenWidth / 2, 25}
-          set size of window 1 to {screenWidth / 2, screenHeight - 25}
-        end try
-      end tell
+      try
+        tell process "${ide.name}"
+          if exists window 1 then
+            set position of window 1 to {halfWidth, menuBarHeight}
+            set size of window 1 to {halfWidth, windowHeight}
+          end if
+        end tell
+      on error errMsg
+        log "IDE positioning error: " & errMsg
+      end try
     end tell
 
     -- Bring Quack back to front
+    delay 0.1
     tell application "Quack" to activate
+
+    return "arranged"
   `;
 
   try {
-    execSync(`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`);
+    // Use spawn for better handling of the AppleScript
+    const { execSync } = require('child_process');
+    const result = execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, {
+      timeout: 10000,
+      encoding: 'utf8',
+    });
+    console.error(`[IDE-MCP] AppleScript result: ${result}`);
     return `Windows arranged: Quack (left) | ${ide.name} (right)`;
   } catch (error) {
     console.error(`[IDE-MCP] AppleScript error: ${error.message}`);
+    // Check for common issues
+    if (error.message.includes('assistive') || error.message.includes('not allowed')) {
+      return `Failed to arrange windows: macOS requires Accessibility permission for Quack. Go to System Preferences > Security & Privacy > Privacy > Accessibility and add Quack.`;
+    }
     return `Failed to arrange windows: ${error.message}`;
   }
 }

@@ -38,7 +38,6 @@ describe('Project Dashboard Tab', () => {
       'claude-assets',
       'kanban',
       'task',
-      'semantic-search',
       'project-dashboard',
     ];
 

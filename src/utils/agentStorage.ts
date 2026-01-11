@@ -85,12 +85,23 @@ export function getSavedAgents(): SavedAgent[] {
 
 /**
  * Save a new agent or update existing one
+ * @param agent - Agent data to save
+ * @param existingId - If provided, update agent with this ID (for edit mode)
  */
-export function saveAgent(agent: Omit<SavedAgent, 'id' | 'createdAt' | 'lastUsed' | 'usageCount'>): SavedAgent {
+export function saveAgent(
+  agent: Omit<SavedAgent, 'id' | 'createdAt' | 'lastUsed' | 'usageCount'>,
+  existingId?: string
+): SavedAgent {
   const agents = getSavedAgents();
 
-  // Check if agent with same name already exists
-  const existingIndex = agents.findIndex(a => a.name === agent.name);
+  // Check if agent exists - first by ID (edit mode), then by name (backwards compat)
+  let existingIndex = -1;
+  if (existingId) {
+    existingIndex = agents.findIndex(a => a.id === existingId);
+  }
+  if (existingIndex < 0) {
+    existingIndex = agents.findIndex(a => a.name === agent.name);
+  }
 
   const now = Date.now();
   let savedAgent: SavedAgent;

@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'semantic-search' | 'project-dashboard';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -350,11 +350,6 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
           {tab.type === 'second-brain' && (
             <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px', color: '#E84A7F' }}>
               🧠
-            </span>
-          )}
-          {tab.type === 'semantic-search' && (
-            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
-              🔍
             </span>
           )}
           {tab.type === 'kanban' && (

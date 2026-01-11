@@ -666,18 +666,16 @@ ${memoryContext}`
     console.error(`[MCP] resolvedMcpServers: ${resolvedMcpServers ? JSON.stringify(Object.keys(resolvedMcpServers)) : 'null'}`);
     console.error(`[MCP] === END MCP SERVER LOADING ===`);
 
-    // Always add Kanban Tools, IDE Tools, and Semantic Search MCP servers (stdio-based for reliability)
+    // Always add Kanban Tools and IDE Tools MCP servers (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
     const kanbanMcpServerPath = join(__dirname, 'kanban-mcp-server.js');
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
-    const semanticSearchMcpServerPath = join(__dirname, 'semantic-search-mcp-server.js');
     console.error(`[MCP] Kanban MCP server path: ${kanbanMcpServerPath}`);
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
-    console.error(`[MCP] Semantic Search MCP server path: ${semanticSearchMcpServerPath}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (kanban, ide, semantic-search)
+    // Merge MCP servers: file-based servers + built-in Quack servers (kanban, ide)
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
       'kanban-tools': {
@@ -688,17 +686,13 @@ ${memoryContext}`
         command: 'node',
         args: [ideMcpServerPath],
       },
-      'semantic-search': {
-        command: 'node',
-        args: [semanticSearchMcpServerPath],
-      },
     };
 
-    const builtInServerCount = 3; // kanban-tools + ide-tools + semantic-search
+    const builtInServerCount = 2; // kanban-tools + ide-tools
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (kanban-tools, ide-tools, semantic-search)`);
+      console.error(`[MCP] Using built-in MCP servers only (kanban-tools, ide-tools)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

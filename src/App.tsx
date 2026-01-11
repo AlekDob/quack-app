@@ -63,14 +63,12 @@ import { useDocsTab } from "./hooks/useDocsTab";
 import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
-import { useSemanticSearchTab } from "./hooks/useSemanticSearchTab";
 import { useKanbanTab } from "./hooks/useKanbanTab";
 import { useKanbanChatSync } from "./hooks/useKanbanChatSync";
 import { useProjectDashboardTab } from "./hooks/useProjectDashboardTab";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
 import SecondBrainTabView from "./views/SecondBrainTabView";
-import SemanticSearchTabView from "./views/SemanticSearchTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
@@ -320,8 +318,6 @@ function AppContent() {
   // Memory Graph tab management
   const { openMemoryGraphTab } = useMemoryGraphTab();
 
-  // Semantic Search tab management
-  const { openSemanticSearchTab } = useSemanticSearchTab();
 
   // Kanban state from store (no longer using isKanbanTabActive overlay)
   const { loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
@@ -6491,6 +6487,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             customNotes: agentPersonality.customNotes || undefined,
             // Claude Code rules (new simplified flow)
             selectedRules: agentPersonality.selectedRules || undefined,
+            // Toolkit (skills, droids, commands for quick-access)
+            toolkit: agentPersonality.toolkit || undefined,
             // Legacy fields (kept for backwards compatibility)
             intro: agentPersonality.intro || '',
             personality: agentPersonality.personality || '',
@@ -7433,31 +7431,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, [openDocsTab]);
 
-  // Handler to open Semantic Search tab
-  const handleOpenSemanticSearchTab = useCallback(() => {
-    // Get current project path (from any terminal CWD or home directory)
-    // First try active terminal, then first available terminal
-    let projectPath = '';
-    const activeTerminal = terminals.find(t => t.id === activeTabId);
-    if (activeTerminal?.cwd) {
-      projectPath = activeTerminal.cwd;
-    } else if (terminals.length > 0 && terminals[0].cwd) {
-      projectPath = terminals[0].cwd;
-    }
-
-    const newTab = openSemanticSearchTab(projectPath);
-    setTabs((prevTabs) => [...prevTabs, newTab]);
-    setActiveTabId(newTab.id);
-
-    // Auto-close side-panel when opening semantic search
-    setSidePanelCollapsed(true);
-
-    console.log('🔍 Semantic Search tab opened:', newTab.id, 'Project:', projectPath);
-    toast.success('Code Search opened! 🔍', {
-      description: 'Search your codebase by meaning',
-      duration: 2000,
-    });
-  }, [openSemanticSearchTab, terminals, activeTabId]);
 
   // Handler for opening Knowledge Graph tab
   const handleOpenMemoryGraphTab = useCallback(() => {
@@ -9719,7 +9692,6 @@ You have access to all Bash tools to execute git commands like:
               onMemoryGraphClick={handleOpenMemoryGraphTab}
               onSecondBrainClick={handleOpenSecondBrainTab}
               onClaudeAssetsClick={openClaudeAssetsTab}
-              onSemanticSearchClick={handleOpenSemanticSearchTab}
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
@@ -9956,6 +9928,24 @@ You have access to all Bash tools to execute git commands like:
                       setEditingTerminal(activeTerminal);
                       setShowNewTerminalModal(true);
                     } : undefined}
+                    // Agent Toolkit - quick-access tools for EquipBar (chips at bottom of input)
+                    agentToolkit={activeTerminal?.personality?.toolkit}
+                    onInsertAtCursor={(text) => {
+                      // Insert text at cursor by appending to current input draft
+                      if (isTaskChat && activeTaskId) {
+                        const currentDraft = taskInputDrafts.get(activeTaskId) || '';
+                        const newDraft = currentDraft + text;
+                        setTaskInputDrafts(prev => {
+                          const newMap = new Map(prev);
+                          newMap.set(activeTaskId, newDraft);
+                          return newMap;
+                        });
+                      } else {
+                        const currentDraft = currentSettings.inputDraft || '';
+                        const newDraft = currentDraft + text;
+                        updateAgentSettings({ inputDraft: newDraft });
+                      }
+                    }}
                     onOpenKanban={handleOpenKanbanTab}
                     hideKanbanTasksBar={false}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
@@ -10312,14 +10302,6 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Semantic Code Search - shown when semantic-search tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('semantic-search-') && !isKanbanTabActive && (() => {
-                const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'semantic-search') {
-                  return <SemanticSearchTabView tab={activeTab} isActive={true} />;
-                }
-                return null;
-              })()}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility (hidden in Kanban mode) */}
               {tabs.some(t => t.type === 'agent-terminal') && !isKanbanTabActive && (

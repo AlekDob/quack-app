@@ -597,6 +597,28 @@ export default function ChatView({
             onEffortChange={(e) => onEffortChange?.(e)}
             disabled={isLoading}
           />
+          {/* 🧠 Thinking Mode Quick Toggle */}
+          <button
+            className={`chat-thinking-toggle ${thinkingMode && thinkingMode !== 'auto' ? 'active' : ''}`}
+            onClick={() => {
+              // Toggle between 'auto' (off) and 'think' (on)
+              const currentMode = thinkingMode || 'auto';
+              const newMode = currentMode === 'auto' ? 'think' : 'auto';
+              onThinkingModeChange?.(newMode);
+              console.log('[ChatView] 🧠 Thinking mode toggled:', currentMode, '→', newMode);
+            }}
+            disabled={isLoading}
+            title={thinkingMode && thinkingMode !== 'auto'
+              ? `Thinking: ${thinkingMode} (click to disable)`
+              : 'Enable Extended Thinking'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a8 8 0 0 0-8 8c0 3 1.5 5.5 4 7v3h8v-3c2.5-1.5 4-4 4-7a8 8 0 0 0-8-8z" />
+              <path d="M9 22h6" />
+              <path d="M12 2v2" />
+              <path d="M8.5 8.5c0-1.5 1.5-2.5 3.5-2.5" />
+            </svg>
+          </button>
           <TokenUsageIndicator
             inputTokens={sessionTokens.inputTokens}
             outputTokens={sessionTokens.outputTokens}

@@ -17,6 +17,58 @@ import { extractAndSaveMemories } from '../services/memoryIntegration';
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
 
+// 🧠 THINKING MODE CONTROL: Patterns to detect user intent to change thinking mode
+// Supports Italian and English commands
+const DISABLE_THINKING_PATTERNS = [
+  /esci\s*(dal)?\s*thinking/i,           // "esci dal thinking", "esci thinking"
+  /disattiva\s*thinking/i,               // "disattiva thinking"
+  /no\s*thinking/i,                      // "no thinking"
+  /\/thinking\s*(off|no|disable|0)/i,    // "/thinking off", "/thinking disable"
+  /stop\s*thinking/i,                    // "stop thinking"
+  /standard\s*mode/i,                    // "standard mode"
+  /disable\s*thinking/i,                 // "disable thinking"
+  /turn\s*off\s*thinking/i,              // "turn off thinking"
+  /normal\s*mode/i,                      // "normal mode"
+  /thinking\s*(off|disable)/i,           // "thinking off", "thinking disable"
+];
+
+const ENABLE_THINKING_PATTERNS = [
+  /attiva\s*thinking/i,                  // "attiva thinking"
+  /usa\s*thinking/i,                     // "usa thinking"
+  /\/thinking\s*(on|enable|1)/i,         // "/thinking on", "/thinking enable"
+  /start\s*thinking/i,                   // "start thinking"
+  /enable\s*thinking/i,                  // "enable thinking"
+  /turn\s*on\s*thinking/i,               // "turn on thinking"
+  /think\s*mode/i,                       // "think mode"
+  /thinking\s*(on|enable)/i,             // "thinking on", "thinking enable"
+];
+
+/**
+ * Parse user prompt to detect thinking mode control commands
+ * Returns the effective thinking mode based on user intent
+ * @exported for testing
+ */
+export function parseThinkingControl(prompt: string, currentMode: ThinkingMode): ThinkingMode {
+  // Check for disable patterns first
+  for (const pattern of DISABLE_THINKING_PATTERNS) {
+    if (pattern.test(prompt)) {
+      console.log('[useClaudeChat] 🧠 Thinking mode DISABLED via prompt pattern');
+      return 'auto'; // Disable extended thinking
+    }
+  }
+
+  // Check for enable patterns
+  for (const pattern of ENABLE_THINKING_PATTERNS) {
+    if (pattern.test(prompt)) {
+      console.log('[useClaudeChat] 🧠 Thinking mode ENABLED via prompt pattern');
+      return 'think'; // Enable basic extended thinking
+    }
+  }
+
+  // No control pattern found, keep current mode
+  return currentMode;
+}
+
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
   model?: 'opus' | 'sonnet' | 'haiku';
@@ -232,10 +284,19 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       // Using Date.now(), Math.random(), and performance.now() for maximum uniqueness
       const streamId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now().toString(36).substr(2, 6)}`;
 
+      // 🧠 THINKING MODE CONTROL: Parse prompt for thinking mode commands
+      const requestedThinkingMode = options?.thinkingMode || 'auto';
+      const effectiveThinkingMode = parseThinkingControl(content, requestedThinkingMode);
+      console.log('[useClaudeChat] 🧠 Thinking mode:', {
+        requested: requestedThinkingMode,
+        effective: effectiveThinkingMode,
+        hasPattern: requestedThinkingMode !== effectiveThinkingMode
+      });
+
       // Stream message using Claude Agent SDK with unique streamId
       const stream = streamClaudeMessage(content, {
         model: options?.model || 'sonnet',
-        thinkingMode: options?.thinkingMode,
+        thinkingMode: effectiveThinkingMode,
         permissionMode: options?.permissionMode || 'bypass',
         sessionId: claudeSessionId.current, // Resume previous session if exists
         workingDirectory: options?.workingDirectory,

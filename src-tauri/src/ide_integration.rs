@@ -4,6 +4,7 @@
 //! Supports: VS Code, Cursor, Windsurf, Zed, JetBrains IDEs, Sublime Text
 
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -162,17 +163,100 @@ pub fn detect_installed_ides() -> Vec<IDEInfo> {
     installed
 }
 
-/// Set the preferred IDE (saves to config file)
+/// IDE config structure for persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct IDEConfig {
+    #[serde(rename = "preferredIDE")]
+    preferred_ide: String,
+    #[serde(rename = "autoLaunch")]
+    auto_launch: bool,
+    #[serde(rename = "syncFocus")]
+    sync_focus: bool,
+}
+
+/// Get the path to ide-config.json in the app support directory
+fn get_ide_config_path() -> Result<std::path::PathBuf, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").map_err(|_| "HOME not set")?;
+        Ok(std::path::PathBuf::from(format!(
+            "{}/Library/Application Support/com.quack.terminal/ide-config.json",
+            home
+        )))
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = std::env::var("APPDATA").map_err(|_| "APPDATA not set")?;
+        Ok(std::path::PathBuf::from(format!(
+            "{}/com.quack.terminal/ide-config.json",
+            appdata
+        )))
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = std::env::var("HOME").map_err(|_| "HOME not set")?;
+        Ok(std::path::PathBuf::from(format!(
+            "{}/.local/share/com.quack.terminal/ide-config.json",
+            home
+        )))
+    }
+}
+
+/// Load current IDE config from file
+fn load_ide_config() -> IDEConfig {
+    if let Ok(path) = get_ide_config_path() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(config) = serde_json::from_str::<IDEConfig>(&content) {
+                return config;
+            }
+        }
+    }
+    // Default config
+    IDEConfig {
+        preferred_ide: String::new(),
+        auto_launch: false,
+        sync_focus: true,
+    }
+}
+
+/// Save IDE config to file
+fn save_ide_config(config: &IDEConfig) -> Result<(), String> {
+    let path = get_ide_config_path()?;
+
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
+    }
+
+    let json = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    fs::write(&path, json).map_err(|e| format!("Failed to write config: {}", e))?;
+
+    log::info!("[IDE] Saved config to {:?}: preferredIDE={}", path, config.preferred_ide);
+    Ok(())
+}
+
+/// Set the preferred IDE (saves to config file for MCP server sync)
 #[tauri::command]
 pub fn set_preferred_ide(ide_id: String) -> Result<(), String> {
-    // For now, we just validate the IDE exists
-    // The actual preference is stored in the frontend store
+    // Validate the IDE exists
     let valid = IDE_REGISTRY.iter().any(|e| e.id == ide_id);
 
     if !valid {
         return Err(format!("Unknown IDE: {}", ide_id));
     }
 
+    // Load current config and update preferredIDE
+    let mut config = load_ide_config();
+    config.preferred_ide = ide_id.clone();
+
+    // Save to file (MCP server reads this)
+    save_ide_config(&config)?;
+
+    log::info!("[IDE] Set preferred IDE to: {}", ide_id);
     Ok(())
 }
 
@@ -188,6 +272,54 @@ pub fn execute_ide_command(cli: String, args: Vec<String>) -> Result<String, Str
     match result {
         Ok(_) => Ok(format!("Launched {} with args: {:?}", cli, args)),
         Err(e) => Err(format!("Failed to execute {}: {}", cli, e)),
+    }
+}
+
+/// Open a folder in the configured IDE using `open -a` (macOS)
+/// This is more reliable than using CLI commands which may not be in PATH
+#[tauri::command]
+pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String, String> {
+    log::info!("[IDE] Opening folder {} in IDE {}", folder_path, ide_id);
+
+    // Find IDE entry
+    let ide = IDE_REGISTRY.iter().find(|e| e.id == ide_id);
+
+    let ide = match ide {
+        Some(i) => i,
+        None => return Err(format!("Unknown IDE: {}", ide_id)),
+    };
+
+    // Verify folder exists
+    if !Path::new(&folder_path).exists() {
+        return Err(format!("Folder not found: {}", folder_path));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Use `open -a "App Name" folder_path` which is more reliable than CLI
+        let result = Command::new("open")
+            .arg("-a")
+            .arg(ide.name)
+            .arg(&folder_path)
+            .spawn();
+
+        match result {
+            Ok(_) => Ok(format!("Opened {} in {}", folder_path, ide.name)),
+            Err(e) => Err(format!("Failed to open in {}: {}", ide.name, e)),
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Fallback to CLI command
+        let result = Command::new(ide.cli)
+            .arg(&folder_path)
+            .spawn();
+
+        match result {
+            Ok(_) => Ok(format!("Opened {} in {}", folder_path, ide.name)),
+            Err(e) => Err(format!("Failed to open in {}: {}", ide.name, e)),
+        }
     }
 }
 

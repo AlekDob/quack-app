@@ -110,6 +110,7 @@ function NewTerminalModal({
   const [currentStep, setCurrentStep] = useState<ModalStep>('project');
   const [completedSteps, setCompletedSteps] = useState<ModalStep[]>([]);
   const [isEditingAgent, setIsEditingAgent] = useState(false); // Track internal edit mode
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null); // Preserve agent ID during edit
   const [selectedProjectColor, setSelectedProjectColor] = useState<string>(''); // Color from project selection
 
   // Toolkit loading state
@@ -167,8 +168,10 @@ function NewTerminalModal({
         setCurrentStep('basics');
         setIsEditingAgent(true);
         // Create synthetic agent data from props to trigger skills/droids restore
+        // Use the agent ID from personality if available, otherwise generate one
+        const agentId = personality?.id as string || `editing-${Date.now()}`;
         setEditingAgentData({
-          id: 'editing-from-external',
+          id: agentId,
           name: name,
           avatar: avatar || '',
           color: color,
@@ -178,6 +181,12 @@ function NewTerminalModal({
           lastUsed: Date.now(),
           usageCount: 0,
         });
+        // Preserve agent ID for edit mode (so save updates instead of creates)
+        setEditingAgentId(agentId);
+        // Load equipment for Toolkit step (skills, droids, commands)
+        if (path) {
+          loadEquipmentForToolkitEditor(path);
+        }
       } else {
         // PROJECT-FIRST FLOW: Start with project selection or agent (if initialStep is 'agent')
         setCurrentStep(initialStep);
@@ -495,6 +504,7 @@ function NewTerminalModal({
 
   // "Edit" an existing agent - go to basics step
   function handleEditAgent(agent: SavedAgent) {
+    console.log('[NewTerminalModal] handleEditAgent - path:', path, 'agent:', agent.name);
     onNameChange(agent.name);
     onColorChange(agent.color);
     onAvatarChange?.(agent.avatar);
@@ -507,6 +517,12 @@ function NewTerminalModal({
 
     // Store original agent data to restore rules after loading
     setEditingAgentData(agent);
+    // Preserve agent ID separately (survives editingAgentData clearing)
+    setEditingAgentId(agent.id);
+
+    // Load equipment in background for Toolkit step
+    console.log('[NewTerminalModal] handleEditAgent - calling loadEquipmentForToolkitEditor with path:', path);
+    loadEquipmentForToolkitEditor(path);
 
     // Go to Basics step for editing
     setIsEditingAgent(true);
@@ -517,6 +533,7 @@ function NewTerminalModal({
   // "Create New" agent - go to Basics step first, then Rules, then Toolkit
   function handleCreateNewAgent() {
     setIsEditingAgent(false);
+    setEditingAgentId(null); // Clear any previous editing ID
     setCompletedSteps(prev => [...prev, 'agent']);
     // Load equipment in background for later steps
     loadEquipmentForToolkitEditor(path);
@@ -542,15 +559,18 @@ function NewTerminalModal({
       },
     };
 
-    // Save to storage
+    // Save to storage (pass ID for edit mode to update correct agent)
     try {
-      saveAgent({
-        name: completeAgent.name,
-        avatar: completeAgent.avatar || '',
-        color: completeAgent.color,
-        workingOn: completeAgent.workingOn,
-        personality: completeAgent.personality,
-      });
+      saveAgent(
+        {
+          name: completeAgent.name,
+          avatar: completeAgent.avatar || '',
+          color: completeAgent.color,
+          workingOn: completeAgent.workingOn,
+          personality: completeAgent.personality,
+        },
+        editingAgentId || undefined // Pass existing ID for edit mode
+      );
     } catch (err) {
       console.warn('Failed to save agent to storage:', err);
     }
@@ -853,9 +873,14 @@ function NewTerminalModal({
               const availableRuleNames = rules.project.concat(rules.global).map(r => r.name);
               const availableCommandNames: string[] = commandsMetadata;
 
+              console.log('[NewTerminalModal] Toolkit step - skillsMetadata:', skillsMetadata.length, 'droidsMetadata:', droidsMetadata.length);
+              console.log('[NewTerminalModal] Toolkit step - availableSkillNames:', availableSkillNames);
+              console.log('[NewTerminalModal] Toolkit step - loadingEquipment:', loadingEquipment);
+
               // Create agent object from Basics step data
+              // Use existing ID if editing, otherwise generate new
               const agentFromBasics: SavedAgent = {
-                id: `agent-${Date.now()}`,
+                id: editingAgentId || `agent-${Date.now()}`,
                 name,
                 avatar: avatar || '',
                 color,
@@ -875,6 +900,7 @@ function NewTerminalModal({
                   availableCommands={availableCommandNames}
                   onSave={handleToolkitSave}
                   onCancel={handleToolkitCancel}
+                  isEditing={isEditingAgent}
                 />
               );
             })()}

@@ -70,11 +70,6 @@ export const TOOL_GIF_KEYWORDS: Record<string, string[]> = {
   'mcp__brain__brain_create_relation': ['connecting dots', 'linking', 'relationship'],
   'mcp__brain__brain_list_entities': ['list checking', 'inventory', 'browsing'],
 
-  // Semantic Search tools
-  'mcp__semantic-search__semantic_search_code': ['code search', 'finding code', 'magnifying glass'],
-  'mcp__semantic-search__index_project': ['indexing files', 'organizing', 'cataloging'],
-  'mcp__semantic-search__generate_embeddings': ['processing data', 'neural network', 'ai learning'],
-
   // Kanban tools
   'mcp__kanban-tools__kanban_list_tasks': ['todo list', 'checking tasks', 'clipboard'],
   'mcp__kanban-tools__kanban_create_task': ['creating task', 'adding item', 'new task'],

@@ -52,7 +52,6 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   'glob': 'search',
   'websearch': 'search',
   'webfetch': 'search',
-  'mcp__semantic-search': 'search',
   // Agents
   'task': 'agents',
   // Never show

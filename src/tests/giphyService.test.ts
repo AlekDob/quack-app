@@ -76,10 +76,6 @@ describe('giphyService', () => {
       expect(keywords).toContain('creating task');
     });
 
-    it('should return keywords for semantic search tools', () => {
-      const keywords = getKeywordsForTool('mcp__semantic-search__semantic_search_code');
-      expect(keywords).toContain('code search');
-    });
   });
 
   describe('TOOL_GIF_KEYWORDS mapping', () => {

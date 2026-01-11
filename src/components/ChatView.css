@@ -24,6 +24,51 @@
   gap: 8px;
 }
 
+/* 🧠 Thinking Mode Toggle Button */
+.chat-thinking-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(120, 120, 120, 0.1);
+  border: 1px solid rgba(120, 120, 120, 0.3);
+  border-radius: 8px;
+  color: rgba(160, 160, 160, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.chat-thinking-toggle:hover {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: rgba(167, 139, 250, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(167, 139, 250, 0.2);
+}
+
+.chat-thinking-toggle.active {
+  background: rgba(167, 139, 250, 0.2);
+  border-color: rgba(167, 139, 250, 0.6);
+  color: rgba(167, 139, 250, 1);
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.3);
+}
+
+.chat-thinking-toggle.active:hover {
+  background: rgba(167, 139, 250, 0.25);
+  border-color: rgba(167, 139, 250, 0.7);
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.4);
+}
+
+.chat-thinking-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .chat-compact-btn {
   display: flex;
   align-items: center;

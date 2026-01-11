@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { SavedAgent } from '../../types';
 import { EquipmentPickerModal } from './EquipmentPickerModal';
 import './AgentBundleEditor.css';
@@ -12,6 +12,8 @@ interface AgentBundleEditorProps {
   availableCommands: string[];
   onSave: (agent: SavedAgent) => void;
   onCancel: () => void;
+  /** Whether we're editing an existing agent (changes button text) */
+  isEditing?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export function AgentBundleEditor({
   availableCommands,
   onSave,
   onCancel,
+  isEditing = false,
 }: AgentBundleEditorProps) {
   const name = agent?.name || 'Agent';
 
@@ -42,6 +45,16 @@ export function AgentBundleEditor({
   const [selectedCommands, setSelectedCommands] = useState<string[]>(
     agent?.personality?.toolkit?.commands || []
   );
+
+  // Sync state when agent prop changes (important for edit mode)
+  useEffect(() => {
+    const toolkit = agent?.personality?.toolkit;
+    if (toolkit) {
+      setSelectedSkills(toolkit.skills || agent?.personality?.skills || []);
+      setSelectedDroids(toolkit.droids || []);
+      setSelectedCommands(toolkit.commands || []);
+    }
+  }, [agent?.personality?.toolkit, agent?.personality?.skills]);
 
   // Picker modal state
   const [pickerOpen, setPickerOpen] = useState<'skills' | 'droids' | 'commands' | null>(null);
@@ -248,7 +261,7 @@ export function AgentBundleEditor({
           Back
         </button>
         <button className="toolkit-btn toolkit-btn-primary" onClick={handleSave}>
-          Create Agent
+          {isEditing ? 'Save Agent' : 'Create Agent'}
         </button>
       </div>
 
