@@ -118,52 +118,46 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
   const isBusy = confirmedStatus === 'busy'
   const isWaitingForResponse = terminal.waitingForResponse ?? false
 
-  // Check if chat is empty (no messages)
-  const isChatEmpty = useMemo(() => {
+  // 🦆 FIX: Use aggregated values from parent when available (sessions-first architecture)
+  // Parent passes aggregatedIsDormant/aggregatedHasUnread calculated from sessions
+  // Fallback to local calculation (using terminal.id) for backward compatibility
+  const terminalWithAggregated = terminal as typeof terminal & {
+    aggregatedIsDormant?: boolean;
+    aggregatedHasUnread?: boolean;
+  };
+
+  // Check if chat is empty (no messages) - local fallback
+  const isChatEmptyLocal = useMemo(() => {
     if (!chatSessions) return true
     const messages = chatSessions.get(terminal.id)
     return !messages || messages.length === 0
   }, [chatSessions, terminal.id])
 
-  // Check if agent is dormant (no user interaction yet)
-  const isDormant = useMemo(() => {
+  // Check if agent is dormant - prefer aggregated from parent
+  const isDormantLocal = useMemo(() => {
     if (!chatSessions) return true
     const messages = chatSessions.get(terminal.id)
     if (!messages || messages.length === 0) return true
-    // Dormant if no user messages
     const hasUserMessage = messages.some(msg => msg.role === 'user')
     return !hasUserMessage
   }, [chatSessions, terminal.id])
+  
+  // 🦆 FIX: Use aggregated value if available, otherwise fallback to local
+  const isDormant = terminalWithAggregated.aggregatedIsDormant ?? isDormantLocal
+  const isChatEmpty = isChatEmptyLocal && isDormant // Empty only if local is empty AND dormant
 
-  // Debug: Log when waitingForResponse changes (AFTER isDormant is defined)
-  useEffect(() => {
-    console.log(`[${terminal.label}] 🔔 waitingForResponse=${terminal.waitingForResponse}, isDormant=${isDormant}`)
-  }, [terminal.waitingForResponse, isDormant, terminal.label])
-
-  // Check if there are unread messages (agent responded but terminal not active)
-  const hasUnreadMessages = useMemo(() => {
-    if (!chatSessions || isActive) {
-      console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (isActive=${isActive}, chatSessions exists=${!!chatSessions})`)
-      return false // If active, no unread messages
-    }
+  // Check if there are unread messages - prefer aggregated from parent
+  const hasUnreadMessagesLocal = useMemo(() => {
+    if (!chatSessions || isActive) return false
     const messages = chatSessions.get(terminal.id)
-    if (!messages || messages.length === 0) {
-      console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (no messages)`)
-      return false
-    }
-
-    // If agent is dormant (no user interaction), no unread messages
-    if (isDormant) {
-      console.log(`[${terminal.label}] 💬 hasUnreadMessages=false (dormant)`)
-      return false
-    }
-
-    // Check if there's at least one assistant message
+    if (!messages || messages.length === 0) return false
+    if (isDormantLocal) return false
     const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant')
-    const result = lastAssistantMessage !== undefined
-    console.log(`[${terminal.label}] 💬 hasUnreadMessages=${result} (isActive=${isActive}, hasAssistantMsg=${lastAssistantMessage !== undefined})`)
-    return result
-  }, [chatSessions, terminal.id, isActive, terminal.label, isDormant])
+    return lastAssistantMessage !== undefined
+  }, [chatSessions, terminal.id, isActive, isDormantLocal])
+  
+  // 🦆 FIX: Use aggregated value if available, otherwise fallback to local
+  const hasUnreadMessages = terminalWithAggregated.aggregatedHasUnread ?? hasUnreadMessagesLocal
 
   // Memoize last message calculation
   const lastMessage = useMemo((): string | null => {

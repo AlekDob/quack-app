@@ -26,7 +26,7 @@ import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
-import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo, KanbanTask } from "../types";
+import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
 // Storage format for project order and colors
 interface ProjectStorageData {
@@ -71,12 +71,11 @@ interface SortableRepositoryGroupProps {
   // Kanban tab props
   isKanbanTabActive?: boolean;
   onOpenKanbanTab?: () => void;
-  // Kanban tasks to show under agents (TODO + in_progress)
-  agentTasks?: KanbanTask[];
-  onOpenTaskTab?: (task: KanbanTask) => void;
-  activeTaskId?: string | null;
   // Chat loading state for task status indicators
   chatLoadingMap?: Map<string, boolean>;
+  // Session props
+  onSessionClick?: (sessionId: string) => void;
+  activeSessionId?: string;
 }
 
 function SortableRepositoryGroup({
@@ -179,10 +178,6 @@ interface TerminalSidebarProps {
   isKanbanTabActive?: boolean;
   onOpenKanbanTab?: () => void;
   inProgressTaskCount?: number; // Number of tasks in progress (for badge)
-  // Kanban tasks to show under agents in sidebar (TODO + in_progress)
-  agentTasks?: KanbanTask[];
-  onOpenTaskTab?: (task: KanbanTask) => void;
-  activeTaskId?: string | null; // Currently active task tab
   // Quack sound props
   onToggleQuackSound?: () => void;
   quackSoundEnabled?: boolean;
@@ -206,6 +201,9 @@ interface TerminalSidebarProps {
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   onCreateTask?: (terminal: TerminalInfo) => void; // Create Kanban task for this agent
+  // Session props
+  onSessionClick?: (sessionId: string) => void;
+  activeSessionId?: string;
 }
 
 export default function TerminalSidebar({
@@ -227,10 +225,6 @@ export default function TerminalSidebar({
   isKanbanTabActive = false,
   onOpenKanbanTab,
   inProgressTaskCount = 0,
-  // Kanban tasks to show under agents (TODO + in_progress)
-  agentTasks = [],
-  onOpenTaskTab,
-  activeTaskId = null,
   // Quack sound props
   onToggleQuackSound,
   quackSoundEnabled,
@@ -254,6 +248,8 @@ export default function TerminalSidebar({
   gitRefreshTrigger,
   onOpenDashboard,
   onCreateTask,
+  onSessionClick,
+  activeSessionId,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -904,10 +900,9 @@ export default function TerminalSidebar({
                     onOpenDashboard={onOpenDashboard}
                     isKanbanTabActive={isKanbanTabActive}
                     onOpenKanbanTab={onOpenKanbanTab}
-                    agentTasks={agentTasks}
-                    onOpenTaskTab={onOpenTaskTab}
-                    activeTaskId={activeTaskId}
                     chatLoadingMap={chatLoadingMap}
+                    onSessionClick={onSessionClick}
+                    activeSessionId={activeSessionId}
                   />
                 );
               })}

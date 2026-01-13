@@ -9,11 +9,14 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { KanbanTask, KanbanStatus, KanbanAssignedAgent, TaskCompletionResult, KanbanTaskInitialValues } from '../types';
-import {
-  saveKanbanTasks,
-  loadKanbanTasks,
-} from '../services/kanbanStorage';
+import type { KanbanTask, KanbanStatus, KanbanAssignedAgent, TaskCompletionResult, KanbanTaskInitialValues, AgentSession } from '../types';
+import { sessionToKanbanTask } from '../utils/sessionKanbanAdapter';
+import { useSessionStore } from './sessionStore';
+// NOTE: kanbanStorage is deprecated - sessions are now the source of truth
+// import {
+//   saveKanbanTasks,
+//   loadKanbanTasks,
+// } from '../services/kanbanStorage';
 import {
   ensureWorktree,
   mergeAndCleanup,
@@ -55,9 +58,14 @@ export interface KanbanNotification {
 }
 
 interface KanbanState {
+  // 🦆 SESSIONS-FIRST: tasks removed - read from sessionStore instead
   // State
-  tasks: KanbanTask[];
-  selectedTaskId: string | null;
+  // tasks: KanbanTask[]; // DEPRECATED - using sessionStore
+  
+  // Agent info map for rendering (agentId → {name, avatar, color})
+  agentInfoMap: Map<string, { name?: string; avatar?: string; color?: string }>;
+  
+  selectedTaskId: string | null; // Now references session.id
   isDrawerOpen: boolean;
   isKanbanViewActive: boolean;
   isLoading: boolean;
@@ -67,7 +75,7 @@ interface KanbanState {
   isNewTaskModalRequested: boolean;
   // Initial values for new task modal (from context menu "Create Task")
   pendingTaskInitialValues: KanbanTaskInitialValues | null;
-  // Task IDs currently being documented
+  // Task IDs currently being documented (session IDs)
   processingDocumentation: Set<string>;
 
   // Pagination state for Done column (infinite scroll)
@@ -75,12 +83,15 @@ interface KanbanState {
   donePageSize: number;
   isLoadingMoreDone: boolean;
 
+  // Agent filter for Kanban view
+  filterAgentId: string | null;
+
   // Actions
-  loadTasks: (options?: { silent?: boolean }) => Promise<void>;
-  addTask: (task: Omit<KanbanTask, 'id' | 'createdAt'>) => Promise<KanbanTask>;
-  updateTask: (id: string, updates: Partial<KanbanTask>) => Promise<void>;
-  moveTask: (id: string, newStatus: KanbanStatus, onComplete?: (task: KanbanTask) => void) => Promise<void>;
-  deleteTask: (id: string) => Promise<void>;
+  loadTasks: (options?: { silent?: boolean }) => Promise<void>; // Now loads from sessionStore
+  addTask: (task: Omit<KanbanTask, 'id' | 'createdAt'>) => Promise<KanbanTask>; // Creates session
+  updateTask: (id: string, updates: Partial<KanbanTask>) => Promise<void>; // Updates session
+  moveTask: (id: string, newStatus: KanbanStatus, onComplete?: (task: KanbanTask) => void) => Promise<void>; // Updates session status
+  deleteTask: (id: string) => Promise<void>; // Deletes session
   selectTask: (id: string | null) => void;
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -96,8 +107,12 @@ interface KanbanState {
   // Task completion documentation tracking
   markDocumentationProcessing: (taskId: string) => void;
   markDocumentationComplete: (taskId: string, result: TaskCompletionResult) => void;
+  // Agent filter actions
+  setAgentFilter: (agentId: string | null) => void;
+  // Agent info management
+  updateAgentInfo: (agentId: string, info: { name?: string; avatar?: string; color?: string }) => void;
 
-  // Selectors
+  // Selectors - now read from sessionStore
   getTasksByStatus: (status: KanbanStatus) => KanbanTask[];
   getTasksByProject: (projectPath: string) => KanbanTask[];
   getSelectedTask: () => KanbanTask | null;
@@ -121,8 +136,8 @@ export const useKanbanStore = create<KanbanState>()(
   devtools(
     persist(
       (set, get) => ({
-        // Initial state
-        tasks: [],
+        // Initial state - 🦆 SESSIONS-FIRST: no local tasks array
+        agentInfoMap: new Map(),
         selectedTaskId: null,
         isDrawerOpen: false,
         isKanbanViewActive: false,
@@ -137,16 +152,21 @@ export const useKanbanStore = create<KanbanState>()(
         donePageSize: 20,
         isLoadingMoreDone: false,
 
-        // Load tasks from storage
-        // Use { silent: true } for background polling to avoid showing loading indicator
+        // Agent filter
+        filterAgentId: null,
+
+        // 🦆 SESSIONS-FIRST: Load tasks from sessionStore (no-op for compatibility)
+        // Sessions are loaded by sessionStore.loadSessions()
         loadTasks: async (options) => {
           const silent = options?.silent ?? false;
           if (!silent) {
             set({ isLoading: true });
           }
           try {
-            const tasks = await loadKanbanTasks();
-            set({ tasks, isLoading: false });
+            // Sessions are managed by sessionStore - nothing to load here
+            // This method kept for API compatibility
+            console.log('[kanbanStore] loadTasks called (sessions-first: no-op)');
+            set({ isLoading: false });
           } catch (error) {
             console.error('[kanbanStore] Failed to load tasks:', error);
             if (!silent) {
@@ -155,138 +175,126 @@ export const useKanbanStore = create<KanbanState>()(
           }
         },
 
-        // Add a new task
+        // 🦆 SESSIONS-FIRST: Add a new task = create a new session
         addTask: async (taskData) => {
-          const newTask: KanbanTask = {
-            ...taskData,
-            id: generateTaskId(),
+          const sessionStore = useSessionStore.getState();
+          
+          // Create session from task data
+          const newSession: Omit<AgentSession, 'id'> = {
+            claudeSessionId: taskData.sessionId,
+            title: taskData.title,
+            agentId: taskData.terminalId || taskData.assignedAgent?.id || 'unknown',
+            projectPath: taskData.projectPath,
+            projectName: taskData.projectName,
+            status: taskData.status || 'todo',
             createdAt: Date.now(),
-            type: taskData.type || 'agent', // Default to agent task
+            updatedAt: Date.now(),
+            messageCount: 0,
+            inputTokens: taskData.inputTokens,
+            outputTokens: taskData.outputTokens,
+            cacheCreationTokens: taskData.cacheCreationTokens,
+            cacheReadTokens: taskData.cacheReadTokens,
+            totalCost: taskData.totalCost,
           };
 
-          const tasks = [...get().tasks, newTask];
-          set({ tasks });
+          const createdSession = await sessionStore.createSession(newSession);
+          
+          // Update agent info map
+          if (taskData.assignedAgent) {
+            const agentInfoMap = new Map(get().agentInfoMap);
+            agentInfoMap.set(createdSession.agentId, {
+              name: taskData.assignedAgent.name,
+              avatar: taskData.assignedAgent.avatar,
+              color: taskData.assignedAgent.color,
+            });
+            set({ agentInfoMap });
+          }
 
-          // Persist to storage and mark write to prevent race condition with file watcher
-          await saveKanbanTasks(tasks);
-          kanbanWriteLock.markWrite();
-
-          console.log('[kanbanStore] Added task:', newTask.id, newTask.title);
+          const newTask = sessionToKanbanTask(createdSession, get().agentInfoMap.get(createdSession.agentId));
+          console.log('[kanbanStore] Added task (session):', newTask.id, newTask.title);
           return newTask;
         },
 
-        // Update an existing task
+        // 🦆 SESSIONS-FIRST: Update an existing task = update session
         updateTask: async (id, updates) => {
-          const tasks = get().tasks.map((task) =>
-            task.id === id ? { ...task, ...updates } : task
-          );
-          set({ tasks });
-
-          // Persist to storage and mark write to prevent race condition
-          await saveKanbanTasks(tasks);
-          kanbanWriteLock.markWrite();
-
-          console.log('[kanbanStore] Updated task:', id);
-        },
-
-        // Move task to a new status column
-        moveTask: async (id, newStatus, onComplete) => {
-          const task = get().tasks.find((t) => t.id === id);
-          if (!task) {
-            console.warn('[kanbanStore] Task not found:', id);
+          const sessionStore = useSessionStore.getState();
+          const session = sessionStore.sessions.find(s => s.id === id);
+          
+          if (!session) {
+            console.warn('[kanbanStore] Session not found for update:', id);
             return;
           }
 
-          const updates: Partial<KanbanTask> = { status: newStatus };
+          // Map KanbanTask updates to AgentSession updates
+          const sessionUpdates: Partial<AgentSession> = {
+            title: updates.title,
+            status: updates.status,
+            completedAt: updates.completedAt,
+            inputTokens: updates.inputTokens,
+            outputTokens: updates.outputTokens,
+            cacheCreationTokens: updates.cacheCreationTokens,
+            cacheReadTokens: updates.cacheReadTokens,
+            totalCost: updates.totalCost,
+            updatedAt: Date.now(),
+          };
+
+          await sessionStore.updateSession(id, sessionUpdates);
+          console.log('[kanbanStore] Updated task (session):', id);
+        },
+
+        // 🦆 SESSIONS-FIRST: Move task to a new status column = update session status
+        moveTask: async (id, newStatus, onComplete) => {
+          const sessionStore = useSessionStore.getState();
+          const session = sessionStore.sessions.find(s => s.id === id);
+          
+          if (!session) {
+            console.warn('[kanbanStore] Session not found:', id);
+            return;
+          }
+
+          const updates: Partial<AgentSession> = { status: newStatus, updatedAt: Date.now() };
 
           // Set timestamps based on status change
-          if (newStatus === 'in_progress' && task.status === 'todo') {
-            updates.startedAt = Date.now();
-
-            // Create worktree when task starts (if useWorktree is enabled)
-            if (task.useWorktree && !task.worktreePath) {
-              try {
-                console.log('[kanbanStore] Creating worktree for task:', task.id);
-                const worktreePath = await ensureWorktree(task);
-                const branchName = generateBranchName(task);
-                updates.worktreePath = worktreePath;
-                updates.branch = branchName;
-                console.log('[kanbanStore] Worktree created:', { worktreePath, branchName });
-              } catch (error) {
-                console.error('[kanbanStore] Failed to create worktree:', error);
-                // Continue without worktree - don't block task start
-              }
-            }
-          } else if (newStatus === 'done' && task.status !== 'done') {
+          if (newStatus === 'done' && session.status !== 'done') {
             updates.completedAt = Date.now();
-
-            // Merge and cleanup worktree when task completes (if it has a worktree)
-            if (task.useWorktree && task.worktreePath) {
-              try {
-                console.log('[kanbanStore] Merging worktree for task:', task.id);
-                const mergeResult = await mergeAndCleanup(task, {
-                  defaultTargetBranch: task.targetBranch || 'main',
-                });
-                if (mergeResult.success) {
-                  console.log('[kanbanStore] Worktree merged successfully');
-                  // Clear worktree path after successful merge
-                  updates.worktreePath = undefined;
-                } else if (mergeResult.hasConflicts) {
-                  console.warn('[kanbanStore] Merge has conflicts:', mergeResult.conflictedFiles);
-                  // Keep worktreePath so user can resolve conflicts
-                } else {
-                  console.error('[kanbanStore] Merge failed:', mergeResult.error);
-                }
-              } catch (error) {
-                console.error('[kanbanStore] Failed to merge worktree:', error);
-                // Don't block task completion
-              }
-            }
           }
           // Reset completedAt when task moves OUT of done status
-          if (task.status === 'done' && newStatus !== 'done') {
+          if (session.status === 'done' && newStatus !== 'done') {
             updates.completedAt = undefined;
           }
 
-          const tasks = get().tasks.map((t) =>
-            t.id === id ? { ...t, ...updates } : t
-          );
-          set({ tasks });
-
-          // Persist to storage and mark write to prevent race condition
-          await saveKanbanTasks(tasks);
-          kanbanWriteLock.markWrite();
-
-          console.log('[kanbanStore] Moved task:', id, 'to', newStatus);
+          await sessionStore.updateSession(id, updates);
+          console.log('[kanbanStore] Moved task (session):', id, 'to', newStatus);
 
           // Call completion callback if moving to done
           if (newStatus === 'done' && onComplete) {
-            const updatedTask = tasks.find((t) => t.id === id);
-            if (updatedTask) {
-              onComplete(updatedTask);
+            const updatedSession = sessionStore.sessions.find(s => s.id === id);
+            if (updatedSession) {
+              const task = sessionToKanbanTask(updatedSession, get().agentInfoMap.get(updatedSession.agentId));
+              onComplete(task);
             }
           }
+          
+          // NOTE: Worktree management removed - sessions don't use worktrees
+          // Worktrees are managed at the agent level, not session level
         },
 
-        // Delete a task
+        // 🦆 SESSIONS-FIRST: Delete a task = delete session
         deleteTask: async (id) => {
           const { selectedTaskId, isDrawerOpen } = get();
+          const sessionStore = useSessionStore.getState();
 
           // Close drawer if deleting the selected task
           const shouldCloseDrawer = selectedTaskId === id && isDrawerOpen;
 
-          const tasks = get().tasks.filter((t) => t.id !== id);
+          await sessionStore.deleteSession(id);
+          
           set({
-            tasks,
             selectedTaskId: selectedTaskId === id ? null : selectedTaskId,
             isDrawerOpen: shouldCloseDrawer ? false : isDrawerOpen,
           });
 
-          // Persist to storage and mark write to prevent race condition
-          await saveKanbanTasks(tasks);
-          kanbanWriteLock.markWrite();
-
-          console.log('[kanbanStore] Deleted task:', id);
+          console.log('[kanbanStore] Deleted task (session):', id);
         },
 
         // Select a task (for drawer display)
@@ -345,6 +353,12 @@ export const useKanbanStore = create<KanbanState>()(
           set({ pendingTaskInitialValues: null });
         },
 
+        // Set agent filter for Kanban view
+        setAgentFilter: (agentId) => {
+          set({ filterAgentId: agentId });
+          console.log('[kanbanStore] Agent filter set to:', agentId);
+        },
+
         // Mark task as being documented
         markDocumentationProcessing: (taskId) => {
           const processingDocumentation = new Set(get().processingDocumentation);
@@ -354,52 +368,72 @@ export const useKanbanStore = create<KanbanState>()(
         },
 
         // Mark documentation as complete and update task
+        // NOTE: Sessions don't track docFilePath/memoryEntityId yet
         markDocumentationComplete: async (taskId, result) => {
           const processingDocumentation = new Set(get().processingDocumentation);
           processingDocumentation.delete(taskId);
 
-          const updates: Partial<KanbanTask> = {};
-          if (result.memoryEntityId) {
-            updates.memoryEntityId = result.memoryEntityId;
-          }
-          if (result.docFilePath) {
-            updates.docFilePath = result.docFilePath;
-          }
-
-          if (Object.keys(updates).length > 0) {
-            const tasks = get().tasks.map((t) =>
-              t.id === taskId ? { ...t, ...updates } : t
-            );
-            set({ tasks, processingDocumentation });
-            await saveKanbanTasks(tasks);
-            kanbanWriteLock.markWrite();
-            console.log('[kanbanStore] Documentation complete for task:', taskId, updates);
-          } else {
-            set({ processingDocumentation });
-          }
+          // TODO: Add documentation tracking to AgentSession type
+          // For now, just clear the processing flag
+          set({ processingDocumentation });
+          console.log('[kanbanStore] Documentation complete for session:', taskId, '(not persisted - AgentSession needs docFilePath/memoryEntityId fields)');
         },
 
-        // Selector: Get tasks by status
+        // 🦆 SESSIONS-FIRST: Selector: Get tasks by status (reads from sessionStore)
         getTasksByStatus: (status) => {
-          return get().tasks.filter((t) => t.status === status);
+          const { filterAgentId, agentInfoMap } = get();
+          const sessionStore = useSessionStore.getState();
+          
+          let filteredSessions = sessionStore.sessions.filter((s) => s.status === status);
+
+          // Apply agent filter if set
+          if (filterAgentId) {
+            filteredSessions = filteredSessions.filter((s) => s.agentId === filterAgentId);
+          }
+
+          // Convert sessions to tasks
+          return filteredSessions.map((session) => 
+            sessionToKanbanTask(session, agentInfoMap.get(session.agentId))
+          );
         },
 
-        // Selector: Get tasks by project
+        // 🦆 SESSIONS-FIRST: Selector: Get tasks by project
         getTasksByProject: (projectPath) => {
-          return get().tasks.filter((t) => t.projectPath === projectPath);
+          const sessionStore = useSessionStore.getState();
+          const { agentInfoMap } = get();
+          
+          const filteredSessions = sessionStore.sessions.filter((s) => s.projectPath === projectPath);
+          
+          return filteredSessions.map((session) =>
+            sessionToKanbanTask(session, agentInfoMap.get(session.agentId))
+          );
         },
 
-        // Selector: Get the currently selected task
+        // 🦆 SESSIONS-FIRST: Selector: Get the currently selected task
         getSelectedTask: () => {
-          const { tasks, selectedTaskId } = get();
+          const { selectedTaskId, agentInfoMap } = get();
           if (!selectedTaskId) return null;
-          return tasks.find((t) => t.id === selectedTaskId) ?? null;
+          
+          const sessionStore = useSessionStore.getState();
+          const session = sessionStore.sessions.find((s) => s.id === selectedTaskId);
+          
+          if (!session) return null;
+          return sessionToKanbanTask(session, agentInfoMap.get(session.agentId));
         },
 
         // Selector: Check if task has documentation
+        // NOTE: Sessions don't track docFilePath/memoryEntityId yet
+        // This would need to be added to AgentSession type
         hasDocumentation: (taskId) => {
-          const task = get().tasks.find((t) => t.id === taskId);
-          return !!(task?.docFilePath || task?.memoryEntityId);
+          // TODO: Add documentation tracking to AgentSession
+          return false;
+        },
+        
+        // New action: Update agent info for rendering
+        updateAgentInfo: (agentId, info) => {
+          const agentInfoMap = new Map(get().agentInfoMap);
+          agentInfoMap.set(agentId, info);
+          set({ agentInfoMap });
         },
 
         // Pagination: Load more done tasks
@@ -423,24 +457,32 @@ export const useKanbanStore = create<KanbanState>()(
           set({ doneVisibleCount: 20, isLoadingMoreDone: false });
         },
 
-        // Selector: Get visible done tasks (paginated)
+        // 🦆 SESSIONS-FIRST: Selector: Get visible done tasks (paginated)
         getVisibleDoneTasks: () => {
-          const { tasks, doneVisibleCount } = get();
-          const doneTasks = tasks
-            .filter((t) => t.status === 'done')
+          const { doneVisibleCount, agentInfoMap } = get();
+          const sessionStore = useSessionStore.getState();
+          
+          const doneSessions = sessionStore.sessions
+            .filter((s) => s.status === 'done')
             .sort((a, b) => {
               // Sort by completedAt descending (most recent first)
               const aTime = a.completedAt || a.createdAt || 0;
               const bTime = b.completedAt || b.createdAt || 0;
               return bTime - aTime;
             });
-          return doneTasks.slice(0, doneVisibleCount);
+          
+          const visibleSessions = doneSessions.slice(0, doneVisibleCount);
+          
+          return visibleSessions.map((session) =>
+            sessionToKanbanTask(session, agentInfoMap.get(session.agentId))
+          );
         },
 
-        // Selector: Check if there are more done tasks to load
+        // 🦆 SESSIONS-FIRST: Selector: Check if there are more done tasks to load
         hasMoreDoneTasks: () => {
-          const { tasks, doneVisibleCount } = get();
-          const totalDone = tasks.filter((t) => t.status === 'done').length;
+          const { doneVisibleCount } = get();
+          const sessionStore = useSessionStore.getState();
+          const totalDone = sessionStore.sessions.filter((s) => s.status === 'done').length;
           return totalDone > doneVisibleCount;
         },
       }),

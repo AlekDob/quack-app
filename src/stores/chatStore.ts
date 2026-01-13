@@ -85,6 +85,7 @@ export const useChatStore = create<ChatState>()(
     }),
 
     setLoading: (sessionId, loading) => set((state) => {
+      console.log(`🦆 [chatStore.setLoading] sessionId=${sessionId}, loading=${loading}`);
       const newLoadingMap = new Map(state.chatLoadingMap);
       if (loading) {
         newLoadingMap.set(sessionId, loading);

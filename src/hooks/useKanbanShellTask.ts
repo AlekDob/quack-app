@@ -133,10 +133,17 @@ export function useKanbanShellTask(): UseKanbanShellTaskReturn {
 
   /**
    * Start executing a shell task
+   * NOTE: Shell tasks are legacy - with sessions-first, most tasks are agent sessions
    */
   const startShellTask = useCallback(async (taskId: string) => {
-    const tasks = useKanbanStore.getState().tasks;
-    const task = tasks.find((t) => t.id === taskId);
+    // 🦆 SESSIONS-FIRST: Use getter to find task
+    const { getTasksByStatus } = useKanbanStore.getState();
+    const allTasks = [
+      ...getTasksByStatus('todo'),
+      ...getTasksByStatus('in_progress'),
+      ...getTasksByStatus('done'),
+    ];
+    const task = allTasks.find((t) => t.id === taskId);
 
     if (!task || task.type !== 'shell') {
       console.warn('[useKanbanShellTask] Invalid task or not a shell task:', taskId);

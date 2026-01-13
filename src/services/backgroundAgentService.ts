@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, emit } from '@tauri-apps/api/event';
 import { sendNotification } from '@tauri-apps/plugin-notification';
 import { useBackgroundAgentStore } from '../stores/backgroundAgentStore';
+import { useKanbanStore } from '../stores/kanbanStore';
 import type {
   BackgroundTask,
   BackgroundTaskConfig,
@@ -138,6 +139,20 @@ async function handleTaskCompletion(
     store.completeTask(taskId, result);
   } else {
     store.failTask(taskId, result.error || 'Unknown error');
+  }
+
+  // Update Kanban task if linked
+  if (task.config.kanbanTaskId) {
+    const kanbanStore = useKanbanStore.getState();
+    try {
+      await kanbanStore.moveTask(
+        task.config.kanbanTaskId,
+        result.success ? 'done' : 'todo'
+      );
+      console.log(`[BackgroundAgentService] Updated Kanban task ${task.config.kanbanTaskId} to ${result.success ? 'done' : 'todo'}`);
+    } catch (error) {
+      console.error(`[BackgroundAgentService] Failed to update Kanban task:`, error);
+    }
   }
 
   // Send notification if enabled

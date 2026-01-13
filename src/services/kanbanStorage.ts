@@ -1,6 +1,13 @@
 /**
  * Kanban Storage Service
  *
+ * @deprecated This module is deprecated as of the Sessions-First refactor.
+ * Kanban tasks are now represented by AgentSessions which are persisted
+ * by sessionStore. This file is kept for backward compatibility but should
+ * not be used for new code.
+ *
+ * See: src/stores/sessionStore.ts and src/utils/sessionKanbanAdapter.ts
+ *
  * Handles persistent storage of Kanban tasks using Tauri Store.
  * Tasks are stored per project and persist across app restarts.
  *
@@ -17,6 +24,8 @@ const KANBAN_TASKS_KEY = "kanbanTasks";
 
 /**
  * Saves kanban tasks to persistent storage
+ *
+ * @deprecated Use sessionStore.updateSession() instead. Sessions are the source of truth.
  *
  * @param tasks - Array of KanbanTask objects to persist
  *
@@ -42,6 +51,9 @@ export const saveKanbanTasks = async (tasks: KanbanTask[]): Promise<void> => {
 
 /**
  * Loads kanban tasks from persistent storage with defensive validation
+ *
+ * @deprecated Use sessionStore.loadSessions() instead. Sessions are the source of truth.
+ * Convert sessions to tasks using sessionToKanbanTask() from sessionKanbanAdapter.
  *
  * Features:
  * - Forces reload from disk to catch external changes (e.g., from MCP server)

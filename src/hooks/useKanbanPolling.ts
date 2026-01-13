@@ -36,25 +36,31 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
   const { enabled = true, interval = 30000 } = options; // 30s fallback (not 3s!)
 
   const loadTasks = useKanbanStore((state) => state.loadTasks);
-  const tasks = useKanbanStore((state) => state.tasks);
+  // 🦆 SESSIONS-FIRST: Get tasks via getter instead of direct state access
+  const getTasksByStatus = useKanbanStore((state) => state.getTasksByStatus);
 
   // Track last fingerprint to avoid unnecessary reloads
   const lastFingerprintRef = useRef<string>('');
   // Track if we're currently loading to avoid overlapping requests
   const isPollingRef = useRef<boolean>(false);
 
-  // Create fingerprint from tasks (id + status + updatedAt)
-  const createFingerprint = useCallback((taskList: typeof tasks): string => {
-    return taskList
+  // Create fingerprint from tasks (id + status + completedAt)
+  const createFingerprint = useCallback((): string => {
+    const allTasks = [
+      ...getTasksByStatus('todo'),
+      ...getTasksByStatus('in_progress'),
+      ...getTasksByStatus('done'),
+    ];
+    return allTasks
       .map(t => `${t.id}:${t.status}:${t.completedAt || 0}`)
       .sort()
       .join('|');
-  }, []);
+  }, [getTasksByStatus]);
 
-  // Update fingerprint when tasks change
+  // Update fingerprint periodically (sessions are the source of truth now)
   useEffect(() => {
-    lastFingerprintRef.current = createFingerprint(tasks);
-  }, [tasks, createFingerprint]);
+    lastFingerprintRef.current = createFingerprint();
+  }, [createFingerprint]);
 
   // === PRIMARY: Event Listener (immediate updates) ===
   useEffect(() => {

@@ -44,8 +44,9 @@ import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
 // Old Background Tasks system - replaced by Kanban shell tasks
 // import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
-// import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 // import { runDroidInBackground } from "./services/backgroundAgentService";
+// Background agent service for /background @agent commands
+import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import TabBar, { type Tab, type PopoutPosition } from "./components/TabBar";
 import { useTabPopoutWindow } from "./hooks/useTabPopoutWindow";
@@ -65,6 +66,7 @@ import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
 import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
 import { useKanbanTab } from "./hooks/useKanbanTab";
 import { useKanbanChatSync } from "./hooks/useKanbanChatSync";
+import { useSessionMessageSync } from "./hooks/useSessionMessageSync";
 import { useProjectDashboardTab } from "./hooks/useProjectDashboardTab";
 import DocsTabView from "./views/DocsTabView";
 import MemoryGraphTabView from "./views/MemoryGraphTabView";
@@ -76,6 +78,8 @@ import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
+import { useSessionStore } from "./stores/sessionStore";
+import { useChatStore } from "./stores/chatStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -302,8 +306,8 @@ function AppContent() {
   // System wake handler - prevents blank screen after macOS standby
   useSystemWakeHandler({ debug: true });
 
-  // Old Background Agents initialization - removed, using Kanban shell tasks now
-  // useBackgroundAgentInit();
+  // Background Agents initialization - needed for /background @agent commands
+  useBackgroundAgentInit();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();
@@ -321,14 +325,24 @@ function AppContent() {
 
 
   // Kanban state from store (no longer using isKanbanTabActive overlay)
-  const { loadTasks: loadKanbanTasks, tasks: kanbanTasks, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
+  // 🦆 SESSIONS-FIRST: Use getters instead of direct tasks array
+  const { loadTasks: loadKanbanTasks, getTasksByStatus, pendingNotification, dismissNotification, requestNewTaskModal } = useKanbanStore();
 
-  // Count tasks in progress for badge
-  const inProgressTaskCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
+  // Session state from store (sessions-first architecture)
+  const { sessions: agentSessions, selectSession, createSession, updateSession } = useSessionStore();
 
-  // Get active tasks (TODO + in_progress) to show under agents in sidebar
-  // Done tasks are not shown - users can see them in Kanban board
-  const agentTasks = kanbanTasks.filter(t => t.status !== 'done');
+  // 🦆 SESSION-FIRST: Helper to get agentId from sessionId
+  // Used when we need to route Claude SDK calls (which use agentId) from session-based UI
+  const getAgentIdFromSession = useCallback((sessionId: string | null): string | null => {
+    if (!sessionId) return null;
+    const session = agentSessions.find(s => s.id === sessionId);
+    return session?.agentId ?? null;
+  }, [agentSessions]);
+
+  // 🦆 SESSIONS-FIRST: Count tasks in progress for badge (reads from sessions)
+  const inProgressTasks = getTasksByStatus('in_progress');
+  const inProgressTaskCount = inProgressTasks.length;
+
 
   // Second Brain tab management
   const { openSecondBrainTab } = useSecondBrainTab();
@@ -341,6 +355,7 @@ function AppContent() {
 
   // Kanban sync - emit loading state and task changes to popout windows
   const { emitLoadingState, emitTasksChanged } = useKanbanChatSync();
+
 
   // Claude Assets Manager tab - hook is called later after tabs state is defined
 
@@ -365,6 +380,9 @@ function AppContent() {
   // 🦆 Active Task ID: Tasks are now first-class citizens, completely independent from agents
   // When a task is selected, it opens in its own tab - NOT tied to any agent
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  // 🦆 Active Session ID: Track which AgentSession is currently active for chat
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   // 🗣️ AskUserQuestion: Track pending requests from canUseTool callback
   // Maps requestId -> { agentId, questions } for responding via stdin
@@ -783,6 +801,11 @@ function AppContent() {
   // the event arrives before React's setState has created the streaming message
   const eventBufferRef = useRef<Map<string, ClaudeEvent[]>>(new Map());
 
+  // 🦆 SESSION-FIRST: Map agentId → active sessionId/messageKey
+  // When streaming, events come with agentId but we need to write to the correct sessionId
+  // This ref tracks which messageKey (sessionId or agentId) is currently active for each agent
+  const activeMessageKeyRef = useRef<Map<string, string>>(new Map());
+
   // Agent Chat Settings - persistent configuration per agent
   const [agentChatSettings, setAgentChatSettings] = useState<Map<string, AgentChatSettings>>(new Map());
 
@@ -813,6 +836,12 @@ function AppContent() {
   const [pendingQuestionIdsMap, setPendingQuestionIdsMap] = useState<Map<string, Set<string>>>(new Map());
   const [answeredQuestionsMap, setAnsweredQuestionsMap] = useState<Map<string, Map<string, AskUserQuestionAnswers>>>(new Map());
 
+  // 🦆 Session message sync - sync messageCount from chatSessions to sessionStore
+  useSessionMessageSync({
+    chatSessions,
+    activeSessionId,
+  });
+
   // 🦆 KANBAN SYNC: Emit loading state to popout windows for real-time sync
   // LIGHTWEIGHT: Only triggers when chatLoadingMap changes (not during streaming)
   // This enables the Kanban popout to show "Working"/"Ready" status
@@ -820,21 +849,59 @@ function AppContent() {
     emitLoadingState(chatLoadingMap);
   }, [chatLoadingMap, emitLoadingState]);
 
+  // 🦆 SESSIONS-FIRST: Sync chatLoadingMap with chatStore for activity indicators
+  // AgentSessionList reads from chatStore, so we need to keep it in sync
+  const chatStoreSetLoading = useChatStore((state) => state.setLoading);
+  useEffect(() => {
+    chatLoadingMap.forEach((isLoading, sessionId) => {
+      chatStoreSetLoading(sessionId, isLoading);
+    });
+  }, [chatLoadingMap, chatStoreSetLoading]);
+
+  // 🦆 SESSIONS-FIRST: Sync chatSessions with chatStore for activity indicators
+  // AgentSessionItem needs chatMessages to determine hasUnreadMessages and show "Quack quack..."
+  const chatStoreAddMessage = useChatStore((state) => state.addMessage);
+  const chatStoreClearSession = useChatStore((state) => state.clearSession);
+  const chatStoreGetSession = useChatStore((state) => state.getSession);
+  useEffect(() => {
+    // Sync each session's messages to chatStore
+    chatSessions.forEach((messages, sessionId) => {
+      const storeMessages = chatStoreGetSession(sessionId);
+      // Check if sync is needed:
+      // 1. Different number of messages
+      // 2. Last message status changed (e.g., streaming -> complete)
+      const lastMsg = messages[messages.length - 1];
+      const lastStoreMsg = storeMessages[storeMessages.length - 1];
+      const needsSync =
+        messages.length !== storeMessages.length ||
+        (lastMsg && lastStoreMsg && lastMsg.status !== lastStoreMsg.status);
+
+      if (needsSync) {
+        // Clear and re-add all messages (simple but effective)
+        chatStoreClearSession(sessionId);
+        messages.forEach(msg => {
+          chatStoreAddMessage(sessionId, msg);
+        });
+      }
+    });
+  }, [chatSessions, chatStoreAddMessage, chatStoreClearSession, chatStoreGetSession]);
+
   // 🦆 KANBAN SYNC: Emit task changes to popout windows
   // Track previous tasks to detect actual changes (not just re-renders)
+  // 🦆 SESSIONS-FIRST: Use agentSessions as source of truth
   const prevKanbanTasksRef = useRef<string>('');
   useEffect(() => {
-    const currentFingerprint = kanbanTasks
-      .map(t => `${t.id}:${t.status}`)
+    const currentFingerprint = agentSessions
+      .map(s => `${s.id}:${s.status}`)
       .sort()
       .join(',');
     if (currentFingerprint !== prevKanbanTasksRef.current) {
       prevKanbanTasksRef.current = currentFingerprint;
-      if (kanbanTasks.length > 0 || prevKanbanTasksRef.current !== '') {
+      if (agentSessions.length > 0 || prevKanbanTasksRef.current !== '') {
         emitTasksChanged('update');
       }
     }
-  }, [kanbanTasks, emitTasksChanged]);
+  }, [agentSessions, emitTasksChanged]);
 
   // 🦆 STAMINA FIX: Centralized token tracking helper to avoid code duplication
   // This function is called from all event listeners (Multi-Listener, Pre-warm, ensureListenerReady)
@@ -891,34 +958,43 @@ function AppContent() {
   // 🦆 EVENT BUFFER FIX: Centralized event handler with buffering support
   // This function handles all incoming Claude events and manages buffering
   // when events arrive before the streaming message is ready
+  // 🦆 SESSION-FIRST: Events now arrive WITH sessionKey from Rust backend
   const handleClaudeEvent = useCallback((
     agentId: string,
     claudeEvent: ClaudeEvent,
-    source: string // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
+    source: string, // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
+    sessionKey?: string // 🦆 SESSION-FIRST: sessionKey from Rust event wrapper
   ) => {
     const evt = claudeEvent as any;
-    console.log(`🎯 [${source}] Event received for ${agentId}:`, {
+
+    // 🦆 SESSION-FIRST: Use sessionKey from event if available, fallback to agentId
+    // This enables parallel conversations - each stream knows where to write
+    const messageKey = sessionKey || agentId;
+
+    console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
       hasMessage: !!evt.message,
+      sessionKeyFromEvent: sessionKey,
       contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
     });
 
-    // Update chat session with incoming events
+    // Update chat session with incoming events using messageKey
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
-      const agentMessages = newSessions.get(agentId) ?? [];
-      const lastMsg = agentMessages[agentMessages.length - 1];
+      const sessionMessages = newSessions.get(messageKey) ?? [];
+      const lastMsg = sessionMessages[sessionMessages.length - 1];
 
       // Check if we have a streaming message ready
       if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
         // 🦆 BUFFER FLUSH: First, check if there are buffered events to apply
-        const bufferedEvents = eventBufferRef.current.get(agentId) || [];
+        // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
+        const bufferedEvents = eventBufferRef.current.get(messageKey) || [];
         if (bufferedEvents.length > 0) {
-          console.log(`🦆 [${source}] Flushing ${bufferedEvents.length} buffered events for ${agentId}`);
-          eventBufferRef.current.delete(agentId);
+          console.log(`🦆 [${source}] Flushing ${bufferedEvents.length} buffered events for messageKey=${messageKey}`);
+          eventBufferRef.current.delete(messageKey);
         }
 
-        const updatedMessages = [...agentMessages];
+        const updatedMessages = [...sessionMessages];
 
         // Combine buffered events with current event
         const allEvents = [...bufferedEvents, claudeEvent];
@@ -934,7 +1010,7 @@ function AppContent() {
           events: [...(lastMsg.events || []), ...allEvents],
           timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
         };
-        newSessions.set(agentId, updatedMessages);
+        newSessions.set(messageKey, updatedMessages);
 
         // Extract text content for Telegram notifications
         if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
@@ -946,25 +1022,27 @@ function AppContent() {
           });
 
           if (textContent) {
-            const existingText = lastAgentResponseRef.current.get(agentId) || '';
-            lastAgentResponseRef.current.set(agentId, existingText + textContent);
+            // 🦆 SESSION-FIRST: Use messageKey for response tracking per-session
+            const existingText = lastAgentResponseRef.current.get(messageKey) || '';
+            lastAgentResponseRef.current.set(messageKey, existingText + textContent);
           }
         }
       } else {
         // 🦆 BUFFER: No streaming message yet - buffer the event for later
-        console.log(`🦆 [${source}] Buffering event for ${agentId} (no streaming message ready yet)`);
-        const buffer = eventBufferRef.current.get(agentId) || [];
+        // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
+        console.log(`🦆 [${source}] Buffering event for messageKey=${messageKey} (no streaming message ready yet)`);
+        const buffer = eventBufferRef.current.get(messageKey) || [];
         buffer.push(claudeEvent);
-        eventBufferRef.current.set(agentId, buffer);
+        eventBufferRef.current.set(messageKey, buffer);
       }
 
       return newSessions;
     });
 
-    // Handle token updates from result events
+    // Handle token updates from result events - use messageKey for token tracking
     if (claudeEvent.type === 'result' && claudeEvent.usage) {
-      console.log(`[${source}] 🦆 Token update for ${agentId}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
-      handleTokenUpdate(agentId, claudeEvent.usage, claudeEvent.total_cost_usd);
+      console.log(`[${source}] 🦆 Token update for messageKey=${messageKey}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
+      handleTokenUpdate(messageKey, claudeEvent.usage, claudeEvent.total_cost_usd);
     }
   }, [handleTokenUpdate]);
 
@@ -1417,11 +1495,14 @@ function AppContent() {
       const eventName = `claude-event:${agentId}`;
 
       try {
-        const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
-          const claudeEvent = event.payload;
+        // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
+        // Payload structure: { sessionKey: string, event: ClaudeEvent }
+        const unlisten = await listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
+          const { sessionKey, event: claudeEvent } = event.payload;
 
           // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
-          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener');
+          // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
+          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey);
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -1666,8 +1747,10 @@ function AppContent() {
     console.log(`[Pre-warm] Setting up listener for activeId: ${activeId}`);
 
     // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
-    listen<ClaudeEvent>(eventName, (event) => {
-      handleClaudeEvent(activeId, event.payload, 'Pre-warm');
+    // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
+    listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
+      const { sessionKey, event: claudeEvent } = event.payload;
+      handleClaudeEvent(activeId, claudeEvent, 'Pre-warm', sessionKey);
     }).then((unlisten) => {
       activeListenersRef.current.set(activeId, unlisten);
       console.log(`[Pre-warm] Listener ready for activeId: ${activeId}`);
@@ -1694,17 +1777,20 @@ function AppContent() {
     console.log(`[Listener] Setting up listener for agent: ${agentId}`);
 
     try {
-      const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
-        const claudeEvent = event.payload;
+      // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
+      const unlisten = await listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
+        const { sessionKey, event: claudeEvent } = event.payload;
 
         // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
-        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady');
+        // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
+        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady', sessionKey);
 
         // Handle completion event - FileExplorer refresh
         if (claudeEvent.type === 'result') {
           // Trigger FileExplorer refresh if files were modified
+          // 🦆 SESSION-FIRST: Use sessionKey for correct session lookup
           setChatSessions((prev) => {
-            const agentMessages = prev.get(agentId) ?? [];
+            const agentMessages = prev.get(sessionKey || agentId) ?? [];
             const lastMsg = agentMessages[agentMessages.length - 1];
 
             if (lastMsg && lastMsg.events) {
@@ -1745,8 +1831,52 @@ function AppContent() {
   }, [handleClaudeEvent]);
 
   // Send message for specific agent
+  // 🦆 SESSION-FIRST: Use chatKey (sessionId when available) for message storage
+  // but keep using activeId (agentId) for Claude SDK routing and event listeners
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:sendMessageForAgent',message:'🚀 sendMessageForAgent CALLED',data:{content:content?.substring(0,100),activeId,activeSessionId,stack:new Error().stack?.split('\n').slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A-send-call'})}).catch(()=>{});
+    // #endregion
     if (!content.trim() || !activeId) return;
+
+    // 🦆 SESSION-FIRST: Require an active session to send messages
+    // The empty state UI prevents users from typing without a session selected
+    // If we reach this point without a session, something is wrong - bail out
+    if (!activeSessionId) {
+      console.error(`🦆 [SESSION-FIRST] No active session selected - cannot send message`);
+      toast.error('Please select a session first');
+      return;
+    }
+
+    const messageKey = activeSessionId;
+    console.log(`🦆 [SESSION-FIRST] Sending message to session: ${messageKey}`);
+
+    // 🦆 AUTO-PROGRESS: Move session to 'in_progress' when first message is sent
+    // This automatically transitions TODO tasks to In Progress in Kanban
+    const currentSession = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
+    console.log(`🦆 [AUTO-PROGRESS] Checking session ${activeSessionId}: found=${!!currentSession}, status=${currentSession?.status}`);
+    if (currentSession && currentSession.status === 'todo') {
+      console.log(`🦆 [AUTO-PROGRESS] Transitioning session ${activeSessionId} from 'todo' to 'in_progress'`);
+      await updateSession(activeSessionId, { status: 'in_progress' });
+    } else if (!currentSession) {
+      // Session might be in agentSessions (React state) but not yet in store
+      // Try to find it in the local React state
+      const localSession = agentSessions.find(s => s.id === activeSessionId);
+      console.log(`🦆 [AUTO-PROGRESS] Session not in store, checking local state: found=${!!localSession}, status=${localSession?.status}`);
+      if (localSession && localSession.status === 'todo') {
+        console.log(`🦆 [AUTO-PROGRESS] Transitioning local session ${activeSessionId} from 'todo' to 'in_progress'`);
+        await updateSession(activeSessionId, { status: 'in_progress' });
+      }
+    }
+
+    // 🦆 SESSIONS-FIRST: Set loading IMMEDIATELY when user presses Enter/Send
+    // This ensures the yellow dot and progress bar appear instantly
+    setChatLoadingMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(messageKey, true);
+      return newMap;
+    });
+    useChatStore.getState().setLoading(messageKey, true);
 
     // Populate ref for Telegram integration (on first call)
     if (!sendMessageForAgentRef.current) {
@@ -1791,7 +1921,10 @@ function AppContent() {
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const streamKey = `${activeId}-${messageId}`;
 
-    console.log(`[sendMessage] Starting stream ${streamKey}`);
+    // 🦆 SESSION-FIRST: No need to check for active streams or block - events now contain sessionKey
+    // Each stream sends its sessionKey to Rust, which includes it in emitted events
+    // The event handler uses the sessionKey from the event to route to the correct chat session
+    console.log(`[sendMessage] Starting stream ${streamKey} for session ${messageKey}`);
 
     // Save the prompt for restoration on abort
     lastPromptsRef.current.set(activeId, content);
@@ -1827,15 +1960,15 @@ function AppContent() {
       };
       setChatSessions((prev) => {
         const newSessions = new Map(prev);
-        const agentMessages = newSessions.get(activeId) ?? [];
-        newSessions.set(activeId, [...agentMessages, errorMessage]);
+        const agentMessages = newSessions.get(messageKey) ?? [];
+        newSessions.set(messageKey, [...agentMessages, errorMessage]);
         return newSessions;
       });
       return;
     }
 
-    // Get current agent's chat session
-    const currentMessages = chatSessions.get(activeId) ?? [];
+    // 🦆 SESSION-FIRST: Get current session's chat messages using messageKey
+    const currentMessages = chatSessions.get(messageKey) ?? [];
 
     // 🦆 Create AgentChat automatically if it doesn't exist (for UI-created agents)
     if (!agentChats.find(a => a.id === activeId)) {
@@ -1897,17 +2030,11 @@ function AppContent() {
       messagesToAdd.push(agentSystemMessage);
     }
 
+    // 🦆 SESSION-FIRST: Add messages to session using messageKey
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
-      newSessions.set(activeId, [...currentMessages, ...messagesToAdd]);
+      newSessions.set(messageKey, [...currentMessages, ...messagesToAdd]);
       return newSessions;
-    });
-
-    // Set loading for this agent
-    setChatLoadingMap((prev) => {
-      const newMap = new Map(prev);
-      newMap.set(activeId, true);
-      return newMap;
     });
 
     // Track chat message sent to PostHog
@@ -1940,32 +2067,34 @@ function AppContent() {
       },
     };
 
-    // Clear previous response text for this agent (new conversation turn)
-    lastAgentResponseRef.current.delete(activeId);
+    // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)
+    lastAgentResponseRef.current.delete(messageKey);
 
-    // 🦆 EVENT BUFFER FIX: Clear any stale buffered events from previous sessions
-    // and prepare for new events
-    eventBufferRef.current.delete(activeId);
+    // 🦆 EVENT BUFFER FIX: Clear any stale buffered events from previous conversations for this session
+    // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
+    eventBufferRef.current.delete(messageKey);
 
+    // 🦆 SESSION-FIRST: Add assistant message placeholder using messageKey
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
-      const agentMessages = newSessions.get(activeId) ?? [];
+      const sessionMessages = newSessions.get(messageKey) ?? [];
 
       // 🦆 EVENT BUFFER FIX: Check if there are buffered events to apply immediately
       // This handles the race condition where events arrive before this setState completes
-      const bufferedEvents = eventBufferRef.current.get(activeId) || [];
+      // 🦆 SESSION-FIRST: Use messageKey for buffer
+      const bufferedEvents = eventBufferRef.current.get(messageKey) || [];
       if (bufferedEvents.length > 0) {
-        console.log(`🦆 [sendMessageForAgent] Flushing ${bufferedEvents.length} buffered events for ${activeId}`);
-        eventBufferRef.current.delete(activeId);
+        console.log(`🦆 [sendMessageForAgent] Flushing ${bufferedEvents.length} buffered events for messageKey=${messageKey}`);
+        eventBufferRef.current.delete(messageKey);
 
         // Apply buffered events to the new assistant message
         const messageWithBufferedEvents = {
           ...assistantMessage,
           events: bufferedEvents,
         };
-        newSessions.set(activeId, [...agentMessages, messageWithBufferedEvents]);
+        newSessions.set(messageKey, [...sessionMessages, messageWithBufferedEvents]);
       } else {
-        newSessions.set(activeId, [...agentMessages, assistantMessage]);
+        newSessions.set(messageKey, [...sessionMessages, assistantMessage]);
       }
 
       return newSessions;
@@ -1998,6 +2127,9 @@ function AppContent() {
 
       // 🦆 SIMPLIFIED: Always start fresh conversation
       // Users can resume sessions via Sessions panel -> "Resume Session" button
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:send_message_via_sdk_streaming',message:'🔥 CALLING CLAUDE API',data:{prompt:prompt?.substring(0,200),activeId,messageKey,workingDir},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D-api-call'})}).catch(()=>{});
+      // #endregion
       // Race between invoke and abort
       const response = await Promise.race([
         invoke<{
@@ -2022,9 +2154,12 @@ function AppContent() {
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
-            // 🦆 SESSION PERSISTENCE: Use saved sessionId to automatically resume conversations
-            // This allows agent chats to persist across app restarts
-            sessionId: chatSessionIds.get(activeId),
+            // 🦆 SESSION-FIRST: Use claudeSessionId from active session for resuming
+            // If session has no claudeSessionId yet, don't pass one (creates NEW Claude session)
+            sessionId: agentSessions.find(s => s.id === messageKey)?.claudeSessionId,
+            // 🦆 SESSION-FIRST: Pass sessionKey so Rust can include it in emitted events
+            // This enables parallel conversations - each stream knows where to route events
+            sessionKey: messageKey,
             // ✅ New SDK 0.1.54+ features
             outputFormat: options?.outputFormat, // Structured outputs (beta)
             effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
@@ -2040,13 +2175,13 @@ function AppContent() {
         abortPromise,
       ]);
 
-      // Update message with final result
+      // 🦆 SESSION-FIRST: Update message with final result using messageKey
       setChatSessions((prev) => {
         const newSessions = new Map(prev);
-        const agentMessages = newSessions.get(activeId) ?? [];
+        const sessionMessages = newSessions.get(messageKey) ?? [];
         newSessions.set(
-          activeId,
-          agentMessages.map((msg) =>
+          messageKey,
+          sessionMessages.map((msg) =>
             msg.id === assistantMessageId
               ? {
                   ...msg,
@@ -2089,14 +2224,26 @@ function AppContent() {
         console.warn('[sendMessageForAgent] Memory extraction failed:', memErr);
       }
 
-      // ✅ CRITICAL FIX: Save session ID for resume support
+      // ✅ CRITICAL FIX: Save session ID for resume support (legacy compatibility)
       setChatSessionIds((prev) => {
         const updated = new Map(prev);
         updated.set(activeId, response.session_id);
         return updated;
       });
 
-      // 🦆 SESSION PERSISTENCE: Save session ID in AgentChat for persistence across app restarts
+      // 🦆 SESSION-FIRST: Save Claude session ID in AgentSession for session-specific resumption
+      if (messageKey && messageKey !== activeId) {
+        try {
+          await updateSession(messageKey, {
+            claudeSessionId: response.session_id,
+            updatedAt: Date.now(),
+          });
+        } catch (err) {
+          console.warn(`[SESSION-FIRST] Failed to save claudeSessionId:`, err);
+        }
+      }
+
+      // 🦆 SESSION PERSISTENCE: Save session ID in AgentChat for persistence across app restarts (legacy)
       setAgentChats((prev) => {
         return prev.map((agent) => {
           if (agent.id === activeId) {
@@ -2110,14 +2257,15 @@ function AppContent() {
       });
 
       // 🦆 CHAT PERSISTENCE: Save sessionId and messages to storage
+      // Note: Uses messageKey for message retrieval (session-first architecture)
       try {
-        await saveAgentSessionId(activeId, response.session_id);
+        await saveAgentSessionId(messageKey, response.session_id);
 
-        // Get current messages for this agent
-        const currentMessages = chatSessions.get(activeId) || [];
-        await saveAgentMessages(activeId, response.session_id, currentMessages);
+        // Get current messages for this session
+        const currentMessages = chatSessions.get(messageKey) || [];
+        await saveAgentMessages(messageKey, response.session_id, currentMessages);
 
-        console.log(`[sendMessageForAgent] 💾 Saved session and ${currentMessages.length} messages for agent ${activeId}`);
+        console.log(`[sendMessageForAgent] 💾 Saved session and ${currentMessages.length} messages for messageKey=${messageKey}`);
       } catch (persistErr) {
         // Non-critical, don't block chat
         console.warn('[sendMessageForAgent] Failed to persist chat data:', persistErr);
@@ -2168,13 +2316,13 @@ function AppContent() {
       if (wasAborted) {
         console.log('[sendMessageForAgent] Stream was aborted by user');
 
-        // Update message with aborted status
+        // 🦆 SESSION-FIRST: Update message with aborted status using messageKey
         setChatSessions((prev) => {
           const newSessions = new Map(prev);
-          const agentMessages = newSessions.get(activeId) ?? [];
+          const sessionMessages = newSessions.get(messageKey) ?? [];
           newSessions.set(
-            activeId,
-            agentMessages.map((msg) =>
+            messageKey,
+            sessionMessages.map((msg) =>
               msg.id === assistantMessageId
                 ? {
                     ...msg,
@@ -2195,13 +2343,13 @@ function AppContent() {
               ? err
               : 'Unknown error';
 
-        // Update message with error
+        // 🦆 SESSION-FIRST: Update message with error using messageKey
         setChatSessions((prev) => {
           const newSessions = new Map(prev);
-          const agentMessages = newSessions.get(activeId) ?? [];
+          const sessionMessages = newSessions.get(messageKey) ?? [];
           newSessions.set(
-            activeId,
-            agentMessages.map((msg) =>
+            messageKey,
+            sessionMessages.map((msg) =>
               msg.id === assistantMessageId
                 ? {
                     ...msg,
@@ -2216,12 +2364,15 @@ function AppContent() {
         });
       }
     } finally {
-      // Clear loading for this agent
+      // 🦆 SESSION-FIRST: Clear loading using messageKey
       setChatLoadingMap((prev) => {
         const newMap = new Map(prev);
-        newMap.set(activeId, false);
+        newMap.delete(messageKey); // Delete instead of set(false) for consistency
         return newMap;
       });
+      // 🦆 SESSIONS-FIRST: Also update chatStore directly for AgentSessionItem activity indicators
+      // Use getState() to avoid stale closure issues
+      useChatStore.getState().setLoading(messageKey, false);
 
       // Clean up abort controller with composite key
       abortControllersRef.current.delete(streamKey);
@@ -2249,7 +2400,7 @@ function AppContent() {
 
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
     }
-  }, [activeId, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady]);
+  }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession]);
 
   // Abort streaming for specific agent - aborts ALL active streams for this agent
   const abortStreamForAgent = useCallback(() => {
@@ -2450,30 +2601,30 @@ function AppContent() {
 
     console.log(`[sendMessageForTargetAgent] Starting stream ${streamKey} for Kanban task`);
 
-    // 🦆 Get existing sessionId from Kanban task for conversation continuity
-    const kanbanTasks = useKanbanStore.getState().tasks;
-    const kanbanTask = kanbanTasks.find(t => t.id === targetAgentId);
-    const existingSessionId = kanbanTask?.sessionId;
+    // 🦆 SESSIONS-FIRST: Get session for conversation continuity
+    // In sessions-first architecture, targetAgentId IS the sessionId
+    const { sessions } = useSessionStore.getState();
+    const session = sessions.find(s => s.id === targetAgentId);
+    const existingSessionId = session?.claudeSessionId;
     if (existingSessionId) {
       console.log(`[sendMessageForTargetAgent] Resuming session ${existingSessionId} for task ${targetAgentId}`);
     }
 
-    // 🦆 AUTO-TRANSITION: If task is in TODO status, move it to in_progress when user sends first message
-    if (kanbanTask && kanbanTask.status === 'todo') {
-      console.log(`[sendMessageForTargetAgent] Auto-transitioning task ${targetAgentId} from TODO to in_progress`);
-      const { moveTask } = useKanbanStore.getState();
-      await moveTask(targetAgentId, 'in_progress');
+    // 🦆 SESSIONS-FIRST: Auto-transition session from TODO to in_progress
+    if (session && session.status === 'todo') {
+      console.log(`[sendMessageForTargetAgent] Auto-transitioning session ${targetAgentId} from TODO to in_progress`);
+      const { updateSession } = useSessionStore.getState();
+      await updateSession(targetAgentId, { status: 'in_progress', updatedAt: Date.now() });
     }
 
-    // 🦆 Re-fetch task after potential status change to get updated worktreePath
-    // When task moves to in_progress, worktree might be created in kanbanStore.moveTask
-    const updatedKanbanState = useKanbanStore.getState();
-    const taskWithWorktree = updatedKanbanState.tasks.find(t => t.id === targetAgentId);
+    // 🦆 SESSIONS-FIRST: Re-fetch session after potential status change
+    const { sessions: updatedSessions } = useSessionStore.getState();
+    const updatedSession = updatedSessions.find(s => s.id === targetAgentId);
 
-    // 🦆 WORKTREE ISOLATION: Use worktreePath if available, otherwise projectPath
-    // This ensures Claude SDK operates in the isolated worktree when enabled
-    const effectiveWorkingDirectory = taskWithWorktree?.worktreePath || taskWithWorktree?.projectPath || options?.workingDirectory || '/';
-    console.log(`[sendMessageForTargetAgent] Using working directory: ${effectiveWorkingDirectory} (worktree: ${!!taskWithWorktree?.worktreePath})`)
+    // 🦆 SESSIONS-FIRST: Use session's projectPath as working directory
+    // (Worktree isolation not used in sessions-first architecture)
+    const effectiveWorkingDirectory = updatedSession?.projectPath || options?.workingDirectory || '/';
+    console.log(`[sendMessageForTargetAgent] Using working directory: ${effectiveWorkingDirectory}`)
 
     // Save the prompt for restoration on abort
     lastPromptsRef.current.set(targetAgentId, content);
@@ -2658,7 +2809,11 @@ function AppContent() {
 
       // 🦆 CRITICAL: Save sessionId in Kanban task for persistence across app restarts
       if (response.session_id) {
-        const { updateTask } = useKanbanStore.getState();
+        const { updateTask, getTasksByStatus } = useKanbanStore.getState();
+        // Get current task to accumulate token values
+        const allTasks = [...getTasksByStatus('todo'), ...getTasksByStatus('in_progress'), ...getTasksByStatus('done')];
+        const kanbanTask = allTasks.find(t => t.id === targetAgentId);
+        
         await updateTask(targetAgentId, {
           sessionId: response.session_id,
           // Also update token usage on the task
@@ -2671,12 +2826,12 @@ function AppContent() {
         console.log(`[sendMessageForTargetAgent] Saved sessionId ${response.session_id} to Kanban task ${targetAgentId}`);
       }
 
-      // 🦆 Notify that Kanban task agent completed response (plays Quack sound + toast)
-      // Find task info to get a better label (re-fetch since we updated)
-      const updatedKanbanTasks = useKanbanStore.getState().tasks;
-      const updatedKanbanTask = updatedKanbanTasks.find(t => t.id === targetAgentId);
-      const taskLabel = updatedKanbanTask?.title || updatedKanbanTask?.assignedAgent?.name || 'Kanban Task';
-      const taskCwd = updatedKanbanTask?.projectPath || '';
+      // 🦆 SESSIONS-FIRST: Notify that session agent completed response (plays Quack sound + toast)
+      // Find session info to get a better label
+      const { sessions: finalSessions } = useSessionStore.getState();
+      const finalSession = finalSessions.find(s => s.id === targetAgentId);
+      const taskLabel = finalSession?.title || 'Session Task';
+      const taskCwd = finalSession?.projectPath || '';
       notifyAgentReadyRef.current({ id: targetAgentId, label: taskLabel, cwd: taskCwd });
 
       // 🦆 Save chat session to persistent storage for MCP Kanban access
@@ -2845,9 +3000,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Generate unique message ID
       const messageId = `msg-${Date.now()}-compact`;
 
-      // Get working directory for this task from kanban store
-      const kanbanTask = useKanbanStore.getState().tasks.find(t => t.id === targetAgentId);
-      const workingDir = kanbanTask?.projectPath || explorerPath;
+      // 🦆 SESSIONS-FIRST: Get working directory from session
+      const { sessions: compactSessions } = useSessionStore.getState();
+      const compactSession = compactSessions.find(s => s.id === targetAgentId);
+      const workingDir = compactSession?.projectPath || explorerPath;
 
       // Call Claude to generate summary using Haiku (faster + cheaper for summaries)
       const response = await invoke<{
@@ -3286,22 +3442,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId, chatSessionIds, agentChats, explorerPath, openTerminalWindow]);
 
-  // Open Kanban task session in terminal window with claude --resume command
-  const openKanbanSessionInTerminal = useCallback(async (taskId: string) => {
-    const task = kanbanTasks.find(t => t.id === taskId);
-    if (!task) {
-      toast.error('Task not found');
+  // 🦆 SESSIONS-FIRST: Open session in terminal window with claude --resume command
+  const openKanbanSessionInTerminal = useCallback(async (sessionId: string) => {
+    const session = agentSessions.find(s => s.id === sessionId);
+    if (!session) {
+      toast.error('Session not found');
       return;
     }
 
-    if (!task.sessionId) {
-      toast.error('No session ID found for this task');
+    if (!session.claudeSessionId) {
+      toast.error('No Claude session ID found for this session');
       return;
     }
 
     try {
-      const terminalCwd = task.projectPath || explorerPath || process.env.HOME || '~';
-      const terminalLabel = `Resume ${task.sessionId.slice(0, 8)}`;
+      const terminalCwd = session.projectPath || explorerPath || process.env.HOME || '~';
+      const terminalLabel = `Resume ${session.claudeSessionId.slice(0, 8)}`;
 
       // Prepare projects list from agent chats
       const projects = agentChats.map(agent => ({
@@ -3316,7 +3472,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Open terminal window with initial command to resume session
       await openTerminalWindow(uniqueProjects, {
         projectPath: terminalCwd,
-        command: `claude --resume ${task.sessionId}`,
+        command: `claude --resume ${session.claudeSessionId}`,
         terminalLabel: terminalLabel,
       });
 
@@ -3324,10 +3480,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         duration: 3000,
       });
     } catch (error) {
-      console.error('Failed to open Kanban session in terminal:', error);
+      console.error('Failed to open session in terminal:', error);
       toast.error('Failed to open session in terminal');
     }
-  }, [kanbanTasks, agentChats, explorerPath, openTerminalWindow]);
+  }, [agentSessions, agentChats, explorerPath, openTerminalWindow]);
 
   // Quack Agency state
   const [showQuackAgencyDrawer, setShowQuackAgencyDrawer] = useState(false);
@@ -3365,16 +3521,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // activeTerminal moved to top of component for TypeScript hoisting
 
-  // Compute current agent's chat messages and loading state
+  // 🦆 SESSION-FIRST: Compute current session's chat messages and loading state
+  // Now uses activeSessionId as the primary key for chat messages (independent sessions per agent)
+  // Falls back to activeId for backward compatibility during migration
+  const chatKey = activeSessionId || activeId;
+
   const currentAgentMessages = useMemo(() => {
-    const messages = activeId ? (chatSessions.get(activeId) ?? []) : [];
-    console.log(`[ChatView] Loading messages for activeId="${activeId}": ${messages.length} messages`);
+    const messages = chatKey ? (chatSessions.get(chatKey) ?? []) : [];
+    console.log(`[ChatView] Loading messages for chatKey="${chatKey}" (sessionId: ${activeSessionId}, agentId: ${activeId}): ${messages.length} messages`);
     return messages;
-  }, [activeId, chatSessions]);
+  }, [chatKey, chatSessions, activeSessionId, activeId]);
 
   const currentAgentLoading = useMemo(() => {
-    return activeId ? (chatLoadingMap.get(activeId) ?? false) : false;
-  }, [activeId, chatLoadingMap]);
+    return chatKey ? (chatLoadingMap.get(chatKey) ?? false) : false;
+  }, [chatKey, chatLoadingMap]);
 
   // 🦆 FIX: Task messages need useMemo to trigger re-renders when chatSessions changes
   // Previously calculated inline which didn't properly track Map changes
@@ -3393,8 +3553,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     return activeTaskId ? chatTokensMap.get(activeTaskId) : undefined;
   }, [activeTaskId, chatTokensMap]);
 
+  // 🦆 SESSION-FIRST: Token tracking now uses chatKey (sessionId when available)
   const currentAgentTokens = useMemo(() => {
-    const tokens = activeId ? (chatTokensMap.get(activeId) ?? {
+    const tokens = chatKey ? (chatTokensMap.get(chatKey) ?? {
       inputTokens: 0,
       outputTokens: 0,
       cacheCreationTokens: 0,
@@ -3411,7 +3572,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     const cwd = activeTerminal?.cwd || explorerPath || '';
     const overhead = cwd ? projectOverheadCache.get(cwd) : undefined;
     return { ...tokens, overhead };
-  }, [activeId, chatTokensMap, activeTerminal?.cwd, explorerPath, projectOverheadCache]);
+  }, [chatKey, chatTokensMap, activeTerminal?.cwd, explorerPath, projectOverheadCache]);
 
   const selectedGitEntry = useMemo(() => {
     if (!gitSummary || !selectedGitPath) {
@@ -3561,9 +3722,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     return "sonnet"; // Fallback to sonnet if unknown
   };
 
+  // 🦆 SESSIONS-FIRST: Use sessionId for settings if available, fallback to agentId
+  const settingsKey = activeSessionId || activeId;
+
   const getCurrentAgentSettings = useCallback((): AgentChatSettings => {
-    if (!activeId) {
-      // Default settings when no agent is active - use presets from settings
+    if (!settingsKey) {
+      // Default settings when no session/agent is active - use presets from settings
       const presets = useSettingsStore.getState().agentModePresets;
       const bypassPreset = presets.bypass;
 
@@ -3576,7 +3740,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       };
     }
 
-    const existing = agentChatSettings.get(activeId);
+    const existing = agentChatSettings.get(settingsKey);
     if (existing) {
       // Normalize the model name in case it's a legacy full ID
       return {
@@ -3586,7 +3750,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       };
     }
 
-    // Initialize default settings for new agent using presets from settings
+    // Initialize default settings for new session using presets from settings
     const presets = useSettingsStore.getState().agentModePresets;
     const bypassPreset = presets.bypass;
 
@@ -3600,15 +3764,17 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     setAgentChatSettings((prev) => {
       const newMap = new Map(prev);
-      newMap.set(activeId, defaultSettings);
+      newMap.set(settingsKey, defaultSettings);
       return newMap;
     });
 
     return defaultSettings;
-  }, [activeId, agentChatSettings]);
+  }, [settingsKey, agentChatSettings]);
 
   const updateAgentSettings = useCallback((updates: Partial<AgentChatSettings>) => {
-    if (!activeId) return;
+    // 🦆 SESSIONS-FIRST: Use sessionId for settings if available, fallback to agentId
+    const key = activeSessionId || activeId;
+    if (!key) return;
 
     setAgentChatSettings((prev) => {
       const newMap = new Map(prev);
@@ -3617,7 +3783,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const presets = useSettingsStore.getState().agentModePresets;
       const bypassPreset = presets.bypass;
 
-      const current = newMap.get(activeId) ?? {
+      const current = newMap.get(key) ?? {
         inputDraft: '',
         model: bypassPreset?.model || 'sonnet',
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
@@ -3636,10 +3802,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         }
       }
 
-      newMap.set(activeId, { ...current, ...finalUpdates });
+      newMap.set(key, { ...current, ...finalUpdates });
       return newMap;
     });
-  }, [activeId]);
+  }, [activeSessionId, activeId]);
 
   const currentSettings = getCurrentAgentSettings();
 
@@ -6073,6 +6239,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setShowNewTerminalModal(true);
   }, [activeId, terminals]);
 
+  // Handle session click from AgentSessionList
+  const handleSessionClick = useCallback((sessionId: string) => {
+    console.log('[App] Session clicked:', sessionId);
+
+    // Find the session in sessionStore
+    const session = useSessionStore.getState().sessions.find(s => s.id === sessionId);
+    if (!session) {
+      console.warn('[App] Session not found:', sessionId);
+      return;
+    }
+
+    // Set active session in local state
+    setActiveSessionId(sessionId);
+
+    // Select the session in the store
+    selectSession(sessionId);
+
+    // If session has an associated agent, select that agent
+    if (session.agentId) {
+      const agentTerminal = terminals.find(t => t.id === session.agentId);
+      if (agentTerminal) {
+        console.log('[App] Selecting agent for session:', agentTerminal.label);
+        setActiveId(session.agentId);
+      } else {
+        console.warn('[App] Agent not found for session:', session.agentId);
+      }
+    }
+  }, [selectSession, terminals]);
+
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
     // Update terminal workingOn field
     setTerminals((prevTerminals) =>
@@ -6894,6 +7089,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // This ensures user sees the agent's chat, not a task
       // Tasks are now independent - this just ensures proper tab focus
       setActiveTaskId(null);
+
+      // 🦆 SESSIONS-FIRST: Clear activeSessionId when selecting agent
+      // User must explicitly click a session to see its chat
+      // This ensures the empty state is shown: "Select a session to start chatting"
+      setActiveSessionId(null);
 
       // Always open the chat tab when selecting a terminal from sidebar
       // This ensures consistent behavior - first tab is always the agent chat
@@ -9549,9 +9749,6 @@ You have access to all Bash tools to execute git commands like:
           isKanbanTabActive={isKanbanTabActive}
           onOpenKanbanTab={handleOpenKanbanTab}
           inProgressTaskCount={inProgressTaskCount}
-          agentTasks={agentTasks}
-          onOpenTaskTab={selectTask}
-          activeTaskId={activeTaskId}
           // Quack sound props
           onToggleQuackSound={toggleQuackSound}
           quackSoundEnabled={quackSoundEnabled}
@@ -9574,6 +9771,9 @@ You have access to all Bash tools to execute git commands like:
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           onOpenDashboard={handleOpenProjectDashboard}
           onCreateTask={handleCreateTaskFromAgent}
+          // Session props
+          onSessionClick={handleSessionClick}
+          activeSessionId={activeSessionId ?? undefined}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
         />
@@ -9827,6 +10027,8 @@ You have access to all Bash tools to execute git commands like:
                       }}
                       showMiniPanel={showKanbanMiniPanel}
                       onOpenTaskTab={selectTask}
+                      onSessionClick={handleSessionClick}
+                      onExitKanban={() => setActiveTabId('chat')}
                       onOpenTerminal={async (path, label) => {
                         // Open terminal in specified directory (worktree or project path)
                         const projectName = label || path.split('/').pop() || 'Terminal';
@@ -9882,16 +10084,44 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Chat View - shown when chat tab is active and Kanban is not active */}
-              {/* Shows either task chat (if activeTaskId is set) or agent chat */}
+              {/* 🦆 SESSIONS-FIRST: Shows session chat */}
               {activeTabId === 'chat' && !isKanbanTabActive && (() => {
-                // Check if we have an active task
-                const activeTask = activeTaskId ? kanbanTasks.find(t => t.id === activeTaskId) : null;
+                // Check if we have an active task (now a session in sessions-first)
+                const activeTask = activeTaskId ? agentSessions.find(s => s.id === activeTaskId) : null;
                 const isTaskChat = !!activeTask;
 
                 // Task-specific data
                 const taskMessages = activeTaskId ? (chatSessions.get(activeTaskId) ?? []) : [];
                 const taskLoading = activeTaskId ? (chatLoadingMap.get(activeTaskId) ?? false) : false;
                 const taskTokens = activeTaskId ? chatTokensMap.get(activeTaskId) : undefined;
+
+                // 🦆 SESSIONS-FIRST: Show empty state if no session is selected (and not a task chat)
+                // Agent click shows sessions list, user must click a session to see chat
+                if (!isTaskChat && !activeSessionId && activeId) {
+                  return (
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '16px',
+                        color: 'rgba(255, 255, 255, 0.5)',
+                        padding: '40px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '48px', opacity: 0.3 }}>💬</div>
+                      <div style={{ fontSize: '16px', fontWeight: 500 }}>
+                        Select a session to start chatting
+                      </div>
+                      <div style={{ fontSize: '13px', opacity: 0.7, maxWidth: '300px' }}>
+                        Click on a session from the list below the agent, or create a new one with the + button
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <ChatView
@@ -10004,7 +10234,13 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
-                    currentSessionId={isTaskChat ? activeTask?.sessionId : (activeId ? chatSessionIds.get(activeId) : undefined)}
+                    currentSessionId={isTaskChat ? activeTask?.sessionId : (() => {
+                      // 🦆 SESSION-FIRST: Show claudeSessionId (the real Claude Code session ID)
+                      const session = agentSessions.find(s => s.id === activeSessionId);
+                      return session?.claudeSessionId ?? undefined;
+                    })()}
+                    // 🦆 SESSION-FIRST: Internal session ID for state management (attachments, settings)
+                    internalSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
                     // Fullscreen mode
                     isFullscreen={isChatFullscreen}
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
@@ -10013,17 +10249,17 @@ You have access to all Bash tools to execute git commands like:
               })()}
 
               {/* Task Chat View - shown when a task tab is active */}
-              {/* Tasks are FIRST-CLASS CITIZENS with their own dedicated tabs */}
+              {/* 🦆 SESSIONS-FIRST: Sessions are tasks, shown in dedicated tabs */}
               {activeTabId.startsWith('task-') && !isKanbanTabActive && (() => {
-                // Get task from the tab's taskId
+                // Get session from the tab's taskId (which is now sessionId)
                 const activeTab = tabs.find(t => t.id === activeTabId);
-                const taskId = activeTab?.taskId;
-                const activeTask = taskId ? kanbanTasks.find(t => t.id === taskId) : null;
+                const sessionId = activeTab?.taskId;
+                const activeSession = sessionId ? agentSessions.find(s => s.id === sessionId) : null;
 
-                if (!activeTask) {
+                if (!activeSession) {
                   return (
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)' }}>
-                      Task not found
+                      Session not found
                     </div>
                   );
                 }
@@ -10124,6 +10360,8 @@ You have access to all Bash tools to execute git commands like:
                     answeredQuestions={answeredQuestionsMap.get(taskId!) || new Map()}
                     // Current session ID for display
                     currentSessionId={activeTask.sessionId}
+                    // 🦆 Internal session ID for state management (attachments, settings)
+                    internalSessionId={taskId}
                     // Fullscreen mode
                     isFullscreen={isChatFullscreen}
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
@@ -10474,6 +10712,8 @@ You have access to all Bash tools to execute git commands like:
           gitBranch={gitBranch}
           agentRefreshKey={agentRefreshKey}
           onEditAgent={handleEditAgentFromContext}
+          onSessionClick={handleSessionClick}
+          activeSessionId={activeSessionId ?? undefined}
           // Terminal props
           activeTerminalId={activeId}
           terminals={terminals}

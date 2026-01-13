@@ -21,21 +21,19 @@ interface KanbanTaskCounts {
  * @param projectPath - Optional project path to filter tasks
  */
 export function useKanbanTaskCounts(projectPath?: string): KanbanTaskCounts {
-  const tasks = useKanbanStore((state) => state.tasks);
+  // 🦆 SESSIONS-FIRST: Use getters instead of direct tasks array
+  const getTasksByStatus = useKanbanStore((state) => state.getTasksByStatus);
+  const getTasksByProject = useKanbanStore((state) => state.getTasksByProject);
 
-  // Filter by project if provided
-  const filteredTasks = projectPath
-    ? tasks.filter((task) => task.projectPath === projectPath)
-    : tasks;
-
-  const todoCount = filteredTasks.filter((task) => task.status === 'todo').length;
-  const inProgressCount = filteredTasks.filter((task) => task.status === 'in_progress').length;
-  const doneCount = filteredTasks.filter((task) => task.status === 'done').length;
+  // Get tasks either by project or all
+  const todoTasks = projectPath ? getTasksByProject(projectPath).filter(t => t.status === 'todo') : getTasksByStatus('todo');
+  const inProgressTasks = projectPath ? getTasksByProject(projectPath).filter(t => t.status === 'in_progress') : getTasksByStatus('in_progress');
+  const doneTasks = projectPath ? getTasksByProject(projectPath).filter(t => t.status === 'done') : getTasksByStatus('done');
 
   return {
-    todoCount,
-    inProgressCount,
-    doneCount,
-    totalActive: todoCount + inProgressCount,
+    todoCount: todoTasks.length,
+    inProgressCount: inProgressTasks.length,
+    doneCount: doneTasks.length,
+    totalActive: todoTasks.length + inProgressTasks.length,
   };
 }

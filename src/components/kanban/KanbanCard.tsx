@@ -191,9 +191,9 @@ export default function KanbanCard({
       ? TASK_TYPE_COLORS.watch
       : (task.assignedAgent?.color || '#6b7280');
 
-  // Truncate title if too long
-  const displayTitle = task.title.length > 40
-    ? task.title.substring(0, 40) + '...'
+  // Truncate title if too long (increased limit for better readability)
+  const displayTitle = task.title.length > 80
+    ? task.title.substring(0, 80) + '...'
     : task.title;
 
   // Truncate prompt/command preview
@@ -261,154 +261,73 @@ export default function KanbanCard({
         style={{ backgroundColor: accentColor }}
       />
 
-      {/* Card content */}
+      {/* Card content - MINIMAL DESIGN */}
       <div className="kanban-card-content">
-        {/* Header with title, type badge, status badge, and delete button */}
+        {/* Row 1: Agent + Actions */}
         <div className="kanban-card-header">
-          <div className="kanban-card-title-row">
-            {/* Mini agent avatar - shown for all tasks with assigned agent */}
-            {task.assignedAgent && (
+          {/* Left: Agent avatar + name */}
+          {task.assignedAgent && (
+            <div className="kanban-card-agent-info">
               <MiniAgentAvatar
                 agentName={task.assignedAgent.name}
                 avatarFilename={task.assignedAgent.avatar}
                 agentColor={task.assignedAgent.color}
               />
-            )}
-            {/* Task type badge for non-agent tasks */}
-            {!isAgentTask && (
-              <span
-                className="kanban-task-type-badge"
-                style={{ backgroundColor: accentColor }}
-              >
-                {isShellTask ? 'SHELL' : 'WATCH'}
+              <span className="kanban-card-agent-name" style={{ color: accentColor }}>
+                {task.assignedAgent.name}
               </span>
-            )}
-            <h4 className="kanban-card-title">
-              {displayTitle}
-            </h4>
-          </div>
+            </div>
+          )}
+          {/* Shell/Watch badge */}
+          {!isAgentTask && (
+            <span className="kanban-task-type-badge" style={{ backgroundColor: accentColor }}>
+              {isShellTask ? 'SHELL' : 'WATCH'}
+            </span>
+          )}
+          {/* Right: Actions */}
           <div className="kanban-card-actions">
-            {/* Start button - only for TODO agent tasks */}
             {isAgentTask && task.status === 'todo' && onStart && (
-              <button
-                className="kanban-card-start"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStart();
-                }}
-                title="Start task"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                Start
+              <button className="kanban-card-start" onClick={(e) => { e.stopPropagation(); onStart(); }} title="Start">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
               </button>
             )}
-            {/* Documentation badge - show if doc exists or is being processed */}
             {(task.docFilePath || isProcessingDoc) && (
-              <button
-                className="kanban-doc-badge"
-                onClick={handleOpenDoc}
-                disabled={isProcessingDoc}
-                title={isProcessingDoc ? "Generating documentation..." : "Open documentation"}
-              >
-                {isProcessingDoc ? (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="animate-spin"
-                  >
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                ) : (
-                  <FileText size={14} />
-                )}
+              <button className="kanban-doc-badge" onClick={handleOpenDoc} disabled={isProcessingDoc} title="Docs">
+                <FileText size={12} />
               </button>
             )}
-            {/* Kill button for running shell/watch tasks */}
             {(isShellTask || isWatchTask) && task.status === 'in_progress' && task.pid && onKill && (
-              <button
-                className="kanban-card-kill"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onKill();
-                }}
-                title="Kill process"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                </svg>
+              <button className="kanban-card-kill" onClick={(e) => { e.stopPropagation(); onKill(); }} title="Kill">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>
               </button>
             )}
             {onDelete && (
-              <button
-                className="kanban-card-delete"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                title="Delete task"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <button className="kanban-card-delete" onClick={(e) => { e.stopPropagation(); onDelete(); }} title="Delete">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             )}
           </div>
         </div>
 
-        {/* Progress bar when streaming/busy */}
-        {task.status === 'in_progress' && isLoading && (
-          <div className="kanban-progress-bar">
-            <div className="kanban-progress-indicator" />
-          </div>
-        )}
+        {/* Row 2: Session/Task title (on its own line) */}
+        <h4 className="kanban-card-title">{displayTitle}</h4>
 
-        {/* Project info - clickable to open side panel */}
-        <button
-          type="button"
-          className="kanban-card-project kanban-card-project-clickable"
-          onClick={(e) => {
-            e.stopPropagation();
-            onProjectClick?.(task.projectPath);
-          }}
-          title="Open project context panel"
+        {/* Row 2: Project name (small, colored) */}
+        <div 
+          className="kanban-card-project-row"
+          onClick={(e) => { e.stopPropagation(); onProjectClick?.(task.projectPath); }}
+          title={task.projectPath}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
-          <span className="kanban-card-project-name">{task.projectName}</span>
-          {task.branch && (
-            <>
-              <span className="kanban-card-separator">/</span>
-              <span className="kanban-card-branch">{task.branch}</span>
-            </>
-          )}
-          {task.useWorktree && (
-            <span className="kanban-card-worktree-badge" title={task.worktreePath || 'Isolated worktree'}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="6" y1="3" x2="6" y2="15" />
-                <circle cx="18" cy="6" r="3" />
-                <circle cx="6" cy="18" r="3" />
-                <path d="M18 9a9 9 0 0 1-9 9" />
-                <line x1="18" y1="9" x2="18" y2="21" />
-              </svg>
-            </span>
-          )}
-          <svg className="kanban-card-project-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </button>
+          <span style={{ color: accentColor }}>{task.projectName}</span>
+        </div>
 
-        {/* Prompt/Command preview */}
-        <p className="kanban-card-prompt">{promptPreview}</p>
+        {/* Progress bar */}
+        {task.status === 'in_progress' && isLoading && (
+          <div className="kanban-progress-bar"><div className="kanban-progress-indicator" /></div>
+        )}
 
         {/* Shell output preview (last 3 lines) */}
         {isShellTask && shellOutput && (
@@ -632,8 +551,8 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
       ? TASK_TYPE_COLORS.watch
       : (task.assignedAgent?.color || '#6b7280');
 
-  const displayTitle = task.title.length > 40
-    ? task.title.substring(0, 40) + '...'
+  const displayTitle = task.title.length > 80
+    ? task.title.substring(0, 80) + '...'
     : task.title;
 
   return (

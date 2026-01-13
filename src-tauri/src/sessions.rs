@@ -188,6 +188,14 @@ fn extract_session_metadata_fast(session_file: &PathBuf) -> Result<SessionInfo, 
         return Err("Empty session file".to_string());
     }
 
+    // 🦆 SIDECHAIN FILTER: Skip sessions that are Claude SDK sidechains (warmup sessions)
+    // These are automatically created by Claude Code SDK for prefetching and have "isSidechain": true
+    if let Ok(first_event) = serde_json::from_str::<Value>(lines[0]) {
+        if first_event["isSidechain"].as_bool() == Some(true) {
+            return Err("Sidechain session (SDK warmup) - skipped".to_string());
+        }
+    }
+
     let mut title = String::from("Untitled Session");
     let mut created_at = 0i64;
     let mut updated_at = 0i64;

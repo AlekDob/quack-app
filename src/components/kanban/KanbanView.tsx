@@ -70,8 +70,10 @@ interface KanbanViewProps {
   // Mini panel toggle - exits Kanban to Chat with mini panel in sidebar
   onToggleMiniPanel?: () => void;
   showMiniPanel?: boolean;
-  // Open task in new tab
+  // Open task in new tab (legacy)
   onOpenTaskTab?: (task: KanbanTask) => void;
+  // 🦆 SESSIONS-FIRST: Open session directly (preferred)
+  onSessionClick?: (sessionId: string) => void;
   // Open terminal in specified directory (for worktree tasks)
   onOpenTerminal?: (path: string, label?: string) => void;
 }
@@ -101,10 +103,12 @@ export default function KanbanView({
   onToggleMiniPanel,
   showMiniPanel = false,
   onOpenTaskTab,
+  onSessionClick,
   onOpenTerminal,
 }: KanbanViewProps) {
+  // 🦆 SESSIONS-FIRST: Use getters instead of direct tasks array
   const {
-    tasks,
+    getTasksByStatus, // NEW: getter that reads from sessionStore
     isLoading,
     loadTasks,
     addTask,
@@ -115,12 +119,24 @@ export default function KanbanView({
     clearNewTaskModalRequest,
     pendingTaskInitialValues,
     clearPendingTaskInitialValues,
+    updateAgentInfo, // NEW: to update agent rendering info
     // Pagination for Done column
     getVisibleDoneTasks,
     hasMoreDoneTasks,
     loadMoreDone,
     isLoadingMoreDone,
   } = useKanbanStore();
+
+  // 🦆 SESSIONS-FIRST: Sync agentInfoMap with terminals for proper avatar/color display
+  useEffect(() => {
+    terminals.forEach((terminal) => {
+      updateAgentInfo(terminal.id, {
+        name: terminal.label,
+        avatar: terminal.avatar,
+        color: terminal.color,
+      });
+    });
+  }, [terminals, updateAgentInfo]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
@@ -133,6 +149,8 @@ export default function KanbanView({
   // Shell drawer state (separate from chat drawer)
   const [isShellDrawerOpen, setIsShellDrawerOpen] = useState(false);
   const [selectedShellTaskId, setSelectedShellTaskId] = useState<string | null>(null);
+  // Reopen done task confirmation dialog
+  const [reopenTaskDialog, setReopenTaskDialog] = useState<KanbanTask | null>(null);
 
   // Shell task management hook
   const {
@@ -177,12 +195,16 @@ export default function KanbanView({
     return rectCollisions;
   }, []);
 
-  // Show ALL tasks (cross-project view)
-  const todoTasks = tasks.filter((t) => t.status === 'todo');
-  const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  // Use paginated Done tasks for infinite scroll
+  // 🦆 SESSIONS-FIRST: Get tasks from sessionStore via getters
+  const todoTasks = getTasksByStatus('todo');
+  const inProgressTasks = getTasksByStatus('in_progress');
+  
+  // Create a combined array for find operations (used in drag handlers and drawer)
   const visibleDoneTasks = getVisibleDoneTasks();
-  const totalDoneTasks = tasks.filter((t) => t.status === 'done').length;
+  const allTasks = [...todoTasks, ...inProgressTasks, ...visibleDoneTasks];
+  // 🦆 SESSIONS-FIRST: Get total done count from getter
+  const allDoneTasks = getTasksByStatus('done');
+  const totalDoneTasks = allDoneTasks.length;
   const hasMoreDone = hasMoreDoneTasks();
 
   // Load tasks on mount, then load chat sessions from saved sessionIds
@@ -216,10 +238,10 @@ export default function KanbanView({
   }, [isNewTaskModalRequested, clearNewTaskModalRequest, pendingTaskInitialValues, clearPendingTaskInitialValues]);
 
   // Auto-start shell tasks that are in_progress but not yet running
+  // 🦆 SESSIONS-FIRST: Use inProgressTasks instead of tasks
   useEffect(() => {
-    const shellTasksToStart = tasks.filter(task =>
+    const shellTasksToStart = inProgressTasks.filter(task =>
       task.type === 'shell' &&
-      task.status === 'in_progress' &&
       task.command &&
       !task.pid && // No PID means not started yet
       !task.completedAt && // Not already completed
@@ -232,7 +254,7 @@ export default function KanbanView({
       startedShellTasksRef.current.add(task.id);
       startShellTask(task.id);
     });
-  }, [tasks, isTaskRunning, startShellTask]);
+  }, [inProgressTasks, isTaskRunning, startShellTask]);
 
 
   // Configure drag sensors
@@ -250,7 +272,7 @@ export default function KanbanView({
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const task = tasks.find((t) => t.id === active.id);
+    const task = allTasks.find((t) => t.id === active.id);
     if (task) {
       setActiveTask(task);
     }
@@ -280,7 +302,7 @@ export default function KanbanView({
     // Check if dropped on a column
     if (['todo', 'in_progress', 'done'].includes(overId)) {
       const newStatus = overId as KanbanStatus;
-      const task = tasks.find((t) => t.id === taskId);
+      const task = allTasks.find((t) => t.id === taskId);
 
       if (task && task.status !== newStatus) {
         // 🦆 Block moving to TODO if task has chat messages (conversation started)
@@ -311,23 +333,59 @@ export default function KanbanView({
       setSelectedShellTaskId(task.id);
       setIsShellDrawerOpen(true);
     } else {
-      // Open task in new tab for agent tasks
-      if (onOpenTaskTab) {
+      // 🦆 Done tasks require confirmation to reopen
+      if (task.status === 'done') {
+        setReopenTaskDialog(task);
+        return;
+      }
+      
+      // 🦆 SESSIONS-FIRST: Open session directly (task.id = session.id)
+      if (onSessionClick) {
+        onSessionClick(task.id);
+      } else if (onOpenTaskTab) {
+        // Legacy fallback
         onOpenTaskTab(task);
+      }
+      // Close Kanban and return to chat view
+      if (onExitKanban) {
+        onExitKanban();
       }
       // Close shell drawer if open
       setIsShellDrawerOpen(false);
       setSelectedShellTaskId(null);
     }
-  }, [onOpenTaskTab]);
+  }, [onSessionClick, onOpenTaskTab, onExitKanban]);
+
+  // Handle reopen done task - move to in_progress and open
+  const handleReopenTask = useCallback(async () => {
+    if (!reopenTaskDialog) return;
+    
+    // Move task to in_progress
+    await moveTask(reopenTaskDialog.id, 'in_progress');
+    
+    // Open the session
+    if (onSessionClick) {
+      onSessionClick(reopenTaskDialog.id);
+    } else if (onOpenTaskTab) {
+      onOpenTaskTab(reopenTaskDialog);
+    }
+    
+    // Close dialog and exit kanban
+    setReopenTaskDialog(null);
+    if (onExitKanban) {
+      onExitKanban();
+    }
+  }, [reopenTaskDialog, moveTask, onSessionClick, onOpenTaskTab, onExitKanban]);
 
   // Handle Start button click - move to in_progress, open chat, send prompt
   const handleStartTask = useCallback(async (task: KanbanTask) => {
     // 1. Move task to in_progress
     await moveTask(task.id, 'in_progress');
 
-    // 2. Open task in new tab
-    if (onOpenTaskTab) {
+    // 2. 🦆 SESSIONS-FIRST: Open session directly
+    if (onSessionClick) {
+      onSessionClick(task.id);
+    } else if (onOpenTaskTab) {
       onOpenTaskTab(task);
     }
 
@@ -337,7 +395,7 @@ export default function KanbanView({
         onSendMessage(task.id, task.prompt);
       }, 100);
     }
-  }, [moveTask, onOpenTaskTab, onSendMessage]);
+  }, [moveTask, onSessionClick, onOpenTaskTab, onSendMessage]);
 
   // Handle task deletion with async Tauri dialog
   const handleTaskDelete = useCallback(async (taskId: string) => {
@@ -359,9 +417,10 @@ export default function KanbanView({
   }, [deleteTask, clearOutput, selectedShellTaskId]);
 
   // Handle clearing all done tasks (uses ALL done tasks, not just visible ones)
+  // 🦆 SESSIONS-FIRST: Use getter for all done tasks
   const handleClearDone = useCallback(async () => {
-    const allDoneTasks = tasks.filter((t) => t.status === 'done');
-    const doneCount = allDoneTasks.length;
+    const doneTasks = getTasksByStatus('done');
+    const doneCount = doneTasks.length;
     if (doneCount === 0) return;
 
     const confirmed = await confirm(
@@ -374,13 +433,13 @@ export default function KanbanView({
 
     if (confirmed) {
       // Delete all done tasks
-      for (const task of allDoneTasks) {
+      for (const task of doneTasks) {
         deleteTask(task.id);
         clearOutput(task.id);
       }
       toast.success(`Cleared ${doneCount} completed task${doneCount > 1 ? 's' : ''}`);
     }
-  }, [tasks, deleteTask, clearOutput]);
+  }, [getTasksByStatus, deleteTask, clearOutput]);
 
   // Handle task edit (open modal in edit mode)
   const handleTaskEdit = useCallback((task: KanbanTask) => {
@@ -523,45 +582,10 @@ export default function KanbanView({
 
   return (
     <div className="kanban-view">
-      {/* Header with Add Task button - draggable region */}
+      {/* Header - draggable region */}
       <div className="kanban-header" data-tauri-drag-region>
-        {/* Title - also draggable */}
         <h1 className="kanban-title" data-tauri-drag-region>Kanban Board</h1>
-
-        {/* Spacer - main drag area */}
         <div style={{ flex: 1 }} data-tauri-drag-region />
-
-        {/* Add Task button */}
-        <button
-          className="kanban-add-button"
-          onClick={() => setIsModalOpen(true)}
-          disabled={terminals.length === 0}
-          title={terminals.length === 0 ? 'Create an agent first' : 'Add a new task'}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add Task
-        </button>
-
-        {/* Mini Panel toggle button - returns to chat with mini panel in sidebar */}
-        {onToggleMiniPanel && (
-          <button
-            className={`kanban-mini-panel-toggle ${showMiniPanel ? 'active' : ''}`}
-            onClick={onToggleMiniPanel}
-            title={showMiniPanel ? 'Hide sidebar panel' : 'Show in sidebar and return to chat'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {/* Sidebar with panel icon */}
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="9" y1="3" x2="9" y2="21" />
-              <line x1="9" y1="9" x2="21" y2="9" />
-              <line x1="9" y1="15" x2="21" y2="15" />
-            </svg>
-            {showMiniPanel ? 'Hide Panel' : 'Sidebar View'}
-          </button>
-        )}
       </div>
 
       {/* Kanban columns */}
@@ -672,7 +696,7 @@ export default function KanbanView({
 
       {/* Shell Drawer - for shell/watch tasks */}
       <KanbanShellDrawer
-        task={selectedShellTaskId ? tasks.find(t => t.id === selectedShellTaskId) || null : null}
+        task={selectedShellTaskId ? allTasks.find(t => t.id === selectedShellTaskId) || null : null}
         isOpen={isShellDrawerOpen}
         onClose={handleShellDrawerClose}
         output={selectedShellTaskId ? getTaskOutput(selectedShellTaskId) : ''}
@@ -681,6 +705,38 @@ export default function KanbanView({
         onStart={() => selectedShellTaskId && handleShellStart(selectedShellTaskId)}
         onClearOutput={() => selectedShellTaskId && handleShellClearOutput(selectedShellTaskId)}
       />
+
+      {/* Reopen Done Task Confirmation Dialog */}
+      {reopenTaskDialog && (
+        <div
+          className="kanban-reopen-dialog-overlay"
+          onClick={() => setReopenTaskDialog(null)}
+        >
+          <div
+            className="kanban-reopen-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="kanban-reopen-dialog-title">Reopen Task?</h3>
+            <p className="kanban-reopen-dialog-message">
+              This task is marked as done. Would you like to move it back to In Progress and open it?
+            </p>
+            <div className="kanban-reopen-dialog-actions">
+              <button
+                className="kanban-reopen-dialog-cancel"
+                onClick={() => setReopenTaskDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="kanban-reopen-dialog-confirm"
+                onClick={handleReopenTask}
+              >
+                Move to In Progress
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

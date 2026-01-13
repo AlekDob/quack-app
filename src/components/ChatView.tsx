@@ -12,6 +12,7 @@ import type { TodoItem } from './TodoProgressBar';
 import KanbanTasksBar from './KanbanTasksBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
+import { createBackgroundTask } from '../services/backgroundAgentService';
 import { useChatStore } from '../stores/chatStore';
 import { useKanbanTaskCounts } from '../hooks/useKanbanTaskCounts';
 import { useAgentRules } from '../hooks/useAgentRules';
@@ -113,8 +114,10 @@ interface ChatViewProps {
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
-  // Current session ID for display
+  // Current session ID for display (Claude Code session ID)
   currentSessionId?: string;
+  // Internal session ID for state management (AgentSession.id)
+  internalSessionId?: string;
   // Agent toolkit - quick-access tools from agent personality
   agentToolkit?: {
     skills: string[];
@@ -193,8 +196,10 @@ export default function ChatView({
   onUserQuestionAnswer,
   pendingQuestionIds,
   answeredQuestions,
-  // Current session ID
+  // Current session ID (Claude Code session ID for display)
   currentSessionId,
+  // Internal session ID (AgentSession.id for state management)
+  internalSessionId,
   // Agent toolkit
   agentToolkit,
   onInsertAtCursor,
@@ -219,18 +224,21 @@ export default function ChatView({
   const clearStoreAttachments = useChatStore((state) => state.clearAttachments);
   const pendingAttachments = useChatStore((state) => state.pendingAttachments);
 
+  // 🦆 SESSIONS-FIRST: Use internalSessionId (AgentSession.id) for attachments, fallback to currentSessionId
+  const attachmentKey = internalSessionId || currentSessionId;
+
   // Derive current session attachments (reactive via pendingAttachments subscription)
   const sessionAttachments = useMemo(() => {
-    if (!currentSessionId) return [];
-    return pendingAttachments.get(currentSessionId) || [];
-  }, [currentSessionId, pendingAttachments]);
+    if (!attachmentKey) return [];
+    return pendingAttachments.get(attachmentKey) || [];
+  }, [attachmentKey, pendingAttachments]);
 
   // Handler to update attachments in store
   const handleAttachmentsChange = useCallback((newAttachments: ChatAttachment[]) => {
-    if (currentSessionId) {
-      setStoreAttachments(currentSessionId, newAttachments);
+    if (attachmentKey) {
+      setStoreAttachments(attachmentKey, newAttachments);
     }
-  }, [currentSessionId, setStoreAttachments]);
+  }, [attachmentKey, setStoreAttachments]);
 
   const handleSend = async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
@@ -256,7 +264,8 @@ export default function ChatView({
         const projectName = projectPath.split('/').pop() || 'Unknown';
 
         // Check if it's an agent invocation: @agentname prompt
-        const agentMatch = args.match(/^@(\w+)\s+(.+)$/s);
+        // Note: Agent names can contain hyphens (e.g., code-explorer, frontend-developer)
+        const agentMatch = args.match(/^@([\w-]+)\s+(.+)$/s);
 
         if (agentMatch) {
           // Agent task: /background @code-reviewer Review this code
@@ -269,7 +278,22 @@ export default function ChatView({
             projectName,
             type: 'agent',
           });
-          toast.success(`Kanban task created: Agent ${agentName}`);
+
+          // Execute the agent task in background
+          createBackgroundTask({
+            type: 'agent',
+            priority: 'medium',
+            name: `Agent: ${agentName}`,
+            description: prompt,
+            agentId: agentName,
+            prompt: prompt,
+            model: 'sonnet',
+            workingDirectory: projectPath,
+            notifyOnComplete: true,
+            kanbanTaskId: newTask.id, // Link to Kanban for status sync
+          });
+
+          toast.success(`Background agent started: ${agentName}`);
           // Show notification bar if not already in Kanban view
           if (!isKanbanViewActive) {
             showNotification({
@@ -836,8 +860,9 @@ export default function ChatView({
           inputValue={inputDraft}
           onInputChange={onInputDraftChange}
           // Controlled attachments (persist across tab switches)
-          attachments={currentSessionId ? sessionAttachments : undefined}
-          onAttachmentsChange={currentSessionId ? handleAttachmentsChange : undefined}
+          // 🦆 SESSIONS-FIRST: Use attachmentKey for consistency
+          attachments={attachmentKey ? sessionAttachments : undefined}
+          onAttachmentsChange={attachmentKey ? handleAttachmentsChange : undefined}
           // Streaming control
           isStreaming={isLoading}
           onAbort={onAbortStream}

@@ -13,6 +13,11 @@ import {
   type TokenBudgetStatus,
 } from '../services/conversationRecovery';
 import { extractAndSaveMemories } from '../services/memoryIntegration';
+import { useKanbanStore } from '../stores/kanbanStore';
+import { useChatStore } from '../stores/chatStore';
+
+// Map to track Task tool_use_id -> Kanban task_id for status updates
+const taskToolToKanbanMap = new Map<string, string>();
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
@@ -94,6 +99,7 @@ export interface UseClaudeChatOptions {
     cacheReadTokens: number;
   };
   taskId?: string; // Optional task ID for per-task event deduplication
+  internalSessionId?: string; // 🦆 SESSIONS-FIRST: Internal session ID for loading state sync
 }
 
 export function useClaudeChat(options?: UseClaudeChatOptions) {
@@ -134,10 +140,21 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   const [pendingQuestionIds, setPendingQuestionIds] = useState<Set<string>>(new Set());
   const [answeredQuestions, setAnsweredQuestions] = useState<Map<string, AskUserQuestionAnswers>>(new Map());
 
+  // 🦆 SESSIONS-FIRST: Get chatStore setLoading for activity indicator sync
+  const chatStoreSetLoading = useChatStore((state) => state.setLoading);
+
   // 🦆 FIX: Update messagesLengthRef when messages.length changes
   useEffect(() => {
     messagesLengthRef.current = messages.length;
   }, [messages.length]);
+
+  // 🦆 SESSIONS-FIRST: Sync loading state with chatStore for activity indicators
+  useEffect(() => {
+    const sessionId = options?.internalSessionId;
+    if (sessionId) {
+      chatStoreSetLoading(sessionId, isLoading);
+    }
+  }, [isLoading, options?.internalSessionId, chatStoreSetLoading]);
 
   // 🦆 FIX: Clear event deduplication AND abort active stream when taskId changes
   // This prevents events from Task A being incorrectly flagged as duplicates in Task B
@@ -439,6 +456,62 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             for (const block of event.message.content) {
               if (block.type === 'text' && block.text) {
                 assistantContent += block.text;
+              }
+
+              // 🦆 KANBAN SYNC: Intercept Task tool calls to show in Kanban
+              if (block.type === 'tool_use' && block.name?.toLowerCase() === 'task') {
+                const input = block.input as { subagent_type?: string; description?: string; prompt?: string; run_in_background?: boolean };
+                const toolUseId = block.id;
+
+                // Only track if not already processed and has subagent_type
+                if (input?.subagent_type && toolUseId && !taskToolToKanbanMap.has(toolUseId)) {
+                  console.log('[useClaudeChat] 🦆 Task tool detected! Creating Kanban entry for:', input.subagent_type);
+
+                  // Create Kanban task asynchronously
+                  const kanbanStore = useKanbanStore.getState();
+                  const projectPath = options?.workingDirectory || '/';
+                  const projectName = projectPath.split('/').pop() || 'Unknown';
+
+                  kanbanStore.addTask({
+                    title: input.description || `Droid: ${input.subagent_type}`,
+                    prompt: input.prompt || '',
+                    status: 'in_progress',
+                    projectPath,
+                    projectName,
+                    type: 'agent',
+                    // Store toolUseId in metadata for tracking completion
+                  }).then((task) => {
+                    taskToolToKanbanMap.set(toolUseId, task.id);
+                    console.log('[useClaudeChat] 🦆 Kanban task created:', task.id, 'for tool:', toolUseId);
+                  }).catch((err) => {
+                    console.error('[useClaudeChat] Failed to create Kanban task:', err);
+                  });
+                }
+              }
+            }
+          }
+
+          // 🦆 KANBAN SYNC: Update Kanban when Task tool completes (tool_result)
+          if (event.type === 'user' && event.message?.content) {
+            for (const block of event.message.content as any[]) {
+              if (block.type === 'tool_result' && block.tool_use_id) {
+                const kanbanTaskId = taskToolToKanbanMap.get(block.tool_use_id);
+                if (kanbanTaskId) {
+                  console.log('[useClaudeChat] 🦆 Task tool completed! Updating Kanban:', kanbanTaskId);
+
+                  const kanbanStore = useKanbanStore.getState();
+                  // Check if result indicates success or failure
+                  const isError = block.is_error === true;
+
+                  kanbanStore.moveTask(kanbanTaskId, isError ? 'todo' : 'done')
+                    .then(() => {
+                      console.log('[useClaudeChat] 🦆 Kanban task updated to:', isError ? 'todo' : 'done');
+                      taskToolToKanbanMap.delete(block.tool_use_id);
+                    })
+                    .catch((err) => {
+                      console.error('[useClaudeChat] Failed to update Kanban task:', err);
+                    });
+                }
               }
             }
           }

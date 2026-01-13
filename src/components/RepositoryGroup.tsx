@@ -22,10 +22,11 @@ import {
 import TerminalActivityBar from './TerminalActivityBar';
 import CommitHistoryModal from './CommitHistoryModal';
 import RevealInFinderButton from './RevealInFinderButton';
-import TasksSidebarSection from './TasksSidebarSection';
+import AgentSessionList from './AgentSessionList';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
+import { useSessionStore } from '../stores/sessionStore';
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
-import type { TerminalInfo, ChatMessage, GitPullResult, KanbanTask } from '../types';
+import type { TerminalInfo, ChatMessage, GitPullResult } from '../types';
 
 interface RepositoryGroupProps {
   repoPath: string;
@@ -48,12 +49,11 @@ interface RepositoryGroupProps {
   // Kanban mode props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
-  // Kanban tasks to show under agents (TODO + in_progress)
-  agentTasks?: KanbanTask[];
-  onOpenTaskTab?: (task: KanbanTask) => void;
-  activeTaskId?: string | null;
   // Chat loading state for task status indicators
   chatLoadingMap?: Map<string, boolean>;
+  // Session props
+  onSessionClick?: (sessionId: string) => void;
+  activeSessionId?: string;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -126,6 +126,7 @@ interface SortableAgentProps {
   isActive: boolean;
   chatSessions?: Map<string, ChatMessage[]>;
   lastReadTimestamps?: Map<string, number>; // 🔵 Read-once notification system
+  chatLoadingMap?: Map<string, boolean>; // 🦆 SESSIONS-FIRST: Loading state for sessions
   onSelect: (terminal: TerminalInfo) => void;
   onClose: (id: string) => void;
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
@@ -144,6 +145,7 @@ function SortableAgent({
   isActive,
   chatSessions,
   lastReadTimestamps,
+  chatLoadingMap,
   onSelect,
   onClose,
   onContextMenu,
@@ -160,6 +162,13 @@ function SortableAgent({
   const [showQuackTooltip, setShowQuackTooltip] = useState(false);
   // 🦆 Force re-render every minute to update relative time
   const [tick, setTick] = useState(0);
+  
+  // 🦆 SESSIONS-FIRST: Get all sessions for this agent
+  const { sessions: allSessions } = useSessionStore();
+  const agentSessions = useMemo(() => 
+    allSessions.filter(s => s.agentId === agent.id),
+    [allSessions, agent.id]
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -237,46 +246,78 @@ function SortableAgent({
     willChange: isDragging ? 'transform' : 'auto',
   }), [transform, isDragging, transition]);
 
-  // Check if agent is dormant (no user interaction yet)
+  // 🦆 SESSIONS-FIRST: Check if agent is dormant (no user interaction in ANY session)
+  // Agent is awake if ANY session has at least one assistant response
   const isDormant = useMemo(() => {
-    if (!chatSessions) return true;
-    const messages = chatSessions.get(agent.id);
-    if (!messages || messages.length === 0) return true;
-    // Dormant if no user messages (no actual interaction)
-    const hasUserMessage = messages.some(msg => msg.role === 'user');
-    return !hasUserMessage;
-  }, [chatSessions, agent.id]);
+    if (!chatSessions || agentSessions.length === 0) return true;
+    
+    // Check ALL sessions for this agent
+    for (const session of agentSessions) {
+      const sessionMessages = chatSessions.get(session.id);
+      if (!sessionMessages || sessionMessages.length === 0) continue;
+      
+      // Check if this session has at least one assistant message
+      const hasAssistantMessage = sessionMessages.some(msg => msg.role === 'assistant');
+      if (hasAssistantMessage) {
+        return false; // Agent is AWAKE - at least one session has assistant response
+      }
+    }
+    
+    return true; // No sessions with assistant responses = dormant
+  }, [chatSessions, agentSessions]);
 
-  // Check if chat is empty (no messages) - same logic as TerminalActivityBar
+  // 🦆 SESSIONS-FIRST: Check if ALL sessions are empty (no messages)
   const isChatEmpty = useMemo(() => {
-    if (!chatSessions) return true;
-    const messages = chatSessions.get(agent.id);
-    return !messages || messages.length === 0;
-  }, [chatSessions, agent.id]);
+    if (!chatSessions || agentSessions.length === 0) return true;
+    
+    // Check if ALL sessions have no messages
+    for (const session of agentSessions) {
+      const sessionMessages = chatSessions.get(session.id);
+      if (sessionMessages && sessionMessages.length > 0) {
+        return false; // At least one session has messages
+      }
+    }
+    
+    return true; // All sessions are empty
+  }, [chatSessions, agentSessions]);
 
-  // Check if agent is waiting for response (has unread messages)
+  // 🦆 SESSIONS-FIRST: Check if ANY session has unread messages (agent responded)
   const hasUnreadMessages = useMemo(() => {
-    if (!chatSessions || isActive) return false;
-    const messages = chatSessions.get(agent.id);
-    if (!messages || messages.length === 0) return false;
+    if (!chatSessions || isActive || isDormant) return false;
+    
+    // Check ALL sessions for unread assistant messages
+    for (const session of agentSessions) {
+      const sessionMessages = chatSessions.get(session.id);
+      if (!sessionMessages || sessionMessages.length === 0) continue;
+      
+      const lastAssistantMessage = [...sessionMessages].reverse().find(msg => msg.role === 'assistant');
+      if (lastAssistantMessage) {
+        return true; // At least one session has an assistant response
+      }
+    }
+    
+    return false;
+  }, [chatSessions, agentSessions, isActive, isDormant]);
 
-    // If agent is dormant, no unread messages
-    if (isDormant) return false;
-
-    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
-    return lastAssistantMessage !== undefined;
-  }, [chatSessions, agent.id, isActive, isDormant]);
-
-  // 🦆 Get last assistant message timestamp for this agent
+  // 🦆 SESSIONS-FIRST: Get LATEST assistant message timestamp across ALL sessions
   const lastAssistantTimestamp = useMemo(() => {
-    if (!chatSessions) return 0;
-    const messages = chatSessions.get(agent.id);
-    if (!messages || messages.length === 0) return 0;
-
-    // Find LAST assistant message
-    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
-    return lastAssistantMessage?.timestamp || 0;
-  }, [chatSessions, agent.id]);
+    if (!chatSessions || agentSessions.length === 0) return 0;
+    
+    let latestTimestamp = 0;
+    
+    // Check ALL sessions and find the most recent assistant message
+    for (const session of agentSessions) {
+      const sessionMessages = chatSessions.get(session.id);
+      if (!sessionMessages || sessionMessages.length === 0) continue;
+      
+      const lastAssistantMessage = [...sessionMessages].reverse().find(msg => msg.role === 'assistant');
+      if (lastAssistantMessage && lastAssistantMessage.timestamp) {
+        latestTimestamp = Math.max(latestTimestamp, lastAssistantMessage.timestamp);
+      }
+    }
+    
+    return latestTimestamp;
+  }, [chatSessions, agentSessions]);
 
   // 🔵 Get last read timestamp for this agent
   const lastReadTimestamp = useMemo(() => {
@@ -301,9 +342,58 @@ function SortableAgent({
     return lastAssistantTimestamp > lastReadTimestamp;
   }, [isActive, isDormant, lastAssistantTimestamp, lastReadTimestamp]);
 
+  // 🦆 SESSIONS-FIRST: Aggregate status from ALL sessions for TerminalActivityBar
+  // Status is 'busy' if ANY session is loading, 'idle' otherwise
+  // 🦆 FIX: Use chatLoadingMap prop (memoization now includes this prop for re-renders)
+  const aggregatedStatus = useMemo<'busy' | 'idle'>(() => {
+    if (agentSessions.length === 0) {
+      // Fallback to agent.status if no sessions
+      return agent.status ?? 'idle';
+    }
+    
+    // Check if ANY session is currently loading
+    for (const session of agentSessions) {
+      if (chatLoadingMap?.get(session.id)) {
+        return 'busy'; // At least one session is loading
+      }
+    }
+    
+    return 'idle';
+  }, [agent.status, agentSessions, chatLoadingMap]);
+  
+  // 🦆 SESSIONS-FIRST: Check if ANY session is ready (waiting for user response)
+  // This will show the 💬 badge in TerminalActivityBar
+  const isAnySessionReady = useMemo(() => {
+    if (!chatSessions || agentSessions.length === 0 || isDormant) return false;
+    
+    for (const session of agentSessions) {
+      const sessionMessages = chatSessions.get(session.id);
+      if (!sessionMessages || sessionMessages.length === 0) continue;
+      
+      const lastMessage = sessionMessages[sessionMessages.length - 1];
+      if (lastMessage?.role === 'assistant' && 
+          (lastMessage.status === 'complete' || lastMessage.status === undefined)) {
+        return true; // At least one session is ready
+      }
+    }
+    
+    return false;
+  }, [chatSessions, agentSessions, isDormant]);
+  
+  // Create aggregated agent for TerminalActivityBar
+  // 🦆 FIX: Include aggregatedIsDormant to override TerminalActivityBar's internal check
+  // which uses terminal.id (wrong - sessions use session.id as key)
+  const aggregatedAgent = useMemo(() => ({
+    ...agent,
+    status: aggregatedStatus,
+    waitingForResponse: isAnySessionReady && !isActive,
+    aggregatedIsDormant: isDormant, // Pass session-based dormant state
+    aggregatedHasUnread: hasUnreadMessages, // Pass session-based unread state
+  }), [agent, aggregatedStatus, isAnySessionReady, isActive, isDormant, hasUnreadMessages]);
+  
   // Determine if conversation is active (not dormant)
-  const hasActiveConversation = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
-  const isBusy = agent.status === 'busy';
+  const hasActiveConversation = !isDormant && !isChatEmpty;
+  const isBusy = aggregatedStatus === 'busy';
 
   // Quack tooltip: show periodically when there are UNREAD messages AND agent is NOT busy
   // This ensures the tooltip only appears when the agent has finished responding
@@ -353,12 +443,16 @@ function SortableAgent({
       return;
     }
 
-    // If in Kanban mode, switch back to agent view AND select the agent
-    if (isKanbanViewActive && onToggleKanbanView) {
-      onToggleKanbanView();
+    // If in Kanban mode, set agent filter instead of exiting Kanban
+    if (isKanbanViewActive) {
+      // Import and use kanbanStore to set agent filter
+      import('../stores/kanbanStore').then(({ useKanbanStore }) => {
+        useKanbanStore.getState().setAgentFilter(agent.id);
+        console.log('[SortableAgent] Set Kanban filter to agent:', agent.label || agent.id);
+      });
     }
     onSelect(agent);
-  }, [onSelect, agent, isKanbanViewActive, onToggleKanbanView]);
+  }, [onSelect, agent, isKanbanViewActive]);
 
   const handleContextMenu = useCallback((e: MouseEvent) => onContextMenu(e, agent), [onContextMenu, agent]);
   const handleClose = useCallback((e: React.MouseEvent) => {
@@ -587,7 +681,7 @@ function SortableAgent({
         <div className="flex w-full items-center justify-between">
           <div className="flex w-full items-center gap-2 flex-1">
             <TerminalActivityBar
-              terminal={agent}
+              terminal={aggregatedAgent}
               chatSessions={chatSessions}
               hideBranch={true}
               isActive={isActive}
@@ -889,6 +983,7 @@ function SortableAgent({
 // Memoize SortableAgent with custom comparison to prevent unnecessary re-renders during drag
 const MemoizedSortableAgent = memo(SortableAgent, (prevProps, nextProps) => {
   // Only re-render if these specific props change
+  // 🦆 FIX: Include chatLoadingMap to ensure re-render when loading state changes
   return (
     prevProps.agent.id === nextProps.agent.id &&
     prevProps.agent.label === nextProps.agent.label &&
@@ -902,6 +997,7 @@ const MemoizedSortableAgent = memo(SortableAgent, (prevProps, nextProps) => {
     prevProps.isWorktree === nextProps.isWorktree &&
     prevProps.chatSessions === nextProps.chatSessions &&
     prevProps.lastReadTimestamps === nextProps.lastReadTimestamps &&
+    prevProps.chatLoadingMap === nextProps.chatLoadingMap &&
     prevProps.isKanbanViewActive === nextProps.isKanbanViewActive &&
     prevProps.onToggleKanbanView === nextProps.onToggleKanbanView
   )
@@ -927,10 +1023,9 @@ export default function RepositoryGroup({
   onOpenDashboard,
   isKanbanViewActive = false,
   onToggleKanbanView,
-  agentTasks = [],
-  onOpenTaskTab,
-  activeTaskId = null,
   chatLoadingMap,
+  onSessionClick,
+  activeSessionId,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -943,6 +1038,9 @@ export default function RepositoryGroup({
   const [agentOrder, setAgentOrder] = useState<Record<string, string[]>>({});
   const displayName = getRepoDisplayName(repoName);
   const isDraggingAny = activeAgentId !== null;
+
+  // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
+  const { sessions: allSessionsForRepo } = useSessionStore();
 
   // Cleanup: Ensure dragging class is removed on unmount
   useEffect(() => {
@@ -1585,23 +1683,39 @@ export default function RepositoryGroup({
                   {/* Agents in this branch with Sortable Context */}
                   <SortableContext items={orderedAgents.map(a => a.id)} strategy={verticalListSortingStrategy}>
                     {orderedAgents.map((agent) => (
-                      <MemoizedSortableAgent
-                        key={agent.id}
-                        agent={agent}
-                        isActive={agent.id === activeId}
-                        chatSessions={chatSessions}
-                        lastReadTimestamps={lastReadTimestamps}
-                        onSelect={onSelect}
-                        onClose={onClose}
-                        onContextMenu={onContextMenu}
-                        onGitMenuToggle={setShowGitMenu}
-                        showGitMenu={showGitMenu === agent.id}
-                        handleGitOperation={handleGitOperation}
-                        isWorktree={false}
-                        isDraggingAny={isDraggingAny}
-                        isKanbanViewActive={isKanbanViewActive}
-                        onToggleKanbanView={onToggleKanbanView}
-                      />
+                      <div key={agent.id} className="agent-with-sessions">
+                        <MemoizedSortableAgent
+                          agent={agent}
+                          isActive={agent.id === activeId}
+                          chatSessions={chatSessions}
+                          lastReadTimestamps={lastReadTimestamps}
+                          chatLoadingMap={chatLoadingMap}
+                          onSelect={onSelect}
+                          onClose={onClose}
+                          onContextMenu={onContextMenu}
+                          onGitMenuToggle={setShowGitMenu}
+                          showGitMenu={showGitMenu === agent.id}
+                          handleGitOperation={handleGitOperation}
+                          isWorktree={false}
+                          isDraggingAny={isDraggingAny}
+                          isKanbanViewActive={isKanbanViewActive}
+                          onToggleKanbanView={onToggleKanbanView}
+                        />
+                        {/* Sessions under this agent - always visible */}
+                        {onSessionClick && (
+                          <div className="agent-sessions-container" style={{ marginLeft: '44px', marginTop: '4px' }}>
+                            <AgentSessionList
+                              agentId={agent.id}
+                              agentName={agent.label ?? undefined}
+                              agentColor={agent.color}
+                              projectPath={agent.cwd}
+                              projectName={displayName}
+                              onSessionClick={onSessionClick}
+                              activeSessionId={activeSessionId}
+                            />
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </SortableContext>
                 </div>
@@ -1750,27 +1864,42 @@ export default function RepositoryGroup({
                         return !messages || messages.length === 0;
                       })();
 
-                      // Check if agent is dormant (no user interaction yet)
-                      const isDormant = (() => {
+                      // 🦆 FIX: Check if agent is dormant based on SESSIONS (not agent.id)
+                      // Agent is dormant if NO session has an assistant response
+                      const isDormantWorktree = (() => {
                         if (!chatSessions) return true;
-                        const messages = chatSessions.get(agent.id);
-                        if (!messages || messages.length === 0) return true;
-                        // Dormant if no user messages
-                        const hasUserMessage = messages.some(msg => msg.role === 'user');
-                        return !hasUserMessage;
+                        const agentSessionsForDormant = allSessionsForRepo.filter((s) => s.agentId === agent.id);
+                        if (agentSessionsForDormant.length === 0) return true;
+                        
+                        for (const session of agentSessionsForDormant) {
+                          const sessionMessages = chatSessions.get(session.id);
+                          if (sessionMessages && sessionMessages.some(msg => msg.role === 'assistant')) {
+                            return false; // At least one session has assistant response = not dormant
+                          }
+                        }
+                        return true;
                       })();
+                      // Keep backward compat variable name
+                      const isDormant = isDormantWorktree;
 
-                      // Check if agent has unread messages
-                      const hasUnreadMessages = (() => {
+                      // 🦆 FIX: Check if agent has unread messages based on SESSIONS
+                      const hasUnreadMessagesWorktree = (() => {
                         if (!chatSessions || isActive) return false;
-                        const messages = chatSessions.get(agent.id);
-                        if (!messages || messages.length === 0) return false;
+                        const agentSessionsForUnread = allSessionsForRepo.filter((s) => s.agentId === agent.id);
+                        if (agentSessionsForUnread.length === 0) return false;
+                        if (isDormantWorktree) return false;
 
-                        // If agent is dormant, no unread messages
-                        if (isDormant) return false;
-
-                        const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
-                        return lastAssistantMessage !== undefined;
+                        // Check if ANY session has unread (last message is assistant and complete)
+                        for (const session of agentSessionsForUnread) {
+                          const sessionMessages = chatSessions.get(session.id);
+                          if (sessionMessages && sessionMessages.length > 0) {
+                            const lastMsg = sessionMessages[sessionMessages.length - 1];
+                            if (lastMsg.role === 'assistant' && (lastMsg.status === 'complete' || !lastMsg.status)) {
+                              return true;
+                            }
+                          }
+                        }
+                        return false;
                       })();
 
                       // Calculate last assistant timestamp for worktree agents (same as SortableAgent)
@@ -1789,7 +1918,49 @@ export default function RepositoryGroup({
                       // Determine if conversation is active and if agent is busy (worktree)
                       // NOTE: isBusyWorktree must be declared BEFORE useEffect that uses it
                       const hasActiveConversationWorktree = !isDormant && (chatSessions?.get(agent.id)?.length ?? 0) > 0;
-                      const isBusyWorktree = agent.status === 'busy';
+                      
+                      // 🦆 SESSIONS-FIRST: Calculate aggregated status from sessions for worktree agents
+                      // 🦆 FIX: Use chatLoadingMap prop for consistency (memoization handles re-renders)
+                      const agentSessionsWorktree = allSessionsForRepo.filter((s) => s.agentId === agent.id);
+                      const aggregatedStatusWorktree: 'busy' | 'idle' = (() => {
+                        if (agentSessionsWorktree.length === 0) {
+                          return agent.status ?? 'idle';
+                        }
+                        // Check if ANY session is currently loading
+                        for (const session of agentSessionsWorktree) {
+                          if (chatLoadingMap?.get(session.id)) {
+                            return 'busy';
+                          }
+                        }
+                        return 'idle';
+                      })();
+                      
+                      // 🦆 SESSIONS-FIRST: Check if ANY session is ready (waiting for user response)
+                      const isAnySessionReadyWorktree = (() => {
+                        if (!chatSessions || agentSessionsWorktree.length === 0 || isDormant) return false;
+                        for (const session of agentSessionsWorktree) {
+                          const sessionMessages = chatSessions.get(session.id);
+                          if (sessionMessages && sessionMessages.length > 0) {
+                            const lastMsg = sessionMessages[sessionMessages.length - 1];
+                            if (lastMsg.role === 'assistant' && !chatLoadingMap?.get(session.id)) {
+                              return true;
+                            }
+                          }
+                        }
+                        return false;
+                      })();
+                      
+                      // 🦆 SESSIONS-FIRST: Create aggregated agent for TerminalActivityBar
+                      // 🦆 FIX: Include aggregated dormant/unread state for sessions
+                      const aggregatedAgentWorktree = {
+                        ...agent,
+                        status: aggregatedStatusWorktree,
+                        waitingForResponse: isAnySessionReadyWorktree && !isActive,
+                        aggregatedIsDormant: isDormantWorktree,
+                        aggregatedHasUnread: hasUnreadMessagesWorktree,
+                      };
+                      
+                      const isBusyWorktree = aggregatedStatusWorktree === 'busy';
 
                       // Quack tooltip: show periodically when there are UNREAD messages AND agent is NOT busy
                       // This ensures the tooltip only appears when the agent has finished responding
@@ -1884,9 +2055,12 @@ export default function RepositoryGroup({
                           <div
                             className={`agent-card`}
                             onClick={() => {
-                              // If in Kanban mode, switch back to agent view AND select the agent
-                              if (isKanbanViewActive && onToggleKanbanView) {
-                                onToggleKanbanView();
+                              // If in Kanban mode, set agent filter instead of exiting
+                              if (isKanbanViewActive) {
+                                import('../stores/kanbanStore').then(({ useKanbanStore }) => {
+                                  useKanbanStore.getState().setAgentFilter(agent.id);
+                                  console.log('[RepositoryGroup] Set Kanban filter to agent:', agent.label || agent.id);
+                                });
                               }
                               onSelect(agent);
                             }}
@@ -2054,7 +2228,7 @@ export default function RepositoryGroup({
                             <div className="flex w-full items-center justify-between">
                               <div className="flex w-full items-center gap-2 flex-1">
                                 <TerminalActivityBar
-                                  terminal={agent}
+                                  terminal={aggregatedAgentWorktree}
                                   chatSessions={chatSessions}
                                   hideBranch={true}  // Hide branch badge
                                   isActive={agent.id === activeId}
@@ -2363,17 +2537,6 @@ export default function RepositoryGroup({
             </div>
           )}
 
-          {/* Project Tasks Section - Shows all tasks for this project */}
-          {agentTasks && agentTasks.length > 0 && onOpenTaskTab && (
-            <TasksSidebarSection
-              tasks={agentTasks.filter(task => task.projectPath === repoPath)}
-              activeTaskId={activeTaskId}
-              onOpenTaskTab={onOpenTaskTab}
-              chatSessions={chatSessions}
-              chatLoadingMap={chatLoadingMap}
-              currentProjectPath={repoPath}
-            />
-          )}
         </div>
       )}
 

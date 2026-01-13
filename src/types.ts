@@ -420,6 +420,31 @@ export interface ChatSession {
   claudeSessionId?: string; // Claude Agent SDK session ID for resume
 }
 
+/**
+ * AgentSession - Represents a chat session owned by an agent
+ * Replaces KanbanTask for the sessions-first architecture
+ */
+export interface AgentSession {
+  id: string;                      // UUID generato da Quack
+  claudeSessionId?: string;        // ID reale Claude Code (ff919cb3-...)
+  title: string;                   // Nome dato dall'utente o ID Claude Code
+  agentId: string;                 // TerminalInfo.id dell'agente
+  projectPath: string;             // /Users/.../quack-app
+  projectName: string;             // "quack-app"
+  status: AgentSessionStatus;
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+  messageCount: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  totalCost?: number;
+}
+
+export type AgentSessionStatus = 'todo' | 'in_progress' | 'done';
+
 // Simplified ClaudeSession for Telegram integration
 export interface ClaudeSession {
   id: string;
@@ -1210,6 +1235,9 @@ export interface BackgroundTaskConfig {
   timeout_ms?: number;        // Timeout in milliseconds
   showLogsInRealtime?: boolean; // Show logs as they come
   notifyOnComplete?: boolean;   // Show notification when done
+
+  // Kanban integration
+  kanbanTaskId?: string;      // Link to Kanban task for status sync
 }
 
 /**

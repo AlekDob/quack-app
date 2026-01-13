@@ -32,6 +32,8 @@ interface AgentContextPanelProps {
   onEditAgent?: () => void;
   onOpenRulesTab?: () => void; // Navigate to Rules tab in SidePanel
   onImportAgent?: (agent: import('../types').SavedAgent) => void; // Callback after bundle import
+  onSessionClick?: (sessionId: string) => void; // Navigate to session chat
+  activeSessionId?: string; // Currently active session
   projectName?: string;
   gitBranch?: string;
   refreshKey?: number;
@@ -51,6 +53,8 @@ export default function AgentContextPanel({
   onEditAgent,
   onOpenRulesTab,
   onImportAgent,
+  onSessionClick,
+  activeSessionId,
   projectName,
   gitBranch,
   refreshKey,

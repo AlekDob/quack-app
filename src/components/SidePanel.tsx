@@ -433,6 +433,8 @@ interface SidePanelProps {
   gitBranch?: string;
   agentRefreshKey?: number; // Added: forces context panel refresh when agent is edited
   onEditAgent?: () => void; // Added: callback to edit current agent
+  onSessionClick?: (sessionId: string) => void; // Navigate to session chat
+  activeSessionId?: string; // Currently active session ID
 
   // Terminal props
   activeTerminalId: string | null;
@@ -544,6 +546,8 @@ export default function SidePanel({
   gitBranch,
   agentRefreshKey, // Added: forces context panel refresh when agent is edited
   onEditAgent, // Added: callback to edit current agent
+  onSessionClick, // Navigate to session chat
+  activeSessionId, // Currently active session ID
 
   // Terminal
   activeTerminalId,
@@ -606,10 +610,10 @@ export default function SidePanel({
   const { servers: mcpServers } = useMCPServers(workingDir);
   const mcpCount = mcpServers.length;
 
-  // Load Kanban tasks count
-  const { tasks: kanbanTasks } = useKanbanStore();
-  const kanbanInProgressCount = kanbanTasks.filter(t => t.status === 'in_progress').length;
-  const kanbanTotalCount = kanbanTasks.length;
+  // 🦆 SESSIONS-FIRST: Load Kanban tasks count from sessions
+  const { getTasksByStatus } = useKanbanStore();
+  const kanbanInProgressCount = getTasksByStatus('in_progress').length;
+  const kanbanTotalCount = getTasksByStatus('todo').length + kanbanInProgressCount + getTasksByStatus('done').length;
 
   // Auto-switch to Kanban tab when mini panel is shown
   useEffect(() => {
@@ -816,6 +820,8 @@ export default function SidePanel({
               gitBranch={gitBranch}
               refreshKey={agentRefreshKey}
               onEditAgent={onEditAgent}
+              onSessionClick={onSessionClick}
+              activeSessionId={activeSessionId}
             />
           </div>
         )}

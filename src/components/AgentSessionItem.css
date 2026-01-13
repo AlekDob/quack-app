@@ -1,0 +1,171 @@
+/**
+ * AgentSessionItem CSS
+ *
+ * Activity indicators:
+ * - Dot colors: Gray (empty), Yellow (working), Green (ready)
+ * - "Quack quack..." badge when agent has responded
+ * - Progress bar animation when loading
+ */
+
+/* Activity dot - base style */
+.session-dot {
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, border-radius 0.3s ease;
+}
+
+/* Working dot - morphing shape animation */
+.session-dot.working {
+  animation: sessionDotMorph 2s ease-in-out infinite;
+}
+
+/* Ready dot - checkmark shape with gentle pulse */
+.session-dot.ready {
+  border-radius: 2px !important;
+  transform: rotate(45deg);
+  animation: sessionDotReady 1.5s ease-in-out infinite;
+}
+
+/* Morphing animation - circle → rounded square → diamond → circle */
+@keyframes sessionDotMorph {
+  0% {
+    border-radius: 50%;
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    border-radius: 30%;
+    transform: scale(1.1) rotate(45deg);
+  }
+  50% {
+    border-radius: 50%;
+    transform: scale(0.9) rotate(90deg);
+  }
+  75% {
+    border-radius: 20%;
+    transform: scale(1.1) rotate(135deg);
+  }
+  100% {
+    border-radius: 50%;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+/* Ready animation - diamond shape with glow pulse */
+@keyframes sessionDotReady {
+  0%, 100% {
+    transform: rotate(45deg) scale(1);
+    box-shadow: 0 0 8px currentColor;
+  }
+  50% {
+    transform: rotate(45deg) scale(1.15);
+    box-shadow: 0 0 14px currentColor, 0 0 20px currentColor;
+  }
+}
+
+/* "Quack quack..." tooltip - white tooltip positioned above element */
+/* Matches RepositoryGroup agent-card notification style */
+
+/* Fade in animation for tooltip */
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Subtle bounce animation for the tooltip */
+@keyframes quackBadgeBounce {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-2px);
+  }
+}
+
+/* Progress bar container */
+.session-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+/* Progress indicator with indeterminate animation */
+.session-progress-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.6), transparent);
+  border-radius: 1px;
+  animation: sessionProgressSlide 1.5s ease-in-out infinite;
+}
+
+@keyframes sessionProgressSlide {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* ========================================
+ * Session Context Menu
+ * ======================================== */
+
+.session-context-menu {
+  background: rgba(30, 30, 35, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  animation: sessionContextMenuFadeIn 0.12s ease;
+}
+
+@keyframes sessionContextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.session-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.session-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.session-context-menu-item.delete {
+  color: #ef4444;
+}
+
+.session-context-menu-item.delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+}

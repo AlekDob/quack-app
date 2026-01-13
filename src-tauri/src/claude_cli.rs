@@ -205,6 +205,9 @@ pub struct ClaudeCliRequest {
     // 🧠 Auto Memory Search - search Brain before each query (SDK 0.2.1+)
     // Default: true (enabled). Set to false to disable.
     pub auto_memory_search_enabled: Option<bool>,
+    // 🦆 SESSION-FIRST: Frontend session key for routing events to correct chat session
+    // This allows parallel conversations - each stream knows where to write its events
+    pub session_key: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -944,6 +947,14 @@ pub async fn send_message_via_sdk_streaming(
     request: ClaudeCliRequest,
     session_state: tauri::State<'_, crate::SessionState>,
 ) -> Result<ClaudeCliResponse, String> {
+    // 🔍 DEBUG: Log every API call with full details
+    let debug_timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    log::info!("[SDK DEBUG WARMUP] 🚀 send_message_via_sdk_streaming CALLED at {}", debug_timestamp);
+    log::info!("[SDK DEBUG WARMUP] agent_id={}, prompt={}", agent_id, request.prompt.chars().take(100).collect::<String>());
+    
     let ClaudeCliRequest {
         prompt,
         model,
@@ -958,7 +969,11 @@ pub async fn send_message_via_sdk_streaming(
         setting_sources, // ✅ Extract setting_sources to control prompt length
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
         auto_memory_search_enabled, // 🧠 Auto Memory Search (SDK 0.2.1+)
+        session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
     } = request;
+
+    // 🦆 SESSION-FIRST: Use session_key or fallback to agent_id for event routing
+    let event_session_key = session_key.unwrap_or_else(|| agent_id.clone());
 
     // Use provided cwd or fallback to current directory
     let working_dir = cwd.or_else(|| {
@@ -967,16 +982,15 @@ pub async fn send_message_via_sdk_streaming(
             .and_then(|p| p.to_str().map(|s| s.to_string()))
     });
 
-    // ✅ CRITICAL FIX: Prioritize session ID from request (for resume), fallback to internal state
-    let current_session_id = session_id.clone()
-        .or_else(|| session_state.get_session(&agent_id));
+    // 🦆 SESSIONS-FIRST: Use ONLY the session_id from request
+    // DO NOT fallback to agent_id - each AgentSession must have its own Claude session
+    // If session_id is None, Claude SDK will create a NEW session
+    let current_session_id = session_id.clone();
 
     if let Some(ref sid) = current_session_id {
-        log::info!("[SDK] Resuming session for agent {}: {} (source: {})",
-            agent_id, sid,
-            if session_id.is_some() { "request" } else { "internal state" });
+        log::info!("[SDK] 🦆 SESSIONS-FIRST: Resuming existing Claude session: {}", sid);
     } else {
-        log::info!("[SDK] Starting new session for agent {}", agent_id);
+        log::info!("[SDK] 🦆 SESSIONS-FIRST: Creating NEW Claude session (no session_id provided)");
     }
 
     // Build config JSON for Node.js script
@@ -1338,8 +1352,10 @@ pub async fn send_message_via_sdk_streaming(
                 // Log event type for debugging
                 match &event {
                     ClaudeEvent::System { session_id, .. } => {
-                        log::info!("[SDK] Captured session ID for agent {}: {}", agent_id, session_id);
-                        session_state.set_session(agent_id.clone(), session_id.clone());
+                        // 🦆 SESSIONS-FIRST: Log session ID, but DON'T store in global state
+                        // The frontend stores claudeSessionId in each AgentSession
+                        log::info!("[SDK] 🦆 Claude session ID: {} (frontend will store in AgentSession)", session_id);
+                        // DEPRECATED: session_state.set_session(agent_id.clone(), session_id.clone());
                     }
                     ClaudeEvent::Assistant { message, .. } => {
                         // Log content blocks for debugging Task tool detection
@@ -1425,7 +1441,13 @@ pub async fn send_message_via_sdk_streaming(
                     }
                 }
 
-                match app.emit(&event_name, &event) {
+                // 🦆 SESSION-FIRST: Wrap event with session_key for proper routing
+                let wrapped_event = serde_json::json!({
+                    "sessionKey": event_session_key,
+                    "event": &event
+                });
+
+                match app.emit(&event_name, &wrapped_event) {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("[SDK] ❌ EMIT FAILED: {:?}", e);
@@ -1446,9 +1468,13 @@ pub async fn send_message_via_sdk_streaming(
                 // Try to parse as raw JSON to forward unknown events
                 if let Ok(raw_value) = serde_json::from_str::<serde_json::Value>(&line) {
                     log::warn!("[SDK] ⚠️ Unknown event type, forwarding raw: {:?}", raw_value.get("type"));
-                    // Emit raw JSON event to frontend
+                    // 🦆 SESSION-FIRST: Wrap raw event with session_key
+                    let wrapped_event = serde_json::json!({
+                        "sessionKey": event_session_key,
+                        "event": &raw_value
+                    });
                     let event_name = format!("claude-event:{}", agent_id);
-                    let _ = app.emit(&event_name, &raw_value);
+                    let _ = app.emit(&event_name, &wrapped_event);
                 } else {
                     log::error!("[SDK] ❌ Failed to parse event: {} - Line: {}", e, &line[..std::cmp::min(200, line.len())]);
                 }
