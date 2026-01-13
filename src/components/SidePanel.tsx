@@ -427,6 +427,8 @@ interface SidePanelProps {
   activeAgentWorkingOn?: string | null;
   activeAgentCwd?: string | null;
   activeAgentPersonality?: Partial<AgentPersonality> | null; // Added: personality from terminal state
+  activeAgentColor?: string | null; // Added: agent color for bundles
+  onImportAgent?: (agent: import('../types').SavedAgent) => void; // Callback after bundle import
   projectName?: string;
   gitBranch?: string;
   agentRefreshKey?: number; // Added: forces context panel refresh when agent is edited
@@ -536,6 +538,8 @@ export default function SidePanel({
   activeAgentWorkingOn,
   activeAgentCwd,
   activeAgentPersonality, // Added: personality from terminal state
+  activeAgentColor, // Added: agent color for bundles
+  onImportAgent, // Callback after bundle import
   projectName,
   gitBranch,
   agentRefreshKey, // Added: forces context panel refresh when agent is edited
@@ -803,9 +807,11 @@ export default function SidePanel({
               activeAgentWorkingOn={activeAgentWorkingOn}
               activeAgentCwd={activeAgentCwd}
               activeAgentPersonality={activeAgentPersonality}
+              activeAgentColor={activeAgentColor}
               onOpenFile={onOpenFile}
               onOpenContextDrawer={onOpenContextDrawer}
               onOpenRulesTab={() => setActiveTab("rules")}
+              onImportAgent={onImportAgent}
               projectName={projectName}
               gitBranch={gitBranch}
               refreshKey={agentRefreshKey}

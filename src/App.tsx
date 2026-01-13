@@ -124,7 +124,8 @@ import { generateMemoryId } from "./services/memoryExtractor";
 import { buildMemoryObserverPrompt } from "./services/memoryObserverPrompt";
 import { dispatchMCPMemoryUpdate, type MCPKnowledgeGraph } from "./hooks/useUnifiedMemory";
 import { calculateProjectOverhead } from "./services/conversationRecovery";
-import { getDuckdroidUrl } from "./utils/agentAvatars";
+import { getDuckdroidUrl, getAgentAvatar } from "./utils/agentAvatars";
+import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
 import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
@@ -2679,13 +2680,26 @@ function AppContent() {
       notifyAgentReadyRef.current({ id: targetAgentId, label: taskLabel, cwd: taskCwd });
 
       // 🦆 Save chat session to persistent storage for MCP Kanban access
-      // Get the updated messages after setChatSessions has completed
-      setChatSessions((prevSessions) => {
-        const updatedMessages = prevSessions.get(targetAgentId) || [];
-        // Fire and forget - don't block on this
-        saveKanbanChatSession(targetAgentId, updatedMessages, response.session_id);
-        return prevSessions; // Don't modify state, just read it
-      });
+      // CRITICAL: Build final messages manually to avoid React state timing issues
+      // chatSessions.get() would return STALE data because setChatSessions hasn't flushed yet
+      const finalUserMessage: ChatMessage = {
+        ...userMessage,
+        status: 'complete' as const, // User message is complete after sending
+      };
+      const finalAssistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: response.result,
+        timestamp: Date.now(),
+        status: 'complete' as const,
+        settings: {
+          model: (options?.model || 'sonnet') as 'opus' | 'sonnet' | 'haiku',
+          effort: options?.effort || 'medium',
+          thinkingMode: options?.thinkingMode || 'auto',
+        },
+      };
+      const messagesToSave = [...currentMessages, finalUserMessage, finalAssistantMessage];
+      await saveKanbanChatSession(targetAgentId, messagesToSave, response.session_id);
 
     } catch (err) {
       console.error('[sendMessageForTargetAgent] Error:', err);
@@ -3134,6 +3148,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [activeId]);
 
   // 🗣️ AskUserQuestion: Answer a question from Claude for the current agent
+  // Uses stdin bidirectional communication with requestId
   const answerUserQuestionForAgent = useCallback(async (
     toolUseId: string,
     answers: AskUserQuestionAnswers
@@ -3143,14 +3158,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    const sessionId = chatSessionIds.get(activeId);
-    if (!sessionId) {
-      console.error('[App] Cannot answer question: no active session for agent', activeId);
-      toast.error('No active session to answer question');
-      return;
+    // Find the pending requestId for this agent from stdin-based communication
+    // The requestId is stored in pendingUserQuestions when ask-user-question event arrives
+    let foundRequestId: string | null = null;
+    for (const [requestId, data] of pendingUserQuestions.entries()) {
+      if (data.agentId === activeId) {
+        foundRequestId = requestId;
+        break;
+      }
     }
 
-    console.log('[App] 🗣️ Answering user question:', { activeId, toolUseId, answers });
+    if (!foundRequestId) {
+      console.error('[App] Cannot answer question: no pending requestId for agent', activeId);
+      // Fallback: try using toolUseId as requestId (for backwards compatibility)
+      console.log('[App] 🗣️ Attempting fallback with toolUseId:', toolUseId);
+      foundRequestId = toolUseId;
+    }
+
+    console.log('[App] 🗣️ Answering user question via stdin:', { activeId, requestId: foundRequestId, toolUseId, answers });
 
     // Mark question as answered immediately for UI feedback
     setAnsweredQuestionsMap(prev => {
@@ -3161,7 +3186,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return newMap;
     });
 
-    // Remove from pending
+    // Remove from pending question IDs (UI state)
     setPendingQuestionIdsMap(prev => {
       const newMap = new Map(prev);
       const pending = new Set<string>(newMap.get(activeId) || new Set<string>());
@@ -3170,27 +3195,26 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return newMap;
     });
 
+    // Remove from pendingUserQuestions (stdin state)
+    setPendingUserQuestions(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(foundRequestId!);
+      return newMap;
+    });
+
     try {
-      // Format the answer as a tool result
-      const formattedAnswer = Object.entries(answers)
-        .map(([header, value]) => {
-          const valueStr = Array.isArray(value) ? value.join(', ') : value;
-          return `${header}: ${valueStr}`;
-        })
-        .join('\n');
-
       // Dynamic import to avoid circular dependencies
-      const { sendToolResult } = await import('./services/claudeSDK');
+      const { answerUserQuestionViaStdin } = await import('./services/claudeSDK');
 
-      // Send the tool result to continue the conversation
-      await sendToolResult(
-        sessionId,
-        toolUseId,
-        formattedAnswer,
-        activeTerminal?.cwd || explorerPath
+      // Send answer via stdin to the Node.js process
+      // The answers should be in the format { "header": "selected_value" }
+      await answerUserQuestionViaStdin(
+        activeId,
+        foundRequestId,
+        answers as Record<string, string>
       );
 
-      console.log('[App] 🗣️ Question answered successfully');
+      console.log('[App] 🗣️ Question answered successfully via stdin');
 
       // Track analytics
       posthog.capture('user_question_answered', {
@@ -3218,7 +3242,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
     }
-  }, [activeId, chatSessionIds, activeTerminal?.cwd, explorerPath]);
+  }, [activeId, pendingUserQuestions]);
 
   // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
@@ -4070,11 +4094,34 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     async (payload: { id: string; label: string }) => {
       playQuackSound();
 
-      // Show in-app toast notification
-      toast.success(`${payload.label}`, {
-        description: "Hey, you can do something here!",
-        duration: 4000,
-      });
+      // Find the terminal to get avatar and color info
+      const terminal = terminals.find(t => t.id === payload.id || t.label === payload.label);
+      const agentName = payload.label || "AI Assistant";
+
+      // Extract project name from cwd (last folder in path)
+      let projectName = "Project";
+      if (terminal?.cwd) {
+        const pathParts = terminal.cwd.split(/[/\\]/);
+        projectName = pathParts.filter(Boolean).pop() || "Project";
+      }
+
+      // Get project color
+      const repoKey = `repo-${projectName}`;
+      const projectColor = getProjectColor(repoKey, projectColors, 0);
+
+      // Get avatar URL
+      const avatarResult = getAgentAvatar(agentName, terminal?.avatar);
+      const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
+
+      // Show in-app toast notification with project context
+      showProjectToast({
+        projectName,
+        projectColor,
+        agentName,
+        agentAvatar,
+        message: "Terminal ready - waiting for input",
+        type: 'info',
+      }, 4000);
 
       if (!tauriAvailable) {
         return;
@@ -4090,27 +4137,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
 
       try {
-        // Find the terminal to get its cwd and extract project name
-        const terminal = terminals.find(t => t.id === payload.id || t.label === payload.label);
-        const agentName = payload.label || "AI Assistant";
-
-        // Extract project name from cwd (last folder in path)
-        let projectName = "Project";
-        if (terminal?.cwd) {
-          const pathParts = terminal.cwd.split(/[/\\]/);
-          projectName = pathParts.filter(Boolean).pop() || "Project";
-        }
-
         await sendNotification({
           id: Number(Date.now() % 2147483647),
           title: projectName,
-          body: `${agentName}: Hey, you can do something here!`,
+          body: `${agentName}: Terminal ready`,
         });
       } catch (error) {
         console.warn("Unable to show notification", error);
       }
     },
-    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable, terminals]
+    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable, terminals, projectColors]
   );
 
   // Notify when agent/chat completes response
@@ -4118,11 +4154,37 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     async (payload: { id: string; label: string; cwd?: string }) => {
       playQuackSound();
 
-      // Show in-app toast notification
-      toast.success(`${payload.label}`, {
-        description: "Response completed! 🦆",
-        duration: 4000,
-      });
+      // Find the terminal to get avatar and color info
+      const terminal = terminals.find(t => t.id === payload.id || t.label === payload.label);
+      const agentName = payload.label || "AI Assistant";
+
+      // Extract project name from cwd (last folder in path)
+      let projectName = "Project";
+      if (payload.cwd) {
+        const pathParts = payload.cwd.split(/[/\\]/);
+        projectName = pathParts.filter(Boolean).pop() || "Project";
+      } else if (terminal?.cwd) {
+        const pathParts = terminal.cwd.split(/[/\\]/);
+        projectName = pathParts.filter(Boolean).pop() || "Project";
+      }
+
+      // Get project color
+      const repoKey = `repo-${projectName}`;
+      const projectColor = getProjectColor(repoKey, projectColors, 0);
+
+      // Get avatar URL (async operation)
+      const avatarResult = getAgentAvatar(agentName, terminal?.avatar);
+      const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
+
+      // Show in-app toast notification with project context
+      showProjectToast({
+        projectName,
+        projectColor,
+        agentName,
+        agentAvatar,
+        message: "Response completed!",
+        type: 'success',
+      }, 4000);
 
       if (!tauriAvailable) {
         return;
@@ -4138,19 +4200,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
 
       try {
-        const agentName = payload.label || "AI Assistant";
-
-        // Extract project name from cwd (last folder in path)
-        let projectName = "Project";
-        if (payload.cwd) {
-          const pathParts = payload.cwd.split(/[/\\]/);
-          projectName = pathParts.filter(Boolean).pop() || "Project";
-        }
-
         await sendNotification({
           id: Number(Date.now() % 2147483647),
           title: projectName,
-          body: `${agentName}: Response completed! 🦆`,
+          body: `${agentName}: Response completed!`,
         });
 
         // Send Telegram notification if user is linked
@@ -4200,7 +4253,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         console.warn("Unable to show notification", error);
       }
     },
-    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable]
+    [ensureNotificationPermission, notificationGranted, playQuackSound, tauriAvailable, terminals, projectColors]
   );
 
   // Keep ref to latest notifyAgentReady to avoid dependency issues
@@ -10408,6 +10461,15 @@ You have access to all Bash tools to execute git commands like:
             const activeTerminal = terminals.find((t) => t.id === activeId);
             return activeTerminal?.personality || null;
           })()}
+          activeAgentColor={(() => {
+            const activeTerminal = terminals.find((t) => t.id === activeId);
+            return activeTerminal?.color || null;
+          })()}
+          onImportAgent={async (importedAgent) => {
+            // Refresh agent list after bundle import
+            console.log('[App] Agent imported from bundle:', importedAgent.name);
+            await loadAgents();
+          }}
           projectName={projectName}
           gitBranch={gitBranch}
           agentRefreshKey={agentRefreshKey}

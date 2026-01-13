@@ -39,6 +39,7 @@ export function useBundleOperations(): BundleOperations {
    * Export an agent as a downloadable .zip bundle
    */
   async function exportAgent(agent: SavedAgent): Promise<void> {
+    console.log('[useBundleOperations] exportAgent called', { agentName: agent.name, agentId: agent.id });
     setState((prev) => ({ ...prev, exporting: true, error: null }));
 
     try {

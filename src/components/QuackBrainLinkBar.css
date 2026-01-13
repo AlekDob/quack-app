@@ -1,0 +1,109 @@
+/* QuackBrainLinkBar - Similar to EditSummaryBar but for Quack Brain files */
+
+.quack-brain-link-bar {
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(139, 92, 246, 0.1));
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  border-radius: 8px;
+  margin: 8px 0;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.quack-brain-link-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  gap: 12px;
+}
+
+.quack-brain-link-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.quack-brain-link-bar-brain-icon {
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+.quack-brain-link-bar-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a855f7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quack-brain-link-bar-separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.quack-brain-link-bar-entity-name {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.quack-brain-link-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.quack-brain-link-bar-open-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(147, 51, 234, 0.2);
+  border: 1px solid rgba(147, 51, 234, 0.4);
+  border-radius: 6px;
+  color: #c4b5fd;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quack-brain-link-bar-open-btn:hover:not(:disabled) {
+  background: rgba(147, 51, 234, 0.35);
+  border-color: rgba(147, 51, 234, 0.6);
+  color: #e9d5ff;
+}
+
+.quack-brain-link-bar-open-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quack-brain-link-bar-dismiss-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quack-brain-link-bar-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Entity type specific colors */
+.quack-brain-link-bar-title svg:not(.quack-brain-link-bar-brain-icon) {
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}

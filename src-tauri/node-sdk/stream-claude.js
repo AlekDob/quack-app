@@ -461,15 +461,15 @@ async function main() {
       // TOOLS CONFIGURATION (SDK v0.1.76)
       //
       // Using the claude_code preset for ALL default tools (55+)
-      // AskUserQuestion is handled via canUseTool callback when Claude invokes it.
+      // PLUS AskUserQuestion as a custom tool for interactive user choices
       //
       // From SDK docs:
-      // - `tools`: { type: 'preset', preset: 'claude_code' } for default tools
+      // - `tools`: can be array combining preset + custom tools
       // - `allowedTools`: filters which tools Claude can actually use
       // - `canUseTool`: permission callback fires when tools need approval
       // =============================================================================
 
-      // Use preset to get all Claude Code tools
+      // Use claude_code preset for all standard tools
       tools: {
         type: 'preset',
         preset: 'claude_code'

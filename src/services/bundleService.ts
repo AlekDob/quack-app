@@ -107,6 +107,7 @@ export async function exportAgentBundleAsZip(
   commands: Array<{ id: string; content: string }>,
   avatarData?: Uint8Array
 ): Promise<Uint8Array> {
+  console.log('[bundleService] exportAgentBundleAsZip called', { agentName: agent.name, skillsCount: skills.length });
   const zip = new JSZip();
 
   // Create manifest

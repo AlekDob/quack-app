@@ -6,6 +6,9 @@ import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
+import TodoProgressBar from './TodoProgressBar';
+import QuackBrainLinkBar from './QuackBrainLinkBar';
+import type { TodoItem } from './TodoProgressBar';
 import KanbanTasksBar from './KanbanTasksBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
@@ -201,6 +204,9 @@ export default function ChatView({
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
+
+  // State to show/hide existing ThinkingBlocks (toggle via footer icon)
+  const [showThinkingBlocks, setShowThinkingBlocks] = useState(true);
 
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
@@ -492,6 +498,105 @@ export default function ChatView({
     }
   }, [currentFileEdits, currentFileDeletes, onEditsChange]);
 
+  // Detect if any messages have ThinkingBlocks (thinkingContent or thinking events)
+  const hasThinkingBlocks = useMemo<boolean>(() => {
+    for (const msg of messages) {
+      // Check direct thinkingContent field
+      if (msg.thinkingContent) return true;
+
+      // Check events for thinking content
+      if (msg.events && Array.isArray(msg.events)) {
+        for (const event of msg.events as any[]) {
+          if (event.type === 'assistant' && event.message?.content) {
+            const content = event.message.content;
+            if (Array.isArray(content)) {
+              for (const item of content) {
+                if (item.type === 'thinking' && item.thinking) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }, [messages]);
+
+  // Extract todos from the LAST assistant message only (like EditSummaryBar)
+  // If the last message has no TodoWrite, the bar disappears
+  const currentTodos = useMemo<TodoItem[]>(() => {
+    // Find the last assistant message
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find(msg => msg.role === 'assistant');
+
+    if (!lastAssistantMessage || !lastAssistantMessage.events) return [];
+
+    // Find the LAST TodoWrite in the last message (there could be multiple updates)
+    let lastTodos: TodoItem[] = [];
+
+    for (const event of lastAssistantMessage.events as any[]) {
+      if (event.type === 'assistant' && event.message?.content) {
+        const content = event.message.content;
+        if (Array.isArray(content)) {
+          for (const item of content) {
+            if (item.type === 'tool_use') {
+              const toolName = item.name?.toLowerCase();
+              const input = item.input;
+
+              // Update lastTodos every time we find a TodoWrite in the last message
+              if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
+                lastTodos = input.todos as TodoItem[];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return lastTodos;
+  }, [messages]);
+
+  // Extract QuackBrain file info from the LAST assistant message
+  // Shows a special bar to open the created brain entity in Obsidian
+  const quackBrainFile = useMemo<{ path: string; name: string; type: string } | null>(() => {
+    // Find the last assistant message
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find(msg => msg.role === 'assistant');
+
+    if (!lastAssistantMessage?.events) return null;
+
+    // Look for brain MCP tool results with mdFilePath
+    for (const event of lastAssistantMessage.events as any[]) {
+      if (event.type === 'user' && event.message?.content && Array.isArray(event.message.content)) {
+        for (const item of event.message.content) {
+          if (item.type === 'tool_result' && item.content) {
+            try {
+              const resultContent = typeof item.content === 'string'
+                ? JSON.parse(item.content)
+                : item.content;
+
+              // Check for mdFilePath from brain_create_entity or brain_add_observation
+              if (resultContent.mdFilePath && resultContent.mdFilePath.includes('QuackBrain')) {
+                return {
+                  path: resultContent.mdFilePath,
+                  name: resultContent.name || resultContent.mdFilePath.split('/').pop()?.replace('.md', '') || 'Entity',
+                  type: resultContent.entityType || resultContent.tag || 'note'
+                };
+              }
+            } catch {
+              // Not JSON, skip
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }, [messages]);
+
   // Keyboard shortcuts: Shift+Tab to cycle modes, ESC to abort
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -562,6 +667,7 @@ export default function ChatView({
         pendingQuestionIds={pendingQuestionIds}
         answeredQuestions={answeredQuestions}
         currentSessionId={currentSessionId}
+        showThinkingBlocks={showThinkingBlocks}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar
@@ -575,6 +681,16 @@ export default function ChatView({
             // Instead, just hide the bar by doing nothing
             console.log('Edits are automatically cleared when a new message arrives');
           }}
+        />
+      )}
+      {currentTodos.length > 0 && (
+        <TodoProgressBar todos={currentTodos} />
+      )}
+      {quackBrainFile && (
+        <QuackBrainLinkBar
+          filePath={quackBrainFile.path}
+          entityName={quackBrainFile.name}
+          entityType={quackBrainFile.type}
         />
       )}
       {!hideKanbanTasksBar && onOpenKanban && (
@@ -597,20 +713,36 @@ export default function ChatView({
             onEffortChange={(e) => onEffortChange?.(e)}
             disabled={isLoading}
           />
-          {/* 🧠 Thinking Mode Quick Toggle */}
+          {/* 🧠 Thinking Toggle - shows/hides existing blocks OR enables thinking for future */}
           <button
-            className={`chat-thinking-toggle ${thinkingMode && thinkingMode !== 'auto' ? 'active' : ''}`}
+            className={`chat-thinking-toggle ${
+              (hasThinkingBlocks && showThinkingBlocks) || (thinkingMode && thinkingMode !== 'auto')
+                ? 'active'
+                : ''
+            }`}
             onClick={() => {
-              // Toggle between 'auto' (off) and 'think' (on)
-              const currentMode = thinkingMode || 'auto';
-              const newMode = currentMode === 'auto' ? 'think' : 'auto';
-              onThinkingModeChange?.(newMode);
-              console.log('[ChatView] 🧠 Thinking mode toggled:', currentMode, '→', newMode);
+              if (hasThinkingBlocks) {
+                // Toggle visibility of existing thinking blocks
+                setShowThinkingBlocks(prev => !prev);
+                console.log('[ChatView] 🧠 Thinking blocks visibility:', !showThinkingBlocks);
+              } else {
+                // Toggle thinking mode for future requests
+                const currentMode = thinkingMode || 'auto';
+                const newMode = currentMode === 'auto' ? 'think' : 'auto';
+                onThinkingModeChange?.(newMode);
+                console.log('[ChatView] 🧠 Thinking mode toggled:', currentMode, '→', newMode);
+              }
             }}
             disabled={isLoading}
-            title={thinkingMode && thinkingMode !== 'auto'
-              ? `Thinking: ${thinkingMode} (click to disable)`
-              : 'Enable Extended Thinking'}
+            title={
+              hasThinkingBlocks
+                ? showThinkingBlocks
+                  ? 'Hide thinking blocks'
+                  : 'Show thinking blocks'
+                : thinkingMode && thinkingMode !== 'auto'
+                  ? `Thinking: ${thinkingMode} (click to disable)`
+                  : 'Enable Extended Thinking'
+            }
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a8 8 0 0 0-8 8c0 3 1.5 5.5 4 7v3h8v-3c2.5-1.5 4-4 4-7a8 8 0 0 0-8-8z" />

@@ -20,7 +20,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { useKanbanStore } from '../stores/kanbanStore';
+import { useKanbanStore, kanbanWriteLock } from '../stores/kanbanStore';
 
 interface UseKanbanPollingOptions {
   /** Whether polling is enabled (default: true) */
@@ -76,6 +76,12 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
             return;
           }
 
+          // Skip if a local write just happened (prevents race condition)
+          if (kanbanWriteLock.shouldSkipReload()) {
+            console.log('[useKanbanPolling] Skipping reload due to recent local write');
+            return;
+          }
+
           // Reload tasks immediately
           isPollingRef.current = true;
           loadTasks({ silent: true })
@@ -113,6 +119,11 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
     const poll = async () => {
       // Skip if already polling or document is hidden
       if (isPollingRef.current || document.hidden) {
+        return;
+      }
+
+      // Skip if a local write just happened (prevents race condition)
+      if (kanbanWriteLock.shouldSkipReload()) {
         return;
       }
 

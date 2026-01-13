@@ -119,6 +119,7 @@ interface StreamMessageProps {
   onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
   pendingQuestionIds?: Set<string>; // Tool IDs with pending questions
   answeredQuestions?: Map<string, AskUserQuestionAnswers>; // Already answered questions
+  showThinkingBlocks?: boolean; // Show/hide ThinkingBlocks (controlled by footer icon)
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -131,6 +132,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   onUserQuestionAnswer,
   pendingQuestionIds,
   answeredQuestions,
+  showThinkingBlocks = true,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -228,7 +230,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       <div className="stream-message assistant-message">
         {msg.content.map((content: any, idx: number) => {
           // Thinking block content (SDK 0.1.54+ extended thinking)
-          if (content.type === 'thinking' && content.thinking) {
+          // Only render if showThinkingBlocks is true (controlled by footer icon)
+          if (content.type === 'thinking' && content.thinking && showThinkingBlocks) {
             return (
               <ThinkingBlock
                 key={idx}
@@ -377,21 +380,37 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             }
 
             // AskUserQuestion tool - no GIF (skipped in ToolGifInline)
-            if (toolName === 'askuserquestion' && input?.questions && Array.isArray(input.questions)) {
-              const isPending = pendingQuestionIds?.has(toolId);
-              const existingAnswer = answeredQuestions?.get(toolId);
-              const isAnswered = !!existingAnswer || !!toolResult;
+            // Handle both array and stringified JSON (SDK may serialize as string)
+            if (toolName === 'askuserquestion' && input?.questions) {
+              let questions = input.questions;
 
-              return (
-                <MemoizedAskUserQuestionWidget
-                  key={idx}
-                  questions={input.questions}
-                  toolUseId={toolId}
-                  onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers)}
-                  disabled={isAnswered}
-                  existingAnswers={existingAnswer}
-                />
-              );
+              // Parse if questions came as stringified JSON
+              if (typeof questions === 'string') {
+                try {
+                  questions = JSON.parse(questions);
+                  console.log('🔧 [AskUserQuestion] Parsed stringified questions:', questions);
+                } catch (e) {
+                  console.error('🔧 [AskUserQuestion] Failed to parse questions string:', e);
+                }
+              }
+
+              // Now check if we have a valid array
+              if (Array.isArray(questions)) {
+                const isPending = pendingQuestionIds?.has(toolId);
+                const existingAnswer = answeredQuestions?.get(toolId);
+                const isAnswered = !!existingAnswer || !!toolResult;
+
+                return (
+                  <MemoizedAskUserQuestionWidget
+                    key={idx}
+                    questions={questions}
+                    toolUseId={toolId}
+                    onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers)}
+                    disabled={isAnswered}
+                    existingAnswers={existingAnswer}
+                  />
+                );
+              }
             }
 
             // Task tool (subagent invocation) - launches droids

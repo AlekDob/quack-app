@@ -24,9 +24,11 @@ interface MessageListProps {
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
   // Current session ID for display in chat header
   currentSessionId?: string;
+  // Show/hide ThinkingBlocks (controlled by footer icon)
+  showThinkingBlocks?: boolean;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -244,6 +246,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
                 pendingQuestionIds={pendingQuestionIds}
                 answeredQuestions={answeredQuestions}
                 currentSessionId={currentSessionId}
+                showThinkingBlocks={showThinkingBlocks}
               />
               {/* Show memory indicator below user messages when memories were used */}
               {memoryContext && (

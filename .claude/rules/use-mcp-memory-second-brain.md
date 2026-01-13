@@ -186,6 +186,36 @@ Every note links to its creation day via `[[YYYY-MM-DD]]` WikiLink in frontmatte
 
 This keeps the diary clean and focused on "what happened today" rather than cluttering it with every note created.
 
+### Diary Entry Format
+
+**CRITICAL: When adding entries to the daily diary, follow these rules:**
+
+1. **NO headings** - Do not use `#`, `##`, etc. in diary entries
+2. **Use blockquotes** - Start each entry with `>` for visual separation
+3. **NO tags** - Do not add `#tag` inline in diary content
+4. **WikiLinks only** - Link to detailed notes with `[[note-name]]`
+5. **Keep it brief** - One paragraph per entry, focus on what happened
+
+**Correct diary entry format:**
+```markdown
+> Fixed critical bug where app became white after macOS standby. Enhanced `useSystemWakeHandler` with pageshow/pagehide events and CSS repaint forcing. See [[bug-white-screen-after-macos-standby]] for details.
+```
+
+**WRONG format (avoid):**
+```markdown
+## Bug Fix: White Screen  ← NO headings!
+#bug #quack-app           ← NO tags!
+
+Fixed the bug...
+```
+
+**Multiple entries in same day:**
+```markdown
+> Morning: Resolved authentication issue. See [[bug-auth-token-expired]].
+
+> Afternoon: Implemented new feature for terminal tabs. See [[task-terminal-tabs]].
+```
+
 ### WikiLinks
 
 Use `[[NoteName]]` syntax to create relations between notes. These are tracked and visible in Obsidian's Graph View.

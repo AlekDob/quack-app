@@ -71,7 +71,12 @@ export default function AgentPersonalityCard({
 
   // Handle export button click
   async function handleExport() {
-    if (!personality || !agentName) return;
+    console.log('[AgentPersonalityCard] handleExport called', { personality, agentName, agentId, agentColor });
+
+    if (!personality || !agentName) {
+      console.warn('[AgentPersonalityCard] Export aborted - missing personality or agentName', { personality: !!personality, agentName });
+      return;
+    }
 
     const agent: SavedAgent = {
       id: agentId || `agent-${Date.now()}`,

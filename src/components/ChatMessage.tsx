@@ -58,9 +58,11 @@ interface ChatMessageProps {
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
   // Session ID for display in header
   currentSessionId?: string;
+  // Show/hide ThinkingBlocks (controlled by footer icon)
+  showThinkingBlocks?: boolean;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -233,9 +235,35 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
     return truncated + '...';
   };
 
+  // Extract original slash command from expanded command-context XML
+  // When user types "/task prompt", it expands to "<command-context>...</command-context>\n---\n/task prompt"
+  // This helper extracts the clean "/task prompt" for display in sticky messages
+  const extractOriginalCommand = (content: string): string => {
+    // Check if content contains <command-context> (expanded slash command)
+    if (!content.includes('<command-context')) {
+      return content;
+    }
+
+    // Pattern 1: Look for content after "---\n" separator (original command follows)
+    const separatorMatch = content.match(/---\s*\n\s*(.+)/s);
+    if (separatorMatch) {
+      return separatorMatch[1].trim();
+    }
+
+    // Pattern 2: Extract just the command name from the tag if no separator
+    const nameMatch = content.match(/<command-context\s+name="([^"]+)"/);
+    if (nameMatch) {
+      return `/${nameMatch[1]}`;
+    }
+
+    // Fallback: return original content
+    return content;
+  };
+
   // Check if current message is truncated (only for sticky user messages)
+  // Use extractOriginalCommand to get clean content for truncation check
   const isMessageTruncated = isLastUserMessage && isUser
-    ? isTruncated(message.content, 30, 250)
+    ? isTruncated(extractOriginalCommand(message.content), 30, 250)
     : false;
 
   // 🦆 FIX: Stable event key generator - ALWAYS uses index for guaranteed uniqueness
@@ -465,7 +493,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
           )}
         </div>
         {/* Show thinking block if present (SDK 0.1.54+ extended thinking) */}
-        {!isUser && message.thinkingContent && (
+        {!isUser && message.thinkingContent && showThinkingBlocks && (
           <ThinkingBlock
             content={message.thinkingContent}
             resetKey={thinkingModeResetKey}
@@ -487,13 +515,14 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                 onUserQuestionAnswer={onUserQuestionAnswer}
                 pendingQuestionIds={pendingQuestionIds}
                 answeredQuestions={answeredQuestions}
+                showThinkingBlocks={showThinkingBlocks}
               />
             ))}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
             {isLastUserMessage && isUser && !isExpanded
-              ? renderTextWithMentions(truncateText(message.content, 30))
+              ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
               : renderTextWithMentions(message.content)
             }
             {isStreaming && <span className="streaming-cursor">▊</span>}

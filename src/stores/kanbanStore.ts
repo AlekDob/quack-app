@@ -20,6 +20,33 @@ import {
   generateBranchName,
 } from '../services/worktreeService';
 
+/**
+ * Write lock to prevent race conditions between local writes and file watcher reloads.
+ * When a write operation is in progress, the polling hook should skip reloads.
+ */
+export const kanbanWriteLock = {
+  /** Timestamp of last write operation */
+  lastWriteAt: 0,
+  /** Debounce period in ms - ignore file watcher events for this duration after a write */
+  DEBOUNCE_MS: 500,
+
+  /** Mark that a write operation just happened */
+  markWrite() {
+    this.lastWriteAt = Date.now();
+    console.log('[kanbanWriteLock] Write marked at', this.lastWriteAt);
+  },
+
+  /** Check if we should skip a reload (within debounce period of last write) */
+  shouldSkipReload(): boolean {
+    const elapsed = Date.now() - this.lastWriteAt;
+    const skip = elapsed < this.DEBOUNCE_MS;
+    if (skip) {
+      console.log(`[kanbanWriteLock] Skipping reload (${elapsed}ms since last write, debounce: ${this.DEBOUNCE_MS}ms)`);
+    }
+    return skip;
+  }
+};
+
 // Notification for showing "Open Kanban" bar after background task creation
 export interface KanbanNotification {
   taskId: string;
@@ -140,8 +167,9 @@ export const useKanbanStore = create<KanbanState>()(
           const tasks = [...get().tasks, newTask];
           set({ tasks });
 
-          // Persist to storage
+          // Persist to storage and mark write to prevent race condition with file watcher
           await saveKanbanTasks(tasks);
+          kanbanWriteLock.markWrite();
 
           console.log('[kanbanStore] Added task:', newTask.id, newTask.title);
           return newTask;
@@ -154,8 +182,9 @@ export const useKanbanStore = create<KanbanState>()(
           );
           set({ tasks });
 
-          // Persist to storage
+          // Persist to storage and mark write to prevent race condition
           await saveKanbanTasks(tasks);
+          kanbanWriteLock.markWrite();
 
           console.log('[kanbanStore] Updated task:', id);
         },
@@ -224,8 +253,9 @@ export const useKanbanStore = create<KanbanState>()(
           );
           set({ tasks });
 
-          // Persist to storage
+          // Persist to storage and mark write to prevent race condition
           await saveKanbanTasks(tasks);
+          kanbanWriteLock.markWrite();
 
           console.log('[kanbanStore] Moved task:', id, 'to', newStatus);
 
@@ -252,8 +282,9 @@ export const useKanbanStore = create<KanbanState>()(
             isDrawerOpen: shouldCloseDrawer ? false : isDrawerOpen,
           });
 
-          // Persist to storage
+          // Persist to storage and mark write to prevent race condition
           await saveKanbanTasks(tasks);
+          kanbanWriteLock.markWrite();
 
           console.log('[kanbanStore] Deleted task:', id);
         },
@@ -341,6 +372,7 @@ export const useKanbanStore = create<KanbanState>()(
             );
             set({ tasks, processingDocumentation });
             await saveKanbanTasks(tasks);
+            kanbanWriteLock.markWrite();
             console.log('[kanbanStore] Documentation complete for task:', taskId, updates);
           } else {
             set({ processingDocumentation });

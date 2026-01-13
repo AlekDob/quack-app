@@ -26,10 +26,12 @@ interface AgentContextPanelProps {
   activeAgentWorkingOn?: string | null;
   activeAgentCwd?: string | null;
   activeAgentPersonality?: Partial<AgentPersonality> | null;
+  activeAgentColor?: string | null; // Added: agent color for bundles
   onOpenFile?: (entry: DirectoryEntry) => void;
   onOpenContextDrawer?: (scope: string) => void;
   onEditAgent?: () => void;
   onOpenRulesTab?: () => void; // Navigate to Rules tab in SidePanel
+  onImportAgent?: (agent: import('../types').SavedAgent) => void; // Callback after bundle import
   projectName?: string;
   gitBranch?: string;
   refreshKey?: number;
@@ -43,10 +45,12 @@ export default function AgentContextPanel({
   activeAgentWorkingOn,
   activeAgentCwd,
   activeAgentPersonality,
+  activeAgentColor,
   onOpenFile,
   onOpenContextDrawer,
   onEditAgent,
   onOpenRulesTab,
+  onImportAgent,
   projectName,
   gitBranch,
   refreshKey,
@@ -455,6 +459,9 @@ export default function AgentContextPanel({
               agentName={activeAgentName}
               agentAvatar={activeAgentAvatar}
               agentWorkingOn={activeAgentWorkingOn}
+              agentColor={activeAgentColor}
+              agentId={activeAgentId}
+              onImportAgent={onImportAgent}
             />
           </div>
         )}
