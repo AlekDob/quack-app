@@ -17,6 +17,8 @@ interface AgentSessionItemProps {
   onMarkDone?: (sessionId: string) => void;
   /** Callback to delete session */
   onDelete?: (sessionId: string) => void;
+  /** Callback to rename session */
+  onRename?: (sessionId: string) => void;
 }
 
 /**
@@ -51,6 +53,7 @@ function AgentSessionItem({
   isLoading = false,
   onMarkDone,
   onDelete,
+  onRename,
 }: AgentSessionItemProps) {
   const relativeTime = formatRelativeTime(session.updatedAt);
   const itemRef = useRef<HTMLDivElement>(null);
@@ -260,6 +263,21 @@ function AgentSessionItem({
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               Mark as Done
+            </button>
+          )}
+          {onRename && (
+            <button
+              className="session-context-menu-item"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowContextMenu(false);
+                onRename(session.id);
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              </svg>
+              Rename Session
             </button>
           )}
           {onDelete && (

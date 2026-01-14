@@ -284,6 +284,7 @@ export default function AddKanbanTaskModal({
       setPrompt(editTask.prompt);
       setSelectedProjectPath(editTask.projectPath);
       setSelectedBranch(editTask.branch || '');
+      // Agent ID will be set by separate useEffect when terminals are ready
       setSelectedAgentId(editTask.assignedAgent?.id || '');
       setUseWorktree(editTask.useWorktree || false);
       // Load existing attachments
@@ -351,6 +352,7 @@ export default function AddKanbanTaskModal({
       setSelectedProjectPath(projectGroups[0].path);
     }
   }, [isOpen, projectGroups, selectedProjectPath]);
+
 
   // Auto-select branch when project changes (but NOT when using initialValues)
   useEffect(() => {
@@ -628,7 +630,13 @@ export default function AddKanbanTaskModal({
     const trimmedTitle = title.trim();
     let trimmedPrompt = prompt.trim();
 
-    if (!trimmedTitle || !trimmedPrompt || !selectedProjectPath) return;
+    // In edit mode, prompt might be empty (we don't show it), use the original
+    if (isEditMode && !trimmedPrompt && editTask) {
+      trimmedPrompt = editTask.prompt;
+    }
+
+    if (!trimmedTitle || !selectedProjectPath) return;
+    if (!isEditMode && !trimmedPrompt) return;
 
     // 🦆 Set submitting state immediately to prevent double-clicks
     setIsSubmitting(true);
@@ -739,7 +747,10 @@ export default function AddKanbanTaskModal({
 
   if (!isOpen) return null;
 
-  const isValid = title.trim() && prompt.trim() && selectedProjectPath;
+  // In edit mode, only title is required (prompt and project are already set)
+  const isValid = isEditMode 
+    ? title.trim() && selectedProjectPath
+    : title.trim() && prompt.trim() && selectedProjectPath;
 
   return (
     <div
@@ -761,33 +772,50 @@ export default function AddKanbanTaskModal({
 
         {/* Content */}
         <div className="kanban-modal-content">
-          {/* Project Selection */}
-          <div className="kanban-form-field">
-            <label htmlFor="task-project">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-              </svg>
-              Project
-            </label>
-            {projectGroups.length === 0 ? (
-              <div className="kanban-form-empty">
-                No active projects. Create an agent first.
-              </div>
-            ) : (
-              <select
-                id="task-project"
-                value={selectedProjectPath}
-                onChange={(e) => setSelectedProjectPath(e.target.value)}
-              >
-                <option value="">Select a project...</option>
-                {projectGroups.map((group) => (
-                  <option key={group.path} value={group.path}>
-                    {group.name} ({group.terminals.length} agent{group.terminals.length !== 1 ? 's' : ''})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {/* Project Selection - hidden in edit mode */}
+          {!isEditMode && (
+            <div className="kanban-form-field">
+              <label htmlFor="task-project">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+                Project
+              </label>
+              {projectGroups.length === 0 ? (
+                <div className="kanban-form-empty">
+                  No active projects. Create an agent first.
+                </div>
+              ) : (
+                <select
+                  id="task-project"
+                  value={selectedProjectPath}
+                  onChange={(e) => setSelectedProjectPath(e.target.value)}
+                >
+                  <option value="">Select a project...</option>
+                  {projectGroups.map((group) => (
+                    <option key={group.path} value={group.path}>
+                      {group.name} ({group.terminals.length} agent{group.terminals.length !== 1 ? 's' : ''})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Title field - shown first in edit mode */}
+          {isEditMode && (
+            <div className="kanban-form-field">
+              <label htmlFor="task-title">Title</label>
+              <input
+                id="task-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Review authentication flow"
+                autoFocus
+              />
+            </div>
+          )}
 
           {/* Branch Selection */}
           {currentProject && currentProject.branches.length > 0 && (
@@ -816,8 +844,8 @@ export default function AddKanbanTaskModal({
             </div>
           )}
 
-          {/* Worktree Toggle */}
-          {currentProject && (
+          {/* Worktree Toggle - hidden in edit mode */}
+          {!isEditMode && currentProject && (
             <div className="kanban-form-field kanban-form-checkbox">
               <label htmlFor="task-worktree" className="kanban-checkbox-label">
                 <input
@@ -848,8 +876,8 @@ export default function AddKanbanTaskModal({
             </div>
           )}
 
-          {/* Agent Selection */}
-          {currentProject && (
+          {/* Agent Selection - hidden in edit mode */}
+          {!isEditMode && currentProject && (
             <div className="kanban-form-field">
               <label>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -925,8 +953,8 @@ export default function AddKanbanTaskModal({
             </div>
           )}
 
-          {/* Droids Selection (optional) */}
-          {currentProject && availableDroids.length > 0 && (
+          {/* Droids Selection (optional) - hidden in edit mode */}
+          {!isEditMode && currentProject && availableDroids.length > 0 && (
             <div className="kanban-form-field">
               <label>
                 {/* Robot icon - same as side panel droids tab */}
@@ -982,8 +1010,8 @@ export default function AddKanbanTaskModal({
             </div>
           )}
 
-          {/* Skills Selection (optional) */}
-          {currentProject && availableSkills.length > 0 && (
+          {/* Skills Selection (optional) - hidden in edit mode */}
+          {!isEditMode && currentProject && availableSkills.length > 0 && (
             <div className="kanban-form-field">
               <label>
                 {/* Lightning/star icon - same as side panel skills tab */}
@@ -1033,20 +1061,23 @@ export default function AddKanbanTaskModal({
             </div>
           )}
 
-          {/* Title field */}
-          <div className="kanban-form-field">
-            <label htmlFor="task-title">Title</label>
-            <input
-              id="task-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Review authentication flow"
-              autoFocus={!!selectedProjectPath}
-            />
-          </div>
+          {/* Title field - shown in create mode (in edit mode it's at the top) */}
+          {!isEditMode && (
+            <div className="kanban-form-field">
+              <label htmlFor="task-title">Title</label>
+              <input
+                id="task-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Review authentication flow"
+                autoFocus={!!selectedProjectPath}
+              />
+            </div>
+          )}
 
-          {/* Prompt field with attachment support */}
+          {/* Prompt field with attachment support - hidden in edit mode */}
+          {!isEditMode && (
           <div className="kanban-form-field">
             <label htmlFor="task-prompt">
               Prompt
@@ -1127,9 +1158,10 @@ export default function AddKanbanTaskModal({
               </div>
             )}
           </div>
+          )}
 
-          {/* Task Preview */}
-          {title && selectedProjectPath && (
+          {/* Task Preview - hidden in edit mode */}
+          {!isEditMode && title && selectedProjectPath && (
             <div className="kanban-task-preview">
               <div className="kanban-task-preview-header">
                 <span className="kanban-task-preview-title">{title}</span>

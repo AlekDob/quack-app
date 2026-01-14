@@ -116,7 +116,6 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
   }, [terminal.avatar])
 
   const isBusy = confirmedStatus === 'busy'
-  const isWaitingForResponse = terminal.waitingForResponse ?? false
 
   // 🦆 FIX: Use aggregated values from parent when available (sessions-first architecture)
   // Parent passes aggregatedIsDormant/aggregatedHasUnread calculated from sessions
@@ -146,18 +145,8 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
   const isDormant = terminalWithAggregated.aggregatedIsDormant ?? isDormantLocal
   const isChatEmpty = isChatEmptyLocal && isDormant // Empty only if local is empty AND dormant
 
-  // Check if there are unread messages - prefer aggregated from parent
-  const hasUnreadMessagesLocal = useMemo(() => {
-    if (!chatSessions || isActive) return false
-    const messages = chatSessions.get(terminal.id)
-    if (!messages || messages.length === 0) return false
-    if (isDormantLocal) return false
-    const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant')
-    return lastAssistantMessage !== undefined
-  }, [chatSessions, terminal.id, isActive, isDormantLocal])
-  
-  // 🦆 FIX: Use aggregated value if available, otherwise fallback to local
-  const hasUnreadMessages = terminalWithAggregated.aggregatedHasUnread ?? hasUnreadMessagesLocal
+  // 🦆 SESSIONS-FIRST: hasUnreadMessages badge (💬) now handled by RepositoryGroup with "Quack quack..." tooltip
+  // Removed hasUnreadMessagesLocal calculation - no longer needed here
 
   // Memoize last message calculation
   const lastMessage = useMemo((): string | null => {
@@ -175,6 +164,8 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
   }, [chatSessions, terminal.id])
 
   // Memoize badge calculation
+  // 🦆 SESSIONS-FIRST: Unread messages badge (💬) is now shown in RepositoryGroup with "Quack quack..." tooltip
+  // This component only shows ⚡ (busy) or 💤 (dormant/empty)
   const badge = useMemo(() => {
     if (isBusy) return '⚡'
     // 🚨 CRITICAL: Check isDormant BEFORE isWaitingForResponse!
@@ -182,18 +173,14 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
     if (isChatEmpty || isDormant) return '💤' // Empty chat or dormant (no user interaction)
     // NO badge when agent is active (regardless of dormancy or unread messages)
     if (isActive) return ''
-    // Now check isWaitingForResponse (only for non-dormant agents)
-    if (isWaitingForResponse) return '💬'
-    if (hasUnreadMessages) return '💬' // Has unread messages from assistant
+    // 🦆 REMOVED: 💬 badge for hasUnreadMessages - now handled by RepositoryGroup
     return '' // No badge when all messages are read
-  }, [isBusy, isWaitingForResponse, isActive, isChatEmpty, isDormant, hasUnreadMessages])
+  }, [isBusy, isActive, isChatEmpty, isDormant])
 
   const badgeClassName = useMemo(() => {
-    if (isWaitingForResponse) return 'terminal-status-badge waiting'
     if (isChatEmpty || isDormant) return 'terminal-status-badge sleeping' // Sleeping style for empty chat or dormant
-    if (hasUnreadMessages) return 'terminal-status-badge waiting' // Use waiting style for unread (pulsing)
     return 'terminal-status-badge'
-  }, [isWaitingForResponse, isChatEmpty, isDormant, hasUnreadMessages])
+  }, [isChatEmpty, isDormant])
 
   return (
     <>
@@ -203,8 +190,8 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
       <div className="terminal-details" style={{ flex: 1 }}>
         <span className="terminal-name" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span style={{ flex: 1 }}>{terminal.label}</span>
-          {/* Show badge if busy, waiting, empty chat, or has unread messages */}
-          {(isBusy || isWaitingForResponse || isChatEmpty || hasUnreadMessages) && (
+          {/* Show badge if busy or dormant/empty (💬 for unread now in RepositoryGroup) */}
+          {(isBusy || isChatEmpty || isDormant) && (
             <span className={badgeClassName}>
               {badge}
             </span>

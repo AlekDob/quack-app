@@ -5865,39 +5865,86 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
             }
 
-            // 🦆 CHAT PERSISTENCE: Restore messages for all agents
+            // 🦆 CHAT PERSISTENCE: Restore messages for all SESSIONS (sessions-first architecture)
+            // Messages are now saved with session.id as key, not agent.id
             const initialChatSessions = new Map<string, ChatMessage[]>();
             let totalRestoredMessages = 0;
 
-            for (const agent of existingChats) {
+            // Load sessions from sessionStore FIRST (must be loaded before reading)
+            await useSessionStore.getState().loadSessions();
+            const allSessions = useSessionStore.getState().sessions;
+            console.log(`[Chat Persistence] Loading messages for ${allSessions.length} sessions...`);
+
+            for (const session of allSessions) {
               try {
-                const storedMessages = await loadAgentMessages(agent.id);
+                const storedMessages = await loadAgentMessages(session.id);
                 if (storedMessages && storedMessages.messages.length > 0) {
                   // Convert stored messages to ChatMessage format
                   const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
-                    id: `msg-restored-${agent.id}-${index}`,
+                    id: `msg-restored-${session.id}-${index}`,
                     role: msg.role as 'user' | 'assistant' | 'system',
                     content: msg.content,
                     timestamp: msg.timestamp,
                     status: 'complete' as const,
                   }));
 
-                  initialChatSessions.set(agent.id, chatMessages);
+                  initialChatSessions.set(session.id, chatMessages);
                   totalRestoredMessages += chatMessages.length;
-                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for agent ${agent.id}`);
+                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
                 }
               } catch (err) {
-                console.warn(`[Chat Persistence] Failed to restore messages for agent ${agent.id}:`, err);
+                console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
               }
             }
 
             if (initialChatSessions.size > 0) {
               setChatSessions(initialChatSessions);
-              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} agents`);
+              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
               toast.success(`Restored ${totalRestoredMessages} chat messages`, {
-                description: `${initialChatSessions.size} agent conversations restored`,
+                description: `${initialChatSessions.size} session conversations restored`,
                 duration: 3000,
               });
+            }
+          } else {
+            // 🦆 SESSIONS-FIRST: Even without AgentChats, load chat messages for sessions
+            // This ensures chat persistence works in sessions-first architecture
+            await useSessionStore.getState().loadSessions();
+            const allSessions = useSessionStore.getState().sessions;
+            
+            if (allSessions.length > 0) {
+              console.log(`[Chat Persistence] No AgentChats, loading messages for ${allSessions.length} sessions...`);
+              const initialChatSessions = new Map<string, ChatMessage[]>();
+              let totalRestoredMessages = 0;
+
+              for (const session of allSessions) {
+                try {
+                  const storedMessages = await loadAgentMessages(session.id);
+                  if (storedMessages && storedMessages.messages.length > 0) {
+                    const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
+                      id: `msg-restored-${session.id}-${index}`,
+                      role: msg.role as 'user' | 'assistant' | 'system',
+                      content: msg.content,
+                      timestamp: msg.timestamp,
+                      status: 'complete' as const,
+                    }));
+
+                    initialChatSessions.set(session.id, chatMessages);
+                    totalRestoredMessages += chatMessages.length;
+                    console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
+                  }
+                } catch (err) {
+                  console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
+                }
+              }
+
+              if (initialChatSessions.size > 0) {
+                setChatSessions(initialChatSessions);
+                console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
+                toast.success(`Restored ${totalRestoredMessages} chat messages`, {
+                  description: `${initialChatSessions.size} session conversations restored`,
+                  duration: 3000,
+                });
+              }
             }
           }
 
@@ -5958,39 +6005,85 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
             }
 
-            // 🦆 CHAT PERSISTENCE: Restore messages for all agents
+            // 🦆 CHAT PERSISTENCE: Restore messages for all SESSIONS (sessions-first architecture)
+            // Messages are now saved with session.id as key, not agent.id
             const initialChatSessions = new Map<string, ChatMessage[]>();
             let totalRestoredMessages = 0;
 
-            for (const agent of existingChats) {
+            // Load sessions from sessionStore FIRST (must be loaded before reading)
+            await useSessionStore.getState().loadSessions();
+            const allSessions = useSessionStore.getState().sessions;
+            console.log(`[Chat Persistence] Loading messages for ${allSessions.length} sessions (no terminals branch)...`);
+
+            for (const session of allSessions) {
               try {
-                const storedMessages = await loadAgentMessages(agent.id);
+                const storedMessages = await loadAgentMessages(session.id);
                 if (storedMessages && storedMessages.messages.length > 0) {
                   // Convert stored messages to ChatMessage format
                   const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
-                    id: `msg-restored-${agent.id}-${index}`,
+                    id: `msg-restored-${session.id}-${index}`,
                     role: msg.role as 'user' | 'assistant' | 'system',
                     content: msg.content,
                     timestamp: msg.timestamp,
                     status: 'complete' as const,
                   }));
 
-                  initialChatSessions.set(agent.id, chatMessages);
+                  initialChatSessions.set(session.id, chatMessages);
                   totalRestoredMessages += chatMessages.length;
-                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for agent ${agent.id}`);
+                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
                 }
               } catch (err) {
-                console.warn(`[Chat Persistence] Failed to restore messages for agent ${agent.id}:`, err);
+                console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
               }
             }
 
             if (initialChatSessions.size > 0) {
               setChatSessions(initialChatSessions);
-              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} agents`);
+              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
               toast.success(`Restored ${totalRestoredMessages} chat messages`, {
-                description: `${initialChatSessions.size} agent conversations restored`,
+                description: `${initialChatSessions.size} session conversations restored`,
                 duration: 3000,
               });
+            }
+          } else {
+            // 🦆 SESSIONS-FIRST: Even without AgentChats, load chat messages for sessions
+            await useSessionStore.getState().loadSessions();
+            const allSessions = useSessionStore.getState().sessions;
+            
+            if (allSessions.length > 0) {
+              console.log(`[Chat Persistence] No AgentChats (no terminals), loading messages for ${allSessions.length} sessions...`);
+              const initialChatSessions = new Map<string, ChatMessage[]>();
+              let totalRestoredMessages = 0;
+
+              for (const session of allSessions) {
+                try {
+                  const storedMessages = await loadAgentMessages(session.id);
+                  if (storedMessages && storedMessages.messages.length > 0) {
+                    const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
+                      id: `msg-restored-${session.id}-${index}`,
+                      role: msg.role as 'user' | 'assistant' | 'system',
+                      content: msg.content,
+                      timestamp: msg.timestamp,
+                      status: 'complete' as const,
+                    }));
+
+                    initialChatSessions.set(session.id, chatMessages);
+                    totalRestoredMessages += chatMessages.length;
+                    console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
+                  }
+                } catch (err) {
+                  console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
+                }
+              }
+
+              if (initialChatSessions.size > 0) {
+                setChatSessions(initialChatSessions);
+                console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
+                toast.success(`Restored ${totalRestoredMessages} chat messages`, {
+                  description: `${initialChatSessions.size} session conversations restored`,
+                  duration: 3000,
+                });
+              }
             }
           }
         }
@@ -6249,6 +6342,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.warn('[App] Session not found:', sessionId);
       return;
     }
+
+    // Close Kanban view if open - show the chat instead
+    const { isKanbanViewActive, setKanbanViewActive } = useKanbanStore.getState();
+    if (isKanbanViewActive) {
+      setKanbanViewActive(false);
+    }
+
+    // Switch to chat tab (exit Kanban tab if active)
+    setActiveTabId('chat');
 
     // Set active session in local state
     setActiveSessionId(sessionId);
