@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
 import AgentSessionItem from './AgentSessionItem';
-import NewSessionModal from './NewSessionModal';
 import './AgentSessionList.css';
 
 // Confirmation dialog for delete
@@ -212,10 +211,7 @@ function RenameSessionDialog({
 
 interface AgentSessionListProps {
   agentId: string;
-  agentName?: string;
   agentColor?: string;
-  projectPath: string;
-  projectName: string;
   onSessionClick: (sessionId: string) => void;
   activeSessionId?: string;
 }
@@ -223,24 +219,21 @@ interface AgentSessionListProps {
 /**
  * Compact list of sessions under an agent card.
  * Follows TasksSidebarSection pattern with minimal UI.
- * Shows max 5 non-done sessions, single "+" button for new session.
+ * Shows max 5 non-done sessions.
+ * Note: New session creation is now handled via "+" button on agent card in RepositoryGroup.
  */
 function AgentSessionList({
   agentId,
-  agentName,
   agentColor = '#00D4FF',
-  projectPath,
-  projectName,
   onSessionClick,
   activeSessionId,
 }: AgentSessionListProps) {
   const [showAll, setShowAll] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteDialogSession, setDeleteDialogSession] = useState<{ id: string; title: string } | null>(null);
   const [renameDialogSession, setRenameDialogSession] = useState<{ id: string; title: string } | null>(null);
 
   // Get sessions from store
-  const { sessions: allSessions, isLoading, loadSessions, createSession, updateSession, deleteSession } = useSessionStore();
+  const { sessions: allSessions, isLoading, loadSessions, updateSession, deleteSession } = useSessionStore();
 
   // Filter sessions for this agent
   const sessions = allSessions.filter((s) => s.agentId === agentId);
@@ -254,26 +247,6 @@ function AgentSessionList({
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
-
-  // Handle new session creation
-  const handleNewSession = useCallback(async (title: string) => {
-    try {
-      const newSession = await createSession({
-        title,
-        agentId,
-        projectPath,
-        projectName,
-        status: 'todo',
-        messageCount: 0,
-      });
-
-      // Close modal and open the new session
-      setIsModalOpen(false);
-      onSessionClick(newSession.id);
-    } catch (error) {
-      console.error('[AgentSessionList] Failed to create session:', error);
-    }
-  }, [createSession, agentId, projectPath, projectName, onSessionClick]);
 
   // Handle marking session as done
   const handleMarkDone = useCallback((sessionId: string) => {
@@ -380,46 +353,6 @@ function AgentSessionList({
           + {nonDoneSessions.length - 5} more...
         </button>
       )}
-
-      {/* Compact "+" new session button */}
-      <button
-        onClick={() => setIsModalOpen(true)}
-        title="Create new session"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '6px 10px',
-          marginBottom: '4px',
-          background: `${agentColor}10`,
-          border: `1px dashed ${agentColor}40`,
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '11px',
-          color: `${agentColor}`,
-          width: '100%',
-          transition: 'all 0.2s ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = `${agentColor}20`;
-          e.currentTarget.style.borderColor = `${agentColor}60`;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = `${agentColor}10`;
-          e.currentTarget.style.borderColor = `${agentColor}40`;
-        }}
-      >
-        <span style={{ fontSize: '14px', lineHeight: 1 }}>+</span>
-        <span>New Session</span>
-      </button>
-
-      {/* New Session Modal */}
-      <NewSessionModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleNewSession}
-        agentName={agentName}
-      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDeleteDialog

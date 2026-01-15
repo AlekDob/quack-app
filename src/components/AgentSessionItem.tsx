@@ -123,10 +123,24 @@ function AgentSessionItem({
     return !hasUserMessage;
   }, [chatMessages]);
 
+  // 🦆 Check if the session is actually loading/streaming
+  // This catches both: isLoading prop from chatLoadingMap AND message status === 'streaming'
+  const isActuallyLoading = useMemo(() => {
+    if (isLoading) return true;
+    if (chatMessages.length === 0) return false;
+
+    const lastMessage = chatMessages[chatMessages.length - 1];
+    // If last message is from assistant and is streaming, we're loading
+    if (lastMessage?.role === 'assistant' && lastMessage.status === 'streaming') {
+      return true;
+    }
+    return false;
+  }, [isLoading, chatMessages]);
+
   // Check if the last message is from assistant and complete (for green dot)
   // This is independent of isActive - the dot should be green when assistant has responded
   const isAgentReady = useMemo(() => {
-    if (isLoading || chatMessages.length === 0 || isDormant) {
+    if (isActuallyLoading || chatMessages.length === 0 || isDormant) {
       return false;
     }
     const lastMessage = chatMessages[chatMessages.length - 1];
@@ -135,11 +149,11 @@ function AgentSessionItem({
     }
     // Only ready if the message is complete (not streaming)
     return lastMessage.status === 'complete' || lastMessage.status === undefined;
-  }, [chatMessages, isDormant, isLoading]);
+  }, [chatMessages, isDormant, isActuallyLoading]);
 
   // Get dot color based on activity state
   // Green when agent is ready (regardless of isActive), yellow when loading, gray otherwise
-  const dotColor = getActivityDotColor(isLoading, isAgentReady, isChatEmpty || isDormant);
+  const dotColor = getActivityDotColor(isActuallyLoading, isAgentReady, isChatEmpty || isDormant);
   
   // Check if there are unread messages (used for pulse animation on dot)
   const hasUnreadMessages = isAgentReady && !isActive;
@@ -192,7 +206,7 @@ function AgentSessionItem({
       {/* NOTE: "Quack quack..." tooltip removed - shown at AGENT level, not session level */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <div
-          className={isLoading ? 'session-dot working' : hasUnreadMessages ? 'session-dot ready' : 'session-dot'}
+          className={isActuallyLoading ? 'session-dot working' : hasUnreadMessages ? 'session-dot ready' : 'session-dot'}
           style={{
             width: '8px',
             height: '8px',
@@ -220,7 +234,7 @@ function AgentSessionItem({
         </div>
 
         {/* Progress Bar when loading */}
-        {isLoading && (
+        {isActuallyLoading && (
           <div className="session-progress-bar">
             <div className="session-progress-indicator" />
           </div>

@@ -1,0 +1,240 @@
+/* Splash Screen - Animated gradients with glow effects */
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 120%, rgba(255, 107, 53, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(139, 92, 246, 0.2) 0%, transparent 40%),
+    radial-gradient(ellipse 50% 30% at 80% 30%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+    linear-gradient(180deg, #0a0a12 0%, #12121f 50%, #0f0f1a 100%);
+  z-index: 9999;
+  overflow: hidden;
+  animation: screenFadeOut 0.3s ease-out 0.7s forwards;
+}
+
+/* Animated gradient overlay */
+.splash-screen::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background:
+    conic-gradient(from 0deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 107, 53, 0.1) 60deg,
+      transparent 120deg,
+      rgba(139, 92, 246, 0.08) 180deg,
+      transparent 240deg,
+      rgba(59, 130, 246, 0.08) 300deg,
+      transparent 360deg
+    );
+  animation: gradientRotate 8s linear infinite;
+}
+
+@keyframes gradientRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes screenFadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Animated glow orb behind text */
+.splash-glow-orb {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 107, 53, 0.5) 0%,
+    rgba(242, 140, 82, 0.3) 30%,
+    rgba(230, 126, 34, 0.1) 50%,
+    transparent 70%
+  );
+  filter: blur(60px);
+  animation: orbPulse 2s ease-in-out infinite;
+}
+
+/* Secondary orb - purple accent */
+.splash-glow-orb::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: -150px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(139, 92, 246, 0.4) 0%,
+    transparent 70%
+  );
+  filter: blur(40px);
+  animation: orbFloat 3s ease-in-out infinite;
+}
+
+/* Third orb - blue accent */
+.splash-glow-orb::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  right: -120px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(59, 130, 246, 0.35) 0%,
+    transparent 70%
+  );
+  filter: blur(35px);
+  animation: orbFloat 2.5s ease-in-out infinite reverse;
+}
+
+@keyframes orbPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes orbFloat {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(20px, -15px);
+  }
+}
+
+/* Content container */
+.splash-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Title styling */
+.splash-title {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 72px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: #fff;
+  margin: 0;
+  display: flex;
+}
+
+/* Individual letter animation */
+.splash-title .letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(20px);
+  animation:
+    letterReveal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+    letterGlow 2s ease-in-out infinite;
+  text-shadow:
+    0 0 20px rgba(242, 140, 82, 0.8),
+    0 0 40px rgba(255, 107, 53, 0.5),
+    0 0 60px rgba(230, 126, 34, 0.3);
+}
+
+@keyframes letterReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes letterGlow {
+  0%, 100% {
+    text-shadow:
+      0 0 20px rgba(242, 140, 82, 0.8),
+      0 0 40px rgba(255, 107, 53, 0.5),
+      0 0 60px rgba(230, 126, 34, 0.3);
+  }
+  50% {
+    text-shadow:
+      0 0 30px rgba(242, 140, 82, 1),
+      0 0 60px rgba(255, 107, 53, 0.8),
+      0 0 100px rgba(230, 126, 34, 0.5),
+      0 0 140px rgba(242, 140, 82, 0.3);
+  }
+}
+
+/* Tagline text */
+.splash-tagline {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  opacity: 0;
+  animation: taglineFadeIn 0.5s ease-out 0.3s forwards;
+}
+
+@keyframes taglineFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Version text */
+.splash-version {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.3);
+  opacity: 0;
+  animation: versionFadeIn 0.5s ease-out 0.4s forwards;
+}
+
+@keyframes versionFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .splash-screen,
+  .splash-screen::before,
+  .splash-glow-orb,
+  .splash-glow-orb::before,
+  .splash-glow-orb::after,
+  .splash-title .letter,
+  .splash-version {
+    animation: none !important;
+  }
+
+  .splash-title .letter {
+    opacity: 1;
+    transform: none;
+  }
+
+  .splash-version {
+    opacity: 1;
+  }
+
+  .splash-glow-orb {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+}

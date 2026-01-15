@@ -180,16 +180,16 @@ export async function runShellCommandViaKanban(
  * Get all shell/watch tasks from Kanban
  */
 export function getKanbanShellTasks(): KanbanTask[] {
-  const { tasks } = useKanbanStore.getState();
-  return tasks.filter(t => t.type === 'shell' || t.type === 'watch');
+  const tasks = useKanbanStore.getState().getAllTasks();
+  return tasks.filter((t: KanbanTask) => t.type === 'shell' || t.type === 'watch');
 }
 
 /**
  * Get running shell/watch tasks
  */
 export function getRunningShellTasks(): KanbanTask[] {
-  const { tasks } = useKanbanStore.getState();
-  return tasks.filter(t =>
+  const tasks = useKanbanStore.getState().getAllTasks();
+  return tasks.filter((t: KanbanTask) =>
     (t.type === 'shell' || t.type === 'watch') &&
     t.status === 'in_progress'
   );

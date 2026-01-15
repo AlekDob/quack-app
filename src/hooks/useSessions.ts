@@ -14,9 +14,6 @@ export function useSessions() {
    * Load all sessions from ~/.claude/file-history/
    */
   const loadSessions = useCallback(async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSessions.ts:loadSessions',message:'📂 LOADING FILE-HISTORY SESSIONS',data:{stack:new Error().stack?.split('\n').slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E-file-history-load'})}).catch(()=>{});
-    // #endregion
     setLoading(true);
     setError(null);
 
@@ -36,9 +33,12 @@ export function useSessions() {
               const info = await invoke<SessionInfo>('get_session_info', { sessionId });
               return info;
             } catch (err) {
-              // Silently skip empty or corrupted sessions (don't spam console)
+              // Silently skip empty, corrupted, or sidechain sessions (don't spam console)
               const errMsg = err instanceof Error ? err.message : String(err);
-              if (!errMsg.includes('Empty session file')) {
+              const isExpectedSkip = errMsg.includes('Empty session file') || 
+                                     errMsg.includes('Sidechain session') ||
+                                     errMsg.includes('SDK warmup');
+              if (!isExpectedSkip) {
                 console.warn(`Failed to load session ${sessionId}:`, err);
               }
               return null;
@@ -54,10 +54,6 @@ export function useSessions() {
       // Sort by updatedAt (most recent first)
       const sortedSessions = sessionInfos.sort((a, b) => b.updatedAt - a.updatedAt);
 
-      // #region agent log
-      const warmupSessions = sortedSessions.filter(s => s.title?.toLowerCase().includes('warmup'));
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSessions.ts:loadSessions:done',message:'📂 SESSIONS LOADED',data:{total:sortedSessions.length,warmupCount:warmupSessions.length,warmupTitles:warmupSessions.slice(0,5).map(s=>({id:s.id,title:s.title,updatedAt:s.updatedAt}))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E-file-history-loaded'})}).catch(()=>{});
-      // #endregion
       setSessions(sortedSessions);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load sessions';

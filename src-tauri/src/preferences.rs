@@ -34,7 +34,7 @@ fn default_ai_model() -> String {
 }
 
 fn default_background() -> String {
-    "transparent".to_string()
+    "duckmoto.png".to_string()
 }
 
 impl Default for AppPreferences {

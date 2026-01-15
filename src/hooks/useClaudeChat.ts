@@ -346,7 +346,18 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
               let id = `${b.type}`;
               // Include tool_use.id and name for unique identification
               if (b.type === 'tool_use') {
-                id += `-${b.id || ''}-${b.name || ''}`;
+                // 🦆 FIX: For exitplanmode/enterplanmode, dedupe by CONTENT not by ID
+                // This prevents the same plan from being shown multiple times when
+                // the SDK generates multiple tool_use events with different IDs
+                const toolName = (b.name || '').toLowerCase();
+                if (toolName === 'exitplanmode' || toolName === 'enterplanmode') {
+                  // Use first 200 chars of plan content for deduplication
+                  const planContent = b.input?.plan || '';
+                  const planHash = planContent.substring(0, 200);
+                  id += `-${b.name}-${planHash}`;
+                } else {
+                  id += `-${b.id || ''}-${b.name || ''}`;
+                }
               } else if (b.type === 'text') {
                 // Include first 30 chars of text to differentiate
                 id += `-${(b.text || '').substring(0, 30)}`;

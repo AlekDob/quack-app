@@ -5,6 +5,7 @@ import StreamMessage from './StreamMessage';
 import ThinkingBlock from './ThinkingBlock';
 import MessageSettingsBadges from './MessageSettingsBadges';
 import SessionIdDisplay from './SessionIdDisplay';
+import MarkdownText from './MarkdownText';
 import { AgentMentionChip } from './AgentMentionChip';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
@@ -503,7 +504,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {message.events.map((event, eventIndex) => (
+            {message.events.map((event: any, eventIndex: number) => (
               <StreamMessage
                 key={getStableEventKey(event, eventIndex)}
                 message={event}
@@ -521,10 +522,16 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
-            {isLastUserMessage && isUser && !isExpanded
-              ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
-              : renderTextWithMentions(message.content)
-            }
+            {isUser ? (
+              // User messages: render with mentions support
+              isLastUserMessage && !isExpanded
+                ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
+                : renderTextWithMentions(message.content)
+            ) : (
+              // Assistant messages: render with markdown formatting
+              // This ensures proper formatting even when loaded from disk without events
+              <MarkdownText>{message.content}</MarkdownText>
+            )}
             {isStreaming && <span className="streaming-cursor">▊</span>}
           </div>
         )}

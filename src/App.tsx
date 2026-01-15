@@ -48,6 +48,8 @@ import TelegramSetup from "./components/TelegramSetup";
 // Background agent service for /background @agent commands
 import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
+import SessionEmptyState from "./components/SessionEmptyState";
+import SplashScreen from "./components/SplashScreen";
 import TabBar, { type Tab, type PopoutPosition } from "./components/TabBar";
 import { useTabPopoutWindow } from "./hooks/useTabPopoutWindow";
 import ActionIcons from "./components/ActionIcons";
@@ -184,7 +186,7 @@ import "./components/DrawerAnimations.css";
 // Old Background Tasks CSS - no longer needed, Kanban has its own styles
 // import "./components/BackgroundTasks.css";
 
-const INTRO_REPLAY_DURATION_MS = 5000;
+const INTRO_REPLAY_DURATION_MS = 1000; // Matches SplashScreen duration
 
 // Notification settings
 const NOTIFY_ACTIVE_TERMINAL = true; // Send notifications even for active terminal
@@ -566,9 +568,7 @@ function AppContent() {
     return stored === null ? true : stored === 'true';
   });
   const [_booting, setBooting] = useState(true);
-  const [videoEnded, setVideoEnded] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
-  const [splashFadingOut, setSplashFadingOut] = useState(false);
+  const [splashCompleted, setSplashCompleted] = useState(false);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [introVersion, setIntroVersion] = useState('');
 
@@ -729,7 +729,7 @@ function AppContent() {
   const [claudeCliAvailable, setClaudeCliAvailable] = useState<boolean | null>(null);
   const [claudeAuthBannerExpanded, setClaudeAuthBannerExpanded] = useState(true);
   const [claudeAuthBannerDismissed, setClaudeAuthBannerDismissed] = useState(false);
-  const [currentBackground, setCurrentBackground] = useState("quack-agent.jpeg");
+  const [currentBackground, setCurrentBackground] = useState("duckmoto.png");
 
   // Check Claude CLI availability on mount (with test mode support)
   const claudeCliAvailabilityHook = useClaudeCliAvailability();
@@ -2438,8 +2438,8 @@ function AppContent() {
   // 🦆 Load Kanban task chat sessions from Quack storage first (preserves events for tool widgets)
   // Falls back to Rust backend if not found in storage
   const loadKanbanChatSessions = useCallback(async () => {
-    const { tasks } = useKanbanStore.getState();
-    const tasksWithSessions = tasks.filter(t => t.sessionId);
+    const tasks = useKanbanStore.getState().getAllTasks();
+    const tasksWithSessions = tasks.filter((t: KanbanTask) => t.sessionId);
 
     if (tasksWithSessions.length === 0) {
       console.log('[loadKanbanChatSessions] No Kanban tasks with sessionIds to load');
@@ -2470,10 +2470,34 @@ function AppContent() {
           }>(`chat-${task.id}`);
 
           if (savedChat?.messages && savedChat.messages.length > 0) {
-            // Use saved messages directly - they have events for tool widget rendering
+            // 🦆 FIX: Only load from disk if we don't have messages in memory,
+            // or if disk has MORE messages (streaming completed while away)
+            // NEVER overwrite in-memory messages that have events with disk messages that don't
             setChatSessions(prev => {
               const newSessions = new Map(prev);
-              newSessions.set(task.id, savedChat.messages);
+              const existingMessages = prev.get(task.id);
+              
+              // Check if existing messages have events (richer data)
+              const existingHasEvents = existingMessages?.some(m => m.events && m.events.length > 0);
+              const savedHasEvents = savedChat.messages.some(m => m.events && m.events.length > 0);
+              
+              // Only overwrite if:
+              // 1. No existing messages, OR
+              // 2. Saved has events and existing doesn't (upgrade), OR
+              // 3. Saved has MORE messages (new data arrived)
+              const shouldOverwrite = 
+                !existingMessages || 
+                existingMessages.length === 0 ||
+                (savedHasEvents && !existingHasEvents) ||
+                (savedChat.messages.length > existingMessages.length);
+              
+              if (shouldOverwrite) {
+                newSessions.set(task.id, savedChat.messages);
+                console.log(`[loadKanbanChatSessions] Updated messages for task ${task.id} (had: ${existingMessages?.length || 0}, now: ${savedChat.messages.length})`);
+              } else {
+                console.log(`[loadKanbanChatSessions] Keeping in-memory messages for task ${task.id} (has events: ${existingHasEvents})`);
+              }
+              
               return newSessions;
             });
 
@@ -2515,9 +2539,23 @@ function AppContent() {
             status: 'complete' as const,
           }));
 
+          // 🦆 FIX: Don't overwrite in-memory messages that have events
+          // Rust backend fallback loses events, so only use if no better data exists
           setChatSessions(prev => {
             const newSessions = new Map(prev);
-            newSessions.set(task.id, chatMessages);
+            const existingMessages = prev.get(task.id);
+            
+            // Check if existing messages have events (richer data)
+            const existingHasEvents = existingMessages?.some(m => m.events && m.events.length > 0);
+            
+            // Only load from Rust if we have NO messages or existing don't have events
+            if (!existingMessages || existingMessages.length === 0 || !existingHasEvents) {
+              newSessions.set(task.id, chatMessages);
+              console.log(`[loadKanbanChatSessions] Loaded ${chatMessages.length} messages from Rust for task ${task.id}`);
+            } else {
+              console.log(`[loadKanbanChatSessions] Skipping Rust fallback for task ${task.id} - keeping in-memory messages with events`);
+              return prev; // Don't modify
+            }
             return newSessions;
           });
 
@@ -3972,21 +4010,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       introReplayTimeoutRef.current = null;
     }
 
-    // Clear any previous audio ref (no longer using separate MP3, video has its own audio)
-    if (introAudioRef.current) {
-      introAudioRef.current.pause();
-      introAudioRef.current.currentTime = 0;
-      introAudioRef.current = null;
-    }
-
     setIntroReplayActive(true);
-
-    // Video audio plays directly from the video element (not separate MP3)
-    // The timeout closes the replay overlay after the duration
-    introReplayTimeoutRef.current = setTimeout(() => {
-      setIntroReplayActive(false);
-      introReplayTimeoutRef.current = null;
-    }, INTRO_REPLAY_DURATION_MS);
+    // SplashScreen will call onComplete after animation
   }, []);
 
   useEffect(() => {
@@ -5330,9 +5355,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [duckBackgroundImage, ducksPatternBackgroundImage, duckPattern3BackgroundImage]);
 
-  // Load saved background on mount (only after video ends)
+  // Load saved background on mount (immediately, so it shows during splash)
   useEffect(() => {
-    if (!tauriAvailable || !videoEnded) {
+    if (!tauriAvailable) {
       return;
     }
 
@@ -5343,20 +5368,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         applyBackground(savedBackground);
       } catch (error) {
         console.warn("Unable to load saved background", error);
+        // Apply default background if no saved preference
+        applyBackground(currentBackground);
       }
     };
 
     void loadBackground();
-  }, [tauriAvailable, videoEnded, applyBackground]);
+  }, [tauriAvailable, applyBackground]);
 
-  // Apply background when it changes (only after video ends)
+  // Apply background when it changes
   useEffect(() => {
-    if (!currentBackground || !videoEnded) {
+    if (!currentBackground) {
       return;
     }
 
     applyBackground(currentBackground);
-  }, [currentBackground, videoEnded, applyBackground]);
+  }, [currentBackground, applyBackground]);
 
   const handleSelectBackground = useCallback(async (background: string) => {
     if (!tauriAvailable) {
@@ -6138,7 +6165,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Intro audio disabled - can be re-enabled later when you decide what to use
   // useEffect(() => {
-  //   if (!videoEnded && tauriAvailable) {
+  //   if (!splashCompleted && tauriAvailable) {
   //     const audio = new Audio(introAudio);
   //     audio.volume = 0.5;
   //     audio.play().catch((error) => {
@@ -6150,15 +6177,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   //       audio.currentTime = 0;
   //     };
   //   }
-  // }, [videoEnded, tauriAvailable, introAudio]);
+  // }, [splashCompleted, tauriAvailable, introAudio]);
 
   // Clean background during video splash to avoid flash
   useEffect(() => {
-    if (!videoEnded) {
+    if (!splashCompleted) {
       // Remove background image during splash for clean black screen
       document.body.style.backgroundImage = 'none';
     }
-  }, [videoEnded]);
+  }, [splashCompleted]);
 
   // Global keyboard shortcut: Cmd+J to open AI Assistant
   useEffect(() => {
@@ -6575,12 +6602,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     // 8. Update Kanban tasks that reference the old agent ID
     // This prevents "Agent terminal not found" errors when opening tasks after reset
-    const { tasks, updateTask } = useKanbanStore.getState();
-    const affectedTasks = tasks.filter(t => t.assignedAgent?.id === oldId);
+    const kanbanState = useKanbanStore.getState();
+    const tasks = kanbanState.getAllTasks();
+    const affectedTasks = tasks.filter((t: KanbanTask) => t.assignedAgent?.id === oldId);
 
     for (const task of affectedTasks) {
       if (task.assignedAgent) {
-        await updateTask(task.id, {
+        await kanbanState.updateTask(task.id, {
           assignedAgent: {
             ...task.assignedAgent,
             id: newId,
@@ -7194,7 +7222,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       // 🦆 SESSIONS-FIRST: Clear activeSessionId when selecting agent
       // User must explicitly click a session to see its chat
-      // This ensures the empty state is shown: "Select a session to start chatting"
+      // Agent click shows the agent info/empty state, not a chat
       setActiveSessionId(null);
 
       // Always open the chat tab when selecting a terminal from sidebar
@@ -7848,6 +7876,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Toggle: if already on Kanban tab, switch back to Chat
     if (activeTabId === 'kanban-board') {
       console.log('[Quack] Kanban tab toggled off, returning to chat');
+      // 🦆 SESSIONS-FIRST: Don't auto-select sessions - preserve current state
+      // If user had a session selected, it stays selected
+      // If no session was selected, show the agent empty state
       setActiveTabId('chat');
       return;
     }
@@ -9529,6 +9560,35 @@ You have access to all Bash tools to execute git commands like:
     tauriAvailable,
   ]);
 
+  // Hide native HTML splash when React is ready, show React splash
+  // Native splash in index.html shows instantly, React splash takes over
+  useEffect(() => {
+    const nativeSplash = document.getElementById('native-splash');
+    if (nativeSplash && !splashCompleted) {
+      // Keep native splash visible while React splash is showing
+    } else if (nativeSplash && splashCompleted) {
+      // Fade out and remove native splash
+      nativeSplash.classList.add('fade-out');
+      setTimeout(() => nativeSplash.remove(), 300);
+    }
+  }, [splashCompleted]);
+
+  // Show React splash screen (takes over from native HTML splash)
+  if (!splashCompleted) {
+    return (
+      <SplashScreen
+        version={introVersion}
+        onComplete={() => {
+          setSplashCompleted(true);
+          setBooting(false);
+          if (!hasBootstrapped) {
+            setHasBootstrapped(true);
+          }
+        }}
+      />
+    );
+  }
+
   if (!tauriAvailable) {
     return (
       <div className="app-fallback">
@@ -9555,208 +9615,6 @@ You have access to all Bash tools to execute git commands like:
   // The preview window should only show the external URL content
   if (isPreviewWebview) {
     return null;
-  }
-
-  if (!videoEnded || splashFadingOut) {
-    return (
-      <div className="app-loader" style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#191B44',
-        overflow: 'hidden',
-        zIndex: 9999,
-        pointerEvents: splashFadingOut ? 'none' : 'auto',
-      }}>
-        {/* Light rays and glow effects */}
-        <style>{`
-          @keyframes introRaysRotate {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-          }
-          @keyframes introGlowPulse {
-            0%, 100% {
-              opacity: 0.4;
-              transform: scale(1);
-            }
-            50% {
-              opacity: 0.7;
-              transform: scale(1.1);
-            }
-          }
-          @keyframes introVideoGlow {
-            0%, 100% {
-              box-shadow: 0 0 40px rgba(25, 27, 68, 0.8), 0 0 80px rgba(77, 100, 180, 0.3), 0 0 120px rgba(77, 100, 180, 0.2);
-            }
-            50% {
-              box-shadow: 0 0 60px rgba(25, 27, 68, 0.9), 0 0 100px rgba(77, 100, 180, 0.4), 0 0 150px rgba(77, 100, 180, 0.3);
-            }
-          }
-        `}</style>
-
-        {/* Light rays background */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: '200%',
-          height: '200%',
-          background: `conic-gradient(
-            from 0deg,
-            transparent 0deg,
-            rgba(77, 100, 180, 0.1) 10deg,
-            transparent 20deg,
-            transparent 30deg,
-            rgba(100, 120, 200, 0.08) 40deg,
-            transparent 50deg,
-            transparent 60deg,
-            rgba(77, 100, 180, 0.1) 70deg,
-            transparent 80deg,
-            transparent 90deg,
-            rgba(100, 120, 200, 0.08) 100deg,
-            transparent 110deg,
-            transparent 120deg,
-            rgba(77, 100, 180, 0.1) 130deg,
-            transparent 140deg,
-            transparent 150deg,
-            rgba(100, 120, 200, 0.08) 160deg,
-            transparent 170deg,
-            transparent 180deg,
-            rgba(77, 100, 180, 0.1) 190deg,
-            transparent 200deg,
-            transparent 210deg,
-            rgba(100, 120, 200, 0.08) 220deg,
-            transparent 230deg,
-            transparent 240deg,
-            rgba(77, 100, 180, 0.1) 250deg,
-            transparent 260deg,
-            transparent 270deg,
-            rgba(100, 120, 200, 0.08) 280deg,
-            transparent 290deg,
-            transparent 300deg,
-            rgba(77, 100, 180, 0.1) 310deg,
-            transparent 320deg,
-            transparent 330deg,
-            rgba(100, 120, 200, 0.08) 340deg,
-            transparent 350deg,
-            transparent 360deg
-          )`,
-          animation: 'introRaysRotate 60s linear infinite',
-          pointerEvents: 'none',
-        }} />
-
-        {/* Radial glow around center */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '60vw',
-          height: '60vh',
-          background: 'radial-gradient(ellipse at center, rgba(77, 100, 180, 0.2) 0%, rgba(25, 27, 68, 0.3) 40%, transparent 70%)',
-          animation: 'introGlowPulse 4s ease-in-out infinite',
-          pointerEvents: 'none',
-        }} />
-
-        {/* Video container with soft glow */}
-        <div style={{
-          position: 'relative',
-          zIndex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '20px',
-        }}>
-          {/* Quack Title with glow effect */}
-          <div style={{
-            fontSize: '72px',
-            fontWeight: 'bold',
-            color: '#ffffff',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            letterSpacing: '4px',
-            textShadow: '0 0 20px rgba(77, 100, 180, 1), 0 0 40px rgba(77, 100, 180, 0.8), 0 0 60px rgba(77, 100, 180, 0.6), 0 0 80px rgba(77, 100, 180, 0.4)',
-            animation: 'quackTitleGlow 3s ease-in-out infinite',
-          }}>
-            Quack
-          </div>
-
-          <div style={{
-            width: '40vh',
-            height: '40vh',
-            overflow: 'hidden',
-            borderRadius: '50%',
-            animation: 'introVideoGlow 3s ease-in-out infinite',
-            boxShadow: '0 0 30px rgba(77, 100, 180, 0.5), 0 0 60px rgba(77, 100, 180, 0.3)',
-            opacity: videoReady ? 1 : 0,
-            transition: 'opacity 0.5s ease-in-out',
-          }}>
-            <video
-              autoPlay
-              playsInline
-              preload="auto"
-              onCanPlay={() => setVideoReady(true)}
-              onEnded={() => {
-                setVideoEnded(true);
-                setSplashFadingOut(true);
-                setTimeout(() => {
-                  setBooting(false);
-                  setSplashFadingOut(false);
-                  if (!hasBootstrapped) {
-                    setHasBootstrapped(true);
-                  }
-                }, 800);
-              }}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center',
-              }}
-            >
-            <source src="/video/introquackappdef.mp4" type="video/mp4" />
-            </video>
-          </div>
-          {/* Version with glow effect */}
-          <div style={{
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: '13px',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            letterSpacing: '1px',
-            textShadow: '0 0 10px rgba(77, 100, 180, 0.8), 0 0 20px rgba(77, 100, 180, 0.5), 0 0 30px rgba(77, 100, 180, 0.3)',
-            animation: 'versionGlow 2s ease-in-out infinite',
-          }}>
-            {introVersion}
-          </div>
-        </div>
-        <style>{`
-          @keyframes quackTitleGlow {
-            0%, 100% {
-              opacity: 0.9;
-              text-shadow: 0 0 20px rgba(77, 100, 180, 1), 0 0 40px rgba(77, 100, 180, 0.8), 0 0 60px rgba(77, 100, 180, 0.6), 0 0 80px rgba(77, 100, 180, 0.4);
-            }
-            50% {
-              opacity: 1;
-              text-shadow: 0 0 30px rgba(77, 100, 180, 1), 0 0 60px rgba(77, 100, 180, 0.9), 0 0 90px rgba(77, 100, 180, 0.7), 0 0 120px rgba(77, 100, 180, 0.5);
-            }
-          }
-          @keyframes versionGlow {
-            0%, 100% {
-              opacity: 0.7;
-              text-shadow: 0 0 10px rgba(77, 100, 180, 0.8), 0 0 20px rgba(77, 100, 180, 0.5), 0 0 30px rgba(77, 100, 180, 0.3);
-            }
-            50% {
-              opacity: 1;
-              text-shadow: 0 0 15px rgba(77, 100, 180, 1), 0 0 30px rgba(77, 100, 180, 0.7), 0 0 45px rgba(77, 100, 180, 0.4);
-            }
-          }
-        `}</style>
-      </div>
-    );
   }
 
   return (
@@ -10189,39 +10047,29 @@ You have access to all Bash tools to execute git commands like:
               {/* 🦆 SESSIONS-FIRST: Shows session chat */}
               {activeTabId === 'chat' && !isKanbanTabActive && (() => {
                 // Check if we have an active task (now a session in sessions-first)
-                const activeTask = activeTaskId ? agentSessions.find(s => s.id === activeTaskId) : null;
-                const isTaskChat = !!activeTask;
+                const activeTaskSession = activeTaskId ? agentSessions.find(s => s.id === activeTaskId) : null;
+                
+                // 🦆 FIX: isTaskChat should be true if activeTaskId is set, even if session not found in store
+                // This ensures we always show task messages, not agent messages, when a task is selected
+                // The session might not be in the store yet (race condition) or might have been removed
+                const isTaskChat = !!activeTaskId;
+                
+                // Get agent info for avatar display (from kanbanStore's agentInfoMap)
+                const taskAgentInfo = activeTaskSession ? useKanbanStore.getState().agentInfoMap.get(activeTaskSession.agentId) : undefined;
 
-                // Task-specific data
+                // Task-specific data - always use activeTaskId as the key
                 const taskMessages = activeTaskId ? (chatSessions.get(activeTaskId) ?? []) : [];
                 const taskLoading = activeTaskId ? (chatLoadingMap.get(activeTaskId) ?? false) : false;
                 const taskTokens = activeTaskId ? chatTokensMap.get(activeTaskId) : undefined;
-
+                
                 // 🦆 SESSIONS-FIRST: Show empty state if no session is selected (and not a task chat)
                 // Agent click shows sessions list, user must click a session to see chat
-                if (!isTaskChat && !activeSessionId && activeId) {
+                if (!isTaskChat && !activeSessionId && activeId && activeTerminal) {
                   return (
-                    <div
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '16px',
-                        color: 'rgba(255, 255, 255, 0.5)',
-                        padding: '40px',
-                        textAlign: 'center',
-                      }}
-                    >
-                      <div style={{ fontSize: '48px', opacity: 0.3 }}>💬</div>
-                      <div style={{ fontSize: '16px', fontWeight: 500 }}>
-                        Select a session to start chatting
-                      </div>
-                      <div style={{ fontSize: '13px', opacity: 0.7, maxWidth: '300px' }}>
-                        Click on a session from the list below the agent, or create a new one with the + button
-                      </div>
-                    </div>
+                    <SessionEmptyState
+                      agent={activeTerminal}
+                      onSessionClick={(sessionId) => setActiveSessionId(sessionId)}
+                    />
                   );
                 }
 
@@ -10233,7 +10081,7 @@ You have access to all Bash tools to execute git commands like:
                     onSendMessage={isTaskChat
                       ? (content, opts) => sendMessageForTargetAgent(activeTaskId!, content, {
                           ...opts,
-                          workingDirectory: activeTask?.projectPath || opts?.workingDirectory || '/',
+                          workingDirectory: activeTaskSession?.projectPath || opts?.workingDirectory || '/',
                         })
                       : sendMessageForAgent
                     }
@@ -10254,9 +10102,9 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
-                    basePath={isTaskChat ? (activeTask?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
+                    basePath={isTaskChat ? (activeTaskSession?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
                     inputDraft={isTaskChat
-                      ? (taskInputDrafts.get(activeTaskId!) || (taskMessages.length === 0 ? (activeTask?.prompt || '') : ''))
+                      ? (taskInputDrafts.get(activeTaskId!) || (taskMessages.length === 0 ? '' : ''))
                       : currentSettings.inputDraft
                     }
                     onInputDraftChange={(draft) => {
@@ -10280,7 +10128,7 @@ You have access to all Bash tools to execute git commands like:
                     onEffortChange={(effort) => updateAgentSettings({ effort })}
                     onAbortStream={isTaskChat ? () => abortStreamForTargetAgent(activeTaskId!) : abortStreamForAgent}
                     lastPrompt={isTaskChat
-                      ? (activeTask?.prompt || getLastPromptForTargetAgent(activeTaskId!) || undefined)
+                      ? (getLastPromptForTargetAgent(activeTaskId!) || undefined)
                       : (getLastPromptForAgent() || undefined)
                     }
                     onClearConversation={isTaskChat
@@ -10298,10 +10146,10 @@ You have access to all Bash tools to execute git commands like:
                     sessionTokens={isTaskChat ? taskTokens : currentAgentTokens}
                     openaiApiKey={openaiApiKey ?? undefined}
                     onOpenPromptEngineer={handleOpenPromptEngineer}
-                    agentName={isTaskChat ? (activeTask?.title || 'Task') : (activeTerminal?.label || 'Jack')}
-                    agentAvatar={isTaskChat ? activeTask?.assignedAgent?.avatar : activeTerminal?.avatar}
-                    projectName={isTaskChat ? (activeTask?.projectName || projectName) : projectName}
-                    gitBranch={isTaskChat ? (activeTask?.branch || gitBranch) : gitBranch}
+                    agentName={isTaskChat ? (activeTaskSession?.title || 'Task') : (activeTerminal?.label || 'Jack')}
+                    agentAvatar={isTaskChat ? taskAgentInfo?.avatar : activeTerminal?.avatar}
+                    projectName={isTaskChat ? (activeTaskSession?.projectName || projectName) : projectName}
+                    gitBranch={gitBranch}
                     workingOn={activeTerminal?.workingOn}
                     onWorkingOnChange={(value) => {
                       if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
@@ -10336,7 +10184,7 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
-                    currentSessionId={isTaskChat ? activeTask?.sessionId : (() => {
+                    currentSessionId={isTaskChat ? activeTaskSession?.claudeSessionId : (() => {
                       // 🦆 SESSION-FIRST: Show claudeSessionId (the real Claude Code session ID)
                       const session = agentSessions.find(s => s.id === activeSessionId);
                       return session?.claudeSessionId ?? undefined;
@@ -10355,10 +10203,12 @@ You have access to all Bash tools to execute git commands like:
               {activeTabId.startsWith('task-') && !isKanbanTabActive && (() => {
                 // Get session from the tab's taskId (which is now sessionId)
                 const activeTab = tabs.find(t => t.id === activeTabId);
-                const sessionId = activeTab?.taskId;
-                const activeSession = sessionId ? agentSessions.find(s => s.id === sessionId) : null;
+                const taskSessionId = activeTab?.taskId;
+                const activeSession = taskSessionId ? agentSessions.find(s => s.id === taskSessionId) : null;
+                // Get agent info for avatar display
+                const agentInfo = activeSession ? useKanbanStore.getState().agentInfoMap.get(activeSession.agentId) : undefined;
 
-                if (!activeSession) {
+                if (!activeSession || !taskSessionId) {
                   return (
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)' }}>
                       Session not found
@@ -10366,18 +10216,18 @@ You have access to all Bash tools to execute git commands like:
                   );
                 }
 
-                const taskMessages = chatSessions.get(taskId!) ?? [];
-                const taskLoading = chatLoadingMap.get(taskId!) ?? false;
-                const taskTokens = chatTokensMap.get(taskId!);
+                const taskMessages = chatSessions.get(taskSessionId) ?? [];
+                const taskLoading = chatLoadingMap.get(taskSessionId) ?? false;
+                const taskTokens = chatTokensMap.get(taskSessionId);
 
                 return (
                   <ChatView
-                    key={`task-${taskId}`}
+                    key={`task-${taskSessionId}`}
                     messages={taskMessages}
                     isLoading={taskLoading}
-                    onSendMessage={(content, opts) => sendMessageForTargetAgent(taskId!, content, {
+                    onSendMessage={(content, opts) => sendMessageForTargetAgent(taskSessionId, content, {
                       ...opts,
-                      workingDirectory: activeTask.projectPath || opts?.workingDirectory || '/',
+                      workingDirectory: activeSession.projectPath || opts?.workingDirectory || '/',
                     })}
                     activeAgent={activeAgent}
                     onClearAgent={() => {
@@ -10396,12 +10246,12 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
-                    basePath={activeTask.projectPath || explorerRoot || explorerPath}
-                    inputDraft={taskInputDrafts.get(taskId!) || (taskMessages.length === 0 ? (activeTask.prompt || '') : '')}
+                    basePath={activeSession.projectPath || explorerRoot || explorerPath}
+                    inputDraft={taskInputDrafts.get(taskSessionId) || (taskMessages.length === 0 ? '' : '')}
                     onInputDraftChange={(draft) => {
                       setTaskInputDrafts(prev => {
                         const newMap = new Map(prev);
-                        newMap.set(taskId!, draft);
+                        newMap.set(taskSessionId, draft);
                         return newMap;
                       });
                     }}
@@ -10413,20 +10263,20 @@ You have access to all Bash tools to execute git commands like:
                     onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
                     effort={currentSettings.effort || 'medium'}
                     onEffortChange={(effort) => updateAgentSettings({ effort })}
-                    onAbortStream={() => abortStreamForTargetAgent(taskId!)}
-                    lastPrompt={activeTask.prompt || getLastPromptForTargetAgent(taskId!) || undefined}
-                    onClearConversation={() => clearConversationForTargetAgent(taskId!)}
-                    onCompactConversation={() => compactConversationForTargetAgent(taskId!)}
-                    onOpenSessionInTerminal={() => openKanbanSessionInTerminal(taskId!)}
+                    onAbortStream={() => abortStreamForTargetAgent(taskSessionId)}
+                    lastPrompt={getLastPromptForTargetAgent(taskSessionId) || undefined}
+                    onClearConversation={() => clearConversationForTargetAgent(taskSessionId)}
+                    onCompactConversation={() => compactConversationForTargetAgent(taskSessionId)}
+                    onOpenSessionInTerminal={() => openKanbanSessionInTerminal(taskSessionId)}
                     sessionTokens={taskTokens}
                     openaiApiKey={openaiApiKey ?? undefined}
                     onOpenPromptEngineer={handleOpenPromptEngineer}
                     // Agent display info - show task title for task chat
-                    agentName={activeTask.title || 'Task'}
-                    agentAvatar={activeTask.assignedAgent?.avatar}
+                    agentName={activeSession.title || 'Task'}
+                    agentAvatar={agentInfo?.avatar}
                     // Project context
-                    projectName={activeTask.projectName || projectName}
-                    gitBranch={activeTask.branch || gitBranch}
+                    projectName={activeSession.projectName || projectName}
+                    gitBranch={gitBranch}
                     // Working on field
                     workingOn={activeTerminal?.workingOn}
                     onWorkingOnChange={(value) => {
@@ -10439,11 +10289,11 @@ You have access to all Bash tools to execute git commands like:
                     agentToolkit={activeTerminal?.personality?.toolkit}
                     onInsertAtCursor={(text) => {
                       // Insert text at cursor by appending to current input draft
-                      const currentDraft = taskInputDrafts.get(taskId!) || '';
+                      const currentDraft = taskInputDrafts.get(taskSessionId) || '';
                       const newDraft = currentDraft + text;
                       setTaskInputDrafts(prev => {
                         const newMap = new Map(prev);
-                        newMap.set(taskId!, newDraft);
+                        newMap.set(taskSessionId, newDraft);
                         return newMap;
                       });
                     }}
@@ -10458,12 +10308,12 @@ You have access to all Bash tools to execute git commands like:
                     onOpenKanban={handleOpenKanbanTab}
                     hideKanbanTasksBar={true}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(taskId!) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(taskId!) || new Map()}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
+                    answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
                     // Current session ID for display
-                    currentSessionId={activeTask.sessionId}
+                    currentSessionId={activeSession.claudeSessionId}
                     // 🦆 Internal session ID for state management (attachments, settings)
-                    internalSessionId={taskId}
+                    internalSessionId={taskSessionId}
                     // Fullscreen mode
                     isFullscreen={isChatFullscreen}
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
@@ -11168,170 +11018,12 @@ You have access to all Bash tools to execute git commands like:
         <KanbanToast />
       </div>
 
+      {/* Watch Intro replay - uses SplashScreen component */}
       {introReplayActive && (
-        <div
-          className="intro-replay-overlay"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#191B44',
-            overflow: 'hidden',
-            zIndex: 9999,
-          }}
-        >
-          {/* Light rays and glow effects */}
-          <style>{`
-            @keyframes replayRaysRotate {
-              0% { transform: translate(-50%, -50%) rotate(0deg); }
-              100% { transform: translate(-50%, -50%) rotate(360deg); }
-            }
-            @keyframes replayGlowPulse {
-              0%, 100% {
-                opacity: 0.4;
-                transform: scale(1);
-              }
-              50% {
-                opacity: 0.7;
-                transform: scale(1.1);
-              }
-            }
-            @keyframes replayVideoGlow {
-              0%, 100% {
-                box-shadow: 0 0 40px rgba(25, 27, 68, 0.8), 0 0 80px rgba(77, 100, 180, 0.3), 0 0 120px rgba(77, 100, 180, 0.2);
-              }
-              50% {
-                box-shadow: 0 0 60px rgba(25, 27, 68, 0.9), 0 0 100px rgba(77, 100, 180, 0.4), 0 0 150px rgba(77, 100, 180, 0.3);
-              }
-            }
-          `}</style>
-
-          {/* Light rays background */}
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            width: '200%',
-            height: '200%',
-            background: `conic-gradient(
-              from 0deg,
-              transparent 0deg,
-              rgba(77, 100, 180, 0.1) 10deg,
-              transparent 20deg,
-              transparent 30deg,
-              rgba(100, 120, 200, 0.08) 40deg,
-              transparent 50deg,
-              transparent 60deg,
-              rgba(77, 100, 180, 0.1) 70deg,
-              transparent 80deg,
-              transparent 90deg,
-              rgba(100, 120, 200, 0.08) 100deg,
-              transparent 110deg,
-              transparent 120deg,
-              rgba(77, 100, 180, 0.1) 130deg,
-              transparent 140deg,
-              transparent 150deg,
-              rgba(100, 120, 200, 0.08) 160deg,
-              transparent 170deg,
-              transparent 180deg,
-              rgba(77, 100, 180, 0.1) 190deg,
-              transparent 200deg,
-              transparent 210deg,
-              rgba(100, 120, 200, 0.08) 220deg,
-              transparent 230deg,
-              transparent 240deg,
-              rgba(77, 100, 180, 0.1) 250deg,
-              transparent 260deg,
-              transparent 270deg,
-              rgba(100, 120, 200, 0.08) 280deg,
-              transparent 290deg,
-              transparent 300deg,
-              rgba(77, 100, 180, 0.1) 310deg,
-              transparent 320deg,
-              transparent 330deg,
-              rgba(100, 120, 200, 0.08) 340deg,
-              transparent 350deg,
-              transparent 360deg
-            )`,
-            animation: 'replayRaysRotate 60s linear infinite',
-            pointerEvents: 'none',
-          }} />
-
-          {/* Radial glow around center */}
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '60vw',
-            height: '60vh',
-            background: 'radial-gradient(ellipse at center, rgba(77, 100, 180, 0.2) 0%, rgba(25, 27, 68, 0.3) 40%, transparent 70%)',
-            animation: 'replayGlowPulse 4s ease-in-out infinite',
-            pointerEvents: 'none',
-          }} />
-
-          {/* Video container with soft glow */}
-          <div style={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '20px',
-          }}>
-            {/* Quack Title with glow effect */}
-            <div style={{
-              fontSize: '72px',
-              fontWeight: 'bold',
-              color: '#ffffff',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              letterSpacing: '4px',
-              textShadow: '0 0 20px rgba(77, 100, 180, 1), 0 0 40px rgba(77, 100, 180, 0.8), 0 0 60px rgba(77, 100, 180, 0.6), 0 0 80px rgba(77, 100, 180, 0.4)',
-              animation: 'quackTitleGlow 3s ease-in-out infinite',
-            }}>
-              Quack
-            </div>
-
-            <div style={{
-              width: '40vh',
-              height: '40vh',
-              overflow: 'hidden',
-              borderRadius: '50%',
-              animation: 'replayVideoGlow 3s ease-in-out infinite',
-              boxShadow: '0 0 30px rgba(77, 100, 180, 0.5), 0 0 60px rgba(77, 100, 180, 0.3)',
-            }}>
-              <video
-                autoPlay
-                playsInline
-                loop
-                preload="auto"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                }}
-              >
-                <source src="/video/introquackappdef.mp4" type="video/mp4" />
-              </video>
-            </div>
-            {/* Version with glow effect */}
-            <div style={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontSize: '13px',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              letterSpacing: '1px',
-              textShadow: '0 0 10px rgba(77, 100, 180, 0.8), 0 0 20px rgba(77, 100, 180, 0.5), 0 0 30px rgba(77, 100, 180, 0.3)',
-            }}>
-              {introVersion}
-            </div>
-          </div>
-        </div>
+        <SplashScreen
+          version={introVersion}
+          onComplete={() => setIntroReplayActive(false)}
+        />
       )}
 
       {/* 💰 License and Upgrade Modals */}

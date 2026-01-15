@@ -113,6 +113,7 @@ interface KanbanState {
   updateAgentInfo: (agentId: string, info: { name?: string; avatar?: string; color?: string }) => void;
 
   // Selectors - now read from sessionStore
+  getAllTasks: () => KanbanTask[];
   getTasksByStatus: (status: KanbanStatus) => KanbanTask[];
   getTasksByProject: (projectPath: string) => KanbanTask[];
   getSelectedTask: () => KanbanTask | null;
@@ -377,6 +378,15 @@ export const useKanbanStore = create<KanbanState>()(
           // For now, just clear the processing flag
           set({ processingDocumentation });
           console.log('[kanbanStore] Documentation complete for session:', taskId, '(not persisted - AgentSession needs docFilePath/memoryEntityId fields)');
+        },
+
+        // 🦆 SESSIONS-FIRST: Selector: Get ALL tasks (reads from sessionStore)
+        getAllTasks: () => {
+          const { agentInfoMap } = get();
+          const sessionStore = useSessionStore.getState();
+          return sessionStore.sessions.map((session) =>
+            sessionToKanbanTask(session, agentInfoMap.get(session.agentId))
+          );
         },
 
         // 🦆 SESSIONS-FIRST: Selector: Get tasks by status (reads from sessionStore)

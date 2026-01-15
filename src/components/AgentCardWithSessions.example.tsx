@@ -38,12 +38,10 @@ export default function AgentCardWithSessions({
         agentId={agent.id}
       />
 
-      {/* Sessions list - handles new session creation internally */}
+      {/* Sessions list - new session creation now handled via "+" button on agent card */}
       <AgentSessionList
         agentId={agent.id}
-        agentName={agent.label ?? undefined}
-        projectPath={projectPath}
-        projectName={projectName}
+        agentColor={agent.color}
         onSessionClick={onSessionClick}
         activeSessionId={activeSessionId}
       />

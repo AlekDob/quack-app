@@ -23,6 +23,7 @@ import TerminalActivityBar from './TerminalActivityBar';
 import CommitHistoryModal from './CommitHistoryModal';
 import RevealInFinderButton from './RevealInFinderButton';
 import AgentSessionList from './AgentSessionList';
+import NewSessionModal from './NewSessionModal';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import { useSessionStore } from '../stores/sessionStore';
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
@@ -138,6 +139,8 @@ interface SortableAgentProps {
   // Kanban mode props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
+  // New session button
+  onNewSession?: (agentId: string) => void;
 }
 
 function SortableAgent({
@@ -156,6 +159,7 @@ function SortableAgent({
   isDraggingAny = false,
   isKanbanViewActive = false,
   onToggleKanbanView,
+  onNewSession,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -698,44 +702,40 @@ function SortableAgent({
               gap: '4px',
             }}
           >
-            {/* Git Branch Icon */}
-            {agent.branch && (
+            {/* Add New Session Button */}
+            {onNewSession && (
               <div
-                className="git-branch-icon"
-                onClick={handleGitMenuToggle}
+                className="add-session-icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNewSession(agent.id);
+                }}
+                title="Add new Session/Task"
                 style={{
                   opacity: isHovered ? 1 : 0,
                   visibility: isHovered ? 'visible' : 'hidden',
-                  transition: 'opacity 0.2s ease, visibility 0.2s ease',
+                  transition: 'opacity 0.15s ease, visibility 0.15s ease, background 0.15s ease',
                   cursor: 'pointer',
-                  padding: '6px',
+                  padding: '4px 6px',
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   background: 'transparent',
                   pointerEvents: isHovered ? 'auto' : 'none',
+                  color: agent.color || '#00D4FF',
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  lineHeight: 1,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(78, 205, 196, 0.15)';
+                  e.currentTarget.style.background = `${agent.color || '#00D4FF'}25`;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent';
                 }}
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#4ecdc4"
-                  strokeWidth="2"
-                >
-                  <line x1="6" y1="3" x2="6" y2="15" />
-                  <circle cx="18" cy="6" r="3" />
-                  <circle cx="6" cy="18" r="3" />
-                  <path d="M18 9a9 9 0 0 1-9 9" />
-                </svg>
+                +
               </div>
             )}
 
@@ -1036,11 +1036,13 @@ export default function RepositoryGroup({
   const [branchModifiedFiles, setBranchModifiedFiles] = useState<Map<string, number>>(new Map());
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [agentOrder, setAgentOrder] = useState<Record<string, string[]>>({});
+  // New session modal state
+  const [newSessionModalAgentId, setNewSessionModalAgentId] = useState<string | null>(null);
   const displayName = getRepoDisplayName(repoName);
   const isDraggingAny = activeAgentId !== null;
 
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
-  const { sessions: allSessionsForRepo } = useSessionStore();
+  const { sessions: allSessionsForRepo, createSession } = useSessionStore();
 
   // Cleanup: Ensure dragging class is removed on unmount
   useEffect(() => {
@@ -1087,6 +1089,34 @@ export default function RepositoryGroup({
       console.error('Failed to save agent order:', error);
     }
   }, [repoPath]);
+
+  // Handle new session creation from agent card button
+  const handleNewSession = useCallback(async (title: string) => {
+    if (!newSessionModalAgentId) return;
+
+    // Find agent to get project info
+    const agent = [...mainAgents, ...worktreeAgents].find(a => a.id === newSessionModalAgentId);
+    if (!agent) return;
+
+    try {
+      const newSession = await createSession({
+        title,
+        agentId: newSessionModalAgentId,
+        projectPath: agent.cwd,
+        projectName: displayName,
+        status: 'todo',
+        messageCount: 0,
+      });
+
+      // Close modal and open the new session
+      setNewSessionModalAgentId(null);
+      if (onSessionClick) {
+        onSessionClick(newSession.id);
+      }
+    } catch (error) {
+      console.error('[RepositoryGroup] Failed to create session:', error);
+    }
+  }, [newSessionModalAgentId, mainAgents, worktreeAgents, displayName, createSession, onSessionClick]);
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
@@ -1700,16 +1730,14 @@ export default function RepositoryGroup({
                           isDraggingAny={isDraggingAny}
                           isKanbanViewActive={isKanbanViewActive}
                           onToggleKanbanView={onToggleKanbanView}
+                          onNewSession={onSessionClick ? setNewSessionModalAgentId : undefined}
                         />
                         {/* Sessions under this agent - always visible */}
                         {onSessionClick && (
                           <div className="agent-sessions-container" style={{ marginLeft: '44px', marginTop: '4px' }}>
                             <AgentSessionList
                               agentId={agent.id}
-                              agentName={agent.label ?? undefined}
                               agentColor={agent.color}
-                              projectPath={agent.cwd}
-                              projectName={displayName}
                               onSessionClick={onSessionClick}
                               activeSessionId={activeSessionId}
                             />
@@ -2548,6 +2576,18 @@ export default function RepositoryGroup({
           onClose={() => setCommitHistoryModal(null)}
         />
       )}
+
+      {/* New Session Modal - triggered from agent card "+" button */}
+      <NewSessionModal
+        isOpen={newSessionModalAgentId !== null}
+        onClose={() => setNewSessionModalAgentId(null)}
+        onSubmit={handleNewSession}
+        agentName={
+          newSessionModalAgentId
+            ? [...mainAgents, ...worktreeAgents].find(a => a.id === newSessionModalAgentId)?.label
+            : undefined
+        }
+      />
     </div>
   );
 }

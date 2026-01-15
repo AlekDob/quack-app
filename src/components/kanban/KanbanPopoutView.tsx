@@ -45,7 +45,7 @@ import './KanbanView.css';
 
 export default function KanbanPopoutView() {
   const {
-    tasks,
+    getAllTasks,
     isLoading,
     loadTasks,
     moveTask,
@@ -57,6 +57,7 @@ export default function KanbanPopoutView() {
     openDrawer,
     closeDrawer,
   } = useKanbanStore();
+  const tasks = getAllTasks();
 
   // 🦆 SYNC: Get synced loading state from main window (for Working/Ready status on cards)
   // Also listen for task changes to reload the board
@@ -88,17 +89,17 @@ export default function KanbanPopoutView() {
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
 
   // Get selected task object
-  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : null;
+  const selectedTask = selectedTaskId ? tasks.find((t: KanbanTask) => t.id === selectedTaskId) : null;
 
   // Filter tasks by status
-  const todoTasks = tasks.filter((t) => t.status === 'todo');
-  const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const doneTasks = tasks.filter((t) => t.status === 'done');
+  const todoTasks = tasks.filter((t: KanbanTask) => t.status === 'todo');
+  const inProgressTasks = tasks.filter((t: KanbanTask) => t.status === 'in_progress');
+  const doneTasks = tasks.filter((t: KanbanTask) => t.status === 'done');
 
   // Load chat session when task is selected
   useEffect(() => {
     if (selectedTaskId && isDrawerOpen) {
-      const task = tasks.find(t => t.id === selectedTaskId);
+      const task = tasks.find((t: KanbanTask) => t.id === selectedTaskId);
       loadChatSession(selectedTaskId, task?.sessionId);
     }
   }, [selectedTaskId, isDrawerOpen, tasks, loadChatSession]);
@@ -135,7 +136,7 @@ export default function KanbanPopoutView() {
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const task = tasks.find((t) => t.id === active.id);
+    const task = tasks.find((t: KanbanTask) => t.id === active.id);
     if (task) {
       setActiveTask(task);
     }
@@ -164,7 +165,7 @@ export default function KanbanPopoutView() {
 
     if (['todo', 'in_progress', 'done'].includes(overId)) {
       const newStatus = overId as KanbanStatus;
-      const task = tasks.find((t) => t.id === taskId);
+      const task = tasks.find((t: KanbanTask) => t.id === taskId);
 
       if (task && task.status !== newStatus) {
         moveTask(taskId, newStatus);

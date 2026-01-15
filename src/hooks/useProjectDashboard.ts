@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useKanbanStore } from '../stores/kanbanStore';
+import type { KanbanTask } from '../types';
 
 export interface GitStatusData {
   branch: string;
@@ -47,13 +48,14 @@ export function useProjectDashboard(projectPath: string): ProjectDashboardData {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { tasks } = useKanbanStore();
+  const { getAllTasks } = useKanbanStore();
+  const tasks = getAllTasks();
 
   // Filter tasks by project path
-  const projectTasks = tasks.filter((task) => task.projectPath === projectPath);
-  const todoCount = projectTasks.filter((task) => task.status === 'todo').length;
-  const inProgressCount = projectTasks.filter((task) => task.status === 'in_progress').length;
-  const doneCount = projectTasks.filter((task) => task.status === 'done').length;
+  const projectTasks = tasks.filter((task: KanbanTask) => task.projectPath === projectPath);
+  const todoCount = projectTasks.filter((task: KanbanTask) => task.status === 'todo').length;
+  const inProgressCount = projectTasks.filter((task: KanbanTask) => task.status === 'in_progress').length;
+  const doneCount = projectTasks.filter((task: KanbanTask) => task.status === 'done').length;
 
   useEffect(() => {
     let mounted = true;

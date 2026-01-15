@@ -5,6 +5,8 @@ import {
   importAgentBundle,
 } from '../services/bundleService';
 import { saveAgent } from '../utils/agentStorage';
+import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
+import { writeFile, readFile } from '@tauri-apps/plugin-fs';
 
 interface BundleOperationsState {
   exporting: boolean;
@@ -54,6 +56,10 @@ export function useBundleOperations(): BundleOperations {
         content: '', // In real implementation, we'd read the actual rule content
       }));
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:57',message:'H1: Before ZIP generation',data:{skillsCount:skills.length,rulesCount:rules.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
       // Export as ZIP
       const zipData = await exportAgentBundleAsZip(
         agent,
@@ -63,19 +69,59 @@ export function useBundleOperations(): BundleOperations {
         [] // commands
       );
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:68',message:'H1: After ZIP generation SUCCESS',data:{zipSize:zipData?.byteLength,zipType:typeof zipData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
       // Create download link
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:72',message:'H2: Before Blob creation',data:{zipSize:zipData.byteLength},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+
       const blob = new Blob([zipData], { type: 'application/zip' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${agent.name.toLowerCase().replace(/\s+/g, '-')}-bundle.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:78',message:'H2: Blob created',data:{blobSize:blob.size,blobType:blob.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+
+      const filename = `${agent.name.toLowerCase().replace(/\s+/g, '-')}-bundle.zip`;
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:82',message:'H9: Using Tauri native save dialog',data:{filename,isTauri:!!window.__TAURI__},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+      // #endregion
+
+      // Use Tauri's native save dialog
+      const savePath = await saveDialog({
+        defaultPath: filename,
+        filters: [{
+          name: 'Quack Agent Bundle',
+          extensions: ['zip']
+        }]
+      });
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:95',message:'H9: Save dialog result',data:{savePath,cancelled:!savePath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+      // #endregion
+
+      if (!savePath) {
+        // User cancelled the dialog
+        setState((prev) => ({ ...prev, exporting: false }));
+        return;
+      }
+
+      // Write the file using Tauri's fs plugin
+      await writeFile(savePath, zipData);
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:112',message:'H9: File written successfully!',data:{savePath,size:zipData.byteLength},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+      // #endregion
 
       setState((prev) => ({ ...prev, exporting: false }));
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:118',message:'H4: CATCH BLOCK - Error occurred!',data:{error:err instanceof Error ? err.message : String(err),stack:err instanceof Error ? err.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+
       console.error('Failed to export agent bundle:', err);
       setState((prev) => ({
         ...prev,
@@ -93,29 +139,22 @@ export function useBundleOperations(): BundleOperations {
     setState((prev) => ({ ...prev, importing: true, error: null }));
 
     try {
-      // Create file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.zip';
-
-      // Wait for file selection
-      const file = await new Promise<File | null>((resolve) => {
-        input.onchange = (e) => {
-          const target = e.target as HTMLInputElement;
-          resolve(target.files?.[0] || null);
-        };
-        input.oncancel = () => resolve(null);
-        input.click();
+      // Use Tauri's native file picker
+      const selectedPath = await openDialog({
+        multiple: false,
+        filters: [{
+          name: 'Quack Agent Bundle',
+          extensions: ['zip']
+        }]
       });
 
-      if (!file) {
+      if (!selectedPath) {
         setState((prev) => ({ ...prev, importing: false }));
         return null;
       }
 
-      // Read file as Uint8Array
-      const arrayBuffer = await file.arrayBuffer();
-      const bundleData = new Uint8Array(arrayBuffer);
+      // Read file using Tauri's fs plugin
+      const bundleData = await readFile(selectedPath as string);
 
       // Import bundle
       const result = await importAgentBundle(bundleData);

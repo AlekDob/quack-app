@@ -802,58 +802,60 @@ export default function TerminalSidebar({
       {/* Agent List - always shown in sidebar */}
       <div className="explorer-root-label sidebar-terminals-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '12px' }}>
         <span>ACTIVE AGENTS</span>
-        {/* Kanban Button - opens Kanban tab */}
-        <KeyboardShortcutTooltip
-          label="Kanban"
-          shortcut="⌘K"
-          position="left"
-        >
-          <button
-            type="button"
-            onClick={onOpenKanbanTab}
-            style={{
-              background: isKanbanTabActive ? 'rgba(139, 92, 246, 0.25)' : 'rgba(139, 92, 246, 0.15)',
-              border: `1px solid ${isKanbanTabActive ? 'rgba(139, 92, 246, 0.5)' : 'rgba(139, 92, 246, 0.3)'}`,
-              borderRadius: '4px',
-              padding: '3px 8px',
-              fontSize: '10px',
-              fontWeight: 500,
-              color: '#8b5cf6',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.2s ease',
-            }}
-            aria-label="Open Kanban (⌘K)"
+        {/* Kanban Button - only visible when there are active projects */}
+        {orderedRepositoryGroups.length > 0 && (
+          <KeyboardShortcutTooltip
+            label="Kanban"
+            shortcut="⌘K"
+            position="left"
           >
-            {/* Kanban icon (columns) */}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="5" height="18" rx="1" />
-              <rect x="10" y="3" width="5" height="12" rx="1" />
-              <rect x="17" y="3" width="5" height="15" rx="1" />
-            </svg>
-            Kanban
-            {/* Badge for in-progress tasks */}
-            {inProgressTaskCount > 0 && (
-              <span
-                style={{
-                  background: '#f28c52',
-                  color: '#fff',
-                  fontSize: '9px',
-                  fontWeight: 600,
-                  padding: '1px 5px',
-                  borderRadius: '8px',
-                  marginLeft: '2px',
-                  minWidth: '14px',
-                  textAlign: 'center',
-                }}
-              >
-                {inProgressTaskCount}
-              </span>
-            )}
-          </button>
-        </KeyboardShortcutTooltip>
+            <button
+              type="button"
+              onClick={onOpenKanbanTab}
+              style={{
+                background: isKanbanTabActive ? 'rgba(139, 92, 246, 0.25)' : 'rgba(139, 92, 246, 0.15)',
+                border: `1px solid ${isKanbanTabActive ? 'rgba(139, 92, 246, 0.5)' : 'rgba(139, 92, 246, 0.3)'}`,
+                borderRadius: '4px',
+                padding: '3px 8px',
+                fontSize: '10px',
+                fontWeight: 500,
+                color: '#8b5cf6',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.2s ease',
+              }}
+              aria-label="Open Kanban (⌘K)"
+            >
+              {/* Kanban icon (columns) */}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="5" height="18" rx="1" />
+                <rect x="10" y="3" width="5" height="12" rx="1" />
+                <rect x="17" y="3" width="5" height="15" rx="1" />
+              </svg>
+              Kanban
+              {/* Badge for in-progress tasks */}
+              {inProgressTaskCount > 0 && (
+                <span
+                  style={{
+                    background: '#f28c52',
+                    color: '#fff',
+                    fontSize: '9px',
+                    fontWeight: 600,
+                    padding: '1px 5px',
+                    borderRadius: '8px',
+                    marginLeft: '2px',
+                    minWidth: '14px',
+                    textAlign: 'center',
+                  }}
+                >
+                  {inProgressTaskCount}
+                </span>
+              )}
+            </button>
+          </KeyboardShortcutTooltip>
+        )}
       </div>
 
       <div className="sidebar-list" style={{ marginTop: '5px' }}>

@@ -38,6 +38,8 @@ export function sessionToKanbanTask(
         name: agentInfo.name || `Agent ${session.agentId.slice(0, 8)}`,
         avatar: agentInfo.avatar,
         color: agentInfo.color || '#00D4FF',
+        projectPath: session.projectPath,
+        projectName: session.projectName,
       }
     : undefined;
 

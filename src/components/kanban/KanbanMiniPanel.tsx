@@ -251,7 +251,8 @@ export default function KanbanMiniPanel({
   onTaskClick,
   onOpenKanban,
 }: KanbanMiniPanelProps) {
-  const { tasks, requestNewTaskModal } = useKanbanStore();
+  const { getAllTasks, requestNewTaskModal } = useKanbanStore();
+  const tasks = getAllTasks();
 
   // Section expansion state - In Progress expanded by default, Done collapsed
   const [expandedSections, setExpandedSections] = useState<Record<KanbanStatus, boolean>>({
@@ -261,9 +262,9 @@ export default function KanbanMiniPanel({
   });
 
   // Filter tasks by status
-  const todoTasks = useMemo(() => tasks.filter(t => t.status === 'todo'), [tasks]);
-  const inProgressTasks = useMemo(() => tasks.filter(t => t.status === 'in_progress'), [tasks]);
-  const doneTasks = useMemo(() => tasks.filter(t => t.status === 'done'), [tasks]);
+  const todoTasks = useMemo(() => tasks.filter((t: KanbanTask) => t.status === 'todo'), [tasks]);
+  const inProgressTasks = useMemo(() => tasks.filter((t: KanbanTask) => t.status === 'in_progress'), [tasks]);
+  const doneTasks = useMemo(() => tasks.filter((t: KanbanTask) => t.status === 'done'), [tasks]);
 
   // Toggle section expansion
   const toggleSection = useCallback((status: KanbanStatus) => {
