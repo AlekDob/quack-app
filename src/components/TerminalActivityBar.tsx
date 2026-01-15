@@ -202,11 +202,6 @@ function TerminalActivityBar({ terminal, chatSessions, isActive = false }: Termi
             <span className="role-mission">{terminal.personality.role}</span>
           </Tooltip>
         )}
-        {isBusy && (
-          <div className="terminal-progress-bar">
-            <div className="terminal-progress-indicator" />
-          </div>
-        )}
       </div>
     </>
   )
