@@ -1,12 +1,19 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Magnus**, and you're the **Coder**.
+Your name is **Agent Sophie**, and you're the **Product Manager**.
 
-**Communication Style:** friendly
+**Communication Style:** professional
 
 **Notes:**
-Sei un esperto coder e ti occupi di implementare codice di vari linguaggi in base al progetto su cui lavori. Chiedi sempre delle domande di spiegazione prima di mettere mani sul codice, quando il prompt non è chiarissimo e potrebbe nascondere delle insidie. Usa il droid code explorer per investigare e quando lo ritieni necessario lancia più tool in parallelo. Controlla sempre le regole prima di agire - e controlla anche la memoria.
+Sei la product manager principale di questo progetto. Usi i droids per organizzare i tuoi lavori e deleghi a loro i lavori necessari anche facendoli lavorare in parallelo. Controlli le skill giuste per ogni task e poi ti accerti sempre che il Quack Brain sia aggiornato
+
+**Selected Rules:**
+*IMPORTANT: Follow these rules strictly. At the START of EVERY response, briefly state which rules you are following (e.g., "Following rules: X, Y, Z").*
+
+| Rule | Path | Scope |
+|------|------|-------|
+| use-mcp-memory-second-brain | `~/.claude/rules/use-mcp-memory-second-brain.md` | project |
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -24,19 +31,124 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 **AI/SDK:** Claude Agent SDK 0.2.1, Anthropic SDK 0.71.0 (see `docs/04-build-setup/claude-agent-sdk-upgrade-0.2.1.md`)
 **Testing:** Vitest 4.0.10 (unit & integration tests)
 
-**Key Features:**
-- **Multi-terminal PTY** - Multiple terminals with status detection
-- **Kanban Board** - Visual task management with AI agents (Cmd+K)
-- **Second Brain** - Tana/Logseq-style outliner for knowledge graph
-- **Background Tasks** - Non-blocking execution via `/background`
-- **File Explorer** - Directory navigation synced with terminal CWD
-- **Git Integration** - Status, diffs, staging, commits, timeline
-- **AI Streaming** - Real-time Claude responses with tool widgets
-- **MCP Memory** - Persistent knowledge graph shared with Claude Code
-- **Documentation Center** - In-app guide with custom markdown components
-- **Plugin System** - Extensible via marketplace
-
 **📖 Documentation Hub:** All project documentation is in `/docs` - see `docs/README.md` for complete index
+
+---
+
+## Core Architecture: Projects → Agents → Sessions/Tasks
+
+Quack organizes work in a **hierarchical structure**:
+
+```
+Projects (directories on disk)
+└── Agents (AI assistants with personality)
+    ├── Chat Sessions (conversations with Claude SDK)
+    └── Tasks (Kanban cards assigned to agent)
+```
+
+### 1. Projects
+
+A **Project** is simply a directory path on disk (e.g., `/Users/alekdob/Desktop/Dev/Personal/quack-app`).
+
+- Sidebar groups agents by project
+- Each project can have multiple agents working on it
+- Project context (CLAUDE.md, .claude/ folder) is loaded automatically
+
+### 2. Agents (formerly "Terminals")
+
+An **Agent** is an AI assistant with:
+- **Identity**: name, color, avatar
+- **Personality**: role, communication style, custom instructions
+- **Project binding**: which directory it works on
+- **SDK Session**: Claude conversation history (managed by SDK)
+
+**Storage**: `quack-agents.json` (unified file)
+```typescript
+interface UnifiedAgent {
+  id: string;
+  name: string;              // "Agent Jack"
+  projectPath: string;       // "/path/to/project"
+  projectName: string;       // "quack-app"
+  color: string;             // "#8fa6ff"
+  avatar?: string;           // "duck5.jpeg"
+  personality?: AgentPersonality;
+  claudeSessionId?: string;  // SDK manages history
+  createdAt: number;
+  lastActiveAt: number;
+}
+```
+
+**Key Files**:
+| File | Purpose |
+|------|---------|
+| `src/services/unifiedAgentStorage.ts` | Agent CRUD operations |
+| `src/stores/sessionStore.ts` | Zustand store for sessions |
+| `src/App.tsx` | Agent lifecycle management |
+
+### 3. Chat Sessions
+
+A **Chat Session** is a conversation between user and agent.
+
+- Managed by **Claude Agent SDK** (not stored locally anymore)
+- Each agent has one active session (`claudeSessionId`)
+- History persisted by SDK, not by Quack
+- Streaming responses rendered in real-time
+
+**Key Files**:
+| File | Purpose |
+|------|---------|
+| `src/services/claudeSDK.ts` | SDK wrapper, streaming |
+| `src/hooks/useClaudeChat.ts` | Chat hook with tool execution |
+| `src/components/ChatView.tsx` | Chat UI container |
+| `src/components/ChatMessage.tsx` | Message rendering |
+| `src/components/ChatInput.tsx` | Input with attachments |
+
+### 4. Tasks (Kanban)
+
+A **Task** is a unit of work assigned to an agent, visualized on a Kanban board.
+
+- Three columns: TODO, In Progress, Done
+- Tasks link to agents (can open chat from task)
+- Drag-and-drop between columns
+- Toggle with **Cmd+K**
+
+**Storage**: `quack-kanban-tasks.json`
+```typescript
+interface KanbanTask {
+  id: string;
+  title: string;
+  prompt: string;           // Full task description
+  status: 'todo' | 'in_progress' | 'done';
+  assignedAgentId?: string; // Links to UnifiedAgent.id
+  projectPath: string;
+  createdAt: number;
+}
+```
+
+**Key Files**:
+| File | Purpose |
+|------|---------|
+| `src/stores/kanbanStore.ts` | Task state management |
+| `src/components/kanban/KanbanView.tsx` | Main board view |
+| `src/components/kanban/KanbanColumn.tsx` | Column component |
+| `src/components/kanban/KanbanCard.tsx` | Task card |
+| `src/components/kanban/AddKanbanTaskModal.tsx` | Create task modal |
+
+---
+
+## Key Features Summary
+
+| Feature | Description | Shortcut |
+|---------|-------------|----------|
+| **Multi-Agent** | Multiple AI assistants per project | - |
+| **Kanban Board** | Visual task management | Cmd+K |
+| **Second Brain** | Knowledge graph with Obsidian sync | - |
+| **Background Tasks** | Non-blocking execution | `/background` |
+| **File Explorer** | Directory navigation | - |
+| **Git Integration** | Status, diffs, commits | - |
+| **AI Streaming** | Real-time Claude responses | - |
+| **MCP Memory** | Persistent knowledge graph | - |
+| **Documentation** | In-app guide viewer | - |
 
 ## Language Settings
 

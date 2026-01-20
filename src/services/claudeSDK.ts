@@ -742,3 +742,47 @@ export async function answerUserQuestionViaStdin(
     throw err;
   }
 }
+
+// =============================================================================
+// FILE CHECKPOINTING & REWIND (SDK 0.2.7+)
+// =============================================================================
+
+export interface RewindFilesResult {
+  success: boolean;
+  type: 'completed' | 'preview';
+  sessionId: string;
+  userMessageId: string;
+  canRewind?: boolean;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Rewind files to their state at a specific user message
+ * Requires file checkpointing to be enabled in the session
+ *
+ * @param sessionId - The Claude session ID
+ * @param userMessageId - UUID of the user message to rewind to
+ * @param dryRun - If true, only check if rewind is possible without executing
+ * @returns Result of the rewind operation
+ */
+export async function rewindFiles(
+  sessionId: string,
+  userMessageId: string,
+  dryRun = false
+): Promise<RewindFilesResult> {
+  console.log('[claudeSDK] ⏪ Rewind files request:', { sessionId, userMessageId, dryRun });
+
+  try {
+    const result = await invoke<RewindFilesResult>('rewind_files', {
+      sessionId,
+      userMessageId,
+      dryRun,
+    });
+    console.log('[claudeSDK] ⏪ Rewind files result:', result);
+    return result;
+  } catch (err) {
+    console.error('[claudeSDK] ⏪ Rewind files failed:', err);
+    throw err;
+  }
+}

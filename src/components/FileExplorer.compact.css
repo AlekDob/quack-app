@@ -26,12 +26,12 @@
   margin-bottom: 0.15rem; /* 0.25rem → 0.15rem - less space */
 }
 
-/* Compact rows - minimal borders like VSCode */
+/* Rows - comfortable spacing */
 .file-explorer .explorer-row {
-  gap: 0.3rem; /* 0.35rem → 0.3rem - more compact */
-  padding: 0.1rem 0.35rem; /* 0.15rem 0.4rem → 0.1rem 0.35rem - more compact */
-  margin-bottom: 0; /* No margin for files */
-  border-radius: 3px; /* 4px → 3px - smaller */
+  gap: 0.4rem; /* More gap between icon and name */
+  padding: 0.25rem 0.5rem; /* Increased padding */
+  margin-bottom: 2px; /* Small gap between rows */
+  border-radius: 4px;
   border: none; /* Remove heavy borders */
   background: transparent; /* Start transparent */
   backdrop-filter: none;
@@ -41,7 +41,7 @@
   cursor: pointer !important; /* Fix cursor on search results */
 }
 
-/* Directory rows - slight vertical spacing */
+/* Directory rows - slightly more spacing */
 .file-explorer .explorer-row.directory {
   margin-bottom: 4px;
 }
@@ -73,22 +73,22 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Compact expander */
+/* Expander - comfortable size */
 .file-explorer .explorer-expander {
-  width: 12px; /* 14px → 12px - more compact */
-  font-size: 0.65rem; /* 0.7rem → 0.65rem - smaller */
+  width: 14px;
+  font-size: 0.7rem;
 }
 
-/* Icon size - compact */
+/* Icon size - comfortable */
 .file-explorer .explorer-icon {
-  width: 15px; /* 16px → 15px - slightly smaller */
-  height: 15px;
+  width: 17px;
+  height: 17px;
 }
 
-/* File name - smaller */
+/* File name - readable size */
 .file-explorer .explorer-name {
-  font-size: 0.65rem; /* 0.68rem → 0.65rem - more compact */
-  line-height: 1.3; /* 1.4 → 1.3 - tighter line height */
+  font-size: 0.75rem; /* Larger for better readability */
+  line-height: 1.4;
 }
 
 /* Count badge - smaller */
@@ -128,15 +128,15 @@
   font-size: 0.6rem;
 }
 
-/* Compact file actions buttons */
+/* File actions buttons */
 .file-explorer .explorer-file-actions {
-  gap: 4px; /* More breathing room between icons */
+  gap: 6px; /* More breathing room between icons */
 }
 
 .file-explorer .explorer-mention-btn {
-  width: 16px; /* Slightly larger for better visibility */
-  height: 16px;
-  font-size: 0.6rem; /* Slightly larger @ symbol */
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
   border-radius: 3px;
   padding: 0;
   display: inline-flex;
@@ -144,16 +144,16 @@
   justify-content: center;
 }
 
-/* Reveal in Finder button - minimal, no background, extra compact */
+/* Reveal in Finder button - inline on rows */
 .file-explorer .reveal-in-finder-btn {
-  width: 13px !important; /* 16px → 13px - more compact */
-  height: 13px !important;
-  min-width: 13px !important;
-  min-height: 13px !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
   padding: 0 !important;
-  border-radius: 0 !important; /* No border radius */
-  border: none !important; /* No border */
-  background: transparent !important; /* No background */
+  border-radius: 3px !important;
+  border: none !important;
+  background: transparent !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -161,28 +161,27 @@
 }
 
 .file-explorer .reveal-in-finder-btn:hover {
-  background: transparent !important; /* Keep transparent on hover */
-  opacity: 0.7 !important; /* Just reduce opacity on hover */
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 .file-explorer .reveal-in-finder-btn svg {
-  width: 10px !important; /* 12px → 10px - smaller icon */
-  height: 10px !important;
-  opacity: 0.6 !important; /* Subtle icon */
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.5 !important;
 }
 
 .file-explorer .reveal-in-finder-btn:hover svg {
-  opacity: 1 !important; /* Full opacity on hover */
+  opacity: 1 !important;
 }
 
-/* Open in IDE button - minimal, matches reveal-in-finder style */
+/* Open in IDE button - matches reveal-in-finder style */
 .file-explorer .open-in-ide-button {
-  width: 13px !important;
-  height: 13px !important;
-  min-width: 13px !important;
-  min-height: 13px !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
   padding: 0 !important;
-  border-radius: 0 !important;
+  border-radius: 3px !important;
   border: none !important;
   background: transparent !important;
   display: inline-flex !important;
@@ -194,23 +193,22 @@
 }
 
 .file-explorer .open-in-ide-button:hover {
-  background: transparent !important;
-  opacity: 0.7 !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 .file-explorer .open-in-ide-button svg {
-  width: 10px !important;
-  height: 10px !important;
-  opacity: 0.6 !important;
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.5 !important;
 }
 
 .file-explorer .open-in-ide-button:hover svg {
   opacity: 1 !important;
 }
 
-/* Compact content padding */
+/* Content padding - comfortable */
 .file-explorer .explorer-content {
-  padding: 0.2rem 0.4rem 0.4rem; /* 0.3rem 0.5rem 0.5rem → more compact */
+  padding: 0.4rem 0.5rem 0.5rem;
 }
 
 /* Header - more compact */

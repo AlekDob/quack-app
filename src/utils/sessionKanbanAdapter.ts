@@ -46,7 +46,7 @@ export function sessionToKanbanTask(
   return {
     id: session.id,
     title: session.title,
-    prompt: '', // Sessions don't store the original prompt (it's in chat messages)
+    prompt: session.initialPrompt || '', // Initial prompt from Kanban task creation
     status: session.status,
     assignedAgent,
     type: 'agent', // All sessions are agent tasks
@@ -62,6 +62,7 @@ export function sessionToKanbanTask(
     cacheCreationTokens: session.cacheCreationTokens,
     cacheReadTokens: session.cacheReadTokens,
     totalCost: session.totalCost,
+    attachments: session.initialAttachments, // Initial attachments from Kanban task creation
   };
 }
 

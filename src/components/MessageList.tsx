@@ -26,9 +26,11 @@ interface MessageListProps {
   currentSessionId?: string;
   // Show/hide ThinkingBlocks (controlled by footer icon)
   showThinkingBlocks?: boolean;
+  // File Checkpointing (SDK 0.2.7+)
+  onRewindFiles?: (userMessageId: string) => void;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -188,7 +190,14 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
   // Extract memory context from assistant messages following user messages
   // Maps user message index -> memory info from the following assistant message
   const memoryContextByUserIndex = useMemo(() => {
-    const memoryMap = new Map<number, { memories: MemoryInfo[]; keywords: string[]; durationMs: number }>();
+    const memoryMap = new Map<number, {
+      memories: MemoryInfo[];
+      keywords: string[];
+      userKeywords?: string[];
+      aiConcepts?: string[];
+      durationMs: number;
+      extractionMethod?: 'ai' | 'legacy' | 'none' | 'error';
+    }>();
 
     messages.forEach((msg, index) => {
       // For each user message, look at the next message
@@ -203,7 +212,10 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
             memoryMap.set(index, {
               memories: memoryEvent.memories,
               keywords: memoryEvent.keywords,
+              userKeywords: memoryEvent.userKeywords,
+              aiConcepts: memoryEvent.aiConcepts,
               durationMs: memoryEvent.durationMs,
+              extractionMethod: memoryEvent.extractionMethod,
             });
           }
         }
@@ -247,13 +259,19 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
                 answeredQuestions={answeredQuestions}
                 currentSessionId={currentSessionId}
                 showThinkingBlocks={showThinkingBlocks}
+                onRewindFiles={onRewindFiles}
               />
               {/* Show memory indicator below user messages when memories were used */}
               {memoryContext && (
                 <div className="memory-indicator-wrapper">
                   <MemoryIndicator
                     memories={memoryContext.memories}
-                    keywords={memoryContext.keywords}
+                    keywords={memoryContext.extractionMethod === 'legacy' ? memoryContext.keywords : []}
+                    userKeywords={memoryContext.userKeywords}
+                    query={memoryContext.extractionMethod === 'ai' && memoryContext.aiConcepts?.length
+                      ? memoryContext.aiConcepts.join(', ')
+                      : undefined}
+                    searchContext={memoryContext.extractionMethod === 'ai' ? 'AI semantic' : undefined}
                     durationMs={memoryContext.durationMs}
                   />
                 </div>

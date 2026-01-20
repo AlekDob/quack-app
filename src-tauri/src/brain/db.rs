@@ -289,6 +289,13 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
         [],
     ).map_err(|e| format!("Failed to create brain_settings table: {}", e))?;
 
+    // Migration 4.1: Add updated_at column if it doesn't exist (for databases created before this migration)
+    if !column_exists("brain_settings", "updated_at") {
+        conn.execute("ALTER TABLE brain_settings ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0", [])
+            .map_err(|e| format!("Failed to add updated_at column to brain_settings: {}", e))?;
+        log::info!("Migration: Added updated_at column to brain_settings");
+    }
+
     // Insert default settings if not exist
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

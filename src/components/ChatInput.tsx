@@ -22,13 +22,18 @@ import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
+import {
+  compressImage,
+  blobToBase64,
+  getCompressionMessage,
+  MAX_FILE_SIZE,
+  MAX_IMAGE_DIMENSION,
+  RECOMMENDED_IMAGE_DIMENSION,
+} from '../utils/imageCompression';
 import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // Claude API limit is 5MB
 const MAX_PREVIEW_SIZE = 3 * 1024 * 1024;
-const MAX_IMAGE_DIMENSION = 8000; // Claude API max dimension (8000x8000 pixels)
-const RECOMMENDED_IMAGE_DIMENSION = 1568; // Claude recommended for performance
 
 // Agent color mapping
 const AGENT_COLORS: Record<string, string> = {
@@ -124,6 +129,7 @@ export default function ChatInput({
   const [localInput, setLocalInput] = useState('');
   const [localAttachments, setLocalAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // Initialize attachments from prop (for Kanban tasks) - only for uncontrolled mode
   useEffect(() => {
@@ -243,6 +249,9 @@ export default function ChatInput({
 
   // XML tag auto-complete state
   const [xmlTagPair, setXmlTagPair] = useState<{ start: number; end: number; tagName: string } | null>(null);
+
+  // User-selected priority keywords for memory search (3x weight)
+  const [userKeywords, setUserKeywords] = useState<string[]>([]);
 
   // Microphone recorder hook (uses tauri-plugin-mic-recorder + Whisper API)
   const {
@@ -1006,12 +1015,33 @@ export default function ChatInput({
           break;
         }
 
-        if (file.size > MAX_FILE_SIZE) {
-          setError(`Clipboard file ${file.name || '(unnamed)'} is larger than 5MB (Claude API limit).`);
-          continue;
-        }
-
         try {
+          // Compress image if it's an image file (before size check)
+          let processedFile: File | Blob = file;
+          let compressionMsg: string | null = null;
+
+          if (file.type.startsWith('image/')) {
+            const result = await compressImage(file);
+            processedFile = result.blob;
+            compressionMsg = getCompressionMessage(result);
+          }
+
+          // Now check size after potential compression
+          if (processedFile.size > MAX_FILE_SIZE) {
+            const sizeMsg = compressionMsg
+              ? `Even after compression, image is too large (${(processedFile.size / (1024 * 1024)).toFixed(1)}MB). Max: 5MB.`
+              : `File ${file.name || '(unnamed)'} is larger than 5MB (Claude API limit).`;
+            setError(sizeMsg);
+            continue;
+          }
+
+          // Show compression info message if image was compressed
+          if (compressionMsg) {
+            setInfoMessage(compressionMsg);
+            // Auto-hide after 4 seconds
+            setTimeout(() => setInfoMessage(null), 4000);
+          }
+
           const extensionFromMime = mimeToExtension(file.type);
           const nameExtension = (() => {
             const parts = file.name?.split('.') ?? [];
@@ -1021,7 +1051,9 @@ export default function ChatInput({
             return undefined;
           })();
           const extension = extensionFromMime ?? nameExtension ?? 'png';
-          const base64 = await readFileAsBase64(file);
+
+          // Convert blob to base64
+          const base64 = await blobToBase64(processedFile);
 
           const tempPath = await invoke<string>('save_clipboard_file', {
             dataBase64: base64,
@@ -1048,7 +1080,7 @@ export default function ChatInput({
         // who try to read it as a file path. The image is visible in the attachment preview.
       }
     },
-    [attachments.length, createAttachmentFromPath, disabled, mimeToExtension, readFileAsBase64]
+    [attachments.length, createAttachmentFromPath, disabled, mimeToExtension]
   );
 
   const formatSize = useCallback((size: number) => {
@@ -1066,9 +1098,11 @@ export default function ChatInput({
     // #endregion
     if ((!trimmed && attachments.length === 0) || disabled) return;
 
-    await onSend(trimmed, { attachments });
+    // Pass userKeywords for priority memory search (3x weight)
+    await onSend(trimmed, { attachments, userKeywords: userKeywords.length > 0 ? userKeywords : undefined });
     setInput('');
     setAttachments([]);
+    setUserKeywords([]); // Clear keywords after send
     setError(null);
   };
 
@@ -1225,12 +1259,28 @@ export default function ChatInput({
             textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
           }
         }, 0);
+      } else if (keyCombo === shortcuts.addMemoryKeyword?.currentKeys) {
+        // Add selected text as priority keyword for memory search
+        e.preventDefault();
+        const selection = window.getSelection();
+        const selectedText = selection?.toString().trim();
+        if (selectedText && selectedText.length > 2) {
+          // Split by spaces for multi-word selection, filter short words
+          const words = selectedText.split(/\s+/).filter(w => w.length > 2);
+          if (words.length > 0) {
+            setUserKeywords(prev => {
+              const newKeywords = [...new Set([...prev, ...words])];
+              console.log('[ChatInput] Added memory keywords:', words, '-> Total:', newKeywords);
+              return newKeywords;
+            });
+          }
+        }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [shortcuts, input, disabled, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput]);
+  }, [shortcuts, input, disabled, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput, setUserKeywords]);
 
   // Snippet insertion handler
   const handleInsertSnippet = useCallback((content: string, cursorOffset?: number) => {
@@ -1446,12 +1496,27 @@ export default function ChatInput({
             break;
           }
 
-          if (file.size > MAX_FILE_SIZE) {
-            setError(`Image ${file.name} is larger than 5MB (Claude API limit).`);
-            continue;
-          }
-
           try {
+            // Compress image before size check
+            const result = await compressImage(file);
+            const processedFile = result.blob;
+            const compressionMsg = getCompressionMessage(result);
+
+            // Check size after compression
+            if (processedFile.size > MAX_FILE_SIZE) {
+              const sizeMsg = compressionMsg
+                ? `Even after compression, image is too large (${(processedFile.size / (1024 * 1024)).toFixed(1)}MB). Max: 5MB.`
+                : `Image ${file.name} is larger than 5MB (Claude API limit).`;
+              setError(sizeMsg);
+              continue;
+            }
+
+            // Show compression info message if image was compressed
+            if (compressionMsg) {
+              setInfoMessage(compressionMsg);
+              setTimeout(() => setInfoMessage(null), 4000);
+            }
+
             const extensionFromMime = mimeToExtension(file.type);
             const nameExtension = (() => {
               const parts = file.name?.split('.') ?? [];
@@ -1461,7 +1526,9 @@ export default function ChatInput({
               return undefined;
             })();
             const extension = extensionFromMime ?? nameExtension ?? 'png';
-            const base64 = await readFileAsBase64(file);
+
+            // Convert blob to base64
+            const base64 = await blobToBase64(processedFile);
 
             const tempPath = await invoke<string>('save_clipboard_file', {
               dataBase64: base64,
@@ -1918,6 +1985,26 @@ export default function ChatInput({
             </div>
           );
         })()}
+        {/* Show user-selected priority keywords for memory search */}
+        {userKeywords.length > 0 && (
+          <div className="chat-input-memory-keywords">
+            <span className="chat-input-memory-keywords-label">Priority Keywords:</span>
+            {userKeywords.map((keyword, idx) => (
+              <span key={idx} className="chat-input-memory-keyword-chip">
+                <span className="chat-input-memory-keyword-star">★</span>
+                {keyword}
+                <button
+                  type="button"
+                  className="chat-input-memory-keyword-remove"
+                  onClick={() => setUserKeywords(prev => prev.filter((_, i) => i !== idx))}
+                  title="Remove keyword"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="chat-input-field-row">
           <div className="chat-input-actions" onMouseDown={(e) => e.preventDefault()}>
           <div className="chat-input-actions-left">
@@ -2235,6 +2322,7 @@ export default function ChatInput({
         </div>
       )}
       {error && <div className="chat-input-error">{error}</div>}
+      {infoMessage && <div className="chat-input-info">{infoMessage}</div>}
 
       {/* Voice Recording Modal */}
       <VoiceRecordingModal

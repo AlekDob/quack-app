@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.62",
+    "@anthropic-ai/sdk": "^0.71.0",
     "@modelcontextprotocol/sdk": "^1.25.1",
-    "better-sqlite3": "^11.7.0"
+    "proper-lockfile": "^4.1.2",
+    "sql.js": "^1.11.0"
   },
   "devDependencies": {
     "@vitest/ui": "^2.1.8",

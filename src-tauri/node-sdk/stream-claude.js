@@ -134,6 +134,7 @@ const {
   mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
   allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
   autoMemorySearchEnabled = true, // Auto memory search from Brain (SDK 0.2.1+)
+  userKeywords = [], // User-selected priority keywords for memory search (3x weight)
 } = config;
 
 // DEBUG: Log what we received from Rust
@@ -436,13 +437,15 @@ async function main() {
       'KillShell',
       'ExitPlanMode',
       'AskUserQuestion', // Interactive questions to user (SDK v0.1.71+)
-      // Kanban Tools - Custom MCP tools for task management
-      'mcp__kanban-tools__kanban_list_tasks',
-      'mcp__kanban-tools__kanban_move_task',
-      'mcp__kanban-tools__kanban_create_task',
-      'mcp__kanban-tools__kanban_update_task',
-      'mcp__kanban-tools__kanban_delete_task',
-      'mcp__kanban-tools__kanban_get_workload',
+      // Kanban Tools V2 - Multi-Project Agent Architecture
+      'mcp__kanban-tools-v2__kanban_create_agent',
+      'mcp__kanban-tools-v2__kanban_create_session',
+      'mcp__kanban-tools-v2__kanban_list_agents',
+      'mcp__kanban-tools-v2__kanban_list_sessions',
+      'mcp__kanban-tools-v2__kanban_move_session',
+      'mcp__kanban-tools-v2__kanban_update_session',
+      'mcp__kanban-tools-v2__kanban_delete_agent',
+      'mcp__kanban-tools-v2__kanban_delete_session',
     ];
 
     // Use allowedTools from config if provided, otherwise use defaults
@@ -451,6 +454,53 @@ async function main() {
       : defaultAllowedTools;
 
     console.error(`[DEBUG] Using ${resolvedAllowedTools.length} allowed tools:`, resolvedAllowedTools.slice(0, 5).join(', ') + '...');
+
+    // =============================================================================
+    // 🧠 AUTO MEMORY SEARCH (v2 - AI-Powered)
+    // Perform memory search BEFORE building options since it's now async
+    // Uses Claude Haiku to extract semantic concepts from the user's prompt
+    // =============================================================================
+    let memorySearchResult = null;
+    let memoryContext = '';
+
+    if (autoMemorySearchEnabled && prompt) {
+      console.error(`[DEBUG] Auto Memory Search enabled, searching Brain...`);
+      console.error(`[DEBUG] User keywords for priority search: ${userKeywords.length > 0 ? userKeywords.join(', ') : '(none)'}`);
+
+      // Extract project name from cwd for contextual scoping
+      const projectName = cwd ? cwd.split('/').filter(Boolean).pop() : null;
+      console.error(`[DEBUG] Project context: ${projectName || '(none)'}`);
+
+      try {
+        memorySearchResult = await autoMemorySearch(prompt, {
+          enabled: true,
+          maxMemories: 5,
+          userKeywords: userKeywords, // Pass user-selected keywords with 3x weight
+          projectName: projectName, // Add project name for contextual scoping (2x weight)
+        });
+        memoryContext = memorySearchResult.context || '';
+
+        // Store result for later emission (after system event)
+        if (memorySearchResult.memories && memorySearchResult.memories.length > 0) {
+          console.error(`[DEBUG] Memory context found (${memorySearchResult.memories.length} memories, method: ${memorySearchResult.extractionMethod})`);
+          // Store in global for emission after first event
+          globalThis.__pendingMemoryContext = {
+            type: 'memory_context',
+            memories: memorySearchResult.memories,
+            keywords: memorySearchResult.keywords,
+            aiConcepts: memorySearchResult.aiConcepts || [], // NEW: AI-extracted concepts
+            userKeywords: memorySearchResult.userKeywords || [], // User-selected keywords (★)
+            durationMs: memorySearchResult.durationMs,
+            count: memorySearchResult.memories.length,
+            extractionMethod: memorySearchResult.extractionMethod, // NEW: 'ai' | 'legacy' | 'none'
+          };
+        }
+      } catch (memError) {
+        console.error(`[DEBUG] Memory search error (non-fatal): ${memError.message}`);
+      }
+    } else {
+      console.error(`[DEBUG] Auto Memory Search: enabled=${autoMemorySearchEnabled}, prompt=${!!prompt}`);
+    }
 
     const options = {
       model: modelId,
@@ -478,42 +528,12 @@ async function main() {
       // allowedTools filters from the preset - includes AskUserQuestion
       allowedTools: resolvedAllowedTools,
 
-      // 🧠 Auto Memory Search: Inject relevant knowledge from Second Brain
-      // This searches the Brain SQLite DB for memories related to the user's prompt
-      // and injects them into the system prompt for better context awareness
-      systemPrompt: (() => {
-        let memoryContext = '';
-
-        // Only search if enabled and we have a prompt
-        if (autoMemorySearchEnabled && prompt) {
-          console.error(`[DEBUG] Auto Memory Search enabled, searching Brain...`);
-          const memorySearchResult = autoMemorySearch(prompt, {
-            enabled: true,
-            maxMemories: 5,
-          });
-          memoryContext = memorySearchResult.context || '';
-
-          // Store result for later emission (after system event)
-          // We can't emit here because the streaming message doesn't exist yet
-          if (memorySearchResult.memories && memorySearchResult.memories.length > 0) {
-            console.error(`[DEBUG] Memory context found (${memorySearchResult.memories.length} memories, ${memoryContext.length} chars)`);
-            // Store in global for emission after first event
-            globalThis.__pendingMemoryContext = {
-              type: 'memory_context',
-              memories: memorySearchResult.memories,
-              keywords: memorySearchResult.keywords,
-              durationMs: memorySearchResult.durationMs,
-              count: memorySearchResult.memories.length,
-            };
-          }
-        } else {
-          console.error(`[DEBUG] Auto Memory Search: enabled=${autoMemorySearchEnabled}, prompt=${!!prompt}`);
-        }
-
-        return {
-          type: 'preset',
-          preset: 'claude_code',
-          append: `
+      // 🧠 System Prompt with Memory Context (already populated above)
+      // Memory search was performed BEFORE building options (now async with AI extraction)
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: `
 
 ## Interactive Questions (AskUserQuestion Tool)
 
@@ -538,8 +558,7 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.
 ${memoryContext}`
-        };
-      })(),
+      },
 
       // =============================================================================
       // PERMISSION CALLBACK - Handles AskUserQuestion and other permission requests
@@ -642,6 +661,13 @@ ${memoryContext}`
       console.error(`[DEBUG] Using structured outputs with schema:`, JSON.stringify(outputFormat, null, 2));
     }
 
+    // =============================================================================
+    // FILE CHECKPOINTING (SDK 0.2.7+)
+    // Enable automatic file snapshots before modifications for rollback capability
+    // =============================================================================
+    options.enableFileCheckpointing = true;
+    console.error(`[DEBUG] File checkpointing ENABLED (SDK 0.2.7+)`);
+
     // Add effort parameter if provided (SDK 0.1.54+)
     // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high'
     if (effort) {
@@ -670,15 +696,15 @@ ${memoryContext}`
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
-    const kanbanMcpServerPath = join(__dirname, 'kanban-mcp-server.js');
+    const kanbanMcpServerPath = join(__dirname, 'kanban-mcp-server-v2.js');
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
-    console.error(`[MCP] Kanban MCP server path: ${kanbanMcpServerPath}`);
+    console.error(`[MCP] Kanban MCP server V2 path: ${kanbanMcpServerPath}`);
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
 
     // Merge MCP servers: file-based servers + built-in Quack servers (kanban, ide)
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
-      'kanban-tools': {
+      'kanban-tools-v2': {
         command: 'node',
         args: [kanbanMcpServerPath],
       },
@@ -688,11 +714,11 @@ ${memoryContext}`
       },
     };
 
-    const builtInServerCount = 2; // kanban-tools + ide-tools
+    const builtInServerCount = 2; // kanban-tools-v2 + ide-tools
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (kanban-tools, ide-tools)`);
+      console.error(`[MCP] Using built-in MCP servers only (kanban-tools-v2, ide-tools)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

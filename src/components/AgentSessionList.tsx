@@ -250,7 +250,7 @@ function AgentSessionList({
 
   // Handle marking session as done
   const handleMarkDone = useCallback((sessionId: string) => {
-    updateSession(sessionId, { status: 'done' });
+    updateSession(sessionId, { status: 'done', completedAt: Date.now() });
   }, [updateSession]);
 
   // Handle delete session (shows confirmation dialog)

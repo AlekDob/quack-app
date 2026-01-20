@@ -441,6 +441,12 @@ export interface AgentSession {
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
   totalCost?: number;
+
+  // Initial prompt and attachments from Kanban task creation
+  // These are pre-populated in ChatInput when opening the session for the first time
+  initialPrompt?: string;
+  initialAttachments?: ChatAttachment[];
+  initialPromptConsumed?: boolean;  // Flag to avoid re-population on re-open
 }
 
 export type AgentSessionStatus = 'todo' | 'in_progress' | 'done';
@@ -532,6 +538,7 @@ export interface ClaudeContentBlock {
 export interface ClaudeAssistantMessage {
   id: string;
   content: ClaudeContentBlock[];
+  uuid?: string; // SDK message UUID (for file checkpointing)
 }
 
 export interface ClaudeAssistantEvent extends ClaudeEventBase {
@@ -552,6 +559,7 @@ export interface ClaudeUserEvent extends ClaudeEventBase {
     }>;
   };
   session_id?: string;
+  uuid?: string; // SDK User message UUID (for file checkpointing rewind)
 }
 
 export interface ClaudeResultEvent extends ClaudeEventBase {
@@ -631,7 +639,7 @@ export interface ClaudeContentBlockStopEvent extends ClaudeEventBase {
   session_id?: string;
 }
 
-// Memory Context Event (Auto Memory Search - SDK 0.2.1+)
+// Memory Context Event (Auto Memory Search - SDK 0.2.1+, v2 AI-Powered)
 export interface ClaudeMemoryContextEvent extends ClaudeEventBase {
   type: 'memory_context';
   memories: Array<{
@@ -639,10 +647,19 @@ export interface ClaudeMemoryContextEvent extends ClaudeEventBase {
     type: string;
     projectId?: string;
     observations: string[];
+    /** Scope of the memory: 'project' or 'global' */
+    scope?: 'project' | 'global';
   }>;
+  /** Legacy keyword extraction results (stopword-based fallback) */
   keywords: string[];
+  /** AI-extracted semantic concepts (NEW - v2 with Claude Haiku) */
+  aiConcepts?: string[];
+  /** User-selected priority keywords (3x weight in search) */
+  userKeywords?: string[];
   durationMs: number;
   count: number;
+  /** Extraction method used: 'ai' | 'legacy' | 'none' | 'error' */
+  extractionMethod?: 'ai' | 'legacy' | 'none' | 'error';
 }
 
 export type ClaudeEvent =
@@ -1542,7 +1559,8 @@ export type ShortcutActionId =
   | 'chatOpenDroids'
   | 'chatOpenCommands'
   | 'chatInsertXml'
-  | 'chatNewLine';
+  | 'chatNewLine'
+  | 'addMemoryKeyword';
 
 /**
  * Configuration for a single keyboard shortcut

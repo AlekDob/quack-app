@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import debugLogger, { type DebugLogEntry } from '../services/debugLogger';
+import { useSessionStore } from '../stores/sessionStore';
 import './DebugPanel.css';
 
 export default function DebugPanel() {
@@ -15,6 +16,7 @@ export default function DebugPanel() {
   const [filter, setFilter] = useState<'all' | 'deduplication' | 'rendering' | 'events'>('all');
   const [levelFilter, setLevelFilter] = useState<'all' | 'info' | 'warn' | 'error'>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const { sessions } = useSessionStore();
 
   // Load logs on mount and refresh
   useEffect(() => {
@@ -98,6 +100,9 @@ export default function DebugPanel() {
       default: return '#888';
     }
   };
+
+  const activeSessions = sessions.filter(s => s.status !== 'done');
+  const completedSessions = sessions.filter(s => s.status === 'done');
 
   return (
     <div className="debug-panel">
@@ -240,6 +245,28 @@ export default function DebugPanel() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Session Stats Section */}
+      <div className="debug-panel-storage">
+        <h3>📊 Sessions</h3>
+        <div className="debug-stats" style={{ marginBottom: '12px' }}>
+          <div className="debug-stat">
+            <span className="debug-stat-label">Active Sessions:</span>
+            <span className="debug-stat-value">{activeSessions.length}</span>
+          </div>
+          <div className="debug-stat">
+            <span className="debug-stat-label">Completed:</span>
+            <span className="debug-stat-value">{completedSessions.length}</span>
+          </div>
+          <div className="debug-stat">
+            <span className="debug-stat-label">Total:</span>
+            <span className="debug-stat-value" style={{ color: '#00D9FF' }}>{sessions.length}</span>
+          </div>
+        </div>
+        <p className="debug-panel-description" style={{ fontSize: '11px', opacity: 0.7 }}>
+          Chat history is managed by Claude SDK. Sessions are stored in sessionStore.
+        </p>
       </div>
 
       {/* Help */}

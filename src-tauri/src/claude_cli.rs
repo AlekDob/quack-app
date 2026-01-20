@@ -108,12 +108,29 @@ pub enum ClaudeEvent {
         payload: serde_json::Value,
         timestamp: u64,
     },
+    // Memory Context event (Auto Memory Search from Second Brain - SDK 0.2.1+, v2 AI-Powered)
+    #[serde(rename = "memory_context")]
+    MemoryContext {
+        memories: Vec<MemoryInfo>,
+        keywords: Vec<String>,
+        #[serde(rename = "aiConcepts")]
+        ai_concepts: Option<Vec<String>>,  // NEW: AI-extracted semantic concepts
+        #[serde(rename = "userKeywords")]
+        user_keywords: Option<Vec<String>>,
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+        count: u32,
+        #[serde(rename = "extractionMethod")]
+        extraction_method: Option<String>,  // NEW: 'ai' | 'legacy' | 'none' | 'error'
+    },
     // AskUserQuestion event - requires user input (SDK v0.1.71+)
     #[serde(rename = "ask_user_question")]
     AskUserQuestion {
         #[serde(rename = "requestId")]
         request_id: String,
         questions: Vec<AskUserQuestionQuestion>,
+        #[serde(flatten)]
+        extra: serde_json::Value,
     },
 }
 
@@ -132,6 +149,18 @@ pub struct AskUserQuestionQuestion {
 pub struct AskUserQuestionOption {
     pub label: String,
     pub description: String,
+}
+
+/// Memory info structure for MemoryContext event (Auto Memory Search)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryInfo {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub memory_type: String,
+    #[serde(rename = "projectId")]
+    pub project_id: Option<String>,
+    pub observations: Vec<String>,
+    pub scope: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,6 +237,8 @@ pub struct ClaudeCliRequest {
     // 🦆 SESSION-FIRST: Frontend session key for routing events to correct chat session
     // This allows parallel conversations - each stream knows where to write its events
     pub session_key: Option<String>,
+    // 🧠 User-selected priority keywords for memory search (3x weight)
+    pub user_keywords: Option<Vec<String>>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -970,6 +1001,7 @@ pub async fn send_message_via_sdk_streaming(
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
         auto_memory_search_enabled, // 🧠 Auto Memory Search (SDK 0.2.1+)
         session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
+        user_keywords, // 🧠 User-selected priority keywords for memory search (3x weight)
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key or fallback to agent_id for event routing
@@ -1091,6 +1123,16 @@ pub async fn send_message_via_sdk_streaming(
     let auto_memory_enabled = auto_memory_search_enabled.unwrap_or(true);
     config["autoMemorySearchEnabled"] = serde_json::Value::Bool(auto_memory_enabled);
     log::info!("[SDK DEBUG] Auto Memory Search enabled: {}", auto_memory_enabled);
+
+    // 🧠 Add userKeywords for priority memory search (3x weight)
+    if let Some(keywords) = user_keywords {
+        if !keywords.is_empty() {
+            config["userKeywords"] = serde_json::Value::Array(
+                keywords.iter().map(|k| serde_json::Value::String(k.clone())).collect()
+            );
+            log::info!("[SDK DEBUG] Adding {} user keywords for priority memory search", keywords.len());
+        }
+    }
 
     let config_str = config.to_string();
 
@@ -1407,20 +1449,35 @@ pub async fn send_message_via_sdk_streaming(
                             }
                         }
                     }
-                    ClaudeEvent::AskUserQuestion { request_id, questions } => {
+                    ClaudeEvent::AskUserQuestion { request_id, questions, .. } => {
                         log::info!("[SDK] 🗣️ AskUserQuestion event: requestId={}, {} questions", request_id, questions.len());
-                        // Emit ask_user_question event to frontend
+                        // Emit ask_user_question event to frontend using BOTH:
+                        // 1. Agent-specific event (for backwards compatibility)
+                        // 2. Global event (more reliable, frontend filters by agentId)
                         let ask_event_name = format!("ask-user-question:{}", agent_id);
-                        match app.emit(&ask_event_name, serde_json::json!({
+                        let payload = serde_json::json!({
                             "requestId": request_id,
                             "questions": questions,
                             "agentId": agent_id
-                        })) {
+                        });
+
+                        // Emit to agent-specific listener
+                        match app.emit(&ask_event_name, payload.clone()) {
                             Ok(_) => {
-                                log::info!("[SDK] 🗣️ Emitted ask-user-question event to frontend");
+                                log::info!("[SDK] 🗣️ Emitted ask-user-question event to frontend (agent-specific: {})", agent_id);
                             }
                             Err(e) => {
-                                log::error!("[SDK] ❌ Failed to emit ask-user-question event: {:?}", e);
+                                log::error!("[SDK] ❌ Failed to emit ask-user-question event (agent-specific): {:?}", e);
+                            }
+                        }
+
+                        // Also emit to global listener (more reliable fallback)
+                        match app.emit("ask-user-question", payload) {
+                            Ok(_) => {
+                                log::info!("[SDK] 🗣️ Emitted ask-user-question event to frontend (global)");
+                            }
+                            Err(e) => {
+                                log::error!("[SDK] ❌ Failed to emit ask-user-question event (global): {:?}", e);
                             }
                         }
                     }
@@ -1439,6 +1496,16 @@ pub async fn send_message_via_sdk_streaming(
                             }
                         }
                     }
+                }
+
+                // Debug: Log MemoryContext events
+                if let ClaudeEvent::MemoryContext { memories, keywords, ai_concepts, extraction_method, .. } = &event {
+                    log::info!("[SDK] 🧠 EMITTING MemoryContext event: {} memories, method={:?}, keywords={}, ai_concepts={:?}",
+                        memories.len(),
+                        extraction_method,
+                        keywords.len(),
+                        ai_concepts.as_ref().map(|c| c.len()).unwrap_or(0)
+                    );
                 }
 
                 // 🦆 SESSION-FIRST: Wrap event with session_key for proper routing
@@ -1495,6 +1562,20 @@ pub async fn send_message_via_sdk_streaming(
     } else {
         Vec::new()
     };
+
+    // Check if process was terminated by signal (SIGTERM = 15, SIGINT = 2)
+    // These are intentional cancellations, not errors
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(signal) = status.signal() {
+            if signal == 15 || signal == 2 {
+                // SIGTERM or SIGINT - user cancelled, not an error
+                log::info!("[SDK] Process was cancelled by user (signal {})", signal);
+                return final_result.ok_or_else(|| "Cancelled by user".to_string());
+            }
+        }
+    }
 
     if !status.success() {
         let stderr_text = if !stderr_output.is_empty() {
@@ -1621,6 +1702,175 @@ fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
     }
 
     Err("Could not find stream-claude.js script".to_string())
+}
+
+/// Helper to get the rewind-files script path
+fn get_rewind_script_path(app: &AppHandle) -> Result<PathBuf, String> {
+    // Try to find the bundled script first
+    let resource_path = app.path().resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+    let script_path = resource_path.join("node-sdk").join("rewind-files.js");
+    if script_path.exists() {
+        return Ok(script_path);
+    }
+
+    // Fallback to development path
+    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("node-sdk")
+        .join("rewind-files.js");
+
+    if dev_path.exists() {
+        return Ok(dev_path);
+    }
+
+    Err("Could not find rewind-files.js script".to_string())
+}
+
+/// Helper to get the Node.js executable path (bundled sidecar or system Node.js)
+fn get_bundled_node_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let is_production = !cfg!(debug_assertions);
+
+    log::info!("[Node.js] Looking for Node.js executable (production: {})", is_production);
+
+    let node_path = if is_production {
+        // Production mode: Try bundled sidecar first
+        let sidecar_name = "node-sidecar";
+
+        let sidecar_path = app.path().resolve(
+            sidecar_name,
+            tauri::path::BaseDirectory::Resource
+        ).ok().or_else(|| {
+            // Strategy 2: Manual path construction
+            if let Ok(exe_path) = std::env::current_exe() {
+                if let Some(macos_dir) = exe_path.parent() {
+                    let manual_path = macos_dir.join(sidecar_name);
+                    if manual_path.exists() {
+                        return Some(manual_path);
+                    }
+                }
+            }
+            None
+        });
+
+        match sidecar_path {
+            Some(path) if path.exists() => {
+                log::info!("[Node.js] ✅ Found bundled Node.js sidecar at: {:?}", path);
+                Some(path)
+            }
+            _ => {
+                log::warn!("[Node.js] ⚠️ Falling back to system Node.js...");
+                find_system_node_executable()
+            }
+        }
+    } else {
+        // Development mode: Use system Node.js directly
+        log::info!("[Node.js] Development mode - using system Node.js");
+        find_system_node_executable()
+    };
+
+    node_path.ok_or_else(|| {
+        "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
+    })
+}
+
+/// Rewind files to a previous state using SDK file checkpointing
+/// This calls the rewind-files.js script to restore files to their state
+/// at a specific user message in the conversation
+#[tauri::command]
+pub async fn rewind_files(
+    app: AppHandle,
+    session_id: String,
+    user_message_id: String,
+    dry_run: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    log::info!("[SDK REWIND] Starting rewind operation");
+    log::info!("[SDK REWIND] Session: {}", session_id);
+    log::info!("[SDK REWIND] Target message: {}", user_message_id);
+    log::info!("[SDK REWIND] Dry run: {:?}", dry_run);
+
+    // Get the rewind script path
+    let script_path = get_rewind_script_path(&app)?;
+    log::info!("[SDK REWIND] Script path: {:?}", script_path);
+
+    // Build config JSON
+    let config = serde_json::json!({
+        "sessionId": session_id,
+        "userMessageId": user_message_id,
+        "dryRun": dry_run.unwrap_or(false),
+    });
+
+    let config_str = serde_json::to_string(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    // Get node path
+    let node_path = get_bundled_node_path(&app)?;
+    log::info!("[SDK REWIND] Node path: {:?}", node_path);
+
+    // Spawn the rewind process
+    let mut child = Command::new(&node_path)
+        .arg(&script_path)
+        .arg(&config_str)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn rewind process: {}", e))?;
+
+    let stdout = child.stdout.take()
+        .ok_or_else(|| "Failed to capture stdout".to_string())?;
+    let stderr = child.stderr.take()
+        .ok_or_else(|| "Failed to capture stderr".to_string())?;
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    let mut stderr_reader = BufReader::new(stderr).lines();
+
+    let mut result: Option<serde_json::Value> = None;
+    let mut error_output = Vec::new();
+
+    // Read stdout (JSON events)
+    while let Ok(Some(line)) = stdout_reader.next_line().await {
+        log::debug!("[SDK REWIND] stdout: {}", line);
+        if let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) {
+            let event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            match event_type {
+                "rewind_completed" => {
+                    log::info!("[SDK REWIND] Rewind completed successfully");
+                    result = Some(serde_json::json!({
+                        "success": true,
+                        "type": "completed",
+                        "sessionId": session_id,
+                        "userMessageId": user_message_id,
+                    }));
+                }
+                "rewind_preview" => {
+                    log::info!("[SDK REWIND] Preview result: {:?}", event);
+                    result = Some(event);
+                }
+                "error" => {
+                    let error_msg = event.get("error").and_then(|e| e.as_str()).unwrap_or("Unknown error");
+                    return Err(format!("Rewind failed: {}", error_msg));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Read any stderr (debug logs)
+    while let Ok(Some(line)) = stderr_reader.next_line().await {
+        log::debug!("[SDK REWIND] stderr: {}", line);
+        error_output.push(line);
+    }
+
+    // Wait for process to complete
+    let status = child.wait().await
+        .map_err(|e| format!("Failed to wait for rewind process: {}", e))?;
+
+    if !status.success() {
+        let error_msg = error_output.join("\n");
+        return Err(format!("Rewind process failed with exit code {:?}: {}", status.code(), error_msg));
+    }
+
+    result.ok_or_else(|| "No result from rewind operation".to_string())
 }
 
 

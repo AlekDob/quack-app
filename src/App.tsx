@@ -102,8 +102,6 @@ import { usePipWindow } from "./hooks/usePipWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
 import {
-  saveTerminalsToStorage,
-  loadTerminalsFromStorage,
   saveTabsByTerminalToStorage,
   loadTabsByTerminalFromStorage,
   saveNativeTerminalsToStorage,
@@ -111,19 +109,13 @@ import {
   STORAGE_KEY,
   TABS_BY_TERMINAL_KEY,
   NATIVE_TERMINALS_STORAGE_KEY,
-  type TerminalMetadata,
 } from "./services/terminalStorage";
 import {
-  saveAgentChatsToStorage,
-  loadAgentChatsFromStorage,
-} from "./services/agentChatStorage";
-import {
-  saveAgentSessionId,
-  saveAgentMessages,
-  loadAllAgentSessions,
-  loadAgentMessages,
-  deleteAgentData,
-} from "./services/agentChatPersistence";
+  loadAgents as loadUnifiedAgents,
+  saveAgents as saveUnifiedAgents,
+  migrateFromLegacy,
+  type UnifiedAgent,
+} from "./services/unifiedAgentStorage";
 import { extractAndSaveMemories, extractManualMemoryFromInput } from "./services/memoryIntegration";
 import { getMemorySettings, addMemory } from "./services/memoryStorage";
 import { generateMemoryId } from "./services/memoryExtractor";
@@ -134,6 +126,7 @@ import { getDuckdroidUrl, getAgentAvatar } from "./utils/agentAvatars";
 import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
+import { cleanupOldSessions } from "./utils/sessionCleanup";
 import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
 // import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
@@ -186,10 +179,15 @@ import "./components/DrawerAnimations.css";
 // Old Background Tasks CSS - no longer needed, Kanban has its own styles
 // import "./components/BackgroundTasks.css";
 
-const INTRO_REPLAY_DURATION_MS = 1000; // Matches SplashScreen duration
-
 // Notification settings
 const NOTIFY_ACTIVE_TERMINAL = true; // Send notifications even for active terminal
+
+// Helper to get working directory for Tauri commands
+// Converts empty strings to undefined so Rust uses std::env::current_dir()
+const getEffectiveWorkingDir = (cwd: string | undefined, fallback: string | undefined): string | undefined => {
+  const dir = cwd ?? fallback;
+  return dir && dir.trim() !== '' ? dir : undefined;
+};
 
 // ============================================
 // Storage Version System
@@ -261,6 +259,47 @@ async function getCachedStore(filename: string) {
     storeCache.set(filename, await Store.load(filename));
   }
   return storeCache.get(filename)!;
+}
+
+// ============================================
+// Terminal <-> UnifiedAgent Conversion Helpers
+// ============================================
+
+/**
+ * Convert TerminalInfo to UnifiedAgent for storage
+ */
+function terminalToUnifiedAgent(terminal: TerminalInfo): UnifiedAgent {
+  // Extract project name from cwd (last segment of path)
+  const projectName = terminal.cwd?.split("/").pop() ?? "Unknown";
+
+  return {
+    id: terminal.id,
+    name: terminal.label,
+    projectPath: terminal.cwd || "",
+    projectName,
+    color: terminal.color || "#6366f1",
+    avatar: terminal.avatar,
+    personality: terminal.personality as AgentPersonality | undefined,
+    createdAt: Date.now(),
+    lastActiveAt: Date.now(),
+  };
+}
+
+/**
+ * Convert UnifiedAgent back to TerminalInfo metadata for restoration
+ * Note: workingOn and branch are runtime state and will be re-detected on startup
+ */
+function unifiedAgentToTerminalMetadata(agent: UnifiedAgent) {
+  return {
+    id: agent.id,
+    label: agent.name,
+    color: agent.color,
+    cwd: agent.projectPath,
+    avatar: agent.avatar,
+    personality: agent.personality,
+    workingOn: undefined, // Runtime state - will be re-detected
+    branch: undefined, // Runtime state - will be re-detected
+  };
 }
 
 function AppContent() {
@@ -568,7 +607,8 @@ function AppContent() {
     return stored === null ? true : stored === 'true';
   });
   const [_booting, setBooting] = useState(true);
-  const [splashCompleted, setSplashCompleted] = useState(false);
+  // Splash is now handled by native HTML splash in index.html only
+  // React SplashScreen is only used for "Watch Intro" replay feature
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [introVersion, setIntroVersion] = useState('');
 
@@ -712,7 +752,6 @@ function AppContent() {
   });
   const recentCommandsRef = useRef<string[]>([]);
   const [introReplayActive, setIntroReplayActive] = useState(false);
-  const introReplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Background state
@@ -2113,7 +2152,7 @@ function AppContent() {
 
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
-      const workingDir = activeTerminal?.cwd ?? explorerPath;
+      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -2170,6 +2209,8 @@ function AppContent() {
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
+            // 🧠 User-selected priority keywords for memory search (3x weight)
+            userKeywords: options?.userKeywords || [],
           },
         }),
         abortPromise,
@@ -2210,7 +2251,7 @@ function AppContent() {
 
       // 🧠 Quack Memory: Auto-extract memories from AI response
       try {
-        const workingDir = activeTerminal?.cwd ?? explorerPath;
+        const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
         const memoriesExtracted = await extractAndSaveMemories(
           response.result,
           response.session_id,
@@ -2255,21 +2296,6 @@ function AppContent() {
           return agent;
         });
       });
-
-      // 🦆 CHAT PERSISTENCE: Save sessionId and messages to storage
-      // Note: Uses messageKey for message retrieval (session-first architecture)
-      try {
-        await saveAgentSessionId(messageKey, response.session_id);
-
-        // Get current messages for this session
-        const currentMessages = chatSessions.get(messageKey) || [];
-        await saveAgentMessages(messageKey, response.session_id, currentMessages);
-
-        console.log(`[sendMessageForAgent] 💾 Saved session and ${currentMessages.length} messages for messageKey=${messageKey}`);
-      } catch (persistErr) {
-        // Non-critical, don't block chat
-        console.warn('[sendMessageForAgent] Failed to persist chat data:', persistErr);
-      }
 
       // Track usage from Claude Agent SDK (with full token details!)
       const agentLabel = activeTerminal?.label || activeAgent?.name || 'AI Assistant';
@@ -2539,36 +2565,62 @@ function AppContent() {
             status: 'complete' as const,
           }));
 
-          // 🦆 FIX: Don't overwrite in-memory messages that have events
+          // 🦆 CRITICAL FIX: Don't overwrite in-memory messages that have events
           // Rust backend fallback loses events, so only use if no better data exists
+          // This protects session integrity in-memory (same principle as store protection below)
           setChatSessions(prev => {
             const newSessions = new Map(prev);
             const existingMessages = prev.get(task.id);
-            
+
             // Check if existing messages have events (richer data)
             const existingHasEvents = existingMessages?.some(m => m.events && m.events.length > 0);
-            
-            // Only load from Rust if we have NO messages or existing don't have events
-            if (!existingMessages || existingMessages.length === 0 || !existingHasEvents) {
+            const newHasEvents = chatMessages.some(m => m.events && m.events.length > 0);
+
+            // Only load from Rust if:
+            // 1. We have NO messages in memory OR
+            // 2. Existing messages don't have events AND new messages do (upgrade) OR
+            // 3. Neither has events (both poor quality, so refresh)
+            if (!existingMessages || existingMessages.length === 0 || (!existingHasEvents && newHasEvents) || (!existingHasEvents && !newHasEvents)) {
               newSessions.set(task.id, chatMessages);
-              console.log(`[loadKanbanChatSessions] Loaded ${chatMessages.length} messages from Rust for task ${task.id}`);
+              console.log(`[loadKanbanChatSessions] Loaded ${chatMessages.length} messages from Rust for task ${task.id} ${newHasEvents ? 'WITH EVENTS' : 'without events'}`);
             } else {
-              console.log(`[loadKanbanChatSessions] Skipping Rust fallback for task ${task.id} - keeping in-memory messages with events`);
-              return prev; // Don't modify
+              console.log(`[loadKanbanChatSessions] 🛡️ PROTECTED: Skipping Rust fallback for task ${task.id} - keeping in-memory messages with events. Session integrity preserved.`);
+              return prev; // Don't modify - session is SACRED
             }
             return newSessions;
           });
 
-          // 🦆 FIX: Also save to store so useKanbanChatStore can read it
-          // This ensures the drawer shows complete messages from store
+          // 🦆 CRITICAL FIX: NEVER save event-less messages - they corrupt session data
+          // Sessions are SACRED - don't overwrite rich messages with poor fallback data
+          // The Rust backend fallback creates messages WITHOUT events field, which causes:
+          // 1. Loss of formatting (no tool_use/tool_result events)
+          // 2. Potential message mixing between sessions
+          // We ONLY save if messages have events OR if there's no existing data in store
           if (store) {
-            await store.set(`chat-${task.id}`, {
-              messages: chatMessages,
-              sessionId: task.sessionId,
-              timestamp: Date.now(),
-            });
-            await store.save();
-            console.log(`[loadKanbanChatSessions] Saved ${chatMessages.length} messages to store for task ${task.id}`);
+            const hasEvents = chatMessages.some(m => m.events && m.events.length > 0);
+            const existingStoreData = await store.get<{
+              messages: ChatMessage[];
+              tokens?: { inputTokens: number; outputTokens: number };
+              sessionId?: string;
+              timestamp?: number;
+            }>(`chat-${task.id}`);
+            const existingHasEvents = existingStoreData?.messages?.some((m: ChatMessage) => m.events && m.events.length > 0);
+
+            // Only save if:
+            // 1. Messages have events (rich data from streaming) OR
+            // 2. No existing data in store (first time) OR
+            // 3. Existing data also lacks events (both are poor quality, so update timestamp)
+            if (hasEvents || !existingStoreData || !existingHasEvents) {
+              await store.set(`chat-${task.id}`, {
+                messages: chatMessages,
+                sessionId: task.sessionId,
+                timestamp: Date.now(),
+              });
+              await store.save();
+              console.log(`[loadKanbanChatSessions] Saved ${chatMessages.length} messages ${hasEvents ? 'WITH EVENTS' : 'without events (no better data exists)'} to store for task ${task.id}`);
+            } else {
+              console.log(`[loadKanbanChatSessions] 🛡️ PROTECTED: Skipping save for task ${task.id} - would overwrite event-rich messages with event-less fallback data. Session integrity preserved.`);
+            }
           }
 
           console.log(`[loadKanbanChatSessions] Restored ${chatMessages.length} messages (raw text) for task ${task.id} from Rust backend`);
@@ -2791,6 +2843,8 @@ function AppContent() {
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
+            // 🧠 User-selected priority keywords for memory search (3x weight)
+            userKeywords: options?.userKeywords || [],
           },
         }),
         abortPromise,
@@ -3130,10 +3184,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // ============================================
 
   // Compact conversation for current agent (custom implementation since SDK /compact is buggy)
+  // 🦆 SESSION-FIRST: Use chatKey (sessionId when available) for message lookup
   const compactCurrentAgentConversation = useCallback(async () => {
-    if (!activeId) return;
+    // Use sessionId if available, fallback to agentId (same logic as ChatView)
+    const chatKey = activeSessionId || activeId;
+    if (!chatKey) return;
 
-    const currentMessages = chatSessions.get(activeId) ?? [];
+    const currentMessages = chatSessions.get(chatKey) ?? [];
     const totalMessages = currentMessages.length;
 
     // Need at least 6 messages to compact (keep last 5, summarize the rest)
@@ -3144,7 +3201,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    console.log('[compactConversation] Starting compaction for agent:', activeId);
+    console.log('[compactConversation] Starting compaction for chatKey:', chatKey);
 
     try {
       // Keep last 5 messages, summarize everything before
@@ -3183,7 +3240,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Set loading state
       setChatLoadingMap((prev) => {
         const newMap = new Map(prev);
-        newMap.set(activeId, true);
+        newMap.set(chatKey, true);
         return newMap;
       });
 
@@ -3226,14 +3283,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Replace old messages with summary + keep recent messages
       setChatSessions((prev) => {
         const newSessions = new Map(prev);
-        newSessions.set(activeId, [summaryMessage, ...messagesToPreserve]);
+        newSessions.set(chatKey, [summaryMessage, ...messagesToPreserve]);
         return newSessions;
       });
 
       console.log(`[compactConversation] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
 
       // Get current tokens and estimate reduction
-      const currentTokens = chatTokensMap.get(activeId);
+      const currentTokens = chatTokensMap.get(chatKey);
       const currentInputTokens = currentTokens?.inputTokens || 0;
       const currentOutputTokens = currentTokens?.outputTokens || 0;
 
@@ -3245,7 +3302,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Update token counts
       setChatTokensMap((prev) => {
         const newMap = new Map(prev);
-        newMap.set(activeId, {
+        newMap.set(chatKey, {
           inputTokens: reducedInputTokens,
           outputTokens: reducedOutputTokens,
           cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
@@ -3268,11 +3325,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Clear loading state
       setChatLoadingMap((prev) => {
         const newMap = new Map(prev);
-        newMap.set(activeId, false);
+        newMap.set(chatKey, false);
         return newMap;
       });
     }
-  }, [activeId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
+  }, [activeId, activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
 
   // Clear conversation for current agent (Claude SDK /clear command)
   const clearCurrentAgentConversation = useCallback(async () => {
@@ -4005,15 +4062,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   );
 
   const showIntroReplay = useCallback(() => {
-    if (introReplayTimeoutRef.current) {
-      clearTimeout(introReplayTimeoutRef.current);
-      introReplayTimeoutRef.current = null;
-    }
-
     setIntroReplayActive(true);
     // SplashScreen will call onComplete after animation
   }, []);
 
+  // 🦆 RACE CONDITION FIX: Split static listeners (don't depend on terminals) from dynamic ones
+  // This prevents the crash where listeners are torn down and recreated on every terminal status change
+  // which causes Tauri's internal "listeners[eventId].handlerId" race condition
   useEffect(() => {
     if (!tauriAvailable) {
       return;
@@ -4056,6 +4111,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       togglePipWindow();
     });
 
+    // 🗣️ GLOBAL AskUserQuestion listener - more reliable than agent-specific listeners
+    // This catches events even when agent-specific listener doesn't exist (e.g., task chats, sessions)
+    const unlistenAskUserQuestionGlobalPromise = listen<{
+      requestId: string;
+      questions: unknown[];
+      agentId: string;
+    }>('ask-user-question', (event) => {
+      console.log(`🗣️ [GLOBAL] AskUserQuestion event received:`, event.payload);
+      const { requestId, questions, agentId } = event.payload;
+
+      // Store the pending question for when user responds
+      setPendingUserQuestions((prev) => {
+        const next = new Map(prev);
+        next.set(requestId, { agentId, questions });
+        return next;
+      });
+
+      // Also add to pending question IDs for UI state
+      setPendingQuestionIdsMap((prev) => {
+        const newMap = new Map(prev);
+        const pending = new Set<string>(newMap.get(agentId) || new Set<string>());
+        pending.add(requestId); // Note: this is requestId, not toolUseId
+        newMap.set(agentId, pending);
+        return newMap;
+      });
+    });
+
     // Listen for Kanban updates from Claude Agent SDK custom tools
     const unlistenKanbanUpdatePromise = listen<{
       eventType: string;
@@ -4076,7 +4158,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log("📋 Kanban update event received:", event.payload);
       const { eventType, payload } = event.payload;
 
-      // Reload tasks from storage to sync with backend changes
+      // Reload sessions from storage to sync with backend changes (sessions-first architecture)
+      await useSessionStore.getState().loadSessions();
+      // Also reload kanban tasks for backwards compatibility
       await loadKanbanTasks();
 
       // Show toast notification based on event type
@@ -4097,20 +4181,57 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     });
 
-    // 🗣️ Listen for AskUserQuestion events from SDK (via canUseTool callback)
-    // These events come from all agents, so we need to track them by requestId
-    // The event pattern is ask-user-question:{agentId}
-    const askUserQuestionListeners: Array<Promise<() => void>> = [];
+    return () => {
+      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenKanbanUpdatePromise.then(unlisten => unlisten()).catch(() => undefined);
+    };
+  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, loadKanbanTasks]);
 
-    // Setup listeners for each active terminal/agent
-    terminals.forEach((terminal) => {
-      const eventName = `ask-user-question:${terminal.id}`;
-      const unlistenPromise = listen<{
+  // 🦆 DYNAMIC LISTENERS: These depend on terminals and need careful cleanup
+  // Use a ref to track terminal IDs to avoid rapid listener churn on status changes
+  const terminalIdsRef = useRef<string[]>([]);
+  const askUserListenersRef = useRef<Map<string, () => void>>(new Map());
+
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    // Only track terminal IDs, not the full terminals array
+    // This prevents re-running on every status change (idle/busy)
+    const currentTerminalIds = terminals.map(t => t.id).sort();
+    const previousTerminalIds = terminalIdsRef.current;
+
+    // Find which terminals were added or removed
+    const addedIds = currentTerminalIds.filter(id => !previousTerminalIds.includes(id));
+    const removedIds = previousTerminalIds.filter(id => !currentTerminalIds.includes(id));
+
+    // Skip if no terminals were added or removed (just status changes)
+    if (addedIds.length === 0 && removedIds.length === 0 && previousTerminalIds.length > 0) {
+      return;
+    }
+
+    terminalIdsRef.current = currentTerminalIds;
+
+    // 🗣️ Setup AskUserQuestion listeners only for NEW terminals
+    addedIds.forEach((terminalId) => {
+      // Skip if listener already exists
+      if (askUserListenersRef.current.has(terminalId)) {
+        return;
+      }
+
+      const eventName = `ask-user-question:${terminalId}`;
+      listen<{
         requestId: string;
         questions: unknown[];
         agentId: string;
       }>(eventName, (event) => {
-        console.log(`🗣️ AskUserQuestion event received for agent ${terminal.id}:`, event.payload);
+        console.log(`🗣️ AskUserQuestion event received for agent ${terminalId}:`, event.payload);
         const { requestId, questions, agentId } = event.payload;
 
         // Store the pending question for when user responds
@@ -4119,26 +4240,67 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           next.set(requestId, { agentId, questions });
           return next;
         });
+      }).then((unlisten) => {
+        askUserListenersRef.current.set(terminalId, unlisten);
+        console.log(`[AskUser] Listener ready for terminal: ${terminalId}`);
+      }).catch((error) => {
+        console.error(`[AskUser] Failed to setup listener for ${terminalId}:`, error);
       });
-      askUserQuestionListeners.push(unlistenPromise);
     });
 
-    // Listen for Telegram /status command
+    // Cleanup listeners for REMOVED terminals
+    removedIds.forEach((terminalId) => {
+      const unlisten = askUserListenersRef.current.get(terminalId);
+      if (unlisten) {
+        try {
+          unlisten();
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+        askUserListenersRef.current.delete(terminalId);
+        console.log(`[AskUser] Listener removed for terminal: ${terminalId}`);
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      askUserListenersRef.current.forEach((unlisten, id) => {
+        try {
+          unlisten();
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+      });
+      askUserListenersRef.current.clear();
+    };
+  }, [tauriAvailable, terminals]);
+
+  // 🦆 TELEGRAM STATUS: Separate effect with ref to avoid closure issues
+  const telegramTerminalsRef = useRef(terminals);
+  telegramTerminalsRef.current = terminals;
+
+  useEffect(() => {
+    if (!tauriAvailable) {
+      return;
+    }
+
+    // Listen for Telegram /status command - uses ref to get current terminals
     const unlistenTelegramStatusPromise = listen<{ unique_id: string; telegram_chat_id: number }>(
       "telegram-command-status",
       async (event) => {
         console.log("🦆 Telegram /status command received:", event.payload);
         const { telegram_chat_id } = event.payload;
+        const currentTerminals = telegramTerminalsRef.current;
 
         try {
           // Get all active agents (terminals)
-          const activeAgents = terminals
+          const activeAgents = currentTerminals
             .filter((t) => t.status === "busy" || t.status === "idle")
             .map((t) => `• ${t.label} - ${t.status === "busy" ? "🟡 Working" : "🟢 Ready"}`)
             .join("\n");
 
           const message = activeAgents.length > 0
-            ? `🦆 *Active Agents* (${terminals.length})\n\n${activeAgents}`
+            ? `🦆 *Active Agents* (${currentTerminals.length})\n\n${activeAgents}`
             : "🦆 No active agents.\n\nCreate a new terminal to get started!";
 
           // Send status message to Telegram
@@ -4155,17 +4317,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     );
 
     return () => {
-      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
-      unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
-      unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
-      unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
-      unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
-      unlistenKanbanUpdatePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenTelegramStatusPromise.then(unlisten => unlisten()).catch(() => undefined);
-      // Cleanup AskUserQuestion listeners
-      askUserQuestionListeners.forEach(p => p.then(unlisten => unlisten()).catch(() => undefined));
     };
-  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, terminals, loadKanbanTasks]);
+  }, [tauriAvailable]);
 
   // Auto-save terminals to storage (debounced to avoid excessive writes)
   useEffect(() => {
@@ -4176,18 +4330,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Debounce storage save - wait 2 seconds after last change before saving
     const saveTimer = setTimeout(() => {
       if (terminals.length > 0) {
-        void saveTerminalsToStorage(terminals);
-      } else {
-        // If no terminals, clean up storage
+        // Convert terminals to unified agents and save
         void (async () => {
           try {
-            const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
-            await store.delete(STORAGE_KEY);
-            await store.save();
-          } catch {
-            // Ignore errors
+            const agents = terminals.map(terminalToUnifiedAgent);
+            await saveUnifiedAgents(agents);
+          } catch (error) {
+            console.error("[App] Failed to save terminals to unified storage:", error);
           }
         })();
+      } else {
+        // If no terminals, save empty array (keep storage clean)
+        void saveUnifiedAgents([]);
       }
     }, 2000); // Wait 2 seconds before saving
 
@@ -4243,22 +4397,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [hasBootstrapped, tauriAvailable, nativeTerminals]);
 
-  // Auto-save AgentChats when they change (Phase 1)
-  useEffect(() => {
-    if (!tauriAvailable) return;
-
-    const saveDebounced = debounce(() => {
-      if (agentChats.length > 0) {
-        void saveAgentChatsToStorage(agentChats);
-      }
-    }, 1000);
-
-    saveDebounced();
-
-    return () => {
-      saveDebounced.cancel();
-    };
-  }, [agentChats, tauriAvailable]);
+  // AgentChats auto-save removed - now using unifiedAgentStorage
 
   // Auto-save active AgentChat when it changes (Phase 1)
   const ensureNotificationPermission =
@@ -4812,23 +4951,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setAgentsError(null);
 
     try {
-      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
+      console.log('[loadAgents] 🦆 Loading agents with workingDir:', workingDir, 'cwd:', activeTerminal?.cwd, 'explorerPath:', explorerPath);
 
-      // Check if agents directory exists
+      // Check if PROJECT agents directory exists (for UI indicator)
+      // Note: Global agents (~/.claude/agents/) are ALWAYS loaded regardless of this check
       const dirExists = await invoke<boolean>("check_agents_directory", {
         workingDir,
       });
+      console.log('[loadAgents] 🦆 Project directory exists:', dirExists);
       setAgentsDirectoryExists(dirExists);
 
-      if (!dirExists) {
-        setAgents([]);
-        setAgentsError(null); // Clear error if directory just doesn't exist
-        return;
-      }
-
+      // ALWAYS call list_agents - it loads both global AND project agents
+      // The dirExists check is only for UI purposes (showing "setup" message)
       const agentsList = await invoke<AgentInfo[]>("list_agents", {
         workingDir,
       });
+      console.log('[loadAgents] 🦆 Loaded agents:', agentsList.length, agentsList.map(a => a.name));
       setAgents(agentsList);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -4994,7 +5133,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setSkillsError(null);
 
     try {
-      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
       // Check if PROJECT skills directory exists (for UI display purposes)
       const dirExists = await invoke<boolean>("check_skills_directory", {
@@ -5062,7 +5201,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setHooksError(null);
 
     try {
-      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
       const hooksList = await invoke<HookConfig[]>("list_hooks", {
         workingDir,
       });
@@ -5081,7 +5220,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       throw new Error('Tauri not available');
     }
 
-    const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+    const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
     await invoke<HookConfig>("save_hook", {
       workingDir,
       hook,
@@ -5094,7 +5233,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       throw new Error('Tauri not available');
     }
 
-    const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+    const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
     await invoke("delete_hook", {
       workingDir,
       hookId,
@@ -5108,7 +5247,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       throw new Error('Tauri not available');
     }
 
-    const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+    const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
     await invoke("toggle_hook", {
       workingDir,
       hookId,
@@ -5172,7 +5311,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
-      const workingDir = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
       await invoke<string>("create_agent", {
         name,
         description,
@@ -5223,13 +5362,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
 
   // Load Quack Agency agents on startup
+  // No longer blocking splash - agents load in background while native splash shows
   useEffect(() => {
-    if (!tauriAvailable || !hasBootstrapped) {
+    if (!tauriAvailable) {
       return;
     }
-    void loadAgents();
+    const loadInitialAgents = async () => {
+      console.log('[Startup] Loading agents...');
+      await loadAgents();
+      console.log('[Startup] Agents loaded');
+      setBooting(false);
+      if (!hasBootstrapped) {
+        setHasBootstrapped(true);
+      }
+    };
+    void loadInitialAgents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tauriAvailable, hasBootstrapped]); // Initial load on startup
+  }, [tauriAvailable]);
 
   // 🦆 FIX: Reload agents when project/working directory changes
   // This ensures @mention dropdown shows correct droids for the current project
@@ -5750,11 +5899,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const colors = await loadProjectColors();
         setProjectColors(colors);
 
-        // Try to load saved terminals
-        const savedMetadata = await loadTerminalsFromStorage();
+        // NOTE: Legacy migration removed - storage is now clean
+        // If you need to re-enable migration, uncomment:
+        // await migrateFromLegacy();
+
+        // Load saved agents from unified storage
+        const savedAgents = await loadUnifiedAgents();
+        const savedMetadata = savedAgents.map(unifiedAgentToTerminalMetadata);
 
         if (savedMetadata.length > 0) {
-          console.log(`Found ${savedMetadata.length} saved terminals`);
+          console.log(`Found ${savedMetadata.length} saved terminals from unified storage`);
 
           // Recreate terminals from saved metadata
           const recreated: TerminalInfo[] = [];
@@ -5849,131 +6003,31 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           // SIMPLE: Just load terminals - no migration needed!
           setTerminals(recreated);
 
-          // Load AgentChats for UI grouping (optional)
-          const existingChats = await loadAgentChatsFromStorage();
-          if (existingChats.length > 0) {
-            setAgentChats(existingChats);
+          // Load sessions from sessionStore (sessions-first architecture)
+          await useSessionStore.getState().loadSessions();
 
-            // 🦆 STAMINA PRESERVATION: Initialize chatTokensMap with saved token counts
-            const initialTokensMap = new Map<string, {
-              inputTokens: number;
-              outputTokens: number;
-              cacheCreationTokens: number;
-              cacheReadTokens: number;
-              totalCost: number;
-            }>();
-            const initialSessionIds = new Map<string, string>();
+          // Auto-cleanup old completed sessions (>30 days)
+          const sessionsBeforeCleanup = useSessionStore.getState().sessions;
+          const { deletedCount, deletedIds } = cleanupOldSessions(sessionsBeforeCleanup, 30);
 
-            existingChats.forEach((agent) => {
-              // Load tokens
-              if (agent.inputTokens !== undefined || agent.outputTokens !== undefined) {
-                initialTokensMap.set(agent.id, {
-                  inputTokens: agent.inputTokens ?? 0,
-                  outputTokens: agent.outputTokens ?? 0,
-                  cacheCreationTokens: agent.cacheCreationTokens ?? 0,
-                  cacheReadTokens: agent.cacheReadTokens ?? 0,
-                  totalCost: agent.totalCost ?? 0, // Restore cost on app restart
-                });
-              }
-
-              // 🦆 SESSION PERSISTENCE: Load session IDs
-              if (agent.sessionId) {
-                initialSessionIds.set(agent.id, agent.sessionId);
-              }
+          if (deletedCount > 0) {
+            console.log(`[Session Cleanup] Deleted ${deletedCount} old sessions (>30 days old, status=done):`, deletedIds);
+            const sessionStore = useSessionStore.getState();
+            for (const id of deletedIds) {
+              await sessionStore.deleteSession(id);
+            }
+            await sessionStore.loadSessions();
+            toast.success(`Cleaned up ${deletedCount} old session(s)`, {
+              description: 'Removed sessions completed more than 30 days ago',
+              duration: 3000,
             });
-
-            if (initialTokensMap.size > 0) {
-              setChatTokensMap(initialTokensMap);
-              console.log(`[Stamina Preservation] Loaded tokens for ${initialTokensMap.size} agents`);
-            }
-
-            if (initialSessionIds.size > 0) {
-              setChatSessionIds(initialSessionIds);
-              console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
-            }
-
-            // 🦆 CHAT PERSISTENCE: Restore messages for all SESSIONS (sessions-first architecture)
-            // Messages are now saved with session.id as key, not agent.id
-            const initialChatSessions = new Map<string, ChatMessage[]>();
-            let totalRestoredMessages = 0;
-
-            // Load sessions from sessionStore FIRST (must be loaded before reading)
-            await useSessionStore.getState().loadSessions();
-            const allSessions = useSessionStore.getState().sessions;
-            console.log(`[Chat Persistence] Loading messages for ${allSessions.length} sessions...`);
-
-            for (const session of allSessions) {
-              try {
-                const storedMessages = await loadAgentMessages(session.id);
-                if (storedMessages && storedMessages.messages.length > 0) {
-                  // Convert stored messages to ChatMessage format
-                  const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
-                    id: `msg-restored-${session.id}-${index}`,
-                    role: msg.role as 'user' | 'assistant' | 'system',
-                    content: msg.content,
-                    timestamp: msg.timestamp,
-                    status: 'complete' as const,
-                  }));
-
-                  initialChatSessions.set(session.id, chatMessages);
-                  totalRestoredMessages += chatMessages.length;
-                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
-                }
-              } catch (err) {
-                console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
-              }
-            }
-
-            if (initialChatSessions.size > 0) {
-              setChatSessions(initialChatSessions);
-              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
-              toast.success(`Restored ${totalRestoredMessages} chat messages`, {
-                description: `${initialChatSessions.size} session conversations restored`,
-                duration: 3000,
-              });
-            }
-          } else {
-            // 🦆 SESSIONS-FIRST: Even without AgentChats, load chat messages for sessions
-            // This ensures chat persistence works in sessions-first architecture
-            await useSessionStore.getState().loadSessions();
-            const allSessions = useSessionStore.getState().sessions;
-            
-            if (allSessions.length > 0) {
-              console.log(`[Chat Persistence] No AgentChats, loading messages for ${allSessions.length} sessions...`);
-              const initialChatSessions = new Map<string, ChatMessage[]>();
-              let totalRestoredMessages = 0;
-
-              for (const session of allSessions) {
-                try {
-                  const storedMessages = await loadAgentMessages(session.id);
-                  if (storedMessages && storedMessages.messages.length > 0) {
-                    const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
-                      id: `msg-restored-${session.id}-${index}`,
-                      role: msg.role as 'user' | 'assistant' | 'system',
-                      content: msg.content,
-                      timestamp: msg.timestamp,
-                      status: 'complete' as const,
-                    }));
-
-                    initialChatSessions.set(session.id, chatMessages);
-                    totalRestoredMessages += chatMessages.length;
-                    console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
-                  }
-                } catch (err) {
-                  console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
-                }
-              }
-
-              if (initialChatSessions.size > 0) {
-                setChatSessions(initialChatSessions);
-                console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
-                toast.success(`Restored ${totalRestoredMessages} chat messages`, {
-                  description: `${initialChatSessions.size} session conversations restored`,
-                  duration: 3000,
-                });
-              }
-            }
           }
+
+          const allSessions = useSessionStore.getState().sessions;
+          console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions`);
+
+          // Note: Chat history is managed by Claude SDK via session resume
+          // No need to load local messages - SDK handles conversation continuity
 
           // Load tabs by terminal from storage
           const savedTabsByTerminal = await loadTabsByTerminalFromStorage();
@@ -5988,131 +6042,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           }
         } else {
           console.log('No saved terminals found - empty state will be shown');
-
-          // Load any existing AgentChats even if no terminals (optional UI grouping)
-          const existingChats = await loadAgentChatsFromStorage();
-          if (existingChats.length > 0) {
-            setAgentChats(existingChats);
-
-            // 🦆 STAMINA PRESERVATION: Initialize chatTokensMap with saved token counts
-            const initialTokensMap = new Map<string, {
-              inputTokens: number;
-              outputTokens: number;
-              cacheCreationTokens: number;
-              cacheReadTokens: number;
-              totalCost: number;
-            }>();
-            const initialSessionIds = new Map<string, string>();
-
-            existingChats.forEach((agent) => {
-              // Load tokens
-              if (agent.inputTokens !== undefined || agent.outputTokens !== undefined) {
-                initialTokensMap.set(agent.id, {
-                  inputTokens: agent.inputTokens ?? 0,
-                  outputTokens: agent.outputTokens ?? 0,
-                  cacheCreationTokens: agent.cacheCreationTokens ?? 0,
-                  cacheReadTokens: agent.cacheReadTokens ?? 0,
-                  totalCost: agent.totalCost ?? 0, // Restore cost on app restart
-                });
-              }
-
-              // 🦆 SESSION PERSISTENCE: Load session IDs
-              if (agent.sessionId) {
-                initialSessionIds.set(agent.id, agent.sessionId);
-              }
-            });
-
-            if (initialTokensMap.size > 0) {
-              setChatTokensMap(initialTokensMap);
-              console.log(`[Stamina Preservation] Loaded tokens for ${initialTokensMap.size} agents`);
-            }
-
-            if (initialSessionIds.size > 0) {
-              setChatSessionIds(initialSessionIds);
-              console.log(`[Session Persistence] Loaded session IDs for ${initialSessionIds.size} agents`);
-            }
-
-            // 🦆 CHAT PERSISTENCE: Restore messages for all SESSIONS (sessions-first architecture)
-            // Messages are now saved with session.id as key, not agent.id
-            const initialChatSessions = new Map<string, ChatMessage[]>();
-            let totalRestoredMessages = 0;
-
-            // Load sessions from sessionStore FIRST (must be loaded before reading)
-            await useSessionStore.getState().loadSessions();
-            const allSessions = useSessionStore.getState().sessions;
-            console.log(`[Chat Persistence] Loading messages for ${allSessions.length} sessions (no terminals branch)...`);
-
-            for (const session of allSessions) {
-              try {
-                const storedMessages = await loadAgentMessages(session.id);
-                if (storedMessages && storedMessages.messages.length > 0) {
-                  // Convert stored messages to ChatMessage format
-                  const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
-                    id: `msg-restored-${session.id}-${index}`,
-                    role: msg.role as 'user' | 'assistant' | 'system',
-                    content: msg.content,
-                    timestamp: msg.timestamp,
-                    status: 'complete' as const,
-                  }));
-
-                  initialChatSessions.set(session.id, chatMessages);
-                  totalRestoredMessages += chatMessages.length;
-                  console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
-                }
-              } catch (err) {
-                console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
-              }
-            }
-
-            if (initialChatSessions.size > 0) {
-              setChatSessions(initialChatSessions);
-              console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
-              toast.success(`Restored ${totalRestoredMessages} chat messages`, {
-                description: `${initialChatSessions.size} session conversations restored`,
-                duration: 3000,
-              });
-            }
-          } else {
-            // 🦆 SESSIONS-FIRST: Even without AgentChats, load chat messages for sessions
-            await useSessionStore.getState().loadSessions();
-            const allSessions = useSessionStore.getState().sessions;
-            
-            if (allSessions.length > 0) {
-              console.log(`[Chat Persistence] No AgentChats (no terminals), loading messages for ${allSessions.length} sessions...`);
-              const initialChatSessions = new Map<string, ChatMessage[]>();
-              let totalRestoredMessages = 0;
-
-              for (const session of allSessions) {
-                try {
-                  const storedMessages = await loadAgentMessages(session.id);
-                  if (storedMessages && storedMessages.messages.length > 0) {
-                    const chatMessages: ChatMessage[] = storedMessages.messages.map((msg, index) => ({
-                      id: `msg-restored-${session.id}-${index}`,
-                      role: msg.role as 'user' | 'assistant' | 'system',
-                      content: msg.content,
-                      timestamp: msg.timestamp,
-                      status: 'complete' as const,
-                    }));
-
-                    initialChatSessions.set(session.id, chatMessages);
-                    totalRestoredMessages += chatMessages.length;
-                    console.log(`[Chat Persistence] Restored ${chatMessages.length} messages for session ${session.id} (${session.title})`);
-                  }
-                } catch (err) {
-                  console.warn(`[Chat Persistence] Failed to restore messages for session ${session.id}:`, err);
-                }
-              }
-
-              if (initialChatSessions.size > 0) {
-                setChatSessions(initialChatSessions);
-                console.log(`[Chat Persistence] ✅ Restored ${totalRestoredMessages} messages across ${initialChatSessions.size} sessions`);
-                toast.success(`Restored ${totalRestoredMessages} chat messages`, {
-                  description: `${initialChatSessions.size} session conversations restored`,
-                  duration: 3000,
-                });
-              }
-            }
-          }
+          // Sessions-first: just load sessions, SDK manages chat history
+          await useSessionStore.getState().loadSessions();
+          const allSessions = useSessionStore.getState().sessions;
+          console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions (no terminals)`);
         }
       } catch (error) {
         console.error("Error during initialization", error);
@@ -6149,12 +6082,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable]);
 
+  // Cleanup intro audio on unmount
   useEffect(() => {
     return () => {
-      if (introReplayTimeoutRef.current) {
-        clearTimeout(introReplayTimeoutRef.current);
-        introReplayTimeoutRef.current = null;
-      }
       if (introAudioRef.current) {
         introAudioRef.current.pause();
         introAudioRef.current.currentTime = 0;
@@ -6163,29 +6093,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, []);
 
-  // Intro audio disabled - can be re-enabled later when you decide what to use
-  // useEffect(() => {
-  //   if (!splashCompleted && tauriAvailable) {
-  //     const audio = new Audio(introAudio);
-  //     audio.volume = 0.5;
-  //     audio.play().catch((error) => {
-  //       console.warn("Unable to play intro audio:", error);
-  //     });
-
-  //     return () => {
-  //       audio.pause();
-  //       audio.currentTime = 0;
-  //     };
-  //   }
-  // }, [splashCompleted, tauriAvailable, introAudio]);
-
-  // Clean background during video splash to avoid flash
-  useEffect(() => {
-    if (!splashCompleted) {
-      // Remove background image during splash for clean black screen
-      document.body.style.backgroundImage = 'none';
-    }
-  }, [splashCompleted]);
 
   // Global keyboard shortcut: Cmd+J to open AI Assistant
   useEffect(() => {
@@ -6364,10 +6271,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[App] Session clicked:', sessionId);
 
     // Find the session in sessionStore
-    const session = useSessionStore.getState().sessions.find(s => s.id === sessionId);
+    const sessionStore = useSessionStore.getState();
+    const session = sessionStore.sessions.find(s => s.id === sessionId);
     if (!session) {
       console.warn('[App] Session not found:', sessionId);
       return;
+    }
+
+    // Pre-populate ChatInput with initial prompt and attachments (only if not consumed yet)
+    if (!session.initialPromptConsumed) {
+      // Pre-populate input draft with initial prompt
+      if (session.initialPrompt) {
+        console.log('[App] Pre-populating input with initial prompt:', session.initialPrompt.substring(0, 50) + '...');
+        setTaskInputDrafts(prev => {
+          const newMap = new Map(prev);
+          newMap.set(sessionId, session.initialPrompt!);
+          return newMap;
+        });
+      }
+
+      // Pre-populate attachments in chatStore
+      if (session.initialAttachments?.length) {
+        console.log('[App] Pre-populating attachments:', session.initialAttachments.length);
+        useChatStore.getState().setAttachments(sessionId, session.initialAttachments);
+      }
+
+      // Mark initial prompt as consumed to avoid re-population on re-open
+      sessionStore.updateSession(sessionId, { initialPromptConsumed: true });
     }
 
     // Close Kanban view if open - show the chat instead
@@ -6386,16 +6316,26 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     selectSession(sessionId);
 
     // If session has an associated agent, select that agent
+    // 🦆 FIX: Always set activeId to session.agentId, even if agent is not in terminals
+    // This prevents the bug where activeId stays on the previous agent, causing
+    // messages to be sent with the wrong agentId
     if (session.agentId) {
       const agentTerminal = terminals.find(t => t.id === session.agentId);
       if (agentTerminal) {
         console.log('[App] Selecting agent for session:', agentTerminal.label);
-        setActiveId(session.agentId);
       } else {
-        console.warn('[App] Agent not found for session:', session.agentId);
+        console.warn('[App] Agent not found in terminals for session:', session.agentId);
       }
+      // Always set activeId to the session's agent, even if terminal not found
+      setActiveId(session.agentId);
     }
-  }, [selectSession, terminals]);
+
+    // 🦆 FIX: Sync File Explorer with session's project path
+    if (session.projectPath) {
+      console.log('[App] Syncing File Explorer to session projectPath:', session.projectPath);
+      void loadDirectory(session.projectPath);
+    }
+  }, [selectSession, terminals, loadDirectory]);
 
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
     // Update terminal workingOn field
@@ -7220,10 +7160,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Tasks are now independent - this just ensures proper tab focus
       setActiveTaskId(null);
 
-      // 🦆 SESSIONS-FIRST: Clear activeSessionId when selecting agent
-      // User must explicitly click a session to see its chat
-      // Agent click shows the agent info/empty state, not a chat
-      setActiveSessionId(null);
+      // 🦆 FIX: Don't reset activeSessionId! Instead, auto-select the agent's most recent session
+      // This preserves chat continuity when switching between agents
+      const agentSessionsList = agentSessions.filter(s => s.agentId === id);
+      if (agentSessionsList.length > 0) {
+        // Sort by updatedAt (most recent first) and select the first one
+        const sortedSessions = [...agentSessionsList].sort((a, b) => b.updatedAt - a.updatedAt);
+        const mostRecentSession = sortedSessions[0];
+        setActiveSessionId(mostRecentSession.id);
+        console.log(`[handleSelectTerminal] Auto-selected most recent session: ${mostRecentSession.id} for agent ${id}`);
+      } else {
+        // 🦆 FIX: Clear activeSessionId when agent has no sessions
+        // This ensures SessionEmptyState is shown, not chat from a different agent/project
+        setActiveSessionId(null);
+        console.log(`[handleSelectTerminal] No sessions for agent ${id}, cleared activeSessionId to show SessionEmptyState`);
+      }
 
       // Always open the chat tab when selecting a terminal from sidebar
       // This ensures consistent behavior - first tab is always the agent chat
@@ -7277,6 +7228,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     },
     [
+      agentSessions,
       clearIdleTimer,
       clearTerminalAttention,
       loadDirectory,
@@ -9298,6 +9250,65 @@ You have access to all Bash tools to execute git commands like:
     }
   }, []);
 
+  // ⏪ File Checkpointing: Rewind files to before a specific message (SDK 0.2.7+)
+  const handleRewindFiles = useCallback(async (userMessageId: string) => {
+    // Get the current session ID (Claude Code session, not internal session)
+    const isTaskChat = activeTaskId && activeTabId === 'agent-chat';
+    let sessionId: string | undefined;
+
+    if (isTaskChat) {
+      const activeTaskSession = agentSessions.find(s => s.id === activeTaskId);
+      sessionId = activeTaskSession?.claudeSessionId;
+    } else {
+      const session = agentSessions.find(s => s.id === activeSessionId);
+      sessionId = session?.claudeSessionId;
+    }
+
+    if (!sessionId) {
+      toast.error('No active session found');
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmed = await confirm(
+      'This will revert all file changes made after this message. This action cannot be undone.',
+      {
+        title: 'Rewind Files',
+        kind: 'warning',
+        okLabel: 'Rewind',
+        cancelLabel: 'Cancel',
+      }
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      toast.loading('Rewinding files...', { id: 'rewind-files' });
+      const { rewindFiles } = await import('./services/claudeSDK');
+      const result = await rewindFiles(sessionId, userMessageId);
+
+      if (result.success) {
+        toast.success('Files rewound successfully', {
+          id: 'rewind-files',
+          description: 'File changes have been reverted',
+        });
+      } else {
+        toast.error('Failed to rewind files', {
+          id: 'rewind-files',
+          description: result.error || 'Unknown error',
+        });
+      }
+    } catch (error) {
+      console.error('[handleRewindFiles] Failed:', error);
+      toast.error('Failed to rewind files', {
+        id: 'rewind-files',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }, [activeTaskId, activeTabId, agentSessions, activeSessionId]);
+
   const handleResumeSession = useCallback(async (sessionId: string) => {
     if (!tauriAvailable || creatingTerminal) {
       return;
@@ -9560,34 +9571,21 @@ You have access to all Bash tools to execute git commands like:
     tauriAvailable,
   ]);
 
-  // Hide native HTML splash when React is ready, show React splash
-  // Native splash in index.html shows instantly, React splash takes over
+  // Hide native HTML splash immediately when React mounts
+  // React SplashScreen will take over the animation
   useEffect(() => {
     const nativeSplash = document.getElementById('native-splash');
-    if (nativeSplash && !splashCompleted) {
-      // Keep native splash visible while React splash is showing
-    } else if (nativeSplash && splashCompleted) {
-      // Fade out and remove native splash
+    if (nativeSplash) {
+      // Immediately fade out and remove native splash when React is ready
+      // This allows React SplashScreen to be visible (it was hidden behind native's z-index: 99999)
       nativeSplash.classList.add('fade-out');
       setTimeout(() => nativeSplash.remove(), 300);
     }
-  }, [splashCompleted]);
+  }, []); // Run only once on mount
 
-  // Show React splash screen (takes over from native HTML splash)
-  if (!splashCompleted) {
-    return (
-      <SplashScreen
-        version={introVersion}
-        onComplete={() => {
-          setSplashCompleted(true);
-          setBooting(false);
-          if (!hasBootstrapped) {
-            setHasBootstrapped(true);
-          }
-        }}
-      />
-    );
-  }
+  // REMOVED: React SplashScreen at startup
+  // Native splash in index.html now handles the intro animation
+  // SplashScreen component is only used for "Watch Intro" replay feature
 
   if (!tauriAvailable) {
     return (
@@ -9688,13 +9686,8 @@ You have access to all Bash tools to execute git commands like:
               setActiveAgentChatId(null);
             }
 
-            // 🦆 CHAT PERSISTENCE: Delete stored data for this agent
-            try {
-              await deleteAgentData(chatId);
-              console.log(`[onDeleteAgentChat] 💾 Deleted persisted data for agent: ${chatId}`);
-            } catch (err) {
-              console.warn(`[onDeleteAgentChat] Failed to delete persisted data:`, err);
-            }
+            // Note: SDK session cleanup happens automatically
+            console.log(`[onDeleteAgentChat] Removed agent chat: ${chatId}`);
           }}
           onUpdateAgentChat={(chatId, updates) => {
             setAgentChats(prev => prev.map(chat =>
@@ -9730,7 +9723,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           onOpenDashboard={handleOpenProjectDashboard}
-          onCreateTask={handleCreateTaskFromAgent}
+          // onCreateTask={handleCreateTaskFromAgent} // Temporarily hidden
           // Session props
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
@@ -10068,14 +10061,14 @@ You have access to all Bash tools to execute git commands like:
                   return (
                     <SessionEmptyState
                       agent={activeTerminal}
-                      onSessionClick={(sessionId) => setActiveSessionId(sessionId)}
+                      onSessionClick={handleSessionClick}
                     />
                   );
                 }
 
                 return (
                   <ChatView
-                    key={isTaskChat ? `task-${activeTaskId}` : (activeId ?? 'no-agent')}
+                    key={isTaskChat ? `task-${activeTaskId}` : `${activeId ?? 'no-agent'}-${activeSessionId ?? 'no-session'}`}
                     messages={isTaskChat ? taskMessages : currentAgentMessages}
                     isLoading={isTaskChat ? taskLoading : currentAgentLoading}
                     onSendMessage={isTaskChat
@@ -10180,7 +10173,6 @@ You have access to all Bash tools to execute git commands like:
                       }
                     }}
                     onOpenKanban={handleOpenKanbanTab}
-                    hideKanbanTasksBar={false}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
@@ -10194,6 +10186,8 @@ You have access to all Bash tools to execute git commands like:
                     // Fullscreen mode
                     isFullscreen={isChatFullscreen}
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
+                    // File Checkpointing (SDK 0.2.7+)
+                    onRewindFiles={handleRewindFiles}
                   />
                 );
               })()}
@@ -10306,7 +10300,6 @@ You have access to all Bash tools to execute git commands like:
                     } : undefined}
                     // Open Kanban view callback
                     onOpenKanban={handleOpenKanbanTab}
-                    hideKanbanTasksBar={true}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
@@ -10317,6 +10310,8 @@ You have access to all Bash tools to execute git commands like:
                     // Fullscreen mode
                     isFullscreen={isChatFullscreen}
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
+                    // File Checkpointing (SDK 0.2.7+)
+                    onRewindFiles={handleRewindFiles}
                   />
                 );
               })()}

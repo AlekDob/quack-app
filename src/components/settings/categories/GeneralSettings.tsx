@@ -4,6 +4,7 @@ import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import StorageMetrics from '../../StorageMetrics';
 
 export default function GeneralSettings() {
   const [performanceMonitor, setPerformanceMonitor] = useState(false);
@@ -170,6 +171,14 @@ export default function GeneralSettings() {
           description="Automatically save terminal sessions and restore them on restart"
           control={<IOSSwitch checked={true} onChange={() => {}} disabled />}
         />
+      </div>
+
+      <SectionHeader
+        title="Storage"
+        description="Manage session storage and cleanup"
+      />
+      <div className="settings-group">
+        <StorageMetrics />
       </div>
     </div>
   );

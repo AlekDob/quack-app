@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import FileStatusBadge, { type FileStatus } from './FileStatusBadge';
 import FileDiffButton from './FileDiffButton';
 import { useIDEStore, selectHasPreferredIDE } from '../stores/ideStore';
-import { openInEditor, getSettings } from '../services/obsidianSyncService';
-import type { BrainSettings } from '../types/brainSync';
 import './EditSummaryBar.css';
 
 export interface LineChange {
@@ -35,21 +33,11 @@ interface EditSummaryBarProps {
 export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDiffClick, onClear, onClearEdits }: EditSummaryBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOpeningAll, setIsOpeningAll] = useState(false);
-  const [markdownEditor, setMarkdownEditor] = useState<BrainSettings['markdownEditor']>('obsidian');
 
   // IDE Integration
   const hasPreferredIDE = useIDEStore(selectHasPreferredIDE);
   const openFileInIDE = useIDEStore((state) => state.openFileInIDE);
   const openMultipleFilesInIDE = useIDEStore((state) => state.openMultipleFilesInIDE);
-
-  // Load markdown editor preference
-  useEffect(() => {
-    getSettings().then((settings) => {
-      setMarkdownEditor(settings.markdownEditor);
-    }).catch((err) => {
-      console.error('[EditSummaryBar] Failed to load markdown editor setting:', err);
-    });
-  }, []);
 
   // Support both onClear and deprecated onClearEdits
   const handleClear = onClear || onClearEdits;
@@ -75,25 +63,6 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
   const hasModifiedFiles = modifiedFiles.length > 0;
   const hasDeletes = deletes.length > 0;
   const hasCodeFiles = hasNewFiles || hasModifiedFiles;
-
-  // Get editor display name
-  const getEditorName = () => {
-    switch (markdownEditor) {
-      case 'obsidian': return 'Obsidian';
-      case 'vscode': return 'VS Code';
-      case 'cursor': return 'Cursor';
-      default: return 'Editor';
-    }
-  };
-
-  // Handle opening markdown file in configured editor
-  const handleOpenMarkdown = async (filePath: string) => {
-    try {
-      await openInEditor(filePath, markdownEditor);
-    } catch (error) {
-      console.error('[EditSummaryBar] Failed to open markdown in editor:', error);
-    }
-  };
 
   const handleFileClick = async (filePath: string, lineChanges?: LineChange[]) => {
     console.log('[EditSummaryBar] handleFileClick called with:', { filePath, lineChanges, hasPreferredIDE });
@@ -337,14 +306,14 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                             onDiffClick={(path) => handleDiffClick(path, isNew ? 'created' : 'modified')}
                           />
                           <button
-                            className="edit-summary-bar-open-btn edit-summary-bar-open-btn-markdown"
+                            className={`edit-summary-bar-open-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleOpenMarkdown(edit.filePath);
+                              handleFileClick(edit.filePath, edit.lineChanges);
                             }}
-                            title={`Open in ${getEditorName()}`}
+                            title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
                           >
-                            {getEditorName()}
+                            {hasPreferredIDE ? 'IDE' : 'Open'}
                           </button>
                         </div>
                       </div>

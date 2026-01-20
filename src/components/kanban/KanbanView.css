@@ -1349,6 +1349,27 @@
   color: #ef4444;
 }
 
+/* ===== Readonly State (Task Started) ===== */
+.kanban-prompt-wrapper.readonly {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.kanban-prompt-wrapper textarea.readonly {
+  background: rgba(255, 255, 255, 0.02);
+  cursor: not-allowed;
+  color: var(--kanban-text-muted);
+}
+
+.kanban-attachments.readonly {
+  opacity: 0.7;
+}
+
+.kanban-form-hint-warning {
+  color: var(--kanban-warning, #f59e0b) !important;
+  font-style: italic;
+}
+
 /* ===== Status Badge Styles ===== */
 .kanban-status-badge {
   font-size: 0.75rem;

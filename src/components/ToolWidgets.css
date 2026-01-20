@@ -611,3 +611,83 @@
   background: rgba(239, 68, 68, 0.8);
   border-radius: 50%;
 }
+
+
+/* EnterPlanMode Widget - Purple header with white text */
+.enter-plan-mode-widget {
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 8px 0;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.enter-plan-mode-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  /* Inverted: Purple/violet background with white text */
+  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  transition: background 0.2s ease;
+}
+
+.enter-plan-mode-header:hover {
+  background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%);
+}
+
+.enter-plan-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+.enter-plan-mode-icon {
+  color: white;
+  flex-shrink: 0;
+}
+
+.enter-plan-mode-title span {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+}
+
+.enter-plan-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 4px;
+}
+
+.enter-plan-mode-chevron {
+  color: white;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.enter-plan-mode-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.enter-plan-mode-content {
+  padding: 12px 14px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  line-height: 1.5;
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.enter-plan-mode-content p {
+  margin: 0;
+}

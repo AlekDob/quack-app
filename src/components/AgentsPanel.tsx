@@ -115,11 +115,9 @@ export default function AgentsPanel({
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Search */}
-      {agents.length > 0 && (
-        <div className="px-4 pb-3">
+        {/* Search - inside header, above separator */}
+        {agents.length > 0 && (
           <div className="relative">
             <input
               type="text"
@@ -142,8 +140,8 @@ export default function AgentsPanel({
               />
             </svg>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">

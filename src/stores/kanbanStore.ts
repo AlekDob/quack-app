@@ -179,7 +179,7 @@ export const useKanbanStore = create<KanbanState>()(
         // 🦆 SESSIONS-FIRST: Add a new task = create a new session
         addTask: async (taskData) => {
           const sessionStore = useSessionStore.getState();
-          
+
           // Create session from task data
           const newSession: Omit<AgentSession, 'id'> = {
             claudeSessionId: taskData.sessionId,
@@ -196,6 +196,9 @@ export const useKanbanStore = create<KanbanState>()(
             cacheCreationTokens: taskData.cacheCreationTokens,
             cacheReadTokens: taskData.cacheReadTokens,
             totalCost: taskData.totalCost,
+            // Initial prompt and attachments from Kanban task creation
+            initialPrompt: taskData.prompt || undefined,
+            initialAttachments: taskData.attachments?.length ? taskData.attachments : undefined,
           };
 
           const createdSession = await sessionStore.createSession(newSession);

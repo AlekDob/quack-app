@@ -4,7 +4,6 @@ import './AgentPersonalityCard.css';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import PowerBadge from './PowerBadge';
 import { useBundleOperations } from '../hooks/useBundleOperations';
 
 interface AgentPersonalityCardProps {
@@ -202,15 +201,6 @@ export default function AgentPersonalityCard({
           )}
         </div>
       </div>
-
-      {/* Power Rating Badge */}
-      <PowerBadge
-        skillCount={personality.skills?.length || 0}
-        droidCount={0} // TODO: Get from Protocol Droids count when available
-        ruleCount={personality.selectedRules?.length || 0}
-        commandCount={0} // TODO: Get from slash commands count when available
-        compact={true}
-      />
 
       {/* Bundle Export/Import Actions */}
       <div className="personality-section bundle-actions">

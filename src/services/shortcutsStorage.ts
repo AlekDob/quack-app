@@ -137,6 +137,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = {
     defaultKeys: "Meta+Shift+L",
     currentKeys: "Meta+Shift+L",
   },
+  addMemoryKeyword: {
+    id: "addMemoryKeyword",
+    label: "Add Memory Keyword",
+    description: "Mark selected text as priority keyword for memory search",
+    defaultKeys: "Meta+Shift+K",
+    currentKeys: "Meta+Shift+K",
+  },
 };
 
 /**

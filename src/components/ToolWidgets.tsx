@@ -710,3 +710,49 @@ export const ExitPlanModeWidget: React.FC<{
 }> = ({ plan, defaultExpanded = true, workingDirectory }) => {
   return <PlanWidget plan={plan} defaultExpanded={defaultExpanded} workingDirectory={workingDirectory} />;
 };
+
+// EnterPlanMode widget - shows when AI enters planning mode
+// Purple header with white text (inverted style)
+export const EnterPlanModeWidget: React.FC<{
+  objective?: string;
+  defaultExpanded?: boolean;
+}> = ({ objective, defaultExpanded = false }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  return (
+    <div className="tool-widget enter-plan-mode-widget">
+      <div
+        className="enter-plan-mode-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="enter-plan-mode-title">
+          <svg
+            className="enter-plan-mode-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+          >
+            <path d="M5.75 0a.75.75 0 01.75.75V2h3V.75a.75.75 0 011.5 0V2H12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2h1V.75A.75.75 0 015.75 0zM4 3.5a.5.5 0 00-.5.5v10a.5.5 0 00.5.5h8a.5.5 0 00.5-.5V4a.5.5 0 00-.5-.5H4zm1.25 3a.75.75 0 01.75-.75h4a.75.75 0 010 1.5h-4a.75.75 0 01-.75-.75zm.75 2.25a.75.75 0 000 1.5h4a.75.75 0 000-1.5h-4zm0 3a.75.75 0 000 1.5h2a.75.75 0 000-1.5h-2z"/>
+          </svg>
+          <span>Objective</span>
+          <span className="enter-plan-mode-badge">PLAN MODE</span>
+        </div>
+        <svg
+          className={`enter-plan-mode-chevron ${isExpanded ? 'expanded' : ''}`}
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+        >
+          <path d="M12.78 6.22a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 7.28a.75.75 0 011.06-1.06L8 9.94l3.72-3.72a.75.75 0 011.06 0z"/>
+        </svg>
+      </div>
+      {isExpanded && objective && (
+        <div className="enter-plan-mode-content">
+          <p>{objective}</p>
+        </div>
+      )}
+    </div>
+  );
+};

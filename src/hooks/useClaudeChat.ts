@@ -88,6 +88,8 @@ export interface ChatSendOptions {
   onTokenWarning?: (status: TokenBudgetStatus) => void; // Called when token usage is high
   onTokenBlocked?: (reason: string) => void; // Called when message is blocked due to token limit
   bypassTokenCheck?: boolean; // Skip token check (use with caution)
+  // User-selected priority keywords for memory search (3x weight)
+  userKeywords?: string[];
 }
 
 export interface UseClaudeChatOptions {

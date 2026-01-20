@@ -694,24 +694,76 @@ function FileExplorer({
 
   return (
     <aside className="file-explorer">
-      <div className="explorer-header">
-        <div className="explorer-header-top">
-          <h2 className="explorer-title">File Explorer</h2>
-          {activePath && <RevealInFinderButton path={activePath} iconOnly />}
+      {/* Header - matching other panels pattern */}
+      <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wide">File Explorer</h3>
+          <div className="flex items-center gap-1">
+            {/* Refresh button */}
+            <button
+              type="button"
+              onClick={() => activePath && onLoadChildren?.(activePath)}
+              disabled={loading}
+              className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            {/* Reveal in Finder button - larger */}
+            {activePath && (
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const { invoke } = await import('@tauri-apps/api/core');
+                    await invoke('reveal_in_finder', { path: activePath });
+                  } catch (err) {
+                    console.error('Failed to reveal in Finder:', err);
+                  }
+                }}
+                className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                title="Reveal in Finder"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
         <span className="explorer-path">{activePath}</span>
         {error && <span className="explorer-error">{error}</span>}
-        <input
-          className="explorer-search"
-          type="text"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search files or folders"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-        />
+
+        {/* Search - with icon, matching other panels */}
+        <div className="relative mt-2">
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search files or folders"
+            className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+          <svg
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </div>
       </div>
 
       <div className={`explorer-content ${loading || isSearching ? "loading" : ""}`}>

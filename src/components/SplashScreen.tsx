@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import './SplashScreen.css';
 
 interface SplashScreenProps {
@@ -6,15 +6,27 @@ interface SplashScreenProps {
   version?: string;
 }
 
+const SPLASH_DURATION = 3000; // Total animation time (3 seconds - down from 5)
+
 /**
- * Minimal splash screen - animated "Quack" text with glow
- * Duration: 1 second
+ * Splash screen for "Watch Intro" replay feature
+ * Shows animated logo and "Quack" text with glow effect
  */
 export default function SplashScreen({ onComplete, version }: SplashScreenProps) {
+  const hasCompletedRef = useRef(false);
+
+  // Auto-complete after animation duration
   useEffect(() => {
-    const timer = setTimeout(onComplete, 1000);
+    const timer = setTimeout(() => {
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        onComplete();
+      }
+    }, SPLASH_DURATION);
     return () => clearTimeout(timer);
   }, [onComplete]);
+
+  const logoUrl = new URL('../../images/quackapp.png', import.meta.url).href;
 
   return (
     <div className="splash-screen">
@@ -23,6 +35,13 @@ export default function SplashScreen({ onComplete, version }: SplashScreenProps)
 
       {/* Main content */}
       <div className="splash-content">
+        {/* Logo */}
+        <img
+          src={logoUrl}
+          alt="Quack Logo"
+          className="splash-logo"
+        />
+
         <h1 className="splash-title">
           <span className="letter" style={{ animationDelay: '0s' }}>Q</span>
           <span className="letter" style={{ animationDelay: '0.05s' }}>u</span>

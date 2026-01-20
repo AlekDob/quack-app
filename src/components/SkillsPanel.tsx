@@ -64,11 +64,9 @@ export default function SkillsPanel({
             </svg>
           </button>
         </div>
-      </div>
 
-      {/* Search */}
-      {skills.length > 0 && (
-        <div className="px-4 pb-3">
+        {/* Search - inside header, above separator */}
+        {skills.length > 0 && (
           <div className="relative">
             <input
               type="text"
@@ -91,8 +89,8 @@ export default function SkillsPanel({
               />
             </svg>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">

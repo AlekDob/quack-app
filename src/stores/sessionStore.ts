@@ -11,7 +11,21 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { AgentSession, AgentSessionStatus } from '../types';
-import { loadAgentSessions, saveAgentSessions } from '../services/sessionStorage';
+import { loadAgentSessions, saveAgentSessions } from '../services/unifiedAgentStorage';
+
+/**
+ * Maximum messages allowed per session before archiving is recommended
+ */
+const MAX_MESSAGES_PER_SESSION = 1000;
+
+/**
+ * Check if a session should be archived due to size
+ * @param session The session to check
+ * @returns true if session has exceeded the message limit
+ */
+export function shouldArchiveSession(session: AgentSession): boolean {
+  return session.messageCount > MAX_MESSAGES_PER_SESSION;
+}
 
 /**
  * Write lock to prevent race conditions between local writes and file watcher reloads.
@@ -60,6 +74,7 @@ interface SessionState {
   getSessionsForAgent: (agentId: string) => AgentSession[];
   getSessionsByStatus: (status: AgentSessionStatus) => AgentSession[];
   getSelectedSession: () => AgentSession | null;
+  getLargeSessions: () => AgentSession[];
 }
 
 /**
@@ -122,11 +137,21 @@ export const useSessionStore = create<SessionState>()(
 
         // Update an existing session
         updateSession: async (id, updates) => {
-          const sessions = get().sessions.map((session) =>
-            session.id === id
-              ? { ...session, ...updates, updatedAt: Date.now() }
-              : session
-          );
+          const sessions = get().sessions.map((session) => {
+            if (session.id === id) {
+              const updatedSession = { ...session, ...updates, updatedAt: Date.now() };
+
+              // Check if session has exceeded message limit (soft warning)
+              if (shouldArchiveSession(updatedSession)) {
+                console.warn(
+                  `[sessionStore] Session ${id} has exceeded message limit (${updatedSession.messageCount}/${MAX_MESSAGES_PER_SESSION})`
+                );
+              }
+
+              return updatedSession;
+            }
+            return session;
+          });
           set({ sessions });
 
           // Persist to storage and mark write to prevent race condition
@@ -203,6 +228,11 @@ export const useSessionStore = create<SessionState>()(
           const { sessions, selectedSessionId } = get();
           if (!selectedSessionId) return null;
           return sessions.find((s) => s.id === selectedSessionId) ?? null;
+        },
+
+        // Selector: Get sessions that have exceeded the message limit
+        getLargeSessions: () => {
+          return get().sessions.filter(shouldArchiveSession);
         },
       }),
       {

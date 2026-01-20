@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Directory Chooser - Cyberpunk Design</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0c1121 0%, #1a1f3a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .demo-container {
+      max-width: 600px;
+      width: 100%;
+      background: rgba(18, 26, 46, 0.6);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    p {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .directory-chooser {
+      /* Base Structure */
+      position: relative;
+      width: 100%;
+      padding: 1.5rem 1.8rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+
+      /* Cyberpunk Glassmorphism */
+      background:
+        linear-gradient(135deg,
+          rgba(255, 107, 53, 0.15) 0%,
+          rgba(247, 147, 30, 0.12) 50%,
+          rgba(0, 217, 255, 0.08) 100%
+        );
+      backdrop-filter: blur(16px) saturate(180%);
+      border: 2px solid transparent;
+      border-radius: 16px;
+
+      /* Neon Glow Effect */
+      box-shadow:
+        0 0 30px rgba(255, 107, 53, 0.4),
+        0 0 60px rgba(247, 147, 30, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+
+      /* Text & Layout */
+      color: #ffffff;
+      text-shadow: 0 0 20px rgba(255, 107, 53, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+
+      cursor: pointer;
+      overflow: hidden;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      /* Pulse Animation */
+      animation: directory-chooser-pulse 2.5s ease-in-out infinite;
+    }
+
+    /* Animated Gradient Border */
+    .directory-chooser::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 16px;
+      padding: 2px;
+      background: linear-gradient(
+        135deg,
+        #FF6B35 0%,
+        #F7931E 25%,
+        #00D9FF 50%,
+        #FF6B35 75%,
+        #F7931E 100%
+      );
+      background-size: 200% 200%;
+      -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0.8;
+      animation: directory-chooser-border-rotate 3s linear infinite;
+    }
+
+    /* Scan Line Effect */
+    .directory-chooser::after {
+      content: '';
+      position: absolute;
+      top: -100%;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 50%,
+        transparent 100%
+      );
+      animation: directory-chooser-scan 2s ease-in-out infinite;
+    }
+
+    /* Icon Glow */
+    .directory-chooser svg {
+      filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.8));
+      transition: all 0.3s ease;
+      animation: directory-chooser-icon-float 3s ease-in-out infinite;
+      position: relative;
+      z-index: 1;
+    }
+
+    .directory-chooser span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Hover State - EXPLOSIVE */
+    .directory-chooser:hover {
+      transform: translateY(-4px) scale(1.02);
+      background:
+        linear-gradient(135deg,
+          rgba(255, 107, 53, 0.25) 0%,
+          rgba(247, 147, 30, 0.22) 50%,
+          rgba(0, 217, 255, 0.15) 100%
+        );
+      box-shadow:
+        0 0 50px rgba(255, 107, 53, 0.7),
+        0 0 100px rgba(247, 147, 30, 0.4),
+        0 8px 32px rgba(255, 107, 53, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      text-shadow:
+        0 0 30px rgba(255, 107, 53, 1),
+        0 0 10px rgba(255, 255, 255, 0.8);
+    }
+
+    .directory-chooser:hover::before {
+      opacity: 1;
+      animation-duration: 1.5s;
+    }
+
+    .directory-chooser:hover svg {
+      transform: scale(1.15) rotate(5deg);
+      filter: drop-shadow(0 0 15px rgba(255, 107, 53, 1));
+    }
+
+    /* Active State */
+    .directory-chooser:active {
+      transform: translateY(-1px) scale(1.01);
+      box-shadow:
+        0 0 40px rgba(255, 107, 53, 0.6),
+        0 4px 20px rgba(255, 107, 53, 0.4);
+    }
+
+    /* Keyframe Animations */
+    @keyframes directory-chooser-pulse {
+      0%, 100% {
+        box-shadow:
+          0 0 30px rgba(255, 107, 53, 0.4),
+          0 0 60px rgba(247, 147, 30, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      }
+      50% {
+        box-shadow:
+          0 0 40px rgba(255, 107, 53, 0.6),
+          0 0 80px rgba(247, 147, 30, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    @keyframes directory-chooser-border-rotate {
+      0% {
+        background-position: 0% 50%;
+      }
+      100% {
+        background-position: 200% 50%;
+      }
+    }
+
+    @keyframes directory-chooser-scan {
+      0% {
+        top: -100%;
+      }
+      50% {
+        top: 100%;
+      }
+      100% {
+        top: 100%;
+      }
+    }
+
+    @keyframes directory-chooser-icon-float {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-3px);
+      }
+    }
+
+    .features {
+      margin-top: 40px;
+      padding-top: 32px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .feature-list {
+      display: grid;
+      gap: 16px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+
+    .feature-icon {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      color: #FF6B35;
+    }
+
+    .feature-content h3 {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .feature-content p {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 13px;
+      margin: 0;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <h1>Directory Chooser - Cyberpunk Style</h1>
+    <p>Impossible to miss. Hover to feel the power.</p>
+
+    <button class="directory-chooser">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span>Browse for new project</span>
+    </button>
+
+    <div class="features">
+      <div class="feature-list">
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+          <div class="feature-content">
+            <h3>Pulsating Neon Glow</h3>
+            <p>Animated glow effect pulses every 2.5s - demands attention</p>
+          </div>
+        </div>
+
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+            <polyline points="17 6 23 6 23 12"></polyline>
+          </svg>
+          <div class="feature-content">
+            <h3>Animated Gradient Border</h3>
+            <p>Rotating gradient (orange → accent → cyan) on 3s loop</p>
+          </div>
+        </div>
+
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path>
+          </svg>
+          <div class="feature-content">
+            <h3>Scan Line Effect</h3>
+            <p>Subtle vertical scan passes through every 2s (cyberpunk aesthetic)</p>
+          </div>
+        </div>
+
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v6m0 4v10m-8-8h6m4 0h8"></path>
+          </svg>
+          <div class="feature-content">
+            <h3>Icon Float Animation</h3>
+            <p>Folder icon floats up/down gently - adds life and motion</p>
+          </div>
+        </div>
+
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          </svg>
+          <div class="feature-content">
+            <h3>Explosive Hover State</h3>
+            <p>Scale, lift, glow intensification - makes interaction feel powerful</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

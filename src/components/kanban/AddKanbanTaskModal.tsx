@@ -17,6 +17,7 @@ import type { TerminalInfo, KanbanAssignedAgent, KanbanTask, ChatAttachment } fr
 import type { DroidMetadata, SkillMetadata } from '../modal-steps/types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
 import { loadAvailableDroids, loadAvailableSkills } from '../../utils/skillsAndDroidsLoader';
+import { compressImage, blobToBase64, MAX_FILE_SIZE as IMAGE_MAX_SIZE } from '../../utils/imageCompression';
 
 // Constants for attachment handling
 const MAX_ATTACHMENTS = 4;
@@ -116,6 +117,8 @@ export default function AddKanbanTaskModal({
 }: AddKanbanTaskModalProps) {
   // Determine if we're in edit mode
   const isEditMode = !!editTask;
+  // Task is started if status is not 'todo' - prompt/attachments cannot be modified
+  const isTaskStarted = isEditMode && editTask?.status !== 'todo';
   // Form state
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -515,15 +518,22 @@ export default function AddKanbanTaskModal({
           break;
         }
 
-        if (file.size > MAX_FILE_SIZE) {
-          setAttachmentError(`Image is larger than 15MB.`);
-          continue;
-        }
-
         try {
+          // Compress image before size check
+          const { blob: processedFile, wasCompressed } = await compressImage(file);
+
+          // Check size after compression
+          if (processedFile.size > IMAGE_MAX_SIZE) {
+            const sizeMsg = wasCompressed
+              ? `Even after compression, image is too large (${(processedFile.size / (1024 * 1024)).toFixed(1)}MB). Max: 5MB.`
+              : `Image is larger than 5MB (Claude API limit).`;
+            setAttachmentError(sizeMsg);
+            continue;
+          }
+
           const extensionFromMime = mimeToExtension(file.type);
           const extension = extensionFromMime ?? 'png';
-          const base64 = await readFileAsBase64(file);
+          const base64 = await blobToBase64(processedFile);
 
           const tempPath = await invoke<string>('save_clipboard_file', {
             dataBase64: base64,
@@ -542,7 +552,7 @@ export default function AddKanbanTaskModal({
         }
       }
     },
-    [attachments.length, createAttachmentFromPath, mimeToExtension, readFileAsBase64]
+    [attachments.length, createAttachmentFromPath, mimeToExtension]
   );
 
   // Handle drag events
@@ -578,15 +588,22 @@ export default function AddKanbanTaskModal({
           break;
         }
 
-        if (file.size > MAX_FILE_SIZE) {
-          setAttachmentError(`Image ${file.name} is larger than 15MB.`);
-          continue;
-        }
-
         try {
+          // Compress image before size check
+          const { blob: processedFile, wasCompressed } = await compressImage(file);
+
+          // Check size after compression
+          if (processedFile.size > IMAGE_MAX_SIZE) {
+            const sizeMsg = wasCompressed
+              ? `Even after compression, image is too large (${(processedFile.size / (1024 * 1024)).toFixed(1)}MB). Max: 5MB.`
+              : `Image ${file.name} is larger than 5MB (Claude API limit).`;
+            setAttachmentError(sizeMsg);
+            continue;
+          }
+
           const extensionFromMime = mimeToExtension(file.type);
           const extension = extensionFromMime ?? 'png';
-          const base64 = await readFileAsBase64(file);
+          const base64 = await blobToBase64(processedFile);
 
           const tempPath = await invoke<string>('save_clipboard_file', {
             dataBase64: base64,
@@ -605,7 +622,7 @@ export default function AddKanbanTaskModal({
         }
       }
     },
-    [attachments.length, createAttachmentFromPath, mimeToExtension, readFileAsBase64]
+    [attachments.length, createAttachmentFromPath, mimeToExtension]
   );
 
   // Remove attachment
@@ -1076,30 +1093,39 @@ export default function AddKanbanTaskModal({
             </div>
           )}
 
-          {/* Prompt field with attachment support - hidden in edit mode */}
-          {!isEditMode && (
+          {/* Prompt field with attachment support - shown in create mode and edit mode (readonly if started) */}
+          {(!isEditMode || (isEditMode && (editTask?.prompt || editTask?.attachments?.length))) && (
           <div className="kanban-form-field">
             <label htmlFor="task-prompt">
               Prompt
-              <span className="kanban-form-hint">
-                (paste or drop images)
-              </span>
+              {!isTaskStarted && (
+                <span className="kanban-form-hint">
+                  (paste or drop images)
+                </span>
+              )}
+              {isTaskStarted && (
+                <span className="kanban-form-hint kanban-form-hint-warning">
+                  (task already started - cannot modify)
+                </span>
+              )}
             </label>
             <div
-              className={`kanban-prompt-wrapper ${isDragOver ? 'drag-over' : ''}`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              className={`kanban-prompt-wrapper ${isDragOver ? 'drag-over' : ''} ${isTaskStarted ? 'readonly' : ''}`}
+              onDragOver={!isTaskStarted ? handleDragOver : undefined}
+              onDragLeave={!isTaskStarted ? handleDragLeave : undefined}
+              onDrop={!isTaskStarted ? handleDrop : undefined}
             >
               <textarea
                 ref={textareaRef}
                 id="task-prompt"
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onPaste={handlePaste}
-                placeholder="Enter the full prompt for the AI agent..."
+                onChange={(e) => !isTaskStarted && setPrompt(e.target.value)}
+                onPaste={!isTaskStarted ? handlePaste : undefined}
+                placeholder={isTaskStarted ? "Task already started - prompt cannot be modified" : "Enter the full prompt for the AI agent..."}
+                readOnly={isTaskStarted}
+                className={isTaskStarted ? 'readonly' : ''}
               />
-              {isDragOver && (
+              {isDragOver && !isTaskStarted && (
                 <div className="kanban-prompt-drop-overlay">
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -1112,7 +1138,7 @@ export default function AddKanbanTaskModal({
             </div>
 
             {/* Attachment error */}
-            {attachmentError && (
+            {attachmentError && !isTaskStarted && (
               <div className="kanban-attachment-error">
                 {attachmentError}
               </div>
@@ -1120,7 +1146,7 @@ export default function AddKanbanTaskModal({
 
             {/* Attachment previews */}
             {attachments.length > 0 && (
-              <div className="kanban-attachments">
+              <div className={`kanban-attachments ${isTaskStarted ? 'readonly' : ''}`}>
                 {attachments.map((attachment) => (
                   <div key={attachment.id} className="kanban-attachment">
                     {attachment.previewUrl ? (
@@ -1142,17 +1168,20 @@ export default function AddKanbanTaskModal({
                       <span className="kanban-attachment-name">{attachment.name}</span>
                       <span className="kanban-attachment-size">{formatSize(attachment.size)}</span>
                     </div>
-                    <button
-                      type="button"
-                      className="kanban-attachment-remove"
-                      onClick={() => removeAttachment(attachment.id)}
-                      title="Remove attachment"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
+                    {/* Hide remove button if task is started */}
+                    {!isTaskStarted && (
+                      <button
+                        type="button"
+                        className="kanban-attachment-remove"
+                        onClick={() => removeAttachment(attachment.id)}
+                        title="Remove attachment"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

@@ -131,53 +131,52 @@ export default function PluginsPanel({
     <div className="plugins-panel flex flex-col h-full">
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-3 border-b"
+        className="flex-shrink-0 px-4 py-3 border-b"
         style={{
           borderColor: "rgba(255, 255, 255, 0.1)",
         }}
       >
-        <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
-            Plugin Marketplace
-          </h3>
-          {installedCount > 0 && (
-            <div
-              className="px-2 py-0.5 rounded text-xs font-medium"
-              style={{
-                background: "rgba(16, 185, 129, 0.1)",
-                color: "#10b981",
-              }}
-            >
-              {installedCount} installed
-            </div>
-          )}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
+              Plugin Marketplace
+            </h3>
+            {installedCount > 0 && (
+              <div
+                className="px-2 py-0.5 rounded text-xs font-medium"
+                style={{
+                  background: "rgba(16, 185, 129, 0.1)",
+                  color: "#10b981",
+                }}
+              >
+                {installedCount} installed
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
+            style={{
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "rgba(255, 255, 255, 0.9)",
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+            }}
+          >
+            {loading ? "..." : "↻ Refresh"}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={loading}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
-          style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "rgba(255, 255, 255, 0.9)",
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-          }}
-        >
-          {loading ? "..." : "↻ Refresh"}
-        </button>
-      </div>
 
-      {/* Search and Filters */}
-      <div className="px-4 py-3 space-y-3">
-        {/* Search bar */}
+        {/* Search bar - inside header, above separator */}
         <div className="relative">
           <svg
             width="16"
@@ -199,7 +198,7 @@ export default function PluginsPanel({
             placeholder="Search plugins..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded text-sm"
+            className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
             style={{
               background: "rgba(255, 255, 255, 0.05)",
               border: "1px solid rgba(255, 255, 255, 0.12)",
@@ -207,7 +206,10 @@ export default function PluginsPanel({
             }}
           />
         </div>
+      </div>
 
+      {/* Category Filters */}
+      <div className="px-4 py-3">
         {/* Category filters */}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {categories.map((cat) => (

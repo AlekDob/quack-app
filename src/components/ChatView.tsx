@@ -9,12 +9,10 @@ import EditSummaryBar from './EditSummaryBar';
 import TodoProgressBar from './TodoProgressBar';
 import QuackBrainLinkBar from './QuackBrainLinkBar';
 import type { TodoItem } from './TodoProgressBar';
-import KanbanTasksBar from './KanbanTasksBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { createBackgroundTask } from '../services/backgroundAgentService';
 import { useChatStore } from '../stores/chatStore';
-import { useKanbanTaskCounts } from '../hooks/useKanbanTaskCounts';
 import { useAgentRules } from '../hooks/useAgentRules';
 import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers } from '../types';
 import type {
@@ -106,8 +104,6 @@ interface ChatViewProps {
   onEditRules?: () => void;
   // Initial attachments (from Kanban task)
   initialAttachments?: ChatAttachment[];
-  // Hide the KanbanTasksBar (for use inside Kanban drawer)
-  hideKanbanTasksBar?: boolean;
   // Callback to open Kanban view (passed from App.tsx)
   onOpenKanban?: () => void;
   // AskUserQuestion support
@@ -129,6 +125,8 @@ interface ChatViewProps {
   // Fullscreen mode - hides side panel and expands chat
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  // File Checkpointing (SDK 0.2.7+)
+  onRewindFiles?: (userMessageId: string) => void;
 }
 
 export default function ChatView({
@@ -188,8 +186,6 @@ export default function ChatView({
   onEditRules,
   // Initial attachments (from Kanban task)
   initialAttachments,
-  // Hide the KanbanTasksBar (for use inside Kanban drawer)
-  hideKanbanTasksBar = false,
   // Callback to open Kanban view
   onOpenKanban,
   // AskUserQuestion support
@@ -206,6 +202,8 @@ export default function ChatView({
   // Fullscreen mode
   isFullscreen = false,
   onToggleFullscreen,
+  // File Checkpointing
+  onRewindFiles,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -216,8 +214,6 @@ export default function ChatView({
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
 
-  // Kanban task counts for the tasks bar
-  const { todoCount, inProgressCount } = useKanbanTaskCounts(basePath);
 
   // Persistent attachments via chat store
   const setStoreAttachments = useChatStore((state) => state.setAttachments);
@@ -692,6 +688,7 @@ export default function ChatView({
         answeredQuestions={answeredQuestions}
         currentSessionId={currentSessionId}
         showThinkingBlocks={showThinkingBlocks}
+        onRewindFiles={onRewindFiles}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar
@@ -715,13 +712,6 @@ export default function ChatView({
           filePath={quackBrainFile.path}
           entityName={quackBrainFile.name}
           entityType={quackBrainFile.type}
-        />
-      )}
-      {!hideKanbanTasksBar && onOpenKanban && (
-        <KanbanTasksBar
-          todoCount={todoCount}
-          inProgressCount={inProgressCount}
-          onOpenKanban={onOpenKanban}
         />
       )}
       <div className="chat-view-footer">

@@ -9,6 +9,7 @@ import {
   GrepWidget,
   TodoWriteWidget,
   ExitPlanModeWidget,
+  EnterPlanModeWidget,
   ToolIcon,
   getToolColor,
 } from './ToolWidgets';
@@ -37,6 +38,7 @@ const MemoizedTaskWidget = memo(TaskWidget);
 const MemoizedTaskOutputWidget = memo(TaskOutputWidget);
 const MemoizedTodoWriteWidget = memo(TodoWriteWidget);
 const MemoizedExitPlanModeWidget = memo(ExitPlanModeWidget);
+const MemoizedEnterPlanModeWidget = memo(EnterPlanModeWidget);
 const MemoizedAskUserQuestionWidget = memo(AskUserQuestionWidget);
 
 /**
@@ -120,6 +122,9 @@ interface StreamMessageProps {
   pendingQuestionIds?: Set<string>; // Tool IDs with pending questions
   answeredQuestions?: Map<string, AskUserQuestionAnswers>; // Already answered questions
   showThinkingBlocks?: boolean; // Show/hide ThinkingBlocks (controlled by footer icon)
+  // File Checkpointing (SDK 0.2.7+)
+  sessionId?: string; // Session ID for rewind operations
+  onRewindFiles?: (userMessageId: string) => void; // Callback to rewind files to a specific message
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -133,6 +138,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   pendingQuestionIds,
   answeredQuestions,
   showThinkingBlocks = true,
+  sessionId,
+  onRewindFiles,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -379,6 +386,27 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
+            // EnterPlanMode tool - purple header widget, no GIF
+            // Only render ONCE even if called multiple times
+            if (toolName === 'enterplanmode') {
+              // Skip if this is a duplicate (same tool in same message already rendered)
+              const isFirstEnterPlanMode = msg.content.findIndex(
+                (c: any) => c.type === 'tool_use' && c.name?.toLowerCase() === 'enterplanmode'
+              ) === idx;
+
+              if (!isFirstEnterPlanMode) {
+                return null; // Skip duplicates
+              }
+
+              return (
+                <MemoizedEnterPlanModeWidget
+                  key={idx}
+                  objective={input?.objective}
+                  defaultExpanded={false}
+                />
+              );
+            }
+
             // AskUserQuestion tool - no GIF (skipped in ToolGifInline)
             // Handle both array and stringified JSON (SDK may serialize as string)
             if (toolName === 'askuserquestion' && input?.questions) {
@@ -491,6 +519,96 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
 
           return null;
         })}
+
+        {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
+        {(() => {
+          // Check if this message has file-modifying tools (Edit, Write, MultiEdit)
+          const hasFileChanges = msg.content.some(
+            (c: any) => c.type === 'tool_use' && ['edit', 'write', 'multiedit'].includes(c.name?.toLowerCase())
+          );
+
+          // Get the UUID from the preceding user message (required for rewind)
+          // We need the user message UUID that preceded this assistant response
+          const messageIndex = streamMessages.findIndex((m) => m === message);
+          let precedingUserMessageUuid: string | undefined;
+
+          if (messageIndex > 0) {
+            // Look backwards for the user message
+            for (let i = messageIndex - 1; i >= 0; i--) {
+              const prevMsg = streamMessages[i];
+              if (prevMsg.type === 'user') {
+                // Get UUID from user event (SDK provides this in the uuid field)
+                precedingUserMessageUuid = (prevMsg as any).uuid;
+                break;
+              }
+            }
+          }
+
+          // DEBUG: Log why rewind button might not show
+          if (hasFileChanges) {
+            console.log('[RewindButton] hasFileChanges:', hasFileChanges);
+            console.log('[RewindButton] onRewindFiles:', !!onRewindFiles);
+            console.log('[RewindButton] sessionId:', sessionId);
+            console.log('[RewindButton] precedingUserMessageUuid:', precedingUserMessageUuid);
+            // Log full structure of user messages to find UUID location
+            const userMessages = streamMessages.filter((m: any) => m.type === 'user');
+            console.log('[RewindButton] User messages:', userMessages.length);
+            if (userMessages.length > 0) {
+              console.log('[RewindButton] First user message keys:', Object.keys(userMessages[0]));
+              console.log('[RewindButton] First user message:', JSON.stringify(userMessages[0]).substring(0, 500));
+            }
+          }
+
+          if (hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid) {
+            return (
+              <div className="rewind-files-action" style={{
+                marginTop: '8px',
+                paddingTop: '8px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+              }}>
+                <button
+                  onClick={() => onRewindFiles(precedingUserMessageUuid!)}
+                  className="rewind-button"
+                  title="Rewind file changes to before this message"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                    e.currentTarget.style.color = 'rgba(139, 92, 246, 0.9)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l2.315 2.315a1 1 0 01-1.415 1.414l-2.315-2.315A6 6 0 012 8z"/>
+                    <path d="M5 8a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5A.5.5 0 015 8z"/>
+                    <path d="M1.5 8a.5.5 0 01.5-.5h2.5a.5.5 0 010 1H2a.5.5 0 01-.5-.5z"/>
+                    <path fillRule="evenodd" d="M5.854 4.146a.5.5 0 010 .708L3.207 7.5l2.647 2.646a.5.5 0 11-.708.708l-3-3a.5.5 0 010-.708l3-3a.5.5 0 01.708 0z"/>
+                  </svg>
+                  Rewind Files
+                </button>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
     );
   }

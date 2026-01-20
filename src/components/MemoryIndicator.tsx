@@ -28,6 +28,8 @@ export interface MemoryIndicatorProps {
   memories: MemoryInfo[];
   /** @deprecated Use `query` instead for AI-driven search */
   keywords?: string[];
+  /** User-selected priority keywords (3x weight in search) */
+  userKeywords?: string[];
   /** AI-driven search query (natural language) */
   query?: string;
   /** Search context explaining why this search was performed */
@@ -43,6 +45,7 @@ export interface MemoryIndicatorProps {
 export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
   memories,
   keywords = [],
+  userKeywords = [],
   query,
   searchContext,
   durationMs,
@@ -106,13 +109,25 @@ export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
             </div>
           )}
 
-          {/* Fallback to legacy keywords if no query */}
+          {/* User-selected keywords (priority - 3x weight) */}
+          {!query && userKeywords.length > 0 && (
+            <div className="memory-indicator-keywords memory-indicator-user-keywords">
+              <span className="memory-indicator-keywords-label">Priority:</span>
+              {userKeywords.map((keyword, idx) => (
+                <span key={idx} className="memory-indicator-keyword user-keyword">
+                  <span className="keyword-star">★</span> {keyword}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Auto-extracted keywords (fallback) */}
           {!query && keywords.length > 0 && (
             <div className="memory-indicator-keywords">
-              <span className="memory-indicator-keywords-label">Keywords:</span>
+              <span className="memory-indicator-keywords-label">Auto:</span>
               {keywords.map((keyword, idx) => (
-                <span key={idx} className="memory-indicator-keyword">
-                  {keyword}
+                <span key={idx} className="memory-indicator-keyword auto-keyword">
+                  <span className="keyword-dot">○</span> {keyword}
                 </span>
               ))}
             </div>

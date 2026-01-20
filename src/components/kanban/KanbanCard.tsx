@@ -20,6 +20,7 @@ import { FileText } from 'lucide-react';
 import type { KanbanTask } from '../../types';
 import { getCustomAvatarUrl, isCustomAvatar } from '../../utils/customAvatarStorage';
 import { useAgentAvatar } from '../../hooks/useAgentAvatar';
+import { useProjectColor } from '../../hooks/useProjectColor';
 
 // Task type colors
 const TASK_TYPE_COLORS = {
@@ -184,12 +185,18 @@ export default function KanbanCard({
   const isWatchTask = taskType === 'watch';
   const isAgentTask = taskType === 'agent';
 
-  // Get the accent color based on task type
-  const accentColor = isShellTask
+  // Get project color for accent bar
+  const projectColor = useProjectColor(task.projectPath);
+
+  // Agent color for agent-related UI (avatar border, agent name)
+  const agentColor = task.assignedAgent?.color || '#6b7280';
+
+  // Accent bar color: project color for agent tasks, type-specific colors for shell/watch
+  const accentBarColor = isShellTask
     ? TASK_TYPE_COLORS.shell
     : isWatchTask
       ? TASK_TYPE_COLORS.watch
-      : (task.assignedAgent?.color || '#6b7280');
+      : projectColor;
 
   // Truncate title if too long (increased limit for better readability)
   const displayTitle = task.title.length > 80
@@ -255,10 +262,10 @@ export default function KanbanCard({
       onClick={onClick}
       onContextMenu={handleContextMenu}
     >
-      {/* Color accent bar */}
+      {/* Color accent bar - uses project color */}
       <div
         className="kanban-card-accent"
-        style={{ backgroundColor: accentColor }}
+        style={{ backgroundColor: accentBarColor }}
       />
 
       {/* Card content - MINIMAL DESIGN */}
@@ -273,14 +280,14 @@ export default function KanbanCard({
                 avatarFilename={task.assignedAgent.avatar}
                 agentColor={task.assignedAgent.color}
               />
-              <span className="kanban-card-agent-name" style={{ color: accentColor }}>
+              <span className="kanban-card-agent-name" style={{ color: agentColor }}>
                 {task.assignedAgent.name}
               </span>
             </div>
           )}
           {/* Shell/Watch badge */}
           {!isAgentTask && (
-            <span className="kanban-task-type-badge" style={{ backgroundColor: accentColor }}>
+            <span className="kanban-task-type-badge" style={{ backgroundColor: accentBarColor }}>
               {isShellTask ? 'SHELL' : 'WATCH'}
             </span>
           )}
@@ -312,16 +319,16 @@ export default function KanbanCard({
         {/* Row 2: Session/Task title (on its own line) */}
         <h4 className="kanban-card-title">{displayTitle}</h4>
 
-        {/* Row 2: Project name (small, colored) */}
-        <div 
+        {/* Row 2: Project name (small, colored with project color) */}
+        <div
           className="kanban-card-project-row"
           onClick={(e) => { e.stopPropagation(); onProjectClick?.(task.projectPath); }}
           title={task.projectPath}
         >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={projectColor} strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
-          <span style={{ color: accentColor }}>{task.projectName}</span>
+          <span style={{ color: projectColor }}>{task.projectName}</span>
         </div>
 
         {/* Progress bar */}
@@ -545,11 +552,15 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
   const isWatchTask = taskType === 'watch';
   const isAgentTask = taskType === 'agent';
 
-  const accentColor = isShellTask
+  // Get project color for accent bar
+  const projectColor = useProjectColor(task.projectPath);
+
+  // Accent bar color: project color for agent tasks, type-specific for others
+  const accentBarColor = isShellTask
     ? TASK_TYPE_COLORS.shell
     : isWatchTask
       ? TASK_TYPE_COLORS.watch
-      : (task.assignedAgent?.color || '#6b7280');
+      : projectColor;
 
   const displayTitle = task.title.length > 80
     ? task.title.substring(0, 80) + '...'
@@ -559,7 +570,7 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
     <div className="kanban-card dragging-overlay">
       <div
         className="kanban-card-accent"
-        style={{ backgroundColor: accentColor }}
+        style={{ backgroundColor: accentBarColor }}
       />
       <div className="kanban-card-content">
         <div className="kanban-card-title-row">
@@ -574,14 +585,14 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
           {!isAgentTask && (
             <span
               className="kanban-task-type-badge"
-              style={{ backgroundColor: accentColor }}
+              style={{ backgroundColor: accentBarColor }}
             >
               {isShellTask ? 'SHELL' : 'WATCH'}
             </span>
           )}
           <h4 className="kanban-card-title">{displayTitle}</h4>
         </div>
-        <div className="kanban-card-project">
+        <div className="kanban-card-project" style={{ color: projectColor }}>
           <span>{task.projectName}</span>
         </div>
       </div>
