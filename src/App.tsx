@@ -725,6 +725,8 @@ function AppContent() {
   const [diffLoading, setDiffLoading] = useState(false);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [diffView, setDiffView] = useState<"worktree" | "staged">("worktree");
+  // Synthetic entry for diffs opened from EditSummaryBar (not from git panel)
+  const [editSummaryDiffEntry, setEditSummaryDiffEntry] = useState<GitStatusEntry | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
   const [committing, setCommitting] = useState(false);
   const [commitHistory, setCommitHistory] = useState<GitCommitEntry[]>([]);
@@ -4398,6 +4400,50 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log(`📱 Session ${action}: ${sessionId} (source: ${source})`);
     });
 
+    // 📱 Listen for WhatsApp auto-start chat requests
+    // When WhatsApp watcher creates a session and wants to auto-start it with a prompt
+    const unlistenSessionAutoStartPromise = listen<{
+      sessionId: string;
+      prompt: string;
+      whatsappRecipient?: string;
+      autoSend: boolean;
+    }>("session-auto-start", async (event) => {
+      console.log("📱 Session auto-start request:", event.payload);
+      const { sessionId, prompt, whatsappRecipient, autoSend } = event.payload;
+
+      // Reload sessions to ensure we have the latest
+      await useSessionStore.getState().loadSessions();
+
+      // Find the session to get the agentId
+      const sessions = useSessionStore.getState().sessions;
+      const session = sessions.find(s => s.id === sessionId);
+
+      if (!session) {
+        console.error(`📱 Session not found for auto-start: ${sessionId}`);
+        return;
+      }
+
+      console.log(`📱 Found session for auto-start: ${session.title} (agent: ${session.agentId})`);
+
+      // Set the agent and session as active
+      setActiveId(session.agentId);
+      setActiveSessionIdExclusive(sessionId);
+
+      // Build prompt with WhatsApp MCP instruction if recipient is provided
+      let finalPrompt = prompt;
+      if (whatsappRecipient) {
+        finalPrompt = `${prompt}\n\n---\nIMPORTANT: After completing this task, respond to the user via WhatsApp using the MCP WhatsApp tool. Send the response to: ${whatsappRecipient}`;
+      }
+
+      // Auto-send the prompt if requested
+      if (autoSend && sendMessageForAgentRef.current) {
+        // Small delay to ensure UI is ready
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log(`📱 Auto-sending prompt for session ${sessionId}:`, finalPrompt.substring(0, 100));
+        await sendMessageForAgentRef.current(finalPrompt);
+      }
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -4407,8 +4453,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenKanbanUpdatePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenSessionAutoStartPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
-  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, loadKanbanTasks]);
+  }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, loadKanbanTasks, setActiveSessionIdExclusive]);
 
   // 🦆 DYNAMIC LISTENERS: These depend on terminals and need careful cleanup
   // Use a ref to track terminal IDs to avoid rapid listener churn on status changes
@@ -7816,12 +7863,34 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const handleDiffClick = useCallback(async (filePath: string, status: 'created' | 'modified' | 'deleted') => {
     console.log('[App] Diff clicked for:', filePath, 'status:', status);
 
+    // Clear git panel selection (we're using synthetic entry)
+    setSelectedGitPath(null);
+
     setDiffLoading(true);
     setDiffError(null);
     setShowDiffDrawer(true);
 
+    // Create synthetic GitStatusEntry for the DiffDrawer
+    const rootPath = activeTerminal?.cwd ?? explorerRoot ?? explorerPath ?? undefined;
+    let relativePath = filePath;
+    if (rootPath && filePath.startsWith(rootPath)) {
+      relativePath = filePath.substring(rootPath.length);
+      if (relativePath.startsWith('/')) {
+        relativePath = relativePath.substring(1);
+      }
+    }
+
+    // Map status to git status codes
+    const syntheticEntry: GitStatusEntry = {
+      path: relativePath,
+      staged_status: null,
+      unstaged_status: status === 'modified' ? 'M' : (status === 'deleted' ? 'D' : null),
+      is_untracked: status === 'created',
+      original_path: null,
+    };
+    setEditSummaryDiffEntry(syntheticEntry);
+
     try {
-      const rootPath = activeTerminal?.cwd ?? explorerRoot ?? explorerPath ?? undefined;
       let diffContent = '';
 
       if (status === 'created') {
@@ -9185,6 +9254,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
     setSelectedGitPath(entry.path);
+    setEditSummaryDiffEntry(null); // Clear synthetic entry when selecting from git panel
     if (entry.unstaged_status || entry.is_untracked) {
       setDiffView("worktree");
     } else if (entry.staged_status) {
@@ -11153,10 +11223,10 @@ You have access to all Bash tools to execute git commands like:
           </div>
         </div>
 
-        {/* Diff Drawer - Opened when clicking a file */}
-        {showDiffDrawer && selectedGitEntry && (
+        {/* Diff Drawer - Opened when clicking a file (from git panel or EditSummaryBar) */}
+        {showDiffDrawer && (selectedGitEntry || editSummaryDiffEntry) && (
           <DiffDrawer
-            selected={selectedGitEntry}
+            selected={selectedGitEntry || editSummaryDiffEntry}
             diffContent={diffContent}
             diffLoading={diffLoading}
             diffError={diffError}
@@ -11164,7 +11234,10 @@ You have access to all Bash tools to execute git commands like:
             onDiffViewChange={handleDiffViewChange}
             onStage={handleStageEntry}
             onUnstage={handleUnstageEntry}
-            onClose={() => setShowDiffDrawer(false)}
+            onClose={() => {
+              setShowDiffDrawer(false);
+              setEditSummaryDiffEntry(null); // Clear synthetic entry on close
+            }}
           />
         )}
 

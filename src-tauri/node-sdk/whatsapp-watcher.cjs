@@ -29,7 +29,6 @@ const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const http = require('http');
-const { spawn } = require('child_process');
 
 // ============================================================
 // KANBAN INTEGRATION - Via Quack HTTP API
@@ -240,6 +239,66 @@ function createKanbanSession(agent, projectPath, projectName, title, description
     req.on('error', (err) => {
       console.error(`[ERROR] Failed to connect to Quack API: ${err.message}`);
       console.error(`[HINT] Make sure Quack app is running`);
+      reject(new Error(`Quack API not available: ${err.message}`));
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Quack API request timeout'));
+    });
+
+    req.write(payload);
+    req.end();
+  });
+}
+
+/**
+ * Start a chat session via Quack's HTTP API (auto-sends prompt)
+ * This triggers the frontend to select the session and auto-send the prompt
+ * Claude in Quack has access to WhatsApp MCP, so it can respond directly
+ */
+function startChatSession(sessionId, prompt, whatsappRecipient) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      session_id: sessionId,
+      prompt: prompt,
+      whatsapp_recipient: whatsappRecipient,
+    });
+
+    const options = {
+      hostname: '127.0.0.1',
+      port: QUACK_API_PORT,
+      path: '/session/start-chat',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+      timeout: 10000,
+    };
+
+    const req = http.request(options, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(body);
+          if (result.success) {
+            console.error(`[INFO] Started chat session via API: ${sessionId}`);
+            resolve(result);
+          } else {
+            console.error(`[ERROR] API error starting chat: ${result.error || 'Unknown error'}`);
+            reject(new Error(result.error || 'Failed to start chat'));
+          }
+        } catch (e) {
+          console.error(`[ERROR] Invalid API response for start-chat: ${body.substring(0, 200)}`);
+          reject(new Error(`Invalid response from Quack API: ${e.message}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error(`[ERROR] Failed to connect to Quack API for start-chat: ${err.message}`);
       reject(new Error(`Quack API not available: ${err.message}`));
     });
 
@@ -723,78 +782,6 @@ function sendWhatsAppRequestInternal(recipient, message) {
   });
 }
 
-// Process query with Claude Agent SDK
-function processWithAgent(query, agent, projectPath, context = null) {
-  return new Promise((resolve, reject) => {
-    const args = [
-      '--print',
-      '--output-format', 'text',
-      '--dangerously-skip-permissions',
-      '--max-turns', '1',  // Limit to single response for faster replies
-      '--model', 'haiku'   // Use fast model for WhatsApp responses
-    ];
-
-    // Build prompt with context if available
-    let fullPrompt = query;
-    if (context && context.length > 0) {
-      const contextStr = context.map(m =>
-        `[${m.sender === 'me' ? 'You' : m.sender}]: ${m.content}`
-      ).join('\n');
-      fullPrompt = `Context from recent conversation:\n${contextStr}\n\nCurrent question: ${query}`;
-    }
-
-    args.push(fullPrompt);
-
-    // Use cwd option in spawn to set working directory
-    const spawnOptions = {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env }
-    };
-
-    if (projectPath && fs.existsSync(projectPath)) {
-      spawnOptions.cwd = projectPath;
-      log('DEBUG', `Running claude in directory: ${projectPath}`);
-    }
-
-    log('DEBUG', `Running claude with args: ${args.slice(0, -1).join(' ')} <prompt>`);
-
-    const claudeProcess = spawn('claude', args, spawnOptions);
-
-    let stdout = '';
-    let stderr = '';
-
-    claudeProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    claudeProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    claudeProcess.on('close', (code) => {
-      if (code === 0) {
-        resolve(stdout.trim());
-      } else {
-        log('ERROR', `Claude error: ${stderr}`);
-        reject(new Error(`Claude exited with code ${code}: ${stderr.substring(0, 200)}`));
-      }
-    });
-
-    claudeProcess.on('error', (err) => {
-      reject(new Error(`Failed to start claude: ${err.message}`));
-    });
-
-    // Configurable timeout
-    const timeout = setTimeout(() => {
-      claudeProcess.kill('SIGTERM');
-      setTimeout(() => claudeProcess.kill('SIGKILL'), 5000); // Force kill after 5s
-      reject(new Error(`Agent timeout after ${CONFIG.agentTimeout / 1000}s`));
-    }, CONFIG.agentTimeout);
-
-    claudeProcess.on('close', () => clearTimeout(timeout));
-  });
-}
-
 // Check if WhatsApp bridge is running
 function isWhatsAppBridgeRunning() {
   return new Promise((resolve) => {
@@ -1130,13 +1117,14 @@ class WhatsAppWatcher {
 
   /**
    * Handle follow-up message to an active session
-   * Calls Claude directly and sends response to WhatsApp
+   * Uses Quack session-based approach: sends message to existing session in Quack
+   * Claude in Quack has WhatsApp MCP and will respond directly to WhatsApp
    */
   async handleFollowUp(message, activeSession) {
     const chatDisplay = message.chat_name || message.chat_jid.split('@')[0];
 
     try {
-      // Check if WhatsApp bridge is running
+      // Check if WhatsApp bridge is running (for the thinking indicator)
       const bridgeRunning = await isWhatsAppBridgeRunning();
       if (!bridgeRunning) {
         log('WARN', 'WhatsApp bridge not running, skipping response');
@@ -1147,7 +1135,7 @@ class WhatsAppWatcher {
       if (CONFIG.thinkingMessage) {
         await sendWhatsAppResponse(
           message.chat_jid,
-          `${CONFIG.successEmoji} *${activeSession.agentName}* sta elaborando...`
+          `${CONFIG.successEmoji} *${activeSession.agentName}* sta elaborando in Quack...`
         );
       }
 
@@ -1161,39 +1149,58 @@ class WhatsAppWatcher {
         message.timestamp
       );
 
-      // Call Claude directly with the follow-up message
-      log('INFO', `Calling Claude for follow-up in project: ${activeSession.projectPath}`);
-      const response = await processWithAgent(
-        message.content,
-        { name: activeSession.agentName, id: activeSession.agentId },
-        activeSession.projectPath,
-        context
-      );
+      // Build full prompt with context
+      let fullPrompt = message.content;
+      if (context && context.length > 0) {
+        const contextStr = context.map(m =>
+          `[${m.sender === 'me' ? 'You' : m.sender}]: ${m.content}`
+        ).join('\n');
+        fullPrompt = `**WhatsApp Context:**\n${contextStr}\n\n**Follow-up:**\n${message.content}`;
+      }
 
-      // Send Claude's response directly to WhatsApp
-      const truncatedResponse = response.length > CONFIG.maxResponseLength
-        ? response.substring(0, CONFIG.maxResponseLength - 50) + '\n\n... (risposta troncata)'
-        : response;
-
-      await sendWhatsAppResponse(
-        message.chat_jid,
-        `${CONFIG.successEmoji} *${activeSession.agentName}*:\n\n${truncatedResponse}`
-      );
-
-      // Try to add to Quack session for tracking (non-blocking)
-      try {
+      // Use existing session or create a new one if session doesn't exist
+      if (activeSession.sessionId) {
+        // Continue conversation in existing Quack session
+        log('INFO', `Continuing chat in Quack session: ${activeSession.sessionId}`);
+        await startChatSession(activeSession.sessionId, fullPrompt, message.chat_jid);
+      } else {
+        // Session ID missing - create a new session
+        log('WARN', `No sessionId in activeSession, creating new session`);
         const senderInfo = {
           chatJid: message.chat_jid,
           chatName: message.chat_name,
           sender: message.sender,
           timestamp: message.timestamp,
         };
-        await addMessageToSession(activeSession.sessionId, message.content, senderInfo);
-      } catch (trackingErr) {
-        log('DEBUG', `Could not track message in Quack: ${trackingErr.message}`);
+        const sessionTitle = `WhatsApp: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`;
+
+        // Create agent object for session
+        const agent = {
+          id: activeSession.agentId,
+          name: activeSession.agentName,
+        };
+
+        const session = await createKanbanSession(
+          agent,
+          activeSession.projectPath,
+          activeSession.projectName,
+          sessionTitle,
+          fullPrompt,
+          senderInfo
+        );
+
+        if (session?.id) {
+          // Update active session with new sessionId
+          setActiveSession(message.chat_jid, {
+            ...activeSession,
+            sessionId: session.id,
+          });
+
+          await startChatSession(session.id, fullPrompt, message.chat_jid);
+        }
       }
 
-      log('INFO', `Follow-up processed for session ${activeSession.sessionId}`);
+      log('INFO', `Follow-up sent to Quack session, Claude will respond via WhatsApp MCP`);
       this.stats.totalProcessed++;
       this.stats.lastSuccess = new Date().toISOString();
       saveProcessedIds(this.processedIds, this.stats);
@@ -1324,7 +1331,7 @@ class WhatsAppWatcher {
       if (CONFIG.thinkingMessage) {
         await sendWhatsAppResponse(
           message.chat_jid,
-          `${CONFIG.successEmoji} *${agent.name}* sta elaborando...`
+          `${CONFIG.successEmoji} *${agent.name}* sta elaborando in Quack...`
         );
       }
 
@@ -1338,30 +1345,6 @@ class WhatsAppWatcher {
       if (context.length > 0) {
         log('DEBUG', `Including ${context.length} messages of context`);
       }
-
-      // Call Claude directly and get response
-      log('INFO', `Calling Claude in project: ${agent.projectPath}`);
-      const response = await processWithAgent(
-        trigger.query,
-        agent,
-        agent.projectPath,
-        context
-      );
-
-      // Send Claude's response directly to WhatsApp
-      const truncatedResponse = response.length > CONFIG.maxResponseLength
-        ? response.substring(0, CONFIG.maxResponseLength - 50) + '\n\n... (risposta troncata)'
-        : response;
-
-      // Include hint for continuous conversation
-      const continuousHint = CONFIG.enableContinuousConversation
-        ? `\n\n💬 _Puoi continuare a scrivere senza ripetere ${trigger.trigger || '@quack'}_`
-        : '';
-
-      await sendWhatsAppResponse(
-        message.chat_jid,
-        `${CONFIG.successEmoji} *${agent.name}*:\n\n${truncatedResponse}${continuousHint}`
-      );
 
       // Create a title from the query (first 50 chars)
       const sessionTitle = `WhatsApp: ${trigger.query.substring(0, 50)}${trigger.query.length > 50 ? '...' : ''}`;
@@ -1383,7 +1366,8 @@ class WhatsAppWatcher {
         fullDescription = `**WhatsApp Context:**\n${contextStr}\n\n**Request:**\n${trigger.query}`;
       }
 
-      // Try to create Quack session for tracking (non-blocking)
+      // STEP 1: Create Quack session via HTTP API
+      log('INFO', `Creating Quack session for agent: ${agent.name}`);
       let sessionId = null;
       try {
         const session = await createKanbanSession(
@@ -1395,10 +1379,20 @@ class WhatsAppWatcher {
           senderInfo
         );
         sessionId = session?.id;
-        log('DEBUG', `Quack session created for tracking: ${sessionId}`);
-      } catch (trackingErr) {
-        log('DEBUG', `Could not create Quack session: ${trackingErr.message}`);
+        log('INFO', `Quack session created: ${sessionId}`);
+      } catch (sessionErr) {
+        log('ERROR', `Failed to create Quack session: ${sessionErr.message}`);
+        throw new Error(`Could not create Quack session: ${sessionErr.message}`);
       }
+
+      if (!sessionId) {
+        throw new Error('Session ID not returned from Quack API');
+      }
+
+      // STEP 2: Auto-start the chat in Quack with WhatsApp MCP instruction
+      // Claude in Quack has access to WhatsApp MCP and will respond directly
+      log('INFO', `Starting chat in Quack with WhatsApp recipient: ${message.chat_jid}`);
+      await startChatSession(sessionId, fullDescription, message.chat_jid);
 
       // Save as active session for this chat (enables continuous conversation)
       setActiveSession(message.chat_jid, {
@@ -1415,7 +1409,7 @@ class WhatsAppWatcher {
       this.stats.lastSuccess = new Date().toISOString();
       saveProcessedIds(this.processedIds, this.stats);
 
-      log('INFO', `Response sent to WhatsApp, session active for chat ${message.chat_jid}`);
+      log('INFO', `Chat started in Quack, Claude will respond via WhatsApp MCP to ${message.chat_jid}`);
 
     } catch (err) {
       log('ERROR', `Error processing: ${err.message}`);

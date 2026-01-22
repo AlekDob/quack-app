@@ -459,6 +459,64 @@ async fn handle_add_message(
     }
 }
 
+// ============================================================
+// WhatsApp Auto-Start Chat Endpoint
+// ============================================================
+
+#[derive(Deserialize, Clone, Debug)]
+struct StartChatPayload {
+    session_id: String,
+    prompt: String,
+    #[serde(default)]
+    whatsapp_recipient: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+struct StartChatResponse {
+    success: bool,
+    error: Option<String>,
+}
+
+/// Start a chat session with auto-send prompt
+/// This emits an event that the frontend listens to for auto-starting the chat
+async fn handle_start_chat(
+    State(state): State<HookState>,
+    Json(payload): Json<StartChatPayload>,
+) -> (StatusCode, Json<StartChatResponse>) {
+    log::info!("🚀 Auto-starting chat for session: {}", payload.session_id);
+
+    // Emit event to frontend to auto-start the chat
+    let result = state.app.emit("session-auto-start", serde_json::json!({
+        "sessionId": payload.session_id,
+        "prompt": payload.prompt,
+        "whatsappRecipient": payload.whatsapp_recipient,
+        "autoSend": true,
+    }));
+
+    match result {
+        Ok(_) => {
+            log::info!("✅ Auto-start event emitted for session: {}", payload.session_id);
+            (
+                StatusCode::OK,
+                Json(StartChatResponse {
+                    success: true,
+                    error: None,
+                }),
+            )
+        }
+        Err(e) => {
+            log::error!("Failed to emit auto-start event: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(StartChatResponse {
+                    success: false,
+                    error: Some(format!("Failed to emit event: {}", e)),
+                }),
+            )
+        }
+    }
+}
+
 async fn handle_status_update(
     State(state): State<HookState>,
     Json(payload): Json<HookPayload>,
@@ -785,6 +843,7 @@ pub fn run() {
                     .route("/terminal/status", post(handle_status_update))
                     .route("/session/create", post(handle_create_session))
                     .route("/session/message", post(handle_add_message))
+                    .route("/session/start-chat", post(handle_start_chat))
                     .route("/proxy", get(proxy::proxy_handler))
                     .with_state(state)
                     .merge(telegram_router);
