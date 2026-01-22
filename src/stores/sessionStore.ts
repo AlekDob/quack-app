@@ -102,7 +102,9 @@ export const useSessionStore = create<SessionState>()(
             set({ isLoading: true });
           }
           try {
+            const previousCount = get().sessions.length;
             const sessions = await loadAgentSessions();
+            console.log(`[sessionStore] loadSessions: previous=${previousCount}, loaded=${sessions.length}`);
             set({ sessions, isLoading: false });
           } catch (error) {
             console.error('[sessionStore] Failed to load sessions:', error);

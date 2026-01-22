@@ -1,9 +1,12 @@
 /**
  * KanbanWatcherInitializer Component
  *
- * Initializes Kanban tasks file watcher on app startup.
- * Watches the quack-kanban-tasks.json file for changes made by the MCP server
+ * Initializes unified storage file watcher on app startup.
+ * Watches the quack-agents.json file for changes made by the MCP server V2
  * and triggers immediate UI updates via events (no polling delay).
+ *
+ * NOTE: V2 unified architecture uses quack-agents.json for BOTH agents AND sessions.
+ * Sessions ARE the Kanban cards (sessions-first architecture).
  *
  * This component renders nothing - it's purely for side effects.
  *
@@ -19,7 +22,7 @@ import { join } from '@tauri-apps/api/path';
  * Invisible component that initializes Kanban watcher
  *
  * Should be mounted once at the app root level.
- * Automatically starts watching the Kanban tasks file on mount.
+ * Automatically starts watching the sessions file on mount.
  */
 export default function KanbanWatcherInitializer(): null {
   const [watcherActive, setWatcherActive] = useState<boolean>(false);
@@ -28,24 +31,25 @@ export default function KanbanWatcherInitializer(): null {
   useEffect(() => {
     const initializeWatcher = async () => {
       try {
-        // Get the path to quack-kanban-tasks.json based on OS
+        // Get the path to quack-agents.json based on OS
+        // NOTE: V2 unified architecture uses quack-agents.json for BOTH agents AND sessions
         const home = await homeDir();
-        let kanbanTasksPath: string;
+        let unifiedFilePath: string;
 
         if (navigator.userAgent.includes('Mac')) {
-          kanbanTasksPath = await join(home, 'Library', 'Application Support', 'com.quack.terminal', 'quack-kanban-tasks.json');
+          unifiedFilePath = await join(home, 'Library', 'Application Support', 'com.quack.terminal', 'quack-agents.json');
         } else if (navigator.userAgent.includes('Win')) {
-          kanbanTasksPath = await join(home, 'AppData', 'Roaming', 'com.quack.terminal', 'quack-kanban-tasks.json');
+          unifiedFilePath = await join(home, 'AppData', 'Roaming', 'com.quack.terminal', 'quack-agents.json');
         } else {
           // Linux
-          kanbanTasksPath = await join(home, '.local', 'share', 'com.quack.terminal', 'quack-kanban-tasks.json');
+          unifiedFilePath = await join(home, '.local', 'share', 'com.quack.terminal', 'quack-agents.json');
         }
 
-        console.log('[KanbanWatcherInitializer] Starting watcher for:', kanbanTasksPath);
+        console.log('[KanbanWatcherInitializer] Starting watcher for unified storage file:', unifiedFilePath);
 
-        // Start the file watcher
+        // Start the file watcher for unified storage file (V2 architecture)
         await invoke<void>('kanban_start_watcher', {
-          filePath: kanbanTasksPath,
+          filePath: unifiedFilePath,
         });
 
         console.log('[KanbanWatcherInitializer] Watcher started successfully');

@@ -121,11 +121,11 @@ export const MemoryIndicator: React.FC<MemoryIndicatorProps> = ({
             </div>
           )}
 
-          {/* Auto-extracted keywords (fallback) */}
+          {/* Auto-extracted keywords (fallback) - deduplicated for display */}
           {!query && keywords.length > 0 && (
             <div className="memory-indicator-keywords">
               <span className="memory-indicator-keywords-label">Auto:</span>
-              {keywords.map((keyword, idx) => (
+              {[...new Set(keywords)].map((keyword, idx) => (
                 <span key={idx} className="memory-indicator-keyword auto-keyword">
                   <span className="keyword-dot">○</span> {keyword}
                 </span>

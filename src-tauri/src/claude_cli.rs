@@ -17,34 +17,57 @@ static ACTIVE_PROCESSES: Lazy<TokioMutex<HashMap<String, ChildStdin>>> =
     Lazy::new(|| TokioMutex::new(HashMap::new()));
 
 /// Send a message to an active SDK process via stdin
-pub async fn send_to_process(agent_id: &str, message: &str) -> Result<(), String> {
+/// Send message to a running process via stdin
+/// 🦆 FIX: Now uses process_key (sessionKey) instead of agent_id to support concurrent sessions
+pub async fn send_to_process(process_key: &str, message: &str) -> Result<(), String> {
+    log::info!("[SDK] 📤 send_to_process called for process: {}", process_key);
+
     let mut processes = ACTIVE_PROCESSES.lock().await;
 
-    if let Some(stdin) = processes.get_mut(agent_id) {
+    // Log active process count for debugging
+    log::info!("[SDK] 📤 Active processes count: {}, looking for: {}", processes.len(), process_key);
+
+    if let Some(stdin) = processes.get_mut(process_key) {
         let line = format!("{}\n", message);
+        log::info!("[SDK] 📤 Writing {} bytes to stdin...", line.len());
+
         stdin.write_all(line.as_bytes()).await
-            .map_err(|e| format!("Failed to write to process stdin: {}", e))?;
+            .map_err(|e| {
+                log::error!("[SDK] ❌ Failed to write to process stdin: {}", e);
+                format!("Failed to write to process stdin: {}", e)
+            })?;
+
+        log::info!("[SDK] 📤 Flushing stdin...");
         stdin.flush().await
-            .map_err(|e| format!("Failed to flush process stdin: {}", e))?;
-        log::info!("[SDK] 📤 Sent message to process {}: {}...", agent_id, &message[..std::cmp::min(100, message.len())]);
+            .map_err(|e| {
+                log::error!("[SDK] ❌ Failed to flush process stdin: {}", e);
+                format!("Failed to flush process stdin: {}", e)
+            })?;
+
+        log::info!("[SDK] ✅ Sent message to process {}: {}...", process_key, &message[..std::cmp::min(100, message.len())]);
         Ok(())
     } else {
-        Err(format!("No active process found for agent: {}", agent_id))
+        // Log all available process IDs for debugging
+        let available_ids: Vec<&String> = processes.keys().collect();
+        log::error!("[SDK] ❌ No active process found for process: {}. Available: {:?}", process_key, available_ids);
+        Err(format!("No active process found for process: {}. Available: {:?}", process_key, available_ids))
     }
 }
 
 /// Register an active process stdin
-async fn register_process_stdin(agent_id: String, stdin: ChildStdin) {
+/// 🦆 FIX: Use process_key (sessionKey or agentId) to support multiple concurrent sessions per agent
+async fn register_process_stdin(process_key: String, stdin: ChildStdin) {
     let mut processes = ACTIVE_PROCESSES.lock().await;
-    processes.insert(agent_id.clone(), stdin);
-    log::info!("[SDK] 📝 Registered stdin for agent: {}", agent_id);
+    processes.insert(process_key.clone(), stdin);
+    log::info!("[SDK] 📝 Registered stdin for process: {}", process_key);
 }
 
 /// Unregister a process when it completes
-async fn unregister_process(agent_id: &str) {
+/// 🦆 FIX: Use process_key (sessionKey or agentId) to support multiple concurrent sessions per agent
+async fn unregister_process(process_key: &str) {
     let mut processes = ACTIVE_PROCESSES.lock().await;
-    processes.remove(agent_id);
-    log::info!("[SDK] 🗑️ Unregistered stdin for agent: {}", agent_id);
+    processes.remove(process_key);
+    log::info!("[SDK] 🗑️ Unregistered stdin for process: {}", process_key);
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1004,8 +1027,14 @@ pub async fn send_message_via_sdk_streaming(
         user_keywords, // 🧠 User-selected priority keywords for memory search (3x weight)
     } = request;
 
-    // 🦆 SESSION-FIRST: Use session_key or fallback to agent_id for event routing
-    let event_session_key = session_key.unwrap_or_else(|| agent_id.clone());
+    // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
+    let event_session_key = match &session_key {
+        Some(key) => key.clone(),
+        None => {
+            log::warn!("⚠️ [SDK] session_key missing in request! Using agent_id as fallback. This may cause session mixing.");
+            agent_id.clone()
+        }
+    };
 
     // Use provided cwd or fallback to current directory
     let working_dir = cwd.or_else(|| {
@@ -1359,8 +1388,9 @@ pub async fn send_message_via_sdk_streaming(
     log::info!("[SDK DEBUG] Node.js process spawned successfully");
 
     // Take stdin for bidirectional communication (AskUserQuestion)
+    // 🦆 FIX: Use event_session_key instead of agent_id to support multiple concurrent sessions
     if let Some(stdin) = child.stdin.take() {
-        register_process_stdin(agent_id.clone(), stdin).await;
+        register_process_stdin(event_session_key.clone(), stdin).await;
     }
 
     // Read stdout for events (in foreground to stream in real-time)
@@ -1450,15 +1480,17 @@ pub async fn send_message_via_sdk_streaming(
                         }
                     }
                     ClaudeEvent::AskUserQuestion { request_id, questions, .. } => {
-                        log::info!("[SDK] 🗣️ AskUserQuestion event: requestId={}, {} questions", request_id, questions.len());
+                        log::info!("[SDK] 🗣️ AskUserQuestion event: requestId={}, {} questions, sessionKey={}", request_id, questions.len(), event_session_key);
                         // Emit ask_user_question event to frontend using BOTH:
                         // 1. Agent-specific event (for backwards compatibility)
                         // 2. Global event (more reliable, frontend filters by agentId)
+                        // 🦆 FIX: Include sessionKey so frontend can track pending questions per session
                         let ask_event_name = format!("ask-user-question:{}", agent_id);
                         let payload = serde_json::json!({
                             "requestId": request_id,
                             "questions": questions,
-                            "agentId": agent_id
+                            "agentId": agent_id,
+                            "sessionKey": event_session_key
                         });
 
                         // Emit to agent-specific listener
@@ -1554,7 +1586,8 @@ pub async fn send_message_via_sdk_streaming(
         .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?;
 
     // Cleanup: unregister the process stdin
-    unregister_process(&agent_id).await;
+    // 🦆 FIX: Use event_session_key instead of agent_id to match registration
+    unregister_process(&event_session_key).await;
 
     // Collect stderr if available
     let stderr_output = if let Some(handle) = stderr_handle {
@@ -1656,13 +1689,15 @@ pub async fn send_tool_result_to_sdk(
 
 /// Send answers to an AskUserQuestion request via stdin to the active SDK process
 /// This uses the bidirectional communication system to respond to the Node.js process
+/// 🦆 FIX: Now uses agent_id as process_key (sessionKey) to support concurrent sessions
 #[tauri::command]
 pub async fn answer_user_question(
-    agent_id: String,
+    agent_id: String,  // Note: This is actually the processKey (sessionKey or agentId)
     request_id: String,
     answers: serde_json::Value,
 ) -> Result<(), String> {
-    log::info!("[SDK] 🗣️ Answering user question for agent: {}, requestId: {}", agent_id, request_id);
+    // Note: agent_id parameter name kept for backwards compatibility, but it's actually the process_key
+    log::info!("[SDK] 🗣️ Answering user question for process: {}, requestId: {}", agent_id, request_id);
     log::info!("[SDK] 🗣️ Answers: {:?}", answers);
 
     // Build the response message
@@ -1674,7 +1709,7 @@ pub async fn answer_user_question(
     let message = serde_json::to_string(&response)
         .map_err(|e| format!("Failed to serialize answer: {}", e))?;
 
-    // Send to the active process via stdin
+    // Send to the active process via stdin (agent_id is actually the process_key/sessionKey)
     send_to_process(&agent_id, &message).await?;
 
     log::info!("[SDK] 🗣️ Answer sent successfully");

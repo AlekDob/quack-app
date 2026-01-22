@@ -6,7 +6,7 @@ interface SplashScreenProps {
   version?: string;
 }
 
-const SPLASH_DURATION = 3000; // Total animation time (3 seconds - down from 5)
+const SPLASH_DURATION = 4000; // Total animation time (4 seconds)
 
 /**
  * Splash screen for "Watch Intro" replay feature

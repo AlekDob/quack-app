@@ -14,11 +14,13 @@ let isLoading = false;
 let loadPromise: Promise<Record<string, string>> | null = null;
 
 /**
- * Convert project path to repo key (last segment of path)
+ * Convert project path to repo key (matches TerminalSidebar storage format)
+ * Storage uses "repo-{name}" format, so we must match it
  */
 function pathToRepoKey(projectPath: string): string {
   const segments = projectPath.split('/').filter(Boolean);
-  return segments[segments.length - 1] || projectPath;
+  const name = segments[segments.length - 1] || projectPath;
+  return `repo-${name}`;
 }
 
 /**

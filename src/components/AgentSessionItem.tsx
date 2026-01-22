@@ -13,6 +13,8 @@ interface AgentSessionItemProps {
   chatMessages?: ChatMessage[];
   /** Whether the session is currently loading (streaming response) */
   isLoading?: boolean;
+  /** Whether the session has a pending AskUserQuestion (awaiting user response) */
+  hasPendingQuestion?: boolean;
   /** Callback to mark session as done (moves to Kanban done column) */
   onMarkDone?: (sessionId: string) => void;
   /** Callback to delete session */
@@ -23,11 +25,14 @@ interface AgentSessionItemProps {
 
 /**
  * Get status dot color based on activity state
- * - Gray: no conversation (empty)
+ * Priority: Awaiting > Working > Ready > Empty
+ * - Purple: awaiting response (has pending question)
  * - Yellow/Orange: working (loading)
  * - Green: ready (agent responded, waiting for user)
+ * - Gray: no conversation (empty)
  */
-function getActivityDotColor(isLoading: boolean, hasUnread: boolean, isEmpty: boolean): string {
+function getActivityDotColor(hasPendingQuestion: boolean, isLoading: boolean, hasUnread: boolean, isEmpty: boolean): string {
+  if (hasPendingQuestion) return '#a855f7'; // Purple - awaiting user response (HIGHEST PRIORITY)
   if (isLoading) return '#f59e0b'; // Yellow/Orange - working
   if (hasUnread) return '#22c55e'; // Green - ready (agent responded)
   if (isEmpty) return '#6b7280'; // Gray - no conversation
@@ -51,6 +56,7 @@ function AgentSessionItem({
   agentColor = '#00D4FF',
   chatMessages = [],
   isLoading = false,
+  hasPendingQuestion = false,
   onMarkDone,
   onDelete,
   onRename,
@@ -152,11 +158,19 @@ function AgentSessionItem({
   }, [chatMessages, isDormant, isActuallyLoading]);
 
   // Get dot color based on activity state
-  // Green when agent is ready (regardless of isActive), yellow when loading, gray otherwise
-  const dotColor = getActivityDotColor(isActuallyLoading, isAgentReady, isChatEmpty || isDormant);
-  
+  // Priority: Awaiting (purple) > Working (yellow) > Ready (green) > Empty (gray)
+  const dotColor = getActivityDotColor(hasPendingQuestion, isActuallyLoading, isAgentReady, isChatEmpty || isDormant);
+
   // Check if there are unread messages (used for pulse animation on dot)
   const hasUnreadMessages = isAgentReady && !isActive;
+
+  // Determine dot CSS class based on state priority
+  const getDotClassName = (): string => {
+    if (hasPendingQuestion) return 'session-dot awaiting';
+    if (isActuallyLoading) return 'session-dot working';
+    if (hasUnreadMessages) return 'session-dot ready';
+    return 'session-dot';
+  };
 
   return (
     <div
@@ -202,19 +216,27 @@ function AgentSessionItem({
         }
       }}
     >
-      {/* Activity Indicator Dot - Gray (empty), Yellow (working), Green (ready) */}
+      {/* Activity Indicator Dot - Purple (awaiting), Yellow (working), Green (ready), Gray (empty) */}
       {/* NOTE: "Quack quack..." tooltip removed - shown at AGENT level, not session level */}
-      <div style={{ position: 'relative', flexShrink: 0 }}>
+      <div style={{ position: 'relative', flexShrink: 0, width: '12px', height: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div
-          className={isActuallyLoading ? 'session-dot working' : hasUnreadMessages ? 'session-dot ready' : 'session-dot'}
+          className={getDotClassName()}
           style={{
-            width: '8px',
-            height: '8px',
+            width: hasPendingQuestion ? '12px' : '8px',
+            height: hasPendingQuestion ? '12px' : '8px',
             borderRadius: '50%',
             background: dotColor,
             boxShadow: `0 0 6px ${dotColor}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-        />
+        >
+          {/* Question mark for awaiting state */}
+          {hasPendingQuestion && (
+            <span className="session-dot-question">?</span>
+          )}
+        </div>
       </div>
 
       {/* Session Content - title + progress bar */}
@@ -229,7 +251,7 @@ function AgentSessionItem({
               whiteSpace: 'nowrap',
             }}
           >
-            {session.title.length > 25 ? session.title.substring(0, 25) + '...' : session.title}
+            {(session.title || 'Untitled').length > 25 ? (session.title || 'Untitled').substring(0, 25) + '...' : (session.title || 'Untitled')}
           </span>
         </div>
 

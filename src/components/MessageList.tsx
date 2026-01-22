@@ -19,7 +19,7 @@ interface MessageListProps {
   // Thinking mode reset key (changes when mode cycles)
   thinkingModeResetKey?: string | number;
   // AskUserQuestion support
-  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers, sessionKey?: string) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
   // Current session ID for display in chat header

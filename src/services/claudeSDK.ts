@@ -722,24 +722,44 @@ export async function sendToolResult(
 /**
  * Answer an AskUserQuestion request via stdin to the active SDK process
  * This is the new approach that uses bidirectional communication
+ * Includes timeout (5s) and retry logic (3 attempts) to handle race conditions
  */
 export async function answerUserQuestionViaStdin(
   agentId: string,
   requestId: string,
-  answers: Record<string, string>
+  answers: Record<string, string>,
+  maxRetries = 3,
+  timeoutMs = 5000
 ): Promise<void> {
   console.log('[claudeSDK] 🗣️ Answering user question via stdin:', { agentId, requestId, answers });
 
-  try {
-    await invoke('answer_user_question', {
-      agentId,
-      requestId,
-      answers,
-    });
-    console.log('[claudeSDK] 🗣️ Answer sent successfully via stdin');
-  } catch (err) {
-    console.error('[claudeSDK] Failed to send answer via stdin:', err);
-    throw err;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Race between the invoke and a timeout
+      await Promise.race([
+        invoke('answer_user_question', {
+          agentId,
+          requestId,
+          answers,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
+        )
+      ]);
+      console.log('[claudeSDK] 🗣️ Answer sent successfully via stdin');
+      return; // Success - exit function
+    } catch (err) {
+      console.warn(`[claudeSDK] ⚠️ Attempt ${attempt}/${maxRetries} failed:`, err);
+
+      if (attempt === maxRetries) {
+        console.error('[claudeSDK] ❌ All retry attempts failed');
+        throw err;
+      }
+
+      // Wait 500ms before next retry
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log(`[claudeSDK] 🔄 Retrying... (attempt ${attempt + 1}/${maxRetries})`);
+    }
   }
 }
 

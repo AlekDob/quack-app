@@ -242,6 +242,7 @@ function AgentSessionList({
   // Reading from chatStore directly to get real-time loading state updates
   const chatSessions = useChatStore((state) => state.chatSessions);
   const chatLoadingMap = useChatStore((state) => state.chatLoadingMap);
+  const pendingQuestionsMap = useChatStore((state) => state.pendingQuestionsMap);
 
   // Load sessions on mount
   useEffect(() => {
@@ -309,6 +310,10 @@ function AgentSessionList({
       {/* Session list */}
       {visibleSessions.map((session) => {
         const isLoadingForSession = chatLoadingMap.get(session.id) ?? false;
+        // 🦆 FIX: Check pending questions using session.id (the sessionKey from the event)
+        // pendingQuestionsMap is now keyed by sessionId (not agentId) to show "?" only on the correct session
+        const pendingQuestionsSet = pendingQuestionsMap.get(session.id);
+        const hasPendingQuestion = pendingQuestionsSet ? pendingQuestionsSet.size > 0 : false;
         return (
           <AgentSessionItem
             key={session.id}
@@ -319,6 +324,7 @@ function AgentSessionList({
             // 🦆 SESSIONS-FIRST: Pass chat data for activity indicators
             chatMessages={chatSessions.get(session.id) || []}
             isLoading={isLoadingForSession}
+            hasPendingQuestion={hasPendingQuestion}
             // Context menu callbacks
             onMarkDone={handleMarkDone}
             onDelete={handleDeleteRequest}

@@ -608,24 +608,65 @@ function getEntityWithObservations(entityId) {
 /**
  * Handle brain_search tool
  * Search entities using FTS5 full-text search
+ *
+ * Supports optional projectId filter to scope results to a specific project.
+ * Query is sanitized to handle special characters (e.g., hyphens in "studio-futuro").
  */
 async function handleBrainSearch(args) {
-  const { query, limit = 10 } = args;
+  const { query, limit = 10, projectId } = args;
 
-  console.error(`[BrainMCP] Search: "${query}" (limit: ${limit})`);
+  console.error(`[BrainMCP] Search: "${query}" (limit: ${limit}, project: ${projectId || 'all'})`);
 
   try {
     const db = getDb();
 
-    // Use FTS5 search
-    const results = db.prepare(`
-      SELECT e.id, e.name, e.entity_type, rank
-      FROM entities e
-      JOIN entities_fts fts ON e.rowid = fts.rowid
-      WHERE entities_fts MATCH ?
-      ORDER BY rank
-      LIMIT ?
-    `).all(query, limit);
+    // Sanitize query for FTS5 - remove special chars that break syntax
+    // e.g., "studio-futuro" becomes "studio futuro" (hyphen is NOT operator in FTS5)
+    const sanitizedQuery = query
+      .replace(/[^\w\s]/g, ' ')  // Remove special chars (hyphens, etc.)
+      .replace(/\s+/g, ' ')      // Normalize whitespace
+      .trim();
+
+    // Use prefix matching for better recall (e.g., "auth" matches "authentication")
+    const terms = sanitizedQuery.split(' ').filter(t => t.length > 0);
+    const ftsQuery = terms.map(t => `${t}*`).join(' OR ');
+
+    console.error(`[BrainMCP] FTS5 query: "${ftsQuery}"`);
+
+    let sql;
+    let params;
+
+    if (projectId) {
+      // Filter by project: include project-scoped AND global entities
+      sql = `
+        SELECT e.id, e.name, e.entity_type, e.project_id, rank,
+          CASE
+            WHEN e.project_id = ? THEN 1
+            WHEN e.project_id IS NULL THEN 2
+            ELSE 3
+          END as scope_priority
+        FROM entities e
+        JOIN entities_fts fts ON e.rowid = fts.rowid
+        WHERE entities_fts MATCH ?
+          AND (e.project_id = ? OR e.project_id IS NULL)
+        ORDER BY scope_priority ASC, rank ASC
+        LIMIT ?
+      `;
+      params = [projectId, ftsQuery, projectId, limit];
+    } else {
+      // No project filter - return all results
+      sql = `
+        SELECT e.id, e.name, e.entity_type, e.project_id, rank
+        FROM entities e
+        JOIN entities_fts fts ON e.rowid = fts.rowid
+        WHERE entities_fts MATCH ?
+        ORDER BY rank ASC
+        LIMIT ?
+      `;
+      params = [ftsQuery, limit];
+    }
+
+    const results = db.prepare(sql).all(...params);
 
     // Get full entities with observations
     const entities = results.map(r => {
@@ -641,6 +682,8 @@ async function handleBrainSearch(args) {
     return JSON.stringify({
       success: true,
       query,
+      searchTerms: terms,
+      projectId: projectId || null,
       count: entities.length,
       entities,
     }, null, 2);

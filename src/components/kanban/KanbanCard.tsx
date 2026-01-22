@@ -199,9 +199,10 @@ export default function KanbanCard({
       : projectColor;
 
   // Truncate title if too long (increased limit for better readability)
-  const displayTitle = task.title.length > 80
-    ? task.title.substring(0, 80) + '...'
-    : task.title;
+  const safeTitle = task.title || 'Untitled';
+  const displayTitle = safeTitle.length > 80
+    ? safeTitle.substring(0, 80) + '...'
+    : safeTitle;
 
   // Truncate prompt/command preview
   const previewText = isShellTask || isWatchTask
@@ -562,9 +563,10 @@ export function KanbanCardOverlay({ task }: { task: KanbanTask }) {
       ? TASK_TYPE_COLORS.watch
       : projectColor;
 
-  const displayTitle = task.title.length > 80
-    ? task.title.substring(0, 80) + '...'
-    : task.title;
+  const safeTitleDrag = task.title || 'Untitled';
+  const displayTitle = safeTitleDrag.length > 80
+    ? safeTitleDrag.substring(0, 80) + '...'
+    : safeTitleDrag;
 
   return (
     <div className="kanban-card dragging-overlay">

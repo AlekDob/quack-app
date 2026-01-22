@@ -107,7 +107,7 @@ interface ChatViewProps {
   // Callback to open Kanban view (passed from App.tsx)
   onOpenKanban?: () => void;
   // AskUserQuestion support
-  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers, sessionKey?: string) => void;
   pendingQuestionIds?: Set<string>;
   answeredQuestions?: Map<string, AskUserQuestionAnswers>;
   // Current session ID for display (Claude Code session ID)

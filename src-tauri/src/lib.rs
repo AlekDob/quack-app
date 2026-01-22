@@ -106,6 +106,359 @@ fn default_true() -> bool {
     true
 }
 
+// ============================================================
+// WhatsApp Session Creation Endpoint
+// ============================================================
+
+#[derive(Deserialize, Clone, Debug)]
+struct CreateSessionPayload {
+    agent_id: String,
+    project_path: String,
+    project_name: String,
+    title: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    whatsapp_sender: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+struct CreateSessionResponse {
+    success: bool,
+    session_id: Option<String>,
+    error: Option<String>,
+}
+
+/// Create a new session from external sources (like WhatsApp watcher)
+/// This endpoint properly handles file locking and emits events to update the UI
+async fn handle_create_session(
+    State(state): State<HookState>,
+    Json(payload): Json<CreateSessionPayload>,
+) -> (StatusCode, Json<CreateSessionResponse>) {
+    use std::fs;
+    use std::path::PathBuf;
+    use uuid::Uuid;
+
+    log::info!("📱 Creating session from external source: {:?}", payload.source);
+
+    // Get the storage path
+    let storage_path = if cfg!(target_os = "macos") {
+        dirs::home_dir()
+            .map(|h| h.join("Library/Application Support/com.quack.terminal/quack-agents.json"))
+    } else if cfg!(target_os = "windows") {
+        std::env::var("APPDATA")
+            .ok()
+            .map(|p| PathBuf::from(p).join("com.quack.terminal/quack-agents.json"))
+    } else {
+        dirs::home_dir()
+            .map(|h| h.join(".local/share/com.quack.terminal/quack-agents.json"))
+    };
+
+    let storage_path = match storage_path {
+        Some(p) => p,
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CreateSessionResponse {
+                    success: false,
+                    session_id: None,
+                    error: Some("Failed to determine storage path".to_string()),
+                }),
+            );
+        }
+    };
+
+    // Read current storage
+    let storage_content = match fs::read_to_string(&storage_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Failed to read storage file: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CreateSessionResponse {
+                    success: false,
+                    session_id: None,
+                    error: Some(format!("Failed to read storage: {}", e)),
+                }),
+            );
+        }
+    };
+
+    // Parse JSON
+    let mut storage: serde_json::Value = match serde_json::from_str(&storage_content) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse storage JSON: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CreateSessionResponse {
+                    success: false,
+                    session_id: None,
+                    error: Some(format!("Failed to parse storage: {}", e)),
+                }),
+            );
+        }
+    };
+
+    // Generate session ID
+    let session_id = format!("session-{}", Uuid::new_v4());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+
+    // Clone source for later use in event
+    let source_str = payload.source.clone().unwrap_or_else(|| "external".to_string());
+
+    // Create new session object
+    let new_session = serde_json::json!({
+        "id": session_id,
+        "title": payload.title,
+        "agentId": payload.agent_id,
+        "projectPath": payload.project_path,
+        "projectName": payload.project_name,
+        "status": "in_progress",
+        "createdAt": now,
+        "updatedAt": now,
+        "messageCount": 0,
+        "initialPrompt": payload.description,
+        "source": source_str,
+        "whatsappSender": payload.whatsapp_sender,
+    });
+
+    // Add to sessions array
+    if let Some(sessions) = storage.get_mut("sessions") {
+        if let Some(arr) = sessions.as_array_mut() {
+            arr.push(new_session);
+        }
+    } else {
+        // Create sessions array if it doesn't exist
+        storage["sessions"] = serde_json::json!([new_session]);
+    }
+
+    // Update agent lastActiveAt
+    if let Some(agents) = storage.get_mut("agents") {
+        if let Some(arr) = agents.as_array_mut() {
+            for agent in arr.iter_mut() {
+                if agent.get("id").and_then(|v| v.as_str()) == Some(&payload.agent_id) {
+                    agent["lastActiveAt"] = serde_json::json!(now);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Write back to file
+    match fs::write(&storage_path, serde_json::to_string_pretty(&storage).unwrap_or_default()) {
+        Ok(_) => {
+            log::info!("✅ Session created: {}", session_id);
+
+            // Emit event to frontend to reload sessions
+            let _ = state.app.emit("sessions-updated", serde_json::json!({
+                "action": "created",
+                "sessionId": session_id,
+                "source": source_str,
+            }));
+
+            (
+                StatusCode::OK,
+                Json(CreateSessionResponse {
+                    success: true,
+                    session_id: Some(session_id),
+                    error: None,
+                }),
+            )
+        }
+        Err(e) => {
+            log::error!("Failed to write storage file: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CreateSessionResponse {
+                    success: false,
+                    session_id: None,
+                    error: Some(format!("Failed to save session: {}", e)),
+                }),
+            )
+        }
+    }
+}
+
+// ============================================================
+// WhatsApp Follow-up Message Endpoint
+// ============================================================
+
+#[derive(Deserialize, Clone, Debug)]
+struct AddMessagePayload {
+    session_id: String,
+    content: String,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    sender_info: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+struct AddMessageResponse {
+    success: bool,
+    error: Option<String>,
+}
+
+/// Add a follow-up message to an existing session
+/// This is used for continuous WhatsApp conversations
+async fn handle_add_message(
+    State(state): State<HookState>,
+    Json(payload): Json<AddMessagePayload>,
+) -> (StatusCode, Json<AddMessageResponse>) {
+    use std::fs;
+    use std::path::PathBuf;
+
+    log::info!("📱 Adding message to session: {}", payload.session_id);
+
+    // Get the storage path
+    let storage_path = if cfg!(target_os = "macos") {
+        dirs::home_dir()
+            .map(|h| h.join("Library/Application Support/com.quack.terminal/quack-agents.json"))
+    } else if cfg!(target_os = "windows") {
+        std::env::var("APPDATA")
+            .ok()
+            .map(|p| PathBuf::from(p).join("com.quack.terminal/quack-agents.json"))
+    } else {
+        dirs::home_dir()
+            .map(|h| h.join(".local/share/com.quack.terminal/quack-agents.json"))
+    };
+
+    let storage_path = match storage_path {
+        Some(p) => p,
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AddMessageResponse {
+                    success: false,
+                    error: Some("Failed to determine storage path".to_string()),
+                }),
+            );
+        }
+    };
+
+    // Read current storage
+    let storage_content = match fs::read_to_string(&storage_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Failed to read storage file: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AddMessageResponse {
+                    success: false,
+                    error: Some(format!("Failed to read storage: {}", e)),
+                }),
+            );
+        }
+    };
+
+    // Parse JSON
+    let mut storage: serde_json::Value = match serde_json::from_str(&storage_content) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse storage JSON: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AddMessageResponse {
+                    success: false,
+                    error: Some(format!("Failed to parse storage: {}", e)),
+                }),
+            );
+        }
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+
+    // Find the session and update it
+    let mut session_found = false;
+    if let Some(sessions) = storage.get_mut("sessions") {
+        if let Some(arr) = sessions.as_array_mut() {
+            for session in arr.iter_mut() {
+                if session.get("id").and_then(|v| v.as_str()) == Some(&payload.session_id) {
+                    session_found = true;
+
+                    // Update session timestamp
+                    session["updatedAt"] = serde_json::json!(now);
+
+                    // Increment message count
+                    let current_count = session
+                        .get("messageCount")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0);
+                    session["messageCount"] = serde_json::json!(current_count + 1);
+
+                    // Append to pending messages (the frontend will process these)
+                    let pending_key = "pendingWhatsAppMessages";
+                    if session.get(pending_key).is_none() {
+                        session[pending_key] = serde_json::json!([]);
+                    }
+                    if let Some(pending) = session.get_mut(pending_key) {
+                        if let Some(arr) = pending.as_array_mut() {
+                            arr.push(serde_json::json!({
+                                "content": payload.content,
+                                "timestamp": now,
+                                "senderInfo": payload.sender_info,
+                            }));
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    if !session_found {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(AddMessageResponse {
+                success: false,
+                error: Some(format!("Session not found: {}", payload.session_id)),
+            }),
+        );
+    }
+
+    // Write back to file
+    match fs::write(&storage_path, serde_json::to_string_pretty(&storage).unwrap_or_default()) {
+        Ok(_) => {
+            log::info!("✅ Message added to session: {}", payload.session_id);
+
+            // Emit event to frontend to reload sessions
+            let _ = state.app.emit("sessions-updated", serde_json::json!({
+                "action": "message_added",
+                "sessionId": payload.session_id,
+                "source": payload.source.unwrap_or_else(|| "whatsapp".to_string()),
+            }));
+
+            (
+                StatusCode::OK,
+                Json(AddMessageResponse {
+                    success: true,
+                    error: None,
+                }),
+            )
+        }
+        Err(e) => {
+            log::error!("Failed to write storage file: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AddMessageResponse {
+                    success: false,
+                    error: Some(format!("Failed to save message: {}", e)),
+                }),
+            )
+        }
+    }
+}
+
 async fn handle_status_update(
     State(state): State<HookState>,
     Json(payload): Json<HookPayload>,
@@ -430,6 +783,8 @@ pub fn run() {
                 let telegram_router = telegram_bot::create_telegram_router(app_handle.clone());
                 let router = Router::new()
                     .route("/terminal/status", post(handle_status_update))
+                    .route("/session/create", post(handle_create_session))
+                    .route("/session/message", post(handle_add_message))
                     .route("/proxy", get(proxy::proxy_handler))
                     .with_state(state)
                     .merge(telegram_router);

@@ -9,6 +9,7 @@ interface ChatState {
   chatLoadingMap: Map<string, boolean>;
   chatTokensMap: Map<string, SessionUsage>;
   pendingAttachments: Map<string, ChatAttachment[]>; // Pending attachments per session
+  pendingQuestionsMap: Map<string, Set<string>>; // Session ID -> Set of pending question tool IDs
   activeAgent: AgentInfo | null;
   streamingMessage: ChatMessage | null;
 
@@ -20,6 +21,8 @@ interface ChatState {
   updateTokens: (sessionId: string, tokens: SessionUsage) => void;
   setActiveAgent: (agent: AgentInfo | null) => void;
   setStreamingMessage: (message: ChatMessage | null) => void;
+  setPendingQuestion: (sessionId: string, toolUseId: string, hasPending: boolean) => void;
+  clearPendingQuestions: (sessionId: string) => void;
 
   // Agent chat actions
   addAgentChat: (chat: AgentChat) => void;
@@ -37,6 +40,7 @@ interface ChatState {
   getSessionTokens: (sessionId: string) => SessionUsage | undefined;
   getAgentChatById: (id: string) => AgentChat | undefined;
   getAttachments: (sessionId: string) => ChatAttachment[];
+  hasPendingQuestion: (sessionId: string) => boolean;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -46,6 +50,7 @@ export const useChatStore = create<ChatState>()(
     chatLoadingMap: new Map(),
     chatTokensMap: new Map(),
     pendingAttachments: new Map(),
+    pendingQuestionsMap: new Map(),
     activeAgent: null,
     streamingMessage: null,
 
@@ -104,6 +109,33 @@ export const useChatStore = create<ChatState>()(
     setActiveAgent: (agent) => set({ activeAgent: agent }),
 
     setStreamingMessage: (message) => set({ streamingMessage: message }),
+
+    // Pending questions (for "awaiting response" state)
+    setPendingQuestion: (sessionId, toolUseId, hasPending) => set((state) => {
+      const newPendingMap = new Map(state.pendingQuestionsMap);
+      const currentSet = newPendingMap.get(sessionId) || new Set();
+      const newSet = new Set(currentSet);
+
+      if (hasPending) {
+        newSet.add(toolUseId);
+      } else {
+        newSet.delete(toolUseId);
+      }
+
+      if (newSet.size > 0) {
+        newPendingMap.set(sessionId, newSet);
+      } else {
+        newPendingMap.delete(sessionId);
+      }
+
+      return { pendingQuestionsMap: newPendingMap };
+    }),
+
+    clearPendingQuestions: (sessionId) => set((state) => {
+      const newPendingMap = new Map(state.pendingQuestionsMap);
+      newPendingMap.delete(sessionId);
+      return { pendingQuestionsMap: newPendingMap };
+    }),
 
     // Agent chat actions
     addAgentChat: (chat) => set((state) => ({
@@ -166,6 +198,12 @@ export const useChatStore = create<ChatState>()(
     getAttachments: (sessionId) => {
       const state = get();
       return state.pendingAttachments.get(sessionId) || [];
+    },
+
+    hasPendingQuestion: (sessionId) => {
+      const state = get();
+      const pendingSet = state.pendingQuestionsMap.get(sessionId);
+      return pendingSet ? pendingSet.size > 0 : false;
     },
   }), { name: 'chat-store' })
 );

@@ -207,17 +207,12 @@ export default function KanbanView({
   const totalDoneTasks = allDoneTasks.length;
   const hasMoreDone = hasMoreDoneTasks();
 
-  // Load tasks on mount, then load chat sessions from saved sessionIds
+  // Load tasks on mount
+  // Note: Chat sessions are now loaded at app startup (App.tsx), not here
+  // This prevents formatting loss when navigating to/from Kanban view
   useEffect(() => {
-    const initializeKanban = async () => {
-      await loadTasks();
-      // 🦆 Load saved chat sessions after tasks are loaded
-      if (onLoadChatSessions) {
-        await onLoadChatSessions();
-      }
-    };
-    initializeKanban();
-  }, [loadTasks, onLoadChatSessions]);
+    loadTasks();
+  }, [loadTasks]);
 
   // 🦆 MCP SYNC: Poll for task changes from external sources (MCP server, other windows)
   // This ensures the Kanban UI stays in sync when tasks are created/modified via MCP tools

@@ -338,11 +338,13 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
     // Force reload from disk to catch external changes
     try {
       await store.reload();
+      console.log("[unifiedAgentStorage] Store reloaded from disk");
     } catch (reloadError) {
       console.warn("[unifiedAgentStorage] Failed to reload sessions from disk:", reloadError);
     }
 
     const stored = await store.get<AgentSession[]>(SESSIONS_KEY);
+    console.log(`[unifiedAgentStorage] Got ${stored ? (Array.isArray(stored) ? stored.length : 'non-array') : 'null'} sessions from store`);
 
     // Handle empty storage
     if (!stored) {

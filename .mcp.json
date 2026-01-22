@@ -7,14 +7,6 @@
         "@modelcontextprotocol/server-puppeteer"
       ]
     },
-    "memory": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ]
-    },
     "context7": {
       "type": "stdio",
       "command": "npx",
@@ -25,22 +17,6 @@
       "env": {
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       }
-    },
-    "postgresql": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "${FLOW_POSTGRES_URL}"
-      ]
-    },
-    "brain": {
-      "type": "stdio",
-      "command": "/Users/alekdob/.nvm/versions/node/v22.21.0/bin/node",
-      "args": [
-        "src-tauri/node-sdk/brain-mcp-server.js"
-      ]
     }
   }
 }

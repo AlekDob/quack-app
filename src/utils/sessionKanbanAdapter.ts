@@ -45,7 +45,7 @@ export function sessionToKanbanTask(
 
   return {
     id: session.id,
-    title: session.title,
+    title: session.title || 'Untitled Session',
     prompt: session.initialPrompt || '', // Initial prompt from Kanban task creation
     status: session.status,
     assignedAgent,

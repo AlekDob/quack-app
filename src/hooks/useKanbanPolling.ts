@@ -21,6 +21,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useKanbanStore, kanbanWriteLock } from '../stores/kanbanStore';
+import { useSessionStore, sessionWriteLock } from '../stores/sessionStore';
 
 interface UseKanbanPollingOptions {
   /** Whether polling is enabled (default: true) */
@@ -35,7 +36,8 @@ interface UseKanbanPollingOptions {
 export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
   const { enabled = true, interval = 30000 } = options; // 30s fallback (not 3s!)
 
-  const loadTasks = useKanbanStore((state) => state.loadTasks);
+  // 🦆 SESSIONS-FIRST: Load sessions directly (kanbanStore.loadTasks is a no-op)
+  const loadSessions = useSessionStore((state) => state.loadSessions);
   // 🦆 SESSIONS-FIRST: Get tasks via getter instead of direct state access
   const getTasksByStatus = useKanbanStore((state) => state.getTasksByStatus);
 
@@ -83,23 +85,24 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
           }
 
           // Skip if a local write just happened (prevents race condition)
-          if (kanbanWriteLock.shouldSkipReload()) {
+          // Check both kanban and session write locks since they write to the same file
+          if (sessionWriteLock.shouldSkipReload() || kanbanWriteLock.shouldSkipReload()) {
             console.log('[useKanbanPolling] Skipping reload due to recent local write');
             return;
           }
 
-          // Reload tasks immediately
+          // Reload sessions immediately (sessions are the source of truth for Kanban V2)
           isPollingRef.current = true;
-          loadTasks({ silent: true })
+          loadSessions({ silent: true })
             .catch((error) => {
-              console.error('[useKanbanPolling] Failed to reload from event:', error);
+              console.error('[useKanbanPolling] Failed to reload sessions from event:', error);
             })
             .finally(() => {
               isPollingRef.current = false;
             });
         });
 
-        console.log('[useKanbanPolling] Event listener registered for kanban:tasks-changed');
+        console.log('[useKanbanPolling] Event listener registered for kanban:tasks-changed (sessions reload)');
       } catch (error) {
         console.error('[useKanbanPolling] Failed to setup event listener:', error);
       }
@@ -114,7 +117,7 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
         console.log('[useKanbanPolling] Event listener cleaned up');
       }
     };
-  }, [enabled, loadTasks]);
+  }, [enabled, loadSessions]);
 
   // === FALLBACK: Polling (30s safety net) ===
   useEffect(() => {
@@ -129,20 +132,20 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
       }
 
       // Skip if a local write just happened (prevents race condition)
-      if (kanbanWriteLock.shouldSkipReload()) {
+      if (sessionWriteLock.shouldSkipReload() || kanbanWriteLock.shouldSkipReload()) {
         return;
       }
 
       isPollingRef.current = true;
 
       try {
-        // Load tasks silently (no loading indicator) for stealth polling
-        await loadTasks({ silent: true });
+        // Load sessions silently (no loading indicator) for stealth polling
+        await loadSessions({ silent: true });
 
         // Note: fingerprint comparison happens automatically via the tasks effect above
-        // The store will only trigger re-renders if tasks actually changed
+        // The store will only trigger re-renders if sessions actually changed
       } catch (error) {
-        console.error('[useKanbanPolling] Failed to poll tasks:', error);
+        console.error('[useKanbanPolling] Failed to poll sessions:', error);
       } finally {
         isPollingRef.current = false;
       }
@@ -171,7 +174,7 @@ export function useKanbanPolling(options: UseKanbanPollingOptions = {}) {
       clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [enabled, interval, loadTasks]);
+  }, [enabled, interval, loadSessions]);
 
   // Return nothing - this hook just sets up side effects
 }

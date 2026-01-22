@@ -89,12 +89,12 @@ fn create_schema(conn: &Connection) -> Result<(), String> {
     ).map_err(|e| format!("Failed to create projects table: {}", e))?;
 
     // Full-text search virtual table
+    // Note: This is a contentless FTS5 table (content='') - we manage content manually via triggers
+    // We only index the entity name for fast text search
     conn.execute(
         "CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
             name,
-            content,
-            content='entities',
-            content_rowid='rowid'
+            content=''
         )",
         [],
     ).map_err(|e| format!("Failed to create FTS5 table: {}", e))?;
@@ -141,26 +141,26 @@ fn create_schema(conn: &Connection) -> Result<(), String> {
     // Create triggers for FTS5 automatic sync
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS entities_ai AFTER INSERT ON entities BEGIN
-            INSERT INTO entities_fts(rowid, name, content)
-            VALUES (new.rowid, new.name, '');
+            INSERT INTO entities_fts(rowid, name)
+            VALUES (new.rowid, new.name);
         END",
         [],
     ).map_err(|e| format!("Failed to create FTS insert trigger: {}", e))?;
 
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS entities_ad AFTER DELETE ON entities BEGIN
-            INSERT INTO entities_fts(entities_fts, rowid, name, content)
-            VALUES ('delete', old.rowid, old.name, '');
+            INSERT INTO entities_fts(entities_fts, rowid, name)
+            VALUES ('delete', old.rowid, old.name);
         END",
         [],
     ).map_err(|e| format!("Failed to create FTS delete trigger: {}", e))?;
 
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS entities_au AFTER UPDATE ON entities BEGIN
-            INSERT INTO entities_fts(entities_fts, rowid, name, content)
-            VALUES ('delete', old.rowid, old.name, '');
-            INSERT INTO entities_fts(rowid, name, content)
-            VALUES (new.rowid, new.name, '');
+            INSERT INTO entities_fts(entities_fts, rowid, name)
+            VALUES ('delete', old.rowid, old.name);
+            INSERT INTO entities_fts(rowid, name)
+            VALUES (new.rowid, new.name);
         END",
         [],
     ).map_err(|e| format!("Failed to create FTS update trigger: {}", e))?;
@@ -345,6 +345,75 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
         "CREATE INDEX IF NOT EXISTS idx_entities_status ON entities(status)",
         [],
     ).map_err(|e| format!("Failed to create status index: {}", e))?;
+
+    // Migration 6: Fix FTS table schema
+    // Old schemas that need migration:
+    // - FTS4: entities_fts(entity_id, name, entity_type, observations_text, tokenize=porter)
+    // - FTS5 with content: entities_fts(name, content, content='entities', content_rowid='rowid')
+    // New schema: entities_fts(name, content='') - contentless FTS5 table with only name column
+    let fts_schema = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='entities_fts'",
+        [],
+        |row| row.get::<_, String>(0)
+    ).unwrap_or_default();
+
+    // Need rebuild if: using FTS4, or has wrong columns, or has content='entities'
+    let fts_needs_rebuild = fts_schema.contains("fts4")
+        || fts_schema.contains("content='entities'")
+        || fts_schema.contains("entity_id")
+        || fts_schema.contains("observations_text")
+        || (!fts_schema.is_empty() && !fts_schema.contains("content=''"));
+
+    if fts_needs_rebuild {
+        log::info!("Migration 6: Rebuilding FTS5 table with corrected schema...");
+
+        // Drop old FTS table and triggers
+        conn.execute("DROP TRIGGER IF EXISTS entities_ai", [])
+            .map_err(|e| format!("Failed to drop FTS insert trigger: {}", e))?;
+        conn.execute("DROP TRIGGER IF EXISTS entities_ad", [])
+            .map_err(|e| format!("Failed to drop FTS delete trigger: {}", e))?;
+        conn.execute("DROP TRIGGER IF EXISTS entities_au", [])
+            .map_err(|e| format!("Failed to drop FTS update trigger: {}", e))?;
+        conn.execute("DROP TABLE IF EXISTS entities_fts", [])
+            .map_err(|e| format!("Failed to drop old FTS table: {}", e))?;
+
+        // Recreate with correct schema (contentless FTS5)
+        conn.execute(
+            "CREATE VIRTUAL TABLE entities_fts USING fts5(name, content='')",
+            [],
+        ).map_err(|e| format!("Failed to recreate FTS5 table: {}", e))?;
+
+        // Recreate triggers with correct schema (no 'content' column)
+        conn.execute(
+            "CREATE TRIGGER entities_ai AFTER INSERT ON entities BEGIN
+                INSERT INTO entities_fts(rowid, name) VALUES (new.rowid, new.name);
+            END",
+            [],
+        ).map_err(|e| format!("Failed to recreate FTS insert trigger: {}", e))?;
+
+        conn.execute(
+            "CREATE TRIGGER entities_ad AFTER DELETE ON entities BEGIN
+                INSERT INTO entities_fts(entities_fts, rowid, name) VALUES ('delete', old.rowid, old.name);
+            END",
+            [],
+        ).map_err(|e| format!("Failed to recreate FTS delete trigger: {}", e))?;
+
+        conn.execute(
+            "CREATE TRIGGER entities_au AFTER UPDATE ON entities BEGIN
+                INSERT INTO entities_fts(entities_fts, rowid, name) VALUES ('delete', old.rowid, old.name);
+                INSERT INTO entities_fts(rowid, name) VALUES (new.rowid, new.name);
+            END",
+            [],
+        ).map_err(|e| format!("Failed to recreate FTS update trigger: {}", e))?;
+
+        // Rebuild FTS index with all existing entities
+        conn.execute(
+            "INSERT INTO entities_fts(rowid, name) SELECT rowid, name FROM entities",
+            [],
+        ).map_err(|e| format!("Failed to rebuild FTS index: {}", e))?;
+
+        log::info!("Migration 6: FTS5 table rebuilt successfully");
+    }
 
     log::info!("✅ Database migrations completed");
 

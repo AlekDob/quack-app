@@ -118,7 +118,7 @@ interface StreamMessageProps {
   agentName?: string;
   agentAvatar?: string;
   workingDirectory?: string; // Current working directory for file operations
-  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers) => void;
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers, sessionKey?: string) => void;
   pendingQuestionIds?: Set<string>; // Tool IDs with pending questions
   answeredQuestions?: Map<string, AskUserQuestionAnswers>; // Already answered questions
   showThinkingBlocks?: boolean; // Show/hide ThinkingBlocks (controlled by footer icon)
@@ -433,7 +433,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
                     key={idx}
                     questions={questions}
                     toolUseId={toolId}
-                    onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers)}
+                    onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers, sessionId)}
                     disabled={isAnswered}
                     existingAnswers={existingAnswer}
                   />

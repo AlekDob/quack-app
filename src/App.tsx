@@ -425,9 +425,40 @@ function AppContent() {
   // 🦆 Active Session ID: Track which AgentSession is currently active for chat
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
+  // 🦆 FIX SESSION MIXING: Wrapper functions that ensure mutual exclusivity
+  // When one is set, the other MUST be cleared to prevent mixing
+  const setActiveTaskIdExclusive = useCallback((taskId: string | null) => {
+    console.log(`[SESSION-FIX] setActiveTaskIdExclusive: ${taskId}`);
+    setActiveTaskId(taskId);
+    if (taskId !== null) {
+      // When setting a task, clear the session to prevent mixing
+      setActiveSessionId(null);
+      console.log(`[SESSION-FIX] Cleared activeSessionId because activeTaskId is now: ${taskId}`);
+    }
+  }, []);
+
+  const setActiveSessionIdExclusive = useCallback((newSessionId: string | null) => {
+    console.log(`[SESSION-FIX] setActiveSessionIdExclusive: ${newSessionId}`);
+
+    // 🦆 FIX: Do NOT abort streams when switching sessions!
+    // Each session is independent and can continue running in background.
+    // The user must explicitly click "Stop" to abort a stream.
+    // Previous "BUG #3 FIX" was WRONG - it aborted streams involuntarily when user
+    // simply wanted to switch between sessions to check on them.
+    // Session isolation is handled by sessionKey in events, not by aborting streams.
+    setActiveSessionId(newSessionId);
+
+    if (newSessionId !== null) {
+      // When setting a session, clear the task to prevent mixing
+      setActiveTaskId(null);
+      console.log(`[SESSION-FIX] Cleared activeTaskId because activeSessionId is now: ${newSessionId}`);
+    }
+  }, []);
+
   // 🗣️ AskUserQuestion: Track pending requests from canUseTool callback
-  // Maps requestId -> { agentId, questions } for responding via stdin
-  const [pendingUserQuestions, setPendingUserQuestions] = useState<Map<string, { agentId: string; questions: unknown[] }>>(new Map());
+  // Maps requestId -> { agentId, sessionKey, questions } for responding via stdin
+  // 🦆 FIX: Added sessionKey to track which specific session has the pending question
+  const [pendingUserQuestions, setPendingUserQuestions] = useState<Map<string, { agentId: string; sessionKey?: string; questions: unknown[] }>>(new Map());
 
   // 🔵 Read-once notification badge system: Track last read timestamp for each agent
   // When user clicks an agent, we mark it as "read" by storing current timestamp
@@ -823,7 +854,9 @@ function AppContent() {
   // Key format: `${activeId}-${messageId}` to prevent race conditions between concurrent streams
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const lastPromptsRef = useRef<Map<string, string>>(new Map());
-  // Track active streams per agent to prevent concurrency issues
+  // Track active streams per SESSION (not per agent) to prevent concurrency issues
+  // Key is sessionKey (activeSessionId || activeId), Value is Set of streamKeys
+  // This allows different sessions of the same agent to be stopped independently
   const activeStreamsRef = useRef<Map<string, Set<string>>>(new Map());
   // Track stream count for UI display (Map of agentId -> count)
   // const [activeStreamCounts, setActiveStreamCounts] = useState<Map<string, number>>(new Map());
@@ -896,6 +929,39 @@ function AppContent() {
       chatStoreSetLoading(sessionId, isLoading);
     });
   }, [chatLoadingMap, chatStoreSetLoading]);
+
+  // 🦆 SESSIONS-FIRST: Sync pendingQuestionsMap with chatStore for "awaiting response" indicator
+  // AgentSessionList reads from chatStore to show purple dot with "?" when session needs user input
+  // 🦆 FIX: Now uses sessionId as the key (not agentId) to show "?" only on the specific session
+  const chatStoreSetPendingQuestion = useChatStore((state) => state.setPendingQuestion);
+  const chatStoreClearPendingQuestions = useChatStore((state) => state.clearPendingQuestions);
+  useEffect(() => {
+    // Build a set of keys (sessionIds) that have pending questions
+    const keysWithPending = new Set<string>();
+
+    // For each session with pending questions, sync to chatStore using sessionId as key
+    pendingQuestionIdsMap.forEach((pendingSet, key) => {
+      if (pendingSet.size > 0) {
+        keysWithPending.add(key);
+        // Sync each pending question to the store (using sessionId/key)
+        pendingSet.forEach((toolUseId) => {
+          chatStoreSetPendingQuestion(key, toolUseId, true);
+        });
+      }
+    });
+
+    // Clear pending questions for sessions that no longer have any
+    // Get all known session IDs from agentSessions
+    const allSessionIds = new Set(agentSessions.map((s) => s.id));
+    // Also include agentIds for backwards compatibility with older events
+    agentChats.forEach((a) => allSessionIds.add(a.id));
+
+    allSessionIds.forEach((id) => {
+      if (!keysWithPending.has(id)) {
+        chatStoreClearPendingQuestions(id);
+      }
+    });
+  }, [pendingQuestionIdsMap, agentChats, agentSessions, chatStoreSetPendingQuestion, chatStoreClearPendingQuestions]);
 
   // 🦆 SESSIONS-FIRST: Sync chatSessions with chatStore for activity indicators
   // AgentSessionItem needs chatMessages to determine hasUnreadMessages and show "Quack quack..."
@@ -1006,9 +1072,13 @@ function AppContent() {
   ) => {
     const evt = claudeEvent as any;
 
-    // 🦆 SESSION-FIRST: Use sessionKey from event if available, fallback to agentId
-    // This enables parallel conversations - each stream knows where to write
-    const messageKey = sessionKey || agentId;
+    // 🦆 SESSION-FIRST FIX: STRICT session isolation - NEVER fallback to agentId
+    // If sessionKey is missing, log error and reject the event to prevent mixing
+    if (!sessionKey) {
+      console.error(`🚨 [${source}] REJECTED event without sessionKey! agentId=${agentId}, type=${claudeEvent.type}. This would cause session mixing.`);
+      return; // REJECT event - do not write to any session
+    }
+    const messageKey = sessionKey;
 
     console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
@@ -1972,20 +2042,14 @@ function AppContent() {
     const abortController = new AbortController();
     abortControllersRef.current.set(streamKey, abortController);
 
-    // Track this stream as active for this agent
-    if (!activeStreamsRef.current.has(activeId)) {
-      activeStreamsRef.current.set(activeId, new Set());
+    // 🦆 SESSION ISOLATION FIX: Track this stream as active for this SESSION (not agent!)
+    // This allows different sessions of the same agent to be stopped independently
+    if (!activeStreamsRef.current.has(messageKey)) {
+      activeStreamsRef.current.set(messageKey, new Set());
     }
-    activeStreamsRef.current.get(activeId)!.add(streamKey);
+    activeStreamsRef.current.get(messageKey)!.add(streamKey);
 
-    // Update stream count for UI
-    // setActiveStreamCounts((prev) => {
-    //   const newCounts = new Map(prev);
-    //   newCounts.set(activeId, activeStreamsRef.current.get(activeId)!.size);
-    //   return newCounts;
-    // });
-
-    console.log(`[sendMessage] Active streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
+    console.log(`[sendMessage] Active streams for session ${messageKey}:`, activeStreamsRef.current.get(messageKey)?.size || 0);
 
     // Check if chat is configured
     if (!isChatConfigured) {
@@ -2265,36 +2329,25 @@ function AppContent() {
         console.warn('[sendMessageForAgent] Memory extraction failed:', memErr);
       }
 
-      // ✅ CRITICAL FIX: Save session ID for resume support (legacy compatibility)
-      setChatSessionIds((prev) => {
-        const updated = new Map(prev);
-        updated.set(activeId, response.session_id);
-        return updated;
-      });
-
-      // 🦆 SESSION-FIRST: Save Claude session ID in AgentSession for session-specific resumption
-      if (messageKey && messageKey !== activeId) {
-        try {
-          await updateSession(messageKey, {
-            claudeSessionId: response.session_id,
-            updatedAt: Date.now(),
-          });
-        } catch (err) {
-          console.warn(`[SESSION-FIRST] Failed to save claudeSessionId:`, err);
-        }
+      // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
+      // Each session has its own claudeSessionId for independent conversations
+      // The messageKey is the session ID, which is what we need to use
+      try {
+        await updateSession(messageKey, {
+          claudeSessionId: response.session_id,
+          updatedAt: Date.now(),
+        });
+        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}`);
+      } catch (err) {
+        console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }
 
-      // 🦆 SESSION PERSISTENCE: Save session ID in AgentChat for persistence across app restarts (legacy)
-      setAgentChats((prev) => {
-        return prev.map((agent) => {
-          if (agent.id === activeId) {
-            return {
-              ...agent,
-              sessionId: response.session_id,
-            };
-          }
-          return agent;
-        });
+      // 🦆 LEGACY COMPATIBILITY: Keep chatSessionIds Map updated for any old code paths
+      // But now keyed by messageKey (session ID), not activeId (agent ID)
+      setChatSessionIds((prev) => {
+        const updated = new Map(prev);
+        updated.set(messageKey, response.session_id); // ✅ FIX: Use messageKey not activeId!
+        return updated;
       });
 
       // Track usage from Claude Agent SDK (with full token details!)
@@ -2403,52 +2456,43 @@ function AppContent() {
       // Clean up abort controller with composite key
       abortControllersRef.current.delete(streamKey);
 
-      // Remove from active streams
-      const activeStreams = activeStreamsRef.current.get(activeId);
+      // 🦆 SESSION ISOLATION FIX: Remove from active streams using messageKey (not activeId!)
+      const activeStreams = activeStreamsRef.current.get(messageKey);
       if (activeStreams) {
         activeStreams.delete(streamKey);
         if (activeStreams.size === 0) {
-          activeStreamsRef.current.delete(activeId);
+          activeStreamsRef.current.delete(messageKey);
         }
       }
 
-      // Update stream count for UI
-      // setActiveStreamCounts((prev) => {
-      //   const newCounts = new Map(prev);
-      //   const currentCount = activeStreamsRef.current.get(activeId)?.size || 0;
-      //   if (currentCount === 0) {
-      //     newCounts.delete(activeId);
-      //   } else {
-      //     newCounts.set(activeId, currentCount);
-      //   }
-      //   return newCounts;
-      // });
-
-      console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for ${activeId}:`, activeStreamsRef.current.get(activeId)?.size || 0);
+      console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for session ${messageKey}:`, activeStreamsRef.current.get(messageKey)?.size || 0);
     }
   }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession]);
 
-  // Abort streaming for specific agent - aborts ALL active streams for this agent
+  // 🦆 SESSION ISOLATION FIX: Abort streaming for CURRENT SESSION only (not all agent sessions!)
+  // Uses messageKey (sessionId || agentId) to target only the active session
   const abortStreamForAgent = useCallback(() => {
-    if (!activeId) return;
+    // Determine the current session key (same logic as sendMessage)
+    const messageKey = activeSessionId || activeId;
+    if (!messageKey) return;
 
-    const activeStreams = activeStreamsRef.current.get(activeId);
+    const activeStreams = activeStreamsRef.current.get(messageKey);
     if (!activeStreams || activeStreams.size === 0) {
-      console.log('[abortStreamForAgent] No active streams for agent:', activeId);
+      console.log('[abortStreamForSession] No active streams for session:', messageKey);
       return;
     }
 
-    console.log(`[abortStreamForAgent] Aborting ${activeStreams.size} stream(s) for agent: ${activeId}`);
+    console.log(`[abortStreamForSession] Aborting ${activeStreams.size} stream(s) for session: ${messageKey}`);
 
-    // Abort all active streams for this agent
+    // Abort all active streams for this SESSION (not all sessions of the agent!)
     activeStreams.forEach((streamKey) => {
       const abortController = abortControllersRef.current.get(streamKey);
       if (abortController && !abortController.signal.aborted) {
-        console.log(`[abortStreamForAgent] Aborting stream: ${streamKey}`);
+        console.log(`[abortStreamForSession] Aborting stream: ${streamKey}`);
         abortController.abort();
       }
     });
-  }, [activeId]);
+  }, [activeId, activeSessionId]);
 
   // Get last prompt for specific agent
   const getLastPromptForAgent = useCallback(() => {
@@ -2496,34 +2540,34 @@ function AppContent() {
           }>(`chat-${task.id}`);
 
           if (savedChat?.messages && savedChat.messages.length > 0) {
-            // 🦆 FIX: Only load from disk if we don't have messages in memory,
-            // or if disk has MORE messages (streaming completed while away)
-            // NEVER overwrite in-memory messages that have events with disk messages that don't
+            // 🦆 FIX: Only load from disk if we don't have messages in memory
+            // NEVER overwrite in-memory messages that have events - they are SACRED
+            // The "more messages on disk" condition was REMOVED because it caused formatting loss:
+            // disk messages from Rust backend don't have events, so loading them destroys formatting
             setChatSessions(prev => {
               const newSessions = new Map(prev);
               const existingMessages = prev.get(task.id);
-              
+
               // Check if existing messages have events (richer data)
               const existingHasEvents = existingMessages?.some(m => m.events && m.events.length > 0);
               const savedHasEvents = savedChat.messages.some(m => m.events && m.events.length > 0);
-              
+
               // Only overwrite if:
-              // 1. No existing messages, OR
-              // 2. Saved has events and existing doesn't (upgrade), OR
-              // 3. Saved has MORE messages (new data arrived)
-              const shouldOverwrite = 
-                !existingMessages || 
+              // 1. No existing messages in memory, OR
+              // 2. Saved has events and existing doesn't (upgrade quality)
+              // REMOVED: "savedChat.messages.length > existingMessages.length" - this caused formatting loss!
+              const shouldOverwrite =
+                !existingMessages ||
                 existingMessages.length === 0 ||
-                (savedHasEvents && !existingHasEvents) ||
-                (savedChat.messages.length > existingMessages.length);
-              
+                (savedHasEvents && !existingHasEvents);
+
               if (shouldOverwrite) {
                 newSessions.set(task.id, savedChat.messages);
-                console.log(`[loadKanbanChatSessions] Updated messages for task ${task.id} (had: ${existingMessages?.length || 0}, now: ${savedChat.messages.length})`);
+                console.log(`[loadKanbanChatSessions] ✅ Updated messages for task ${task.id} (had: ${existingMessages?.length || 0}, now: ${savedChat.messages.length}, hasEvents: ${savedHasEvents})`);
               } else {
-                console.log(`[loadKanbanChatSessions] Keeping in-memory messages for task ${task.id} (has events: ${existingHasEvents})`);
+                console.log(`[loadKanbanChatSessions] 🛡️ PROTECTED: Keeping in-memory messages for task ${task.id} (${existingMessages?.length} msgs with events: ${existingHasEvents})`);
               }
-              
+
               return newSessions;
             });
 
@@ -2845,6 +2889,10 @@ function AppContent() {
             ],
             // 🧠 User-selected priority keywords for memory search (3x weight)
             userKeywords: options?.userKeywords || [],
+            // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
+            // This ensures ask-user-question events are emitted with the same key
+            // that the frontend uses to identify the session (targetAgentId)
+            sessionKey: targetAgentId,
           },
         }),
         abortPromise,
@@ -3115,6 +3163,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
             'AskUserQuestion',
           ],
+          // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
+          sessionKey: targetAgentId,
         },
       });
 
@@ -3185,10 +3235,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Compact conversation for current agent (custom implementation since SDK /compact is buggy)
   // 🦆 SESSION-FIRST: Use chatKey (sessionId when available) for message lookup
+  // 🦆 FIX SESSION MIXING: Only use activeSessionId, no fallback
   const compactCurrentAgentConversation = useCallback(async () => {
-    // Use sessionId if available, fallback to agentId (same logic as ChatView)
-    const chatKey = activeSessionId || activeId;
-    if (!chatKey) return;
+    const chatKey = activeSessionId;
+    if (!chatKey) {
+      console.warn('[compactConversation] No activeSessionId set, cannot compact');
+      return;
+    }
 
     const currentMessages = chatSessions.get(chatKey) ?? [];
     const totalMessages = currentMessages.length;
@@ -3267,6 +3320,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
             'AskUserQuestion',
           ],
+          // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
+          sessionKey: activeId,
         },
       });
 
@@ -3329,7 +3384,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
     }
-  }, [activeId, activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
+  }, [activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
 
   // Clear conversation for current agent (Claude SDK /clear command)
   const clearCurrentAgentConversation = useCallback(async () => {
@@ -3400,33 +3455,90 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // 🗣️ AskUserQuestion: Answer a question from Claude for the current agent
   // Uses stdin bidirectional communication with requestId
+  // 🦆 FIX: Now accepts sessionKey to prevent cross-session contamination
   const answerUserQuestionForAgent = useCallback(async (
     toolUseId: string,
-    answers: AskUserQuestionAnswers
+    answers: AskUserQuestionAnswers,
+    targetSessionKey?: string // 🦆 FIX: Session key from the UI component showing the question
   ) => {
     if (!activeId) {
       console.error('[App] Cannot answer question: no active agent');
       return;
     }
 
-    // Find the pending requestId for this agent from stdin-based communication
-    // The requestId is stored in pendingUserQuestions when ask-user-question event arrives
+    // 🦆 FIX: Helper to find requestId with retry support for race conditions
+    // Now filters by BOTH agentId AND sessionKey to prevent session mixing
+    const findRequestId = (): { requestId: string | null; sessionKey?: string; questions: unknown[] } => {
+      for (const [requestId, data] of pendingUserQuestions.entries()) {
+        // 🦆 FIX: Match by agentId AND sessionKey (if provided) to prevent cross-session contamination
+        const agentMatches = data.agentId === activeId;
+        const sessionMatches = !targetSessionKey || data.sessionKey === targetSessionKey;
+
+        if (agentMatches && sessionMatches) {
+          return { requestId, sessionKey: data.sessionKey, questions: data.questions };
+        }
+      }
+      return { requestId: null, sessionKey: undefined, questions: [] };
+    };
+
+    // 🦆 FIX: Retry with exponential backoff for race conditions
+    // Total wait time: 200ms + 400ms + 800ms = 1400ms before giving up
+    const MAX_RETRY_ATTEMPTS = 4;
+    const BASE_RETRY_DELAY_MS = 200;
+
     let foundRequestId: string | null = null;
-    for (const [requestId, data] of pendingUserQuestions.entries()) {
-      if (data.agentId === activeId) {
-        foundRequestId = requestId;
+    let foundSessionKey: string | undefined = undefined;
+    let foundQuestions: unknown[] = [];
+
+    for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+      const result = findRequestId();
+      if (result.requestId) {
+        foundRequestId = result.requestId;
+        foundSessionKey = result.sessionKey;
+        foundQuestions = result.questions;
+        if (attempt > 0) {
+          console.info(`[App] 🗣️ Found requestId on attempt ${attempt + 1}:`, foundRequestId);
+        }
         break;
+      }
+
+      if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+        // Exponential backoff: 100ms, 200ms, 400ms
+        const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt);
+        console.info(`[App] 🗣️ No pending requestId found, retrying in ${delay}ms... (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     if (!foundRequestId) {
-      console.error('[App] Cannot answer question: no pending requestId for agent', activeId);
-      // Fallback: try using toolUseId as requestId (for backwards compatibility)
-      console.log('[App] 🗣️ Attempting fallback with toolUseId:', toolUseId);
-      foundRequestId = toolUseId;
+      console.error('[App] Cannot answer question: no pending requestId for agent after retries', {
+        activeId,
+        targetSessionKey,
+        pendingQuestionsSize: pendingUserQuestions.size,
+        pendingQuestions: Array.from(pendingUserQuestions.entries()).map(([id, data]) => ({
+          requestId: id,
+          agentId: data.agentId,
+          sessionKey: data.sessionKey
+        }))
+      });
+      toast.error('Unable to submit answer. The agent may still be processing. Please wait a moment and try again.');
+      return;
     }
 
-    console.log('[App] 🗣️ Answering user question via stdin:', { activeId, requestId: foundRequestId, toolUseId, answers });
+    // 🦆 FIX: Use sessionKey if available, fallback to agentId for backwards compatibility
+    const pendingKey = foundSessionKey || activeId;
+    console.info('[App] 🗣️ Answering user question via stdin:', {
+      activeId,
+      targetSessionKey,
+      foundSessionKey,
+      requestId: foundRequestId,
+      toolUseId,
+      pendingKey,
+      answersKeys: Object.keys(answers),
+      // 🐛 DEBUG: Show current pending state before removal
+      currentPendingForKey: Array.from(pendingQuestionIdsMap.get(pendingKey) || new Set()),
+      allPendingKeys: Array.from(pendingQuestionIdsMap.keys())
+    });
 
     // Mark question as answered immediately for UI feedback
     setAnsweredQuestionsMap(prev => {
@@ -3438,20 +3550,52 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     // Remove from pending question IDs (UI state)
+    // 🦆 FIX: Use sessionKey-based pendingKey to match how it was stored
+    // 🦆 FIX: Safe state updates with null checks (foundRequestId validated above)
+    // 🐛 DEBUG: Try all possible keys to find where the requestId was stored
+    const allPossibleKeys = [pendingKey, activeId, targetSessionKey, foundSessionKey].filter(Boolean);
+    console.log('[App] 🗣️ Before removing from pendingQuestionIdsMap:', {
+      pendingKey,
+      activeId,
+      targetSessionKey,
+      foundSessionKey,
+      toolUseId,
+      foundRequestId,
+      currentPendingForPendingKey: Array.from(pendingQuestionIdsMap.get(pendingKey) || new Set()),
+      // Check all possible keys to see where it might be stored
+      allPossibleKeys,
+      foundInKeys: allPossibleKeys.filter(key => {
+        const pending = pendingQuestionIdsMap.get(key!);
+        return pending && (pending.has(foundRequestId || '') || pending.has(toolUseId));
+      })
+    });
     setPendingQuestionIdsMap(prev => {
       const newMap = new Map(prev);
-      const pending = new Set<string>(newMap.get(activeId) || new Set<string>());
+      const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+      console.log('[App] 🗣️ Inside setPendingQuestionIdsMap - pending before delete:', Array.from(pending));
       pending.delete(toolUseId);
-      newMap.set(activeId, pending);
+      if (foundRequestId) {
+        pending.delete(foundRequestId);
+      }
+      console.log('[App] 🗣️ Inside setPendingQuestionIdsMap - pending after delete:', Array.from(pending));
+      if (pending.size === 0) {
+        newMap.delete(pendingKey);
+        console.log('[App] 🗣️ Deleted entire pendingKey from map');
+      } else {
+        newMap.set(pendingKey, pending);
+        console.log('[App] 🗣️ Updated pending set for key');
+      }
       return newMap;
     });
 
     // Remove from pendingUserQuestions (stdin state)
-    setPendingUserQuestions(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(foundRequestId!);
-      return newMap;
-    });
+    if (foundRequestId) {
+      setPendingUserQuestions(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(foundRequestId);
+        return newMap;
+      });
+    }
 
     try {
       // Dynamic import to avoid circular dependencies
@@ -3459,8 +3603,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       // Send answer via stdin to the Node.js process
       // The answers should be in the format { "header": "selected_value" }
+      // 🦆 FIX: Use sessionKey (foundSessionKey) instead of agentId to support concurrent sessions
+      // Process registration now uses sessionKey, so we must use the same key here
+      const processKey = foundSessionKey || activeId;
       await answerUserQuestionViaStdin(
-        activeId,
+        processKey,
         foundRequestId,
         answers as Record<string, string>
       );
@@ -3473,11 +3620,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         tool_use_id: toolUseId,
         agent_id: activeId,
       });
-    } catch (err) {
-      console.error('[App] Failed to send question answer:', err);
-      toast.error(`Failed to submit answer: ${err}`);
+    } catch (error) {
+      console.error('[App] Failed to send question answer:', error);
+      toast.error('Failed to submit answer. Please try again.');
 
-      // Revert the answered state on error
+      // 🦆 FIX: Revert state with validation to allow user retry
       setAnsweredQuestionsMap(prev => {
         const newMap = new Map(prev);
         const agentAnswers = new Map(newMap.get(activeId) || new Map());
@@ -3485,13 +3632,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         newMap.set(activeId, agentAnswers);
         return newMap;
       });
+
+      // Re-add to pending question IDs (UI state)
       setPendingQuestionIdsMap(prev => {
         const newMap = new Map(prev);
-        const pending = new Set<string>(newMap.get(activeId) || new Set<string>());
+        const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
         pending.add(toolUseId);
-        newMap.set(activeId, pending);
+        newMap.set(pendingKey, pending);
         return newMap;
       });
+
+      // Re-add to pendingUserQuestions only if we have valid data
+      if (foundRequestId && foundQuestions.length > 0) {
+        setPendingUserQuestions(prev => {
+          const newMap = new Map(prev);
+          // Only restore if not already present (avoid duplicates)
+          if (!newMap.has(foundRequestId)) {
+            newMap.set(foundRequestId, {
+              agentId: activeId,
+              sessionKey: foundSessionKey,
+              questions: foundQuestions
+            });
+          }
+          return newMap;
+        });
+      }
+
+      console.info('[App] 🔄 Reverted question state - user can retry');
     }
   }, [activeId, pendingUserQuestions]);
 
@@ -3589,6 +3756,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string } | null>(null); // File to insert as @file mention
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
   const [loadingAgents, setLoadingAgents] = useState(false);
+  const [agentsInitialized, setAgentsInitialized] = useState(false); // True after first load completes
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentsDirectoryExists, setAgentsDirectoryExists] = useState<boolean>(true);
 
@@ -3618,14 +3786,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // 🦆 SESSION-FIRST: Compute current session's chat messages and loading state
   // Now uses activeSessionId as the primary key for chat messages (independent sessions per agent)
-  // Falls back to activeId for backward compatibility during migration
-  const chatKey = activeSessionId || activeId;
+  // 🦆 FIX SESSION MIXING: Only use activeSessionId, no fallback to activeId
+  // The fallback was causing session mixing because activeId could point to a different agent
+  const chatKey = activeSessionId; // REMOVED || activeId fallback
 
   const currentAgentMessages = useMemo(() => {
+    // 🦆 FIX SESSION MIXING: If activeTaskId is set, return empty - task messages are handled separately
+    if (activeTaskId) {
+      console.log(`[ChatView] activeTaskId is set (${activeTaskId}), returning empty for currentAgentMessages`);
+      return [];
+    }
     const messages = chatKey ? (chatSessions.get(chatKey) ?? []) : [];
-    console.log(`[ChatView] Loading messages for chatKey="${chatKey}" (sessionId: ${activeSessionId}, agentId: ${activeId}): ${messages.length} messages`);
+    console.log(`[ChatView] Loading messages for chatKey="${chatKey}" (sessionId: ${activeSessionId}): ${messages.length} messages`);
     return messages;
-  }, [chatKey, chatSessions, activeSessionId, activeId]);
+  }, [chatKey, chatSessions, activeSessionId, activeTaskId]);
 
   const currentAgentLoading = useMemo(() => {
     return chatKey ? (chatLoadingMap.get(chatKey) ?? false) : false;
@@ -4117,25 +4291,51 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       requestId: string;
       questions: unknown[];
       agentId: string;
-    }>('ask-user-question', (event) => {
+      sessionKey?: string; // 🦆 FIX: Now includes sessionKey for per-session tracking
+    }>('ask-user-question', async (event) => {
       console.log(`🗣️ [GLOBAL] AskUserQuestion event received:`, event.payload);
-      const { requestId, questions, agentId } = event.payload;
+      const { requestId, questions, agentId, sessionKey } = event.payload;
 
       // Store the pending question for when user responds
+      // 🦆 FIX: Include sessionKey for proper per-session tracking when removing
       setPendingUserQuestions((prev) => {
         const next = new Map(prev);
-        next.set(requestId, { agentId, questions });
+        next.set(requestId, { agentId, sessionKey, questions });
         return next;
       });
+
+      // 🦆 FIX: Use sessionKey (if available) as the key for pending questions
+      // This ensures the "?" indicator shows only on the specific session that has the question
+      // Fallback to agentId for backwards compatibility with older events
+      const pendingKey = sessionKey || agentId;
+      console.log(`🗣️ [GLOBAL] Using pendingKey=${pendingKey} (sessionKey=${sessionKey}, agentId=${agentId})`);
 
       // Also add to pending question IDs for UI state
       setPendingQuestionIdsMap((prev) => {
         const newMap = new Map(prev);
-        const pending = new Set<string>(newMap.get(agentId) || new Set<string>());
+        const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
         pending.add(requestId); // Note: this is requestId, not toolUseId
-        newMap.set(agentId, pending);
+        newMap.set(pendingKey, pending);
         return newMap;
       });
+
+      // 🔔 Send desktop notification when agent needs user input
+      try {
+        // Get agent name for the notification
+        const agentChat = agentChats.find((a) => a.id === agentId);
+        const agentName = agentChat?.name || 'Agent';
+        const questionCount = Array.isArray(questions) ? questions.length : 1;
+
+        await sendNotification({
+          title: `${agentName} needs your input`,
+          body: questionCount === 1
+            ? 'The agent has a question for you'
+            : `The agent has ${questionCount} questions for you`,
+        });
+        console.log(`🔔 Desktop notification sent for ${agentName}`);
+      } catch (notifyError) {
+        console.warn('Failed to send notification:', notifyError);
+      }
     });
 
     // Listen for Kanban updates from Claude Agent SDK custom tools
@@ -4181,6 +4381,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     });
 
+    // 📱 Listen for session updates from external sources (WhatsApp, Telegram, etc.)
+    // When the Rust backend creates sessions via HTTP API, it emits this event
+    const unlistenSessionsUpdatedPromise = listen<{
+      action: string;
+      sessionId: string;
+      source: string;
+    }>("sessions-updated", async (event) => {
+      console.log("📱 Sessions updated from external source:", event.payload);
+      const { action, sessionId, source } = event.payload;
+
+      // Reload sessions from storage to sync with external changes
+      await useSessionStore.getState().loadSessions();
+
+      // Log source for debugging
+      console.log(`📱 Session ${action}: ${sessionId} (source: ${source})`);
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -4189,6 +4406,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenKanbanUpdatePromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
   }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, loadKanbanTasks]);
 
@@ -4230,14 +4448,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         requestId: string;
         questions: unknown[];
         agentId: string;
+        sessionKey?: string; // 🦆 FIX: Now includes sessionKey for per-session tracking
       }>(eventName, (event) => {
         console.log(`🗣️ AskUserQuestion event received for agent ${terminalId}:`, event.payload);
-        const { requestId, questions, agentId } = event.payload;
+        const { requestId, questions, agentId, sessionKey } = event.payload;
 
         // Store the pending question for when user responds
+        // 🦆 FIX: Include sessionKey for proper per-session tracking
         setPendingUserQuestions((prev) => {
           const next = new Map(prev);
-          next.set(requestId, { agentId, questions });
+          next.set(requestId, { agentId, sessionKey, questions });
           return next;
         });
       }).then((unlisten) => {
@@ -4340,8 +4560,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           }
         })();
       } else {
-        // If no terminals, save empty array (keep storage clean)
-        void saveUnifiedAgents([]);
+        // Don't save empty array - it would overwrite existing agents!
+        // This can happen during startup when terminals haven't loaded yet
+        console.log("[App] Skipping save - no terminals loaded yet");
       }
     }, 2000); // Wait 2 seconds before saving
 
@@ -4975,6 +5196,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setAgents([]);
     } finally {
       setLoadingAgents(false);
+      setAgentsInitialized(true); // Mark first load as complete (for splash screen)
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
@@ -6076,6 +6298,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     loadKanbanTasks();
   }, [loadKanbanTasks]);
 
+  // 🦆 FIX: Load chat sessions on app startup (not when opening Kanban!)
+  // This ensures messages with events are loaded ONCE at startup,
+  // preventing formatting loss when navigating to/from Kanban view
+  useEffect(() => {
+    if (hasBootstrapped) {
+      console.log('[App Startup] Loading chat sessions from storage...');
+      loadKanbanChatSessions().then(() => {
+        console.log('[App Startup] Chat sessions loaded successfully');
+      }).catch((err) => {
+        console.warn('[App Startup] Failed to load chat sessions:', err);
+      });
+    }
+  }, [hasBootstrapped, loadKanbanChatSessions]);
+
   useEffect(() => {
     if (!tauriAvailable) {
       setBooting(false);
@@ -6310,7 +6546,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setActiveTabId('chat');
 
     // Set active session in local state
-    setActiveSessionId(sessionId);
+    // 🦆 FIX SESSION MIXING: Use exclusive setter to clear activeTaskId
+    setActiveSessionIdExclusive(sessionId);
 
     // Select the session in the store
     selectSession(sessionId);
@@ -6323,6 +6560,31 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const agentTerminal = terminals.find(t => t.id === session.agentId);
       if (agentTerminal) {
         console.log('[App] Selecting agent for session:', agentTerminal.label);
+
+        // 🦆 FIX: Inject agent personality into CLAUDE.md when clicking session
+        // This ensures the CLAUDE.md reflects the agent's personality, same as clicking agent-card
+        if (tauriAvailable) {
+          (async () => {
+            try {
+              console.log(`[handleSessionClick] Loading personality for "${agentTerminal.label}" (ID: ${agentTerminal.id})`);
+              const personality = await invoke<AgentPersonality>('load_agent_personality', {
+                projectPath: agentTerminal.cwd,
+                personalityId: agentTerminal.id,
+              });
+
+              // Inject into CLAUDE.md
+              await invoke('inject_personality_to_claude_md', {
+                projectPath: agentTerminal.cwd,
+                personality,
+              });
+
+              console.log(`[handleSessionClick] ✅ Injected personality for "${agentTerminal.label}" into CLAUDE.md`);
+            } catch (error) {
+              // No personality found or injection failed - not critical
+              console.warn(`[handleSessionClick] Failed to inject personality:`, error);
+            }
+          })();
+        }
       } else {
         console.warn('[App] Agent not found in terminals for session:', session.agentId);
       }
@@ -6335,7 +6597,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log('[App] Syncing File Explorer to session projectPath:', session.projectPath);
       void loadDirectory(session.projectPath);
     }
-  }, [selectSession, terminals, loadDirectory]);
+  }, [selectSession, terminals, loadDirectory, setActiveSessionIdExclusive, tauriAvailable]);
 
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
     // Update terminal workingOn field
@@ -7155,26 +7417,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       clearTerminalAttention(id);
       clearIdleTimer(id);
 
-      // 🦆 Clear activeTaskId when selecting agent from sidebar
-      // This ensures user sees the agent's chat, not a task
-      // Tasks are now independent - this just ensures proper tab focus
+      // 🦆 FIX AGENT OVERVIEW: When clicking on agent card, NEVER auto-select a session
+      // The user should see the "agent overview" (SessionEmptyState) with:
+      // - List of past sessions
+      // - Button to create new session
+      // Session auto-selection should ONLY happen when clicking directly on a session item
       setActiveTaskId(null);
-
-      // 🦆 FIX: Don't reset activeSessionId! Instead, auto-select the agent's most recent session
-      // This preserves chat continuity when switching between agents
-      const agentSessionsList = agentSessions.filter(s => s.agentId === id);
-      if (agentSessionsList.length > 0) {
-        // Sort by updatedAt (most recent first) and select the first one
-        const sortedSessions = [...agentSessionsList].sort((a, b) => b.updatedAt - a.updatedAt);
-        const mostRecentSession = sortedSessions[0];
-        setActiveSessionId(mostRecentSession.id);
-        console.log(`[handleSelectTerminal] Auto-selected most recent session: ${mostRecentSession.id} for agent ${id}`);
-      } else {
-        // 🦆 FIX: Clear activeSessionId when agent has no sessions
-        // This ensures SessionEmptyState is shown, not chat from a different agent/project
-        setActiveSessionId(null);
-        console.log(`[handleSelectTerminal] No sessions for agent ${id}, cleared activeSessionId to show SessionEmptyState`);
-      }
+      setActiveSessionId(null);
+      console.log(`[handleSelectTerminal] Agent clicked: ${id} - showing agent overview (SessionEmptyState)`);
 
       // Always open the chat tab when selecting a terminal from sidebar
       // This ensures consistent behavior - first tab is always the agent chat
@@ -7234,6 +7484,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       loadDirectory,
       tauriAvailable,
       terminals,
+      setActiveSessionIdExclusive,
     ]
   );
 
@@ -7971,9 +8222,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     if (!existingTaskTab) {
       // Create new task tab
-      const taskLabel = task.title.length > 25
-        ? task.title.substring(0, 25) + '...'
-        : task.title;
+      const taskTitle = task.title || 'Untitled Task';
+      const taskLabel = taskTitle.length > 25
+        ? taskTitle.substring(0, 25) + '...'
+        : taskTitle;
 
       const newTaskTab: Tab = {
         id: taskTabId,
@@ -7990,7 +8242,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     // Activate task tab and set activeTaskId
     setActiveTabId(taskTabId);
-    setActiveTaskId(task.id);
+    // 🦆 FIX SESSION MIXING: Use exclusive setter to clear activeSessionId
+    setActiveTaskIdExclusive(task.id);
 
     // ========================================
     // STEP 2: PARALLEL OPERATIONS
@@ -8048,17 +8301,26 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     const hasInMemoryMessages = existingMessages && existingMessages.length > 0;
 
     if (chatLoadResult?.messages) {
-      // If we have in-memory messages, they might be more recent (streaming in progress)
-      // Only load from disk if we have NO in-memory messages OR disk has more messages
-      if (!hasInMemoryMessages || chatLoadResult.messages.length > existingMessages.length) {
+      // 🦆 FIX: NEVER overwrite in-memory messages that have events - they are SACRED
+      // The "more messages on disk" condition was REMOVED because it caused formatting loss
+      const existingHasEvents = existingMessages?.some(m => m.events && m.events.length > 0);
+      const loadedHasEvents = chatLoadResult.messages.some(m => m.events && m.events.length > 0);
+
+      // Only load from disk if:
+      // 1. No messages in memory, OR
+      // 2. Loaded messages have events and existing don't (upgrade quality)
+      // REMOVED: "messages.length > existingMessages.length" - caused formatting loss!
+      const shouldLoad = !hasInMemoryMessages || (loadedHasEvents && !existingHasEvents);
+
+      if (shouldLoad) {
         setChatSessions(prev => {
           const newSessions = new Map(prev);
           newSessions.set(task.id, chatLoadResult.messages);
           return newSessions;
         });
-        console.log(`[Quack] Loaded ${chatLoadResult.messages.length} messages from disk for task "${task.title}"`);
+        console.log(`[openTaskTab] ✅ Loaded ${chatLoadResult.messages.length} messages from disk for task "${task.title}" (hasEvents: ${loadedHasEvents})`);
       } else {
-        console.log(`[Quack] Keeping ${existingMessages.length} in-memory messages for task "${task.title}" (more recent than disk)`);
+        console.log(`[openTaskTab] 🛡️ PROTECTED: Keeping ${existingMessages?.length} in-memory messages for task "${task.title}" (hasEvents: ${existingHasEvents})`);
       }
 
       // Always restore tokens if available
@@ -8098,7 +8360,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }).catch(err => {
       console.warn(`[Quack] Failed to pre-create listener for task "${task.title}":`, err);
     });
-  }, [terminals, tabs, loadDirectory, activeTaskId, chatSessions, saveKanbanChatSession]);
+  }, [terminals, tabs, loadDirectory, activeTaskId, chatSessions, saveKanbanChatSession, setActiveTaskIdExclusive]);
 
   // ========================================
   // SELECT TASK (like selecting an agent - no new tabs)
@@ -8136,7 +8398,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Set the assigned agent as active (shows Agent Personality in side panel)
     setActiveId(terminal.id);
     // Set task as active (this will show task chat in the main area)
-    setActiveTaskId(task.id);
+    // 🦆 FIX SESSION MIXING: Use exclusive setter to clear activeSessionId
+    setActiveTaskIdExclusive(task.id);
     // Switch to chat tab (not a task-specific tab)
     setActiveTabId('chat');
 
@@ -8182,7 +8445,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     // Load chat messages from disk if needed
-    if (!hasInMemoryMessages) {
+    // 🦆 FIX: Also check if existing messages have events before loading
+    const existingHasEvents = existingMessages.some(m => m.events && m.events.length > 0);
+
+    if (!hasInMemoryMessages || !existingHasEvents) {
       try {
         const store = await getCachedStore('quack-chats.json');
         const savedChat = await store.get<{
@@ -8193,12 +8459,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         }>(`chat-${task.id}`);
 
         if (savedChat && savedChat.messages && savedChat.messages.length > 0) {
-          setChatSessions(prev => {
-            const newSessions = new Map(prev);
-            newSessions.set(task.id, savedChat.messages);
-            return newSessions;
-          });
-          console.log(`[Quack] Loaded ${savedChat.messages.length} messages for task "${task.title}"`);
+          const savedHasEvents = savedChat.messages.some(m => m.events && m.events.length > 0);
+
+          // Only load if: no messages in memory, OR saved has events and existing doesn't
+          const shouldLoad = !hasInMemoryMessages || (savedHasEvents && !existingHasEvents);
+
+          if (shouldLoad) {
+            setChatSessions(prev => {
+              const newSessions = new Map(prev);
+              newSessions.set(task.id, savedChat.messages);
+              return newSessions;
+            });
+            console.log(`[selectTask] ✅ Loaded ${savedChat.messages.length} messages for task "${task.title}" (hasEvents: ${savedHasEvents})`);
+          } else {
+            console.log(`[selectTask] 🛡️ PROTECTED: Keeping ${existingMessages.length} in-memory messages for task "${task.title}" (hasEvents: ${existingHasEvents})`);
+          }
 
           if (savedChat.tokens) {
             setChatTokensMap(prev => {
@@ -8225,7 +8500,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     console.log(`[Quack] Task "${task.title}" selected (showing in main chat area)`);
-  }, [terminals, chatSessions, loadDirectory]);
+  }, [terminals, chatSessions, loadDirectory, setActiveTaskIdExclusive]);
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
@@ -8281,6 +8556,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     if (tabId.startsWith('task-')) {
       const tab = tabs.find(t => t.id === tabId);
       if (tab?.taskId === activeTaskId) {
+        // 🦆 FIX SESSION MIXING: Just clear the task, don't need exclusive here
+        // because we're just clearing, not setting a new value
         setActiveTaskId(null);
       }
     }
@@ -9353,7 +9630,8 @@ You have access to all Bash tools to execute git commands like:
 
       // 2. Determine working directory
       const workingDirectory = sessionDetails.working_directory || explorerPath || await invoke<string>('get_home_directory');
-      const terminalName = `Resumed: ${sessionDetails.title.substring(0, 40)}${sessionDetails.title.length > 40 ? '...' : ''}`;
+      const resumeTitle = sessionDetails.title || 'Session';
+      const terminalName = `Resumed: ${resumeTitle.substring(0, 40)}${resumeTitle.length > 40 ? '...' : ''}`;
 
       // 3. Create new terminal for the resumed session
       console.log('[Resume] Creating terminal:', terminalName, 'cwd:', workingDirectory);
@@ -9571,17 +9849,33 @@ You have access to all Bash tools to execute git commands like:
     tauriAvailable,
   ]);
 
-  // Hide native HTML splash immediately when React mounts
-  // React SplashScreen will take over the animation
+  // Track when app started for minimum splash duration
+  const appMountTimeRef = useRef(Date.now());
+  const MINIMUM_SPLASH_DURATION = 4000; // Show splash for at least 4 seconds
+
+  // Hide native HTML splash when agents are loaded (sidebar populated)
   useEffect(() => {
+    console.log('[Splash] agentsInitialized:', agentsInitialized);
+    if (!agentsInitialized) return; // Wait for first agent load to complete
+
     const nativeSplash = document.getElementById('native-splash');
-    if (nativeSplash) {
-      // Immediately fade out and remove native splash when React is ready
-      // This allows React SplashScreen to be visible (it was hidden behind native's z-index: 99999)
+    console.log('[Splash] nativeSplash element:', nativeSplash ? 'found' : 'NOT FOUND');
+    if (!nativeSplash) return;
+
+    // Calculate remaining time to meet minimum duration
+    const elapsed = Date.now() - appMountTimeRef.current;
+    const remainingTime = Math.max(0, MINIMUM_SPLASH_DURATION - elapsed);
+    console.log('[Splash] elapsed:', elapsed, 'remainingTime:', remainingTime);
+
+    // Wait for minimum duration, then fade out
+    const timeoutId = setTimeout(() => {
+      console.log('[Splash] Fading out now');
       nativeSplash.classList.add('fade-out');
       setTimeout(() => nativeSplash.remove(), 300);
-    }
-  }, []); // Run only once on mount
+    }, remainingTime);
+
+    return () => clearTimeout(timeoutId);
+  }, [agentsInitialized]); // Run when agents finish loading
 
   // REMOVED: React SplashScreen at startup
   // Native splash in index.html now handles the intro animation
@@ -10176,11 +10470,7 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
-                    currentSessionId={isTaskChat ? activeTaskSession?.claudeSessionId : (() => {
-                      // 🦆 SESSION-FIRST: Show claudeSessionId (the real Claude Code session ID)
-                      const session = agentSessions.find(s => s.id === activeSessionId);
-                      return session?.claudeSessionId ?? undefined;
-                    })()}
+                    currentSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
                     // 🦆 SESSION-FIRST: Internal session ID for state management (attachments, settings)
                     internalSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
                     // Fullscreen mode
@@ -10303,8 +10593,9 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
-                    // Current session ID for display
-                    currentSessionId={activeSession.claudeSessionId}
+                    // 🦆 FIX: Use Quack session ID (taskSessionId) for AskUserQuestion matching
+                    // The backend stores questions keyed by sessionKey (Quack session ID), not claudeSessionId
+                    currentSessionId={taskSessionId}
                     // 🦆 Internal session ID for state management (attachments, settings)
                     internalSessionId={taskSessionId}
                     // Fullscreen mode

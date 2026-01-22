@@ -324,26 +324,75 @@ pub fn brain_list_entities(filters: EntityFilters) -> Result<Vec<BrainEntity>, S
     Ok(entities)
 }
 
+/// Sanitize query for FTS5 - remove special characters that break syntax
+/// e.g., "studio-futuro" becomes "studio* OR futuro*" (hyphen is NOT operator in FTS5)
+fn sanitize_fts_query(query: &str) -> String {
+    // Remove special chars, normalize whitespace
+    let sanitized: String = query
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c.is_whitespace() { c } else { ' ' })
+        .collect();
+
+    // Split into terms and add prefix wildcard for better recall
+    let terms: Vec<&str> = sanitized.split_whitespace().filter(|t| !t.is_empty()).collect();
+
+    if terms.is_empty() {
+        return String::new();
+    }
+
+    // Use OR with prefix matching: "studio* OR futuro*"
+    terms.iter().map(|t| format!("{}*", t)).collect::<Vec<_>>().join(" OR ")
+}
+
 /// Full-text search across entities
+/// Query is sanitized to handle special characters (e.g., hyphens in "studio-futuro")
 #[tauri::command]
-pub fn brain_search(query: String) -> Result<Vec<SearchResult>, String> {
+pub fn brain_search(query: String, project_id: Option<String>) -> Result<Vec<SearchResult>, String> {
     let conn = get_connection()?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT e.id, rank
-             FROM entities e
-             JOIN entities_fts fts ON e.rowid = fts.rowid
-             WHERE entities_fts MATCH ?1
-             ORDER BY rank",
-        )
-        .map_err(|e| format!("Failed to prepare search query: {}", e))?;
+    let fts_query = sanitize_fts_query(&query);
+    if fts_query.is_empty() {
+        return Ok(Vec::new());
+    }
 
-    let results: Vec<(String, f64)> = stmt
-        .query_map(params![&query], |row| Ok((row.get(0)?, row.get(1)?)))
-        .map_err(|e| format!("Failed to execute search: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect search results: {}", e))?;
+    let results: Vec<(String, f64)> = if let Some(ref pid) = project_id {
+        // Filter by project: include project-scoped AND global entities
+        let mut stmt = conn
+            .prepare(
+                "SELECT e.id, rank
+                 FROM entities e
+                 JOIN entities_fts fts ON e.rowid = fts.rowid
+                 WHERE entities_fts MATCH ?1
+                   AND (e.project_id = ?2 OR e.project_id IS NULL)
+                 ORDER BY
+                   CASE WHEN e.project_id = ?2 THEN 1 WHEN e.project_id IS NULL THEN 2 ELSE 3 END,
+                   rank",
+            )
+            .map_err(|e| format!("Failed to prepare search query: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![&fts_query, pid], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| format!("Failed to execute search: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect search results: {}", e))?
+    } else {
+        // No project filter
+        let mut stmt = conn
+            .prepare(
+                "SELECT e.id, rank
+                 FROM entities e
+                 JOIN entities_fts fts ON e.rowid = fts.rowid
+                 WHERE entities_fts MATCH ?1
+                 ORDER BY rank",
+            )
+            .map_err(|e| format!("Failed to prepare search query: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![&fts_query], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| format!("Failed to execute search: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect search results: {}", e))?
+    };
 
     let mut search_results = Vec::new();
     for (id, rank) in results {

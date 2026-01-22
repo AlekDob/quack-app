@@ -115,6 +115,10 @@ function DiffDrawer({
             <div className="diff-drawer-diff">
               {(() => {
                 // Parse diff to extract real line numbers
+                // Safety check for undefined/null diffContent
+                if (!diffContent) {
+                  return <div className="diff-drawer-empty">No diff available</div>;
+                }
                 const lines = diffContent.split('\n');
                 let oldLineNum = 0;
                 let newLineNum = 0;

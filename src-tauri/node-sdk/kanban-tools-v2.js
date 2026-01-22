@@ -54,25 +54,24 @@ function getTauriStorePath() {
   }
 }
 
-// Paths to storage files
-const AGENTS_STORE_PATH = join(getTauriStorePath(), 'quack-agents.json');
-const SESSIONS_STORE_PATH = join(getTauriStorePath(), 'quack-agent-sessions.json');
+// Path to unified storage file (agents + sessions in one file)
+// NOTE: Frontend uses quack-agents.json for BOTH agents and sessions
+const UNIFIED_STORE_PATH = join(getTauriStorePath(), 'quack-agents.json');
 
-console.error(`[KanbanV2] Agents storage: ${AGENTS_STORE_PATH}`);
-console.error(`[KanbanV2] Sessions storage: ${SESSIONS_STORE_PATH}`);
+console.error(`[KanbanV2] Unified storage: ${UNIFIED_STORE_PATH}`);
 
 /**
  * Load agents from quack-agents.json
- * Format: { agents: UnifiedAgent[], version: number }
+ * Format: { agents: UnifiedAgent[], sessions: AgentSession[], version: number }
  */
 function loadAgents() {
   try {
-    if (!existsSync(AGENTS_STORE_PATH)) {
-      console.error('[KanbanV2] No agents file found, returning empty array');
+    if (!existsSync(UNIFIED_STORE_PATH)) {
+      console.error('[KanbanV2] No storage file found, returning empty array');
       return [];
     }
 
-    const data = JSON.parse(readFileSync(AGENTS_STORE_PATH, 'utf8'));
+    const data = JSON.parse(readFileSync(UNIFIED_STORE_PATH, 'utf8'));
     const agents = data.agents || [];
     console.error(`[KanbanV2] Loaded ${agents.length} agents from storage`);
     return agents;
@@ -84,6 +83,7 @@ function loadAgents() {
 
 /**
  * Save agents to quack-agents.json with file locking
+ * Preserves existing sessions when saving agents
  */
 async function saveAgents(agents) {
   let release;
@@ -94,22 +94,31 @@ async function saveAgents(agents) {
     }
 
     // Ensure file exists before locking
-    if (!existsSync(AGENTS_STORE_PATH)) {
-      writeFileSync(AGENTS_STORE_PATH, JSON.stringify({ agents: [], version: 2 }, null, 2), 'utf8');
+    if (!existsSync(UNIFIED_STORE_PATH)) {
+      writeFileSync(UNIFIED_STORE_PATH, JSON.stringify({ agents: [], sessions: [], version: 2 }, null, 2), 'utf8');
     }
 
     // Acquire lock with timeout
-    release = await lockfile.lock(AGENTS_STORE_PATH, {
+    release = await lockfile.lock(UNIFIED_STORE_PATH, {
       retries: { retries: 5, minTimeout: 100, maxTimeout: 1000 },
       stale: 5000, // Consider lock stale after 5 seconds
     });
 
+    // Read existing data to preserve sessions
+    let existingData = { agents: [], sessions: [], version: 2 };
+    try {
+      existingData = JSON.parse(readFileSync(UNIFIED_STORE_PATH, 'utf8'));
+    } catch (e) {
+      console.error(`[KanbanV2] Could not read existing data, starting fresh`);
+    }
+
     const data = {
       agents: agents,
+      sessions: existingData.sessions || [], // Preserve existing sessions
       version: 2, // V2 = Multi-Project Agent Architecture
     };
-    writeFileSync(AGENTS_STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
-    console.error(`[KanbanV2] Saved ${agents.length} agents to storage`);
+    writeFileSync(UNIFIED_STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
+    console.error(`[KanbanV2] Saved ${agents.length} agents to storage (preserved ${data.sessions.length} sessions)`);
     return true;
   } catch (error) {
     console.error(`[KanbanV2] Error saving agents: ${error.message}`);
@@ -126,19 +135,19 @@ async function saveAgents(agents) {
 }
 
 /**
- * Load sessions from quack-agent-sessions.json
- * Format: { agentSessions: AgentSession[] }
+ * Load sessions from quack-agents.json (unified storage)
+ * Format: { agents: [], sessions: [], version: 2 }
  */
 function loadSessions() {
   try {
-    if (!existsSync(SESSIONS_STORE_PATH)) {
-      console.error('[KanbanV2] No sessions file found, returning empty array');
+    if (!existsSync(UNIFIED_STORE_PATH)) {
+      console.error('[KanbanV2] No unified storage file found, returning empty array');
       return [];
     }
 
-    const data = JSON.parse(readFileSync(SESSIONS_STORE_PATH, 'utf8'));
-    const sessions = data.agentSessions || [];
-    console.error(`[KanbanV2] Loaded ${sessions.length} sessions from storage`);
+    const data = JSON.parse(readFileSync(UNIFIED_STORE_PATH, 'utf8'));
+    const sessions = data.sessions || [];
+    console.error(`[KanbanV2] Loaded ${sessions.length} sessions from unified storage`);
     return sessions;
   } catch (error) {
     console.error(`[KanbanV2] Error loading sessions: ${error.message}`);
@@ -147,7 +156,8 @@ function loadSessions() {
 }
 
 /**
- * Save sessions to quack-agent-sessions.json with file locking
+ * Save sessions to quack-agents.json (unified storage) with file locking
+ * Preserves existing agents when saving sessions
  */
 async function saveSessions(sessions) {
   let release;
@@ -158,19 +168,31 @@ async function saveSessions(sessions) {
     }
 
     // Ensure file exists before locking
-    if (!existsSync(SESSIONS_STORE_PATH)) {
-      writeFileSync(SESSIONS_STORE_PATH, JSON.stringify({ agentSessions: [] }, null, 2), 'utf8');
+    if (!existsSync(UNIFIED_STORE_PATH)) {
+      writeFileSync(UNIFIED_STORE_PATH, JSON.stringify({ agents: [], sessions: [], version: 2 }, null, 2), 'utf8');
     }
 
     // Acquire lock with timeout
-    release = await lockfile.lock(SESSIONS_STORE_PATH, {
+    release = await lockfile.lock(UNIFIED_STORE_PATH, {
       retries: { retries: 5, minTimeout: 100, maxTimeout: 1000 },
       stale: 5000, // Consider lock stale after 5 seconds
     });
 
-    const data = { agentSessions: sessions };
-    writeFileSync(SESSIONS_STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
-    console.error(`[KanbanV2] Saved ${sessions.length} sessions to storage`);
+    // Read existing data to preserve agents
+    let existingData = { agents: [], sessions: [], version: 2 };
+    try {
+      existingData = JSON.parse(readFileSync(UNIFIED_STORE_PATH, 'utf8'));
+    } catch (e) {
+      console.error(`[KanbanV2] Could not read existing data, starting fresh`);
+    }
+
+    const data = {
+      agents: existingData.agents || [], // Preserve existing agents
+      sessions: sessions,
+      version: 2,
+    };
+    writeFileSync(UNIFIED_STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
+    console.error(`[KanbanV2] Saved ${sessions.length} sessions to unified storage (preserved ${data.agents.length} agents)`);
     return true;
   } catch (error) {
     console.error(`[KanbanV2] Error saving sessions: ${error.message}`);

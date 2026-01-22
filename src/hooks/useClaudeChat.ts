@@ -158,28 +158,30 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     }
   }, [isLoading, options?.internalSessionId, chatStoreSetLoading]);
 
-  // 🦆 FIX: Clear event deduplication AND abort active stream when taskId changes
+  // 🦆 FIX: Clear event deduplication when taskId changes
   // This prevents events from Task A being incorrectly flagged as duplicates in Task B
-  // AND ensures the old stream doesn't continue updating stale state
+  // NOTE: We do NOT abort the stream when switching tasks - let it continue in background
+  // The user must explicitly click "Stop" to abort a stream
   useEffect(() => {
     const newTaskId = options?.taskId;
 
-    // If taskId changed, abort active stream, clear deduplication Set and reset session
+    // If taskId changed, clear deduplication Set (but DON'T abort stream)
     if (newTaskId !== currentTaskIdRef.current) {
-      console.log('[useClaudeChat] TaskId changed, aborting active stream and clearing state:', {
+      console.log('[useClaudeChat] TaskId changed, clearing deduplication state:', {
         oldTaskId: currentTaskIdRef.current,
         newTaskId,
         previousEventCount: seenEventIdsRef.current.size,
-        hadActiveStream: !!abortControllerRef.current
+        hasActiveStream: !!abortControllerRef.current
       });
 
-      // 🦆 FIX: Abort any active stream BEFORE switching tasks
-      // This prevents the race condition where old stream updates stale state
-      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
-        console.log('[useClaudeChat] Aborting stream due to task switch...');
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      // 🦆 FIX: Do NOT abort stream on task switch - this was causing the bug
+      // where switching sessions would abort the stream involuntarily
+      // The user must explicitly click "Stop" to abort
+      // if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+      //   console.log('[useClaudeChat] Aborting stream due to task switch...');
+      //   abortControllerRef.current.abort();
+      //   abortControllerRef.current = null;
+      // }
 
       seenEventIdsRef.current.clear();
       currentTaskIdRef.current = newTaskId;
@@ -189,8 +191,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
         claudeSessionId.current = undefined;
       }
 
-      // Reset loading state since we aborted the stream
-      setIsLoading(false);
+      // 🦆 FIX: Do NOT reset loading state - let the stream continue
+      // setIsLoading(false);
     }
   }, [options?.taskId, options?.initialSessionId]);
 

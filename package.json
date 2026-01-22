@@ -34,11 +34,14 @@
     "test:dedup": "vitest run src/tests/eventDeduplication.test.ts src/tests/sessionKeyStability.test.ts",
     "test:dev": "VITE_TEST_MODE=true npm run tauri:dev",
     "test:clean": "rm -f ~/Library/Application\\ Support/com.quack.terminal/*-TEST.json && echo '✅ Test data cleaned!'",
-    "test:reset": "npm run test:clean && echo '🧪 Starting Quack in TEST MODE...' && npm run test:dev"
+    "test:reset": "npm run test:clean && echo '🧪 Starting Quack in TEST MODE...' && npm run test:dev",
+    "whatsapp:watch": "node src-tauri/node-sdk/whatsapp-watcher.cjs",
+    "whatsapp:watch:test": "node src-tauri/node-sdk/whatsapp-watcher.cjs --allow-own-messages --verbose",
+    "whatsapp:watch:dry": "node src-tauri/node-sdk/whatsapp-watcher.cjs --dry-run --verbose"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.7",
-    "@anthropic-ai/sdk": "^0.71.0",
+    "@anthropic-ai/sdk": "^0.71.2",
     "@codemirror/commands": "^6.10.0",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.11",
@@ -90,6 +93,7 @@
     "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
+    "sqlite3": "^5.1.7",
     "tauri-plugin-mic-recorder-api": "^2.0.0",
     "thememirror": "^2.0.1",
     "vscode-icons-js": "^11.6.1",
