@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -29,6 +29,8 @@ export interface Tab {
   docsPath?: string; // Path to docs page for docs tabs
   initialNodeId?: string; // Initial node to zoom into for second-brain tabs
   taskId?: string; // Reference to Kanban task for task tabs
+  imageData?: string; // Base64 image data for image tabs
+  mediaType?: string; // MIME type (image/png, image/jpeg, etc.) for image tabs
 }
 
 interface ContextMenuState {
@@ -366,6 +368,13 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </span>
+          )}
+          {tab.type === 'image' && (
+            <span className="tab-icon tab-icon-image" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1.75 2.5a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25h.94a.76.76 0 01.03-.03l6.077-6.078a1.75 1.75 0 012.412-.06L14.5 10.31V2.75a.25.25 0 00-.25-.25H1.75zM0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0114.25 15H1.75A1.75 1.75 0 010 13.25V2.75zm5.5 3.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
               </svg>
             </span>
           )}

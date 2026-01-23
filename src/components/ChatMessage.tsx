@@ -63,9 +63,11 @@ interface ChatMessageProps {
   showThinkingBlocks?: boolean;
   // File Checkpointing (SDK 0.2.7+)
   onRewindFiles?: (userMessageId: string) => void;
+  // Image preview
+  onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -519,6 +521,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                 pendingQuestionIds={pendingQuestionIds}
                 answeredQuestions={answeredQuestions}
                 showThinkingBlocks={showThinkingBlocks}
+                onOpenImageTab={onOpenImageTab}
                 sessionId={currentSessionId}
                 onRewindFiles={onRewindFiles}
               />

@@ -691,3 +691,72 @@
 .enter-plan-mode-content p {
   margin: 0;
 }
+
+/* Image Preview Widget */
+.image-preview-widget {
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+}
+
+.image-preview-widget .image-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.image-preview-widget .image-preview-header svg {
+  color: rgba(147, 197, 253, 0.7);
+  flex-shrink: 0;
+}
+
+.image-preview-widget .image-preview-container {
+  position: relative;
+  cursor: pointer;
+}
+
+.image-preview-widget .image-preview-container img {
+  width: 100%;
+  display: block;
+}
+
+.image-preview-widget .image-preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-preview-widget .image-preview-container:hover .image-preview-overlay {
+  opacity: 1;
+}
+
+.image-preview-widget .image-preview-open-btn {
+  padding: 8px 16px;
+  background: rgba(139, 92, 246, 0.8);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.image-preview-widget .image-preview-open-btn:hover {
+  background: rgba(139, 92, 246, 1);
+  transform: scale(1.05);
+}

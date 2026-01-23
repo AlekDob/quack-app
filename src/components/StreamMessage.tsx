@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, memo } from 'react';
+import React, { useMemo, useState, useEffect, memo, useCallback } from 'react';
 import './ToolWidgets.css';
 import {
   SystemInitializedWidget,
@@ -10,6 +10,7 @@ import {
   TodoWriteWidget,
   ExitPlanModeWidget,
   EnterPlanModeWidget,
+  ImagePreviewWidget,
   ToolIcon,
   getToolColor,
 } from './ToolWidgets';
@@ -40,6 +41,7 @@ const MemoizedTodoWriteWidget = memo(TodoWriteWidget);
 const MemoizedExitPlanModeWidget = memo(ExitPlanModeWidget);
 const MemoizedEnterPlanModeWidget = memo(EnterPlanModeWidget);
 const MemoizedAskUserQuestionWidget = memo(AskUserQuestionWidget);
+const MemoizedImagePreviewWidget = memo(ImagePreviewWidget);
 
 /**
  * CollapsibleToolWidget - A collapsible widget for generic MCP tools
@@ -125,6 +127,8 @@ interface StreamMessageProps {
   // File Checkpointing (SDK 0.2.7+)
   sessionId?: string; // Session ID for rewind operations
   onRewindFiles?: (userMessageId: string) => void; // Callback to rewind files to a specific message
+  // Image preview
+  onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -140,6 +144,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   showThinkingBlocks = true,
   sessionId,
   onRewindFiles,
+  onOpenImageTab,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -198,6 +203,29 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
 
     return results;
   }, [streamMessages]);
+
+  // Helper function to extract image data from tool results
+  const extractImageData = useCallback((toolResult: any): { data: string; mediaType: string } | null => {
+    if (!toolResult) return null;
+
+    // tool_result.content can be an array of content blocks
+    const content = toolResult.content;
+
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block.type === 'image' && block.source?.type === 'base64') {
+          return { data: block.source.data, mediaType: block.source.media_type || 'image/png' };
+        }
+      }
+    }
+
+    // Or it could be a single image object
+    if (content?.type === 'image' && content?.source?.type === 'base64') {
+      return { data: content.source.data, mediaType: content.source.media_type || 'image/png' };
+    }
+
+    return null;
+  }, []);
 
 
   // System initialization message
@@ -335,8 +363,30 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // Read tool
+            // Read tool - check if image file first
             if (toolName === 'read' && input?.file_path) {
+              const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
+              const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
+
+              if (isImageFile && toolResult) {
+                // Extract image data from tool result
+                const imageContent = extractImageData(toolResult);
+                if (imageContent) {
+                  return (
+                    <React.Fragment key={idx}>
+                      <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
+                      <MemoizedImagePreviewWidget
+                        filePath={input.file_path}
+                        imageData={imageContent.data}
+                        mediaType={imageContent.mediaType}
+                        onOpenInTab={onOpenImageTab}
+                      />
+                    </React.Fragment>
+                  );
+                }
+              }
+
+              // Text files - existing ReadWidget
               return (
                 <React.Fragment key={idx}>
                   <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />

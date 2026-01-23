@@ -127,6 +127,7 @@ interface ChatViewProps {
   onToggleFullscreen?: () => void;
   // File Checkpointing (SDK 0.2.7+)
   onRewindFiles?: (userMessageId: string) => void;
+  onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
 }
 
 export default function ChatView({
@@ -203,6 +204,7 @@ export default function ChatView({
   isFullscreen = false,
   onToggleFullscreen,
   // File Checkpointing
+  onOpenImageTab,
   onRewindFiles,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
@@ -689,6 +691,7 @@ export default function ChatView({
         currentSessionId={currentSessionId}
         showThinkingBlocks={showThinkingBlocks}
         onRewindFiles={onRewindFiles}
+        onOpenImageTab={onOpenImageTab}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar

@@ -76,6 +76,7 @@ import SecondBrainTabView from "./views/SecondBrainTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
+import ImageTabView from "./views/ImageTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -7887,6 +7888,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unstaged_status: status === 'modified' ? 'M' : (status === 'deleted' ? 'D' : null),
       is_untracked: status === 'created',
       original_path: null,
+      additions: 0,
+      deletions: 0,
     };
     setEditSummaryDiffEntry(syntheticEntry);
 
@@ -8128,6 +8131,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     console.log('[Quack] Second Brain tab opened with node:', nodeId, nodeLabel);
   }, [openSecondBrainTab]);
+  // Handler for opening image in a dedicated tab
+  const handleOpenImageTab = useCallback((filePath: string, imageData: string, mediaType: string) => {
+    const fileName = filePath.split("/").pop() || "Image";
+    const newTab: Tab = {
+      id: `image-${Date.now()}`,
+      label: fileName,
+      type: "image",
+      closable: true,
+      filePath,
+      imageData,
+      mediaType,
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+  }, []);
+
 
   // Handler for opening/focusing Kanban tab (toggle behavior with Cmd+K)
   // Refactored to avoid nested state updates which can cause race conditions
@@ -10548,6 +10567,7 @@ You have access to all Bash tools to execute git commands like:
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
+                    onOpenImageTab={handleOpenImageTab}
                   />
                 );
               })()}
@@ -10673,6 +10693,7 @@ You have access to all Bash tools to execute git commands like:
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
+                    onOpenImageTab={handleOpenImageTab}
                   />
                 );
               })()}
@@ -10897,6 +10918,15 @@ You have access to all Bash tools to execute git commands like:
                       onSelectDroid={handleSelectDroid}
                     />
                   );
+                }
+                return null;
+              })()}
+
+              {/* Image Viewer - shown when image tab is active (hidden in Kanban mode) */}
+              {activeTabId.startsWith('image-') && !isKanbanTabActive && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'image') {
+                  return <ImageTabView tab={activeTab} isActive={true} />;
                 }
                 return null;
               })()}

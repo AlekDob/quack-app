@@ -630,7 +630,11 @@ export const ReadWidget: React.FC<{
       </div>
       {isExpanded && result && result.content && (
         <div className="tool-widget-content">
-          <pre className="tool-widget-output">{result.content}</pre>
+          {typeof result.content === 'string' ? (
+            <pre className="tool-widget-output">{result.content}</pre>
+          ) : (
+            <pre className="tool-widget-output">{JSON.stringify(result.content, null, 2)}</pre>
+          )}
         </div>
       )}
     </div>
@@ -753,6 +757,36 @@ export const EnterPlanModeWidget: React.FC<{
           <p>{objective}</p>
         </div>
       )}
+    </div>
+  );
+};
+
+// ImagePreviewWidget - inline image preview with open in tab button
+export const ImagePreviewWidget: React.FC<{
+  filePath: string;
+  imageData: string; // base64 encoded
+  mediaType: string; // e.g. "image/png"
+  onOpenInTab?: (filePath: string, imageData: string, mediaType: string) => void;
+}> = ({ filePath, imageData, mediaType, onOpenInTab }) => {
+  const fileName = filePath.split('/').pop() || 'Image';
+  const imageSrc = `data:${mediaType};base64,${imageData}`;
+
+  return (
+    <div className="image-preview-widget">
+      <div className="image-preview-header">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M1.75 2.5a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25h.94a.76.76 0 01.03-.03l6.077-6.078a1.75 1.75 0 012.412-.06L14.5 10.31V2.75a.25.25 0 00-.25-.25H1.75zM0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0114.25 15H1.75A1.75 1.75 0 010 13.25V2.75zm5.5 3.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+        </svg>
+        <span>{fileName}</span>
+      </div>
+      <div className="image-preview-container" onClick={() => onOpenInTab?.(filePath, imageData, mediaType)}>
+        <img src={imageSrc} alt={fileName} />
+        <div className="image-preview-overlay">
+          <button className="image-preview-open-btn">
+            Open in tab
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
