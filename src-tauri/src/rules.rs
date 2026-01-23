@@ -3,9 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
-/// Bundled rule: MCP Memory as Second Brain
+/// Bundled rule: Quack Brain (file-first knowledge store)
 /// This rule is installed automatically for all Quack users on first run
-const BUNDLED_RULE_MCP_MEMORY: &str = include_str!("../../.claude/rules/use-mcp-memory-second-brain.md");
+const BUNDLED_RULE_QUACK_BRAIN: &str = include_str!("../../.claude/rules/use-quack-brain.md");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rule {
@@ -400,8 +400,8 @@ struct BundledRule {
 /// List of bundled rules to install for all Quack users
 const BUNDLED_RULES: &[BundledRule] = &[
     BundledRule {
-        name: "use-mcp-memory-second-brain",
-        content: BUNDLED_RULE_MCP_MEMORY,
+        name: "use-quack-brain",
+        content: BUNDLED_RULE_QUACK_BRAIN,
     },
 ];
 

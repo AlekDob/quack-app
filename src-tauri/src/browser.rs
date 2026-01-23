@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use std::time::Duration;
 use reqwest;
