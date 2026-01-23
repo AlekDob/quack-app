@@ -8305,6 +8305,38 @@ button.directory-chooser:disabled {
   line-height: 1;
 }
 
+/* ===== Sidebar Brain Button ===== */
+.sidebar-brain-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(139, 92, 246, 0.08);
+  border: none;
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-brain-button:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+}
+
+.sidebar-brain-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.sidebar-brain-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
 /* ===== Sidebar Settings Button ===== */
 .sidebar-settings-button {
   position: sticky;

@@ -8,7 +8,6 @@ import './TabPopoutWindowApp.css';
 
 // Lazy load components to match main app tab views
 const CodeEditor = lazy(() => import('./CodeEditorMonaco'));
-const MemoryGraphTabView = lazy(() => import('../views/MemoryGraphTabView'));
 const DocsViewer = lazy(() => import('./docs/DocsViewer'));
 const SkillViewer = lazy(() => import('./SkillViewer'));
 const AgentViewer = lazy(() => import('./AgentViewer'));
@@ -283,11 +282,7 @@ const TabPopoutWindowApp: React.FC = () => {
         );
 
       case 'memory-graph':
-        return (
-          <Suspense fallback={<LoadingSpinner message="Loading memory graph..." />}>
-            <MemoryGraphTabView tab={tab} isActive={true} />
-          </Suspense>
-        );
+        return renderPlaceholder('Brain', 'Memory Graph', 'Open in Obsidian');
 
       case 'browser':
         return renderPlaceholder('🌐', 'Browser', tab.url || 'No URL');

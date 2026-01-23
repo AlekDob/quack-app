@@ -172,26 +172,9 @@
   transform: scale(0.95);
 }
 
-/* Message wrapper for grouping message + memory indicator */
+/* Message wrapper */
 .message-wrapper {
   width: 100%;
   display: flex;
   flex-direction: column;
-}
-
-/* Memory indicator wrapper - positioned below user message, aligned to the left */
-.memory-indicator-wrapper {
-  padding: 0 16px 8px 64px; /* Align with message content (after avatar) */
-  animation: memoryIndicatorSlideIn 0.3s ease;
-}
-
-@keyframes memoryIndicatorSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }

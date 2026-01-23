@@ -142,12 +142,11 @@ interface KanbanTask {
 |---------|-------------|----------|
 | **Multi-Agent** | Multiple AI assistants per project | - |
 | **Kanban Board** | Visual task management | Cmd+K |
-| **Second Brain** | Knowledge graph with Obsidian sync | - |
+| **Second Brain** | File-based knowledge in ~/.quack/brain/ | - |
 | **Background Tasks** | Non-blocking execution | `/background` |
 | **File Explorer** | Directory navigation | - |
 | **Git Integration** | Status, diffs, commits | - |
 | **AI Streaming** | Real-time Claude responses | - |
-| **MCP Memory** | Persistent knowledge graph | - |
 | **Documentation** | In-app guide viewer | - |
 
 ## Language Settings
@@ -343,116 +342,43 @@ Non-blocking execution of long-running operations via `/background` command.
 **Files:** `src/hooks/useBackgroundAgents.ts`, `src/stores/backgroundAgentStore.ts`
 **Docs:** `docs/05-features/background-tasks.md`
 
-## Second Brain (Knowledge Graph)
+## Second Brain (File-based Knowledge)
 
-Tana/Logseq-style outliner for managing MCP Memory entities.
+File-first knowledge storage in `~/.quack/brain/`. No database, no MCP server - just markdown files with YAML frontmatter.
 
-**Features:**
-- Inline editing with bullet points
-- Zoom/focus mode with breadcrumbs
-- `@mentions` for relations
-- `#supertags` for entity types
-- Observations as nested details
-- Bidirectional sync with AI
+**Architecture:**
+- **Storage**: Markdown files in `~/.quack/brain/{global|projects}/{type}/`
+- **AI Access**: Via `.claude/skills/quack-brain/skill.md` (Claude reads/writes files directly)
+- **Auto-learn**: Post-session hook evaluates responses for knowledge worth saving
+- **UI**: Open in Finder or Obsidian (no in-app UI)
 
-**Entity Types:** fact, preference, pattern, decision, project, person, technology, mistake, context
-
-**Files:** `src/views/SecondBrainTabView.tsx`, `src/components/second-brain/`
-**Docs:** `docs/05-features/second-brain.md`
-
-## MCP Memory - Second Brain
-
-Quack uses **MCP Memory** (`@modelcontextprotocol/server-memory`) as the user's **Second Brain** - a persistent knowledge base that AI agents should actively use and contribute to.
-
-### Why Use MCP Memory?
-
-The MCP Memory is the user's personal knowledge graph containing:
-- **Patterns & Best Practices** discovered during development
-- **Architectural Decisions** and their rationale
-- **Bug Solutions** that were hard to find
-- **User Preferences** and working style
-- **Project Context** that helps AI understand the codebase
-- **Lessons Learned** from past mistakes
-
-### When to SEARCH Memory (Read)
-
-**ALWAYS search memory during the Analysis phase:**
-- Before answering questions you're unsure about
-- When investigating bugs or issues
-- When making architectural decisions
-- When the user asks about past work or decisions
-- When you need context about patterns used in the project
-
-```typescript
-// Example: Search for relevant context
-mcp__memory__search_nodes({ query: "authentication pattern" })
-mcp__memory__search_nodes({ query: "bug fix dropdown" })
+**Structure:**
+```
+~/.quack/brain/
+├── global/
+│   ├── patterns/
+│   ├── preferences/
+│   ├── people/
+│   └── tools/
+└── projects/
+    └── {project-name}/
+        ├── patterns/
+        ├── bugs/
+        ├── decisions/
+        ├── gotchas/
+        └── diary/
 ```
 
-### When to SAVE to Memory (Write)
-
-**ALWAYS save important discoveries:**
-- Bug fixes that were tricky to solve
-- Patterns that work well in this project
-- Architectural decisions and their rationale
-- User preferences you learn during conversation
-- Solutions that might be useful in the future
-- Configuration quirks or gotchas
-
-### Memory Scopes
-
-Memories can be **Global** (visible everywhere) or **Project-scoped** (visible only in a specific project).
-
-**Project-scoped memories use the `belongs_to_project` relation:**
-
-```jsonl
-// Project entity
-{"type":"entity","name":"quack-app","entityType":"project","observations":["Path: /Users/alekdob/Desktop/Dev/Personal/quack-app"]}
-
-// Memory scoped to project
-{"type":"entity","name":"pattern_react_hooks","entityType":"pattern","observations":["Use custom hooks for reusable logic"]}
-{"type":"relation","from":"pattern_react_hooks","to":"quack-app","relationType":"belongs_to_project"}
-```
-
-**When saving memories via AI:**
-- **Global memories**: Facts about user, preferences, general knowledge - NO project relation needed
-- **Project memories**: Patterns, decisions, context specific to THIS project - ADD `belongs_to_project` relation
-
-**Current project: quack-app**
-- When saving project-specific memories, create relation: `{ from: "<entity>", to: "quack-app", relationType: "belongs_to_project" }`
-- Global memories (about Alek, general preferences) don't need project relation
-
-### MCP Tools for Memories
-
-| Tool | Purpose |
+**Key Files:**
+| File | Purpose |
 |------|---------|
-| `mcp__memory__search_nodes` | Search existing memories (USE OFTEN!) |
-| `mcp__memory__read_graph` | Read entire knowledge graph |
-| `mcp__memory__create_entities` | Create new memory entities |
-| `mcp__memory__create_relations` | Create relations between entities |
-| `mcp__memory__add_observations` | Add observations to existing entities |
-
-### Entity Types for Memories
-
-Use consistent entity types for better organization:
-- `pattern` - Code patterns and best practices
-- `bug_fix` - Solutions to bugs
-- `decision` - Architectural or technical decisions
-- `preference` - User preferences
-- `gotcha` - Common pitfalls and how to avoid them
-- `tool` - Tools and their configurations
-- `project` - Project metadata
+| `src/services/brainFileService.ts` | Read/write brain files via Tauri |
+| `.claude/skills/quack-brain/skill.md` | Skill for Claude to access brain |
+| `src/components/settings/categories/SecondBrainSettings.tsx` | Settings panel |
 
 ## Critical Rules
 
-1. **⚠️ TESTING**: Write Vitest tests for new features (see Testing section)
-2. **⚠️ DOCUMENTATION**: Update relevant docs in `/docs` when making changes
-3. **⚠️ ARCHITECTURE**: Update `docs/01-architecture.md` for architectural changes
-4. **⚠️ MCP MEMORY**:
-   - **SEARCH** memory during Analysis phase for relevant context, patterns, and past solutions
-   - **SAVE** important discoveries: bug fixes, patterns, decisions, preferences, gotchas
-   - This is the user's Second Brain - use it actively!
-5. All UI text must be in English (user is Italian, but app is English)
-6. Use Discovery Protocol before answering questions
-7. Coordinate with Protocol Droids for specialized tasks
-8. Follow agentic cycle for development
+1. All UI text must be in English (user is Italian, but app is English)
+2. Use Discovery Protocol before answering questions
+3. Coordinate with Protocol Droids for specialized tasks
+4. Follow agentic cycle for development

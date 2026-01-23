@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
-import { MemoryIndicator, type MemoryInfo } from './MemoryIndicator';
-import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers, ClaudeMemoryContextEvent } from '../types';
+import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import './MessageList.css';
 
 interface MessageListProps {
@@ -189,43 +188,6 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
     return msg.role === 'user' ? index : lastIndex;
   }, -1);
 
-  // Extract memory context from assistant messages following user messages
-  // Maps user message index -> memory info from the following assistant message
-  const memoryContextByUserIndex = useMemo(() => {
-    const memoryMap = new Map<number, {
-      memories: MemoryInfo[];
-      keywords: string[];
-      userKeywords?: string[];
-      aiConcepts?: string[];
-      durationMs: number;
-      extractionMethod?: 'ai' | 'legacy' | 'none' | 'error';
-    }>();
-
-    messages.forEach((msg, index) => {
-      // For each user message, look at the next message
-      if (msg.role === 'user' && index < messages.length - 1) {
-        const nextMsg = messages[index + 1];
-        // If next message is assistant and has events, look for memory_context
-        if (nextMsg && nextMsg.role === 'assistant' && nextMsg.events) {
-          const memoryEvent = nextMsg.events.find(
-            (e): e is ClaudeMemoryContextEvent => e.type === 'memory_context'
-          );
-          if (memoryEvent && memoryEvent.memories.length > 0) {
-            memoryMap.set(index, {
-              memories: memoryEvent.memories,
-              keywords: memoryEvent.keywords,
-              userKeywords: memoryEvent.userKeywords,
-              aiConcepts: memoryEvent.aiConcepts,
-              durationMs: memoryEvent.durationMs,
-              extractionMethod: memoryEvent.extractionMethod,
-            });
-          }
-        }
-      }
-    });
-
-    return memoryMap;
-  }, [messages]);
 
   if (messages.length === 0 && !loading) {
     return (
@@ -240,10 +202,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
   return (
     <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
       <div className="message-list-content">
-        {messages.map((message, index) => {
-          const memoryContext = message.role === 'user' ? memoryContextByUserIndex.get(index) : null;
-
-          return (
+        {messages.map((message, index) => (
             <div key={message.id} className="message-wrapper">
               <ChatMessage
                 message={message}
@@ -264,24 +223,8 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
                 onRewindFiles={onRewindFiles}
                 onOpenImageTab={onOpenImageTab}
               />
-              {/* Show memory indicator below user messages when memories were used */}
-              {memoryContext && (
-                <div className="memory-indicator-wrapper">
-                  <MemoryIndicator
-                    memories={memoryContext.memories}
-                    keywords={memoryContext.extractionMethod === 'legacy' ? memoryContext.keywords : []}
-                    userKeywords={memoryContext.userKeywords}
-                    query={memoryContext.extractionMethod === 'ai' && memoryContext.aiConcepts?.length
-                      ? memoryContext.aiConcepts.join(', ')
-                      : undefined}
-                    searchContext={memoryContext.extractionMethod === 'ai' ? 'AI semantic' : undefined}
-                    durationMs={memoryContext.durationMs}
-                  />
-                </div>
-              )}
             </div>
-          );
-        })}
+        ))}
         {loading && <SkeletonMessage />}
       </div>
       {showScrollButton && (

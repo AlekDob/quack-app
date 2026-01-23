@@ -7,7 +7,6 @@ import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import EditSummaryBar from './EditSummaryBar';
 import TodoProgressBar from './TodoProgressBar';
-import QuackBrainLinkBar from './QuackBrainLinkBar';
 import type { TodoItem } from './TodoProgressBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
@@ -582,42 +581,6 @@ export default function ChatView({
 
   // Extract QuackBrain file info from the LAST assistant message
   // Shows a special bar to open the created brain entity in Obsidian
-  const quackBrainFile = useMemo<{ path: string; name: string; type: string } | null>(() => {
-    // Find the last assistant message
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find(msg => msg.role === 'assistant');
-
-    if (!lastAssistantMessage?.events) return null;
-
-    // Look for brain MCP tool results with mdFilePath
-    for (const event of lastAssistantMessage.events as any[]) {
-      if (event.type === 'user' && event.message?.content && Array.isArray(event.message.content)) {
-        for (const item of event.message.content) {
-          if (item.type === 'tool_result' && item.content) {
-            try {
-              const resultContent = typeof item.content === 'string'
-                ? JSON.parse(item.content)
-                : item.content;
-
-              // Check for mdFilePath from brain_create_entity or brain_add_observation
-              if (resultContent.mdFilePath && resultContent.mdFilePath.includes('QuackBrain')) {
-                return {
-                  path: resultContent.mdFilePath,
-                  name: resultContent.name || resultContent.mdFilePath.split('/').pop()?.replace('.md', '') || 'Entity',
-                  type: resultContent.entityType || resultContent.tag || 'note'
-                };
-              }
-            } catch {
-              // Not JSON, skip
-            }
-          }
-        }
-      }
-    }
-
-    return null;
-  }, [messages]);
 
   // Keyboard shortcuts: Shift+Tab to cycle modes, ESC to abort
   useEffect(() => {
@@ -709,13 +672,6 @@ export default function ChatView({
       )}
       {currentTodos.length > 0 && (
         <TodoProgressBar todos={currentTodos} />
-      )}
-      {quackBrainFile && (
-        <QuackBrainLinkBar
-          filePath={quackBrainFile.path}
-          entityName={quackBrainFile.name}
-          entityType={quackBrainFile.type}
-        />
       )}
       <div className="chat-view-footer">
         <div className="chat-view-footer-controls">

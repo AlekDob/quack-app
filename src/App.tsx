@@ -64,15 +64,11 @@ import BrowserManager from "./components/BrowserManager";
 import KanbanToast from "./components/KanbanToast";
 import { useDocsTab } from "./hooks/useDocsTab";
 import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
-import { useMemoryGraphTab } from "./hooks/useMemoryGraphTab";
-import { useSecondBrainTab } from "./hooks/useSecondBrainTab";
 import { useKanbanTab } from "./hooks/useKanbanTab";
 import { useKanbanChatSync } from "./hooks/useKanbanChatSync";
 import { useSessionMessageSync } from "./hooks/useSessionMessageSync";
 import { useProjectDashboardTab } from "./hooks/useProjectDashboardTab";
 import DocsTabView from "./views/DocsTabView";
-import MemoryGraphTabView from "./views/MemoryGraphTabView";
-import SecondBrainTabView from "./views/SecondBrainTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
@@ -86,7 +82,6 @@ import { useChatStore } from "./stores/chatStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
-import ObsidianSyncInitializer from "./components/ObsidianSyncInitializer";
 import KanbanWatcherInitializer from "./components/KanbanWatcherInitializer";
 import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
@@ -117,11 +112,6 @@ import {
   migrateFromLegacy,
   type UnifiedAgent,
 } from "./services/unifiedAgentStorage";
-import { extractAndSaveMemories, extractManualMemoryFromInput } from "./services/memoryIntegration";
-import { getMemorySettings, addMemory } from "./services/memoryStorage";
-import { generateMemoryId } from "./services/memoryExtractor";
-import { buildMemoryObserverPrompt } from "./services/memoryObserverPrompt";
-import { dispatchMCPMemoryUpdate, type MCPKnowledgeGraph } from "./hooks/useUnifiedMemory";
 import { calculateProjectOverhead } from "./services/conversationRecovery";
 import { getDuckdroidUrl, getAgentAvatar } from "./utils/agentAvatars";
 import { showProjectToast } from "./components/ProjectToast";
@@ -362,8 +352,6 @@ function AppContent() {
   // Documentation tab management
   const { openDocsTab } = useDocsTab();
 
-  // Memory Graph tab management
-  const { openMemoryGraphTab } = useMemoryGraphTab();
 
 
   // Kanban state from store (no longer using isKanbanTabActive overlay)
@@ -386,8 +374,6 @@ function AppContent() {
   const inProgressTaskCount = inProgressTasks.length;
 
 
-  // Second Brain tab management
-  const { openSecondBrainTab } = useSecondBrainTab();
 
   // Kanban tab management
   const { openKanbanTab } = useKanbanTab();
@@ -519,74 +505,6 @@ function AppContent() {
   >({});
   const [explorerRoot, setExplorerRoot] = useState<string | null>(null);
 
-  // 🧠 QUACK MEMORY: Listen for memory-observer background task completion
-  useEffect(() => {
-    if (!tauriAvailable) return;
-
-    let unlisten: (() => void) | undefined;
-
-    listen<{ taskId: string; result: { success: boolean; output?: string; error?: string } }>(
-      'background-task-complete',
-      async (event) => {
-        const { result } = event.payload;
-
-        // Only process successful memory-observer tasks
-        if (!result.success || !result.output) return;
-
-        // Check if this looks like a memory-observer result (contains JSON with memories)
-        if (!result.output.includes('"memories"')) return;
-
-        try {
-          // Extract JSON from the output (may have surrounding text)
-          const jsonMatch = result.output.match(/\{[\s\S]*"memories"[\s\S]*\}/);
-          if (!jsonMatch) return;
-
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (!parsed.memories || !Array.isArray(parsed.memories)) return;
-
-          console.log(`[Memory Observer] Received ${parsed.memories.length} memories from background task`);
-
-          // Save each extracted memory
-          for (const mem of parsed.memories) {
-            if (mem.content && mem.category) {
-              const now = Date.now();
-              await addMemory({
-                id: generateMemoryId(),
-                content: mem.content,
-                category: mem.category as 'preference' | 'fact' | 'decision' | 'pattern' | 'mistake' | 'context',
-                confidence: mem.confidence || 'medium',
-                scope: explorerPath ? 'project' : 'global',
-                keywords: mem.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3).slice(0, 10),
-                projectPath: explorerPath || undefined,
-                createdAt: now,
-                lastAccessedAt: now,
-                accessCount: 0,
-                userVerified: false,
-                isArchived: false,
-              });
-              console.log(`[Memory Observer] Saved memory: ${mem.category} - "${mem.content.substring(0, 50)}..."`);
-            }
-          }
-
-          // Show toast if memories were saved
-          if (parsed.memories.length > 0) {
-            toast.success(`Extracted ${parsed.memories.length} memory(s)`, {
-              description: 'From tool execution analysis',
-              duration: 3000,
-            });
-          }
-        } catch (err) {
-          console.warn('[Memory Observer] Failed to parse memories:', err);
-        }
-      }
-    ).then((fn) => {
-      unlisten = fn;
-    });
-
-    return () => {
-      unlisten?.();
-    };
-  }, [tauriAvailable, explorerPath]);
 
   // Available droids for @mention invocation (loaded from .claude/agents directories)
   const [availableDroids, setAvailableDroids] = useState<DroidMetadata[]>([]);
@@ -1721,43 +1639,7 @@ function AppContent() {
                             : JSON.stringify(content.content).substring(0, 200)
                         });
 
-                        // Check if this is a result from mcp__memory__read_graph
-                        // The content might be a string or have a text field
-                        const resultContent = typeof content.content === 'string'
-                          ? content.content
-                          : content.content?.[0]?.text || content.text || JSON.stringify(content.content);
 
-                        // Look for knowledge graph structure in the result
-                        if (resultContent && resultContent.includes('entities') && resultContent.includes('relations')) {
-                          console.log('[MCP Memory] 📊 Found potential knowledge graph data');
-                          try {
-                            // Try to parse the JSON from the result
-                            const jsonMatch = resultContent.match(/\{[\s\S]*"entities"[\s\S]*"relations"[\s\S]*\}/);
-                            if (jsonMatch) {
-                              const graphData = JSON.parse(jsonMatch[0]) as MCPKnowledgeGraph;
-                              console.log('[MCP Memory] ✅ Parsed knowledge graph:', {
-                                entities: graphData.entities?.length || 0,
-                                relations: graphData.relations?.length || 0,
-                                entityNames: graphData.entities?.map(e => e.name),
-                              });
-                              // Dispatch event to update Memory Panel
-                              dispatchMCPMemoryUpdate(graphData);
-                            } else {
-                              console.log('[MCP Memory] ⚠️ JSON match failed, trying direct parse');
-                              // Try direct parse
-                              const graphData = JSON.parse(resultContent) as MCPKnowledgeGraph;
-                              if (graphData.entities) {
-                                console.log('[MCP Memory] ✅ Direct parse succeeded:', {
-                                  entities: graphData.entities?.length || 0,
-                                  relations: graphData.relations?.length || 0,
-                                });
-                                dispatchMCPMemoryUpdate(graphData);
-                              }
-                            }
-                          } catch (parseErr) {
-                            console.warn('[MCP Memory] ❌ Failed to parse knowledge graph:', parseErr);
-                          }
-                        }
                       }
                     });
                   }
@@ -1768,45 +1650,6 @@ function AppContent() {
                   setRefreshExplorerTrigger(prev => prev + 1);
                 }
 
-                // 🧠 QUACK MEMORY: Launch memory-observer for tool executions
-                // Uses built-in prompt (no external droid file needed)
-                if (toolExecutions.length > 0) {
-                  console.log(`[Memory Observer] Tool executions detected: ${toolExecutions.length}`,
-                    toolExecutions.map(t => t.name));
-
-                  // Launch async task outside of setter (to avoid blocking React)
-                  setTimeout(async () => {
-                    try {
-                      const settings = await getMemorySettings();
-                      console.log('[Memory Observer] Settings check:', {
-                        enabled: settings.enabled,
-                        llmExtractionTrigger: settings.llmExtractionTrigger,
-                        extractionMode: settings.extractionMode,
-                      });
-
-                      // Only run if memory is enabled and tool-based extraction is on
-                      if (settings.enabled && settings.llmExtractionTrigger === 'tool-based') {
-                        // Build the full prompt with embedded system instructions
-                        const memoryObserverPrompt = buildMemoryObserverPrompt(toolExecutions);
-
-                        console.log(`[Memory Observer] Launching for ${toolExecutions.length} tool(s):`,
-                          toolExecutions.map(t => t.name).join(', '));
-
-                        // TODO: Memory Observer now needs to use Kanban shell tasks
-                        // Old runDroidInBackground removed, needs migration
-                        console.log('[Memory Observer] Background agent not yet migrated to Kanban');
-                      } else {
-                        console.log('[Memory Observer] Skipping - conditions not met:', {
-                          enabled: settings.enabled,
-                          trigger: settings.llmExtractionTrigger,
-                          expected: 'tool-based',
-                        });
-                      }
-                    } catch (err) {
-                      console.warn('[Memory Observer] Failed to launch:', err);
-                    }
-                  }, 0);
-                }
               }
 
               // Return unchanged - we're just reading, not modifying
@@ -1994,26 +1837,6 @@ function AppContent() {
     });
     useChatStore.getState().setLoading(messageKey, true);
 
-    // 🧠 QUACK MEMORY: Check for manual '#' trigger to save memory directly
-    if (content.trim().startsWith('#')) {
-      try {
-        const savedMemory = await extractManualMemoryFromInput(
-          content,
-          activeId, // sessionId
-          explorerPath || undefined // projectPath
-        );
-        if (savedMemory) {
-          console.log(`[sendMessageForAgent] 🧠 Manual memory saved: ${savedMemory.category} - "${savedMemory.content.substring(0, 50)}..."`);
-          toast.success(`Memory saved: ${savedMemory.category}`, {
-            description: savedMemory.content.substring(0, 100),
-            duration: 3000,
-          });
-        }
-      } catch (memErr) {
-        console.warn('[sendMessageForAgent] Manual memory extraction failed:', memErr);
-      }
-      // Continue sending the message to the AI regardless
-    }
 
     // 🦆 RACE CONDITION FIX: Ensure listener is ready BEFORE calling invoke
     // Note: The real fix was removing the cleanup logic that was removing listeners
@@ -2315,21 +2138,6 @@ function AppContent() {
       ];
       chatConversationHistoryRef.current.set(activeId, updatedHistory);
 
-      // 🧠 Quack Memory: Auto-extract memories from AI response
-      try {
-        const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
-        const memoriesExtracted = await extractAndSaveMemories(
-          response.result,
-          response.session_id,
-          workingDir
-        );
-        if (memoriesExtracted > 0) {
-          console.log(`[sendMessageForAgent] 🧠 Extracted ${memoriesExtracted} memories`);
-        }
-      } catch (memErr) {
-        // Non-critical, don't block chat
-        console.warn('[sendMessageForAgent] Memory extraction failed:', memErr);
-      }
 
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
       // Each session has its own claudeSessionId for independent conversations
@@ -8126,47 +7934,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [openDocsTab]);
 
 
-  // Handler for opening Knowledge Graph tab
+  // Handler for opening Knowledge Graph tab (deprecated - brain modules removed)
   const handleOpenMemoryGraphTab = useCallback(() => {
-    // Check if memory graph tab already exists
-    const existingTab = tabs.find(t => t.type === 'memory-graph');
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
-      return;
-    }
+    console.log('[Quack] Memory Graph tab deprecated - use Obsidian vault directly');
+  }, []);
 
-    const newTab = openMemoryGraphTab();
-    setTabs((prevTabs) => [...prevTabs, newTab]);
-    setActiveTabId(newTab.id);
-
-    console.log('[Quack] Knowledge Graph tab opened:', newTab.id);
-  }, [openMemoryGraphTab, tabs]);
-
-  // Handler for opening Second Brain tab
+  // Handler for opening Second Brain tab (deprecated - brain modules removed)
   const handleOpenSecondBrainTab = useCallback(() => {
-    // Check if second brain tab already exists
-    const existingTab = tabs.find(t => t.type === 'second-brain');
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
-      return;
-    }
+    console.log('[Quack] Second Brain tab deprecated - use Obsidian vault directly');
+  }, []);
 
-    const newTab = openSecondBrainTab();
-    setTabs((prevTabs) => [...prevTabs, newTab]);
-    setActiveTabId(newTab.id);
-
-    console.log('[Quack] Second Brain tab opened:', newTab.id);
-  }, [openSecondBrainTab, tabs]);
-
-  // Handler for opening Second Brain tab with a specific node (from Knowledge Graph)
-  const handleOpenSecondBrainWithNode = useCallback((nodeId: string, nodeLabel: string) => {
-    // Always create new tab when opening specific node
-    const newTab = openSecondBrainTab({ nodeId, nodeLabel });
-    setTabs((prevTabs) => [...prevTabs, newTab]);
-    setActiveTabId(newTab.id);
-
-    console.log('[Quack] Second Brain tab opened with node:', nodeId, nodeLabel);
-  }, [openSecondBrainTab]);
+  // Handler for opening Second Brain tab with a specific node (deprecated)
+  const handleOpenSecondBrainWithNode = useCallback((_nodeId: string, _nodeLabel: string) => {
+    console.log('[Quack] Second Brain with node deprecated - use Obsidian vault directly');
+  }, []);
   // Handler for opening image in a dedicated tab
   const handleOpenImageTab = useCallback((filePath: string, imageData: string, mediaType: string) => {
     const fileName = filePath.split("/").pop() || "Image";
@@ -10036,8 +9817,6 @@ You have access to all Bash tools to execute git commands like:
 
   return (
     <>
-      {/* Obsidian Sync Initializer - Auto-starts vault watcher when sync is enabled */}
-      <ObsidianSyncInitializer />
 
       {/* Kanban Watcher Initializer - Auto-starts file watcher for MCP sync (event-driven architecture) */}
       <KanbanWatcherInitializer />
@@ -10900,27 +10679,12 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Memory Graph Viewer - shown when memory-graph tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('memory-graph-') && !isKanbanTabActive && (() => {
-                const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'memory-graph') {
-                  return <MemoryGraphTabView
-                    tab={activeTab}
-                    isActive={true}
-                    onOpenSecondBrain={handleOpenSecondBrainWithNode}
-                  />;
-                }
-                return null;
-              })()}
-
-              {/* Second Brain Outliner - shown when second-brain tab is active (hidden in Kanban mode) */}
-              {activeTabId.startsWith('second-brain-') && !isKanbanTabActive && (() => {
-                const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'second-brain') {
-                  return <SecondBrainTabView tab={activeTab} isActive={true} />;
-                }
-                return null;
-              })()}
+              {/* Memory Graph / Second Brain - deprecated, use Obsidian vault directly */}
+              {(activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('second-brain-')) && !isKanbanTabActive && (
+                <div style={{ padding: '40px', textAlign: 'center', opacity: 0.5 }}>
+                  Brain: Open in Obsidian
+                </div>
+              )}
 
               {/* Claude Assets Manager - shown when claude-assets tab is active (hidden in Kanban mode) */}
               {activeTabId.startsWith('claude-assets-') && !isKanbanTabActive && (() => {

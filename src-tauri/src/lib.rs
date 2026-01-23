@@ -9,7 +9,6 @@ use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Manage
 mod agency;
 mod agency_setup;
 mod ai;
-mod brain; // 🧠 Quack Brain - Local-first knowledge graph
 mod browser;
 mod claude_auth;
 mod claude_cli;
@@ -572,7 +571,6 @@ pub fn run() {
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(background_tasks::KanbanShellManager::new()) // Register Kanban shell manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
-        .manage(brain::VaultWatcherManager::new()) // Register Brain vault watcher for Obsidian sync
         .manage(kanban_watcher::KanbanWatcherManager::new()) // Register Kanban watcher for MCP sync
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -620,7 +618,6 @@ pub fn run() {
             });
 
             // 📜 Install bundled rules for all Quack users on first run
-            // This ensures essential global rules (like MCP Memory Second Brain) are available
             if let Err(e) = rules::install_bundled_rules() {
                 log::warn!("⚠️ Failed to install bundled rules: {}", e);
             }
@@ -631,16 +628,6 @@ pub fn run() {
                 log::warn!("⚠️ Failed to install bundled commands: {}", e);
             }
 
-            // 🧠 Initialize Quack Brain database
-            if let Err(e) = brain::init_database() {
-                log::warn!("⚠️ Failed to initialize Quack Brain database: {}", e);
-            }
-
-            // 🧠 Setup MCP Brain server (installs brain-mcp-server.js and dependencies)
-            // This ensures the MCP server works on all Mac users by rebuilding better-sqlite3
-            if let Err(e) = brain::setup_mcp_server() {
-                log::warn!("⚠️ Failed to setup MCP Brain server: {}", e);
-            }
 
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
@@ -1135,70 +1122,11 @@ pub fn run() {
             semantic_search::semantic_search_code,
             semantic_search::semantic_search_get_status,
             semantic_search::semantic_search_generate_embeddings,
-            // 🧠 Quack Brain commands
-            brain::brain_init,
-            brain::brain_create_entity,
-            brain::brain_update_entity,
-            brain::brain_delete_entity,
-            brain::brain_get_entity,
-            brain::brain_list_entities,
-            brain::brain_search,
-            brain::brain_add_observation,
-            brain::brain_delete_observation,
-            brain::brain_create_relation,
-            brain::brain_delete_relation,
-            brain::brain_get_graph,
-            brain::brain_register_project,
-            brain::brain_list_projects,
-            brain::brain_import_mcp_memory,
-            brain::brain_import_quack_memory,
-            brain::brain_get_migration_status,
-            // 🧠 Quack Brain - Markdown Sync
-            brain::brain_sync_entity_to_md,
-            brain::brain_sync_all_to_md,
-            brain::brain_get_markdown_path,
-            brain::brain_open_markdown_folder,
-            // 🧠 Quack Brain - Semantic Search
-            brain::brain_store_embedding,
-            brain::brain_get_embedding,
-            brain::brain_get_entities_without_embeddings,
-            brain::brain_semantic_search,
-            brain::brain_hybrid_search,
-            // 🧠 Quack Brain - Settings & Obsidian Sync
-            brain::brain_get_settings,
-            brain::brain_set_setting,
-            brain::brain_get_setting,
-            brain::brain_debug_settings,
-            brain::brain_update_settings,
-            brain::brain_get_sync_status,
-            brain::brain_update_sync_metadata,
-            brain::brain_get_entities_needing_sync,
-            // 🧠 Quack Brain - Vault Watcher (Obsidian)
-            brain::brain_start_vault_watcher,
-            brain::brain_stop_vault_watcher,
-            brain::brain_is_vault_watching,
-            brain::brain_get_vault_path,
-            brain::brain_parse_markdown_file,
             // 📋 Kanban Tasks File Watcher (MCP Sync)
             kanban_watcher::kanban_start_watcher,
             kanban_watcher::kanban_stop_watcher,
             kanban_watcher::kanban_is_watching,
             kanban_watcher::kanban_get_watched_path,
-            brain::brain_import_markdown_file,
-            brain::brain_scan_vault,
-            brain::brain_import_vault,
-            // 🧠 Quack Brain - Obsidian Sync Advanced Commands
-            brain::brain_resolve_conflict,
-            brain::brain_get_global_sync_status,
-            brain::brain_sync_to_vault,
-            brain::brain_import_from_vault,
-            brain::brain_open_vault,
-            brain::brain_generate_embeddings_batch,
-            brain::brain_generate_all_embeddings,
-            // 🧠 Quack Brain - WikiLinks & Backlinks
-            brain::brain_get_backlinks,
-            brain::brain_get_wikilinks,
-            brain::brain_reprocess_all_wikilinks
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

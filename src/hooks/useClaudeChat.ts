@@ -12,7 +12,6 @@ import {
   getRecommendedAction,
   type TokenBudgetStatus,
 } from '../services/conversationRecovery';
-import { extractAndSaveMemories } from '../services/memoryIntegration';
 import { useKanbanStore } from '../stores/kanbanStore';
 import { useChatStore } from '../stores/chatStore';
 
@@ -586,21 +585,6 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             });
           } catch (err) {
             console.warn('[Mobile Notification] Failed:', err);
-          }
-
-          // 🧠 Quack Memory: Auto-extract memories from AI response
-          try {
-            const memoriesExtracted = await extractAndSaveMemories(
-              assistantContent,
-              claudeSessionId.current,
-              options?.workingDirectory
-            );
-            if (memoriesExtracted > 0) {
-              console.log(`[useClaudeChat] 🧠 Extracted ${memoriesExtracted} memories`);
-            }
-          } catch (memErr) {
-            // Non-critical, don't block chat
-            console.warn('[useClaudeChat] Memory extraction failed:', memErr);
           }
 
           // Trigger onComplete callback if provided

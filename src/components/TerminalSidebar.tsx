@@ -998,6 +998,28 @@ export default function TerminalSidebar({
         />
       )}
 
+      {/* Open Brain Button */}
+      <button
+        type="button"
+        className="sidebar-brain-button"
+        onClick={() => {
+          import('../services/brainFileService').then(({ openBrainFolder }) => {
+            openBrainFolder();
+          });
+        }}
+        title="Open Brain folder"
+      >
+        <svg className="sidebar-brain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+          <path d="M9.5 2a2.5 2.5 0 0 1 2.5 2.5V5a2.5 2.5 0 0 1-5 0v-.5A2.5 2.5 0 0 1 9.5 2z"/>
+          <path d="M14.5 2a2.5 2.5 0 0 1 2.5 2.5V5a2.5 2.5 0 0 1-5 0v-.5A2.5 2.5 0 0 1 14.5 2z"/>
+          <path d="M6 8.5a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-2z"/>
+          <path d="M12 13.5v4"/>
+          <path d="M8 17.5h8"/>
+          <path d="M9 20h6"/>
+        </svg>
+        <span className="sidebar-brain-label">Brain</span>
+      </button>
+
       {/* Settings Button */}
       {onOpenSettings && (
         <button
