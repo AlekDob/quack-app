@@ -737,63 +737,143 @@ ${memoryContext}`
       options,
     });
 
-    // Stream events
-    let memoryContextEmitted = false;
+    // Stream events with retry logic for subagent failures
+    const MAX_RETRIES = 2;
+    let retryCount = 0;
+    let lastError = null;
 
-    for await (const event of stream) {
-      // Log slash command info from system events
-      if (event.type === 'system' && event.subtype === 'init') {
-        console.error(`[DEBUG] System initialized - Session: ${event.session_id}`);
-        if (event.slash_commands) {
-          console.error(`[DEBUG] Available slash commands:`, event.slash_commands);
+    while (retryCount <= MAX_RETRIES) {
+      try {
+        let memoryContextEmitted = retryCount > 0; // Skip memory on retry
+        let currentStream = retryCount === 0 ? stream : query({
+          prompt: useStreamingInput ? generateMessages() : prompt,
+          options: { ...options, resume: options.resume }, // Resume same session
+        });
+
+        if (retryCount > 0) {
+          console.error(`[RETRY] Attempt ${retryCount}/${MAX_RETRIES} - resuming after subagent failure`);
+          emitEvent({
+            type: 'assistant',
+            message: {
+              content: [{
+                type: 'text',
+                text: `\n\n> [Subagent recovered after error - retrying automatically...]\n\n`,
+              }],
+            },
+          });
         }
-        // Log MCP server connection status
-        if (event.mcp_servers) {
-          console.error(`[MCP] Server status:`, JSON.stringify(event.mcp_servers, null, 2));
-          const failedServers = event.mcp_servers.filter(s => s.status !== 'connected');
-          if (failedServers.length > 0) {
-            console.error(`[MCP] ⚠️ Failed to connect to servers:`, failedServers);
+
+        for await (const event of currentStream) {
+          // Log slash command info from system events
+          if (event.type === 'system' && event.subtype === 'init') {
+            console.error(`[DEBUG] System initialized - Session: ${event.session_id}`);
+            if (event.slash_commands) {
+              console.error(`[DEBUG] Available slash commands:`, event.slash_commands);
+            }
+            // Log MCP server connection status
+            if (event.mcp_servers) {
+              console.error(`[MCP] Server status:`, JSON.stringify(event.mcp_servers, null, 2));
+              const failedServers = event.mcp_servers.filter(s => s.status !== 'connected');
+              if (failedServers.length > 0) {
+                console.error(`[MCP] ⚠️ Failed to connect to servers:`, failedServers);
+              }
+            }
+          }
+
+          // Log agent/subagent events for debugging
+          if (event.type === 'agent') {
+            console.error(`[DEBUG] 🤖 Subagent event:`, JSON.stringify(event, null, 2));
+          }
+
+          // Log Task tool invocations (subagent delegation)
+          if (event.type === 'assistant' && event.message?.content) {
+            const taskTools = event.message.content.filter(
+              (block) => block.type === 'tool_use' && block.name?.toLowerCase() === 'task'
+            );
+            if (taskTools.length > 0) {
+              console.error(`[DEBUG] 🎯 Task tool invocation detected:`, JSON.stringify(taskTools, null, 2));
+            }
+          }
+
+          emitEvent(event);
+
+          // 🧠 Emit pending memory context AFTER first event (so streaming message exists)
+          if (!memoryContextEmitted && globalThis.__pendingMemoryContext) {
+            console.error(`[DEBUG] Emitting pending memory_context event`);
+            emitEvent(globalThis.__pendingMemoryContext);
+            delete globalThis.__pendingMemoryContext;
+            memoryContextEmitted = true;
           }
         }
-      }
 
-      // Log agent/subagent events for debugging
-      if (event.type === 'agent') {
-        console.error(`[DEBUG] 🤖 Subagent event:`, JSON.stringify(event, null, 2));
-      }
+        // Success - emit final complete event
+        emitEvent({
+          type: 'complete',
+        });
 
-      // Log Task tool invocations (subagent delegation)
-      if (event.type === 'assistant' && event.message?.content) {
-        const taskTools = event.message.content.filter(
-          (block) => block.type === 'tool_use' && block.name?.toLowerCase() === 'task'
-        );
-        if (taskTools.length > 0) {
-          console.error(`[DEBUG] 🎯 Task tool invocation detected:`, JSON.stringify(taskTools, null, 2));
+        // 🧠 Cleanup memory hook database connection
+        closeMemoryDb();
+
+        // 🦆 IMPORTANT: Exit process cleanly to avoid hanging
+        // MCP servers may keep event loop open, so we need explicit exit
+        process.exit(0);
+
+      } catch (streamError) {
+        lastError = streamError;
+        const errorMsg = streamError instanceof Error ? streamError.message : String(streamError);
+        const errorStack = streamError instanceof Error ? streamError.stack : '';
+
+        // Determine if this is a recoverable subagent error
+        const isSubagentCrash = errorStack?.includes('ProcessTransport') ||
+          errorStack?.includes('exitHandler') ||
+          errorMsg.includes('process exited') ||
+          errorMsg.includes('exit code') ||
+          errorMsg.includes('Stream closed');
+
+        const isRecoverable = isSubagentCrash && retryCount < MAX_RETRIES;
+
+        console.error(`[ERROR] Stream error (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${errorMsg}`);
+        console.error(`[ERROR] Is subagent crash: ${isSubagentCrash}, Is recoverable: ${isRecoverable}`);
+
+        if (isRecoverable) {
+          retryCount++;
+          console.error(`[RETRY] Subagent crashed, will retry (${retryCount}/${MAX_RETRIES})...`);
+          // Small delay before retry to let resources settle
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue; // Retry the loop
         }
-      }
 
-      emitEvent(event);
+        // Non-recoverable error or max retries exceeded
+        // Emit a user-friendly error message before crashing
+        if (isSubagentCrash) {
+          emitEvent({
+            type: 'assistant',
+            message: {
+              content: [{
+                type: 'text',
+                text: `\n\n> **Error:** A subagent process crashed unexpectedly after ${retryCount + 1} attempt(s). This can happen due to rate limits, timeout, or temporary issues. Please try again.\n\n`,
+              }],
+            },
+          });
+          // Emit complete so the UI doesn't hang
+          emitEvent({ type: 'complete' });
+          closeMemoryDb();
+          process.exit(0); // Exit cleanly - the error was communicated in-stream
+        }
 
-      // 🧠 Emit pending memory context AFTER first event (so streaming message exists)
-      if (!memoryContextEmitted && globalThis.__pendingMemoryContext) {
-        console.error(`[DEBUG] Emitting pending memory_context event`);
-        emitEvent(globalThis.__pendingMemoryContext);
-        delete globalThis.__pendingMemoryContext;
-        memoryContextEmitted = true;
+        // Fatal error - propagate normally
+        closeMemoryDb();
+        emitError(streamError);
+        process.exit(1);
       }
     }
 
-    // Success - emit final complete event
-    emitEvent({
-      type: 'complete',
-    });
-
-    // 🧠 Cleanup memory hook database connection
+    // Should not reach here, but handle gracefully
     closeMemoryDb();
-
-    // 🦆 IMPORTANT: Exit process cleanly to avoid hanging
-    // MCP servers may keep event loop open, so we need explicit exit
-    process.exit(0);
+    if (lastError) {
+      emitError(lastError);
+    }
+    process.exit(lastError ? 1 : 0);
   } catch (error) {
     // 🧠 Cleanup memory hook database connection on error
     closeMemoryDb();

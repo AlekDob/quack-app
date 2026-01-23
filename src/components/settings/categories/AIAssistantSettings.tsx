@@ -4,9 +4,12 @@ import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSInput from '../controls/IOSInput';
 
+type ImageModel = 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini' | 'dall-e-3';
+
 export default function AIAssistantSettings() {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState<'gpt-4o-mini' | 'gpt-4o' | 'gpt-3.5-turbo'>('gpt-4o-mini');
+  const [imageModel, setImageModel] = useState<ImageModel>('gpt-image-1.5');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -25,6 +28,9 @@ export default function AIAssistantSettings() {
 
       const savedModel = await invoke<string>('get_ai_model');
       setModel(savedModel as typeof model);
+
+      const savedImageModel = await invoke<string>('get_image_model');
+      setImageModel(savedImageModel as ImageModel);
     } catch (err) {
       console.error('Failed to load saved AI settings:', err);
     }
@@ -50,6 +56,7 @@ export default function AIAssistantSettings() {
     try {
       await invoke('save_api_key', { key: apiKey });
       await invoke('set_ai_model', { model });
+      await invoke('set_image_model', { model: imageModel });
 
       const connected = await invoke<boolean>('test_api_connection');
 
@@ -161,6 +168,72 @@ export default function AIAssistantSettings() {
             <div className="ai-model-info">
               <div className="ai-model-name">GPT-3.5 Turbo</div>
               <div className="ai-model-desc">Budget option (~$0.50/1M tokens)</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Image Generation Model */}
+      <SectionHeader
+        title="Image Generation Model"
+        description="Choose the model for image generation skills. gpt-image-1.5 is the latest and most capable."
+      />
+      <div className="settings-group">
+        <div className="ai-model-options">
+          <label className="ai-model-option">
+            <input
+              type="radio"
+              name="imageModel"
+              value="gpt-image-1.5"
+              checked={imageModel === 'gpt-image-1.5'}
+              onChange={(e) => setImageModel(e.target.value as ImageModel)}
+            />
+            <div className="ai-model-info">
+              <div className="ai-model-name">GPT Image 1.5</div>
+              <div className="ai-model-desc">Latest, best photorealism & text rendering</div>
+              <div className="ai-model-badge ai-model-badge-recommended">Recommended</div>
+            </div>
+          </label>
+
+          <label className="ai-model-option">
+            <input
+              type="radio"
+              name="imageModel"
+              value="gpt-image-1"
+              checked={imageModel === 'gpt-image-1'}
+              onChange={(e) => setImageModel(e.target.value as ImageModel)}
+            />
+            <div className="ai-model-info">
+              <div className="ai-model-name">GPT Image 1</div>
+              <div className="ai-model-desc">High quality (~$0.01-$0.25/image)</div>
+            </div>
+          </label>
+
+          <label className="ai-model-option">
+            <input
+              type="radio"
+              name="imageModel"
+              value="gpt-image-1-mini"
+              checked={imageModel === 'gpt-image-1-mini'}
+              onChange={(e) => setImageModel(e.target.value as ImageModel)}
+            />
+            <div className="ai-model-info">
+              <div className="ai-model-name">GPT Image 1 Mini</div>
+              <div className="ai-model-desc">Fast & affordable (~$0.005-$0.05/image)</div>
+            </div>
+          </label>
+
+          <label className="ai-model-option">
+            <input
+              type="radio"
+              name="imageModel"
+              value="dall-e-3"
+              checked={imageModel === 'dall-e-3'}
+              onChange={(e) => setImageModel(e.target.value as ImageModel)}
+            />
+            <div className="ai-model-info">
+              <div className="ai-model-name">DALL-E 3</div>
+              <div className="ai-model-desc">Previous gen (~$0.04-$0.12/image, deprecated 05/2026)</div>
             </div>
           </label>
         </div>

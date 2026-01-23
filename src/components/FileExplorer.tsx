@@ -697,7 +697,7 @@ function FileExplorer({
       {/* Header - matching other panels pattern */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white uppercase tracking-wide">File Explorer</h3>
+          <h3 className="text-sm font-semibold text-white">File Explorer</h3>
           <div className="flex items-center gap-1">
             {/* Refresh button */}
             <button

@@ -11,6 +11,8 @@ pub struct AppPreferences {
     pub claude_api_key: Option<String>,
     #[serde(default = "default_ai_model")]
     pub ai_model: String,
+    #[serde(default = "default_image_model")]
+    pub image_model: String,
     #[serde(default = "default_background")]
     pub background_image: String,
     // Mobile notifications settings
@@ -33,6 +35,10 @@ fn default_ai_model() -> String {
     "gpt-4o-mini".to_string()
 }
 
+fn default_image_model() -> String {
+    "gpt-image-1.5".to_string()
+}
+
 fn default_background() -> String {
     "duckmoto.png".to_string()
 }
@@ -44,6 +50,7 @@ impl Default for AppPreferences {
             openai_api_key: None,
             claude_api_key: None,
             ai_model: default_ai_model(),
+            image_model: default_image_model(),
             background_image: default_background(),
             telegram_bot_token: None,
             telegram_chat_id: None,
@@ -199,6 +206,38 @@ pub async fn set_ai_model(app: AppHandle, model: String) -> Result<(), String> {
 pub async fn get_ai_model(app: AppHandle) -> Result<String, String> {
     let prefs = get_preferences(app).await?;
     Ok(prefs.ai_model)
+}
+
+#[tauri::command]
+pub async fn set_image_model(app: AppHandle, model: String) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.image_model = model;
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_image_model(app: AppHandle) -> Result<String, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.image_model)
 }
 
 #[tauri::command]

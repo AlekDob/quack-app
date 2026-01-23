@@ -1497,10 +1497,6 @@ function AppContent() {
   // 🦆 Ref to sendMessageForAgent function (to avoid circular dependency)
   const sendMessageForAgentRef = useRef<((content: string, options?: ChatSendOptions) => Promise<void>) | null>(null);
 
-  // 📱 Pending auto-start: When WhatsApp triggers a session, store the prompt here
-  // A useEffect will pick it up when activeId/activeSessionId are updated by React
-  const pendingAutoStartRef = useRef<{ prompt: string; sessionId: string } | null>(null);
-
   // 🦆 Telegram Bot integration hook (DEPRECATED - using Telegram Central Bot now)
   // TODO: Remove this old webhook-based telegram system
   /*
@@ -1994,6 +1990,11 @@ function AppContent() {
     });
     useChatStore.getState().setLoading(messageKey, true);
 
+    // Populate ref for Telegram integration (on first call)
+    if (!sendMessageForAgentRef.current) {
+      sendMessageForAgentRef.current = sendMessageForAgent;
+    }
+
     // 🧠 QUACK MEMORY: Check for manual '#' trigger to save memory directly
     if (content.trim().startsWith('#')) {
       try {
@@ -2470,31 +2471,6 @@ function AppContent() {
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for session ${messageKey}:`, activeStreamsRef.current.get(messageKey)?.size || 0);
     }
   }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession]);
-
-  // 📱 Keep ref always up-to-date for external integrations (WhatsApp auto-start, Telegram)
-  sendMessageForAgentRef.current = sendMessageForAgent;
-
-  // 📱 WhatsApp Auto-Start: Send pending prompt when activeId/activeSessionId update
-  useEffect(() => {
-    const pending = pendingAutoStartRef.current;
-    if (pending && activeSessionId === pending.sessionId && sendMessageForAgentRef.current) {
-      console.log(`📱 Auto-start: activeSessionId matched ${pending.sessionId}, sending prompt`);
-      pendingAutoStartRef.current = null; // Clear to prevent double-send
-
-      // Small delay for Claude SDK listener and chat UI to be fully ready
-      const timer = setTimeout(async () => {
-        if (sendMessageForAgentRef.current) {
-          console.log(`📱 Auto-sending prompt:`, pending.prompt.substring(0, 100));
-          await sendMessageForAgentRef.current(pending.prompt);
-        } else {
-          console.error(`📱 sendMessageForAgentRef still null after delay`);
-        }
-      }, 800);
-
-      return () => clearTimeout(timer);
-    }
-  }, [activeSessionId, activeId]);
-
 
   // 🦆 SESSION ISOLATION FIX: Abort streaming for CURRENT SESSION only (not all agent sessions!)
   // Uses messageKey (sessionId || agentId) to target only the active session
@@ -4450,34 +4426,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log(`📱 Found session for auto-start: ${session.title} (agent: ${session.agentId})`);
 
+      // Set the agent and session as active
+      setActiveId(session.agentId);
+      setActiveSessionIdExclusive(sessionId);
+
       // Build prompt with WhatsApp MCP instruction if recipient is provided
       let finalPrompt = prompt;
       if (whatsappRecipient) {
         finalPrompt = `${prompt}\n\n---\nIMPORTANT: After completing this task, respond to the user via WhatsApp using the MCP WhatsApp tool. Send the response to: ${whatsappRecipient}`;
       }
 
-      // Set pending BEFORE state updates so useEffect finds it when activeSessionId changes
-      if (autoSend) {
-        console.log(`📱 Setting pendingAutoStartRef for session ${sessionId}`);
-        pendingAutoStartRef.current = { prompt: finalPrompt, sessionId };
-      }
-
-      // Set the agent and session as active (triggers React re-render → useEffect picks up pending)
-      setActiveId(session.agentId);
-      setActiveSessionIdExclusive(sessionId);
-
-      // Edge case: if activeSessionId was already this sessionId, useEffect won't re-trigger
-      // In that case, send directly after a delay
-      if (autoSend) {
-        setTimeout(() => {
-          if (pendingAutoStartRef.current?.sessionId === sessionId) {
-            console.log(`📱 Fallback: pendingAutoStart still pending, sending directly`);
-            pendingAutoStartRef.current = null;
-            if (sendMessageForAgentRef.current) {
-              sendMessageForAgentRef.current(finalPrompt);
-            }
-          }
-        }, 2000);
+      // Auto-send the prompt if requested
+      if (autoSend && sendMessageForAgentRef.current) {
+        // Small delay to ensure UI is ready
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log(`📱 Auto-sending prompt for session ${sessionId}:`, finalPrompt.substring(0, 100));
+        await sendMessageForAgentRef.current(finalPrompt);
       }
     });
 
@@ -7924,8 +7888,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unstaged_status: status === 'modified' ? 'M' : (status === 'deleted' ? 'D' : null),
       is_untracked: status === 'created',
       original_path: null,
-      additions: 0,
-      deletions: 0,
     };
     setEditSummaryDiffEntry(syntheticEntry);
 
@@ -8167,22 +8129,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     console.log('[Quack] Second Brain tab opened with node:', nodeId, nodeLabel);
   }, [openSecondBrainTab]);
-  // Handler for opening image in a dedicated tab
-  const handleOpenImageTab = useCallback((filePath: string, imageData: string, mediaType: string) => {
-    const fileName = filePath.split("/").pop() || "Image";
-    const newTab: Tab = {
-      id: `image-${Date.now()}`,
-      label: fileName,
-      type: "image",
-      closable: true,
-      filePath,
-      imageData,
-      mediaType,
-    };
-    setTabs(prev => [...prev, newTab]);
-    setActiveTabId(newTab.id);
-  }, []);
-
 
   // Handler for opening/focusing Kanban tab (toggle behavior with Cmd+K)
   // Refactored to avoid nested state updates which can cause race conditions
@@ -10603,7 +10549,6 @@ You have access to all Bash tools to execute git commands like:
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
-                    onOpenImageTab={handleOpenImageTab}
                   />
                 );
               })()}
@@ -10729,7 +10674,6 @@ You have access to all Bash tools to execute git commands like:
                     onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
-                    onOpenImageTab={handleOpenImageTab}
                   />
                 );
               })()}

@@ -1004,6 +1004,8 @@ pub fn run() {
             preferences::get_claude_api_key,
             preferences::set_ai_model,
             preferences::get_ai_model,
+            preferences::set_image_model,
+            preferences::get_image_model,
             // 🔐 Secure keychain commands for API keys
             keychain::set_claude_api_key_secure,
             keychain::get_claude_api_key_secure,
