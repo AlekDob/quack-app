@@ -30,20 +30,44 @@ No database, no MCP server, no corruption risk.
 
 ### Search Priority Order
 
-1. **FIRST**: List files in the current project's brain folder. File names are self-descriptive — you can understand the content without opening them.
-2. **THEN**: Only if nothing relevant, search globally across `~/.quack/brain/`
-3. **LAST**: Read specific files only when the title matches your need.
+1. **FIRST**: Read `map.md` if you need to locate components or understand architecture
+2. **THEN**: List files in the current project's brain folder (file names are self-descriptive)
+3. **THEN**: Check `inbox/` for pending items relevant to current task
+4. **THEN**: Only if nothing relevant, search globally across `~/.quack/brain/`
+5. **LAST**: Read specific files only when the title matches your need.
 
 ```bash
-# STEP 1: List project files (titles tell you what's inside)
+# STEP 1: Read map for architecture orientation
+Read "~/.quack/brain/projects/quack-app/map.md"
+
+# STEP 2: List project files (titles tell you what's inside)
 Glob "~/.quack/brain/projects/quack-app/**/*.md"
 
-# STEP 2: Only if needed, search globally
+# STEP 3: Check inbox for pending items
+Glob "~/.quack/brain/projects/quack-app/inbox/*.md"
+
+# STEP 4: Only if needed, search globally
 Grep pattern="dropdown" path="~/.quack/brain/"
 
-# STEP 3: Read only what matches
+# STEP 5: Read only what matches
 Read file_path="~/.quack/brain/projects/quack-app/bugs/fix-dropdown-z-index.md"
 ```
+
+### Inbox (Mobile-First Ideas)
+
+The `inbox/` folder captures quick ideas from mobile (Obsidian Sync). Rules:
+- Check inbox when starting work — process relevant items
+- Minimal frontmatter: only `type: inbox` and `created`
+- After processing: delete or promote to proper folder
+- Do NOT auto-process all items — only those relevant to current context
+
+### Map (Architecture Glossary)
+
+`map.md` is a single navigation file per project. Rules:
+- Read map FIRST before grepping the codebase
+- Keep updated when significant components are added/moved
+- Tables preferred: Component | Path | Purpose
+- One file per project, concise and scannable
 
 ## When to SAVE to Brain (Write)
 
@@ -88,7 +112,9 @@ Use useMemo for filtered/sorted lists to avoid re-computation on every render...
         ├── bugs/       # Bug fixes
         ├── decisions/  # Architecture decisions
         ├── gotchas/    # Pitfalls to avoid
-        └── diary/      # Daily logs (YYYY-MM-DD.md)
+        ├── diary/      # Daily logs (YYYY-MM-DD.md)
+        ├── inbox/      # Quick ideas & todos (mobile-first via Obsidian Sync)
+        └── map.md      # Architecture map & glossary
 ```
 
 ## Entity Types
