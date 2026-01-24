@@ -1318,6 +1318,13 @@ pub async fn send_message_via_sdk_streaming(
         }
     }
 
+    // Set CLAUDE_CODE_TASK_LIST_ID for Tasks persistence across sessions
+    if let Some(ref sid) = session_id {
+        let task_list_id = format!("quack-{}", sid);
+        log::info!("[SDK] Setting CLAUDE_CODE_TASK_LIST_ID: {}", task_list_id);
+        command.env("CLAUDE_CODE_TASK_LIST_ID", &task_list_id);
+    }
+
     log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);
     log::info!("[SDK DEBUG] Working directory: {:?}", node_sdk_dir);
 

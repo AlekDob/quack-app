@@ -15,6 +15,8 @@ import AgentContextPanel from "./AgentContextPanel";
 import TerminalToolBar from "./TerminalToolBar";
 import UsagePanel from "./UsagePanel";
 import { SessionsPanel } from "./SessionsPanel";
+import TasksPanel from "./TasksPanel";
+import { useTasksStore } from "../stores/tasksStore";
 import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality, HookConfig, ChatMessage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 
@@ -24,7 +26,7 @@ import type { SlashCommand } from "../hooks/useSlashCommands";
  * Note: Marketplace is now a drawer (not a tab)
  */
 
-type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "rules" | "sessions" | "terminal" | "usage" | "kanban";
+type TabId = "agent-context" | "explorer" | "agents" | "skills" | "mcp" | "hooks" | "commands" | "rules" | "sessions" | "terminal" | "usage" | "kanban" | "tasks";
 
 // Tab icons - SVG icons matching the app style
 const icons: Record<string, ReactNode> = {
@@ -347,6 +349,12 @@ const icons: Record<string, ReactNode> = {
       <rect x="3" y="13" width="14" height="3" rx="1" />
     </svg>
   ),
+  tasks: (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 10l2.5 2.5L14 7" />
+      <rect x="3" y="3" width="14" height="14" rx="2" />
+    </svg>
+  ),
 };
 
 interface SidePanelProps {
@@ -600,6 +608,10 @@ export default function SidePanel({
   const kanbanInProgressCount = getTasksByStatus('in_progress').length;
   const kanbanTotalCount = getTasksByStatus('todo').length + kanbanInProgressCount + getTasksByStatus('done').length;
 
+  // Tasks tab: read from tasksStore (populated by ChatView on TodoWrite events)
+  const tasksCount = useTasksStore(s => s.tasks.length);
+  const tasksInProgress = useTasksStore(s => s.tasks.filter(t => t.status === 'in_progress').length);
+
   // Auto-switch to Kanban tab when mini panel is shown
   useEffect(() => {
     if (showKanbanMiniPanel && activeTab !== 'kanban') {
@@ -684,6 +696,13 @@ export default function SidePanel({
       id: "sessions" as TabId,
       label: "Sessions",
       icon: icons.sessions,
+    },
+    {
+      id: "tasks" as TabId,
+      label: "Tasks",
+      icon: icons.tasks,
+      badge: tasksInProgress > 0 ? tasksInProgress : tasksCount,
+      hasContent: tasksCount > 0,
     },
     // Kanban Mini Panel - shown only when enabled
     ...(showKanbanMiniPanel ? [{
@@ -900,6 +919,12 @@ export default function SidePanel({
               key={sessionsRefreshKey}
               onSelectSession={(session) => onSelectSession?.(session)}
             />
+          </div>
+        )}
+
+        {activeTab === "tasks" && (
+          <div className="side-panel-pane">
+            <TasksPanel />
           </div>
         )}
 

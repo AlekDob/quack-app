@@ -1458,6 +1458,34 @@ export default function ChatInput({
       }
     }
 
+    // Check if a task is being dropped from Tasks panel
+    const taskDataStr = e.dataTransfer.getData('application/quack-task');
+    if (taskDataStr) {
+      try {
+        const taskData = JSON.parse(taskDataStr) as { type: string; content: string; status: string };
+        if (taskData.type === 'task') {
+          const cursorPos = textareaRef.current.selectionStart;
+          const beforeCursor = input.substring(0, cursorPos);
+          const afterCursor = input.substring(cursorPos);
+          const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+          const prefix = needsSpaceBefore ? ' ' : '';
+          const mention = `${prefix}[task: ${taskData.content}] `;
+          const newInput = beforeCursor + mention + afterCursor;
+          setInput(newInput);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              const newCursorPos = beforeCursor.length + mention.length;
+              textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+          }, 0);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to parse task data:', err);
+      }
+    }
+
     // Check if files are being dropped from Finder (native files)
     const finderFiles = Array.from(e.dataTransfer.files);
     if (finderFiles.length > 0) {
