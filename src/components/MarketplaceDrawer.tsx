@@ -4,20 +4,27 @@ import { useMarketplace } from '../hooks/useMarketplace';
 import type { MarketplaceCategory, MarketplaceResource } from '../types';
 import MarketplaceCard from './MarketplaceCard';
 import MarketplaceInstallModal from './MarketplaceInstallModal';
-import MarketplaceContributeModal from './MarketplaceContributeModal';
 
 /**
- * MarketplaceDrawer - Drawer version of the marketplace
- * Replaces the old PluginsPanel drawer
+ * MarketplaceDrawer - Fetches plugins from quack-marketplace GitHub repo
+ * Dynamically shows categories based on what the repo contains
  */
 
 interface MarketplaceDrawerProps {
-  workingDir?: string;
   onRefresh?: () => void;
 }
 
+const CATEGORY_META: Record<MarketplaceCategory, { label: string }> = {
+  skills: { label: 'Skills' },
+  agents: { label: 'Agents' },
+  commands: { label: 'Commands' },
+  hooks: { label: 'Hooks' },
+  settings: { label: 'Settings' },
+  mcp: { label: 'MCP' },
+  stacks: { label: 'Stacks' },
+};
+
 export default function MarketplaceDrawer({
-  workingDir,
   onRefresh,
 }: MarketplaceDrawerProps) {
   const {
@@ -27,27 +34,25 @@ export default function MarketplaceDrawer({
     error,
     filters,
     setFilters,
+    categories,
     loadResources,
     installResource,
     uninstallResource,
     toggleFavorite,
     isInstalled,
     isFavorite,
-  } = useMarketplace(workingDir);
+  } = useMarketplace();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedResource, setSelectedResource] = useState<MarketplaceResource | null>(null);
-  const [contributeModalOpen, setContributeModalOpen] = useState(false);
 
-  const categories: Array<{ value: MarketplaceCategory | 'all'; label: string; icon: string }> = [
-    { value: 'all', label: 'All', icon: '🏪' },
-    { value: 'agents', label: 'Agents', icon: '🦆' },
-    { value: 'commands', label: 'Commands', icon: '⌘' },
-    { value: 'hooks', label: 'Hooks', icon: '🪝' },
-    { value: 'settings', label: 'Settings', icon: '⚙️' },
-    { value: 'mcp', label: 'MCP', icon: '🔌' },
-    { value: 'stacks', label: 'Stacks', icon: '📚' },
-    { value: 'skills', label: 'Skills', icon: '⭐' },
+  // Build dynamic category tabs from what the repo actually contains
+  const categoryTabs: Array<{ value: MarketplaceCategory | 'all'; label: string }> = [
+    { value: 'all', label: 'All' },
+    ...categories.map(cat => ({
+      value: cat,
+      label: CATEGORY_META[cat]?.label || cat,
+    })),
   ];
 
   const handleCategoryChange = (category: MarketplaceCategory | 'all') => {
@@ -66,34 +71,26 @@ export default function MarketplaceDrawer({
   };
 
   const handleInstall = async (resource: MarketplaceResource) => {
-    // Show loading toast
     const toastId = toast.loading(`Installing ${resource.name}...`, {
-      description: 'This may take a few moments',
+      description: 'Downloading from GitHub...',
     });
 
     try {
       const success = await installResource(resource);
       if (success) {
-        console.log('Resource installed successfully:', resource.name);
-
-        // Show success toast
-        toast.success(`${resource.name} installed successfully!`, {
+        toast.success(`${resource.name} installed!`, {
           id: toastId,
-          description: `Check your .claude/${resource.category} folder`,
+          description: `Saved to ~/.claude/${resource.category}/`,
           duration: 5000,
         });
-
-        // Wait a bit for filesystem to sync before refreshing
-        await new Promise(resolve => setTimeout(resolve, 500));
         onRefresh?.();
         return true;
       }
       return false;
-    } catch (error) {
-      // Show error toast
+    } catch (err) {
       toast.error(`Failed to install ${resource.name}`, {
         id: toastId,
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description: err instanceof Error ? err.message : 'Unknown error',
         duration: 6000,
       });
       return false;
@@ -102,43 +99,25 @@ export default function MarketplaceDrawer({
 
   const handleUninstall = async (resourceId: string) => {
     const resource = resources.find(r => r.id === resourceId);
-    const resourceName = resource?.name || 'Resource';
-
-    // Show loading toast
-    const toastId = toast.loading(`Uninstalling ${resourceName}...`);
+    const name = resource?.name || 'Resource';
+    const toastId = toast.loading(`Uninstalling ${name}...`);
 
     try {
       const success = await uninstallResource(resourceId);
       if (success) {
-        console.log('Resource uninstalled successfully');
-
-        // Show success toast
-        toast.success(`${resourceName} uninstalled successfully!`, {
-          id: toastId,
-          duration: 4000,
-        });
-
-        // Wait a bit for filesystem to sync before refreshing
-        await new Promise(resolve => setTimeout(resolve, 500));
+        toast.success(`${name} uninstalled`, { id: toastId, duration: 4000 });
         onRefresh?.();
         return true;
       }
       return false;
-    } catch (error) {
-      // Show error toast
-      toast.error(`Failed to uninstall ${resourceName}`, {
+    } catch (err) {
+      toast.error(`Failed to uninstall ${name}`, {
         id: toastId,
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description: err instanceof Error ? err.message : 'Unknown error',
         duration: 5000,
       });
       return false;
     }
-  };
-
-  const handleContribute = async (resource: Partial<MarketplaceResource>) => {
-    console.log('Contributing resource:', resource);
-    // In production, this would submit to the marketplace API
-    alert('Thank you for your contribution! Your resource will be reviewed by our team.');
   };
 
   const handleRefresh = async () => {
@@ -154,13 +133,13 @@ export default function MarketplaceDrawer({
     <div className="marketplace-drawer flex flex-col h-full">
       {/* Header */}
       <div
-        className="px-4 py-3 border-b"
+        className="px-3 py-2.5 border-b"
         style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
       >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold" style={{ color: '#f28c52' }}>
-              🛍️ Marketplace
+              Marketplace
             </h3>
             {installedCount > 0 && (
               <div
@@ -175,50 +154,27 @@ export default function MarketplaceDrawer({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setContributeModalOpen(true)}
-              className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200"
-              style={{
-                background: 'rgba(34, 197, 94, 0.1)',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
-                color: '#22c55e',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.3)';
-              }}
-            >
-              + Contribute
-            </button>
-
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={loading}
-              className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'rgba(255, 255, 255, 0.9)',
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-              }}
-            >
-              {loading ? '...' : '↻ Refresh'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              color: 'rgba(255, 255, 255, 0.9)',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+            }}
+          >
+            {loading ? '...' : 'Refresh'}
+          </button>
         </div>
 
         {/* Search Bar */}
@@ -255,16 +211,16 @@ export default function MarketplaceDrawer({
 
       {/* Category Tabs */}
       <div
-        className="px-4 py-3 border-b overflow-x-auto"
+        className="px-3 py-2 border-b overflow-x-auto"
         style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
       >
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {categories.map((cat) => (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {categoryTabs.map((cat) => (
             <button
               key={cat.value}
               type="button"
               onClick={() => handleCategoryChange(cat.value)}
-              className="px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap transition-all duration-200"
+              className="px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-all duration-200"
               style={{
                 background: activeCategory === cat.value
                   ? 'rgba(242, 140, 82, 0.2)'
@@ -277,7 +233,6 @@ export default function MarketplaceDrawer({
                   : 'rgba(255, 255, 255, 0.7)',
               }}
             >
-              <span className="mr-1">{cat.icon}</span>
               {cat.label}
             </button>
           ))}
@@ -285,7 +240,7 @@ export default function MarketplaceDrawer({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-12">
+      <div className="flex-1 overflow-y-auto px-3 pb-8">
         {loading && (
           <div
             className="flex items-center justify-center py-8 text-sm"
@@ -313,10 +268,9 @@ export default function MarketplaceDrawer({
 
         {!loading && !error && displayedResources.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="text-5xl mb-4">🔍</div>
             <p
               className="text-sm"
-              style={{ color: 'rgba(255, 255, 255, 0.6)' }}
+              style={{ color: 'rgba(255, 255, 255, 0.5)' }}
             >
               {searchQuery
                 ? 'No resources found matching your search'
@@ -326,7 +280,7 @@ export default function MarketplaceDrawer({
         )}
 
         {!loading && !error && displayedResources.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-8 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pb-4 pt-3">
             {displayedResources.map((resource) => (
               <MarketplaceCard
                 key={resource.id}
@@ -352,13 +306,6 @@ export default function MarketplaceDrawer({
           onUninstall={handleUninstall}
         />
       )}
-
-      {/* Contribute Modal */}
-      <MarketplaceContributeModal
-        isOpen={contributeModalOpen}
-        onClose={() => setContributeModalOpen(false)}
-        onSubmit={handleContribute}
-      />
     </div>
   );
 }

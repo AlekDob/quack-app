@@ -912,7 +912,6 @@ function AppRefactored() {
       {showPluginsDrawer && (
         <Suspense fallback={<ModalSkeleton />}>
           <MarketplaceDrawer
-            workingDir={explorerPath}
             onRefresh={() => {
               // Refresh marketplace
             }}

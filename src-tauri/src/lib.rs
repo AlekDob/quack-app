@@ -901,6 +901,8 @@ pub fn run() {
             fs::read_file_content,
             fs::write_file_content,
             fs::create_directory,
+            fs::remove_file,
+            fs::remove_directory,
             fs::stat_file,
             fs::read_file_preview,
             fs::save_clipboard_file,

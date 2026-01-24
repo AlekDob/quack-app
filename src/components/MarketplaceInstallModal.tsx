@@ -22,20 +22,9 @@ export default function MarketplaceInstallModal({
   onInstall,
   onUninstall,
 }: MarketplaceInstallModalProps) {
-  const [copied, setCopied] = useState(false);
   const [installing, setInstalling] = useState(false);
 
   if (!resource) return null;
-
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(resource.installCommand);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -64,16 +53,16 @@ export default function MarketplaceInstallModal({
     }
   };
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'agents': return '🦆';
-      case 'commands': return '⌘';
-      case 'hooks': return '🪝';
-      case 'settings': return '⚙️';
-      case 'mcp': return '🔌';
-      case 'stacks': return '📚';
-      case 'skills': return '⭐';
-      default: return '📦';
+      case 'agents': return '#f28c52';
+      case 'commands': return '#3b82f6';
+      case 'hooks': return '#8b5cf6';
+      case 'settings': return '#6b7280';
+      case 'mcp': return '#10b981';
+      case 'stacks': return '#f59e0b';
+      case 'skills': return '#ec4899';
+      default: return '#6b7280';
     }
   };
 
@@ -109,13 +98,24 @@ export default function MarketplaceInstallModal({
       >
         {/* Header */}
         <div
-          className="px-6 py-4 border-b"
+          className="px-5 py-3 border-b"
           style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-3xl">{getCategoryIcon(resource.category)}</span>
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: `${getCategoryColor(resource.category)}20`,
+                    border: `1px solid ${getCategoryColor(resource.category)}40`,
+                  }}
+                >
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: getCategoryColor(resource.category) }}
+                  />
+                </div>
                 <div>
                   <h2
                     className="text-xl font-bold"
@@ -157,7 +157,7 @@ export default function MarketplaceInstallModal({
           </div>
 
           {/* Badges */}
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex flex-wrap gap-1.5 mt-2">
             <span
               className="px-2 py-1 rounded text-xs font-medium"
               style={{
@@ -175,7 +175,7 @@ export default function MarketplaceInstallModal({
                   color: '#22c55e',
                 }}
               >
-                ✓ Verified
+                Verified
               </span>
             )}
             {resource.featured && (
@@ -186,15 +186,15 @@ export default function MarketplaceInstallModal({
                   color: '#fbbf24',
                 }}
               >
-                ⭐ Featured
+                Featured
               </span>
             )}
           </div>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-          <div className="p-6 space-y-6">
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+          <div className="p-5 space-y-4">
             {/* Description */}
             <div>
               <h3
@@ -214,65 +214,28 @@ export default function MarketplaceInstallModal({
               </p>
             </div>
 
-            {/* Installation Command - Only show if installCommand exists */}
-            {resource.installCommand && (
-              <div>
-                <h3
-                  className="text-sm font-semibold mb-2"
-                  style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                >
-                  Installation Command
-                </h3>
-                <div
-                  className="relative p-3 rounded-lg font-mono text-sm"
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: '#22c55e',
-                    paddingRight: '80px', // Make room for the Copy button
-                    wordBreak: 'break-all', // Allow breaking long commands
-                  }}
-                >
-                  <code style={{ display: 'block', lineHeight: '1.6' }}>
-                    {resource.installCommand}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={copyToClipboard}
-                    className="absolute top-2 right-2 px-3 py-1 rounded text-xs font-sans transition-colors"
-                    style={{
-                      background: copied ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      color: copied ? '#22c55e' : 'rgba(255, 255, 255, 0.9)',
-                    }}
-                  >
-                    {copied ? '✓ Copied' : 'Copy'}
-                  </button>
-                </div>
+            {/* Installation Info */}
+            <div>
+              <h3
+                className="text-sm font-semibold mb-2"
+                style={{ color: 'rgba(255, 255, 255, 0.7)' }}
+              >
+                Installation
+              </h3>
+              <div
+                className="p-3 rounded-lg text-sm"
+                style={{
+                  background: installed ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${installed ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                  color: installed ? '#22c55e' : 'rgba(255, 255, 255, 0.7)',
+                }}
+              >
+                {installed
+                  ? `Installed in ~/.claude/${resource.category}/`
+                  : `Will be installed to ~/.claude/${resource.category}/`
+                }
               </div>
-            )}
-
-            {/* Pre-installed Notice - Show if no installCommand */}
-            {!resource.installCommand && (
-              <div>
-                <h3
-                  className="text-sm font-semibold mb-2"
-                  style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                >
-                  Installation Status
-                </h3>
-                <div
-                  className="p-3 rounded-lg text-sm"
-                  style={{
-                    background: 'rgba(139, 92, 246, 0.1)',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    color: '#8b5cf6',
-                  }}
-                >
-                  ✓ This skill is pre-installed and ready to use in this project.
-                </div>
-              </div>
-            )}
+            </div>
 
             {/* Version */}
             <div>
@@ -360,91 +323,70 @@ export default function MarketplaceInstallModal({
 
         {/* Footer Actions */}
         <div
-          className="px-6 py-4 border-t flex items-center gap-3"
+          className="px-5 py-3 border-t flex items-center gap-2"
           style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
         >
-          {/* Only show Install/Uninstall buttons if there's an installCommand */}
-          {resource.installCommand && (
+          {installed ? (
             <>
-              {installed ? (
-                <>
-                  <button
-                    type="button"
-                    className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium"
-                    style={{
-                      background: 'rgba(34, 197, 94, 0.1)',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      color: '#22c55e',
-                      cursor: 'default',
-                    }}
-                  >
-                    ✓ Installed
-                  </button>
-                  {onUninstall && (
-                    <button
-                      type="button"
-                      onClick={handleUninstall}
-                      disabled={installing}
-                      className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#ef4444',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!installing) {
-                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                      }}
-                    >
-                      {installing ? 'Uninstalling...' : 'Uninstall'}
-                    </button>
-                  )}
-                </>
-              ) : (
+              <button
+                type="button"
+                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium"
+                style={{
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  color: '#22c55e',
+                  cursor: 'default',
+                }}
+              >
+                Installed
+              </button>
+              {onUninstall && (
                 <button
                   type="button"
-                  onClick={handleInstall}
+                  onClick={handleUninstall}
                   disabled={installing}
-                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
+                  className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
                   style={{
-                    background: 'rgba(242, 140, 82, 0.1)',
-                    border: '1px solid rgba(242, 140, 82, 0.3)',
-                    color: '#f28c52',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#ef4444',
                   }}
                   onMouseEnter={(e) => {
                     if (!installing) {
-                      e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
-                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
                   }}
                 >
-                  {installing ? 'Installing...' : 'Install Now'}
+                  {installing ? 'Removing...' : 'Uninstall'}
                 </button>
               )}
             </>
-          )}
-
-          {/* If no install command, show "Pre-installed" badge */}
-          {!resource.installCommand && (
+          ) : (
             <button
               type="button"
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium"
+              onClick={handleInstall}
+              disabled={installing}
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
               style={{
-                background: 'rgba(139, 92, 246, 0.1)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                color: '#8b5cf6',
-                cursor: 'default',
+                background: 'rgba(242, 140, 82, 0.1)',
+                border: '1px solid rgba(242, 140, 82, 0.3)',
+                color: '#f28c52',
+              }}
+              onMouseEnter={(e) => {
+                if (!installing) {
+                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
               }}
             >
-              ✓ Pre-installed in Project
+              {installing ? 'Installing...' : 'Install'}
             </button>
           )}
 

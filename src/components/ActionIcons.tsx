@@ -114,7 +114,7 @@ function ActionIcons({
         <span className="action-icon-tooltip">Git Panel</span>
       </button>
 
-      {/* Marketplace Icon - HIDDEN temporarily
+      {/* Marketplace Icon */}
       <button
         type="button"
         className="action-icon"
@@ -123,13 +123,26 @@ function ActionIcons({
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path
-            d="M8 1L3 4V7C3 10.5 5.5 13.7 8 14.5C10.5 13.7 13 10.5 13 7V4L8 1ZM8 7.5C7.2 7.5 6.5 6.8 6.5 6C6.5 5.2 7.2 4.5 8 4.5C8.8 4.5 9.5 5.2 9.5 6C9.5 6.8 8.8 7.5 8 7.5Z"
-            fill="currentColor"
+            d="M2 3H14V4.5L12.5 6.5H3.5L2 4.5V3Z"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <path
+            d="M3.5 6.5V13.5H12.5V6.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <path
+            d="M6.5 10H9.5V13.5H6.5V10Z"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
           />
         </svg>
         <span className="action-icon-tooltip">Marketplace</span>
       </button>
-      */}
 
       {/* Usage Icon - HIDDEN temporarily
       <button

@@ -983,7 +983,7 @@ export interface MarketplaceResource {
   rating?: number;
   tags: string[];
   version: string;
-  installCommand: string; // Full npx command (e.g., "npx claude-code-templates@latest --agent=...")
+  installCommand?: string; // Legacy - now uses GitHub download
   repository?: string; // GitHub repo URL
   icon?: string;
   featured?: boolean;

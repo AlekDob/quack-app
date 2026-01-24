@@ -22,27 +22,6 @@ export default function MarketplaceCard({
   onViewDetails,
   onToggleFavorite,
 }: MarketplaceCardProps) {
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'agents':
-        return '🦆';
-      case 'commands':
-        return '⌘';
-      case 'hooks':
-        return '🪝';
-      case 'settings':
-        return '⚙️';
-      case 'mcp':
-        return '🔌';
-      case 'stacks':
-        return '📚';
-      case 'skills':
-        return '⭐';
-      default:
-        return '📦';
-    }
-  };
-
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'agents':
@@ -70,8 +49,8 @@ export default function MarketplaceCard({
       style={{
         background: 'rgba(20, 24, 32, 0.8)',
         border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '12px',
-        padding: '16px',
+        borderRadius: '10px',
+        padding: '12px',
         transition: 'all 0.2s ease',
         cursor: 'pointer',
         position: 'relative',
@@ -91,19 +70,15 @@ export default function MarketplaceCard({
       }}
     >
       {/* Badges Row */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-1.5 mb-2">
         {/* Category Badge */}
         <span
           className="px-2 py-1 rounded text-xs font-medium"
           style={{
             background: `${getCategoryColor(resource.category)}20`,
             color: getCategoryColor(resource.category),
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
           }}
         >
-          <span>{getCategoryIcon(resource.category)}</span>
           {resource.category}
         </span>
 
@@ -114,12 +89,9 @@ export default function MarketplaceCard({
             style={{
               background: 'rgba(34, 197, 94, 0.1)',
               color: '#22c55e',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
             }}
           >
-            ✓ Verified
+            Verified
           </span>
         )}
 
@@ -130,12 +102,9 @@ export default function MarketplaceCard({
             style={{
               background: 'rgba(251, 191, 36, 0.1)',
               color: '#fbbf24',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
             }}
           >
-            ⭐ Featured
+            Featured
           </span>
         )}
 
@@ -151,9 +120,9 @@ export default function MarketplaceCard({
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '18px',
             padding: '4px',
             transition: 'transform 0.2s ease',
+            color: favorited ? '#f28c52' : 'rgba(255, 255, 255, 0.3)',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.2)';
@@ -162,13 +131,15 @@ export default function MarketplaceCard({
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          {favorited ? '❤️' : '🤍'}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={favorited ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
         </button>
       </div>
 
       {/* Resource Name */}
       <h4
-        className="text-base font-semibold mb-2"
+        className="text-sm font-semibold mb-1"
         style={{ color: 'rgba(255, 255, 255, 0.9)' }}
       >
         {resource.name}
@@ -176,7 +147,7 @@ export default function MarketplaceCard({
 
       {/* Description */}
       <p
-        className="text-sm mb-3"
+        className="text-xs mb-2"
         style={{
           color: 'rgba(255, 255, 255, 0.6)',
           lineHeight: '1.5',
@@ -191,12 +162,12 @@ export default function MarketplaceCard({
 
       {/* Author */}
       <div
-        className="flex items-center gap-2 text-xs mb-3"
+        className="flex items-center gap-1.5 text-xs mb-2"
         style={{ color: 'rgba(255, 255, 255, 0.5)' }}
       >
         <svg
-          width="14"
-          height="14"
+          width="12"
+          height="12"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -209,7 +180,7 @@ export default function MarketplaceCard({
       </div>
 
       {/* Tags */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-1.5 mb-3">
         {resource.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
@@ -238,63 +209,42 @@ export default function MarketplaceCard({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
-        {/* Only show Install button if there's an installCommand */}
-        {resource.installCommand && (
-          <>
-            {installed ? (
-              <button
-                type="button"
-                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium"
-                style={{
-                  background: 'rgba(34, 197, 94, 0.1)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  color: '#22c55e',
-                  cursor: 'default',
-                }}
-              >
-                ✓ Installed
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onInstall(resource);
-                }}
-                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-                style={{
-                  background: 'rgba(242, 140, 82, 0.1)',
-                  border: '1px solid rgba(242, 140, 82, 0.3)',
-                  color: '#f28c52',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
-                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
-                }}
-              >
-                Install
-              </button>
-            )}
-          </>
-        )}
-
-        {/* If no install command, show "Pre-installed" badge */}
-        {!resource.installCommand && (
+        {installed ? (
           <button
             type="button"
-            className="flex-1 px-4 py-2 rounded-lg text-sm font-medium"
+            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{
-              background: 'rgba(139, 92, 246, 0.1)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              color: '#8b5cf6',
+              background: 'rgba(34, 197, 94, 0.1)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              color: '#22c55e',
               cursor: 'default',
             }}
           >
-            ✓ Pre-installed
+            Installed
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onInstall(resource);
+            }}
+            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
+            style={{
+              background: 'rgba(242, 140, 82, 0.1)',
+              border: '1px solid rgba(242, 140, 82, 0.3)',
+              color: '#f28c52',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
+              e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+            }}
+          >
+            Install
           </button>
         )}
 
@@ -304,7 +254,7 @@ export default function MarketplaceCard({
             e.stopPropagation();
             onViewDetails(resource);
           }}
-          className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
           style={{
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.12)',

@@ -11036,7 +11036,6 @@ You have access to all Bash tools to execute git commands like:
               </button>
             </header>
             <MarketplaceDrawer
-              workingDir={explorerPath || undefined}
               onRefresh={handleMarketplaceRefresh}
             />
           </div>

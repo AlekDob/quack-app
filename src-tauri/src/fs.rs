@@ -89,6 +89,16 @@ pub fn create_directory(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn remove_file(path: String) -> Result<(), String> {
+    std::fs::remove_file(&path).map_err(|e| format!("Failed to remove file: {}", e))
+}
+
+#[tauri::command]
+pub fn remove_directory(path: String) -> Result<(), String> {
+    std::fs::remove_dir_all(&path).map_err(|e| format!("Failed to remove directory: {}", e))
+}
+
+#[tauri::command]
 pub fn stat_file(path: String) -> Result<FileMetadata, String> {
     stat_file_impl(path).map_err(|err| err.to_string())
 }
