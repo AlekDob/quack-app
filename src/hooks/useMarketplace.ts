@@ -173,7 +173,8 @@ export function useMarketplace() {
   // Check which resources are installed locally
   const checkInstalledResources = async (allResources: MarketplaceResource[]) => {
     try {
-      const home = await homeDir();
+      let home = await homeDir();
+      if (!home.endsWith('/')) home += '/';
       const installed: MarketplaceResource[] = [];
 
       for (const resource of allResources) {
@@ -254,10 +255,11 @@ export function useMarketplace() {
     };
 
     try {
-      const home = await homeDir();
+      let home = await homeDir();
+      if (!home.endsWith('/')) home += '/';
 
       if (ext._skillPath && ext._pluginSource) {
-        // Download the skill folder (skill.md file)
+        // Download the skill SKILL.md file
         const skillName = ext._skillPath.split('/').pop() || '';
         const skillMdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
 
@@ -269,8 +271,12 @@ export function useMarketplace() {
         const targetDir = `${home}.claude/skills/${skillName}`;
         const targetPath = `${targetDir}/SKILL.md`;
 
-        // Create directory and write file
-        await invoke('create_directory', { path: targetDir });
+        // Create directory (idempotent) and write file
+        try {
+          await invoke('create_directory', { path: targetDir });
+        } catch {
+          // Directory may already exist, continue
+        }
         await invoke('write_file_content', { path: targetPath, content });
       } else if (ext._agentPath && ext._pluginSource) {
         // Download the agent .md file
@@ -285,7 +291,11 @@ export function useMarketplace() {
         const targetDir = `${home}.claude/agents`;
         const targetPath = `${targetDir}/${agentFile}`;
 
-        await invoke('create_directory', { path: targetDir });
+        try {
+          await invoke('create_directory', { path: targetDir });
+        } catch {
+          // Directory may already exist, continue
+        }
         await invoke('write_file_content', { path: targetPath, content });
       } else {
         throw new Error('Unknown resource type');
@@ -316,7 +326,8 @@ export function useMarketplace() {
     };
 
     try {
-      const home = await homeDir();
+      let home = await homeDir();
+      if (!home.endsWith('/')) home += '/';
 
       if (ext._skillPath) {
         const skillName = ext._skillPath.split('/').pop() || '';
