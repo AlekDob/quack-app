@@ -38,7 +38,6 @@ import { KanbanCardOverlay } from './KanbanCard';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import { usePopoutKanbanChat } from '../../hooks/usePopoutKanbanChat';
 import { useKanbanChatSync } from '../../hooks/useKanbanChatSync';
-import { useKanbanPolling } from '../../hooks/useKanbanPolling';
 import type { KanbanTask, KanbanStatus } from '../../types';
 import { toast } from 'sonner';
 import './KanbanView.css';
@@ -109,8 +108,6 @@ export default function KanbanPopoutView() {
     loadTasks();
   }, [loadTasks]);
 
-  // 🦆 MCP SYNC: Poll for task changes from external sources (MCP server)
-  useKanbanPolling({ enabled: true, interval: 5000 }); // 5 second interval for low overhead
 
   // Configure drag sensors
   const sensors = useSensors(

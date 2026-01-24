@@ -25,7 +25,6 @@ interface TaskWithState {
   isLoading: boolean;
   hasMessages: boolean;
   isDormant: boolean;
-  shellState?: { output: string; isRunning: boolean };
 }
 
 interface InProgressGroup {
@@ -66,15 +65,12 @@ interface KanbanColumnProps {
   onTaskClick: (task: KanbanTask) => void;
   onTaskDelete: (taskId: string) => void | Promise<void>;
   onTaskEdit?: (task: KanbanTask) => void;
-  onTaskKill?: (taskId: string) => void; // Kill shell/watch process
   onTaskStart?: (task: KanbanTask) => void; // Start TODO task: move to in_progress, open chat, send prompt
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
   onOpenTerminal?: (path: string, label?: string) => void; // Open terminal in specified directory (for worktree tasks)
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
   chatSessions?: Map<string, ChatMessage[]>;
-  // Shell task state
-  shellOutputs?: Map<string, { output: string; isRunning: boolean }>;
   // Drop target from parent (more reliable than internal isOver)
   isDropTarget?: boolean;
   // Handler for agent drop from sidebar (native HTML5 drag-and-drop)
@@ -96,13 +92,11 @@ export default function KanbanColumn({
   onTaskClick,
   onTaskDelete,
   onTaskEdit,
-  onTaskKill,
   onTaskStart,
   onProjectClick,
   onOpenTerminal,
   chatLoadingMap,
   chatSessions,
-  shellOutputs,
   isDropTarget = false,
   onSidebarAgentDrop,
   onClearAll,
@@ -180,14 +174,12 @@ export default function KanbanColumn({
       const hasMessages = messages.length > 0;
       const hasUserMessage = messages.some((msg) => msg.role === 'user');
       const isDormant = !hasUserMessage;
-      const shellState = shellOutputs?.get(task.id);
 
       const taskWithState: TaskWithState = {
         task,
         isLoading,
         hasMessages,
         isDormant,
-        shellState,
       };
 
       // Cold = never started (no messages at all)
@@ -217,7 +209,7 @@ export default function KanbanColumn({
     }
 
     return groups;
-  }, [id, tasks, chatLoadingMap, chatSessions, shellOutputs]);
+  }, [id, tasks, chatLoadingMap, chatSessions]);
 
   // Native HTML5 drag handlers for sidebar agent drops
   const handleNativeDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -323,25 +315,17 @@ export default function KanbanColumn({
                   const hasMessages = messages.length > 0;
                   const hasUserMessage = messages.some(msg => msg.role === 'user');
                   const isDormant = !hasUserMessage;
-                  const shellState = shellOutputs?.get(task.id);
-                  const isShellRunning = shellState?.isRunning || false;
-                  const shellOutput = shellState?.output || '';
-                  const taskType = task.type || 'agent';
-                  const isTaskLoading = taskType === 'agent' ? isLoading : isShellRunning;
-
                   return (
                     <KanbanCard
                       key={task.id}
                       task={task}
-                      isLoading={isTaskLoading}
+                      isLoading={isLoading}
                       hasMessages={hasMessages}
                       messageCount={messages.length}
                       isDormant={isDormant}
-                      shellOutput={shellOutput}
                       onClick={() => onTaskClick(task)}
                       onDelete={() => onTaskDelete(task.id)}
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
-                      onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
                       onProjectClick={onProjectClick}
                       onOpenTerminal={onOpenTerminal}
                     />
@@ -361,26 +345,20 @@ export default function KanbanColumn({
                   <span className="kanban-status-group-label">{group.label}</span>
                   <span className="kanban-status-group-count">{group.tasks.length}</span>
                 </div>
-                {group.tasks.map(({ task, isLoading, hasMessages, isDormant, shellState }) => {
+                {group.tasks.map(({ task, isLoading, hasMessages, isDormant }) => {
                   const messages = chatSessions?.get(task.id) || [];
-                  const isShellRunning = shellState?.isRunning || false;
-                  const shellOutput = shellState?.output || '';
-                  const taskType = task.type || 'agent';
-                  const isTaskLoading = taskType === 'agent' ? isLoading : isShellRunning;
 
                   return (
                     <KanbanCard
                       key={task.id}
                       task={task}
-                      isLoading={isTaskLoading}
+                      isLoading={isLoading}
                       hasMessages={hasMessages}
                       messageCount={messages.length}
                       isDormant={isDormant}
-                      shellOutput={shellOutput}
                       onClick={() => onTaskClick(task)}
                       onDelete={() => onTaskDelete(task.id)}
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
-                      onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
                       onProjectClick={onProjectClick}
                       onOpenTerminal={onOpenTerminal}
                     />
@@ -391,35 +369,23 @@ export default function KanbanColumn({
           ) : (
             // Render flat list for TODO column
             tasks.map((task) => {
-              // Get chat state for this task (agent tasks)
               const isLoading = chatLoadingMap?.get(task.id) || false;
               const messages = chatSessions?.get(task.id) || [];
               const hasMessages = messages.length > 0;
               const hasUserMessage = messages.some(msg => msg.role === 'user');
               const isDormant = !hasUserMessage;
 
-              // Get shell state for this task (shell/watch tasks)
-              const shellState = shellOutputs?.get(task.id);
-              const isShellRunning = shellState?.isRunning || false;
-              const shellOutput = shellState?.output || '';
-
-              // Determine loading state based on task type
-              const taskType = task.type || 'agent';
-              const isTaskLoading = taskType === 'agent' ? isLoading : isShellRunning;
-
               return (
                 <KanbanCard
                   key={task.id}
                   task={task}
-                  isLoading={isTaskLoading}
+                  isLoading={isLoading}
                   hasMessages={hasMessages}
                   messageCount={messages.length}
                   isDormant={isDormant}
-                  shellOutput={shellOutput}
                   onClick={() => onTaskClick(task)}
                   onDelete={() => onTaskDelete(task.id)}
                   onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
-                  onKill={onTaskKill ? () => onTaskKill(task.id) : undefined}
                   onStart={onTaskStart ? () => onTaskStart(task) : undefined}
                   onProjectClick={onProjectClick}
                   onOpenTerminal={onOpenTerminal}

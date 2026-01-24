@@ -11,7 +11,7 @@ import '@testing-library/jest-dom';
 // Mock the zustand store
 vi.mock('../stores/kanbanStore', () => ({
   useKanbanStore: vi.fn(() => ({
-    tasks: [],
+    getAllTasks: () => [],
     requestNewTaskModal: vi.fn(),
   })),
 }));
@@ -64,7 +64,7 @@ describe('KanbanMiniPanel', () => {
   describe('rendering', () => {
     it('should render the panel header', () => {
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [],
+        getAllTasks: () => [],
         requestNewTaskModal: vi.fn(),
       });
 
@@ -82,7 +82,7 @@ describe('KanbanMiniPanel', () => {
 
     it('should render empty state when no tasks', () => {
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [],
+        getAllTasks: () => [],
         requestNewTaskModal: vi.fn(),
       });
 
@@ -109,7 +109,7 @@ describe('KanbanMiniPanel', () => {
       ];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -134,7 +134,7 @@ describe('KanbanMiniPanel', () => {
       ];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -156,7 +156,7 @@ describe('KanbanMiniPanel', () => {
   describe('quick actions', () => {
     it('should render Add Task button', () => {
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [],
+        getAllTasks: () => [],
         requestNewTaskModal: vi.fn(),
       });
 
@@ -174,7 +174,7 @@ describe('KanbanMiniPanel', () => {
 
     it('should render Full Board button', () => {
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [],
+        getAllTasks: () => [],
         requestNewTaskModal: vi.fn(),
       });
 
@@ -192,7 +192,7 @@ describe('KanbanMiniPanel', () => {
 
     it('should call onOpenKanban when Full Board button is clicked', () => {
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [],
+        getAllTasks: () => [],
         requestNewTaskModal: vi.fn(),
       });
 
@@ -214,7 +214,7 @@ describe('KanbanMiniPanel', () => {
       const mockRequestNewTaskModal = vi.fn();
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [],
+        getAllTasks: () => [],
         requestNewTaskModal: mockRequestNewTaskModal,
       });
 
@@ -245,7 +245,7 @@ describe('KanbanMiniPanel', () => {
       ];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -266,7 +266,7 @@ describe('KanbanMiniPanel', () => {
       const mockTasks = [createMockTask('1', 'todo', 'My TODO Task')];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -287,7 +287,7 @@ describe('KanbanMiniPanel', () => {
       const mockTasks = [createMockTask('1', 'todo', 'My TODO Task')];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -315,7 +315,7 @@ describe('KanbanMiniPanel', () => {
       const mockTasks = [createMockTask('task-1', 'in_progress', 'My Task')];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -341,7 +341,7 @@ describe('KanbanMiniPanel', () => {
       const loadingMap = new Map([['task-1', true]]);
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -362,7 +362,7 @@ describe('KanbanMiniPanel', () => {
       const mockTasks = [createMockTask('task-1', 'in_progress')];
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -394,7 +394,7 @@ describe('KanbanMiniPanel', () => {
       ]);
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -418,7 +418,7 @@ describe('KanbanMiniPanel', () => {
       ]);
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: mockTasks,
+        getAllTasks: () => mockTasks,
         requestNewTaskModal: vi.fn(),
       });
 
@@ -449,7 +449,7 @@ describe('KanbanMiniPanel', () => {
       };
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [mockTask],
+        getAllTasks: () => [mockTask],
         requestNewTaskModal: vi.fn(),
       });
 
@@ -476,7 +476,7 @@ describe('KanbanMiniPanel', () => {
       };
 
       (useKanbanStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        tasks: [mockTask],
+        getAllTasks: () => [mockTask],
         requestNewTaskModal: vi.fn(),
       });
 

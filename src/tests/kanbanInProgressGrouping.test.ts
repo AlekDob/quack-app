@@ -81,17 +81,6 @@ describe('Kanban In Progress Status Grouping', () => {
       expect(result).toBe(false);
     });
 
-    it('should return false for shell tasks (always working)', () => {
-      const task = createMockTask({ type: 'shell' });
-      const result = isTaskReady(task, false, true, false);
-      expect(result).toBe(false);
-    });
-
-    it('should return false for watch tasks (always working)', () => {
-      const task = createMockTask({ type: 'watch' });
-      const result = isTaskReady(task, false, true, false);
-      expect(result).toBe(false);
-    });
 
     it('should treat tasks without type as agent tasks', () => {
       // Backwards compatibility: tasks without type should be treated as agent
@@ -201,32 +190,22 @@ describe('Kanban In Progress Status Grouping', () => {
       expect(groups[0].bucket).toBe('working');
     });
 
-    it('should put shell task in WORKING group', () => {
-      const task = createMockTask({ id: 'task-1', type: 'shell' });
-      const chatLoadingMap = new Map<string, boolean>();
-      const chatSessions = new Map<string, ChatMessage[]>();
-
-      const groups = groupInProgressTasks([task], chatLoadingMap, chatSessions);
-
-      expect(groups).toHaveLength(1);
-      expect(groups[0].bucket).toBe('working');
-    });
 
     it('should separate ready and working tasks correctly', () => {
       const readyTask = createMockTask({ id: 'ready-1', type: 'agent' });
       const workingTask1 = createMockTask({ id: 'working-1', type: 'agent' });
-      const workingTask2 = createMockTask({ id: 'working-2', type: 'shell' });
+      const workingTask2 = createMockTask({ id: 'working-2', type: 'agent' });
 
       const chatLoadingMap = new Map<string, boolean>([
         ['ready-1', false],
         ['working-1', true], // Loading
-        ['working-2', false],
+        ['working-2', true],
       ]);
 
       const chatSessions = new Map<string, ChatMessage[]>([
         ['ready-1', createMockMessages(true)],
         ['working-1', createMockMessages(true)],
-        ['working-2', []],
+        ['working-2', createMockMessages(true)],
       ]);
 
       const groups = groupInProgressTasks(
@@ -313,15 +292,16 @@ describe('Kanban In Progress Status Grouping', () => {
 
     it('should only return WORKING group when no tasks are ready', () => {
       const task1 = createMockTask({ id: 'task-1', type: 'agent' });
-      const task2 = createMockTask({ id: 'task-2', type: 'shell' });
+      const task2 = createMockTask({ id: 'task-2', type: 'agent' });
 
       const chatLoadingMap = new Map<string, boolean>([
         ['task-1', true], // Loading
-        ['task-2', false],
+        ['task-2', true],
       ]);
 
       const chatSessions = new Map<string, ChatMessage[]>([
         ['task-1', createMockMessages(true)],
+        ['task-2', createMockMessages(true)],
       ]);
 
       const groups = groupInProgressTasks([task1, task2], chatLoadingMap, chatSessions);

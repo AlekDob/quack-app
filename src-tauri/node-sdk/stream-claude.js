@@ -14,9 +14,8 @@ import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
-import { autoMemorySearch, closeDb as closeMemoryDb } from './memory-prompt-hook.js';
 
-// Get the directory of this script for kanban-mcp-server.js path
+// Get the directory of this script for MCP server paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -133,8 +132,6 @@ const {
   effort, // Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
   mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
   allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
-  autoMemorySearchEnabled = true, // Auto memory search from Brain (SDK 0.2.1+)
-  userKeywords = [], // User-selected priority keywords for memory search (3x weight)
 } = config;
 
 // DEBUG: Log what we received from Rust
@@ -437,15 +434,6 @@ async function main() {
       'KillShell',
       'ExitPlanMode',
       'AskUserQuestion', // Interactive questions to user (SDK v0.1.71+)
-      // Kanban Tools V2 - Multi-Project Agent Architecture
-      'mcp__kanban-tools-v2__kanban_create_agent',
-      'mcp__kanban-tools-v2__kanban_create_session',
-      'mcp__kanban-tools-v2__kanban_list_agents',
-      'mcp__kanban-tools-v2__kanban_list_sessions',
-      'mcp__kanban-tools-v2__kanban_move_session',
-      'mcp__kanban-tools-v2__kanban_update_session',
-      'mcp__kanban-tools-v2__kanban_delete_agent',
-      'mcp__kanban-tools-v2__kanban_delete_session',
     ];
 
     // Use allowedTools from config if provided, otherwise use defaults
@@ -454,53 +442,6 @@ async function main() {
       : defaultAllowedTools;
 
     console.error(`[DEBUG] Using ${resolvedAllowedTools.length} allowed tools:`, resolvedAllowedTools.slice(0, 5).join(', ') + '...');
-
-    // =============================================================================
-    // 🧠 AUTO MEMORY SEARCH (v2 - AI-Powered)
-    // Perform memory search BEFORE building options since it's now async
-    // Uses Claude Haiku to extract semantic concepts from the user's prompt
-    // =============================================================================
-    let memorySearchResult = null;
-    let memoryContext = '';
-
-    if (autoMemorySearchEnabled && prompt) {
-      console.error(`[DEBUG] Auto Memory Search enabled, searching Brain...`);
-      console.error(`[DEBUG] User keywords for priority search: ${userKeywords.length > 0 ? userKeywords.join(', ') : '(none)'}`);
-
-      // Extract project name from cwd for contextual scoping
-      const projectName = cwd ? cwd.split('/').filter(Boolean).pop() : null;
-      console.error(`[DEBUG] Project context: ${projectName || '(none)'}`);
-
-      try {
-        memorySearchResult = await autoMemorySearch(prompt, {
-          enabled: true,
-          maxMemories: 5,
-          userKeywords: userKeywords, // Pass user-selected keywords with 3x weight
-          projectName: projectName, // Add project name for contextual scoping (2x weight)
-        });
-        memoryContext = memorySearchResult.context || '';
-
-        // Store result for later emission (after system event)
-        if (memorySearchResult.memories && memorySearchResult.memories.length > 0) {
-          console.error(`[DEBUG] Memory context found (${memorySearchResult.memories.length} memories, method: ${memorySearchResult.extractionMethod})`);
-          // Store in global for emission after first event
-          globalThis.__pendingMemoryContext = {
-            type: 'memory_context',
-            memories: memorySearchResult.memories,
-            keywords: memorySearchResult.keywords,
-            aiConcepts: memorySearchResult.aiConcepts || [], // NEW: AI-extracted concepts
-            userKeywords: memorySearchResult.userKeywords || [], // User-selected keywords (★)
-            durationMs: memorySearchResult.durationMs,
-            count: memorySearchResult.memories.length,
-            extractionMethod: memorySearchResult.extractionMethod, // NEW: 'ai' | 'legacy' | 'none'
-          };
-        }
-      } catch (memError) {
-        console.error(`[DEBUG] Memory search error (non-fatal): ${memError.message}`);
-      }
-    } else {
-      console.error(`[DEBUG] Auto Memory Search: enabled=${autoMemorySearchEnabled}, prompt=${!!prompt}`);
-    }
 
     const options = {
       model: modelId,
@@ -556,8 +497,7 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - MongoDB (document-based, flexible schema)
 - SQLite (lightweight, embedded)
 
-IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.
-${memoryContext}`
+IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
       },
 
       // =============================================================================
@@ -692,33 +632,27 @@ ${memoryContext}`
     console.error(`[MCP] resolvedMcpServers: ${resolvedMcpServers ? JSON.stringify(Object.keys(resolvedMcpServers)) : 'null'}`);
     console.error(`[MCP] === END MCP SERVER LOADING ===`);
 
-    // Always add Kanban Tools and IDE Tools MCP servers (stdio-based for reliability)
+    // Add IDE Tools MCP server (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
-    const kanbanMcpServerPath = join(__dirname, 'kanban-mcp-server-v2.js');
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
-    console.error(`[MCP] Kanban MCP server V2 path: ${kanbanMcpServerPath}`);
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (kanban, ide)
+    // Merge MCP servers: file-based servers + built-in Quack servers (ide)
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
-      'kanban-tools-v2': {
-        command: 'node',
-        args: [kanbanMcpServerPath],
-      },
       'ide-tools': {
         command: 'node',
         args: [ideMcpServerPath],
       },
     };
 
-    const builtInServerCount = 2; // kanban-tools-v2 + ide-tools
+    const builtInServerCount = 1; // ide-tools
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (kanban-tools-v2, ide-tools)`);
+      console.error(`[MCP] Using built-in MCP servers only (ide-tools)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
@@ -744,7 +678,6 @@ ${memoryContext}`
 
     while (retryCount <= MAX_RETRIES) {
       try {
-        let memoryContextEmitted = retryCount > 0; // Skip memory on retry
         let currentStream = retryCount === 0 ? stream : query({
           prompt: useStreamingInput ? generateMessages() : prompt,
           options: { ...options, resume: options.resume }, // Resume same session
@@ -796,14 +729,6 @@ ${memoryContext}`
           }
 
           emitEvent(event);
-
-          // 🧠 Emit pending memory context AFTER first event (so streaming message exists)
-          if (!memoryContextEmitted && globalThis.__pendingMemoryContext) {
-            console.error(`[DEBUG] Emitting pending memory_context event`);
-            emitEvent(globalThis.__pendingMemoryContext);
-            delete globalThis.__pendingMemoryContext;
-            memoryContextEmitted = true;
-          }
         }
 
         // Success - emit final complete event
@@ -811,8 +736,6 @@ ${memoryContext}`
           type: 'complete',
         });
 
-        // 🧠 Cleanup memory hook database connection
-        closeMemoryDb();
 
         // 🦆 IMPORTANT: Exit process cleanly to avoid hanging
         // MCP servers may keep event loop open, so we need explicit exit
@@ -857,27 +780,21 @@ ${memoryContext}`
           });
           // Emit complete so the UI doesn't hang
           emitEvent({ type: 'complete' });
-          closeMemoryDb();
           process.exit(0); // Exit cleanly - the error was communicated in-stream
         }
 
         // Fatal error - propagate normally
-        closeMemoryDb();
         emitError(streamError);
         process.exit(1);
       }
     }
 
     // Should not reach here, but handle gracefully
-    closeMemoryDb();
     if (lastError) {
       emitError(lastError);
     }
     process.exit(lastError ? 1 : 0);
   } catch (error) {
-    // 🧠 Cleanup memory hook database connection on error
-    closeMemoryDb();
-
     emitError(error);
     process.exit(1);
   }

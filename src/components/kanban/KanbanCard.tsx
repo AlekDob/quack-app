@@ -35,12 +35,10 @@ interface KanbanCardProps {
   hasMessages?: boolean;      // Whether there are messages in the chat
   messageCount?: number;      // Number of messages in the chat
   isDormant?: boolean;        // No user interaction yet (chat empty)
-  shellOutput?: string;       // Shell command output (in-memory, not persisted)
   processingDocumentation?: Set<string>; // Set of task IDs currently processing documentation
   onClick?: () => void;
   onDelete?: () => void | Promise<void>;
   onEdit?: () => void;
-  onKill?: () => void;        // Kill running shell/watch process
   onStart?: () => void;       // Start task: move to in_progress, open chat, send prompt
   onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
   onOpenTerminal?: (path: string, label?: string) => void; // Open terminal in specified directory (for worktree)
@@ -92,12 +90,10 @@ export default function KanbanCard({
   hasMessages = false,
   messageCount = 0,
   isDormant = true,
-  shellOutput,
   processingDocumentation,
   onClick,
   onDelete,
   onEdit,
-  onKill,
   onStart,
   onProjectClick,
   onOpenTerminal,
@@ -212,12 +208,6 @@ export default function KanbanCard({
     ? previewText.substring(0, 60) + '...'
     : previewText;
 
-  // Get last 3 lines of shell output for preview
-  const getShellOutputPreview = () => {
-    if (!shellOutput) return null;
-    const lines = shellOutput.trim().split('\n');
-    return lines.slice(-3).join('\n');
-  };
 
   // Format relative time for watch tasks
   const getLastTriggeredText = () => {
@@ -304,11 +294,6 @@ export default function KanbanCard({
                 <FileText size={12} />
               </button>
             )}
-            {(isShellTask || isWatchTask) && task.status === 'in_progress' && task.pid && onKill && (
-              <button className="kanban-card-kill" onClick={(e) => { e.stopPropagation(); onKill(); }} title="Kill">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>
-              </button>
-            )}
             {onDelete && (
               <button className="kanban-card-delete" onClick={(e) => { e.stopPropagation(); onDelete(); }} title="Delete">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -337,12 +322,6 @@ export default function KanbanCard({
           <div className="kanban-progress-bar"><div className="kanban-progress-indicator" /></div>
         )}
 
-        {/* Shell output preview (last 3 lines) */}
-        {isShellTask && shellOutput && (
-          <div className="kanban-card-shell-output">
-            <pre>{getShellOutputPreview()}</pre>
-          </div>
-        )}
 
         {/* Watch task info */}
         {isWatchTask && (

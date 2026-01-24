@@ -123,29 +123,6 @@ pub enum ClaudeEvent {
         #[serde(flatten)]
         extra: serde_json::Value,
     },
-    // Kanban event (from kanban-tools MCP server)
-    #[serde(rename = "kanban_event")]
-    KanbanEvent {
-        #[serde(rename = "eventType")]
-        event_type: String,
-        payload: serde_json::Value,
-        timestamp: u64,
-    },
-    // Memory Context event (Auto Memory Search from Second Brain - SDK 0.2.1+, v2 AI-Powered)
-    #[serde(rename = "memory_context")]
-    MemoryContext {
-        memories: Vec<MemoryInfo>,
-        keywords: Vec<String>,
-        #[serde(rename = "aiConcepts")]
-        ai_concepts: Option<Vec<String>>,  // NEW: AI-extracted semantic concepts
-        #[serde(rename = "userKeywords")]
-        user_keywords: Option<Vec<String>>,
-        #[serde(rename = "durationMs")]
-        duration_ms: u64,
-        count: u32,
-        #[serde(rename = "extractionMethod")]
-        extraction_method: Option<String>,  // NEW: 'ai' | 'legacy' | 'none' | 'error'
-    },
     // AskUserQuestion event - requires user input (SDK v0.1.71+)
     #[serde(rename = "ask_user_question")]
     AskUserQuestion {
@@ -174,17 +151,6 @@ pub struct AskUserQuestionOption {
     pub description: String,
 }
 
-/// Memory info structure for MemoryContext event (Auto Memory Search)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryInfo {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub memory_type: String,
-    #[serde(rename = "projectId")]
-    pub project_id: Option<String>,
-    pub observations: Vec<String>,
-    pub scope: Option<String>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantMessage {
@@ -254,14 +220,9 @@ pub struct ClaudeCliRequest {
     pub setting_sources: Option<Vec<String>>,
     // 🗣️ Allowed tools list (SDK v0.1.57+) - enables specific tools like AskUserQuestion
     pub allowed_tools: Option<Vec<String>>,
-    // 🧠 Auto Memory Search - search Brain before each query (SDK 0.2.1+)
-    // Default: true (enabled). Set to false to disable.
-    pub auto_memory_search_enabled: Option<bool>,
     // 🦆 SESSION-FIRST: Frontend session key for routing events to correct chat session
     // This allows parallel conversations - each stream knows where to write its events
     pub session_key: Option<String>,
-    // 🧠 User-selected priority keywords for memory search (3x weight)
-    pub user_keywords: Option<Vec<String>>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -1022,9 +983,7 @@ pub async fn send_message_via_sdk_streaming(
         effort, // ✅ Extract effort parameter (SDK 0.1.54+)
         setting_sources, // ✅ Extract setting_sources to control prompt length
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
-        auto_memory_search_enabled, // 🧠 Auto Memory Search (SDK 0.2.1+)
         session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
-        user_keywords, // 🧠 User-selected priority keywords for memory search (3x weight)
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
@@ -1145,22 +1104,6 @@ pub async fn send_message_via_sdk_streaming(
             tools.iter().map(|t| serde_json::Value::String(t.clone())).collect()
         );
         log::info!("[SDK DEBUG] Adding allowedTools to config: {:?}", tools);
-    }
-
-    // 🧠 Add autoMemorySearchEnabled (SDK 0.2.1+)
-    // Default: true (enabled). Only add to config if explicitly set to false.
-    let auto_memory_enabled = auto_memory_search_enabled.unwrap_or(true);
-    config["autoMemorySearchEnabled"] = serde_json::Value::Bool(auto_memory_enabled);
-    log::info!("[SDK DEBUG] Auto Memory Search enabled: {}", auto_memory_enabled);
-
-    // 🧠 Add userKeywords for priority memory search (3x weight)
-    if let Some(keywords) = user_keywords {
-        if !keywords.is_empty() {
-            config["userKeywords"] = serde_json::Value::Array(
-                keywords.iter().map(|k| serde_json::Value::String(k.clone())).collect()
-            );
-            log::info!("[SDK DEBUG] Adding {} user keywords for priority memory search", keywords.len());
-        }
     }
 
     let config_str = config.to_string();
@@ -1461,24 +1404,6 @@ pub async fn send_message_via_sdk_streaming(
                     ClaudeEvent::Complete { .. } => {
                         log::info!("[SDK] ✅ Stream complete event received");
                     }
-                    ClaudeEvent::KanbanEvent { event_type, payload, timestamp } => {
-                        log::info!("[SDK] 📋 Kanban event: type={}, timestamp={}", event_type, timestamp);
-                        // Emit kanban-specific event to frontend for real-time UI updates
-                        let kanban_event_name = "kanban:update".to_string();
-                        match app.emit(&kanban_event_name, serde_json::json!({
-                            "eventType": event_type,
-                            "payload": payload,
-                            "timestamp": timestamp,
-                            "agentId": agent_id
-                        })) {
-                            Ok(_) => {
-                                log::info!("[SDK] 📋 Emitted kanban:update event to frontend");
-                            }
-                            Err(e) => {
-                                log::error!("[SDK] ❌ Failed to emit kanban event: {:?}", e);
-                            }
-                        }
-                    }
                     ClaudeEvent::AskUserQuestion { request_id, questions, .. } => {
                         log::info!("[SDK] 🗣️ AskUserQuestion event: requestId={}, {} questions, sessionKey={}", request_id, questions.len(), event_session_key);
                         // Emit ask_user_question event to frontend using BOTH:
@@ -1530,15 +1455,6 @@ pub async fn send_message_via_sdk_streaming(
                     }
                 }
 
-                // Debug: Log MemoryContext events
-                if let ClaudeEvent::MemoryContext { memories, keywords, ai_concepts, extraction_method, .. } = &event {
-                    log::info!("[SDK] 🧠 EMITTING MemoryContext event: {} memories, method={:?}, keywords={}, ai_concepts={:?}",
-                        memories.len(),
-                        extraction_method,
-                        keywords.len(),
-                        ai_concepts.as_ref().map(|c| c.len()).unwrap_or(0)
-                    );
-                }
 
                 // 🦆 SESSION-FIRST: Wrap event with session_key for proper routing
                 let wrapped_event = serde_json::json!({

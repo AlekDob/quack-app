@@ -514,7 +514,7 @@ export interface AgentModePresets {
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
-  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'memory_context';
+  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop';
 }
 
 export interface ClaudeSystemEvent extends ClaudeEventBase {
@@ -639,29 +639,6 @@ export interface ClaudeContentBlockStopEvent extends ClaudeEventBase {
   session_id?: string;
 }
 
-// Memory Context Event (Auto Memory Search - SDK 0.2.1+, v2 AI-Powered)
-export interface ClaudeMemoryContextEvent extends ClaudeEventBase {
-  type: 'memory_context';
-  memories: Array<{
-    name: string;
-    type: string;
-    projectId?: string;
-    observations: string[];
-    /** Scope of the memory: 'project' or 'global' */
-    scope?: 'project' | 'global';
-  }>;
-  /** Legacy keyword extraction results (stopword-based fallback) */
-  keywords: string[];
-  /** AI-extracted semantic concepts (NEW - v2 with Claude Haiku) */
-  aiConcepts?: string[];
-  /** User-selected priority keywords (3x weight in search) */
-  userKeywords?: string[];
-  durationMs: number;
-  count: number;
-  /** Extraction method used: 'ai' | 'legacy' | 'none' | 'error' */
-  extractionMethod?: 'ai' | 'legacy' | 'none' | 'error';
-}
-
 export type ClaudeEvent =
   | ClaudeSystemEvent
   | ClaudeAssistantEvent
@@ -674,8 +651,7 @@ export type ClaudeEvent =
   | ClaudeMessageStopEvent
   | ClaudeContentBlockStartEvent
   | ClaudeContentBlockDeltaEvent
-  | ClaudeContentBlockStopEvent
-  | ClaudeMemoryContextEvent;
+  | ClaudeContentBlockStopEvent;
 
 // ============================================
 // AskUserQuestion Types (SDK v0.1.71+)
@@ -781,7 +757,6 @@ export interface AgentChatSettings {
   thinkingMode: string; // Thinking mode setting
   permissionMode: string; // Permission mode ('plan', 'act', 'bypass')
   effort?: EffortLevel; // SDK 0.1.54+ - Controls quality vs speed/cost tradeoff
-  autoMemorySearch?: boolean; // SDK 0.2.1+ - Auto search Brain before each query (default: true)
 }
 
 // MCP (Model Context Protocol) Server types
@@ -1559,8 +1534,7 @@ export type ShortcutActionId =
   | 'chatOpenDroids'
   | 'chatOpenCommands'
   | 'chatInsertXml'
-  | 'chatNewLine'
-  | 'addMemoryKeyword';
+  | 'chatNewLine';
 
 /**
  * Configuration for a single keyboard shortcut

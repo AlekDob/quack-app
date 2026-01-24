@@ -70,11 +70,6 @@ export const TOOL_GIF_KEYWORDS: Record<string, string[]> = {
   'mcp__brain__brain_create_relation': ['connecting dots', 'linking', 'relationship'],
   'mcp__brain__brain_list_entities': ['list checking', 'inventory', 'browsing'],
 
-  // Kanban tools
-  'mcp__kanban-tools__kanban_list_tasks': ['todo list', 'checking tasks', 'clipboard'],
-  'mcp__kanban-tools__kanban_create_task': ['creating task', 'adding item', 'new task'],
-  'mcp__kanban-tools__kanban_move_task': ['moving task', 'drag drop', 'organizing'],
-  'mcp__kanban-tools__kanban_update_task': ['updating', 'editing', 'modifying'],
 
   // IDE tools
   'mcp__ide-tools__ide_open': ['opening file', 'code editor', 'developer'],

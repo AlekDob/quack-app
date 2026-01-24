@@ -37,7 +37,7 @@ import { join } from 'path';
 import { homedir, platform } from 'os';
 
 // =============================================================================
-// STORAGE PATH (same pattern as kanban-mcp-server.js)
+// STORAGE PATH
 // =============================================================================
 
 function getTauriStorePath() {

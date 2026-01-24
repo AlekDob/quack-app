@@ -71,10 +71,6 @@ describe('giphyService', () => {
       expect(keywords).toContain('googling');
     });
 
-    it('should return keywords for kanban tools', () => {
-      const keywords = getKeywordsForTool('mcp__kanban-tools__kanban_create_task');
-      expect(keywords).toContain('creating task');
-    });
 
   });
 

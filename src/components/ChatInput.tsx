@@ -250,8 +250,6 @@ export default function ChatInput({
   // XML tag auto-complete state
   const [xmlTagPair, setXmlTagPair] = useState<{ start: number; end: number; tagName: string } | null>(null);
 
-  // User-selected priority keywords for memory search (3x weight)
-  const [userKeywords, setUserKeywords] = useState<string[]>([]);
 
   // Microphone recorder hook (uses tauri-plugin-mic-recorder + Whisper API)
   const {
@@ -1098,11 +1096,9 @@ export default function ChatInput({
     // #endregion
     if ((!trimmed && attachments.length === 0) || disabled) return;
 
-    // Pass userKeywords for priority memory search (3x weight)
-    await onSend(trimmed, { attachments, userKeywords: userKeywords.length > 0 ? userKeywords : undefined });
+    await onSend(trimmed, { attachments });
     setInput('');
     setAttachments([]);
-    setUserKeywords([]); // Clear keywords after send
     setError(null);
   };
 
@@ -1259,28 +1255,12 @@ export default function ChatInput({
             textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
           }
         }, 0);
-      } else if (keyCombo === shortcuts.addMemoryKeyword?.currentKeys) {
-        // Add selected text as priority keyword for memory search
-        e.preventDefault();
-        const selection = window.getSelection();
-        const selectedText = selection?.toString().trim();
-        if (selectedText && selectedText.length > 2) {
-          // Split by spaces for multi-word selection, filter short words
-          const words = selectedText.split(/\s+/).filter(w => w.length > 2);
-          if (words.length > 0) {
-            setUserKeywords(prev => {
-              const newKeywords = [...new Set([...prev, ...words])];
-              console.log('[ChatInput] Added memory keywords:', words, '-> Total:', newKeywords);
-              return newKeywords;
-            });
-          }
-        }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [shortcuts, input, disabled, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput, setUserKeywords]);
+  }, [shortcuts, input, disabled, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput]);
 
   // Snippet insertion handler
   const handleInsertSnippet = useCallback((content: string, cursorOffset?: number) => {
@@ -1985,26 +1965,6 @@ export default function ChatInput({
             </div>
           );
         })()}
-        {/* Show user-selected priority keywords for memory search */}
-        {userKeywords.length > 0 && (
-          <div className="chat-input-memory-keywords">
-            <span className="chat-input-memory-keywords-label">Priority Keywords:</span>
-            {userKeywords.map((keyword, idx) => (
-              <span key={idx} className="chat-input-memory-keyword-chip">
-                <span className="chat-input-memory-keyword-star">★</span>
-                {keyword}
-                <button
-                  type="button"
-                  className="chat-input-memory-keyword-remove"
-                  onClick={() => setUserKeywords(prev => prev.filter((_, i) => i !== idx))}
-                  title="Remove keyword"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
         <div className="chat-input-field-row">
           <div className="chat-input-actions" onMouseDown={(e) => e.preventDefault()}>
           <div className="chat-input-actions-left">

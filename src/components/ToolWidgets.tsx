@@ -27,8 +27,6 @@ export const getToolColor = (toolName: string): string => {
   if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
   // Brain tools get vibrant rose color (inherited from old memory style)
   if (name.startsWith('mcp__quack-brain') || name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F'; // vibrant rose
-  // Kanban tools get cyan/teal color
-  if (name.startsWith('mcp__kanban') || name.startsWith('mcp_kanban')) return '#06b6d4'; // cyan
   // IDE tools get purple color
   if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7'; // purple
   // Skill tool gets gold/amber color
@@ -52,12 +50,11 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
   // Determine color based on tool type
   const isWebTool = toolName === 'webfetch' || toolName === 'websearch';
   const isMcpBrainTool = toolName.startsWith('mcp__quack-brain') || toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
-  const isMcpKanbanTool = toolName.startsWith('mcp__kanban') || toolName.startsWith('mcp_kanban');
   const isMcpIdeTool = toolName.startsWith('mcp__ide') || toolName.startsWith('mcp_ide');
   const isSkillTool = toolName === 'skill';
   const isPlanModeTool = toolName === 'enterplanmode' || toolName === 'exitplanmode';
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
-  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : 'currentColor';
+  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : 'currentColor';
 
   if (toolName === 'read') {
     return (
@@ -224,21 +221,6 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
     );
   }
 
-  // MCP Kanban tools - kanban board icon
-  if (isMcpKanbanTool) {
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-        <line x1="9" y1="3" x2="9" y2="21"/>
-        <line x1="15" y1="3" x2="15" y2="21"/>
-        <rect x="4.5" y="6" width="3" height="4" rx="0.5" fill={iconColor}/>
-        <rect x="4.5" y="12" width="3" height="3" rx="0.5" fill={iconColor}/>
-        <rect x="10.5" y="6" width="3" height="5" rx="0.5" fill={iconColor}/>
-        <rect x="16.5" y="6" width="3" height="3" rx="0.5" fill={iconColor}/>
-      </svg>
-    );
-  }
-
   // MCP IDE tools - code editor icon
   if (isMcpIdeTool) {
     return (
@@ -342,12 +324,11 @@ export const SystemInitializedWidget: React.FC<{
               const toolNameLower = tool.toLowerCase();
               const isWebTool = toolNameLower === 'webfetch' || toolNameLower === 'websearch';
               const isMcpBrainTool = toolNameLower.startsWith('mcp__quack-brain') || toolNameLower.startsWith('mcp__brain') || toolNameLower.startsWith('mcp_brain');
-              const isMcpKanbanTool = toolNameLower.startsWith('mcp__kanban') || toolNameLower.startsWith('mcp_kanban');
               const isMcpIdeTool = toolNameLower.startsWith('mcp__ide') || toolNameLower.startsWith('mcp_ide');
               const isSkillTool = toolNameLower === 'skill';
               const isPlanModeTool = toolNameLower === 'enterplanmode' || toolNameLower === 'exitplanmode';
               const isMcpTool = toolNameLower.startsWith('mcp__') || toolNameLower.startsWith('mcp_');
-              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpKanbanTool ? '#06b6d4' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : undefined;
+              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : undefined;
 
               return (
                 <span key={i} className="system-init-tool-badge" style={{ color: textColor }}>

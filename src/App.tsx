@@ -61,7 +61,6 @@ import SkillViewer from "./components/SkillViewer";
 import CommandViewer from "./components/CommandViewer";
 import RuleViewer from "./components/RuleViewer";
 import BrowserManager from "./components/BrowserManager";
-import KanbanToast from "./components/KanbanToast";
 import { useDocsTab } from "./hooks/useDocsTab";
 import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useKanbanTab } from "./hooks/useKanbanTab";
@@ -82,7 +81,6 @@ import { useChatStore } from "./stores/chatStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
-import KanbanWatcherInitializer from "./components/KanbanWatcherInitializer";
 import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
@@ -2098,8 +2096,6 @@ function AppContent() {
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
-            // 🧠 User-selected priority keywords for memory search (3x weight)
-            userKeywords: options?.userKeywords || [],
           },
         }),
         abortPromise,
@@ -2511,7 +2507,7 @@ function AppContent() {
     }
   }, []);
 
-  // 🦆 Save Kanban chat session to persistent storage for MCP access
+  // 🦆 Save Kanban chat session to persistent storage
   const saveKanbanChatSession = useCallback(async (taskId: string, messages: ChatMessage[], sessionId?: string) => {
     try {
       const store = await Store.load('quack-chats.json');
@@ -2722,8 +2718,6 @@ function AppContent() {
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
-            // 🧠 User-selected priority keywords for memory search (3x weight)
-            userKeywords: options?.userKeywords || [],
             // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
             // This ensures ask-user-question events are emitted with the same key
             // that the frontend uses to identify the session (targetAgentId)
@@ -2809,7 +2803,7 @@ function AppContent() {
       const taskCwd = finalSession?.projectPath || '';
       notifyAgentReadyRef.current({ id: targetAgentId, label: taskLabel, cwd: taskCwd });
 
-      // 🦆 Save chat session to persistent storage for MCP Kanban access
+      // 🦆 Save chat session to persistent storage
       // CRITICAL: Build final messages manually to avoid React state timing issues
       // chatSessions.get() would return STALE data because setChatSessions hasn't flushed yet
       const finalUserMessage: ChatMessage = {
@@ -4173,49 +4167,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     });
 
-    // Listen for Kanban updates from Claude Agent SDK custom tools
-    const unlistenKanbanUpdatePromise = listen<{
-      eventType: string;
-      payload: {
-        taskId?: string;
-        task?: unknown;
-        title?: string;
-        previousStatus?: string;
-        newStatus?: string;
-        completionNote?: string;
-        reason?: string;
-        updates?: Record<string, unknown>;
-        parentTaskId?: string;
-      };
-      timestamp: number;
-      agentId: string;
-    }>("kanban:update", async (event) => {
-      console.log("📋 Kanban update event received:", event.payload);
-      const { eventType, payload } = event.payload;
-
-      // Reload sessions from storage to sync with backend changes (sessions-first architecture)
-      await useSessionStore.getState().loadSessions();
-      // Also reload kanban tasks for backwards compatibility
-      await loadKanbanTasks();
-
-      // Show toast notification based on event type
-      const toastMessages: Record<string, string> = {
-        task_created: payload.parentTaskId
-          ? `Subtask created: "${(payload.task as { title?: string })?.title || 'New task'}"`
-          : `Task created: "${(payload.task as { title?: string })?.title || 'New task'}"`,
-        task_moved: `Task moved to ${payload.newStatus}${payload.completionNote ? ` - ${payload.completionNote}` : ''}`,
-        task_updated: `Task updated`,
-        task_deleted: `Task "${payload.title}" deleted${payload.reason ? ` - ${payload.reason}` : ''}`,
-      };
-
-      const message = toastMessages[eventType];
-      if (message) {
-        // Use console for now, will be replaced with toast
-        console.log(`📋 Kanban: ${message}`);
-        // TODO: Add toast notification here
-      }
-    });
-
     // 📱 Listen for session updates from external sources (WhatsApp, Telegram, etc.)
     // When the Rust backend creates sessions via HTTP API, it emits this event
     const unlistenSessionsUpdatedPromise = listen<{
@@ -4296,7 +4247,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
-      unlistenKanbanUpdatePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionAutoStartPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
@@ -9818,8 +9768,6 @@ You have access to all Bash tools to execute git commands like:
   return (
     <>
 
-      {/* Kanban Watcher Initializer - Auto-starts file watcher for MCP sync (event-driven architecture) */}
-      <KanbanWatcherInitializer />
 
       {/* Drag region removed - now using data-tauri-drag-region on sidebar-header only */}
 
@@ -11201,10 +11149,6 @@ You have access to all Bash tools to execute git commands like:
           userStats={userStats}
         />
 
-        {/* Old BackgroundTasksDrawer - removed, replaced by Kanban shell tasks */}
-
-        {/* Kanban toast notifications for Claude tool events */}
-        <KanbanToast />
       </div>
 
       {/* Watch Intro replay - uses SplashScreen component */}

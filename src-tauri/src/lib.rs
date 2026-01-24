@@ -45,7 +45,6 @@ mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
-mod kanban_watcher; // 📋 Kanban tasks file watcher for MCP sync
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -569,9 +568,7 @@ pub fn run() {
         .manage(license::LicenseState::default()) // Register license state
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
-        .manage(background_tasks::KanbanShellManager::new()) // Register Kanban shell manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
-        .manage(kanban_watcher::KanbanWatcherManager::new()) // Register Kanban watcher for MCP sync
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -1103,9 +1100,6 @@ pub fn run() {
             background_tasks::pause_background_task,
             background_tasks::resume_background_task,
             background_tasks::cancel_background_task,
-            // Kanban shell task commands
-            background_tasks::start_kanban_shell_task,
-            background_tasks::kill_kanban_shell_task,
             // 📦 Claude Assets Manager commands
             claude_assets::list_claude_assets,
             claude_assets::copy_claude_asset,
@@ -1122,11 +1116,6 @@ pub fn run() {
             semantic_search::semantic_search_code,
             semantic_search::semantic_search_get_status,
             semantic_search::semantic_search_generate_embeddings,
-            // 📋 Kanban Tasks File Watcher (MCP Sync)
-            kanban_watcher::kanban_start_watcher,
-            kanban_watcher::kanban_stop_watcher,
-            kanban_watcher::kanban_is_watching,
-            kanban_watcher::kanban_get_watched_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
