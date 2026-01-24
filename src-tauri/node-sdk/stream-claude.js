@@ -602,6 +602,20 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     }
 
     // =============================================================================
+    // TASK LIST PERSISTENCE (SDK 0.2.19+)
+    // Tasks persist across sessions in ~/.claude/tasks/
+    // Enables cross-session task tracking with dependencies and blockers
+    // =============================================================================
+    if (sessionId) {
+      const taskListId = `quack-${sessionId}`;
+      options.env = {
+        ...process.env,
+        CLAUDE_CODE_TASK_LIST_ID: taskListId,
+      };
+      console.error(`[DEBUG] Task list ID set: ${taskListId}`);
+    }
+
+    // =============================================================================
     // FILE CHECKPOINTING (SDK 0.2.7+)
     // Enable automatic file snapshots before modifications for rollback capability
     // =============================================================================
