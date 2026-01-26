@@ -99,6 +99,11 @@ pub fn remove_directory(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn path_exists(path: String) -> Result<bool, String> {
+    Ok(std::path::Path::new(&path).exists())
+}
+
+#[tauri::command]
 pub fn stat_file(path: String) -> Result<FileMetadata, String> {
     stat_file_impl(path).map_err(|err| err.to_string())
 }

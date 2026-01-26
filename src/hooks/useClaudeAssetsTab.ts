@@ -44,7 +44,7 @@ export function useClaudeAssetsTab({
     // Create new tab
     const newTab: Tab = {
       id: `claude-assets-${Date.now()}`,
-      label: 'Claude Assets',
+      label: 'Project Assets',
       type: 'claude-assets',
       closable: true,
     };

@@ -1462,14 +1462,15 @@ export default function ChatInput({
     const taskDataStr = e.dataTransfer.getData('application/quack-task');
     if (taskDataStr) {
       try {
-        const taskData = JSON.parse(taskDataStr) as { type: string; content: string; status: string };
+        const taskData = JSON.parse(taskDataStr) as { type: string; id: string; content: string; status: string; uuid?: string };
         if (taskData.type === 'task') {
           const cursorPos = textareaRef.current.selectionStart;
           const beforeCursor = input.substring(0, cursorPos);
           const afterCursor = input.substring(cursorPos);
           const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
           const prefix = needsSpaceBefore ? ' ' : '';
-          const mention = `${prefix}[task: ${taskData.content}] `;
+          // Format: #ID Subject (concise, no path to avoid confusion)
+          const mention = `${prefix}#${taskData.id} ${taskData.content} `;
           const newInput = beforeCursor + mention + afterCursor;
           setInput(newInput);
           setTimeout(() => {

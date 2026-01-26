@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import AgentPersonalityCard from './AgentPersonalityCard';
 import type { AgentPersonality, DirectoryEntry, Rule } from '../types';
+import { areRulePathsEqual } from '../utils/rulePathUtils';
 import './AgentContextPanel.css';
 
 interface ContextFile {
@@ -171,14 +172,10 @@ export default function AgentContextPanel({
           const allRules = [...rulesResponse.project, ...rulesResponse.global];
           console.log('[AgentContextPanel] All available rules:', allRules.map(r => r.filePath));
 
-          // Match selected rules by path
+          // Match selected rules by path using normalized comparison
           const matchedRules: Rule[] = [];
           for (const rulePath of activeAgentPersonality.selectedRules) {
-            const matchedRule = allRules.find(r =>
-              r.filePath === rulePath ||
-              r.filePath.endsWith(rulePath) ||
-              rulePath.endsWith(r.filePath)
-            );
+            const matchedRule = allRules.find(r => areRulePathsEqual(r.filePath, rulePath));
             if (matchedRule) {
               matchedRules.push(matchedRule);
               console.log('[AgentContextPanel] Matched rule:', rulePath, '->', matchedRule.name);

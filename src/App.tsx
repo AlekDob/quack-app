@@ -1805,8 +1805,16 @@ function AppContent() {
       return;
     }
 
+    // 🦆 RACE CONDITION FIX: Capture ALL state at the START of the function
+    // User may switch sessions while this async function runs - we must use captured values
     const messageKey = activeSessionId;
-    console.log(`🦆 [SESSION-FIRST] Sending message to session: ${messageKey}`);
+    const capturedAgentId = activeId;
+    const capturedSession = agentSessions.find(s => s.id === messageKey);
+    const capturedClaudeSessionId = capturedSession?.claudeSessionId;
+    const capturedAgentLabel = activeTerminal?.label || activeAgent?.name || 'AI Assistant';
+    const capturedAgentCwd = activeTerminal?.cwd || explorerPath || '';
+
+    console.log(`🦆 [SESSION-FIRST] Sending message to session: ${messageKey}, agentId: ${capturedAgentId}, claudeSessionId: ${capturedClaudeSessionId?.slice(0, 8) || 'NEW'}`);
 
     // 🦆 AUTO-PROGRESS: Move session to 'in_progress' when first message is sent
     // This automatically transitions TODO tasks to In Progress in Kanban
@@ -1839,19 +1847,19 @@ function AppContent() {
     // 🦆 RACE CONDITION FIX: Ensure listener is ready BEFORE calling invoke
     // Note: The real fix was removing the cleanup logic that was removing listeners
     // prematurely. Now listeners persist until the agent is explicitly deleted.
-    await ensureListenerReady(activeId);
+    await ensureListenerReady(capturedAgentId);
 
     // 🦆 CRITICAL: Wait for Tauri to fully register the listener internally
     // The listen() promise resolves immediately, but Tauri's internal event routing
     // may not be ready yet. This delay ensures events don't get lost.
     // Without this, the first Task event can be emitted before the listener catches it.
-    console.log(`[sendMessage] Listener ready for ${activeId}, waiting for Tauri registration...`);
+    console.log(`[sendMessage] Listener ready for ${capturedAgentId}, waiting for Tauri registration...`);
     await new Promise(resolve => setTimeout(resolve, 150));
-    console.log(`[sendMessage] Tauri registration delay complete for ${activeId}`);
+    console.log(`[sendMessage] Tauri registration delay complete for ${capturedAgentId}`);
 
     // Generate unique message ID for this stream
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const streamKey = `${activeId}-${messageId}`;
+    const streamKey = `${capturedAgentId}-${messageId}`;
 
     // 🦆 SESSION-FIRST: No need to check for active streams or block - events now contain sessionKey
     // Each stream sends its sessionKey to Rust, which includes it in emitted events
@@ -1859,7 +1867,8 @@ function AppContent() {
     console.log(`[sendMessage] Starting stream ${streamKey} for session ${messageKey}`);
 
     // Save the prompt for restoration on abort
-    lastPromptsRef.current.set(activeId, content);
+    // 🦆 RACE CONDITION FIX: Use captured agentId
+    lastPromptsRef.current.set(capturedAgentId, content);
 
     // Create abort controller with composite key to prevent race conditions
     const abortController = new AbortController();
@@ -1897,12 +1906,13 @@ function AppContent() {
     const currentMessages = chatSessions.get(messageKey) ?? [];
 
     // 🦆 Create AgentChat automatically if it doesn't exist (for UI-created agents)
-    if (!agentChats.find(a => a.id === activeId)) {
-      // Get terminal info for this activeId
-      const terminal = terminals.find(t => t.id === activeId);
+    // 🦆 RACE CONDITION FIX: Use capturedAgentId
+    if (!agentChats.find(a => a.id === capturedAgentId)) {
+      // Get terminal info for this capturedAgentId
+      const terminal = terminals.find(t => t.id === capturedAgentId);
       if (terminal) {
         const newAgentChat: AgentChat = {
-          id: activeId,
+          id: capturedAgentId,
           name: terminal.label,
           color: terminal.color,
           cwd: terminal.cwd,
@@ -1912,7 +1922,7 @@ function AppContent() {
         setAgentChats((prev) => [...prev, newAgentChat]);
 
         // Save metadata for Telegram notifications
-        agentMetadataRef.current.set(activeId, {
+        agentMetadataRef.current.set(capturedAgentId, {
           name: terminal.label,
           cwd: terminal.cwd,
         });
@@ -1942,15 +1952,16 @@ function AppContent() {
     const messagesToAdd: ChatMessage[] = [userMessage];
 
     // If agent is selected, add system message showing agent invocation
+    // 🦆 RACE CONDITION FIX: Use capturedAgentId
     if (activeAgent) {
       const agentSystemMessage: ChatMessage = {
-        id: `msg-${Date.now()}-agent-system-${activeId}`, // Include activeId for uniqueness
+        id: `msg-${Date.now()}-agent-system-${capturedAgentId}`, // Include capturedAgentId for uniqueness
         role: 'system',
         content: `🦆 Invoking droid: **${activeAgent.name}**`,
         timestamp: Date.now() + 1, // Slightly after user message
         status: 'complete',
         metadata: {
-          sessionId: activeId, // Track which session this message belongs to
+          sessionId: capturedAgentId, // Track which session this message belongs to
         },
       };
       messagesToAdd.push(agentSystemMessage);
@@ -1964,10 +1975,11 @@ function AppContent() {
     });
 
     // Track chat message sent to PostHog
+    // 🦆 RACE CONDITION FIX: Use capturedAgentId and capturedAgentLabel
     const messageStartTime = performance.now();
     posthog.capture('ai_message_sent', {
-      agent_id: activeId,
-      agent_name: activeAgent?.name || 'unknown',
+      agent_id: capturedAgentId,
+      agent_name: capturedAgentLabel,
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
       model: options?.model || 'sonnet',
@@ -2028,7 +2040,8 @@ function AppContent() {
 
     try {
       // Build context from agent's conversation history
-      const agentHistory = chatConversationHistoryRef.current.get(activeId) ?? [];
+      // 🦆 RACE CONDITION FIX: Use capturedAgentId
+      const agentHistory = chatConversationHistoryRef.current.get(capturedAgentId) ?? [];
       let prompt = contentWithAttachments;
       if (agentHistory.length > 0) {
         const history = agentHistory
@@ -2064,7 +2077,8 @@ function AppContent() {
           total_cost_usd: number;
           usage: UsageStats;
         }>('send_message_via_sdk_streaming', {
-          agentId: activeId,
+          // 🦆 RACE CONDITION FIX: Use capturedAgentId
+          agentId: capturedAgentId,
           request: {
             prompt,
             model: options?.model || 'sonnet',
@@ -2080,9 +2094,9 @@ function AppContent() {
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
-            // 🦆 SESSION-FIRST: Use claudeSessionId from active session for resuming
-            // If session has no claudeSessionId yet, don't pass one (creates NEW Claude session)
-            sessionId: agentSessions.find(s => s.id === messageKey)?.claudeSessionId,
+            // 🦆 RACE CONDITION FIX: Use CAPTURED claudeSessionId (from start of function)
+            // Don't read agentSessions.find() here - user may have switched sessions!
+            sessionId: capturedClaudeSessionId,
             // 🦆 SESSION-FIRST: Pass sessionKey so Rust can include it in emitted events
             // This enables parallel conversations - each stream knows where to route events
             sessionKey: messageKey,
@@ -2132,7 +2146,8 @@ function AppContent() {
           content: response.result,
         },
       ];
-      chatConversationHistoryRef.current.set(activeId, updatedHistory);
+      // 🦆 RACE CONDITION FIX: Use CAPTURED agentId, not current activeId
+      chatConversationHistoryRef.current.set(capturedAgentId, updatedHistory);
 
 
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
@@ -2157,24 +2172,25 @@ function AppContent() {
       });
 
       // Track usage from Claude Agent SDK (with full token details!)
-      const agentLabel = activeTerminal?.label || activeAgent?.name || 'AI Assistant';
+      // 🦆 RACE CONDITION FIX: Use CAPTURED values, not current state
       trackUsage(
-        activeId,
-        agentLabel,
+        capturedAgentId,
+        capturedAgentLabel,
         response.session_id,
         response.total_cost_usd,
         response.usage  // ✅ Now passing full usage stats from Rust backend!
       );
 
       // Notify that agent response is complete
-      const agentCwd = activeTerminal?.cwd || explorerPath || '';
-      notifyAgentReadyRef.current({ id: activeId, label: agentLabel, cwd: agentCwd });
+      // 🦆 RACE CONDITION FIX: Use CAPTURED values
+      notifyAgentReadyRef.current({ id: capturedAgentId, label: capturedAgentLabel, cwd: capturedAgentCwd });
 
       // Track successful AI response to PostHog
+      // 🦆 RACE CONDITION FIX: Use captured values
       const responseTime = Math.round(performance.now() - messageStartTime);
       posthog.capture('ai_response_received', {
-        agent_id: activeId,
-        agent_name: agentLabel,
+        agent_id: capturedAgentId,
+        agent_name: capturedAgentLabel,
         response_time_ms: responseTime,
         response_length: response.result?.length || 0,
         model: options?.model || 'sonnet',
@@ -2188,10 +2204,11 @@ function AppContent() {
       console.error('Error calling Claude SDK:', err);
 
       // Track error to PostHog
+      // 🦆 RACE CONDITION FIX: Use captured values
       const errorMsg = err instanceof Error ? err.message : String(err);
       const wasAborted = abortController.signal.aborted;
       posthog.capture('ai_error', {
-        agent_id: activeId,
+        agent_id: capturedAgentId,
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMsg.substring(0, 200),
         model: options?.model || 'sonnet',

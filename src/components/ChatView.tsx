@@ -12,7 +12,6 @@ import AgentRulesBanner from './AgentRulesBanner';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { createBackgroundTask } from '../services/backgroundAgentService';
 import { useChatStore } from '../stores/chatStore';
-import { useTasksStore } from '../stores/tasksStore';
 import { useAgentRules } from '../hooks/useAgentRules';
 import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers } from '../types';
 import type {
@@ -580,11 +579,8 @@ export default function ChatView({
     return lastTodos;
   }, [messages]);
 
-  // Sync current todos to the tasks store (for Tasks tab in SidePanel)
-  const setStoreTasks = useTasksStore(s => s.setTasks);
-  useEffect(() => {
-    setStoreTasks(currentTodos);
-  }, [currentTodos, setStoreTasks]);
+  // Note: Tasks tab now reads directly from ~/.claude/tasks/ filesystem
+  // No need to sync currentTodos to store - TasksPanel handles its own loading
 
   // Extract QuackBrain file info from the LAST assistant message
   // Shows a special bar to open the created brain entity in Obsidian

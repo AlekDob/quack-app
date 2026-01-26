@@ -273,12 +273,12 @@ function ActionIcons({
           type="button"
           className={`action-icon ${claudeAssetsOpen ? 'active' : ''}`}
           onClick={onClaudeAssetsClick}
-          aria-label="Open Claude Assets Manager"
-          data-tooltip="Claude Assets"
+          aria-label="Open Project Assets"
+          data-tooltip="Project Assets"
           style={claudeAssetsOpen ? { color: '#22c55e' } : undefined}
         >
           <Package className="w-4 h-4" />
-          <span className="action-icon-tooltip">Claude Assets</span>
+          <span className="action-icon-tooltip">Project Assets</span>
         </button>
       )}
 

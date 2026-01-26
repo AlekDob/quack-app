@@ -3,6 +3,7 @@
  * Supports drop targets for asset drag & drop
  */
 
+import { useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { ClaudeProject } from '../../types/claudeAssets';
 import './ProjectsList.css';
@@ -37,10 +38,12 @@ function ProjectItem({
     data: { projectPath: project.path },
   });
 
-  // Update drop target when hovering
-  if (isOver !== isDropTarget) {
-    onDropTargetChange(isOver);
-  }
+  // Update drop target when hovering (must be in useEffect to avoid setState during render)
+  useEffect(() => {
+    if (isOver !== isDropTarget) {
+      onDropTargetChange(isOver);
+    }
+  }, [isOver, isDropTarget, onDropTargetChange]);
 
   return (
     <div

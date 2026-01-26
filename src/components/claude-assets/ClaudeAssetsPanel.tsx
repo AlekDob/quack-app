@@ -346,7 +346,7 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile, onSelectCo
       {/* Header */}
       <div className="claude-assets-header">
         <div className="claude-assets-title">
-          <h2>Claude Assets</h2>
+          <h2>Project Assets</h2>
           <span className="asset-count">{headerCount}</span>
         </div>
         <div className="claude-assets-actions">

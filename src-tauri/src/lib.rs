@@ -903,6 +903,7 @@ pub fn run() {
             fs::create_directory,
             fs::remove_file,
             fs::remove_directory,
+            fs::path_exists,
             fs::stat_file,
             fs::read_file_preview,
             fs::save_clipboard_file,
