@@ -606,10 +606,24 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     // Tasks persist across sessions in ~/.claude/tasks/
     // Enables cross-session task tracking with dependencies and blockers
     // =============================================================================
+    // =============================================================================
+    // MCP TOOL SEARCH (SDK 0.2.1+) - LAZY LOADING
+    // Dynamically loads MCP tools on-demand instead of preloading all upfront
+    // Reduces context overhead by 85% (from ~77K to ~8.7K tokens with 50+ tools)
+    // See: https://platform.claude.com/docs/en/agent-sdk/mcp#mcp-tool-search
+    //
+    // Values: 'auto' (>10% context), 'auto:N' (>N% context), 'true', 'false'
+    // =============================================================================
+    options.env = {
+      ...process.env,
+      ENABLE_TOOL_SEARCH: 'auto', // Activate when MCP tools exceed 10% of context
+    };
+    console.error(`[DEBUG] MCP Tool Search ENABLED (auto mode - activates at >10% context usage)`);
+
     if (sessionId) {
       const taskListId = `quack-${sessionId}`;
       options.env = {
-        ...process.env,
+        ...options.env,
         CLAUDE_CODE_TASK_LIST_ID: taskListId,
       };
       console.error(`[DEBUG] Task list ID set: ${taskListId}`);
@@ -620,7 +634,10 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     // Enable automatic file snapshots before modifications for rollback capability
     // =============================================================================
     options.enableFileCheckpointing = true;
-    console.error(`[DEBUG] File checkpointing ENABLED (SDK 0.2.7+)`);
+    // Required for rewindFiles to work - SDK must replay user messages to emit UUIDs
+    // Without this, user messages don't have uuid field needed for checkpointing
+    options.extraArgs = { 'replay-user-messages': null };
+    console.error(`[DEBUG] File checkpointing ENABLED with replay-user-messages (SDK 0.2.7+)`);
 
     // Add effort parameter if provided (SDK 0.1.54+)
     // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high'

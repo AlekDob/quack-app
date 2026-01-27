@@ -23,7 +23,6 @@ interface KanbanTabViewProps {
   defaultPermissionMode?: 'plan' | 'bypass';
   defaultEffort?: 'low' | 'medium' | 'high';
   onLoadChatSessions?: () => Promise<void>;
-  onProjectClick?: (projectPath: string) => void;
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
   onOpenSessionInTerminal?: (taskId: string) => void;
   // Side panel toggle
@@ -64,7 +63,6 @@ function KanbanTabView({
   defaultPermissionMode,
   defaultEffort,
   onLoadChatSessions,
-  onProjectClick,
   onDiffClick,
   onOpenSessionInTerminal,
   onToggleSidePanel,
@@ -98,7 +96,6 @@ function KanbanTabView({
         defaultPermissionMode={defaultPermissionMode}
         defaultEffort={defaultEffort}
         onLoadChatSessions={onLoadChatSessions}
-        onProjectClick={onProjectClick}
         onDiffClick={onDiffClick}
         onOpenSessionInTerminal={onOpenSessionInTerminal}
         onToggleSidePanel={onToggleSidePanel}

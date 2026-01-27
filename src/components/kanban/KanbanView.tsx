@@ -55,8 +55,6 @@ interface KanbanViewProps {
   defaultEffort?: 'low' | 'medium' | 'high';
   // 🦆 Load saved chat sessions from sessionIds
   onLoadChatSessions?: () => Promise<void>;
-  // Open side panel when clicking on project name
-  onProjectClick?: (projectPath: string) => void;
   // Diff drawer handler (passed to ChatView via task tab)
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
   // Open session in terminal handler (for claude --resume)
@@ -92,7 +90,6 @@ export default function KanbanView({
   defaultPermissionMode,
   defaultEffort,
   onLoadChatSessions,
-  onProjectClick,
   onDiffClick,
   onOpenSessionInTerminal,
   onToggleSidePanel,
@@ -518,8 +515,7 @@ export default function KanbanView({
             onTaskEdit={handleTaskEdit}
 
             onTaskStart={handleStartTask}
-            onProjectClick={onProjectClick}
-            onOpenTerminal={onOpenTerminal}
+                        onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
 
@@ -541,8 +537,7 @@ export default function KanbanView({
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
 
-            onProjectClick={onProjectClick}
-            onOpenTerminal={onOpenTerminal}
+                        onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
 
@@ -564,8 +559,7 @@ export default function KanbanView({
             onTaskDelete={handleTaskDelete}
             onTaskEdit={handleTaskEdit}
 
-            onProjectClick={onProjectClick}
-            onOpenTerminal={onOpenTerminal}
+                        onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
 

@@ -7405,28 +7405,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     ]
   );
 
-  // Handle project click from Kanban - show side panel with project context (without exiting Kanban)
-  const handleKanbanProjectClick = useCallback((projectPath: string) => {
-    // Find an agent (terminal) that belongs to this project
-    const projectAgent = terminals.find(t => t.cwd === projectPath);
-
-    if (projectAgent) {
-      // Select the agent (this populates the side panel with agent context)
-      setActiveId(projectAgent.id);
-
-      // Expand the side panel to show the agent context
-      setSidePanelCollapsed(false);
-
-      // Mark that we want the side panel expanded in Kanban mode
-      setKanbanSidePanelExpanded(true);
-
-      // Load the project directory for file explorer
-      void loadDirectory(projectPath);
-    } else {
-      console.warn(`No agent found for project: ${projectPath}`);
-    }
-  }, [terminals, loadDirectory]);
-
 
   // ============================================
   // AgentChat Management Handlers (Phase 1)
@@ -10125,7 +10103,6 @@ You have access to all Bash tools to execute git commands like:
                       defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
                       defaultEffort={currentSettings.effort || 'medium'}
                       onLoadChatSessions={loadKanbanChatSessions}
-                      onProjectClick={handleKanbanProjectClick}
                       onDiffClick={handleDiffClick}
                       onOpenSessionInTerminal={openKanbanSessionInTerminal}
                       onToggleSidePanel={() => setKanbanSidePanelExpanded(!kanbanSidePanelExpanded)}
@@ -10348,6 +10325,8 @@ You have access to all Bash tools to execute git commands like:
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
                     onOpenImageTab={handleOpenImageTab}
+                    // Open markdown files in Quack tab
+                    onOpenInQuack={handleFilePathClick}
                   />
                 );
               })()}
@@ -10474,6 +10453,8 @@ You have access to all Bash tools to execute git commands like:
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
                     onOpenImageTab={handleOpenImageTab}
+                    // Open markdown files in Quack tab
+                    onOpenInQuack={handleFilePathClick}
                   />
                 );
               })()}

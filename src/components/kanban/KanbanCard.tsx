@@ -40,7 +40,6 @@ interface KanbanCardProps {
   onDelete?: () => void | Promise<void>;
   onEdit?: () => void;
   onStart?: () => void;       // Start task: move to in_progress, open chat, send prompt
-  onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
   onOpenTerminal?: (path: string, label?: string) => void; // Open terminal in specified directory (for worktree)
 }
 
@@ -95,7 +94,6 @@ export default function KanbanCard({
   onDelete,
   onEdit,
   onStart,
-  onProjectClick,
   onOpenTerminal,
 }: KanbanCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -308,7 +306,6 @@ export default function KanbanCard({
         {/* Row 2: Project name (small, colored with project color) */}
         <div
           className="kanban-card-project-row"
-          onClick={(e) => { e.stopPropagation(); onProjectClick?.(task.projectPath); }}
           title={task.projectPath}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={projectColor} strokeWidth="2">

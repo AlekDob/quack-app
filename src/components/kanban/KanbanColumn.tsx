@@ -66,7 +66,6 @@ interface KanbanColumnProps {
   onTaskDelete: (taskId: string) => void | Promise<void>;
   onTaskEdit?: (task: KanbanTask) => void;
   onTaskStart?: (task: KanbanTask) => void; // Start TODO task: move to in_progress, open chat, send prompt
-  onProjectClick?: (projectPath: string) => void; // Click on project name to open side panel
   onOpenTerminal?: (path: string, label?: string) => void; // Open terminal in specified directory (for worktree tasks)
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
@@ -93,7 +92,6 @@ export default function KanbanColumn({
   onTaskDelete,
   onTaskEdit,
   onTaskStart,
-  onProjectClick,
   onOpenTerminal,
   chatLoadingMap,
   chatSessions,
@@ -326,8 +324,7 @@ export default function KanbanColumn({
                       onClick={() => onTaskClick(task)}
                       onDelete={() => onTaskDelete(task.id)}
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
-                      onProjectClick={onProjectClick}
-                      onOpenTerminal={onOpenTerminal}
+                                            onOpenTerminal={onOpenTerminal}
                     />
                   );
                 })}
@@ -359,8 +356,7 @@ export default function KanbanColumn({
                       onClick={() => onTaskClick(task)}
                       onDelete={() => onTaskDelete(task.id)}
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
-                      onProjectClick={onProjectClick}
-                      onOpenTerminal={onOpenTerminal}
+                                            onOpenTerminal={onOpenTerminal}
                     />
                   );
                 })}
@@ -387,8 +383,7 @@ export default function KanbanColumn({
                   onDelete={() => onTaskDelete(task.id)}
                   onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
                   onStart={onTaskStart ? () => onTaskStart(task) : undefined}
-                  onProjectClick={onProjectClick}
-                  onOpenTerminal={onOpenTerminal}
+                                    onOpenTerminal={onOpenTerminal}
                 />
               );
             })

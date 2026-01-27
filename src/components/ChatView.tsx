@@ -127,6 +127,8 @@ interface ChatViewProps {
   // File Checkpointing (SDK 0.2.7+)
   onRewindFiles?: (userMessageId: string) => void;
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Open file in Quack tab (for markdown files)
+  onOpenInQuack?: (filePath: string) => void;
 }
 
 export default function ChatView({
@@ -205,6 +207,7 @@ export default function ChatView({
   // File Checkpointing
   onOpenImageTab,
   onRewindFiles,
+  onOpenInQuack,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -664,7 +667,8 @@ export default function ChatView({
           edits={currentFileEdits}
           deletes={currentFileDeletes}
           onFileClick={onFilePathClick}
-          onDiffClick={onDiffClick} // NEW: Pass diff handler
+          onDiffClick={onDiffClick}
+          onOpenInQuack={onOpenInQuack}
           onClear={() => {
             // The edits are derived from messages, so to "clear" them
             // we would need to modify the messages array (not recommended)

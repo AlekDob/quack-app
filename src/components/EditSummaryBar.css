@@ -415,6 +415,57 @@
   color: #c4b5fd;
 }
 
+/* Quack button - cyan/teal theme */
+.edit-summary-bar-quack-btn {
+  background: rgba(6, 182, 212, 0.15) !important;
+  border-color: rgba(6, 182, 212, 0.3) !important;
+  color: #22d3ee !important;
+  gap: 4px;
+}
+
+.edit-summary-bar-quack-btn:hover {
+  background: rgba(6, 182, 212, 0.25) !important;
+  border-color: rgba(6, 182, 212, 0.5) !important;
+  color: #67e8f9 !important;
+}
+
+.edit-summary-bar-quack-btn svg {
+  flex-shrink: 0;
+}
+
+/* Responsive: hide text labels on small screens */
+@media (max-width: 600px) {
+  .edit-summary-bar-file-actions .hide-on-small {
+    display: none;
+  }
+
+  .edit-summary-bar-file-path {
+    display: none;
+  }
+
+  .edit-summary-bar-file-actions {
+    gap: 4px;
+  }
+
+  .edit-summary-bar-open-btn {
+    padding: 2px 4px;
+  }
+}
+
+/* Responsive: stack on very small screens */
+@media (max-width: 400px) {
+  .edit-summary-bar-file {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .edit-summary-bar-file-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .edit-summary-bar-file {

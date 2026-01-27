@@ -223,7 +223,9 @@ fn git_diff_impl(
     }
 
     if diff.trim().is_empty() {
-        Ok(String::from("Nessuna differenza da mostrare."))
+        // Return empty string so frontend can handle the "no diff" case properly
+        // This allows the frontend to show appropriate messages or close the drawer
+        Ok(String::new())
     } else {
         Ok(diff)
     }
