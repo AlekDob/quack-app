@@ -57,56 +57,99 @@ async function main() {
     });
 
     // Create a query with resume to get access to the session
-    // We use a minimal prompt that won't execute - we just need the query object
+    // We need to use a real prompt to establish the connection, but we'll interrupt immediately
     const stream = query({
-      prompt: '', // Empty prompt - we just need the query object
+      prompt: 'REWIND_OPERATION', // Minimal prompt to establish connection
       options: {
         resume: sessionId,
         enableFileCheckpointing: true,
-        // Don't actually send anything - we just want the query methods
         persistSession: false, // Don't modify the session
       },
     });
 
-    // Get the query control object from the stream
-    // The stream itself has the rewindFiles method
-    console.error(`[REWIND] Calling rewindFiles...`);
+    console.error(`[REWIND] Query object created, waiting for init...`);
 
-    // Note: The SDK's rewindFiles is called on the stream/query object
-    // We need to consume at least one event to get the full query object
-    let queryObject = null;
+    if (typeof stream.rewindFiles !== 'function') {
+      console.error(`[REWIND] rewindFiles method NOT found. Stream methods:`, Object.keys(stream));
+      throw new Error('rewindFiles method not available on query object. SDK version may not support this feature.');
+    }
 
-    // The stream is an async iterator - we need to get the query object differently
-    // Actually, looking at the SDK types, rewindFiles is on the Query object returned by query()
-    // The query() function returns AsyncIterable<SDKEvent> & Query
-    // So 'stream' itself has the rewindFiles method!
+    console.error(`[REWIND] Found rewindFiles method on stream object`);
 
-    if (typeof stream.rewindFiles === 'function') {
-      console.error(`[REWIND] Found rewindFiles method on stream object`);
+    // We need to wait for the stream to initialize before calling control methods
+    // Start consuming the stream in the background and call rewindFiles
+    let initReceived = false;
+
+    // Create a promise that resolves when we get the init message
+    const waitForInit = (async () => {
+      for await (const event of stream) {
+        console.error(`[REWIND] Received event:`, event.type, event.subtype || '');
+        if (event.type === 'system' && event.subtype === 'init') {
+          initReceived = true;
+          console.error(`[REWIND] Init received, session is ready`);
+          return;
+        }
+      }
+    })();
+
+    // Give the stream a moment to initialize
+    // We race between init and a timeout
+    const initTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout waiting for session init')), 10000);
+    });
+
+    try {
+      await Promise.race([waitForInit, initTimeout]);
+    } catch (timeoutError) {
+      // If we timeout waiting for init, try to proceed anyway
+      console.error(`[REWIND] Warning: ${timeoutError.message}, attempting rewind anyway...`);
+    }
+
+    // Now call rewindFiles
+    console.error(`[REWIND] Calling stream.rewindFiles with UUID: ${userMessageId}`);
+    console.error(`[REWIND] Dry run: ${dryRun}`);
+
+    try {
+      const rewindResult = await stream.rewindFiles(userMessageId, { dryRun });
+      console.error(`[REWIND] Rewind result:`, JSON.stringify(rewindResult));
+
+      // Check if rewind was successful
+      if (rewindResult && rewindResult.canRewind === false) {
+        throw new Error(rewindResult.error || 'Cannot rewind to this checkpoint');
+      }
 
       if (dryRun) {
-        // For dry run, we just validate the operation is possible
+        console.error(`[REWIND] Dry run preview completed`);
         emitEvent({
           type: 'rewind_preview',
           sessionId,
           userMessageId,
-          canRewind: true,
-          message: 'Dry run - rewind operation is available',
+          canRewind: rewindResult?.canRewind ?? true,
+          filesChanged: rewindResult?.filesChanged || [],
+          insertions: rewindResult?.insertions,
+          deletions: rewindResult?.deletions,
         });
       } else {
-        // Execute the rewind
-        await stream.rewindFiles(userMessageId);
         console.error(`[REWIND] Rewind completed successfully`);
-
         emitEvent({
           type: 'rewind_completed',
           sessionId,
           userMessageId,
           success: true,
+          filesChanged: rewindResult?.filesChanged || [],
+          insertions: rewindResult?.insertions,
+          deletions: rewindResult?.deletions,
         });
       }
-    } else {
-      throw new Error('rewindFiles method not available on query object. SDK version may not support this feature.');
+    } catch (rewindError) {
+      console.error(`[REWIND] rewindFiles threw error:`, rewindError.message);
+      throw rewindError;
+    } finally {
+      // Close the stream/connection
+      if (typeof stream.close === 'function') {
+        console.error(`[REWIND] Closing stream...`);
+        stream.close();
+      }
     }
 
     // Success

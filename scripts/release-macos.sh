@@ -169,12 +169,36 @@ rm -f Quack.zip
 echo -e "${GREEN}✓ Notarization completed and stapled${NC}"
 
 # ==== STEP 6: Create DMG ====
-echo -e "${YELLOW}[6/6] Creating DMG...${NC}"
+echo -e "${YELLOW}[6/6] Creating professional DMG...${NC}"
 rm -f "$DMG_PATH"
 
-# Create DMG
-echo "  Creating DMG image..."
-hdiutil create -volname "Quack" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+# Check for create-dmg
+if ! command -v /opt/homebrew/bin/create-dmg &> /dev/null; then
+    echo -e "${RED}ERROR: create-dmg not found. Install with: brew install create-dmg${NC}"
+    exit 1
+fi
+
+# Create professional DMG with branded background
+echo "  Creating DMG with branded layout..."
+/opt/homebrew/bin/create-dmg \
+    --volname "Quack" \
+    --volicon "$PROJECT_ROOT/src-tauri/icons/icon.icns" \
+    --background "$PROJECT_ROOT/scripts/dmg-background.png" \
+    --window-pos 200 120 \
+    --window-size 660 400 \
+    --icon-size 100 \
+    --icon "Quack.app" 180 200 \
+    --app-drop-link 480 200 \
+    --hide-extension "Quack.app" \
+    --no-internet-enable \
+    "$DMG_PATH" \
+    "$APP_PATH" || true
+# Note: create-dmg returns exit code 2 when it can't set the volume icon (non-fatal)
+
+if [ ! -f "$DMG_PATH" ]; then
+    echo -e "${RED}ERROR: DMG creation failed${NC}"
+    exit 1
+fi
 
 # Sign DMG
 echo "  Signing DMG..."
