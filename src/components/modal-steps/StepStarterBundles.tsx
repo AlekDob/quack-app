@@ -16,6 +16,7 @@ interface StarterBundle {
 interface StepStarterBundlesProps {
   bundles: StarterBundle[];
   loading: boolean;
+  installing: boolean;
   onConfirm: (selected: StarterBundle[]) => void;
   onSkip: () => void;
   onBack: () => void;
@@ -24,6 +25,7 @@ interface StepStarterBundlesProps {
 export function StepStarterBundles({
   bundles,
   loading,
+  installing,
   onConfirm,
   onSkip,
   onBack,
@@ -50,6 +52,38 @@ export function StepStarterBundles({
   function handleConfirm() {
     const selected = bundles.filter(b => selectedIds.has(b.resource.id));
     onConfirm(selected);
+  }
+
+  if (installing) {
+    const selectedCount = selectedIds.size;
+    return (
+      <div className="step-content" style={{
+        padding: '48px 32px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+        minHeight: 300,
+      }}>
+        {/* Spinner */}
+        <div style={{
+          width: 40,
+          height: 40,
+          border: '3px solid rgba(255,255,255,0.1)',
+          borderTopColor: '#f28c52',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
+          Setting up your agents...
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.5 }}>
+          Installing skills, rules and creating {selectedCount} agent{selectedCount !== 1 ? 's' : ''}.
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
   }
 
   if (loading) {

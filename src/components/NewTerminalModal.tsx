@@ -78,7 +78,7 @@ interface NewTerminalModalProps {
   /** When true, show starter agent bundles step after project selection */
   isOnboarding?: boolean
   /** Callback when user selects starter bundles to install */
-  onInstallStarterBundles?: (bundles: StarterBundle[], projectPath: string, projectName: string) => void
+  onInstallStarterBundles?: (bundles: StarterBundle[], projectPath: string, projectName: string) => Promise<void>
 }
 
 function NewTerminalModal({
@@ -127,6 +127,8 @@ function NewTerminalModal({
 
   // Toolkit loading state
   const [loadingEquipment, setLoadingEquipment] = useState(false);
+  // Starter bundles install state
+  const [installingBundles, setInstallingBundles] = useState(false);
 
   // Available equipment for Cyberpunk Editor (loaded from filesystem)
   const [skillsMetadata, setSkillsMetadata] = useState<SkillMetadata[]>([]);
@@ -827,10 +829,16 @@ function NewTerminalModal({
               };
             }).filter(b => b.template)}
             loading={marketplaceLoading}
-            onConfirm={(selected) => {
-              const projectName = path.split('/').pop() || path;
-              onInstallStarterBundles?.(selected, path, projectName);
-              onCancel(); // Close modal — agents will be created async
+            installing={installingBundles}
+            onConfirm={async (selected) => {
+              setInstallingBundles(true);
+              try {
+                const projectName = path.split('/').pop() || path;
+                await onInstallStarterBundles?.(selected, path, projectName);
+              } finally {
+                setInstallingBundles(false);
+                onCancel();
+              }
             }}
             onSkip={() => {
               setCompletedSteps(prev => [...prev, 'starters']);

@@ -108,6 +108,7 @@ import {
 import {
   loadAgents as loadUnifiedAgents,
   saveAgents as saveUnifiedAgents,
+  deleteAgent,
   migrateFromLegacy,
   type UnifiedAgent,
 } from "./services/unifiedAgentStorage";
@@ -560,6 +561,8 @@ function AppContent() {
   // Splash is now handled by native HTML splash in index.html only
   // React SplashScreen is only used for "Watch Intro" replay feature
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
+  const [hasSavedAgents, setHasSavedAgents] = useState(true); // Assume true until bootstrap confirms
+  const [persistedProjects, setPersistedProjects] = useState<Map<string, string>>(new Map()); // path -> name
   const [introVersion, setIntroVersion] = useState('');
 
   // Fetch app version for intro screen
@@ -5528,14 +5531,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadSkills to prevent re-load on every switch
 
-  // Auto-open DocsViewer when there are zero agents (onboarding)
+  // Auto-open DocsViewer when there are zero projects (true onboarding)
   const hasOpenedDocsRef = useRef(false);
   useEffect(() => {
-    if (hasBootstrapped && terminals.length === 0 && !hasOpenedDocsRef.current) {
+    if (hasBootstrapped && terminals.length === 0 && persistedProjects.size === 0 && !hasOpenedDocsRef.current) {
       hasOpenedDocsRef.current = true;
       openDocsTab();
     }
-  }, [hasBootstrapped, terminals.length, openDocsTab]);
+  }, [hasBootstrapped, terminals.length, persistedProjects.size, openDocsTab]);
 
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
@@ -6043,6 +6046,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         // Load saved agents from unified storage
         const savedAgents = await loadUnifiedAgents();
         const savedMetadata = savedAgents.map(unifiedAgentToTerminalMetadata);
+        setHasSavedAgents(savedAgents.length > 0);
+
+        // Build persisted projects map from saved agents
+        const projectMap = new Map<string, string>();
+        for (const agent of savedAgents) {
+          if (agent.projectPath && !projectMap.has(agent.projectPath)) {
+            projectMap.set(agent.projectPath, agent.projectName || agent.projectPath.split('/').pop() || 'Unknown');
+          }
+        }
+        setPersistedProjects(projectMap);
 
         if (savedMetadata.length > 0) {
           console.log(`Found ${savedMetadata.length} saved terminals from unified storage`);
@@ -6923,6 +6936,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setTerminals(prev => [...prev, ...newTerminals]);
       // Select the first created agent
       setActiveId(newTerminals[0].id);
+      setHasSavedAgents(true);
+      // Add project to persisted projects
+      setPersistedProjects(prev => {
+        const next = new Map(prev);
+        next.set(projectPath, projectName);
+        return next;
+      });
     }
   }, [installAgentBundle]);
 
@@ -7216,6 +7236,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
         clearTerminalAttention(createdWithState.id);
+
+        // Persist project in sidebar
+        const projectPath = effectivePath;
+        const projectName = projectPath.split('/').pop() || 'Unknown';
+        setPersistedProjects(prev => {
+          if (prev.has(projectPath)) return prev;
+          const next = new Map(prev);
+          next.set(projectPath, projectName);
+          return next;
+        });
 
         // Save agent personality if configured
         if (agentPersonality && Object.keys(agentPersonality).length > 0) {
@@ -7542,6 +7572,56 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     ]
   );
 
+
+  // Remove project: close all agents for this project path
+  const handleRemoveProject = useCallback(
+    async (projectPath: string) => {
+      if (!tauriAvailable) return;
+
+      // Find all terminals for this project
+      const projectTerminals = terminals.filter(t => t.cwd === projectPath);
+
+      // Close each terminal via Tauri and clean up
+      for (const terminal of projectTerminals) {
+        clearIdleTimer(terminal.id);
+        clearNotificationTimer(terminal.id);
+        const visualTimer = visualIdleTimersRef.current.get(terminal.id);
+        if (visualTimer) {
+          clearTimeout(visualTimer);
+          visualIdleTimersRef.current.delete(terminal.id);
+        }
+        try {
+          await invoke("close_terminal", { id: terminal.id });
+        } catch (error) {
+          console.error("Unable to close terminal", terminal.id, error);
+        }
+        // Delete agent from storage
+        try {
+          await deleteAgent(terminal.id);
+        } catch {
+          // Agent may not exist in storage
+        }
+      }
+
+      // Remove from persisted projects
+      setPersistedProjects(prev => {
+        const next = new Map(prev);
+        next.delete(projectPath);
+        return next;
+      });
+
+      // Update state: remove all terminals for this project
+      setTerminals(prev => {
+        const updated = prev.filter(t => t.cwd !== projectPath);
+        if (activeId && projectTerminals.some(t => t.id === activeId)) {
+          const fallback = updated[updated.length - 1];
+          setActiveId(fallback ? fallback.id : null);
+        }
+        return updated;
+      });
+    },
+    [activeId, clearIdleTimer, clearNotificationTimer, terminals, tauriAvailable]
+  );
 
   // ============================================
   // AgentChat Management Handlers (Phase 1)
@@ -9929,7 +10009,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
         <TerminalSidebar
@@ -10001,6 +10081,8 @@ You have access to all Bash tools to execute git commands like:
           onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           onOpenDashboard={handleOpenProjectDashboard}
+          onRemoveProject={handleRemoveProject}
+          persistedProjects={persistedProjects}
           // onCreateTask={handleCreateTaskFromAgent} // Temporarily hidden
           // Session props
           onSessionClick={handleSessionClick}
@@ -10011,8 +10093,8 @@ You have access to all Bash tools to execute git commands like:
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
         <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') ? 'full-width-tab' : ''}`}>
-          {terminals.length === 0 ? (
-            /* Empty state when no agents - show image or guide */
+          {terminals.length === 0 && persistedProjects.size === 0 ? (
+            /* Empty state when no projects at all - show image or guide */
             <div
               style={{
                 width: '100%',
@@ -11016,7 +11098,7 @@ You have access to all Bash tools to execute git commands like:
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
           onOpenDroidFactory={() => setDroidFactoryOpen(true)}
-          isOnboarding={terminals.length === 0}
+          isOnboarding={terminals.length === 0 && !hasSavedAgents}
           onInstallStarterBundles={handleInstallStarterBundles}
         />
 

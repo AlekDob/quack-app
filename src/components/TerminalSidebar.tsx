@@ -67,6 +67,7 @@ interface SortableRepositoryGroupProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number;
   onCreateAgent?: (projectPath?: string) => void; // Create new agent, optionally with pre-selected project path
+  onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   // Kanban tab props
   isKanbanTabActive?: boolean;
@@ -200,6 +201,8 @@ interface TerminalSidebarProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
+  onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
+  persistedProjects?: Map<string, string>; // Projects that persist even with 0 agents (path -> name)
   onCreateTask?: (terminal: TerminalInfo) => void; // Create Kanban task for this agent
   // Session props
   onSessionClick?: (sessionId: string) => void;
@@ -247,6 +250,8 @@ export default function TerminalSidebar({
   onOpenTerminalWindow,
   gitRefreshTrigger,
   onOpenDashboard,
+  onRemoveProject,
+  persistedProjects,
   onCreateTask,
   onSessionClick,
   activeSessionId,
@@ -480,8 +485,22 @@ export default function TerminalSidebar({
       }
     });
 
+    // Add persisted projects that have no terminals (empty projects)
+    if (persistedProjects) {
+      for (const [projectPath, projectName] of persistedProjects) {
+        const dirName = projectPath.split('/').pop() || projectName;
+        if (!repoMap.has(dirName)) {
+          repoMap.set(dirName, {
+            mainAgents: [],
+            worktreeAgents: [],
+            repoPath: projectPath,
+          });
+        }
+      }
+    }
+
     return Array.from(repoMap.entries());
-  }, [filteredTerminals]);
+  }, [filteredTerminals, persistedProjects]);
 
   // Apply custom ordering to repository groups and auto-assign colors to new projects
   const orderedRepositoryGroups = useMemo(() => {
@@ -899,6 +918,7 @@ export default function TerminalSidebar({
                     onOpenTerminalWindow={onOpenTerminalWindow}
                     gitRefreshTrigger={gitRefreshTrigger}
                     onCreateAgent={onCreateAgent}
+                    onRemoveProject={onRemoveProject}
                     onOpenDashboard={onOpenDashboard}
                     isKanbanTabActive={isKanbanTabActive}
                     onOpenKanbanTab={onOpenKanbanTab}
@@ -936,8 +956,8 @@ export default function TerminalSidebar({
             </DragOverlay>
           </DndContext>
 
-        {/* Empty state - Onboarding CTA */}
-        {terminals.length === 0 && (
+        {/* Empty state - Onboarding CTA (only when no projects at all) */}
+        {terminals.length === 0 && (!persistedProjects || persistedProjects.size === 0) && (
           <div className="empty-state">
             <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
               <div
