@@ -27,12 +27,15 @@ import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
 import { useRules } from '../hooks/useRules';
 import { normalizeRulePaths, areRulePathsEqual } from '../utils/rulePathUtils';
 import { loadAvailableSkills, loadAvailableDroids, loadAvailableCommands } from '../utils/skillsAndDroidsLoader';
+import { useMarketplace } from '../hooks/useMarketplace';
 
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
 import { StepProjectSelection } from './modal-steps/StepProjectSelection';
 import { StepAgentBasics } from './modal-steps/StepAgentBasics';
 import { StepRules } from './modal-steps/StepRules';
+import { StepStarterBundles } from './modal-steps/StepStarterBundles';
+import type { StarterBundle } from './modal-steps/StepStarterBundles';
 import type { ModalStep, ActiveProject, SkillMetadata, DroidMetadata } from './modal-steps/types';
 
 // Cyberpunk Agent Bundle Editor
@@ -72,6 +75,10 @@ interface NewTerminalModalProps {
   onCancel: () => void
   onConfirm: (agentData?: SavedAgent) => void
   onOpenDroidFactory?: () => void
+  /** When true, show starter agent bundles step after project selection */
+  isOnboarding?: boolean
+  /** Callback when user selects starter bundles to install */
+  onInstallStarterBundles?: (bundles: StarterBundle[], projectPath: string, projectName: string) => void
 }
 
 function NewTerminalModal({
@@ -103,7 +110,12 @@ function NewTerminalModal({
   onCancel,
   onConfirm,
   onOpenDroidFactory,
+  isOnboarding = false,
+  onInstallStarterBundles,
 }: NewTerminalModalProps) {
+  // Marketplace for starter bundles
+  const { getStarterBundles, loading: marketplaceLoading, allResources } = useMarketplace();
+
   // Step management - PROJECT-FIRST FLOW
   // Normal: project → agent → basics → rules → toolkit
   // Edit mode: basics directly
@@ -615,7 +627,12 @@ function NewTerminalModal({
       return;
     }
     setCompletedSteps(prev => [...prev, 'project']);
-    setCurrentStep('agent');
+    // Show starter bundles during onboarding (first project creation)
+    if (isOnboarding) {
+      setCurrentStep('starters');
+    } else {
+      setCurrentStep('agent');
+    }
   }
 
   // Handle project selection from StepProjectSelection
@@ -796,6 +813,33 @@ function NewTerminalModal({
             onGitInit={handleGitInit}
             onNext={handleProjectNext}
             onCancel={onCancel}
+          />
+        )}
+
+        {/* Step 1.5: Starter Bundles (onboarding only) */}
+        {currentStep === 'starters' && (
+          <StepStarterBundles
+            bundles={getStarterBundles().map(resource => {
+              const ext = resource as typeof resource & { _agentTemplate?: import('../types').AgentTemplate };
+              return {
+                resource,
+                template: ext._agentTemplate!,
+              };
+            }).filter(b => b.template)}
+            loading={marketplaceLoading}
+            onConfirm={(selected) => {
+              const projectName = path.split('/').pop() || path;
+              onInstallStarterBundles?.(selected, path, projectName);
+              onCancel(); // Close modal — agents will be created async
+            }}
+            onSkip={() => {
+              setCompletedSteps(prev => [...prev, 'starters']);
+              setCurrentStep('agent');
+            }}
+            onBack={() => {
+              setCurrentStep('project');
+              setCompletedSteps(prev => prev.filter(s => s !== 'project'));
+            }}
           />
         )}
 

@@ -54,6 +54,8 @@ function forceRepaint(): void {
 /**
  * Checks if the WebView appears to be in a corrupted/blank state.
  * Returns true if the app content is not rendering properly.
+ *
+ * Detects both white-screen (light theme) and black-screen (dark theme) corruption.
  */
 function isWebViewCorrupted(): boolean {
   // Check if the root element has any visible content
@@ -69,15 +71,31 @@ function isWebViewCorrupted(): boolean {
     return true;
   }
 
-  // Check for blank/white background (potential corruption indicator)
-  const bodyBg = window.getComputedStyle(document.body).backgroundColor;
-  const isWhiteOrTransparent = bodyBg === 'rgb(255, 255, 255)' ||
-                                bodyBg === 'rgba(0, 0, 0, 0)' ||
-                                bodyBg === 'transparent';
-
-  // If body is white/transparent AND root has no height, likely corrupted
-  if (isWhiteOrTransparent && root.offsetHeight === 0) {
+  // Check if root has no height (collapsed layout)
+  if (root.offsetHeight === 0) {
     return true;
+  }
+
+  // Check for empty main content area (sidebar visible but content blank)
+  // This catches the dark-theme case where background color looks "normal"
+  // but the main content area has no rendered children
+  const mainContent = root.querySelector('[data-main-content]') ||
+                      root.querySelector('.main-content') ||
+                      root.querySelector('main');
+  if (mainContent) {
+    const mainRect = mainContent.getBoundingClientRect();
+    // Main content exists but has zero dimensions = corrupted
+    if (mainRect.width === 0 || mainRect.height === 0) {
+      return true;
+    }
+    // Main content has no visible children (all children collapsed)
+    const visibleChildren = Array.from(mainContent.children).filter(child => {
+      const rect = child.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    if (visibleChildren.length === 0) {
+      return true;
+    }
   }
 
   return false;
@@ -146,14 +164,29 @@ export function useSystemWakeHandler(options: WakeHandlerOptions = {}) {
     log('Step 2: Attempting React re-render...');
     setRenderTick(prev => prev + 1);
 
-    // STEP 3: Fallback to reload if re-render doesn't work
-    reloadTimeoutRef.current = setTimeout(() => {
-      // Check again if still corrupted after repaint + re-render
+    // STEP 3: Second repaint attempt after a short delay
+    setTimeout(() => {
       if (isWebViewCorrupted()) {
-        log('Step 3: Still corrupted after recovery attempts, falling back to full reload');
+        log('Step 3: Still corrupted, trying aggressive repaint...');
+        // Force all children to re-layout
+        document.body.style.opacity = '0';
+        void document.body.offsetHeight;
+        document.body.style.opacity = '1';
+        forceRepaint();
+        setRenderTick(prev => prev + 1);
+      } else {
+        log('Step 3: Recovery successful after re-render');
+        recoveryInProgressRef.current = false;
+      }
+    }, 200);
+
+    // STEP 4: Fallback to reload if still broken
+    reloadTimeoutRef.current = setTimeout(() => {
+      if (isWebViewCorrupted()) {
+        log('Step 4: Still corrupted after all recovery attempts, falling back to full reload');
         window.location.reload();
       } else {
-        log('Step 3: Recovery successful, no reload needed');
+        log('Step 4: Recovery successful, no reload needed');
         recoveryInProgressRef.current = false;
       }
     }, reloadTimeout);

@@ -73,6 +73,7 @@ import KanbanTabView from "./views/KanbanTabView";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import ImageTabView from "./views/ImageTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
+import { useMarketplace } from "./hooks/useMarketplace";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
@@ -350,7 +351,8 @@ function AppContent() {
   // Documentation tab management
   const { openDocsTab } = useDocsTab();
 
-
+  // Marketplace for onboarding starter bundles
+  const { installAgentBundle } = useMarketplace();
 
   // Kanban state from store (no longer using isKanbanTabActive overlay)
   // 🦆 SESSIONS-FIRST: Use getters instead of direct tasks array
@@ -590,13 +592,58 @@ function AppContent() {
   const [kanbanSidePanelExpanded, setKanbanSidePanelExpanded] = useState(false);
   // Show Kanban Mini Panel in sidebar (toggled via button in Kanban tab header)
   const [showKanbanMiniPanel, setShowKanbanMiniPanel] = useState(false);
-  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(false);
+  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(true);
 
-  // Tab system state
-  const [tabs, setTabs] = useState<Tab[]>([
-    { id: 'chat', label: 'Chat', type: 'chat', closable: false }
-  ]);
-  const [activeTabId, setActiveTabId] = useState('chat');
+  // Tab system state - restore from localStorage for wake-from-standby resilience
+  const [tabs, setTabs] = useState<Tab[]>(() => {
+    try {
+      const stored = localStorage.getItem('ui-storage');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const savedTabs = parsed?.state?.tabs;
+        if (Array.isArray(savedTabs) && savedTabs.length > 0) {
+          // Only restore simple tab types that survive reload (chat, kanban)
+          // Filter out tabs that need runtime context (file editors, terminals, etc.)
+          const safeTypes = new Set(['chat', 'kanban-board', 'docs']);
+          const restored = savedTabs.filter(
+            (t: Tab) => safeTypes.has(t.type) || t.id === 'chat'
+          );
+          // Ensure chat tab is always present
+          if (!restored.find((t: Tab) => t.id === 'chat')) {
+            restored.unshift({ id: 'chat', label: 'Chat', type: 'chat', closable: false });
+          }
+          return restored;
+        }
+      }
+    } catch { /* ignore parse errors */ }
+    return [{ id: 'chat', label: 'Chat', type: 'chat', closable: false }];
+  });
+  const [activeTabId, setActiveTabId] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ui-storage');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const savedId = parsed?.state?.activeTabId;
+        if (typeof savedId === 'string' && savedId.length > 0) {
+          // Only restore safe tab IDs (not file/terminal/task tabs that need runtime state)
+          const safeIds = ['chat', 'kanban-board'];
+          const isSafe = safeIds.includes(savedId) || savedId.startsWith('docs-');
+          return isSafe ? savedId : 'chat';
+        }
+      }
+    } catch { /* ignore parse errors */ }
+    return 'chat';
+  });
+
+  // Persist tab state to localStorage for wake-from-standby resilience
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('ui-storage');
+      const current = stored ? JSON.parse(stored) : { state: {} };
+      current.state = { ...current.state, tabs, activeTabId };
+      localStorage.setItem('ui-storage', JSON.stringify(current));
+    } catch { /* ignore write errors */ }
+  }, [tabs, activeTabId]);
 
   // Derived state: is Kanban tab currently active?
   // This replaces the old isKanbanTabActive overlay approach
@@ -5481,6 +5528,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadSkills to prevent re-load on every switch
 
+  // Auto-open DocsViewer when there are zero agents (onboarding)
+  const hasOpenedDocsRef = useRef(false);
+  useEffect(() => {
+    if (hasBootstrapped && terminals.length === 0 && !hasOpenedDocsRef.current) {
+      hasOpenedDocsRef.current = true;
+      openDocsTab();
+    }
+  }, [hasBootstrapped, terminals.length, openDocsTab]);
+
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
     if (!tauriAvailable) {
@@ -6788,6 +6844,87 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setSelectingDirectory(false);
     setEditingTerminal(null);
   }, [creatingTerminal]);
+
+  // Handle installing starter agent bundles from onboarding
+  const handleInstallStarterBundles = useCallback(async (
+    bundles: Array<{ resource: import('./types').MarketplaceResource; template: import('./types').AgentTemplate }>,
+    projectPath: string,
+    projectName: string
+  ) => {
+    const createdAgents: UnifiedAgent[] = [];
+    const usedNames = new Set<string>();
+    for (const bundle of bundles) {
+      try {
+        const agent = await installAgentBundle(bundle.resource, projectPath, projectName, usedNames);
+        createdAgents.push(agent);
+        usedNames.add(agent.name);
+        console.log(`[Onboarding] Installed starter bundle: ${bundle.template.suggestedName} → ${agent.name}`);
+      } catch (err) {
+        console.error(`[Onboarding] Failed to install bundle ${bundle.template.suggestedName}:`, err);
+      }
+    }
+
+    // Create Tauri terminals for each newly created agent and add to sidebar
+    const newTerminals: TerminalInfo[] = [];
+    for (const agent of createdAgents) {
+      try {
+        const terminal = await invoke<TerminalInfo>("create_terminal", {
+          id: agent.id,
+          label: agent.name,
+          color: agent.color,
+          cwd: agent.projectPath,
+        });
+        newTerminals.push({
+          ...terminal,
+          status: "idle" as const,
+          needsAttention: false,
+          hasResponded: false,
+          responseStartTime: null,
+          avatar: agent.avatar,
+          personality: agent.personality,
+        });
+
+        // Save personality file and inject into CLAUDE.md
+        if (agent.personality) {
+          const fullPersonality: AgentPersonality = {
+            id: agent.id,
+            name: agent.name,
+            role: agent.personality.role || '',
+            communicationStyle: agent.personality.communicationStyle || 'professional',
+            customNotes: agent.personality.customNotes,
+            selectedRules: agent.personality.selectedRules,
+            intro: '',
+            personality: '',
+            quirks: '',
+            specialties: [],
+            skills: [],
+            expressions: [],
+          };
+          try {
+            await invoke('save_agent_personality', {
+              projectPath: agent.projectPath,
+              personality: fullPersonality,
+            });
+            await invoke('inject_personality_to_claude_md', {
+              projectPath: agent.projectPath,
+              personality: fullPersonality,
+            });
+            console.log(`[Onboarding] Injected personality for "${agent.name}" into CLAUDE.md`);
+          } catch (personalityErr) {
+            console.warn(`[Onboarding] Failed to inject personality for ${agent.name}:`, personalityErr);
+          }
+        }
+      } catch (err) {
+        console.error(`[Onboarding] Failed to create terminal for ${agent.name}:`, err);
+      }
+    }
+
+    if (newTerminals.length > 0) {
+      setTerminals(prev => [...prev, ...newTerminals]);
+      // Select the first created agent
+      setActiveId(newTerminals[0].id);
+    }
+  }, [installAgentBundle]);
 
   const handleSelectDirectory = useCallback(async () => {
     if (selectingDirectory || !tauriAvailable) {
@@ -10006,7 +10143,7 @@ You have access to all Bash tools to execute git commands like:
             </div>
           ) : (
             /* Chat area when agents are active */
-            <div className="terminal-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div className="terminal-container" data-main-content style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Action Icons - aligned right above tabs */}
               <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
@@ -10879,6 +11016,8 @@ You have access to all Bash tools to execute git commands like:
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
           onOpenDroidFactory={() => setDroidFactoryOpen(true)}
+          isOnboarding={terminals.length === 0}
+          onInstallStarterBundles={handleInstallStarterBundles}
         />
 
         {/* FilePreviewDrawer overlay DISABLED - now using tab-embedded preview only */}

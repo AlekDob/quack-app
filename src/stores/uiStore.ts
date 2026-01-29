@@ -267,6 +267,9 @@ export const useUIStore = create<UIState>()(
           theme: state.theme,
           terminalFontSize: state.terminalFontSize,
           terminalFontFamily: state.terminalFontFamily,
+          // Persist tab state for wake-from-standby resilience
+          activeTabId: state.activeTabId,
+          tabs: state.tabs,
         }),
       }
     ),

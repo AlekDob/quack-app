@@ -936,41 +936,66 @@ export default function TerminalSidebar({
             </DragOverlay>
           </DndContext>
 
-        {/* Empty state */}
+        {/* Empty state - Onboarding CTA */}
         {terminals.length === 0 && (
           <div className="empty-state">
-            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              <div className="text-6xl mb-4">🦆</div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                No agents yet
+            <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+              <div
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(242, 140, 82, 0.25) 0%, rgba(242, 140, 82, 0.05) 70%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                  boxShadow: '0 0 40px rgba(242, 140, 82, 0.15)',
+                }}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <h3 style={{ fontSize: 17, fontWeight: 600, color: '#fff', marginBottom: 6 }}>
+                Create your first project
               </h3>
-              <p className="text-sm text-white/60 mb-12 max-w-xs">
-                Quack quack! Create your first agent to start coding with AI assistance.
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 24, maxWidth: 220, lineHeight: 1.5 }}>
+                Set up a project and start working with AI agents.
               </p>
               <button
                 type="button"
                 onClick={() => onCreateAgent()}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 animated-button"
-                title="Start to Quack"
+                className="onboarding-cta-button"
+                title="Create your first project"
                 style={{
-                  background: 'rgba(242, 140, 82, 0.1)',
-                  border: '1px solid rgba(242, 140, 82, 0.3)',
-                  color: '#f28c52',
-                  marginTop: '32px',
+                  background: 'linear-gradient(135deg, #f28c52 0%, #e06b2a 100%)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  padding: '10px 28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 20px rgba(242, 140, 82, 0.35), 0 0 0 1px rgba(242, 140, 82, 0.2)',
+                  transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
-                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 6px 28px rgba(242, 140, 82, 0.5), 0 0 0 1px rgba(242, 140, 82, 0.4)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(242, 140, 82, 0.35), 0 0 0 1px rgba(242, 140, 82, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="typewriter-text"></span>
+                Get Started
               </button>
             </div>
           </div>

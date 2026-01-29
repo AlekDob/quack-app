@@ -54,15 +54,38 @@ A **Project** is simply a directory path on disk (e.g., `/Users/alekdob/Desktop/
 - Each project can have multiple agents working on it
 - Project context (CLAUDE.md, .claude/ folder) is loaded automatically
 
-### 2. Agents (formerly "Terminals")
+### 2. Agents vs Droids (Critical Distinction)
+
+**Agents** and **Droids** are NOT the same thing. This is a core architectural concept:
+
+```
+AGENTS (Managers) — stored in quack-agents.json (Tauri Store, local)
+  = Managerial roles visible in Quack sidebar
+  = Each has: personality (name, role, style, notes), project binding, SDK session
+  = Examples: Project Manager, Product Manager, Personal Assistant
+  = Each agent has a BUNDLE of equipment:
+    ├── Droids — specialized technical workers
+    ├── Skills — capabilities
+    ├── Rules — behavioral guidelines
+    └── Commands — slash commands
+
+DROIDS (Workers) — stored as .md files in ~/.claude/agents/
+  = Technical subagents used by Claude Code under the hood
+  = Examples: git-commit-manager, swift-bug-hunter, frontend-developer, code-reviewer
+  = Installed from Marketplace or created manually
+  = An Agent can use multiple Droids as its "team"
+```
+
+**Key Rule**: Agents are what users see and interact with. Droids are invisible workers that Agents delegate to. Agent templates (with pre-configured droids, skills, rules) live in the `quack-marketplace` GitHub repo — NOT hardcoded in the app.
 
 An **Agent** is an AI assistant with:
 - **Identity**: name, color, avatar
 - **Personality**: role, communication style, custom instructions
 - **Project binding**: which directory it works on
 - **SDK Session**: Claude conversation history (managed by SDK)
+- **Equipment**: droids, skills, rules, commands (from Marketplace bundles)
 
-**Storage**: `quack-agents.json` (unified file)
+**Storage**: `quack-agents.json` (unified file, in `~/Library/Application Support/com.quack.terminal/`)
 ```typescript
 interface UnifiedAgent {
   id: string;

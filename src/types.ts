@@ -970,7 +970,24 @@ export interface SessionDetails extends SessionInfo {
 }
 
 // Marketplace types
-export type MarketplaceCategory = 'agents' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills';
+export type MarketplaceCategory = 'agents' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills' | 'rules' | 'agent-bundles';
+
+/**
+ * Agent Template from marketplace bundle.
+ * Defines personality + equipment for creating a UnifiedAgent.
+ */
+export interface AgentTemplate {
+  suggestedName: string;
+  role: string;
+  communicationStyle: string;
+  customNotes?: string;
+  suggestedColor: string;
+  suggestedAvatar?: string;
+  /** Gender hint for random name generation ('male' | 'female') */
+  suggestedGender?: 'male' | 'female';
+  /** References to other plugins (skills, rules) to install alongside */
+  bundledPlugins?: string[];
+}
 
 export interface MarketplaceResource {
   id: string;

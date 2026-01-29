@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir } from '@tauri-apps/api/path';
-import type { MarketplaceResource, MarketplaceCategory, MarketplaceFilters, MarketplaceLibrary } from '../types';
+import type { MarketplaceResource, MarketplaceCategory, MarketplaceFilters, MarketplaceLibrary, AgentTemplate } from '../types';
+import { createAgent, type UnifiedAgent } from '../services/unifiedAgentStorage';
+import { getRandomGenderedName, getRandomName } from '../utils/agentNames';
 
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/AlekDob/quack-marketplace/main';
+const cacheBust = () => `?t=${Date.now()}`;
 const MARKETPLACE_JSON_URL = `${GITHUB_RAW_BASE}/.claude-plugin/marketplace.json`;
 
 interface MarketplaceJson {
@@ -29,6 +32,8 @@ interface PluginJson {
   keywords?: string[];
   skills?: string[];
   agents?: string[];
+  rules?: string[];
+  agentTemplate?: AgentTemplate;
 }
 
 /**
@@ -57,7 +62,8 @@ export function useMarketplace() {
 
     try {
       // Step 1: Fetch the marketplace manifest
-      const marketplaceRes = await fetch(MARKETPLACE_JSON_URL);
+      const fetchOpts: RequestInit = { cache: 'no-store' };
+      const marketplaceRes = await fetch(MARKETPLACE_JSON_URL + cacheBust(), fetchOpts);
       if (!marketplaceRes.ok) {
         throw new Error(`Failed to fetch marketplace: ${marketplaceRes.status}`);
       }
@@ -69,9 +75,9 @@ export function useMarketplace() {
       // Step 2: For each plugin, fetch its plugin.json
       for (const plugin of marketplace.plugins) {
         const pluginSource = plugin.source.replace('./', '');
-        const pluginJsonUrl = `${GITHUB_RAW_BASE}/${pluginSource}/.claude-plugin/plugin.json`;
+        const pluginJsonUrl = `${GITHUB_RAW_BASE}/${pluginSource}/.claude-plugin/plugin.json${cacheBust()}`;
 
-        const pluginRes = await fetch(pluginJsonUrl);
+        const pluginRes = await fetch(pluginJsonUrl, fetchOpts);
         if (!pluginRes.ok) continue;
 
         const pluginData: PluginJson = await pluginRes.json();
@@ -91,13 +97,12 @@ export function useMarketplace() {
               installCount: 0,
               tags: pluginData.keywords || plugin.tags || [],
               version: pluginData.version,
-              installCommand: '', // Will be handled by custom install
+              installCommand: '',
               repository: pluginData.repository,
               verified: true,
               featured: skillName === 'quack-brain',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
-              // Custom fields for installation
               _pluginSource: pluginSource,
               _skillPath: skillPath,
             } as MarketplaceResource & { _pluginSource: string; _skillPath: string });
@@ -118,7 +123,7 @@ export function useMarketplace() {
               installCount: 0,
               tags: pluginData.keywords || plugin.tags || [],
               version: pluginData.version,
-              installCommand: '', // Will be handled by custom install
+              installCommand: '',
               repository: pluginData.repository,
               verified: true,
               featured: false,
@@ -128,6 +133,55 @@ export function useMarketplace() {
               _agentPath: agentPath,
             } as MarketplaceResource & { _pluginSource: string; _agentPath: string });
           }
+        }
+
+        // Create resources for each rule
+        if (pluginData.rules) {
+          discoveredCategories.add('rules');
+          for (const rulePath of pluginData.rules) {
+            const ruleName = rulePath.split('/').pop()?.replace('.md', '') || rulePath;
+            allResources.push({
+              id: `${plugin.name}--rule--${ruleName}`,
+              name: formatName(ruleName),
+              description: `Rule from ${plugin.name} plugin`,
+              category: 'rules',
+              author,
+              installCount: 0,
+              tags: pluginData.keywords || plugin.tags || [],
+              version: pluginData.version,
+              installCommand: '',
+              repository: pluginData.repository,
+              verified: true,
+              featured: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              _pluginSource: pluginSource,
+              _rulePath: rulePath,
+            } as MarketplaceResource & { _pluginSource: string; _rulePath: string });
+          }
+        }
+
+        // Create agent bundle resource if template exists
+        if (pluginData.agentTemplate) {
+          discoveredCategories.add('agent-bundles');
+          allResources.push({
+            id: `${plugin.name}--bundle`,
+            name: pluginData.agentTemplate.suggestedName,
+            description: plugin.description,
+            category: 'agent-bundles',
+            author,
+            installCount: 0,
+            tags: pluginData.keywords || plugin.tags || [],
+            version: pluginData.version,
+            installCommand: '',
+            repository: pluginData.repository,
+            verified: true,
+            featured: (pluginData.keywords || plugin.tags || []).includes('starter'),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            _agentTemplate: pluginData.agentTemplate,
+            _pluginSource: pluginSource,
+          } as MarketplaceResource & { _agentTemplate: AgentTemplate; _pluginSource: string });
         }
       }
 
@@ -182,6 +236,7 @@ export function useMarketplace() {
           _pluginSource?: string;
           _skillPath?: string;
           _agentPath?: string;
+          _rulePath?: string;
         };
 
         let checkPath = '';
@@ -191,6 +246,9 @@ export function useMarketplace() {
         } else if (ext._agentPath) {
           const agentFile = ext._agentPath.split('/').pop() || '';
           checkPath = `${home}.claude/agents/${agentFile}`;
+        } else if (ext._rulePath) {
+          const ruleFile = ext._rulePath.split('/').pop() || '';
+          checkPath = `${home}.claude/rules/${ruleFile}`;
         }
 
         if (checkPath) {
@@ -252,6 +310,7 @@ export function useMarketplace() {
       _pluginSource?: string;
       _skillPath?: string;
       _agentPath?: string;
+      _rulePath?: string;
     };
 
     try {
@@ -271,7 +330,6 @@ export function useMarketplace() {
         const targetDir = `${home}.claude/skills/${skillName}`;
         const targetPath = `${targetDir}/SKILL.md`;
 
-        // Create directory (idempotent) and write file
         try {
           await invoke('create_directory', { path: targetDir });
         } catch {
@@ -290,6 +348,25 @@ export function useMarketplace() {
         // Write to ~/.claude/agents/{agentFile}
         const targetDir = `${home}.claude/agents`;
         const targetPath = `${targetDir}/${agentFile}`;
+
+        try {
+          await invoke('create_directory', { path: targetDir });
+        } catch {
+          // Directory may already exist, continue
+        }
+        await invoke('write_file_content', { path: targetPath, content });
+      } else if (ext._rulePath && ext._pluginSource) {
+        // Download the rule .md file
+        const ruleFile = ext._rulePath.split('/').pop() || '';
+        const ruleUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._rulePath}`;
+
+        const res = await fetch(ruleUrl);
+        if (!res.ok) throw new Error(`Failed to download rule: ${res.status}`);
+        const content = await res.text();
+
+        // Write to ~/.claude/rules/{ruleFile}
+        const targetDir = `${home}.claude/rules`;
+        const targetPath = `${targetDir}/${ruleFile}`;
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -323,6 +400,7 @@ export function useMarketplace() {
       _pluginSource?: string;
       _skillPath?: string;
       _agentPath?: string;
+      _rulePath?: string;
     };
 
     try {
@@ -337,6 +415,10 @@ export function useMarketplace() {
         const agentFile = ext._agentPath.split('/').pop() || '';
         const targetPath = `${home}.claude/agents/${agentFile}`;
         await invoke('remove_file', { path: targetPath });
+      } else if (ext._rulePath) {
+        const ruleFile = ext._rulePath.split('/').pop() || '';
+        const targetPath = `${home}.claude/rules/${ruleFile}`;
+        await invoke('remove_file', { path: targetPath });
       }
 
       setLibrary(prev => ({
@@ -349,6 +431,148 @@ export function useMarketplace() {
       console.error('Failed to uninstall resource:', err);
       throw err;
     }
+  }, [resources]);
+
+  // Install an agent bundle with all its bundled plugins (skills and rules)
+  const installAgentBundle = useCallback(async (
+    resource: MarketplaceResource,
+    projectPath: string,
+    projectName: string,
+    usedNames?: Set<string>
+  ): Promise<UnifiedAgent> => {
+    const ext = resource as MarketplaceResource & { _agentTemplate?: AgentTemplate };
+    if (!ext._agentTemplate) {
+      throw new Error('Resource is not an agent bundle');
+    }
+
+    const template = ext._agentTemplate;
+    const installedRulePaths: string[] = [];
+
+    try {
+      // Install bundled plugins (skills and rules)
+      if (template.bundledPlugins && template.bundledPlugins.length > 0) {
+        // Re-fetch marketplace.json to get plugin sources
+        const fetchOpts: RequestInit = { cache: 'no-store' };
+        const marketplaceRes = await fetch(MARKETPLACE_JSON_URL + cacheBust(), fetchOpts);
+        if (!marketplaceRes.ok) {
+          throw new Error(`Failed to fetch marketplace: ${marketplaceRes.status}`);
+        }
+        const marketplace: MarketplaceJson = await marketplaceRes.json();
+
+        for (const pluginName of template.bundledPlugins) {
+          // Find the plugin in marketplace
+          const pluginEntry = marketplace.plugins.find(p => p.name === pluginName);
+          if (!pluginEntry) {
+            console.warn(`Plugin ${pluginName} not found in marketplace`);
+            continue;
+          }
+
+          const pluginSource = pluginEntry.source.replace('./', '');
+          const pluginJsonUrl = `${GITHUB_RAW_BASE}/${pluginSource}/.claude-plugin/plugin.json${cacheBust()}`;
+
+          const pluginRes = await fetch(pluginJsonUrl, fetchOpts);
+          if (!pluginRes.ok) {
+            console.warn(`Failed to fetch plugin.json for ${pluginName}`);
+            continue;
+          }
+
+          const pluginData: PluginJson = await pluginRes.json();
+
+          // Install all skills from this plugin
+          if (pluginData.skills) {
+            for (const skillPath of pluginData.skills) {
+              const skillName = skillPath.split('/').pop() || '';
+              const skillMdUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${skillPath}/SKILL.md`;
+
+              try {
+                const res = await fetch(skillMdUrl);
+                if (!res.ok) continue;
+                const content = await res.text();
+
+                let home = await homeDir();
+                if (!home.endsWith('/')) home += '/';
+                const targetDir = `${home}.claude/skills/${skillName}`;
+                const targetPath = `${targetDir}/SKILL.md`;
+
+                try {
+                  await invoke('create_directory', { path: targetDir });
+                } catch {
+                  // Directory may already exist
+                }
+                await invoke('write_file_content', { path: targetPath, content });
+              } catch (err) {
+                console.warn(`Failed to install skill ${skillName}:`, err);
+              }
+            }
+          }
+
+          // Install all rules from this plugin
+          if (pluginData.rules) {
+            for (const rulePath of pluginData.rules) {
+              const ruleFile = rulePath.split('/').pop() || '';
+              const ruleUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${rulePath}`;
+
+              try {
+                const res = await fetch(ruleUrl);
+                if (!res.ok) continue;
+                const content = await res.text();
+
+                let home = await homeDir();
+                if (!home.endsWith('/')) home += '/';
+                const targetDir = `${home}.claude/rules`;
+                const targetPath = `${targetDir}/${ruleFile}`;
+
+                try {
+                  await invoke('create_directory', { path: targetDir });
+                } catch {
+                  // Directory may already exist
+                }
+                await invoke('write_file_content', { path: targetPath, content });
+
+                // Track installed rule paths
+                installedRulePaths.push(ruleFile);
+              } catch (err) {
+                console.warn(`Failed to install rule ${ruleFile}:`, err);
+              }
+            }
+          }
+        }
+      }
+
+      // Use the suggested name from the template (e.g., "Agent Jack")
+      const agentName = template.suggestedName;
+
+      // Create the unified agent
+      const agent = await createAgent({
+        name: agentName,
+        projectPath,
+        projectName,
+        color: template.suggestedColor,
+        avatar: template.suggestedAvatar,
+        personality: {
+          id: '',
+          name: agentName,
+          role: template.role,
+          communicationStyle: template.communicationStyle,
+          customNotes: template.customNotes,
+          selectedRules: installedRulePaths,
+        },
+        lastActiveAt: Date.now(),
+      });
+
+      return agent;
+    } catch (err) {
+      console.error('Failed to install agent bundle:', err);
+      throw err;
+    }
+  }, []);
+
+  // Get all starter bundles (agent templates tagged as "starter")
+  const getStarterBundles = useCallback((): MarketplaceResource[] => {
+    return resources.filter(r =>
+      r.category === 'agent-bundles' &&
+      r.tags.includes('starter')
+    );
   }, [resources]);
 
   // Toggle favorite
@@ -386,6 +610,8 @@ export function useMarketplace() {
     loadResources,
     installResource,
     uninstallResource,
+    installAgentBundle,
+    getStarterBundles,
     toggleFavorite,
     isInstalled,
     isFavorite,
