@@ -41,6 +41,7 @@ interface GeneralSettings {
   language: 'en' | 'it';
   enableToolGifs: boolean; // Show GIF reactions when tools execute
   toolGifCategories: ToolGifCategories; // Per-category toggle
+  giphyApiKey: string; // User's own Giphy API key
 }
 
 interface SettingsState {
@@ -67,6 +68,7 @@ interface SettingsState {
   toggleNotifications: () => void;
   toggleSounds: () => void;
   toggleToolGifs: () => void;
+  setGiphyApiKey: (key: string) => void;
 
   // Actions - Global
   resetAllSettings: () => void;
@@ -105,8 +107,9 @@ const defaultGeneralSettings: GeneralSettings = {
   enableSounds: true,
   showWelcomeOnStartup: true,
   language: 'en',
-  enableToolGifs: true, // GIF reactions enabled by default
+  enableToolGifs: false, // GIF reactions disabled by default (requires Giphy API key)
   toolGifCategories: defaultToolGifCategories,
+  giphyApiKey: '', // User provides their own key
 };
 
 const defaultClaudeSettings: ClaudeSettings = {
@@ -191,6 +194,10 @@ export const useSettingsStore = create<SettingsState>()(
 
         toggleToolGifs: () => set((state) => ({
           general: { ...state.general, enableToolGifs: !state.general.enableToolGifs },
+        })),
+
+        setGiphyApiKey: (key: string) => set((state) => ({
+          general: { ...state.general, giphyApiKey: key },
         })),
 
         // Global actions

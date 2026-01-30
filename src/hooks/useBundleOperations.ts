@@ -56,10 +56,6 @@ export function useBundleOperations(): BundleOperations {
         content: '', // In real implementation, we'd read the actual rule content
       }));
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:57',message:'H1: Before ZIP generation',data:{skillsCount:skills.length,rulesCount:rules.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
-
       // Export as ZIP
       const zipData = await exportAgentBundleAsZip(
         agent,
@@ -69,26 +65,10 @@ export function useBundleOperations(): BundleOperations {
         [] // commands
       );
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:68',message:'H1: After ZIP generation SUCCESS',data:{zipSize:zipData?.byteLength,zipType:typeof zipData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
-
       // Create download link
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:72',message:'H2: Before Blob creation',data:{zipSize:zipData.byteLength},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
-
       const blob = new Blob([zipData], { type: 'application/zip' });
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:78',message:'H2: Blob created',data:{blobSize:blob.size,blobType:blob.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
-
       const filename = `${agent.name.toLowerCase().replace(/\s+/g, '-')}-bundle.zip`;
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:82',message:'H9: Using Tauri native save dialog',data:{filename,isTauri:!!window.__TAURI__},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
-      // #endregion
 
       // Use Tauri's native save dialog
       const savePath = await saveDialog({
@@ -99,10 +79,6 @@ export function useBundleOperations(): BundleOperations {
         }]
       });
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:95',message:'H9: Save dialog result',data:{savePath,cancelled:!savePath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
-      // #endregion
-
       if (!savePath) {
         // User cancelled the dialog
         setState((prev) => ({ ...prev, exporting: false }));
@@ -112,16 +88,8 @@ export function useBundleOperations(): BundleOperations {
       // Write the file using Tauri's fs plugin
       await writeFile(savePath, zipData);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:112',message:'H9: File written successfully!',data:{savePath,size:zipData.byteLength},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
-      // #endregion
-
       setState((prev) => ({ ...prev, exporting: false }));
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBundleOperations.ts:118',message:'H4: CATCH BLOCK - Error occurred!',data:{error:err instanceof Error ? err.message : String(err),stack:err instanceof Error ? err.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
-
       console.error('Failed to export agent bundle:', err);
       setState((prev) => ({
         ...prev,

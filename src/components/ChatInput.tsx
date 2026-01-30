@@ -1091,9 +1091,6 @@ export default function ChatInput({
 
   const handleSend = async () => {
     const trimmed = (input || '').trim();
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatInput.tsx:handleSend',message:'📤 ChatInput handleSend triggered',data:{trimmed:trimmed?.substring(0,100),attachmentsCount:attachments?.length,disabled,stack:new Error().stack?.split('\n').slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B-chat-input'})}).catch(()=>{});
-    // #endregion
     if ((!trimmed && attachments.length === 0) || disabled) return;
 
     await onSend(trimmed, { attachments });

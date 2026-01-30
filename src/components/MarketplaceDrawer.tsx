@@ -22,6 +22,8 @@ const CATEGORY_META: Record<MarketplaceCategory, { label: string }> = {
   settings: { label: 'Settings' },
   mcp: { label: 'MCP' },
   stacks: { label: 'Stacks' },
+  rules: { label: 'Rules' },
+  'agent-bundles': { label: 'Agent Bundles' },
 };
 
 export default function MarketplaceDrawer({

@@ -5,10 +5,16 @@
  * making the streaming chat more visually engaging.
  */
 
-// Giphy API key - bundled with app for all users
-// Falls back to embedded key if env var not set (production builds)
-const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'w9lZ6fgXmVo8lFFSdlFRJ1qHpEzYfvAX';
+// Giphy API key - user must provide their own key in Settings
+let giphyApiKey = import.meta.env.VITE_giphyApiKey || '';
 const GIPHY_API_URL = 'https://api.giphy.com/v1/gifs';
+
+/**
+ * Set the Giphy API key at runtime (from Settings store)
+ */
+export function setGiphyApiKey(key: string): void {
+  giphyApiKey = key;
+}
 
 // Cache GIFs by toolId (unique per invocation) to avoid refetching on re-renders
 // But allows variety between different tool invocations
@@ -136,8 +142,7 @@ const MIN_LANDSCAPE_RATIO = 1.2;
  * Fetches multiple results and selects randomly from landscape options
  */
 export async function searchGif(keyword: string, cacheKey?: string): Promise<GiphyGif | null> {
-  // API key is always available (bundled with app)
-  if (!GIPHY_API_KEY) {
+  if (!giphyApiKey) {
     console.warn('[GiphyService] API key not available');
     return null;
   }
@@ -161,7 +166,7 @@ export async function searchGif(keyword: string, cacheKey?: string): Promise<Gip
 
     // Fetch more results to find a landscape GIF
     const params = new URLSearchParams({
-      api_key: GIPHY_API_KEY,
+      api_key: giphyApiKey,
       q: keyword,
       limit: '25', // Fetch 25 for more variety
       offset: randomOffset.toString(), // Random offset for variety
@@ -271,10 +276,10 @@ export async function getGifForTool(toolName: string, toolId?: string): Promise<
 
 /**
  * Check if Giphy service is configured and available
- * Always returns true since API key is bundled with the app
+ * Returns true only if user has provided their own API key
  */
 export function isGiphyConfigured(): boolean {
-  return !!GIPHY_API_KEY;
+  return !!giphyApiKey;
 }
 
 /**

@@ -11,10 +11,12 @@ export default function GeneralSettings() {
   const [loading, setLoading] = useState(false);
 
   // GIF reactions settings
-  const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? true);
+  const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? false);
   const toggleToolGifs = useSettingsStore((s) => s.toggleToolGifs);
   const toolGifCategories = useSettingsStore((s) => s.general?.toolGifCategories);
   const updateGeneralSettings = useSettingsStore((s) => s.updateGeneralSettings);
+  const giphyApiKey = useSettingsStore((s) => s.general?.giphyApiKey ?? '');
+  const setGiphyApiKey = useSettingsStore((s) => s.setGiphyApiKey);
 
   // Default categories if not initialized
   const defaultCategories = {
@@ -97,8 +99,32 @@ export default function GeneralSettings() {
           }
         />
 
+        {/* Giphy API Key input */}
+        <SettingsRow
+          label="Giphy API Key"
+          description="Get a free key at developers.giphy.com. Required for GIF reactions."
+          control={
+            <input
+              type="password"
+              value={giphyApiKey}
+              onChange={(e) => setGiphyApiKey(e.target.value)}
+              placeholder="Enter your Giphy API key"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                color: '#e0e0e0',
+                fontSize: '12px',
+                width: '220px',
+                outline: 'none',
+              }}
+            />
+          }
+        />
+
         {/* Category toggles - only show if GIFs are enabled */}
-        {enableToolGifs && (
+        {enableToolGifs && giphyApiKey && (
           <>
             <div style={{ paddingLeft: '16px', borderLeft: '2px solid rgba(255, 107, 53, 0.3)', marginLeft: '8px' }}>
               <SettingsRow

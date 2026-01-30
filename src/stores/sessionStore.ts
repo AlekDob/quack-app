@@ -116,9 +116,6 @@ export const useSessionStore = create<SessionState>()(
 
         // Create a new session
         createSession: async (sessionData) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sessionStore.ts:createSession',message:'📝 NEW SESSION CREATED',data:{title:sessionData.title,agentId:sessionData.agentId,projectPath:sessionData.projectPath,stack:new Error().stack?.split('\n').slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C-session-create'})}).catch(()=>{});
-          // #endregion
           const newSession: AgentSession = {
             ...sessionData,
             id: generateSessionId(),

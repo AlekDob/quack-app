@@ -1841,9 +1841,6 @@ function AppContent() {
   // 🦆 SESSION-FIRST: Use chatKey (sessionId when available) for message storage
   // but keep using activeId (agentId) for Claude SDK routing and event listeners
   const sendMessageForAgent = useCallback(async (content: string, options?: ChatSendOptions) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:sendMessageForAgent',message:'🚀 sendMessageForAgent CALLED',data:{content:content?.substring(0,100),activeId,activeSessionId,stack:new Error().stack?.split('\n').slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A-send-call'})}).catch(()=>{});
-    // #endregion
     if (!content.trim() || !activeId) return;
 
     // 🦆 SESSION-FIRST: Require an active session to send messages
@@ -2116,9 +2113,6 @@ function AppContent() {
 
       // 🦆 SIMPLIFIED: Always start fresh conversation
       // Users can resume sessions via Sessions panel -> "Resume Session" button
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/3ea3e874-66c9-4ccd-807c-e75a9897e915',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:send_message_via_sdk_streaming',message:'🔥 CALLING CLAUDE API',data:{prompt:prompt?.substring(0,200),activeId,messageKey,workingDir},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D-api-call'})}).catch(()=>{});
-      // #endregion
       // Race between invoke and abort
       const response = await Promise.race([
         invoke<{

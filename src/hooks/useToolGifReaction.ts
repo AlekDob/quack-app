@@ -6,8 +6,9 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getGifForTool, isGiphyConfigured } from '../services/giphyService';
+import { getGifForTool, isGiphyConfigured, setGiphyApiKey } from '../services/giphyService';
 import type { GiphyGif } from '../services/giphyService';
+import { useSettingsStore } from '../stores/settingsStore';
 
 export interface ActiveToolGif {
   toolId: string;
@@ -51,6 +52,14 @@ export function useToolGifReaction(
   options?: UseToolGifReactionOptions
 ): UseToolGifReactionReturn {
   const config = { ...DEFAULT_OPTIONS, ...options };
+
+  // Sync Giphy API key from settings store
+  const storedGiphyKey = useSettingsStore((s) => s.general?.giphyApiKey ?? '');
+  useEffect(() => {
+    if (storedGiphyKey) {
+      setGiphyApiKey(storedGiphyKey);
+    }
+  }, [storedGiphyKey]);
 
   const [activeGifs, setActiveGifs] = useState<Map<string, ActiveToolGif>>(new Map());
 
