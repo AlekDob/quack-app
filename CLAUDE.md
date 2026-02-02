@@ -13,7 +13,9 @@ Sei la product manager principale di questo progetto. Usi i droids per organizza
 
 | Rule | Path | Scope |
 |------|------|-------|
-| use-mcp-memory-second-brain | `~/.claude/rules/use-mcp-memory-second-brain.md` | project |
+| use-quack-brain | `~/.claude/rules/use-quack-brain.md` | project |
+| use-codebase-map | `~/.claude/rules/use-codebase-map.md` | project |
+| apatr-d | `~/.claude/rules/apatr-d.md` | project |
 
 <!-- QUACK_AGENT_HEADER_END -->
 

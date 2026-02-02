@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useMarketplace } from '../hooks/useMarketplace';
+import { useSessionStore } from '../stores/sessionStore';
 import type { MarketplaceCategory, MarketplaceResource } from '../types';
 import MarketplaceCard from './MarketplaceCard';
 import MarketplaceInstallModal from './MarketplaceInstallModal';
@@ -16,14 +17,14 @@ interface MarketplaceDrawerProps {
 
 const CATEGORY_META: Record<MarketplaceCategory, { label: string }> = {
   skills: { label: 'Skills' },
-  agents: { label: 'Agents' },
+  agents: { label: 'Droids' },
   commands: { label: 'Commands' },
   hooks: { label: 'Hooks' },
   settings: { label: 'Settings' },
   mcp: { label: 'MCP' },
   stacks: { label: 'Stacks' },
   rules: { label: 'Rules' },
-  'agent-bundles': { label: 'Agent Bundles' },
+  'agent-bundles': { label: 'Bundles' },
 };
 
 export default function MarketplaceDrawer({
@@ -44,6 +45,8 @@ export default function MarketplaceDrawer({
     isInstalled,
     isFavorite,
   } = useMarketplace();
+
+  const selectedSession = useSessionStore((s) => s.getSelectedSession());
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedResource, setSelectedResource] = useState<MarketplaceResource | null>(null);
@@ -72,17 +75,21 @@ export default function MarketplaceDrawer({
     });
   };
 
-  const handleInstall = async (resource: MarketplaceResource) => {
+  const handleInstall = async (resource: MarketplaceResource, scope: 'global' | 'project' = 'global') => {
+    const projectPath = selectedSession?.projectPath;
     const toastId = toast.loading(`Installing ${resource.name}...`, {
-      description: 'Downloading from GitHub...',
+      description: scope === 'project' ? 'Installing to project...' : 'Installing globally...',
     });
 
     try {
-      const success = await installResource(resource);
+      const success = await installResource(resource, scope, projectPath);
       if (success) {
+        const location = scope === 'project' && projectPath
+          ? `${selectedSession?.projectName}/.claude/${resource.category}/`
+          : `~/.claude/${resource.category}/`;
         toast.success(`${resource.name} installed!`, {
           id: toastId,
-          description: `Saved to ~/.claude/${resource.category}/`,
+          description: `Saved to ${location}`,
           duration: 5000,
         });
         onRefresh?.();

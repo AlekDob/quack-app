@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
 import type { MarketplaceResource } from '../types';
+import { useSessionStore } from '../stores/sessionStore';
 
 /**
  * MarketplaceInstallModal - Modal for viewing resource details and installation
@@ -11,7 +12,7 @@ interface MarketplaceInstallModalProps {
   resource: MarketplaceResource | null;
   installed: boolean;
   onClose: () => void;
-  onInstall: (resource: MarketplaceResource) => Promise<boolean>;
+  onInstall: (resource: MarketplaceResource, scope: 'global' | 'project') => Promise<boolean>;
   onUninstall?: (resourceId: string) => Promise<boolean>;
 }
 
@@ -23,13 +24,18 @@ export default function MarketplaceInstallModal({
   onUninstall,
 }: MarketplaceInstallModalProps) {
   const [installing, setInstalling] = useState(false);
+  const [scope, setScope] = useState<'global' | 'project'>('global');
+
+  const selectedSession = useSessionStore((s) => s.getSelectedSession());
+  const projectPath = selectedSession?.projectPath;
+  const projectName = selectedSession?.projectName || 'No project';
 
   if (!resource) return null;
 
   const handleInstall = async () => {
     setInstalling(true);
     try {
-      const success = await onInstall(resource);
+      const success = await onInstall(resource, scope);
       if (success) {
         // Close modal after successful install
         setTimeout(() => onClose(), 1000);
@@ -232,10 +238,56 @@ export default function MarketplaceInstallModal({
               >
                 {installed
                   ? `Installed in ~/.claude/${resource.category}/`
-                  : `Will be installed to ~/.claude/${resource.category}/`
+                  : scope === 'project' && projectPath
+                    ? `Will install to ${projectName}/.claude/${resource.category}/`
+                    : `Will install to ~/.claude/${resource.category}/`
                 }
               </div>
             </div>
+
+            {/* Scope Selector */}
+            {!installed && (
+              <div>
+                <h3 className="text-sm font-semibold mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                  Install Scope
+                </h3>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScope('global')}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    style={{
+                      background: scope === 'global' ? 'rgba(242, 140, 82, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                      border: `1px solid ${scope === 'global' ? 'rgba(242, 140, 82, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      color: scope === 'global' ? '#f28c52' : 'rgba(255, 255, 255, 0.6)',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>Global</div>
+                    <div style={{ fontSize: '11px', color: scope === 'global' ? 'rgba(242, 140, 82, 0.7)' : 'rgba(255, 255, 255, 0.4)', marginTop: '2px' }}>
+                      ~/.claude/ - All projects
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => projectPath && setScope('project')}
+                    disabled={!projectPath}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                    style={{
+                      background: scope === 'project' ? 'rgba(96, 165, 250, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                      border: `1px solid ${scope === 'project' ? 'rgba(96, 165, 250, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      color: scope === 'project' ? '#60a5fa' : 'rgba(255, 255, 255, 0.6)',
+                      opacity: projectPath ? 1 : 0.4,
+                      cursor: projectPath ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>Project</div>
+                    <div style={{ fontSize: '11px', color: scope === 'project' ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.4)', marginTop: '2px' }}>
+                      {projectPath ? projectName : 'No active project'}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Version */}
             <div>

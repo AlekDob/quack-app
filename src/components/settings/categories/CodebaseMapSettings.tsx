@@ -247,7 +247,7 @@ export default function CodebaseMapSettings() {
             id: 'codebase-map-auto-update',
             name: 'Codebase Map Auto-Update',
             type: 'PostToolUse',
-            matcher: 'Write',
+            matcher: 'Write|Edit',
             command: `node "${scriptPath}" --update-file "$TOOL_INPUT_FILE_PATH" . .quack/codebase-map.md`,
             enabled: true,
             scope: 'project',

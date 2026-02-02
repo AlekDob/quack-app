@@ -305,7 +305,11 @@ export function useMarketplace() {
   }, [resources, filters]);
 
   // Install a resource by downloading from GitHub
-  const installResource = useCallback(async (resource: MarketplaceResource): Promise<boolean> => {
+  const installResource = useCallback(async (
+    resource: MarketplaceResource,
+    scope: 'global' | 'project' = 'global',
+    projectPath?: string
+  ): Promise<boolean> => {
     const ext = resource as MarketplaceResource & {
       _pluginSource?: string;
       _skillPath?: string;
@@ -314,8 +318,15 @@ export function useMarketplace() {
     };
 
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      // Determine base path based on scope
+      let basePath: string;
+      if (scope === 'project' && projectPath) {
+        basePath = projectPath.endsWith('/') ? `${projectPath}.claude` : `${projectPath}/.claude`;
+      } else {
+        let home = await homeDir();
+        if (!home.endsWith('/')) home += '/';
+        basePath = `${home}.claude`;
+      }
 
       if (ext._skillPath && ext._pluginSource) {
         // Download the skill SKILL.md file
@@ -326,8 +337,8 @@ export function useMarketplace() {
         if (!res.ok) throw new Error(`Failed to download skill: ${res.status}`);
         const content = await res.text();
 
-        // Write to ~/.claude/skills/{skillName}/SKILL.md
-        const targetDir = `${home}.claude/skills/${skillName}`;
+        // Write to {basePath}/skills/{skillName}/SKILL.md
+        const targetDir = `${basePath}/skills/${skillName}`;
         const targetPath = `${targetDir}/SKILL.md`;
 
         try {
@@ -345,8 +356,8 @@ export function useMarketplace() {
         if (!res.ok) throw new Error(`Failed to download agent: ${res.status}`);
         const content = await res.text();
 
-        // Write to ~/.claude/agents/{agentFile}
-        const targetDir = `${home}.claude/agents`;
+        // Write to {basePath}/agents/{agentFile}
+        const targetDir = `${basePath}/agents`;
         const targetPath = `${targetDir}/${agentFile}`;
 
         try {
@@ -364,8 +375,8 @@ export function useMarketplace() {
         if (!res.ok) throw new Error(`Failed to download rule: ${res.status}`);
         const content = await res.text();
 
-        // Write to ~/.claude/rules/{ruleFile}
-        const targetDir = `${home}.claude/rules`;
+        // Write to {basePath}/rules/{ruleFile}
+        const targetDir = `${basePath}/rules`;
         const targetPath = `${targetDir}/${ruleFile}`;
 
         try {

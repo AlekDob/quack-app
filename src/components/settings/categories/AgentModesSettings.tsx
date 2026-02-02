@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import { useSessionStore } from '../../../stores/sessionStore';
 import type { EffortLevel, ThinkingMode } from '../../../types';
 import { getModelOptions } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
@@ -18,28 +21,30 @@ const effortOptions = [
   { value: 'high' as EffortLevel, label: 'Quality', desc: 'Thorough responses', icon: '>>>' },
 ];
 
+interface RuleInfo {
+  name: string;
+  exists: boolean;
+}
+
 interface ModePresetCardProps {
   mode: 'bypass' | 'plan';
   title: string;
   description: string;
   color: string;
+  icon: string;
 }
 
-function ModePresetCard({ mode, title, description, color }: ModePresetCardProps) {
+function ModePresetCard({ mode, title, description, color, icon }: ModePresetCardProps) {
   const { agentModePresets, updateModePreset } = useSettingsStore();
   const { models: remoteModels } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
   const preset = agentModePresets[mode];
 
   return (
-    <div className="mode-preset-card" style={{ borderColor: color }}>
+    <div className="mode-preset-card" style={{ borderLeftColor: color }}>
       <div className="mode-preset-header">
         <div className="mode-preset-title" style={{ color }}>
-          {mode === 'bypass' ? (
-            <span className="mode-icon">&#x2B22;</span>
-          ) : (
-            <span className="mode-icon">&#x25C7;</span>
-          )}
+          <span className="mode-icon">{icon}</span>
           {title}
         </div>
         <div className="mode-preset-desc">{description}</div>
@@ -54,9 +59,7 @@ function ModePresetCard({ mode, title, description, color }: ModePresetCardProps
             className="mode-preset-select"
           >
             {modelOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         </div>
@@ -97,6 +100,35 @@ function ModePresetCard({ mode, title, description, color }: ModePresetCardProps
 
 export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
+  const selectedSession = useSessionStore((s) => s.getSelectedSession());
+  const [rules, setRules] = useState<RuleInfo[]>([]);
+
+  const projectPath = selectedSession?.projectPath;
+  const projectName = selectedSession?.projectName || 'No project';
+
+  useEffect(() => {
+    if (!projectPath) return;
+    checkRules(projectPath);
+  }, [projectPath]);
+
+  const checkRules = async (projPath: string) => {
+    const ruleFiles = [
+      { name: 'use-codebase-map', file: 'use-codebase-map.md' },
+      { name: 'use-quack-brain', file: 'use-quack-brain.md' },
+      { name: 'apatr-d', file: 'Analyze-Plan-act-test-review-document.md' },
+    ];
+
+    const results: RuleInfo[] = [];
+    for (const r of ruleFiles) {
+      try {
+        await invoke<string>('read_file_content', { path: `${projPath}/.claude/rules/${r.file}` });
+        results.push({ name: r.name, exists: true });
+      } catch {
+        results.push({ name: r.name, exists: false });
+      }
+    }
+    setRules(results);
+  };
 
   const handleReset = () => {
     if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.5')) {
@@ -111,27 +143,25 @@ export default function AgentModesSettings() {
         description="Configure default parameters for each permission mode. When you switch modes, these settings will be applied automatically."
       />
 
-      <div className="mode-presets-container">
+      <div className="mode-presets-grid">
         <ModePresetCard
           mode="bypass"
           title="Bypass Mode"
           description="No confirmations needed - agent executes autonomously"
           color="#f87171"
+          icon="&#x2B22;"
         />
-
         <ModePresetCard
           mode="plan"
           title="Plan Mode"
           description="Planning only - agent creates plans without executing"
           color="#60a5fa"
+          icon="&#x25C7;"
         />
       </div>
 
       <div className="mode-presets-actions">
-        <button
-          className="ios-button ios-button-secondary"
-          onClick={handleReset}
-        >
+        <button className="ios-button ios-button-secondary" onClick={handleReset}>
           Reset to Anthropic Defaults
         </button>
         <div className="mode-presets-hint">
@@ -139,20 +169,58 @@ export default function AgentModesSettings() {
         </div>
       </div>
 
+      {/* Active Rules */}
+      <SectionHeader
+        title="Active Rules"
+        description={`Rules detected in ${projectName}`}
+      />
+
+      <div className="settings-group">
+        {rules.length === 0 ? (
+          <div className="settings-row">
+            <div className="settings-row-left">
+              <div className="settings-row-description">
+                {projectPath ? 'Checking rules...' : 'Select a session to view project rules'}
+              </div>
+            </div>
+          </div>
+        ) : (
+          rules.map((rule) => (
+            <div key={rule.name} className="settings-row">
+              <div className="settings-row-left">
+                <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span className={`rule-dot ${rule.exists ? 'active' : ''}`} />
+                  {rule.name}
+                </div>
+              </div>
+              <div className="settings-row-control">
+                <span className={`rule-badge ${rule.exists ? 'rule-badge-active' : ''}`}>
+                  {rule.exists ? 'Active' : 'Not installed'}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       <style>{`
-        .mode-presets-container {
+        .mode-presets-grid {
           display: flex;
           flex-direction: column;
           gap: 16px;
-          margin-bottom: 24px;
         }
 
         .mode-preset-card {
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-left: 3px solid;
-          border-radius: 8px;
-          padding: 16px;
+          border-radius: 12px;
+          padding: 20px;
+          transition: border-color 0.15s ease;
+        }
+
+        .mode-preset-card:hover {
+          border-color: rgba(255, 255, 255, 0.15);
         }
 
         .mode-preset-header {
@@ -175,25 +243,26 @@ export default function AgentModesSettings() {
         .mode-preset-desc {
           font-size: 12px;
           color: rgba(255, 255, 255, 0.5);
+          line-height: 1.4;
         }
 
         .mode-preset-options {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 10px;
         }
 
         .mode-preset-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
           gap: 12px;
         }
 
         .mode-preset-label {
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.7);
-          min-width: 70px;
+          color: rgba(255, 255, 255, 0.6);
+          min-width: 64px;
+          flex-shrink: 0;
         }
 
         .mode-preset-select {
@@ -203,10 +272,11 @@ export default function AgentModesSettings() {
           border-radius: 6px;
           padding: 8px 12px;
           font-size: 13px;
-          color: #fff;
+          color: #f3f4f6;
           cursor: pointer;
           outline: none;
-          transition: border-color 0.2s;
+          transition: border-color 0.15s ease;
+          font-family: inherit;
         }
 
         .mode-preset-select:hover {
@@ -219,16 +289,14 @@ export default function AgentModesSettings() {
 
         .mode-preset-select option {
           background: #1a1a1a;
-          color: #fff;
+          color: #f3f4f6;
         }
 
         .mode-presets-actions {
           display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 8px;
-          padding-top: 16px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 8px;
         }
 
         .mode-presets-hint {
@@ -236,20 +304,34 @@ export default function AgentModesSettings() {
           color: rgba(255, 255, 255, 0.4);
         }
 
-        .ios-button-secondary {
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          color: rgba(255, 255, 255, 0.8);
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 13px;
-          cursor: pointer;
-          transition: all 0.2s;
+        .rule-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.15);
+          display: inline-block;
+          flex-shrink: 0;
         }
 
-        .ios-button-secondary:hover {
-          background: rgba(255, 255, 255, 0.15);
-          border-color: rgba(255, 255, 255, 0.2);
+        .rule-dot.active {
+          background: #4ade80;
+          box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+        }
+
+        .rule-badge {
+          font-size: 11px;
+          padding: 3px 10px;
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.05);
+          color: rgba(255, 255, 255, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          font-weight: 500;
+        }
+
+        .rule-badge-active {
+          background: rgba(74, 222, 128, 0.1);
+          color: #4ade80;
+          border-color: rgba(74, 222, 128, 0.2);
         }
       `}</style>
     </div>
