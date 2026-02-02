@@ -18,7 +18,7 @@ interface KanbanTabViewProps {
   getLastPrompt: (agentId: string) => string | null;
   sessionTokensMap: Map<string, { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; totalCost: number }>;
   onCreateNewAgent?: (projectPath: string) => void;
-  defaultModel?: 'opus' | 'sonnet' | 'haiku';
+  defaultModel?: string;
   defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
   defaultPermissionMode?: 'plan' | 'bypass';
   defaultEffort?: 'low' | 'medium' | 'high';

@@ -387,7 +387,7 @@ export interface ChatAttachment {
 
 // Settings metadata stored with each assistant message for UI display
 export interface MessageSettingsMetadata {
-  model?: 'opus' | 'sonnet' | 'haiku';
+  model?: string;
   effort?: EffortLevel;
   thinkingMode?: string; // 'auto' | 'think' | 'hard' | 'harder' | 'ultra'
   hasThinkingBlocks?: boolean; // True if response contained thinking blocks
@@ -501,7 +501,7 @@ export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 
 // Mode preset configuration for Bypass/Plan modes
 export interface ModePreset {
-  model: 'opus' | 'sonnet' | 'haiku';
+  model: string;
   thinkingMode: ThinkingMode;
   effort: EffortLevel;
 }
@@ -1226,7 +1226,7 @@ export interface BackgroundTaskConfig {
   // Agent-specific config
   agentId?: string;           // Droid ID if type is 'agent'
   prompt?: string;            // Prompt for agent
-  model?: 'opus' | 'sonnet' | 'haiku';
+  model?: string;
   workingDirectory?: string;
 
   // Build/Test specific config
@@ -1517,7 +1517,7 @@ export interface KanbanTask {
   completionNote?: string;            // Note when marked as done
 
   // Chat settings (persisted per task)
-  chatModel?: 'opus' | 'sonnet' | 'haiku';
+  chatModel?: string;
   chatThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
   chatPermissionMode?: 'plan' | 'bypass';
   chatEffort?: 'low' | 'medium' | 'high';

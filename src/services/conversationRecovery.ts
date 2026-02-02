@@ -13,12 +13,12 @@
 
 import type { ChatMessage } from '../types';
 
-// Token limits for different models
-export const TOKEN_LIMITS = {
+// Token limits for different models (default 200k for all Claude models)
+export const TOKEN_LIMITS: Record<string, number> = {
   opus: 200000,
   sonnet: 200000,
   haiku: 200000,
-} as const;
+};
 
 // Estimated overhead costs (fallback when no cache data available)
 // These are used only before the first message establishes the cache
@@ -79,9 +79,9 @@ export interface TokenBudgetStatus {
 export function calculateTokenBudget(
   inputTokens: number,
   outputTokens: number,
-  model: 'opus' | 'sonnet' | 'haiku' = 'opus'
+  model: string = 'opus'
 ): TokenBudgetStatus {
-  const maxTokens = TOKEN_LIMITS[model];
+  const maxTokens = TOKEN_LIMITS[model] ?? 200000;
   const messageTokens = inputTokens + outputTokens;
   const totalUsed = messageTokens + TOTAL_OVERHEAD;
   const percentage = (totalUsed / maxTokens) * 100;
@@ -285,7 +285,7 @@ export function downloadConversationExport(
 export function shouldBlockMessage(
   inputTokens: number,
   outputTokens: number,
-  model: 'opus' | 'sonnet' | 'haiku' = 'opus'
+  model: string = 'opus'
 ): { blocked: boolean; reason?: string } {
   const status = calculateTokenBudget(inputTokens, outputTokens, model);
 
@@ -305,7 +305,7 @@ export function shouldBlockMessage(
 export function getRecommendedAction(
   inputTokens: number,
   outputTokens: number,
-  model: 'opus' | 'sonnet' | 'haiku' = 'opus'
+  model: string = 'opus'
 ): {
   action: 'none' | 'suggest_compact' | 'recommend_compact' | 'force_clear';
   message: string;
@@ -369,7 +369,7 @@ export function wouldExceedLimit(
   currentInputTokens: number,
   currentOutputTokens: number,
   newMessageLength: number,
-  model: 'opus' | 'sonnet' | 'haiku' = 'opus'
+  model: string = 'opus'
 ): boolean {
   const estimatedNewTokens = estimateTokens(newMessageLength);
   const futureInputTokens = currentInputTokens + estimatedNewTokens;

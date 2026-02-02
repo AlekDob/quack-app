@@ -565,7 +565,7 @@ export function runDroidInBackground(
   droidName: string,
   prompt: string,
   options: {
-    model?: 'opus' | 'sonnet' | 'haiku';
+    model?: string;
     workingDirectory?: string;
     priority?: 'high' | 'medium' | 'low';
     chatId?: string;

@@ -102,17 +102,19 @@ async function requestFromFrontend(type, data, timeoutMs = 0) {
 }
 
 /**
- * Map friendly model names to official API model IDs
- * Must match mapping in src/services/claudeSDK.ts (frontend)
+ * Map friendly model names to official API model IDs.
+ * Hardcoded fallback - used only when frontend doesn't resolve the model ID.
+ * The frontend resolves models dynamically via Supabase (modelService.ts).
+ * This fallback ensures backward compatibility.
  */
 function getModelId(model) {
-  const modelMap = {
-    'haiku': 'claude-haiku-4-5',                 // Haiku 4.5 (latest)
-    'sonnet': 'claude-sonnet-4-5-20250929',      // Sonnet 4.5 (latest)
-    'opus': 'claude-opus-4-5-20251101',          // Opus 4.5 (latest)
+  const fallbackMap = {
+    'haiku': 'claude-haiku-4-5',
+    'sonnet': 'claude-sonnet-4-5-20250929',
+    'opus': 'claude-opus-4-5-20251101',
   };
 
-  return modelMap[model] || model; // Return as-is if not in map (allows full model IDs)
+  return fallbackMap[model] || model;
 }
 
 // Parse command line arguments

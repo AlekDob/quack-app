@@ -69,6 +69,18 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'codebase-map':
+      return (
+        <svg {...iconProps}>
+          <path d="M3 3v18h18"/>
+          <path d="M7 14l4-4 4 4 4-8"/>
+          <circle cx="7" cy="14" r="1.5"/>
+          <circle cx="11" cy="10" r="1.5"/>
+          <circle cx="15" cy="14" r="1.5"/>
+          <circle cx="19" cy="6" r="1.5"/>
+        </svg>
+      );
+
     case 'ide':
       return (
         <svg {...iconProps}>

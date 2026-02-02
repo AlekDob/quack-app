@@ -278,6 +278,15 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
 
           // Text content
           if (content.type === 'text' && content.text) {
+            // Extract "Following rules:" line into styled pills
+            const rulesMatch = content.text.match(/^(?:Following rules?:\s*)(.+)$/m);
+            const ruleNames = rulesMatch
+              ? rulesMatch[1].split(',').map((r: string) => r.trim().replace(/\.$/, '')).filter(Boolean)
+              : [];
+            const cleanedText = rulesMatch
+              ? content.text.replace(/^Following rules?:\s*.+$/m, '').replace(/^\n+/, '')
+              : content.text;
+
             return (
               <div key={idx} className="assistant-text">
                 <div className="assistant-avatar">
@@ -289,8 +298,19 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
                 </div>
                 <div className="assistant-content">
                   <div className="assistant-name">{agentName}</div>
+                  {ruleNames.length > 0 && (
+                    <div className="rules-pills">
+                      <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      {ruleNames.map((name: string) => (
+                        <span key={name} className="rule-pill">{name}</span>
+                      ))}
+                    </div>
+                  )}
                   <div className="assistant-message-text">
-                    <MarkdownText>{content.text}</MarkdownText>
+                    <MarkdownText>{cleanedText}</MarkdownText>
                   </div>
                 </div>
               </div>

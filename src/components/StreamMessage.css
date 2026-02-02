@@ -52,6 +52,36 @@
   word-wrap: break-word;
 }
 
+/* Rules Pills - inline styled badges for "Following rules:" */
+.rules-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.rules-pills-icon {
+  width: 11px;
+  height: 11px;
+  color: rgba(139, 92, 246, 0.6);
+  flex-shrink: 0;
+}
+
+.rule-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #a78bfa;
+  letter-spacing: 0.2px;
+  line-height: 1.6;
+}
+
 /* Result Message */
 .result-message {
   background: rgba(59, 130, 246, 0.08);

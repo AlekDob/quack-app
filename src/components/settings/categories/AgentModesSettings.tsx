@@ -1,13 +1,8 @@
 import { useSettingsStore } from '../../../stores/settingsStore';
 import type { EffortLevel, ThinkingMode } from '../../../types';
+import { getModelOptions } from '../../../services/modelService';
+import { useModelsConfig } from '../../../hooks/useAppConfig';
 import SectionHeader from '../controls/SectionHeader';
-
-// Options matching ChatSettingsMenu.tsx
-const modelOptions = [
-  { value: 'opus', label: 'Opus 4.5', desc: 'Most capable' },
-  { value: 'sonnet', label: 'Sonnet 4.5', desc: 'Balanced' },
-  { value: 'haiku', label: 'Haiku 4.5', desc: 'Fast & light' },
-];
 
 const thinkingModeOptions = [
   { value: 'auto' as ThinkingMode, label: 'Auto', desc: 'Let model decide' },
@@ -32,6 +27,8 @@ interface ModePresetCardProps {
 
 function ModePresetCard({ mode, title, description, color }: ModePresetCardProps) {
   const { agentModePresets, updateModePreset } = useSettingsStore();
+  const { models: remoteModels } = useModelsConfig();
+  const modelOptions = getModelOptions(remoteModels);
   const preset = agentModePresets[mode];
 
   return (
@@ -53,12 +50,12 @@ function ModePresetCard({ mode, title, description, color }: ModePresetCardProps
           <label className="mode-preset-label">Model</label>
           <select
             value={preset.model}
-            onChange={(e) => updateModePreset(mode, { model: e.target.value as 'opus' | 'sonnet' | 'haiku' })}
+            onChange={(e) => updateModePreset(mode, { model: e.target.value })}
             className="mode-preset-select"
           >
             {modelOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label} - {opt.desc}
+                {opt.label}
               </option>
             ))}
           </select>

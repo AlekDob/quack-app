@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ModelConfig } from '../services/modelService';
 
 // Default fallback values if Supabase is unreachable
 const DEFAULT_CONFIG = {
@@ -57,6 +58,7 @@ interface AppConfig {
   checkout: CheckoutConfig;
   features: FeaturesConfig;
   promotional_banner: PromotionalBannerConfig;
+  models?: ModelConfig[];
 }
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -65,10 +67,13 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 // Cache config in localStorage with 1 hour TTL
 const CACHE_KEY = 'quack_app_config';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+// Bump version when adding new config keys to invalidate stale caches
+const CACHE_VERSION = 2;
 
 interface CachedConfig {
   data: AppConfig;
   timestamp: number;
+  version?: number;
 }
 
 function getCachedConfig(): AppConfig | null {
@@ -79,8 +84,8 @@ function getCachedConfig(): AppConfig | null {
     const parsed: CachedConfig = JSON.parse(cached);
     const now = Date.now();
 
-    // Check if cache is still valid
-    if (now - parsed.timestamp < CACHE_TTL) {
+    // Check if cache version matches and is still valid
+    if (parsed.version === CACHE_VERSION && now - parsed.timestamp < CACHE_TTL) {
       return parsed.data;
     }
 
@@ -98,6 +103,7 @@ function setCachedConfig(config: AppConfig): void {
     const cached: CachedConfig = {
       data: config,
       timestamp: Date.now(),
+      version: CACHE_VERSION,
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
   } catch (error) {
@@ -133,11 +139,13 @@ async function fetchAppConfig(): Promise<AppConfig> {
     }
 
     const data = await response.json();
+    console.log('[AppConfig] Raw Supabase data:', JSON.stringify(data.map((d: { key: string }) => d.key)));
 
     // Transform array of {key, value} into config object
-    const config: Partial<AppConfig> = {};
-    data.forEach((item: { key: string; value: any }) => {
-      config[item.key as keyof AppConfig] = item.value;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const config: Record<string, any> = {};
+    data.forEach((item: { key: string; value: unknown }) => {
+      config[item.key] = item.value;
     });
 
     // Merge with defaults (in case some keys are missing)
@@ -146,12 +154,13 @@ async function fetchAppConfig(): Promise<AppConfig> {
       checkout: config.checkout || DEFAULT_CONFIG.checkout,
       features: config.features || DEFAULT_CONFIG.features,
       promotional_banner: config.promotional_banner || DEFAULT_CONFIG.promotional_banner,
+      models: config.models,
     };
 
     // Cache the result
     setCachedConfig(mergedConfig);
 
-    console.log('✅ App config loaded successfully');
+    console.log('[AppConfig] Loaded successfully. Models:', mergedConfig.models?.length ?? 'none');
     return mergedConfig;
   } catch (error) {
     console.error('❌ Error fetching app config:', error);
@@ -186,4 +195,9 @@ export function useCheckoutConfig() {
 export function useFeaturesConfig() {
   const { config, loading } = useAppConfig();
   return { features: config.features, loading };
+}
+
+export function useModelsConfig() {
+  const { config, loading } = useAppConfig();
+  return { models: config.models, loading };
 }

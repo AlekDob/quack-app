@@ -75,7 +75,7 @@ export function parseThinkingControl(prompt: string, currentMode: ThinkingMode):
 
 export interface ChatSendOptions {
   attachments?: ChatAttachment[];
-  model?: 'opus' | 'sonnet' | 'haiku';
+  model?: string;
   thinkingMode?: ThinkingMode;
   permissionMode?: PermissionMode;
   workingDirectory?: string;
@@ -201,7 +201,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   }, []);
 
   // Get current token budget status
-  const getTokenBudgetStatus = useCallback((model: 'opus' | 'sonnet' | 'haiku' = 'opus'): TokenBudgetStatus => {
+  const getTokenBudgetStatus = useCallback((model: string = 'opus'): TokenBudgetStatus => {
     return calculateTokenBudget(
       sessionTokens.inputTokens,
       sessionTokens.outputTokens,
@@ -839,7 +839,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   }, [messages]);
 
   // 🛡️ RECOVERY: Get recommended action based on current token usage
-  const getRecoveryRecommendation = useCallback((model: 'opus' | 'sonnet' | 'haiku' = 'opus') => {
+  const getRecoveryRecommendation = useCallback((model: string = 'opus') => {
     return getRecommendedAction(
       sessionTokens.inputTokens,
       sessionTokens.outputTokens,

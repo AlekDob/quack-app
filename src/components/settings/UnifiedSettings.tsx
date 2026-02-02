@@ -7,6 +7,7 @@ import ClaudeCodeSettings from './categories/ClaudeCodeSettings';
 import AIAssistantSettings from './categories/AIAssistantSettings';
 import AgentModesSettings from './categories/AgentModesSettings';
 import SecondBrainSettings from './categories/SecondBrainSettings';
+import CodebaseMapSettings from './categories/CodebaseMapSettings';
 import IDESettings from './categories/IDESettings';
 import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
@@ -52,6 +53,8 @@ export default function UnifiedSettings({
         return <AgentModesSettings />;
       case 'second-brain':
         return <SecondBrainSettings />;
+      case 'codebase-map':
+        return <CodebaseMapSettings />;
       case 'ide':
         return <IDESettings />;
       case 'license':

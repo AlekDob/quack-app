@@ -2,9 +2,10 @@
 // import { query } from '@anthropic-ai/claude-agent-sdk';
 import { invoke } from '@tauri-apps/api/core';
 import type { ClaudeEvent, MCPServer, StructuredOutputFormat, EffortLevel } from '../types';
+import { getModelId } from './modelService';
 
 export interface ClaudeSDKOptions {
-  model?: 'opus' | 'sonnet' | 'haiku';
+  model?: string;
   thinkingMode?: string;
   permissionMode?: 'plan' | 'act' | 'bypass';
   sessionId?: string;
@@ -14,25 +15,11 @@ export interface ClaudeSDKOptions {
     args: string[];
     env?: Record<string, string>;
   }>;
-  signal?: AbortSignal; // AbortSignal to cancel the stream
-  timeout?: number; // Timeout in milliseconds (default: 5 minutes)
-  streamId?: string; // Unique identifier for this stream (for logging/debugging)
-  // New SDK 0.1.54+ features
-  outputFormat?: StructuredOutputFormat; // Structured outputs (beta) - guarantees JSON schema compliance
-  effort?: EffortLevel; // Effort parameter - controls quality vs speed/cost tradeoff
-}
-
-/**
- * Map friendly model names to official API model IDs
- */
-function getModelId(model: string): string {
-  const modelMap: Record<string, string> = {
-    'haiku': 'claude-haiku-4-5',                 // Haiku 4.5 (latest)
-    'sonnet': 'claude-sonnet-4-5-20250929',      // Sonnet 4.5 (latest)
-    'opus': 'claude-opus-4-5-20251101',          // Opus 4.5 (latest)
-  };
-
-  return modelMap[model] || model; // Return as-is if not in map (allows full model IDs)
+  signal?: AbortSignal;
+  timeout?: number;
+  streamId?: string;
+  outputFormat?: StructuredOutputFormat;
+  effort?: EffortLevel;
 }
 
 /**
@@ -261,6 +248,7 @@ export async function* streamClaudeMessage(
     }
 
     // Build options object - SDK expects { prompt, options }
+    // getModelId resolves friendly name to full API model ID via modelService
     const modelId = getModelId(model);
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - Input: "${model}" → Mapped to: "${modelId}"`);
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - getModelId function returned:`, modelId);

@@ -2046,7 +2046,7 @@ function AppContent() {
       status: 'streaming',
       // Store settings used for this message (for UI display)
       settings: {
-        model: (options?.model || 'sonnet') as 'opus' | 'sonnet' | 'haiku',
+        model: options?.model || 'sonnet',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2700,7 +2700,7 @@ function AppContent() {
       timestamp: 0,
       status: 'streaming',
       settings: {
-        model: (options?.model || 'sonnet') as 'opus' | 'sonnet' | 'haiku',
+        model: options?.model || 'sonnet',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2878,7 +2878,7 @@ function AppContent() {
         timestamp: Date.now(),
         status: 'complete' as const,
         settings: {
-          model: (options?.model || 'sonnet') as 'opus' | 'sonnet' | 'haiku',
+          model: options?.model || 'sonnet',
           effort: options?.effort || 'medium',
           thinkingMode: options?.thinkingMode || 'auto',
         },
@@ -3873,12 +3873,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
   // Agent Chat Settings helpers - get or create settings for current agent
-  // Normalize model name from legacy full IDs to short names
-  const normalizeModelName = (model: string): 'opus' | 'sonnet' | 'haiku' => {
-    if (model.includes("opus")) return "opus";
-    if (model.includes("sonnet")) return "sonnet";
-    if (model.includes("haiku")) return "haiku"; // Haiku 4.5 (default)
-    return "sonnet"; // Fallback to sonnet if unknown
+  // Normalize legacy full model IDs (e.g. "claude-sonnet-4-5-20250929") to short names
+  // Short IDs from modelService (e.g. "sonnet5", "opus") pass through unchanged
+  const normalizeModelName = (model: string): string => {
+    // Only normalize legacy full API model IDs (contain "claude-")
+    if (model.startsWith("claude-")) {
+      if (model.includes("opus")) return "opus";
+      if (model.includes("haiku")) return "haiku";
+      // Match sonnet last since it's the broadest
+      if (model.includes("sonnet")) return "sonnet";
+    }
+    // Short IDs (opus, sonnet, sonnet5, haiku, etc.) pass through as-is
+    return model;
   };
 
   // 🦆 SESSIONS-FIRST: Use sessionId for settings if available, fallback to agentId
@@ -10311,7 +10317,7 @@ You have access to all Bash tools to execute git commands like:
                       getLastPrompt={getLastPromptForTargetAgent}
                       sessionTokensMap={chatTokensMap}
                       onCreateNewAgent={handleOpenNewAgentForKanban}
-                      defaultModel={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                      defaultModel={currentSettings.model}
                       defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
                       defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
                       defaultEffort={currentSettings.effort || 'medium'}
@@ -10464,7 +10470,7 @@ You have access to all Bash tools to execute git commands like:
                         updateAgentSettings({ inputDraft: draft });
                       }
                     }}
-                    model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                    model={currentSettings.model}
                     onModelChange={(model) => updateAgentSettings({ model })}
                     thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
                     onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
@@ -10601,7 +10607,7 @@ You have access to all Bash tools to execute git commands like:
                         return newMap;
                       });
                     }}
-                    model={currentSettings.model as 'opus' | 'sonnet' | 'haiku'}
+                    model={currentSettings.model}
                     onModelChange={(model) => updateAgentSettings({ model })}
                     thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
                     onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}

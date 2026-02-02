@@ -24,8 +24,8 @@
   gap: 8px;
 }
 
-/* 🧠 Thinking Mode Toggle Button */
-.chat-thinking-toggle {
+/* 🧠 Brain Update Button */
+.chat-brain-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,7 +43,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.chat-thinking-toggle:hover {
+.chat-brain-btn:hover {
   background: rgba(167, 139, 250, 0.15);
   border-color: rgba(167, 139, 250, 0.4);
   color: rgba(167, 139, 250, 0.9);
@@ -51,20 +51,7 @@
   box-shadow: 0 2px 6px rgba(167, 139, 250, 0.2);
 }
 
-.chat-thinking-toggle.active {
-  background: rgba(167, 139, 250, 0.2);
-  border-color: rgba(167, 139, 250, 0.6);
-  color: rgba(167, 139, 250, 1);
-  box-shadow: 0 0 12px rgba(167, 139, 250, 0.3);
-}
-
-.chat-thinking-toggle.active:hover {
-  background: rgba(167, 139, 250, 0.25);
-  border-color: rgba(167, 139, 250, 0.7);
-  box-shadow: 0 0 16px rgba(167, 139, 250, 0.4);
-}
-
-.chat-thinking-toggle:disabled {
+.chat-brain-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

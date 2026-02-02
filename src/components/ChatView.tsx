@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import { Brain } from 'lucide-react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
@@ -61,8 +62,8 @@ interface ChatViewProps {
   // Agent Chat Settings - controlled from parent
   inputDraft?: string;
   onInputDraftChange?: (draft: string) => void;
-  model?: 'opus' | 'sonnet' | 'haiku';
-  onModelChange?: (model: 'opus' | 'sonnet' | 'haiku') => void;
+  model?: string;
+  onModelChange?: (model: string) => void;
   thinkingMode?: ThinkingMode;
   onThinkingModeChange?: (mode: ThinkingMode) => void;
   permissionMode?: PermissionMode;
@@ -687,50 +688,26 @@ export default function ChatView({
             thinkingMode={thinkingMode}
             permissionMode={permissionMode}
             effort={effort}
-            onModelChange={(m) => onModelChange?.(m as 'opus' | 'sonnet' | 'haiku')}
+            onModelChange={(m) => onModelChange?.(m)}
             onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
             onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
             onEffortChange={(e) => onEffortChange?.(e)}
             disabled={isLoading}
           />
-          {/* 🧠 Thinking Toggle - shows/hides existing blocks OR enables thinking for future */}
-          <button
-            className={`chat-thinking-toggle ${
-              (hasThinkingBlocks && showThinkingBlocks) || (thinkingMode && thinkingMode !== 'auto')
-                ? 'active'
-                : ''
-            }`}
-            onClick={() => {
-              if (hasThinkingBlocks) {
-                // Toggle visibility of existing thinking blocks
-                setShowThinkingBlocks(prev => !prev);
-                console.log('[ChatView] 🧠 Thinking blocks visibility:', !showThinkingBlocks);
-              } else {
-                // Toggle thinking mode for future requests
-                const currentMode = thinkingMode || 'auto';
-                const newMode = currentMode === 'auto' ? 'think' : 'auto';
-                onThinkingModeChange?.(newMode);
-                console.log('[ChatView] 🧠 Thinking mode toggled:', currentMode, '→', newMode);
-              }
-            }}
-            disabled={isLoading}
-            title={
-              hasThinkingBlocks
-                ? showThinkingBlocks
-                  ? 'Hide thinking blocks'
-                  : 'Show thinking blocks'
-                : thinkingMode && thinkingMode !== 'auto'
-                  ? `Thinking: ${thinkingMode} (click to disable)`
-                  : 'Enable Extended Thinking'
-            }
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a8 8 0 0 0-8 8c0 3 1.5 5.5 4 7v3h8v-3c2.5-1.5 4-4 4-7a8 8 0 0 0-8-8z" />
-              <path d="M9 22h6" />
-              <path d="M12 2v2" />
-              <path d="M8.5 8.5c0-1.5 1.5-2.5 3.5-2.5" />
-            </svg>
-          </button>
+          {/* Brain Update - injects prompt to update Quack Brain with session progress */}
+          {messages.length > 0 && (
+            <button
+              className="chat-brain-btn"
+              onClick={() => {
+                const prompt = 'Update the Quack Brain with the progress and discoveries made in this session. Only add new items not already documented — check existing brain entries before creating duplicates.';
+                onSendMessage(prompt);
+              }}
+              disabled={isLoading}
+              title="Update Quack Brain with session progress"
+            >
+                <Brain size={16} />
+            </button>
+          )}
           <TokenUsageIndicator
             inputTokens={sessionTokens.inputTokens}
             outputTokens={sessionTokens.outputTokens}

@@ -60,7 +60,7 @@ interface UseBackgroundAgentsReturn {
     droidName: string,
     prompt: string,
     options?: {
-      model?: 'opus' | 'sonnet' | 'haiku';
+      model?: string;
       workingDirectory?: string;
       priority?: BackgroundTaskPriority;
       chatId?: string;
@@ -201,7 +201,7 @@ export function useBackgroundAgents(): UseBackgroundAgentsReturn {
       droidName: string,
       prompt: string,
       options?: {
-        model?: 'opus' | 'sonnet' | 'haiku';
+        model?: string;
         workingDirectory?: string;
         priority?: BackgroundTaskPriority;
         chatId?: string;

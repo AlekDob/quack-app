@@ -49,7 +49,7 @@ interface KanbanViewProps {
   // New Agent creation
   onCreateNewAgent?: (projectPath: string) => void;
   // Default settings from global settings
-  defaultModel?: 'opus' | 'sonnet' | 'haiku';
+  defaultModel?: string;
   defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
   defaultPermissionMode?: 'plan' | 'bypass';
   defaultEffort?: 'low' | 'medium' | 'high';

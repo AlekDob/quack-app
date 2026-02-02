@@ -26,12 +26,15 @@ const AGENT_COLORS: Record<string, string> = {
   pink: "#EC4899",
 };
 
-// Model name mapping for display and storage
+// Normalize legacy full API model IDs to short names
+// Short IDs from modelService (e.g. "sonnet5", "opus") pass through unchanged
 const getModelDisplayName = (model: string): string => {
-  if (model.includes("opus")) return "opus";
-  if (model.includes("sonnet")) return "sonnet";
-  if (model.includes("haiku")) return "haiku"; // Haiku 4.5 (default)
-  return model; // fallback to full model name
+  if (model.startsWith("claude-")) {
+    if (model.includes("opus")) return "opus";
+    if (model.includes("haiku")) return "haiku";
+    if (model.includes("sonnet")) return "sonnet";
+  }
+  return model;
 };
 
 // Convert full model name to short name for storage
