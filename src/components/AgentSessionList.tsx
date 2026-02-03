@@ -308,12 +308,13 @@ function AgentSessionList({
   return (
     <div style={{ marginTop: '4px' }}>
       {/* Session list */}
-      {visibleSessions.map((session) => {
+      {visibleSessions.map((session, index) => {
         const isLoadingForSession = chatLoadingMap.get(session.id) ?? false;
         // 🦆 FIX: Check pending questions using session.id (the sessionKey from the event)
         // pendingQuestionsMap is now keyed by sessionId (not agentId) to show "?" only on the correct session
         const pendingQuestionsSet = pendingQuestionsMap.get(session.id);
         const hasPendingQuestion = pendingQuestionsSet ? pendingQuestionsSet.size > 0 : false;
+        const isLast = index === visibleSessions.length - 1;
         return (
           <AgentSessionItem
             key={session.id}
@@ -321,6 +322,7 @@ function AgentSessionList({
             onClick={onSessionClick}
             isActive={session.id === activeSessionId}
             agentColor={agentColor}
+            isLast={isLast}
             // 🦆 SESSIONS-FIRST: Pass chat data for activity indicators
             chatMessages={chatSessions.get(session.id) || []}
             isLoading={isLoadingForSession}

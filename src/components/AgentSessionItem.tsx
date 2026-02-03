@@ -9,6 +9,8 @@ interface AgentSessionItemProps {
   onClick: (sessionId: string) => void;
   isActive?: boolean;
   agentColor?: string;
+  /** Whether this is the last session in the list (for metro line termination) */
+  isLast?: boolean;
   /** Chat messages for this session (to determine badge/status) */
   chatMessages?: ChatMessage[];
   /** Whether the session is currently loading (streaming response) */
@@ -54,6 +56,7 @@ function AgentSessionItem({
   onClick,
   isActive = false,
   agentColor = '#00D4FF',
+  isLast = false,
   chatMessages = [],
   isLoading = false,
   hasPendingQuestion = false,
@@ -174,59 +177,95 @@ function AgentSessionItem({
 
   return (
     <div
-      ref={itemRef}
-      className="session-item"
-      onClick={handleDirectClick}
-      onContextMenu={handleContextMenu}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleDirectClick();
-        }
-      }}
+      className="session-item-wrapper"
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '6px 10px',
-        marginBottom: '4px',
-        background: isActive ? `${agentColor}35` : `${agentColor}15`,
-        border: isActive
-          ? `2px solid ${agentColor}`
-          : `1px solid ${agentColor}33`,
-        borderRadius: '4px',
-        cursor: 'pointer',
-        fontSize: '12px',
-        color: isActive ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.85)',
-        transition: 'all 0.2s ease',
-        boxShadow: isActive ? `0 0 8px ${agentColor}55` : 'none',
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.background = `${agentColor}25`;
-          e.currentTarget.style.borderColor = `${agentColor}55`;
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.background = `${agentColor}15`;
-          e.currentTarget.style.borderColor = `${agentColor}33`;
-        }
+        position: 'relative',
       }}
     >
+      {/* Metro horizontal connector line */}
+      <div
+        className="metro-horizontal-line"
+        style={{
+          position: 'absolute',
+          left: '-12px',
+          top: '50%',
+          width: '10px',
+          height: '2px',
+          background: agentColor,
+          opacity: 0.4,
+          transform: 'translateY(-50%)',
+        }}
+      />
+      {/* Metro station dot - positioned at the end of horizontal line */}
+      <div
+        className="metro-station-dot"
+        style={{
+          position: 'absolute',
+          left: '-4px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          background: isActive ? agentColor : '#1a1a2e',
+          border: `2px solid ${agentColor}`,
+          zIndex: 5,
+          transition: 'all 0.2s ease',
+          boxShadow: isActive ? `0 0 6px ${agentColor}` : 'none',
+        }}
+      />
+      <div
+        ref={itemRef}
+        className="session-item"
+        onClick={handleDirectClick}
+        onContextMenu={handleContextMenu}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleDirectClick();
+          }
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 8px',
+          marginBottom: isLast ? '16px' : '6px', // Extra margin for last session
+          flex: 1,
+          background: isActive ? `${agentColor}35` : `${agentColor}15`,
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '10px',
+          color: isActive ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.7)',
+          transition: 'all 0.2s ease',
+          boxShadow: isActive ? `0 0 8px ${agentColor}40` : 'none',
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.background = `${agentColor}25`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.background = `${agentColor}15`;
+          }
+        }}
+      >
       {/* Activity Indicator Dot - Purple (awaiting), Yellow (working), Green (ready), Gray (empty) */}
       {/* NOTE: "Quack quack..." tooltip removed - shown at AGENT level, not session level */}
-      <div style={{ position: 'relative', flexShrink: 0, width: '12px', height: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', flexShrink: 0, width: '10px', height: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div
           className={getDotClassName()}
           style={{
-            width: hasPendingQuestion ? '12px' : '8px',
-            height: hasPendingQuestion ? '12px' : '8px',
+            width: hasPendingQuestion ? '10px' : '6px',
+            height: hasPendingQuestion ? '10px' : '6px',
             borderRadius: '50%',
             background: dotColor,
-            boxShadow: `0 0 6px ${dotColor}`,
+            boxShadow: `0 0 4px ${dotColor}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -266,8 +305,8 @@ function AgentSessionItem({
       {/* Relative Time */}
       <span
         style={{
-          fontSize: '10px',
-          color: 'rgba(255, 255, 255, 0.5)',
+          fontSize: '9px',
+          color: 'rgba(255, 255, 255, 0.45)',
           flexShrink: 0,
         }}
       >
@@ -335,6 +374,7 @@ function AgentSessionItem({
         </div>,
         document.body
       )}
+      </div>
     </div>
   );
 }

@@ -364,9 +364,9 @@ function SortableAgent({
     return lastReadTimestamps.get(agent.id) || 0;
   }, [lastReadTimestamps, agent.id]);
 
-  // Memoize agent card background style - NO highlight for waiting (badge dot instead!)
+  // Memoize agent card background style
   const agentCardBg = useMemo(() => {
-    if (isActive) return `${agent.color}28`; // Increased from 15 to 28 (2x opacity, ~16%)
+    if (isActive) return `${agent.color}28`; // ~16% opacity - active state
     if (isHovered) return "rgba(255, 255, 255, 0.03)";
     return "transparent";
   }, [isActive, isHovered, agent.color]);
@@ -589,65 +589,7 @@ function SortableAgent({
         onDragStart={handleNativeDragStart}
         onDragEnd={handleNativeDragEnd}
       >
-        {/* LEFT SECTION: Timing + Metro Station (OUTSIDE colored background) */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            minWidth: "35px",
-          }}
-        >
-          {/* 🦆 Relative Time - ALWAYS visible, positioned left of metro-station */}
-          {relativeTime ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "9px",
-                fontWeight: 600,
-                lineHeight: "1",
-                pointerEvents: "none",
-                userSelect: "none",
-                minWidth: "20px",
-              }}
-            >
-              {/* Value - agent color when <5 min, white otherwise */}
-              <div
-                style={{
-                  marginBottom: "1px",
-                  color:
-                    relativeTime.minutes < 5
-                      ? agent.color
-                      : `rgba(255, 255, 255, ${timestampOpacity})`,
-                  transition: "color 1s ease",
-                }}
-              >
-                {relativeTime.value}
-              </div>
-              {/* Unit - agent color when <5 min, slightly dimmer white otherwise */}
-              <div
-                style={{
-                  fontSize: "7px",
-                  color:
-                    relativeTime.minutes < 5
-                      ? agent.color
-                      : `rgba(255, 255, 255, ${timestampOpacity * 0.75})`,
-                  transition: "color 1s ease",
-                }}
-              >
-                {relativeTime.unit}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Metro Station Dot/Diamond */}
-          <div className="metro-station" style={metroStationStyle} />
-        </div>
-
-        {/* RIGHT SECTION: Colored Background with Avatar + Content */}
+        {/* Agent Card - No left timing section */}
         <div
           className="agent-card flex items-center"
           onClick={handleSelect}
@@ -656,36 +598,36 @@ function SortableAgent({
           onMouseLeave={() => setIsHovered(false)}
           style={{
             flex: 1,
-            padding: "8px 12px",
+            padding: "6px 10px",
             paddingLeft: "8px",
+            marginTop: "4px",
             background: agentCardBg,
-            borderRadius: "6px",
+            borderRadius: "5px",
             cursor: "pointer",
             transition:
               "background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
             position: "relative",
             display: "flex",
             alignItems: "center",
-            gap: "12px",
-            minHeight: "48px",
-            // Add white border only when selected (in focus)
+            gap: "8px",
+            minHeight: "36px",
+            // Border with agent color (more visible when active)
             border: isActive
-              ? "2px solid rgba(255, 255, 255, 0.6)"
-              : "1px solid rgba(255, 255, 255, 0.1)",
+              ? `2px solid ${agent.color}`
+              : `1px solid ${agent.color}55`,
             boxShadow: isActive
-              ? "0 0 12px rgba(255, 255, 255, 0.15)"
+              ? `0 0 8px ${agent.color}40`
               : undefined,
-            // Reduce opacity for dormant/empty agents (matches sleep icon in TerminalActivityBar)
-            // But always full opacity when selected (isActive)
+            // Reduce opacity for dormant/empty agents
             opacity: isActive ? 1 : isChatEmpty || isDormant ? 0.7 : 1,
           }}
         >
           {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
           <div
             style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "6px",
+              width: "32px",
+              height: "32px",
+              borderRadius: "5px",
               border: `2px solid ${agent.color}66`,
               display: "flex",
               alignItems: "center",
@@ -730,7 +672,7 @@ function SortableAgent({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "16px",
+                  fontSize: "13px",
                   fontWeight: 700,
                   color: agent.color,
                 }}
@@ -1979,12 +1921,31 @@ export default function RepositoryGroup({
                               : undefined
                           }
                         />
-                        {/* Sessions under this agent - always visible */}
+                        {/* Sessions under this agent - always visible - with metro line */}
                         {onSessionClick && (
                           <div
                             className="agent-sessions-container"
-                            style={{ marginLeft: "44px", marginTop: "4px" }}
+                            style={{
+                              marginLeft: "8px",
+                              marginTop: "4px",
+                              position: "relative",
+                              paddingLeft: "20px", // Space for metro line
+                            }}
                           >
+                            {/* Metro line connecting agent to sessions */}
+                            <div
+                              className="metro-line-agent-sessions"
+                              style={{
+                                position: "absolute",
+                                left: "8px",
+                                top: "-4px", // Extend up to connect with agent card
+                                bottom: "22px", // Stop before going below last session's horizontal connector
+                                width: "2px",
+                                background: agent.color,
+                                opacity: 0.4,
+                                borderRadius: "1px",
+                              }}
+                            />
                             <AgentSessionList
                               agentId={agent.id}
                               agentColor={agent.color}
@@ -2353,7 +2314,7 @@ export default function RepositoryGroup({
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "4px",
-                                minWidth: "35px",
+                                minWidth: "16px",
                               }}
                             >
                               {/* 🦆 Relative Time - ALWAYS visible, positioned left of metro-station */}

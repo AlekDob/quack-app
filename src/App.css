@@ -1214,7 +1214,35 @@ button.directory-chooser:disabled {
 .sidebar-header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  padding: 8px 12px 6px 80px; /* left padding for traffic lights */
+  -webkit-app-region: drag;
+}
+
+.new-project-btn-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.new-project-btn-sidebar:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.new-project-btn-sidebar svg {
+  opacity: 0.7;
 }
 
 .sidebar-title {
@@ -1290,6 +1318,145 @@ button.directory-chooser:disabled {
 
 .sidebar-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* ===================================
+   CODEX-STYLE SIDEBAR
+   =================================== */
+
+.sidebar.sidebar-codex {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.sidebar.sidebar-codex::before {
+  display: none;
+}
+
+.sidebar-header.sidebar-header-codex {
+  background: transparent;
+  border-bottom: none;
+  box-shadow: none;
+  padding: 12px;
+  padding-top: 38px; /* Space for macOS traffic lights */
+  gap: 8px;
+}
+
+.sidebar-header-codex .sidebar-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* New Project Button - Codex style */
+.sidebar-new-project-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-new-project-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar-new-project-btn:active {
+  transform: scale(0.98);
+}
+
+.sidebar-new-project-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sidebar-new-project-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Individual action icon */
+.sidebar-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-action-icon:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar-action-icon:active {
+  transform: scale(0.95);
+}
+
+.sidebar-action-icon.active {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+.sidebar-action-icon.sound-on {
+  color: #4dd4b3;
+}
+
+.sidebar-action-icon.sound-off {
+  color: rgba(255, 59, 48, 0.7);
+}
+
+.sidebar-action-icon.sidebar-action-new {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-action-icon.sidebar-action-new:hover {
+  color: #f28c52;
+}
+
+.sidebar-action-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Compact search input */
+.explorer-search.explorer-search-codex {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.explorer-search.explorer-search-codex::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.explorer-search.explorer-search-codex:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-footer {
@@ -11301,4 +11468,134 @@ button.directory-chooser:disabled {
 
 .agent-card--responding {
   border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+
+/* ===================================
+   HIDE METRO LINE AND STATIONS
+   (Codex-style minimal sidebar)
+   =================================== */
+
+/* Hide continuous metro line */
+.continuous-metro-line {
+  display: none !important;
+}
+
+/* Hide all metro station dots and diamonds */
+.metro-station,
+.metro-station-diamond,
+.metro-station-dot {
+  display: none !important;
+}
+
+/* Hide any pseudo-element lines in branch groups */
+.branch-group::before,
+.branch-group::after {
+  display: none !important;
+}
+
+/* ===================================
+   SIDEBAR LEFT COMPACT - Codex Style
+   Uniform small fonts matching right column
+   =================================== */
+
+/* Search input - smaller */
+.sidebar.sidebar-codex .explorer-search.explorer-search-codex {
+  font-size: 11px !important;
+  padding: 5px 8px !important;
+}
+
+/* New project button - more visible */
+.new-project-btn-sidebar {
+  font-size: 12px !important;
+  padding: 5px 12px !important;
+}
+
+.new-project-btn-sidebar svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Repository/Project name - smaller */
+.repository-group .font-semibold {
+  font-size: 12px !important;
+}
+
+/* Branch info label (main (3 agents)) - smaller */
+.repository-group .text-xs {
+  font-size: 10px !important;
+}
+
+/* Agent card - more compact */
+.sidebar.sidebar-codex .agent-card {
+  padding: 6px 10px !important;
+  padding-left: 6px !important;
+  gap: 8px !important;
+  min-height: 40px !important;
+}
+
+/* Agent avatar - smaller */
+.sidebar.sidebar-codex .agent-card > div:first-child {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* Agent name - larger for readability */
+.sidebar.sidebar-codex .terminal-name {
+  font-size: 14px !important;
+}
+
+/* Agent role - larger */
+.sidebar.sidebar-codex .role-mission {
+  font-size: 12px !important;
+}
+
+/* Session items - larger */
+.sidebar.sidebar-codex .session-item {
+  padding: 5px 10px !important;
+  font-size: 13px !important;
+}
+
+/* Session title */
+.sidebar.sidebar-codex .session-title {
+  font-size: 13px !important;
+}
+
+/* Session time ago */
+.sidebar.sidebar-codex .session-time {
+  font-size: 11px !important;
+}
+
+/* Settings button - more compact */
+.sidebar-settings-button {
+  padding: 10px 14px !important;
+}
+
+.sidebar-settings-label {
+  font-size: 13px !important;
+}
+
+.sidebar-settings-icon {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.sidebar-settings-version {
+  font-size: 11px !important;
+}
+
+/* Relative time in agent card */
+.sidebar.sidebar-codex .agent-card .flex-col {
+  font-size: 10px !important;
+}
+
+/* Repository group margin - tighter */
+.repository-group {
+  margin-bottom: 10px !important;
+}
+
+/* Section labels uppercase */
+.section-label {
+  font-size: 10px !important;
+  letter-spacing: 0.12em !important;
 }
