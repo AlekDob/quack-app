@@ -5,186 +5,88 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quack</title>
-    <!-- Inline splash screen - shows BEFORE React loads -->
     <style>
       html, body, #root {
         margin: 0;
         padding: 0;
         height: 100%;
-        background-color: #0f0f1a;
+        background-color: #0a0a0c;
       }
 
-      /* Native splash screen - visible before React */
-      #native-splash {
+      /* Overlay loader - masks everything until backend loads */
+      #app-loader {
         position: fixed;
         inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        background:
-          radial-gradient(ellipse 80% 50% at 50% 120%, rgba(255, 107, 53, 0.3) 0%, transparent 50%),
-          radial-gradient(ellipse 60% 40% at 20% 20%, rgba(139, 92, 246, 0.2) 0%, transparent 40%),
-          radial-gradient(ellipse 50% 30% at 80% 30%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
-          linear-gradient(180deg, #0a0a12 0%, #12121f 50%, #0f0f1a 100%);
+        background-color: #0a0a0c;
         z-index: 99999;
-        overflow: hidden;
+        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
-      /* Rotating gradient overlay */
-      #native-splash::before {
-        content: '';
-        position: absolute;
-        inset: -50%;
-        background:
-          conic-gradient(from 0deg at 50% 50%,
-            transparent 0deg,
-            rgba(255, 107, 53, 0.1) 60deg,
-            transparent 120deg,
-            rgba(139, 92, 246, 0.08) 180deg,
-            transparent 240deg,
-            rgba(59, 130, 246, 0.08) 300deg,
-            transparent 360deg
-          );
-        animation: nativeGradientRotate 8s linear infinite;
+      #app-loader.fade-out {
+        opacity: 0;
+        pointer-events: none;
       }
 
-      @keyframes nativeGradientRotate {
-        to { transform: rotate(360deg); }
+      /* Ensure app content is ready before reveal */
+      #root {
+        opacity: 1;
       }
 
-      #native-splash.fade-out {
-        animation: nativeFadeOut 0.3s ease-out forwards;
+      /* Three dots loader */
+      .loader-dots {
+        display: flex;
+        gap: 8px;
       }
 
-      @keyframes nativeFadeOut {
-        to { opacity: 0; pointer-events: none; }
-      }
-
-      /* Main glow orb */
-      .native-glow-orb {
-        position: absolute;
-        width: 400px;
-        height: 400px;
+      .loader-dots span {
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(255,107,53,0.5) 0%, rgba(242,140,82,0.3) 30%, rgba(230,126,34,0.1) 50%, transparent 70%);
-        filter: blur(60px);
-        animation: nativeOrbPulse 2s ease-in-out infinite;
+        background: #FF6B35;
+        animation: dotPulse 1.4s ease-in-out infinite;
       }
 
-      /* Purple accent orb */
-      .native-glow-orb::before {
-        content: '';
-        position: absolute;
-        top: -100px;
-        left: -150px;
-        width: 200px;
-        height: 200px;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(139,92,246,0.4) 0%, transparent 70%);
-        filter: blur(40px);
-        animation: nativeOrbFloat 3s ease-in-out infinite;
+      .loader-dots span:nth-child(2) {
+        animation-delay: 0.2s;
       }
 
-      /* Blue accent orb */
-      .native-glow-orb::after {
-        content: '';
-        position: absolute;
-        bottom: -80px;
-        right: -120px;
-        width: 180px;
-        height: 180px;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(59,130,246,0.35) 0%, transparent 70%);
-        filter: blur(35px);
-        animation: nativeOrbFloat 2.5s ease-in-out infinite reverse;
+      .loader-dots span:nth-child(3) {
+        animation-delay: 0.4s;
       }
 
-      @keyframes nativeOrbPulse {
-        0%, 100% { transform: scale(0.9); opacity: 0.7; }
-        50% { transform: scale(1.1); opacity: 1; }
-      }
-
-      @keyframes nativeOrbFloat {
-        0%, 100% { transform: translate(0, 0); }
-        50% { transform: translate(20px, -15px); }
-      }
-
-      /* Title */
-      .native-title {
-        position: relative;
-        z-index: 1;
-        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-        font-size: 72px;
-        font-weight: 700;
-        letter-spacing: 8px;
-        color: #fff;
-        margin: 0;
-        text-shadow:
-          0 0 20px rgba(242, 140, 82, 0.8),
-          0 0 40px rgba(255, 107, 53, 0.5),
-          0 0 60px rgba(230, 126, 34, 0.3);
-        animation: nativeGlow 2s ease-in-out infinite;
-      }
-
-      @keyframes nativeGlow {
-        0%, 100% {
-          text-shadow:
-            0 0 20px rgba(242, 140, 82, 0.8),
-            0 0 40px rgba(255, 107, 53, 0.5),
-            0 0 60px rgba(230, 126, 34, 0.3);
+      @keyframes dotPulse {
+        0%, 80%, 100% {
+          transform: scale(0.5);
+          opacity: 0.3;
         }
-        50% {
-          text-shadow:
-            0 0 30px rgba(242, 140, 82, 1),
-            0 0 60px rgba(255, 107, 53, 0.8),
-            0 0 100px rgba(230, 126, 34, 0.5),
-            0 0 140px rgba(242, 140, 82, 0.3);
+        40% {
+          transform: scale(1);
+          opacity: 1;
         }
       }
 
-      /* Logo */
-      .native-logo {
-        width: 180px;
-        height: 180px;
-        margin-bottom: -30px;
-        opacity: 0;
-        transform: scale(0.5);
-        animation: nativeLogoReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        filter: drop-shadow(0 0 25px rgba(255, 107, 53, 0.5))
-                drop-shadow(0 0 50px rgba(242, 140, 82, 0.3));
-      }
-
-      @keyframes nativeLogoReveal {
-        to { opacity: 1; transform: scale(1); }
-      }
-
-      /* Tagline */
-      .native-tagline {
-        position: relative;
-        z-index: 1;
-        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-        font-size: 18px;
-        font-weight: 400;
-        letter-spacing: 1px;
-        color: rgba(255, 255, 255, 0.6);
-        margin: 0;
-        opacity: 0;
-        animation: nativeTaglineFadeIn 0.5s ease-out 0.3s forwards;
-      }
-
-      @keyframes nativeTaglineFadeIn {
-        to { opacity: 1; }
+      /* Reduced motion support */
+      @media (prefers-reduced-motion: reduce) {
+        .loader-dots span {
+          animation: none;
+          opacity: 0.7;
+        }
+        #app-loader {
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
-    <!-- Native splash - visible instantly -->
-    <div id="native-splash">
-      <div class="native-glow-orb"></div>
-      <div style="display: flex; flex-direction: column; align-items: center; gap: 0;">
-        <img src="./images/quackapp.png" alt="Quack Logo" class="native-logo" />
-        <h1 class="native-title">Quack</h1>
-        <p class="native-tagline">A Visual IDE for Claude Code Believers</p>
+    <!-- Overlay loader - stays on top until backend data loads -->
+    <div id="app-loader">
+      <div class="loader-dots">
+        <span></span>
+        <span></span>
+        <span></span>
       </div>
     </div>
 

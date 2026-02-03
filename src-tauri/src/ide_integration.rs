@@ -1,12 +1,14 @@
 //! IDE Integration Module
 //!
 //! Provides Tauri commands for detecting and interacting with external IDEs.
-//! Supports: VS Code, Cursor, Windsurf, Zed, JetBrains IDEs, Sublime Text
+//! Supports: VS Code, Cursor, Windsurf, Zed, JetBrains IDEs, Sublime Text, Xcode, Android Studio
+//! Also supports: Terminal apps (Terminal, Warp, Ghostty, iTerm) and Finder
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 /// Information about a detected IDE
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +20,16 @@ pub struct IDEInfo {
     pub cli_available: bool,
     pub app_exists: bool,
     pub supports_diff: bool,
+}
+
+/// Information about an installed app (IDE, Terminal, or Finder)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstalledApp {
+    pub id: String,
+    pub name: String,
+    pub app_path: String,
+    pub category: String, // "ide", "terminal", "finder"
+    pub icon_base64: Option<String>, // Base64 encoded PNG icon
 }
 
 /// IDE Registry entry
@@ -36,7 +48,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
     // VS Code Family
     IDEEntry {
         id: "vscode",
-        name: "Visual Studio Code",
+        name: "VS Code",
         bundle_id: "com.microsoft.VSCode",
         cli: "code",
         app_path: "/Applications/Visual Studio Code.app",
@@ -126,6 +138,81 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Sublime Text.app",
         cli_style: "sublime",
         supports_diff: false,
+    },
+    // Xcode
+    IDEEntry {
+        id: "xcode",
+        name: "Xcode",
+        bundle_id: "com.apple.dt.Xcode",
+        cli: "xed",
+        app_path: "/Applications/Xcode.app",
+        cli_style: "xcode",
+        supports_diff: false,
+    },
+    // Android Studio
+    IDEEntry {
+        id: "android-studio",
+        name: "Android Studio",
+        bundle_id: "com.google.android.studio",
+        cli: "studio",
+        app_path: "/Applications/Android Studio.app",
+        cli_style: "jetbrains",
+        supports_diff: false,
+    },
+    // Antigravity (Vue/Nuxt IDE)
+    IDEEntry {
+        id: "antigravity",
+        name: "Antigravity",
+        bundle_id: "dev.niceprogrammer.Antigravity",
+        cli: "antigravity",
+        app_path: "/Applications/Antigravity.app",
+        cli_style: "vscode",
+        supports_diff: false,
+    },
+];
+
+/// App entry for terminals and Finder
+struct AppEntry {
+    id: &'static str,
+    name: &'static str,
+    app_path: &'static str,
+    category: &'static str,
+}
+
+/// Terminals and Finder registry
+const APP_REGISTRY: &[AppEntry] = &[
+    // Finder (always available on macOS)
+    AppEntry {
+        id: "finder",
+        name: "Finder",
+        app_path: "/System/Library/CoreServices/Finder.app",
+        category: "finder",
+    },
+    // Built-in Terminal
+    AppEntry {
+        id: "terminal",
+        name: "Terminal",
+        app_path: "/System/Applications/Utilities/Terminal.app",
+        category: "terminal",
+    },
+    // Third-party terminals
+    AppEntry {
+        id: "ghostty",
+        name: "Ghostty",
+        app_path: "/Applications/Ghostty.app",
+        category: "terminal",
+    },
+    AppEntry {
+        id: "warp",
+        name: "Warp",
+        app_path: "/Applications/Warp.app",
+        category: "terminal",
+    },
+    AppEntry {
+        id: "iterm",
+        name: "iTerm",
+        app_path: "/Applications/iTerm.app",
+        category: "terminal",
     },
 ];
 
@@ -744,4 +831,137 @@ pub fn open_multiple_files_in_ide(ide_id: String, file_paths: Vec<String>) -> Re
         Ok(_) => Ok(format!("Opened {} files in {}", file_paths.len(), entry.name)),
         Err(e) => Err(format!("Failed to open files: {}", e)),
     }
+}
+
+/// Extract app icon as base64 PNG using sips (macOS built-in)
+fn get_app_icon_base64(app_path: &str) -> Option<String> {
+    // Find the .icns file in the app bundle
+    let contents_path = format!("{}/Contents", app_path);
+    let info_plist = format!("{}/Info.plist", contents_path);
+
+    // Try to read CFBundleIconFile from Info.plist
+    let icon_name = Command::new("defaults")
+        .arg("read")
+        .arg(&info_plist)
+        .arg("CFBundleIconFile")
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                Some(if name.ends_with(".icns") { name } else { format!("{}.icns", name) })
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "AppIcon.icns".to_string());
+
+    let icns_path = format!("{}/Resources/{}", contents_path, icon_name);
+
+    // Check if icns exists
+    if !Path::new(&icns_path).exists() {
+        // Try alternative icon locations
+        let alternatives = [
+            format!("{}/Resources/AppIcon.icns", contents_path),
+            format!("{}/Resources/app.icns", contents_path),
+            format!("{}/Resources/Icon.icns", contents_path),
+        ];
+
+        let found_icns = alternatives.iter().find(|p| Path::new(p).exists());
+        if found_icns.is_none() {
+            log::warn!("[IDE] No icon found for {}", app_path);
+            return None;
+        }
+    }
+
+    // Create temp file for PNG output
+    let temp_png = format!("/tmp/quack_icon_{}.png", std::process::id());
+
+    // Use sips to convert icns to PNG (32x32 for menu)
+    let result = Command::new("sips")
+        .args(["-s", "format", "png", "-z", "32", "32", &icns_path, "--out", &temp_png])
+        .output();
+
+    if result.is_err() || !result.as_ref().unwrap().status.success() {
+        log::warn!("[IDE] Failed to convert icon for {}", app_path);
+        return None;
+    }
+
+    // Read PNG and convert to base64
+    let png_data = fs::read(&temp_png).ok()?;
+    let _ = fs::remove_file(&temp_png); // Cleanup temp file
+
+    Some(BASE64.encode(&png_data))
+}
+
+/// Get all installed apps (IDEs, terminals, and Finder)
+#[tauri::command]
+pub fn get_installed_apps() -> Vec<InstalledApp> {
+    let mut apps = Vec::new();
+
+    // Check IDEs
+    for entry in IDE_REGISTRY {
+        if Path::new(entry.app_path).exists() {
+            let icon = get_app_icon_base64(entry.app_path);
+            apps.push(InstalledApp {
+                id: entry.id.to_string(),
+                name: entry.name.to_string(),
+                app_path: entry.app_path.to_string(),
+                category: "ide".to_string(),
+                icon_base64: icon,
+            });
+        }
+    }
+
+    // Check terminals and Finder
+    for entry in APP_REGISTRY {
+        if Path::new(entry.app_path).exists() {
+            let icon = get_app_icon_base64(entry.app_path);
+            apps.push(InstalledApp {
+                id: entry.id.to_string(),
+                name: entry.name.to_string(),
+                app_path: entry.app_path.to_string(),
+                category: entry.category.to_string(),
+                icon_base64: icon,
+            });
+        }
+    }
+
+    log::info!("[IDE] Found {} installed apps", apps.len());
+    apps
+}
+
+/// Open path in an app (IDE, terminal, or Finder)
+#[tauri::command]
+pub fn open_in_app(app_id: String, path: String) -> Result<String, String> {
+    log::info!("[IDE] Opening {} in {}", path, app_id);
+
+    // Check if it's an IDE
+    if let Some(ide) = IDE_REGISTRY.iter().find(|e| e.id == app_id) {
+        return open_folder_in_ide(app_id, path);
+    }
+
+    // Check if it's a terminal or Finder
+    if let Some(app) = APP_REGISTRY.iter().find(|e| e.id == app_id) {
+        #[cfg(target_os = "macos")]
+        {
+            let result = Command::new("open")
+                .arg("-a")
+                .arg(app.app_path)
+                .arg(&path)
+                .spawn();
+
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", path, app.name)),
+                Err(e) => Err(format!("Failed to open: {}", e)),
+            };
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            return Err("Only supported on macOS".to_string());
+        }
+    }
+
+    Err(format!("Unknown app: {}", app_id))
 }

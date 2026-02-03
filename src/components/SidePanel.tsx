@@ -392,7 +392,6 @@ interface SidePanelProps {
   onRefreshSkills: () => void;
 
   // Commands props
-  onUseCommand: (command: SlashCommand) => void;
   onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
 
   // Rules props
@@ -505,7 +504,6 @@ export default function SidePanel({
   onRefreshSkills,
 
   // Commands
-  onUseCommand,
   onSelectCommand,
 
   // Rules
@@ -879,7 +877,6 @@ export default function SidePanel({
           <div className="side-panel-pane">
             <CommandsPanel
               basePath={rootPath || ''}
-              onUseCommand={onUseCommand}
               onSelectCommand={onSelectCommand}
             />
           </div>

@@ -53,55 +53,6 @@
   background: rgba(255, 59, 48, 0.05);
 }
 
-.chat-message-avatar {
-  flex-shrink: 0;
-}
-
-.avatar-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-
-.avatar-icon img {
-  width: 110%;
-  height: 110%;
-  object-fit: contain;
-  object-position: center;
-  transform: scale(1.1);
-}
-
-.avatar-icon svg {
-  width: 14px;
-  height: 14px;
-  opacity: 0.7;
-}
-
-.user-avatar {
-  background-image: url('/images/humanoid.jpeg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  border-color: rgba(242, 140, 82, 0.3);
-}
-
-/* Nascondi l'iconcina SVG per l'utente */
-.user-avatar svg {
-  display: none;
-}
-
-.assistant-avatar {
-  background: rgba(77, 212, 179, 0.2);
-  border-color: rgba(77, 212, 179, 0.3);
-}
-
 .chat-message-content {
   flex: 1;
   min-width: 0;
@@ -332,6 +283,14 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Minimal tool calls - Codex style */
+.chat-message-tools-minimal {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 /* System messages (agent invocation notifications) */

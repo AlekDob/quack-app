@@ -21,6 +21,7 @@ import { saveSessionBackup } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
+import SidePanelAccordion from "./components/SidePanelAccordion";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
 import FileActionButtons from "./components/FileActionButtons";
@@ -5106,6 +5107,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } finally {
       setLoadingAgents(false);
       setAgentsInitialized(true); // Mark first load as complete (for splash screen)
+
+      // Hide the overlay loader after React has finished rendering
+      // Use requestAnimationFrame to wait for paint, then a small delay for layout stabilization
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Double rAF ensures React render + browser paint are complete
+          setTimeout(() => {
+            const appLoader = document.getElementById('app-loader');
+            if (appLoader) {
+              appLoader.classList.add('fade-out');
+              setTimeout(() => appLoader.remove(), 500); // Match CSS transition duration
+            }
+          }, 150); // Delay for layout stabilization before fade
+        });
+      });
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
@@ -8101,9 +8117,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[Quack] Memory Graph tab deprecated - use Obsidian vault directly');
   }, []);
 
-  // Handler for opening Second Brain tab (deprecated - brain modules removed)
-  const handleOpenSecondBrainTab = useCallback(() => {
-    console.log('[Quack] Second Brain tab deprecated - use Obsidian vault directly');
+  // Handler for opening Brain folder in Finder/Obsidian
+  const handleOpenSecondBrainTab = useCallback(async () => {
+    try {
+      const { openBrainFolder } = await import('./services/brainFileService');
+      openBrainFolder();
+    } catch (error) {
+      console.error('[Quack] Failed to open Brain folder:', error);
+    }
   }, []);
 
   // Handler for opening Second Brain tab with a specific node (deprecated)
@@ -9917,37 +9938,8 @@ You have access to all Bash tools to execute git commands like:
     tauriAvailable,
   ]);
 
-  // Track when app started for minimum splash duration
-  const appMountTimeRef = useRef(Date.now());
-  const MINIMUM_SPLASH_DURATION = 4000; // Show splash for at least 4 seconds
-
-  // Hide native HTML splash when agents are loaded (sidebar populated)
-  useEffect(() => {
-    console.log('[Splash] agentsInitialized:', agentsInitialized);
-    if (!agentsInitialized) return; // Wait for first agent load to complete
-
-    const nativeSplash = document.getElementById('native-splash');
-    console.log('[Splash] nativeSplash element:', nativeSplash ? 'found' : 'NOT FOUND');
-    if (!nativeSplash) return;
-
-    // Calculate remaining time to meet minimum duration
-    const elapsed = Date.now() - appMountTimeRef.current;
-    const remainingTime = Math.max(0, MINIMUM_SPLASH_DURATION - elapsed);
-    console.log('[Splash] elapsed:', elapsed, 'remainingTime:', remainingTime);
-
-    // Wait for minimum duration, then fade out
-    const timeoutId = setTimeout(() => {
-      console.log('[Splash] Fading out now');
-      nativeSplash.classList.add('fade-out');
-      setTimeout(() => nativeSplash.remove(), 300);
-    }, remainingTime);
-
-    return () => clearTimeout(timeoutId);
-  }, [agentsInitialized]); // Run when agents finish loading
-
-  // REMOVED: React SplashScreen at startup
-  // Native splash in index.html now handles the intro animation
-  // SplashScreen component is only used for "Watch Intro" replay feature
+  // Splash screen removed - app loads directly with smooth CSS transition
+  // The #root element in index.html has a smooth reveal animation
 
   if (!tauriAvailable) {
     return (
@@ -10284,6 +10276,9 @@ You have access to all Bash tools to execute git commands like:
                   console.error("Failed to open claude login:", error);
                 }
               }}
+              onKanbanClick={handleOpenKanbanTab}
+              isKanbanActive={tabs.some(t => t.type === 'kanban' && t.id === activeTabId)}
+              inProgressTaskCount={inProgressTaskCount}
             />
 
             {/* Tab Bar - VSCode style (always shown) */}
@@ -10930,7 +10925,8 @@ You have access to all Bash tools to execute git commands like:
           )}
         </section>
 
-        <SidePanel
+        {/* Sidebar Accordion - Codex-style (NEW) */}
+        <SidePanelAccordion
           // FileExplorer props
           rootPath={(explorerRoot ?? explorerPath) || null}
           tree={explorerTree}
@@ -10953,8 +10949,6 @@ You have access to all Bash tools to execute git commands like:
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
           onCreateAgent={handleCreateAgent}
-          onTogglePip={togglePipWindow}
-          isPipOpen={isPipOpen}
           // Skills props
           skills={skills}
           loadingSkills={loadingSkills}
@@ -10971,7 +10965,6 @@ You have access to all Bash tools to execute git commands like:
           onDeleteHook={handleDeleteHook}
           onToggleHook={handleToggleHook}
           // Commands props
-          onUseCommand={handleUseCommand}
           onSelectCommand={handleSelectCommand}
           // Rules props
           onSelectRule={handleSelectRule}
@@ -11017,56 +11010,17 @@ You have access to all Bash tools to execute git commands like:
           onEditAgent={handleEditAgentFromContext}
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
-          // Terminal props
-          activeTerminalId={activeId}
-          terminals={terminals}
-          onTerminalInput={handleTerminalInput}
-          onTerminalOutput={handleTerminalOutput}
-          onUpdateRecentCommands={(commands) => {
-            recentCommandsRef.current = commands;
-          }}
-          onSelectTerminal={handleSelectTerminal}
-          // TerminalToolBar props
-          onExecuteCommand={handleExecuteAICommand}
-          onToggleSavedCommands={() =>
-            setSavedCommandsDrawerOpen((value) => !value)
-          }
-          savedCommandsOpen={savedCommandsDrawerOpen}
-          onCreateTerminal={handleQuickCreateTerminal}
-          // Usage props
-          usageSessions={usageSessions}
-          onClearUsage={handleClearUsage}
-          onCreateTerminalWithCommand={handleCreateTerminalWithCommand}
-          // Sessions props
-          onSelectSession={handleSelectSession}
-          sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets, project-dashboard) are active
-          // In Kanban mode: use kanbanSidePanelExpanded to control visibility
+          // Collapse props
           isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded)}
           onToggleCollapse={() => {
             if (isKanbanTabActive) {
-              // In Kanban mode, toggle kanbanSidePanelExpanded
               setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);
             } else {
               setSidePanelCollapsed(!sidePanelCollapsed);
             }
           }}
-          isKanbanTabActive={isKanbanTabActive} // Used to show/hide toggle button
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
-          // Kanban Mini Panel props
-          chatLoadingMap={chatLoadingMap}
-          chatSessions={chatSessions}
-          onKanbanTaskClick={(taskId) => {
-            // Open Kanban tab and select the task
-            handleOpenKanbanTab();
-            // Select task in store
-            const { selectTask, openDrawer } = useKanbanStore.getState();
-            selectTask(taskId);
-            openDrawer();
-          }}
-          onOpenKanban={handleOpenKanbanTab}
-          showKanbanMiniPanel={showKanbanMiniPanel}
         />
 
         <NewTerminalModal
@@ -11372,7 +11326,6 @@ You have access to all Bash tools to execute git commands like:
       {/* Watch Intro replay - uses SplashScreen component */}
       {introReplayActive && (
         <SplashScreen
-          version={introVersion}
           onComplete={() => setIntroReplayActive(false)}
         />
       )}

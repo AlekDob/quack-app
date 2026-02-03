@@ -201,3 +201,13 @@
 .session-context-menu-item.delete:hover {
   background: rgba(239, 68, 68, 0.15);
 }
+
+/* ========================================
+ * COMPACT SIDEBAR - Codex Style
+ * Smaller fonts matching right column
+ * ======================================== */
+
+.session-context-menu-item {
+  font-size: 11px !important;
+  padding: 6px 10px !important;
+}

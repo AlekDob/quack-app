@@ -291,17 +291,6 @@ export default function AgentsPanel({
                           )}
                         </div>
 
-                        {/* Use button on hover */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUseAgent(agent);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
-                        >
-                          Use
-                        </button>
                       </div>
                     ))}
                 </div>
@@ -361,17 +350,6 @@ export default function AgentsPanel({
                           )}
                         </div>
 
-                        {/* Use button on hover */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUseAgent(agent);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
-                        >
-                          Use
-                        </button>
                       </div>
                     ))}
                 </div>

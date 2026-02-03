@@ -1,9 +1,9 @@
 .agent-personality-card {
-  background: rgba(20, 20, 25, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 0.75rem; /* ← Ridotto da 1.25rem */
-  margin-bottom: 0.75rem; /* ← Ridotto da 1rem */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
 }
 
 .agent-personality-card.empty {
@@ -37,16 +37,16 @@
 .personality-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem; /* ← Ridotto da 1rem */
-  margin-bottom: 0.75rem; /* ← Ridotto da 1.25rem */
-  padding-bottom: 0.75rem; /* ← Ridotto da 1rem */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .personality-avatar {
-  width: 60px; /* ← Ridotto da 80px */
-  height: 60px; /* ← Ridotto da 80px */
-  border-radius: 12px; /* ← Ridotto da 16px */
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   background: linear-gradient(135deg, #f28c52, #ffb26f);
   display: flex;
   align-items: center;
@@ -60,11 +60,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 12px; /* ← Ridotto da 16px */
+  border-radius: 6px;
 }
 
 .avatar-icon {
-  font-size: 1.75rem; /* ← Ridotto da 2.5rem */
+  font-size: 1rem;
 }
 
 .personality-identity {
@@ -73,15 +73,16 @@
 }
 
 .personality-name {
-  font-size: 0.8rem; /* ← Ridotto da 1rem */
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 0.25rem 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  line-height: 1.2;
 }
 
 .personality-role {
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -89,34 +90,16 @@
 }
 
 .personality-working-on {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(77, 212, 179, 0.1);
-  border: 1px solid rgba(77, 212, 179, 0.25);
-  border-radius: 6px;
-  font-size: 0.75rem;
+  display: none; /* Hide working on section - not needed in minimal UI */
 }
 
-.working-on-label {
-  font-weight: 600;
-  color: rgba(77, 212, 179, 0.9);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
+.working-on-label,
 .working-on-text {
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .personality-section {
-  margin-bottom: 0.75rem; /* ← Ridotto da 1rem */
+  margin-bottom: 6px;
 }
 
 .personality-section:last-child {
@@ -124,71 +107,71 @@
 }
 
 .section-title {
-  font-size: 0.625rem; /* ← Ridotto da 0.75rem */
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0 0 0.375rem 0; /* ← Ridotto da 0.5rem */
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0 0 3px 0;
 }
 
 .section-content {
-  font-size: 0.75rem; /* ← Ridotto da 0.875rem */
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
 }
 
 .personality-intro {
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.6);
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 3px solid rgba(77, 212, 179, 0.5);
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  border-left: none;
 }
 
 .communication-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.375rem 0.75rem;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
-  border-radius: 6px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  font-weight: 500;
-  color: #f28c52;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .focus-areas-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
 }
 
 .focus-area-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  color: rgba(255, 255, 255, 0.8);
-  transition: all 0.2s ease;
+  gap: 3px;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: none;
 }
 
 .focus-area-badge:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .focus-icon {
-  font-size: 1rem;
+  font-size: 10px;
   flex-shrink: 0;
+  display: none; /* Hide icons in minimal UI */
 }
 
 .focus-label {
@@ -201,65 +184,55 @@
 .skills-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 3px;
 }
 
 .skill-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.375rem 0.75rem;
-  background: rgba(77, 212, 179, 0.15);
-  border: 1px solid rgba(77, 212, 179, 0.3);
-  border-radius: 6px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  font-weight: 500;
-  color: #4dd4b3;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .expressions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: none; /* Hide expressions in minimal UI */
 }
 
 .expression-item {
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.7);
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 3px solid rgba(242, 140, 82, 0.5);
+  display: none;
 }
 
 .personality-traits-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
 }
 
 .personality-trait-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(142, 107, 255, 0.1);
-  border: 1px solid rgba(142, 107, 255, 0.25);
-  border-radius: 8px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  color: rgba(142, 107, 255, 0.95);
-  font-weight: 500;
-  transition: all 0.2s ease;
+  gap: 3px;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+  transition: none;
 }
 
 .personality-trait-badge:hover {
-  background: rgba(142, 107, 255, 0.15);
-  border-color: rgba(142, 107, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .trait-icon {
-  font-size: 1rem;
-  flex-shrink: 0;
+  display: none; /* Hide icons in minimal UI */
 }
 
 .trait-label {
@@ -269,104 +242,168 @@
   min-width: 0;
 }
 
-/* Rules & Best Practices */
+/* Rules & Best Practices - Minimal */
 .rules-list {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 2px;
 }
 
 .rule-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.625rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  transition: all 0.15s;
+  gap: 4px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  transition: none;
 }
 
 .rule-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: none;
 }
 
 .rule-bullet {
-  color: rgba(242, 140, 82, 0.8);
-  font-size: 1rem;
-  line-height: 1;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+  line-height: 1.4;
   flex-shrink: 0;
-  margin-top: 0.125rem;
 }
 
 .rule-text {
   flex: 1;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
 }
 
-/* Bundle Export/Import Actions */
+/* Bundle Export/Import Actions - Hidden by default, show on hover */
 .bundle-actions {
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 4px;
+  border-top: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.agent-personality-card:hover .bundle-actions {
+  opacity: 1;
 }
 
 .bundle-buttons {
   display: flex;
-  gap: 0.5rem;
+  gap: 4px;
 }
 
 .bundle-btn {
   flex: 1;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: 3px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid;
+  transition: all 0.1s ease;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.bundle-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .bundle-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.bundle-btn-export {
-  background: rgba(0, 212, 255, 0.1);
-  border-color: rgba(0, 212, 255, 0.3);
-  color: #00D4FF;
-}
-
-.bundle-btn-export:hover:not(:disabled) {
-  background: rgba(0, 212, 255, 0.2);
-  border-color: rgba(0, 212, 255, 0.5);
-  box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
-}
-
+.bundle-btn-export,
 .bundle-btn-import {
-  background: rgba(255, 51, 102, 0.1);
-  border-color: rgba(255, 51, 102, 0.3);
-  color: #FF3366;
-}
-
-.bundle-btn-import:hover:not(:disabled) {
-  background: rgba(255, 51, 102, 0.2);
-  border-color: rgba(255, 51, 102, 0.5);
-  box-shadow: 0 0 10px rgba(255, 51, 102, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .bundle-error {
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.7rem;
-  color: #FF3366;
-  background: rgba(255, 51, 102, 0.1);
-  border: 1px solid rgba(255, 51, 102, 0.3);
-  border-radius: 6px;
+  margin-top: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border: none;
+  border-radius: 3px;
   cursor: pointer;
 }
+
+/* Workspace Info - OpenAI Minimal Style */
+.workspace-info-minimal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.workspace-info-minimal .workspace-project {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.workspace-info-minimal .workspace-branch {
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.workspace-info-minimal .workspace-branch::before {
+  content: '/';
+  margin-right: 4px;
+  opacity: 0.5;
+}
+
+/* Context Files - OpenAI Minimal Style */
+.context-files-minimal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.context-files-minimal .context-file-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.context-files-minimal .context-file-tag:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.context-files-minimal .context-file-tag.not-exists {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.context-files-minimal .context-file-tag.global {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.context-files-minimal .file-size {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.context-files-minimal .file-size.stats-good { color: #4ecdc4; }
+.context-files-minimal .file-size.stats-warning { color: #f8b739; }
+.context-files-minimal .file-size.stats-bad { color: #ff6b6b; }

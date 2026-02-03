@@ -6,6 +6,20 @@ import { getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useBundleOperations } from '../hooks/useBundleOperations';
 
+interface ContextFile {
+  name: string;
+  path: string;
+  scope: string;
+  exists: boolean;
+}
+
+interface ContextFileStats {
+  char_count: number;
+  word_count: number;
+  line_count: number;
+  score: 'good' | 'warning' | 'bad';
+}
+
 interface AgentPersonalityCardProps {
   personality: AgentPersonality | null;
   agentName?: string | null;
@@ -14,6 +28,15 @@ interface AgentPersonalityCardProps {
   agentColor?: string | null;
   agentId?: string | null;
   onImportAgent?: (agent: SavedAgent) => void;
+  // Workspace info
+  projectName?: string;
+  gitBranch?: string;
+  // Context files
+  projectFiles?: ContextFile[];
+  globalFiles?: ContextFile[];
+  projectStats?: ContextFileStats | null;
+  globalStats?: ContextFileStats | null;
+  onFileClick?: (file: ContextFile) => void;
 }
 
 const COMMUNICATION_STYLES_MAP: Record<string, string> = {
@@ -64,6 +87,13 @@ export default function AgentPersonalityCard({
   agentColor,
   agentId,
   onImportAgent,
+  projectName,
+  gitBranch,
+  projectFiles = [],
+  globalFiles = [],
+  projectStats,
+  globalStats,
+  onFileClick,
 }: AgentPersonalityCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const { exporting, importing, error, exportAgent, importBundle, clearError } = useBundleOperations();
@@ -264,6 +294,52 @@ export default function AgentPersonalityCard({
         <div className="personality-section">
           <h4 className="section-title">Custom Notes</h4>
           <p className="personality-intro">{filterDroidsFromCustomNotes(personality.customNotes)}</p>
+        </div>
+      )}
+
+      {/* Workspace Info - Minimal OpenAI style */}
+      {(projectName || gitBranch) && (
+        <div className="workspace-info-minimal">
+          {projectName && <span className="workspace-project">{projectName}</span>}
+          {gitBranch && <span className="workspace-branch">{gitBranch}</span>}
+        </div>
+      )}
+
+      {/* Context Files - Combined minimal style */}
+      {(projectFiles.length > 0 || globalFiles.length > 0) && (
+        <div className="context-files-minimal">
+          {projectFiles.map((file) => (
+            <span
+              key={`${file.scope}-${file.name}`}
+              className={`context-file-tag ${!file.exists ? 'not-exists' : ''}`}
+              onClick={() => file.exists && onFileClick?.(file)}
+            >
+              {file.name}
+              {projectStats && projectStats.char_count > 0 && (
+                <span className={`file-size stats-${projectStats.score}`}>
+                  {projectStats.char_count >= 1000
+                    ? `${(projectStats.char_count / 1000).toFixed(1)}k`
+                    : projectStats.char_count}
+                </span>
+              )}
+            </span>
+          ))}
+          {globalFiles.map((file) => (
+            <span
+              key={`${file.scope}-${file.name}`}
+              className={`context-file-tag global ${!file.exists ? 'not-exists' : ''}`}
+              onClick={() => file.exists && onFileClick?.(file)}
+            >
+              {file.name}
+              {globalStats && globalStats.char_count > 0 && (
+                <span className={`file-size stats-${globalStats.score}`}>
+                  {globalStats.char_count >= 1000
+                    ? `${(globalStats.char_count / 1000).toFixed(1)}k`
+                    : globalStats.char_count}
+                </span>
+              )}
+            </span>
+          ))}
         </div>
       )}
 

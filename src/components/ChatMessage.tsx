@@ -1,6 +1,6 @@
 import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
-import ToolCallCard from './ToolCallCard';
+import ToolCallMinimal from './ToolCallMinimal';
 import StreamMessage from './StreamMessage';
 import ThinkingBlock from './ThinkingBlock';
 import MessageSettingsBadges from './MessageSettingsBadges';
@@ -404,32 +404,6 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
 
   return (
     <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''}`}>
-      <div className="chat-message-avatar">
-        {isUser ? (
-          <div className="avatar-icon user-avatar">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="8" cy="5" r="3"/>
-              <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
-            </svg>
-          </div>
-        ) : (projectName && gitBranch) ? (
-          <img
-            src={cyberducksAvatar}
-            alt="Project Context"
-            className="avatar-icon assistant-avatar-img"
-            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-          />
-        ) : avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={agentName}
-            className="avatar-icon assistant-avatar-img"
-            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-          />
-        ) : (
-          <div className="avatar-icon assistant-avatar">🦆</div>
-        )}
-      </div>
       <div
         className="chat-message-content"
         onMouseEnter={() => isLastUserMessage && isUser && setIsHovering(true)}
@@ -572,9 +546,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
           </div>
         )}
         {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="chat-message-tools">
+          <div className="chat-message-tools-minimal">
             {message.toolCalls.map((tool) => (
-              <ToolCallCard key={tool.id} tool={tool} onOpenFile={onOpenFile} />
+              <ToolCallMinimal key={tool.id} tool={tool} onOpenFile={onOpenFile} />
             ))}
           </div>
         )}

@@ -1,0 +1,555 @@
+/* ===================================
+   SIDE PANEL ACCORDION - Codex Style
+   =================================== */
+
+.side-panel-accordion {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+  /* Grid positioning - span both rows like Codex */
+  grid-column: 3;
+  grid-row: 1 / 3;
+  /* Padding for macOS traffic lights area */
+  padding-top: 38px;
+}
+
+.side-panel-accordion.collapsed {
+  display: none;
+}
+
+/* Toggle button */
+.side-panel-accordion .side-panel-toggle {
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 48px;
+  background: rgba(30, 30, 32, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.side-panel-accordion .side-panel-toggle:hover {
+  background: rgba(40, 40, 44, 0.95);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Accordion container */
+.accordion-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Focus mode - sections reorder with animation */
+.accordion-container.has-focus {
+  /* Enable flexbox ordering */
+}
+
+/* Scrollbar styling */
+.accordion-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.accordion-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.accordion-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.accordion-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Accordion Section */
+.accordion-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.accordion-section:last-child {
+  border-bottom: none;
+}
+
+/* Focused section expands to 80vh */
+.accordion-section.focused {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.accordion-section.focused .accordion-content {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(80vh - 50px);
+}
+
+/* Accordion Header */
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.accordion-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.accordion-section.expanded .accordion-header {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Chevron */
+.accordion-chevron {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.accordion-section.expanded .accordion-chevron {
+  transform: rotate(90deg);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Icon */
+.accordion-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.accordion-section.expanded .accordion-icon {
+  color: #f28c52;
+}
+
+/* Title */
+.accordion-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Badge */
+.accordion-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.accordion-section.expanded .accordion-badge {
+  background: rgba(242, 140, 82, 0.2);
+  color: #f28c52;
+}
+
+/* Content */
+.accordion-content {
+  padding: 0;
+  animation: accordionSlideIn 0.2s ease;
+}
+
+@keyframes accordionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Workspace Info - special styling */
+.workspace-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.workspace-item svg {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.workspace-item.branch svg {
+  color: #4da6ff;
+}
+
+.workspace-item.branch span {
+  color: #4da6ff;
+}
+
+/* ===================================
+   COMPACT MODE - Override all panels
+   =================================== */
+
+/* Base font and padding overrides for ALL content */
+.accordion-content {
+  font-size: 12px !important;
+}
+
+.accordion-content * {
+  font-size: inherit;
+}
+
+/* Override panel styles to fit accordion layout */
+.accordion-content .agents-panel,
+.accordion-content .skills-panel,
+.accordion-content .mcp-panel,
+.accordion-content .commands-panel,
+.accordion-content .rules-panel,
+.accordion-content .hooks-panel {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+/* File explorer fills available space in focus mode */
+.accordion-section.focused .accordion-content .file-explorer {
+  max-height: none;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Normal mode - compact */
+.accordion-section:not(.focused) .accordion-content .file-explorer {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Agent context panel adjustments */
+.accordion-content .agent-context-panel {
+  padding: 0;
+}
+
+/* Compact all cards and items */
+.accordion-content .saved-command-card,
+.accordion-content .skill-card,
+.accordion-content .agent-card,
+.accordion-content .rule-card,
+.accordion-content .hook-card,
+.accordion-content .mcp-server-card {
+  padding: 6px 8px !important;
+  margin-bottom: 4px !important;
+  border-radius: 4px !important;
+}
+
+/* Smaller icons everywhere */
+.accordion-content svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Smaller icon containers */
+.accordion-content .command-icon,
+.accordion-content .skill-icon,
+.accordion-content .slash-icon {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  font-size: 11px !important;
+}
+
+/* Compact card titles */
+.accordion-content .command-name,
+.accordion-content .skill-name,
+.accordion-content .agent-name,
+.accordion-content .rule-name {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+/* Compact card descriptions */
+.accordion-content .command-description,
+.accordion-content .skill-description,
+.accordion-content .agent-description {
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  margin-top: 2px !important;
+}
+
+/* Compact search inputs */
+.accordion-content input[type="text"],
+.accordion-content input[type="search"],
+.accordion-content .search-input {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  border-radius: 4px !important;
+}
+
+/* Compact buttons */
+.accordion-content button:not(.accordion-header) {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  border-radius: 4px !important;
+}
+
+/* Compact badges/tags */
+.accordion-content .tag,
+.accordion-content .badge,
+.accordion-content .param-badge {
+  padding: 2px 5px !important;
+  font-size: 9px !important;
+  border-radius: 3px !important;
+}
+
+/* Compact section headers inside panels */
+.accordion-content .panel-header,
+.accordion-content .section-header {
+  padding: 6px 0 !important;
+  font-size: 11px !important;
+}
+
+/* Reduce gaps and margins */
+.accordion-content .commands-list,
+.accordion-content .skills-list,
+.accordion-content .agents-list,
+.accordion-content .rules-list {
+  gap: 4px !important;
+}
+
+/* Compact action buttons row */
+.accordion-content .card-actions,
+.accordion-content .item-actions {
+  gap: 4px !important;
+}
+
+.accordion-content .card-actions button,
+.accordion-content .item-actions button {
+  padding: 3px 6px !important;
+  font-size: 10px !important;
+}
+
+/* ===================================
+   AGENT CONTEXT PANEL - Compact overrides
+   =================================== */
+
+/* Hide only the "Agent Personality" section header (accordion already shows title) */
+.accordion-content .agent-context-panel > .context-section.personality-section > .context-section-header {
+  display: none;
+}
+
+/* Compact agent header area */
+.accordion-content .agent-context-header {
+  padding: 6px !important;
+  gap: 6px !important;
+  margin-top: 0 !important;
+}
+
+.accordion-content .agent-context-header .agent-avatar {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.accordion-content .agent-context-header .agent-avatar img {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.accordion-content .agent-context-header .agent-name {
+  font-size: 13px !important;
+}
+
+.accordion-content .agent-context-header .agent-role {
+  font-size: 11px !important;
+}
+
+/* Compact personality section */
+.accordion-content .personality-section {
+  padding: 4px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Reduce gap between workspace and agent info */
+.accordion-content .agent-context-panel {
+  gap: 0 !important;
+}
+
+.accordion-content .agent-context-panel > * {
+  margin-bottom: 8px !important;
+}
+
+.accordion-content .agent-context-panel > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Hide section headers for Agent Rules, Project Context, Global Context */
+.accordion-content .context-section .context-section-header {
+  display: none;
+}
+
+.accordion-content .personality-section .section-title,
+.accordion-content .context-section-title {
+  font-size: 10px !important;
+  gap: 4px !important;
+  margin-bottom: 4px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Hide only the rules section inside Agent Personality accordion */
+.accordion-content .agent-context-panel > .context-section.rules-context-section {
+  display: none !important;
+}
+
+/* Combine Project Context and Global Context into one visual box */
+.accordion-content .agent-context-panel > .context-section.project-context-section,
+.accordion-content .agent-context-panel > .context-section.global-context-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 4px 6px !important;
+  margin-bottom: 0 !important;
+}
+
+/* Remove bottom margin from project section when followed by global */
+.accordion-content .agent-context-panel > .context-section.project-context-section {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0 !important;
+  padding-bottom: 2px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.accordion-content .agent-context-panel > .context-section.global-context-section {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: 0 !important;
+  padding-top: 2px !important;
+}
+
+.accordion-content .personality-section .section-title svg,
+.accordion-content .context-section-title svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Compact buttons - export/import */
+.accordion-content .agent-bundle-actions {
+  gap: 4px !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+.accordion-content .agent-bundle-actions button {
+  padding: 5px 12px !important;
+  font-size: 10px !important;
+  border-radius: 4px !important;
+}
+
+/* Compact communication style badge */
+.accordion-content .communication-style-badge {
+  padding: 3px 6px !important;
+  font-size: 10px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Compact custom notes textarea */
+.accordion-content .custom-notes-display {
+  padding: 6px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  max-height: 60px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Compact context section */
+.accordion-content .context-section {
+  margin-bottom: 4px !important;
+  padding: 0 !important;
+}
+
+.accordion-content .context-section-header {
+  padding: 6px 0 !important;
+}
+
+.accordion-content .context-item {
+  padding: 4px 8px !important;
+}
+
+.accordion-content .context-item-name {
+  font-size: 11px !important;
+}
+
+.accordion-content .context-item-icon svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Context list - remove margins, minimal padding */
+.accordion-content .context-list {
+  gap: 0 !important;
+  padding: 0.3rem 0 !important;
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Hide metro line and station dots in sidebar */
+.continuous-metro-line {
+  display: none !important;
+}
+
+.metro-station {
+  display: none !important;
+}
+
+.branch-group .metro-station {
+  display: none !important;
+}
+
+.branch-group::before {
+  display: none !important;
+}

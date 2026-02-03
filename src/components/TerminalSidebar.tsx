@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Store } from '@tauri-apps/plugin-store';
-import { Brain } from 'lucide-react';
 import { getCurrentVersion } from '../utils/version';
 import { useUpdateChecker } from '../hooks/useUpdateChecker';
 import {
@@ -101,8 +100,15 @@ function SortableRepositoryGroup({
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
-    backgroundColor: projectColor ? `${projectColor}12` : undefined, // ~7% opacity hex
+    // Glass effect background with project color
+    background: projectColor
+      ? `linear-gradient(135deg, ${projectColor}12 0%, ${projectColor}08 100%)`
+      : undefined,
+    backdropFilter: projectColor ? 'blur(8px)' : undefined,
     borderLeft: projectColor ? `3px solid ${projectColor}` : undefined,
+    borderRadius: '0',
+    marginBottom: '2px',
+    padding: '4px',
   };
 
   return (
@@ -411,10 +417,10 @@ export default function TerminalSidebar({
     setActiveRepoId(null);
   };
 
-  // Filter terminals by query only
+  // No filtering at terminal level - we filter by project name instead
   const filteredTerminals = useMemo(() => {
-    return terminals.filter((terminal) => fuzzyMatch(query, terminal.label));
-  }, [terminals, query]);
+    return terminals;
+  }, [terminals]);
 
   // Group terminals by repository (main repo vs worktrees)
   const repositoryGroups = useMemo(() => {
@@ -503,17 +509,22 @@ export default function TerminalSidebar({
     return Array.from(repoMap.entries());
   }, [filteredTerminals, persistedProjects]);
 
-  // Apply custom ordering to repository groups and auto-assign colors to new projects
+  // Apply custom ordering to repository groups, auto-assign colors, and filter by project name
   const orderedRepositoryGroups = useMemo(() => {
+    // First filter by project name if query exists
+    const filteredGroups = query
+      ? repositoryGroups.filter(([name]) => fuzzyMatch(query, name))
+      : repositoryGroups;
+
     if (repositoryOrder.length === 0) {
-      return repositoryGroups;
+      return filteredGroups;
     }
 
     // Create a map for quick lookup
-    const groupMap = new Map(repositoryGroups.map(([name, group]) => [`repo-${name}`, [name, group] as [string, typeof group]]));
+    const groupMap = new Map(filteredGroups.map(([name, group]) => [`repo-${name}`, [name, group] as [string, typeof group]]));
 
     // Sort based on saved order
-    const ordered: typeof repositoryGroups = [];
+    const ordered: typeof filteredGroups = [];
     const added = new Set<string>();
 
     // First add repositories in the saved order
@@ -527,7 +538,7 @@ export default function TerminalSidebar({
 
     // Then add any new repositories not in the saved order
     const newRepos: string[] = [];
-    for (const [name, group] of repositoryGroups) {
+    for (const [name, group] of filteredGroups) {
       const repoKey = `repo-${name}`;
       if (!added.has(repoKey)) {
         ordered.push([name, group]);
@@ -554,7 +565,7 @@ export default function TerminalSidebar({
     }
 
     return ordered;
-  }, [repositoryGroups, repositoryOrder, projectColors, saveRepositoryOrder]);
+  }, [repositoryGroups, repositoryOrder, projectColors, saveRepositoryOrder, query]);
 
   // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
@@ -734,151 +745,36 @@ export default function TerminalSidebar({
   };
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header" data-tauri-drag-region>
-        <div className="sidebar-header-top" data-tauri-drag-region>
-          {/* Title removed to avoid conflict with macOS traffic lights */}
-          <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
-            {/* PiP Mode Button */}
-            {onTogglePip && (
-              <button
-                type="button"
-                className="sidebar-button"
-                onClick={onTogglePip}
-                style={{
-                  background: isPipOpen ? 'rgba(242, 140, 82, 0.2)' : undefined,
-                  borderColor: isPipOpen ? 'rgba(242, 140, 82, 0.4)' : undefined,
-                  color: isPipOpen ? '#f28c52' : undefined,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-                title={isPipOpen ? 'Close PiP Mode' : 'Open PiP Mode'}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="2" width="20" height="20" rx="2" />
-                  <rect x="8" y="8" width="8" height="8" rx="1" />
-                </svg>
-                PiP
-              </button>
-            )}
-            {/* Quack Sound Button */}
-            {onToggleQuackSound && (
-              <button
-                type="button"
-                className="sidebar-button"
-                onClick={onToggleQuackSound}
-                style={{
-                  background: quackSoundEnabled ? 'rgba(77, 212, 179, 0.2)' : 'rgba(255, 59, 48, 0.15)',
-                  borderColor: quackSoundEnabled ? 'rgba(77, 212, 179, 0.4)' : 'rgba(255, 59, 48, 0.3)',
-                  color: quackSoundEnabled ? '#4dd4b3' : '#ff3b30',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-                title={quackSoundEnabled ? 'Sound ON (Click to disable)' : 'Sound OFF (Click to enable)'}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {quackSoundEnabled ? (
-                    // Volume ON icon
-                    <>
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    </>
-                  ) : (
-                    // Volume OFF icon
-                    <>
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                      <line x1="23" y1="9" x2="17" y2="15" />
-                      <line x1="17" y1="9" x2="23" y2="15" />
-                    </>
-                  )}
-                </svg>
-                Quack
-              </button>
-            )}
-            {/* New Agent Button */}
-            <KeyboardShortcutTooltip label="New Agent" shortcut="⌘N">
-              <button
-                type="button"
-                className="sidebar-button"
-                onClick={() => onCreateAgent()}
-                disabled={creating}
-              >
-                {creating ? "Creating…" : "New"}
-              </button>
-            </KeyboardShortcutTooltip>
-          </div>
-        </div>
+    <aside className="sidebar sidebar-codex">
+      {/* Top area next to traffic lights */}
+      <div className="sidebar-header-top" data-tauri-drag-region>
+        <KeyboardShortcutTooltip label="New Project" shortcut="⌘N">
+          <button
+            type="button"
+            className="new-project-btn-sidebar"
+            onClick={() => onCreateAgent()}
+            aria-label="New Project (⌘N)"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>New project</span>
+          </button>
+        </KeyboardShortcutTooltip>
+      </div>
+
+      <div className="sidebar-header sidebar-header-codex" data-tauri-drag-region>
         <input
-          className="explorer-search"
+          className="explorer-search explorer-search-codex"
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search agents"
+          placeholder="Search projects"
         />
       </div>
 
-      {/* Agent List - always shown in sidebar */}
-      <div className="explorer-root-label sidebar-terminals-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '12px' }}>
-        <span>ACTIVE AGENTS</span>
-        {/* Kanban Button - only visible when there are active projects */}
-        {orderedRepositoryGroups.length > 0 && (
-          <KeyboardShortcutTooltip
-            label="Kanban"
-            shortcut="⌘K"
-            position="left"
-          >
-            <button
-              type="button"
-              onClick={onOpenKanbanTab}
-              style={{
-                background: isKanbanTabActive ? 'rgba(139, 92, 246, 0.25)' : 'rgba(139, 92, 246, 0.15)',
-                border: `1px solid ${isKanbanTabActive ? 'rgba(139, 92, 246, 0.5)' : 'rgba(139, 92, 246, 0.3)'}`,
-                borderRadius: '4px',
-                padding: '3px 8px',
-                fontSize: '10px',
-                fontWeight: 500,
-                color: '#8b5cf6',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.2s ease',
-              }}
-              aria-label="Open Kanban (⌘K)"
-            >
-              {/* Kanban icon (columns) */}
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="5" height="18" rx="1" />
-                <rect x="10" y="3" width="5" height="12" rx="1" />
-                <rect x="17" y="3" width="5" height="15" rx="1" />
-              </svg>
-              Kanban
-              {/* Badge for in-progress tasks */}
-              {inProgressTaskCount > 0 && (
-                <span
-                  style={{
-                    background: '#f28c52',
-                    color: '#fff',
-                    fontSize: '9px',
-                    fontWeight: 600,
-                    padding: '1px 5px',
-                    borderRadius: '8px',
-                    marginLeft: '2px',
-                    minWidth: '14px',
-                    textAlign: 'center',
-                  }}
-                >
-                  {inProgressTaskCount}
-                </span>
-              )}
-            </button>
-          </KeyboardShortcutTooltip>
-        )}
-      </div>
-
-      <div className="sidebar-list" style={{ marginTop: '5px' }}>
+      {/* Agent List - no label, directly the list */}
+      <div className="sidebar-list" style={{ marginTop: '4px' }}>
         {/* Metro Style View is now the only option */}
 
             {/* Metro-style repository groups with drag-and-drop */}
@@ -1043,21 +939,6 @@ export default function TerminalSidebar({
           onCreateTask={onCreateTask ? () => onCreateTask(contextMenu.terminal) : undefined}
         />
       )}
-
-      {/* Open Brain Button */}
-      <button
-        type="button"
-        className="sidebar-brain-button"
-        onClick={() => {
-          import('../services/brainFileService').then(({ openBrainFolder }) => {
-            openBrainFolder();
-          });
-        }}
-        title="Open Brain folder"
-      >
-        <Brain className="sidebar-brain-icon" size={16} />
-        <span className="sidebar-brain-label">Brain</span>
-      </button>
 
       {/* Settings Button */}
       {onOpenSettings && (

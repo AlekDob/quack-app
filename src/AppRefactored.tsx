@@ -572,11 +572,6 @@ function AppRefactored() {
             setLoadingSkills(false);
           }}
 
-          // Commands props
-          onUseCommand={(command) => {
-            setPendingSlashCommand(command);
-          }}
-
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={(scope) => {

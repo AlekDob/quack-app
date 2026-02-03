@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Store } from '@tauri-apps/plugin-store';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
@@ -9,6 +10,10 @@ import StorageMetrics from '../../StorageMetrics';
 export default function GeneralSettings() {
   const [performanceMonitor, setPerformanceMonitor] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // PiP and Quack Sound settings
+  const [pipEnabled, setPipEnabled] = useState(false);
+  const [quackSoundEnabled, setQuackSoundEnabled] = useState(true);
 
   // GIF reactions settings
   const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? false);
@@ -40,6 +45,7 @@ export default function GeneralSettings() {
 
   useEffect(() => {
     loadPreferences();
+    loadUiPreferences();
   }, []);
 
   const loadPreferences = async () => {
@@ -48,6 +54,44 @@ export default function GeneralSettings() {
       setPerformanceMonitor(prefs.show_performance_monitor);
     } catch (err) {
       console.error('Failed to load general preferences:', err);
+    }
+  };
+
+  const loadUiPreferences = async () => {
+    try {
+      const store = await Store.load('.quack-ui-prefs.dat');
+      const pip = await store.get<boolean>('pip-enabled');
+      const sound = await store.get<boolean>('quack-sound-enabled');
+      if (pip !== null && pip !== undefined) setPipEnabled(pip);
+      if (sound !== null && sound !== undefined) setQuackSoundEnabled(sound);
+    } catch (err) {
+      console.error('Failed to load UI preferences:', err);
+    }
+  };
+
+  const handleTogglePip = async (enabled: boolean) => {
+    setPipEnabled(enabled);
+    try {
+      const store = await Store.load('.quack-ui-prefs.dat');
+      await store.set('pip-enabled', enabled);
+      await store.save();
+      // Emit event to notify App.tsx
+      window.dispatchEvent(new CustomEvent('pip-setting-changed', { detail: { enabled } }));
+    } catch (err) {
+      console.error('Failed to save PiP preference:', err);
+    }
+  };
+
+  const handleToggleQuackSound = async (enabled: boolean) => {
+    setQuackSoundEnabled(enabled);
+    try {
+      const store = await Store.load('.quack-ui-prefs.dat');
+      await store.set('quack-sound-enabled', enabled);
+      await store.save();
+      // Emit event to notify App.tsx
+      window.dispatchEvent(new CustomEvent('quack-sound-setting-changed', { detail: { enabled } }));
+    } catch (err) {
+      console.error('Failed to save Quack Sound preference:', err);
     }
   };
 
@@ -180,6 +224,33 @@ export default function GeneralSettings() {
             </div>
           </>
         )}
+      </div>
+
+      <SectionHeader
+        title="Display"
+        description="Visual and audio preferences"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="Picture-in-Picture Mode"
+          description="Show floating agent status cards when minimized"
+          control={
+            <IOSSwitch
+              checked={pipEnabled}
+              onChange={handleTogglePip}
+            />
+          }
+        />
+        <SettingsRow
+          label="Quack Sound"
+          description="Play a quack sound when agents complete tasks"
+          control={
+            <IOSSwitch
+              checked={quackSoundEnabled}
+              onChange={handleToggleQuackSound}
+            />
+          }
+        />
       </div>
 
       <SectionHeader

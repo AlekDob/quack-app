@@ -1,40 +1,216 @@
 import React, { useMemo, useState, useEffect, memo, useCallback } from 'react';
 import './ToolWidgets.css';
+import './ToolCallMinimal.css';
 import {
   SystemInitializedWidget,
-  EditWidget,
-  WriteWidget,
-  BashWidget,
-  ReadWidget,
-  GrepWidget,
   TodoWriteWidget,
   ExitPlanModeWidget,
   EnterPlanModeWidget,
   ImagePreviewWidget,
-  ToolIcon,
-  getToolColor,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
 import { TaskWidget } from './TaskWidget';
 import { TaskOutputWidget } from './TaskOutputWidget';
 import AskUserQuestionWidget from './AskUserQuestionWidget';
-import ToolGifInline from './ToolGifInline';
+import DiffViewer from './DiffViewer';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
-import type { ClaudeEvent, AskUserQuestionAnswers } from '../types';
+import type { ClaudeEvent, AskUserQuestionAnswers, DiffLine, ToolDiff } from '../types';
 import { BugReportWidget, WebAnalysisCard } from './structured-outputs';
 import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
 
-// Memoized tool widget components for performance
-const MemoizedEditWidget = memo(EditWidget);
-const MemoizedWriteWidget = memo(WriteWidget);
-const MemoizedBashWidget = memo(BashWidget);
-const MemoizedReadWidget = memo(ReadWidget);
-const MemoizedGrepWidget = memo(GrepWidget);
+// Helper function to convert old/new strings to ToolDiff
+function createDiffFromStrings(oldString: string, newString: string, fileName?: string): ToolDiff {
+  const oldLines = oldString.split('\n');
+  const newLines = newString.split('\n');
+  const lines: DiffLine[] = [];
+
+  oldLines.forEach((line) => {
+    lines.push({ type: 'removed', content: line });
+  });
+  newLines.forEach((line) => {
+    lines.push({ type: 'added', content: line });
+  });
+
+  return { fileName, lines };
+}
+
+// Get tool color based on type - minimal style
+const getToolColorMinimal = (name: string): string => {
+  const toolName = name.toLowerCase();
+  if (toolName === 'edit' || toolName === 'multiedit') return '#F7931E'; // orange
+  if (toolName === 'read') return '#00D9FF'; // cyan
+  if (toolName === 'write') return '#22c55e'; // green
+  if (toolName === 'bash') return '#9B59B6'; // purple
+  if (toolName === 'glob' || toolName === 'grep') return '#6b7280'; // gray
+  if (toolName === 'task') return '#fbbf24'; // yellow
+  if (toolName === 'webfetch' || toolName === 'websearch') return '#10b981'; // emerald
+  if (toolName.startsWith('mcp__') || toolName.startsWith('mcp_')) return '#f97316'; // orange
+  return '#6b7280'; // default gray
+};
+
+// Extract target from tool input for minimal display
+const getToolTarget = (toolName: string, input: Record<string, unknown> | undefined): string => {
+  if (!input) return '';
+  const name = toolName.toLowerCase();
+
+  // File operations
+  if (input.file_path) {
+    const fullPath = input.file_path as string;
+    return fullPath.split('/').pop() || fullPath;
+  }
+
+  // Bash command
+  if (name === 'bash' && input.command) {
+    const cmd = input.command as string;
+    return cmd.length > 50 ? cmd.substring(0, 47) + '...' : cmd;
+  }
+
+  // Grep/Glob pattern
+  if (input.pattern) {
+    return input.pattern as string;
+  }
+
+  // Task description
+  if (input.description) {
+    return input.description as string;
+  }
+
+  // Read path
+  if (input.path) {
+    const p = input.path as string;
+    return p.split('/').pop() || p;
+  }
+
+  return '';
+};
+
+// Minimal tool display component for streaming
+interface ToolMinimalStreamProps {
+  toolName: string;
+  input: Record<string, unknown> | undefined;
+  isLoading: boolean;
+  hasError?: boolean;
+  result?: any;
+  onFilePathClick?: (path: string) => void;
+  onUndoEdit?: (filePath: string) => void;
+}
+
+const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
+  toolName,
+  input,
+  isLoading,
+  hasError,
+  result,
+  onFilePathClick,
+  onUndoEdit,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const toolColor = getToolColorMinimal(toolName);
+  const toolTarget = getToolTarget(toolName, input);
+  const name = toolName.toLowerCase();
+
+  // Determine if we have expandable content
+  const hasExpandableContent = result?.content ||
+    (name === 'edit' && input?.old_string && input?.new_string);
+
+  const StatusIndicator = () => {
+    if (isLoading) {
+      return (
+        <span className="tool-status-typing">
+          <span /><span /><span />
+        </span>
+      );
+    }
+    if (hasError) {
+      return <span className="tool-status-error">&#10005;</span>;
+    }
+    return <span className="tool-status-check">&#10003;</span>;
+  };
+
+  return (
+    <div className="tool-minimal">
+      <div
+        className={`tool-minimal-line ${hasExpandableContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isLoading ? 'running' : ''}`}
+        onClick={() => hasExpandableContent && setIsExpanded(!isExpanded)}
+      >
+        <span className="tool-minimal-text">
+          <span className="tool-minimal-prefix">using</span>
+          <span className="tool-minimal-name" style={{ color: toolColor }}>
+            {toolName}
+          </span>
+          {toolTarget && (
+            <>
+              <span className="tool-minimal-on">on</span>
+              <span className="tool-minimal-target">{toolTarget}</span>
+            </>
+          )}
+        </span>
+        <StatusIndicator />
+        {hasExpandableContent && (
+          <span className={`tool-minimal-chevron ${isExpanded ? 'rotated' : ''}`}>
+            &#8250;
+          </span>
+        )}
+      </div>
+
+      {isExpanded && hasExpandableContent && (
+        <div className="tool-minimal-content">
+          {/* File path clickable link */}
+          {typeof input?.file_path === 'string' && onFilePathClick && (
+            <div
+              className="tool-minimal-file-path"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFilePathClick(input.file_path as string);
+              }}
+              title="Click to open in IDE"
+            >
+              <svg className="tool-minimal-file-path-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span className="tool-minimal-file-path-text">{input.file_path}</span>
+            </div>
+          )}
+
+          {name === 'edit' && input?.old_string && input?.new_string ? (
+            <>
+              <DiffViewer diff={createDiffFromStrings(
+                input.old_string as string,
+                input.new_string as string,
+                input.file_path as string | undefined
+              )} />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                {typeof input.file_path === 'string' && onUndoEdit && (
+                  <button
+                    className="tool-minimal-undo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUndoEdit(input.file_path as string);
+                    }}
+                  >
+                    Undo Changes
+                  </button>
+                )}
+              </div>
+            </>
+          ) : result?.content ? (
+            <pre className="tool-minimal-result">
+              <code>{typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2)}</code>
+            </pre>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Memoized components for performance
 const MemoizedTaskWidget = memo(TaskWidget);
 const MemoizedTaskOutputWidget = memo(TaskOutputWidget);
 const MemoizedTodoWriteWidget = memo(TodoWriteWidget);
@@ -42,81 +218,14 @@ const MemoizedExitPlanModeWidget = memo(ExitPlanModeWidget);
 const MemoizedEnterPlanModeWidget = memo(EnterPlanModeWidget);
 const MemoizedAskUserQuestionWidget = memo(AskUserQuestionWidget);
 const MemoizedImagePreviewWidget = memo(ImagePreviewWidget);
+const MemoizedToolMinimalStream = memo(ToolMinimalStream);
 
-/**
- * CollapsibleToolWidget - A collapsible widget for generic MCP tools
- * Shows tool name in header, collapsed by default, expandable to show input
- */
-interface CollapsibleToolWidgetProps {
-  toolName: string;
-  toolColor: string;
-  input: any;
-  isLoading: boolean;
-}
-
-const CollapsibleToolWidget: React.FC<CollapsibleToolWidgetProps> = ({
-  toolName,
-  toolColor,
-  input,
-  isLoading,
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  // Get friendly display name
-  const getDisplayName = (name: string): string => {
-    // Remove mcp__ prefix and clean up
-    return name.replace(/^mcp__\w+__/, '').replace(/_/g, ' ');
-  };
-
-  return (
-    <div
-      className="tool-widget collapsible-tool-widget"
-      style={{ borderColor: toolColor }}
-    >
-      <div
-        className="tool-widget-header collapsible-header"
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{ cursor: 'pointer' }}
-      >
-        <div className="tool-widget-title" style={{ color: toolColor }}>
-          <ToolIcon name={toolName} />
-          <span>{getDisplayName(toolName)}</span>
-        </div>
-        <div className="tool-widget-actions">
-          {isLoading && (
-            <div className="tool-widget-loading">
-              <div className="spinner"></div>
-            </div>
-          )}
-          <svg
-            className={`collapse-chevron ${isExpanded ? 'expanded' : ''}`}
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            style={{
-              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
-              opacity: 0.6,
-            }}
-          >
-            <path d="M4.427 6.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 6H4.604a.25.25 0 00-.177.427z" />
-          </svg>
-        </div>
-      </div>
-      {isExpanded && (
-        <div className="tool-widget-content">
-          <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-};
 
 interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
   onFilePathClick?: (path: string) => void;
+  onUndoEdit?: (filePath: string) => void; // Callback to undo file edit
   agentName?: string;
   agentAvatar?: string;
   workingDirectory?: string; // Current working directory for file operations
@@ -135,6 +244,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   message,
   streamMessages,
   onFilePathClick,
+  onUndoEdit,
   agentName = 'Jack',
   agentAvatar,
   workingDirectory,
@@ -324,116 +434,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             const toolId = content.id;
             const toolResult = toolResults.get(toolId);
 
-            // 🦆 DEBUG: Log every tool_use being processed
-            console.log(`🔧 [StreamMessage] TOOL_USE detected: name="${content.name}" id="${toolId}" toolName="${toolName}"`);
-
-            // Debug logging for Task tool
-            if (toolName === 'task') {
-              console.log('🎯 [StreamMessage] Task tool detected!', {
-                toolName,
-                hasSubagentType: !!input?.subagent_type,
-                subagentType: input?.subagent_type,
-                description: input?.description,
-                fullInput: input,
-              });
-            }
-
-            // Edit tool
-            if (toolName === 'edit' && input?.file_path) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'edit'} toolId={toolId} />
-                  <MemoizedEditWidget
-                    file_path={input.file_path}
-                    old_string={input.old_string}
-                    new_string={input.new_string}
-                    result={toolResult}
-                    onFilePathClick={onFilePathClick}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Write tool
-            if (toolName === 'write' && input?.file_path && input?.content) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'write'} toolId={toolId} />
-                  <MemoizedWriteWidget
-                    filePath={input.file_path}
-                    content={input.content}
-                    result={toolResult}
-                    onFilePathClick={onFilePathClick}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Bash tool
-            if (toolName === 'bash' && input?.command) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'bash'} toolId={toolId} />
-                  <MemoizedBashWidget
-                    command={input.command}
-                    description={input.description}
-                    result={toolResult}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Read tool - check if image file first
-            if (toolName === 'read' && input?.file_path) {
-              const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
-              const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
-
-              if (isImageFile && toolResult) {
-                // Extract image data from tool result
-                const imageContent = extractImageData(toolResult);
-                if (imageContent) {
-                  return (
-                    <React.Fragment key={idx}>
-                      <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
-                      <MemoizedImagePreviewWidget
-                        filePath={input.file_path}
-                        imageData={imageContent.data}
-                        mediaType={imageContent.mediaType}
-                        onOpenInTab={onOpenImageTab}
-                      />
-                    </React.Fragment>
-                  );
-                }
-              }
-
-              // Text files - existing ReadWidget
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
-                  <MemoizedReadWidget
-                    filePath={input.file_path}
-                    result={toolResult}
-                    onFilePathClick={onFilePathClick}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Grep tool
-            if (toolName === 'grep' && input?.pattern) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'grep'} toolId={toolId} />
-                  <MemoizedGrepWidget
-                    pattern={input.pattern}
-                    path={input.path}
-                    result={toolResult}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // TodoWrite tool - no GIF (skipped in ToolGifInline)
+            // TodoWrite tool - special widget
             if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
               return (
                 <MemoizedTodoWriteWidget
@@ -444,7 +445,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // ExitPlanMode tool - no GIF
+            // ExitPlanMode tool - special widget
             if (toolName === 'exitplanmode' && input?.plan) {
               return (
                 <MemoizedExitPlanModeWidget
@@ -456,16 +457,14 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // EnterPlanMode tool - purple header widget, no GIF
-            // Only render ONCE even if called multiple times
+            // EnterPlanMode tool - special widget
             if (toolName === 'enterplanmode') {
-              // Skip if this is a duplicate (same tool in same message already rendered)
               const isFirstEnterPlanMode = msg.content.findIndex(
                 (c: any) => c.type === 'tool_use' && c.name?.toLowerCase() === 'enterplanmode'
               ) === idx;
 
               if (!isFirstEnterPlanMode) {
-                return null; // Skip duplicates
+                return null;
               }
 
               return (
@@ -477,24 +476,19 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               );
             }
 
-            // AskUserQuestion tool - no GIF (skipped in ToolGifInline)
-            // Handle both array and stringified JSON (SDK may serialize as string)
+            // AskUserQuestion tool - special widget
             if (toolName === 'askuserquestion' && input?.questions) {
               let questions = input.questions;
 
-              // Parse if questions came as stringified JSON
               if (typeof questions === 'string') {
                 try {
                   questions = JSON.parse(questions);
-                  console.log('🔧 [AskUserQuestion] Parsed stringified questions:', questions);
                 } catch (e) {
-                  console.error('🔧 [AskUserQuestion] Failed to parse questions string:', e);
+                  console.error('Failed to parse questions string:', e);
                 }
               }
 
-              // Now check if we have a valid array
               if (Array.isArray(questions)) {
-                const isPending = pendingQuestionIds?.has(toolId);
                 const existingAnswer = answeredQuestions?.get(toolId);
                 const isAnswered = !!existingAnswer || !!toolResult;
 
@@ -511,79 +505,85 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               }
             }
 
-            // Task tool (subagent invocation) - launches droids
+            // Task tool (subagent) - special widget
             if (toolName === 'task' && input?.subagent_type) {
-              const subagentType = input.subagent_type;
-              const description = input.description || 'Running task';
-
-              console.log('🤖 [StreamMessage] RENDERING Task widget for droid:', subagentType);
-
               return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'task'} toolId={toolId} />
-                  <MemoizedTaskWidget
-                    subagentType={subagentType}
-                    description={description}
-                    isLoading={!toolResult}
-                    workingDirectory={workingDirectory}
-                  />
-                </React.Fragment>
+                <MemoizedTaskWidget
+                  key={idx}
+                  subagentType={input.subagent_type}
+                  description={input.description || 'Running task'}
+                  isLoading={!toolResult}
+                  workingDirectory={workingDirectory}
+                />
               );
             }
 
-            // TaskOutput tool - retrieves output from background tasks
+            // TaskOutput tool - special widget
             if (toolName === 'taskoutput' && input?.task_id) {
-              // Parse status from tool result if available
               let status: 'pending' | 'running' | 'completed' | 'error' | 'unknown' = 'unknown';
               let output: string | undefined;
               let error: string | undefined;
 
               if (toolResult) {
                 try {
-                  // toolResult might be a string or parsed object
                   const result = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
                   status = result.status || 'completed';
                   output = result.output || result.result || (typeof toolResult === 'string' ? toolResult : JSON.stringify(result, null, 2));
                   error = result.error;
                 } catch {
-                  // If parsing fails, use the raw result as output
                   output = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
                   status = 'completed';
                 }
               }
 
               return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'taskoutput'} toolId={toolId} />
-                  <MemoizedTaskOutputWidget
-                    taskId={input.task_id}
-                    status={status}
-                    output={output}
-                    error={error}
-                    block={input.block}
-                    timeout={input.timeout}
-                    isLoading={!toolResult}
-                    defaultExpanded={true}
-                  />
-                </React.Fragment>
+                <MemoizedTaskOutputWidget
+                  key={idx}
+                  taskId={input.task_id}
+                  status={status}
+                  output={output}
+                  error={error}
+                  block={input.block}
+                  timeout={input.timeout}
+                  isLoading={!toolResult}
+                  defaultExpanded={true}
+                />
               );
             }
 
-            // Generic fallback for MCP and other tools
-            // GIF is OUTSIDE the widget with caption
-            const toolColor = getToolColor(content.name || '');
+            // Read tool - check for image files (special handling)
+            if (toolName === 'read' && input?.file_path) {
+              const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
+              const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
+
+              if (isImageFile && toolResult) {
+                const imageContent = extractImageData(toolResult);
+                if (imageContent) {
+                  return (
+                    <MemoizedImagePreviewWidget
+                      key={idx}
+                      filePath={input.file_path}
+                      imageData={imageContent.data}
+                      mediaType={imageContent.mediaType}
+                      onOpenInTab={onOpenImageTab}
+                    />
+                  );
+                }
+              }
+            }
+
+            // All other tools - use minimal display
             return (
-              <React.Fragment key={idx}>
-                {/* GIF outside with caption */}
-                <ToolGifInline toolName={content.name || 'unknown'} toolId={toolId} />
-                {/* Collapsible tool widget */}
-                <CollapsibleToolWidget
-                  toolName={content.name || 'unknown'}
-                  toolColor={toolColor}
-                  input={input}
-                  isLoading={!toolResult}
-                />
-              </React.Fragment>
+              <MemoizedToolMinimalStream
+                key={idx}
+                toolName={content.name || 'unknown'}
+                input={input}
+                isLoading={!toolResult}
+                hasError={toolResult?.is_error}
+                result={toolResult}
+                onFilePathClick={onFilePathClick}
+                onUndoEdit={onUndoEdit}
+              />
             );
           }
 
@@ -643,38 +643,35 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
                   className="rewind-button"
                   title="Undo all file changes from this response"
                   style={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 16px',
-                    background: 'rgba(251, 146, 60, 0.12)',
-                    border: '1px solid rgba(251, 146, 60, 0.3)',
-                    borderRadius: '8px',
-                    color: 'rgb(251, 191, 136)',
-                    fontSize: '13px',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    background: 'transparent',
+                    border: '1px solid rgba(251, 146, 60, 0.25)',
+                    borderRadius: '4px',
+                    color: 'rgba(251, 191, 136, 0.7)',
+                    fontSize: '10px',
                     fontWeight: 500,
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.5)';
-                    e.currentTarget.style.color = 'rgb(251, 146, 60)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.4)';
+                    e.currentTarget.style.color = 'rgb(251, 191, 136)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.12)';
-                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.3)';
-                    e.currentTarget.style.color = 'rgb(251, 191, 136)';
-                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.25)';
+                    e.currentTarget.style.color = 'rgba(251, 191, 136, 0.7)';
                   }}
                 >
-                  {/* Undo/Rewind arrow icon */}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                     <path d="M3 3v5h5"/>
                   </svg>
-                  Undo Changes
+                  Undo
                 </button>
               </div>
             );
