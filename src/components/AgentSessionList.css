@@ -42,15 +42,19 @@
     top: -3px;
     opacity: 0;
   }
-  10% {
+  5% {
+    opacity: 1;
+  }
+  35% {
+    top: calc(100% - 8px);
     opacity: 1;
   }
   40% {
-    top: calc(100% - 10px);
-    opacity: 1;
+    top: calc(100% - 8px);
+    opacity: 0;
   }
-  50%, 100% {
-    top: calc(100% - 10px);
+  40.1%, 100% {
+    top: calc(100% - 8px);
     opacity: 0;
   }
 }
