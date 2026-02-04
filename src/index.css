@@ -19,10 +19,44 @@
   --accent-text: #ffecd9;
   --panel-border: rgba(128, 132, 150, 0.32);
   --panel-border-strong: rgba(128, 132, 150, 0.45);
+
+  /* Performance optimized blur values - reduced from 20-24px to 8-12px */
+  --blur-light: 4px;
+  --blur-medium: 8px;
+  --blur-heavy: 12px;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Performance: Respect user's reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Performance: Pause animations in collapsed/hidden panels */
+.side-panel-accordion.collapsed *,
+.sidebar.collapsed *,
+[hidden] *,
+[aria-hidden="true"] * {
+  animation-play-state: paused !important;
+}
+
+/* Performance: Pause animations when window is not focused (battery saving) */
+.app-shell.window-blurred .session-dot,
+.app-shell.window-blurred .tool-status-dot,
+.app-shell.window-blurred .metro-line-agent-sessions::before,
+.app-shell.window-blurred .metro-horizontal-line::before,
+.app-shell.window-blurred .tool-minimal-line::after {
+  animation-play-state: paused !important;
 }
 
 *,

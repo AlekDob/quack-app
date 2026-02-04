@@ -68,27 +68,27 @@
   }
 }
 
-/* Ready animation - diamond shape with glow pulse */
+/* Ready animation - diamond shape with glow pulse (perf optimized) */
 @keyframes sessionDotReady {
   0%, 100% {
     transform: rotate(45deg) scale(1);
-    box-shadow: 0 0 8px currentColor;
+    box-shadow: 0 0 6px currentColor;
   }
   50% {
-    transform: rotate(45deg) scale(1.15);
-    box-shadow: 0 0 14px currentColor, 0 0 20px currentColor;
+    transform: rotate(45deg) scale(1.1);
+    box-shadow: 0 0 10px currentColor;
   }
 }
 
-/* Awaiting animation - purple glow pulse with scale */
+/* Awaiting animation - purple glow pulse with scale (perf optimized) */
 @keyframes sessionDotAwaiting {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 8px #a855f7, 0 0 12px #a855f7;
+    box-shadow: 0 0 8px #a855f7;
   }
   50% {
-    transform: scale(1.3);
-    box-shadow: 0 0 14px #a855f7, 0 0 24px #a855f7, 0 0 32px #a855f7;
+    transform: scale(1.2);
+    box-shadow: 0 0 14px #a855f7;
   }
 }
 
@@ -224,7 +224,7 @@
   overflow: visible;
 }
 
-/* Pulse traveling along horizontal line */
+/* Pulse traveling along horizontal line (perf optimized) */
 .session-item-wrapper.has-pulse .metro-horizontal-line::before {
   content: '';
   position: absolute;
@@ -234,13 +234,10 @@
   height: 6px;
   border-radius: 50%;
   background: var(--pulse-color, #00D4FF);
-  box-shadow:
-    0 0 8px var(--pulse-color, #00D4FF),
-    0 0 16px var(--pulse-color, #00D4FF),
-    0 0 24px var(--pulse-color, #00D4FF);
+  box-shadow: 0 0 10px var(--pulse-color, #00D4FF);
   animation: horizontalPulse 1.2s ease-in-out infinite;
-  /* Delay synced: vertical takes 35% of 1.2s = 0.42s to reach bottom */
   animation-delay: 0.42s;
+  will-change: left, opacity;
 }
 
 /* Station dot glow when pulse arrives */
@@ -279,16 +276,10 @@
     transform: scale(1);
   }
   10% {
-    box-shadow:
-      0 0 10px var(--pulse-color, #00D4FF),
-      0 0 20px var(--pulse-color, #00D4FF);
-    transform: scale(1.3);
+    box-shadow: 0 0 12px var(--pulse-color, #00D4FF);
+    transform: scale(1.2);
   }
-  40% {
-    box-shadow: none;
-    transform: scale(1);
-  }
-  100% {
+  40%, 100% {
     box-shadow: none;
     transform: scale(1);
   }

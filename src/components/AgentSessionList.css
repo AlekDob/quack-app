@@ -18,7 +18,7 @@
   overflow: visible; /* Allow pulse to extend beyond line */
 }
 
-/* Vertical pulse that travels down the metro line */
+/* Vertical pulse that travels down the metro line (perf optimized) */
 /* Uses .agent-sessions-container which has --agent-color CSS var */
 .agent-sessions-container:has(.session-item-wrapper.has-pulse) .metro-line-agent-sessions::before {
   content: '';
@@ -30,11 +30,9 @@
   border-radius: 50%;
   background: var(--agent-color, #00D4FF);
   opacity: 1;
-  box-shadow:
-    0 0 8px var(--agent-color, #00D4FF),
-    0 0 16px var(--agent-color, #00D4FF),
-    0 0 24px var(--agent-color, #00D4FF);
+  box-shadow: 0 0 10px var(--agent-color, #00D4FF);
   animation: verticalPulse 1.2s ease-in-out infinite;
+  will-change: top, opacity;
 }
 
 @keyframes verticalPulse {

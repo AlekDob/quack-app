@@ -90,28 +90,25 @@
 .tool-status-dot.running {
   background: #fbbf24;
   animation: pulse-dot 1s ease-in-out infinite;
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
+  will-change: opacity, transform;
 }
 
 @keyframes pulse-dot {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
-    box-shadow: 0 0 4px rgba(251, 191, 36, 0.3);
   }
   50% {
     opacity: 0.6;
-    transform: scale(0.7);
-    box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+    transform: scale(0.8);
   }
 }
 
-/* Running line - modern glow effect */
+/* Running line - modern glow effect (perf optimized) */
 .tool-minimal-line.running {
   border-color: rgba(251, 191, 36, 0.2);
-  box-shadow:
-    0 0 20px rgba(251, 191, 36, 0.08),
-    inset 0 0 20px rgba(251, 191, 36, 0.03);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.06);
 }
 
 .tool-minimal-line.running .tool-minimal-name {
@@ -168,7 +165,7 @@
   }
 }
 
-/* Shimmer effect for running tool line */
+/* Shimmer effect for running tool line (perf optimized) */
 .tool-minimal-line.running::after {
   content: '';
   position: absolute;
@@ -179,14 +176,13 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(251, 191, 36, 0.08) 25%,
-    rgba(251, 191, 36, 0.12) 50%,
-    rgba(251, 191, 36, 0.08) 75%,
+    rgba(251, 191, 36, 0.06) 50%,
     transparent 100%
   );
-  animation: shimmer 2s ease-in-out infinite;
+  animation: shimmer 2.5s ease-in-out infinite;
   pointer-events: none;
   border-radius: 8px;
+  will-change: transform;
 }
 
 @keyframes shimmer {

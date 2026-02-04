@@ -96,6 +96,7 @@ import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
+import { useWindowFocus } from "./hooks/useWindowFocus";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
 import {
   saveTabsByTerminalToStorage,
@@ -338,6 +339,9 @@ function AppContent() {
 
   // System wake handler - prevents blank screen after macOS standby
   useSystemWakeHandler({ debug: true });
+
+  // Window focus handler - pauses animations when window is blurred for battery saving
+  useWindowFocus();
 
   // Background Agents initialization - needed for /background @agent commands
   useBackgroundAgentInit();
