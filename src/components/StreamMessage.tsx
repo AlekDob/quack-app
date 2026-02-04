@@ -97,6 +97,7 @@ interface ToolMinimalStreamProps {
   hasError?: boolean;
   result?: any;
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void;
   onUndoEdit?: (filePath: string) => void;
 }
 
@@ -107,6 +108,7 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
   hasError,
   result,
   onFilePathClick,
+  onOpenInIDE,
   onUndoEdit,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -160,21 +162,41 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
 
       {isExpanded && hasExpandableContent && (
         <div className="tool-minimal-content">
-          {/* File path clickable link */}
-          {typeof input?.file_path === 'string' && onFilePathClick && (
-            <div
-              className="tool-minimal-file-path"
-              onClick={(e) => {
-                e.stopPropagation();
-                onFilePathClick(input.file_path as string);
-              }}
-              title="Click to open in IDE"
-            >
+          {/* File path with Open in IDE button */}
+          {typeof input?.file_path === 'string' && (
+            <div className="tool-minimal-file-path">
               <svg className="tool-minimal-file-path-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
-              <span className="tool-minimal-file-path-text">{input.file_path}</span>
+              <span
+                className="tool-minimal-file-path-text"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onFilePathClick) onFilePathClick(input.file_path as string);
+                }}
+                style={{ cursor: onFilePathClick ? 'pointer' : 'default' }}
+                title={onFilePathClick ? "Open in Quack" : undefined}
+              >
+                {input.file_path}
+              </span>
+              {onOpenInIDE && (
+                <button
+                  className="tool-minimal-open-ide-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenInIDE(input.file_path as string);
+                  }}
+                  title="Open in IDE"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Open
+                </button>
+              )}
             </div>
           )}
 
@@ -225,6 +247,7 @@ interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void; // Callback to open file in preferred IDE
   onUndoEdit?: (filePath: string) => void; // Callback to undo file edit
   agentName?: string;
   agentAvatar?: string;
@@ -244,6 +267,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   message,
   streamMessages,
   onFilePathClick,
+  onOpenInIDE,
   onUndoEdit,
   agentName = 'Jack',
   agentAvatar,
@@ -359,325 +383,307 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       return null;
     }
 
-    // Debug: Log all content blocks for this message (expanded)
-    msg.content.forEach((c: any, idx: number) => {
-      console.log(`🔍 [StreamMessage] Content block ${idx}:`, {
-        type: c.type,
-        name: c.name,
-        text: c.text?.substring(0, 50),
-        hasInput: !!c.input,
-        inputKeys: c.input ? Object.keys(c.input) : [],
-        subagent_type: c.input?.subagent_type,
-      });
+    // Render tools separately (after the main avatar+text block)
+    const renderToolContent = (content: any, idx: number) => {
+      const toolName = content.name?.toLowerCase();
+      const input = content.input;
+      const toolId = content.id;
+      const toolResult = toolResults.get(toolId);
+
+      // TodoWrite tool - special widget
+      if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
+        return (
+          <MemoizedTodoWriteWidget
+            key={idx}
+            todos={input.todos}
+            defaultExpanded={true}
+          />
+        );
+      }
+
+      // ExitPlanMode tool - special widget
+      if (toolName === 'exitplanmode' && input?.plan) {
+        return (
+          <MemoizedExitPlanModeWidget
+            key={idx}
+            plan={input.plan}
+            workingDirectory={workingDirectory}
+            defaultExpanded={true}
+          />
+        );
+      }
+
+      // EnterPlanMode tool - special widget
+      if (toolName === 'enterplanmode') {
+        const isFirstEnterPlanMode = msg.content.findIndex(
+          (c: any) => c.type === 'tool_use' && c.name?.toLowerCase() === 'enterplanmode'
+        ) === idx;
+
+        if (!isFirstEnterPlanMode) {
+          return null;
+        }
+
+        return (
+          <MemoizedEnterPlanModeWidget
+            key={idx}
+            objective={input?.objective}
+            defaultExpanded={false}
+          />
+        );
+      }
+
+      // AskUserQuestion tool - special widget
+      if (toolName === 'askuserquestion' && input?.questions) {
+        let questions = input.questions;
+
+        if (typeof questions === 'string') {
+          try {
+            questions = JSON.parse(questions);
+          } catch (e) {
+            console.error('Failed to parse questions string:', e);
+          }
+        }
+
+        if (Array.isArray(questions)) {
+          const existingAnswer = answeredQuestions?.get(toolId);
+          const isAnswered = !!existingAnswer || !!toolResult;
+
+          return (
+            <MemoizedAskUserQuestionWidget
+              key={idx}
+              questions={questions}
+              toolUseId={toolId}
+              onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers, sessionId)}
+              disabled={isAnswered}
+              existingAnswers={existingAnswer}
+            />
+          );
+        }
+      }
+
+      // Task tool (subagent) - special widget
+      if (toolName === 'task' && input?.subagent_type) {
+        return (
+          <MemoizedTaskWidget
+            key={idx}
+            subagentType={input.subagent_type}
+            description={input.description || 'Running task'}
+            isLoading={!toolResult}
+            workingDirectory={workingDirectory}
+          />
+        );
+      }
+
+      // TaskOutput tool - special widget
+      if (toolName === 'taskoutput' && input?.task_id) {
+        let status: 'pending' | 'running' | 'completed' | 'error' | 'unknown' = 'unknown';
+        let output: string | undefined;
+        let error: string | undefined;
+
+        if (toolResult) {
+          try {
+            const result = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
+            status = result.status || 'completed';
+            output = result.output || result.result || (typeof toolResult === 'string' ? toolResult : JSON.stringify(result, null, 2));
+            error = result.error;
+          } catch {
+            output = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
+            status = 'completed';
+          }
+        }
+
+        return (
+          <MemoizedTaskOutputWidget
+            key={idx}
+            taskId={input.task_id}
+            status={status}
+            output={output}
+            error={error}
+            block={input.block}
+            timeout={input.timeout}
+            isLoading={!toolResult}
+            defaultExpanded={true}
+          />
+        );
+      }
+
+      // Read tool - check for image files (special handling)
+      if (toolName === 'read' && input?.file_path) {
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
+        const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
+
+        if (isImageFile && toolResult) {
+          const imageContent = extractImageData(toolResult);
+          if (imageContent) {
+            return (
+              <MemoizedImagePreviewWidget
+                key={idx}
+                filePath={input.file_path}
+                imageData={imageContent.data}
+                mediaType={imageContent.mediaType}
+                onOpenInTab={onOpenImageTab}
+              />
+            );
+          }
+        }
+      }
+
+      // All other tools - use minimal display
+      return (
+        <MemoizedToolMinimalStream
+          key={idx}
+          toolName={content.name || 'unknown'}
+          input={input}
+          isLoading={!toolResult}
+          hasError={toolResult?.is_error}
+          result={toolResult}
+          onFilePathClick={onFilePathClick}
+          onOpenInIDE={onOpenInIDE}
+          onUndoEdit={onUndoEdit}
+        />
+      );
+    };
+
+    // Collect text content and rules
+    let combinedText = '';
+    let ruleNames: string[] = [];
+
+    msg.content.forEach((content: any) => {
+      if (content.type === 'text' && content.text) {
+        const rulesMatch = content.text.match(/^(?:Following rules?:\s*)(.+)$/m);
+        if (rulesMatch) {
+          ruleNames = rulesMatch[1].split(',').map((r: string) => r.trim().replace(/\.$/, '')).filter(Boolean);
+          combinedText += content.text.replace(/^Following rules?:\s*.+$/m, '').replace(/^\n+/, '');
+        } else {
+          combinedText += content.text;
+        }
+      }
     });
 
     return (
       <div className="stream-message assistant-message">
+        {/* Thinking blocks - rendered before the main content */}
         {msg.content.map((content: any, idx: number) => {
-          // Thinking block content (SDK 0.1.54+ extended thinking)
-          // Only render if showThinkingBlocks is true (controlled by footer icon)
           if (content.type === 'thinking' && content.thinking && showThinkingBlocks) {
             return (
               <ThinkingBlock
-                key={idx}
+                key={`thinking-${idx}`}
                 content={content.thinking}
                 defaultExpanded={false}
               />
             );
           }
-
-          // Text content
-          if (content.type === 'text' && content.text) {
-            // Extract "Following rules:" line into styled pills
-            const rulesMatch = content.text.match(/^(?:Following rules?:\s*)(.+)$/m);
-            const ruleNames = rulesMatch
-              ? rulesMatch[1].split(',').map((r: string) => r.trim().replace(/\.$/, '')).filter(Boolean)
-              : [];
-            const cleanedText = rulesMatch
-              ? content.text.replace(/^Following rules?:\s*.+$/m, '').replace(/^\n+/, '')
-              : content.text;
-
-            return (
-              <div key={idx} className="assistant-text">
-                <div className="assistant-avatar">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-                  )}
-                </div>
-                <div className="assistant-content">
-                  <div className="assistant-name">{agentName}</div>
-                  {ruleNames.length > 0 && (
-                    <div className="rules-pills">
-                      <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      {ruleNames.map((name: string) => (
-                        <span key={name} className="rule-pill">{name}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="assistant-message-text">
-                    <MarkdownText>{cleanedText}</MarkdownText>
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          // Tool use content
-          if (content.type === 'tool_use') {
-            const toolName = content.name?.toLowerCase();
-            const input = content.input;
-            const toolId = content.id;
-            const toolResult = toolResults.get(toolId);
-
-            // TodoWrite tool - special widget
-            if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
-              return (
-                <MemoizedTodoWriteWidget
-                  key={idx}
-                  todos={input.todos}
-                  defaultExpanded={true}
-                />
-              );
-            }
-
-            // ExitPlanMode tool - special widget
-            if (toolName === 'exitplanmode' && input?.plan) {
-              return (
-                <MemoizedExitPlanModeWidget
-                  key={idx}
-                  plan={input.plan}
-                  workingDirectory={workingDirectory}
-                  defaultExpanded={true}
-                />
-              );
-            }
-
-            // EnterPlanMode tool - special widget
-            if (toolName === 'enterplanmode') {
-              const isFirstEnterPlanMode = msg.content.findIndex(
-                (c: any) => c.type === 'tool_use' && c.name?.toLowerCase() === 'enterplanmode'
-              ) === idx;
-
-              if (!isFirstEnterPlanMode) {
-                return null;
-              }
-
-              return (
-                <MemoizedEnterPlanModeWidget
-                  key={idx}
-                  objective={input?.objective}
-                  defaultExpanded={false}
-                />
-              );
-            }
-
-            // AskUserQuestion tool - special widget
-            if (toolName === 'askuserquestion' && input?.questions) {
-              let questions = input.questions;
-
-              if (typeof questions === 'string') {
-                try {
-                  questions = JSON.parse(questions);
-                } catch (e) {
-                  console.error('Failed to parse questions string:', e);
-                }
-              }
-
-              if (Array.isArray(questions)) {
-                const existingAnswer = answeredQuestions?.get(toolId);
-                const isAnswered = !!existingAnswer || !!toolResult;
-
-                return (
-                  <MemoizedAskUserQuestionWidget
-                    key={idx}
-                    questions={questions}
-                    toolUseId={toolId}
-                    onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers, sessionId)}
-                    disabled={isAnswered}
-                    existingAnswers={existingAnswer}
-                  />
-                );
-              }
-            }
-
-            // Task tool (subagent) - special widget
-            if (toolName === 'task' && input?.subagent_type) {
-              return (
-                <MemoizedTaskWidget
-                  key={idx}
-                  subagentType={input.subagent_type}
-                  description={input.description || 'Running task'}
-                  isLoading={!toolResult}
-                  workingDirectory={workingDirectory}
-                />
-              );
-            }
-
-            // TaskOutput tool - special widget
-            if (toolName === 'taskoutput' && input?.task_id) {
-              let status: 'pending' | 'running' | 'completed' | 'error' | 'unknown' = 'unknown';
-              let output: string | undefined;
-              let error: string | undefined;
-
-              if (toolResult) {
-                try {
-                  const result = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
-                  status = result.status || 'completed';
-                  output = result.output || result.result || (typeof toolResult === 'string' ? toolResult : JSON.stringify(result, null, 2));
-                  error = result.error;
-                } catch {
-                  output = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
-                  status = 'completed';
-                }
-              }
-
-              return (
-                <MemoizedTaskOutputWidget
-                  key={idx}
-                  taskId={input.task_id}
-                  status={status}
-                  output={output}
-                  error={error}
-                  block={input.block}
-                  timeout={input.timeout}
-                  isLoading={!toolResult}
-                  defaultExpanded={true}
-                />
-              );
-            }
-
-            // Read tool - check for image files (special handling)
-            if (toolName === 'read' && input?.file_path) {
-              const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
-              const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
-
-              if (isImageFile && toolResult) {
-                const imageContent = extractImageData(toolResult);
-                if (imageContent) {
-                  return (
-                    <MemoizedImagePreviewWidget
-                      key={idx}
-                      filePath={input.file_path}
-                      imageData={imageContent.data}
-                      mediaType={imageContent.mediaType}
-                      onOpenInTab={onOpenImageTab}
-                    />
-                  );
-                }
-              }
-            }
-
-            // All other tools - use minimal display
-            return (
-              <MemoizedToolMinimalStream
-                key={idx}
-                toolName={content.name || 'unknown'}
-                input={input}
-                isLoading={!toolResult}
-                hasError={toolResult?.is_error}
-                result={toolResult}
-                onFilePathClick={onFilePathClick}
-                onUndoEdit={onUndoEdit}
-              />
-            );
-          }
-
           return null;
         })}
 
-        {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
-        {(() => {
-          // Check if this message has file-modifying tools (Edit, Write, MultiEdit)
-          const hasFileChanges = msg.content.some(
-            (c: any) => c.type === 'tool_use' && ['edit', 'write', 'multiedit'].includes(c.name?.toLowerCase())
-          );
-
-          // Get the UUID from the preceding user message (required for rewind)
-          // We need the user message UUID that preceded this assistant response
-          const messageIndex = streamMessages.findIndex((m) => m === message);
-          let precedingUserMessageUuid: string | undefined;
-
-          if (messageIndex > 0) {
-            // Look backwards for the user message
-            for (let i = messageIndex - 1; i >= 0; i--) {
-              const prevMsg = streamMessages[i];
-              if (prevMsg.type === 'user') {
-                // Get UUID from user event (SDK provides this in the uuid field)
-                precedingUserMessageUuid = (prevMsg as any).uuid;
-                break;
-              }
-            }
-          }
-
-          // DEBUG: Log why rewind button might not show
-          if (hasFileChanges) {
-            console.log('[RewindButton] hasFileChanges:', hasFileChanges);
-            console.log('[RewindButton] onRewindFiles:', !!onRewindFiles);
-            console.log('[RewindButton] sessionId:', sessionId);
-            console.log('[RewindButton] precedingUserMessageUuid:', precedingUserMessageUuid);
-            // Log full structure of user messages to find UUID location
-            const userMessages = streamMessages.filter((m: any) => m.type === 'user');
-            console.log('[RewindButton] User messages:', userMessages.length);
-            if (userMessages.length > 0) {
-              console.log('[RewindButton] First user message keys:', Object.keys(userMessages[0]));
-              console.log('[RewindButton] First user message:', JSON.stringify(userMessages[0]).substring(0, 500));
-            }
-          }
-
-          if (hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid) {
-            return (
-              <div className="rewind-files-action" style={{
-                marginTop: '12px',
-                paddingTop: '12px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                display: 'flex',
-                justifyContent: 'flex-end',
-              }}>
-                <button
-                  onClick={() => onRewindFiles(precedingUserMessageUuid!)}
-                  className="rewind-button"
-                  title="Undo all file changes from this response"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '3px 8px',
-                    background: 'transparent',
-                    border: '1px solid rgba(251, 146, 60, 0.25)',
-                    borderRadius: '4px',
-                    color: 'rgba(251, 191, 136, 0.7)',
-                    fontSize: '10px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.4)';
-                    e.currentTarget.style.color = 'rgb(251, 191, 136)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.25)';
-                    e.currentTarget.style.color = 'rgba(251, 191, 136, 0.7)';
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                    <path d="M3 3v5h5"/>
-                  </svg>
-                  Undo
-                </button>
+        {/* Avatar + Content block - ALWAYS shown for assistant messages */}
+        <div className="assistant-text">
+          <div className="assistant-avatar">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+            )}
+          </div>
+          <div className="assistant-content">
+            <div className="assistant-name">{agentName}</div>
+            {ruleNames.length > 0 && (
+              <div className="rules-pills">
+                <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                {ruleNames.map((name: string) => (
+                  <span key={name} className="rule-pill">{name}</span>
+                ))}
               </div>
-            );
-          }
-          return null;
-        })()}
+            )}
+            {/* Text content */}
+            {combinedText.trim() && (
+              <div className="assistant-message-text">
+                <MarkdownText>{combinedText.trim()}</MarkdownText>
+              </div>
+            )}
+            {/* Tool uses - rendered inside the content block */}
+            {msg.content.map((content: any, idx: number) => {
+              if (content.type === 'tool_use') {
+                return renderToolContent(content, idx);
+              }
+              return null;
+            })}
+
+            {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
+            {(() => {
+              // Check if this message has file-modifying tools (Edit, Write, MultiEdit)
+              const hasFileChanges = msg.content.some(
+                (c: any) => c.type === 'tool_use' && ['edit', 'write', 'multiedit'].includes(c.name?.toLowerCase())
+              );
+
+              // Get the UUID from the preceding user message (required for rewind)
+              const messageIndex = streamMessages.findIndex((m) => m === message);
+              let precedingUserMessageUuid: string | undefined;
+
+              if (messageIndex > 0) {
+                for (let i = messageIndex - 1; i >= 0; i--) {
+                  const prevMsg = streamMessages[i];
+                  if (prevMsg.type === 'user') {
+                    precedingUserMessageUuid = (prevMsg as any).uuid;
+                    break;
+                  }
+                }
+              }
+
+              if (hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid) {
+                return (
+                  <div className="rewind-files-action" style={{
+                    marginTop: '12px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                  }}>
+                    <button
+                      onClick={() => onRewindFiles(precedingUserMessageUuid!)}
+                      className="rewind-button"
+                      title="Undo all file changes from this response"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        background: 'transparent',
+                        border: '1px solid rgba(251, 146, 60, 0.25)',
+                        borderRadius: '4px',
+                        color: 'rgba(251, 191, 136, 0.7)',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(251, 146, 60, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.4)';
+                        e.currentTarget.style.color = 'rgb(251, 191, 136)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.25)';
+                        e.currentTarget.style.color = 'rgba(251, 191, 136, 0.7)';
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                      </svg>
+                      Undo
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        </div>
       </div>
     );
   }
