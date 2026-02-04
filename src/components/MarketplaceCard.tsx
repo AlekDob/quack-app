@@ -22,19 +22,9 @@ export default function MarketplaceCard({
   onViewDetails,
   onToggleFavorite,
 }: MarketplaceCardProps) {
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'agents': return '#f28c52';
-      case 'agent-bundles': return '#f28c52';
-      case 'commands': return '#3b82f6';
-      case 'hooks': return '#8b5cf6';
-      case 'settings': return '#6b7280';
-      case 'mcp': return '#10b981';
-      case 'stacks': return '#f59e0b';
-      case 'skills': return '#ec4899';
-      case 'rules': return '#60a5fa';
-      default: return '#6b7280';
-    }
+  // Unified accent color for all categories
+  const getCategoryColor = (_category: string) => {
+    return '#f28c52';
   };
 
   /** Icons matching SidePanel.tsx tab icons */

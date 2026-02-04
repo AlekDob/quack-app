@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
 import type { MarketplaceResource } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
 
 /**
- * MarketplaceInstallModal - Modal for viewing resource details and installation
- * Shows full info, install command, and action buttons
+ * MarketplaceInstallModal - Compact inline detail panel (Codex-style)
+ * Minimal design matching AddonsDrawer aesthetic
  */
 
 interface MarketplaceInstallModalProps {
@@ -14,6 +14,101 @@ interface MarketplaceInstallModalProps {
   onClose: () => void;
   onInstall: (resource: MarketplaceResource, scope: 'global' | 'project') => Promise<boolean>;
   onUninstall?: (resourceId: string) => Promise<boolean>;
+}
+
+// Category-specific gradients - matches AddonsDrawer
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  skills: 'linear-gradient(135deg, #f28c52, #e67339)',       // Orange - main accent
+  agents: 'linear-gradient(135deg, #f28c52, #fbbf24)',       // Orange/Yellow - personas
+  'agent-bundles': 'linear-gradient(135deg, #f28c52, #fbbf24)',
+  droids: 'linear-gradient(135deg, #4ecdc4, #26a69a)',       // Teal - automation
+  rules: 'linear-gradient(135deg, #60a5fa, #3b82f6)',        // Blue - governance
+  hooks: 'linear-gradient(135deg, #a78bfa, #8b5cf6)',        // Purple - events
+  mcp: 'linear-gradient(135deg, #34d399, #10b981)',          // Green - servers
+  commands: 'linear-gradient(135deg, #f472b6, #ec4899)',     // Pink - snippets
+  snippets: 'linear-gradient(135deg, #f472b6, #ec4899)',     // Pink - snippets
+  default: 'linear-gradient(135deg, #6b7280, #4b5563)',      // Gray - fallback
+};
+
+function getCategoryGradient(category: string): string {
+  return CATEGORY_GRADIENTS[category] || CATEGORY_GRADIENTS.default;
+}
+
+// Icons - EXACT COPIES from SidePanelAccordion for uniformity
+function getCategoryIcon(category: string): React.ReactElement {
+  const iconStyle = { width: 14, height: 14, color: 'white' };
+
+  switch (category) {
+    case 'skills':
+      // Star icon - matches SidePanel skills icon
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <path d="M10 2l2 4 4.5 0.5-3.25 3 1 4.5-4.25-2.5-4.25 2.5 1-4.5L3.5 6.5 8 6z" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      );
+    case 'agents':
+    case 'agent-bundles':
+      // Person icon for agents (personas)
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <circle cx="10" cy="7" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M5 17a5 5 0 0 1 10 0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 'droids':
+      // Robot icon - matches SidePanel agents/droids icon
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <rect x="4" y="4" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="10" y1="2" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="7.5" cy="9" r="1.3" fill="currentColor" />
+          <circle cx="12.5" cy="9" r="1.3" fill="currentColor" />
+          <line x1="7.5" y1="13" x2="12.5" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 'rules':
+      // Document with checkmarks - matches SidePanel rules icon
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <path d="M4 3h8l4 4v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2z" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M5 10l1.5 1.5L9 9M5 14l1.5 1.5L9 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'hooks':
+      // Hook icon - matches SidePanel hooks icon
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <path d="M10 3v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M10 10c0 2.5-2 4-4 4s-4-1.5-4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="10" cy="3" r="1.5" fill="currentColor" />
+        </svg>
+      );
+    case 'mcp':
+      // Server/MCP icon - matches SidePanel mcp icon
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <path d="M3 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="7" cy="8" r="1.5" fill="currentColor" />
+          <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+          <path d="M7 12h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 'commands':
+    case 'snippets':
+      // Terminal/commands icon - matches SidePanel commands icon
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <path d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M6 7l2 2-2 2M10 11h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 20 20" style={iconStyle}>
+          <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      );
+  }
 }
 
 export default function MarketplaceInstallModal({
@@ -37,8 +132,7 @@ export default function MarketplaceInstallModal({
     try {
       const success = await onInstall(resource, scope);
       if (success) {
-        // Close modal after successful install
-        setTimeout(() => onClose(), 1000);
+        setTimeout(() => onClose(), 800);
       }
     } finally {
       setInstalling(false);
@@ -47,28 +141,14 @@ export default function MarketplaceInstallModal({
 
   const handleUninstall = async () => {
     if (!onUninstall) return;
-
     setInstalling(true);
     try {
       const success = await onUninstall(resource.id);
       if (success) {
-        setTimeout(() => onClose(), 1000);
+        setTimeout(() => onClose(), 800);
       }
     } finally {
       setInstalling(false);
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'agents': return '#f28c52';
-      case 'commands': return '#3b82f6';
-      case 'hooks': return '#8b5cf6';
-      case 'settings': return '#6b7280';
-      case 'mcp': return '#10b981';
-      case 'stacks': return '#f59e0b';
-      case 'skills': return '#ec4899';
-      default: return '#6b7280';
     }
   };
 
@@ -83,383 +163,97 @@ export default function MarketplaceInstallModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{
-        background: 'rgba(0, 0, 0, 0.7)',
-        backdropFilter: 'blur(8px)',
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="relative max-w-2xl w-full mx-4 overflow-hidden"
-        style={{
-          background: 'rgba(12, 16, 24, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '16px',
-          maxHeight: '90vh',
-          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.3)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="addon-detail-overlay" onClick={onClose}>
+      <div className="addon-detail-panel" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div
-          className="px-5 py-3 border-b"
-          style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{
-                    background: `${getCategoryColor(resource.category)}20`,
-                    border: `1px solid ${getCategoryColor(resource.category)}40`,
-                  }}
-                >
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ background: getCategoryColor(resource.category) }}
-                  />
-                </div>
-                <div>
-                  <h2
-                    className="text-xl font-bold"
-                    style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-                  >
-                    {resource.name}
-                  </h2>
-                  <p
-                    className="text-sm"
-                    style={{ color: 'rgba(255, 255, 255, 0.5)' }}
-                  >
-                    by {resource.author} • v{resource.version}
-                  </p>
-                </div>
-              </div>
-            </div>
+        <div className="addon-detail-header">
+          <div className="addon-detail-icon" style={{ background: getCategoryGradient(resource.category) }}>
+            {getCategoryIcon(resource.category)}
+          </div>
+          <div className="addon-detail-title-group">
+            <h3 className="addon-detail-name">{resource.name}</h3>
+            <span className="addon-detail-meta">
+              {resource.author} · v{resource.version}
+            </span>
+          </div>
+          <button type="button" className="addon-detail-close" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
+        {/* Description */}
+        <p className="addon-detail-description">{resource.description}</p>
+
+        {/* Tags */}
+        {resource.tags.length > 0 && (
+          <div className="addon-detail-tags">
+            {resource.tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="addon-detail-tag">#{tag}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Scope selector (only for install) */}
+        {!installed && (
+          <div className="addon-detail-scope">
             <button
               type="button"
-              onClick={onClose}
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'rgba(255, 255, 255, 0.7)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-              }}
+              className={`addon-scope-btn ${scope === 'global' ? 'active' : ''}`}
+              onClick={() => setScope('global')}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              Global
+            </button>
+            <button
+              type="button"
+              className={`addon-scope-btn ${scope === 'project' ? 'active' : ''}`}
+              onClick={() => projectPath && setScope('project')}
+              disabled={!projectPath}
+            >
+              {projectPath ? projectName : 'No project'}
             </button>
           </div>
+        )}
 
-          {/* Badges */}
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            <span
-              className="px-2 py-1 rounded text-xs font-medium"
-              style={{
-                background: 'rgba(242, 140, 82, 0.1)',
-                color: '#f28c52',
-              }}
-            >
-              {resource.category}
-            </span>
-            {resource.verified && (
-              <span
-                className="px-2 py-1 rounded text-xs font-medium"
-                style={{
-                  background: 'rgba(34, 197, 94, 0.1)',
-                  color: '#22c55e',
-                }}
-              >
-                Verified
-              </span>
-            )}
-            {resource.featured && (
-              <span
-                className="px-2 py-1 rounded text-xs font-medium"
-                style={{
-                  background: 'rgba(251, 191, 36, 0.1)',
-                  color: '#fbbf24',
-                }}
-              >
-                Featured
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
-          <div className="p-5 space-y-4">
-            {/* Description */}
-            <div>
-              <h3
-                className="text-sm font-semibold mb-2"
-                style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-              >
-                Description
-              </h3>
-              <p
-                className="text-sm"
-                style={{
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  lineHeight: '1.6',
-                }}
-              >
-                {resource.description}
-              </p>
-            </div>
-
-            {/* Installation Info */}
-            <div>
-              <h3
-                className="text-sm font-semibold mb-2"
-                style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-              >
-                Installation
-              </h3>
-              <div
-                className="p-3 rounded-lg text-sm"
-                style={{
-                  background: installed ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${installed ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                  color: installed ? '#22c55e' : 'rgba(255, 255, 255, 0.7)',
-                }}
-              >
-                {installed
-                  ? `Installed in ~/.claude/${resource.category}/`
-                  : scope === 'project' && projectPath
-                    ? `Will install to ${projectName}/.claude/${resource.category}/`
-                    : `Will install to ~/.claude/${resource.category}/`
-                }
-              </div>
-            </div>
-
-            {/* Scope Selector */}
-            {!installed && (
-              <div>
-                <h3 className="text-sm font-semibold mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                  Install Scope
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setScope('global')}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-                    style={{
-                      background: scope === 'global' ? 'rgba(242, 140, 82, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                      border: `1px solid ${scope === 'global' ? 'rgba(242, 140, 82, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                      color: scope === 'global' ? '#f28c52' : 'rgba(255, 255, 255, 0.6)',
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>Global</div>
-                    <div style={{ fontSize: '11px', color: scope === 'global' ? 'rgba(242, 140, 82, 0.7)' : 'rgba(255, 255, 255, 0.4)', marginTop: '2px' }}>
-                      ~/.claude/ - All projects
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => projectPath && setScope('project')}
-                    disabled={!projectPath}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-                    style={{
-                      background: scope === 'project' ? 'rgba(96, 165, 250, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                      border: `1px solid ${scope === 'project' ? 'rgba(96, 165, 250, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                      color: scope === 'project' ? '#60a5fa' : 'rgba(255, 255, 255, 0.6)',
-                      opacity: projectPath ? 1 : 0.4,
-                      cursor: projectPath ? 'pointer' : 'not-allowed',
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>Project</div>
-                    <div style={{ fontSize: '11px', color: scope === 'project' ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.4)', marginTop: '2px' }}>
-                      {projectPath ? projectName : 'No active project'}
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Version */}
-            <div>
-              <h3
-                className="text-sm font-semibold mb-2"
-                style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-              >
-                Version
-              </h3>
-              <div
-                className="inline-block px-3 py-2 rounded-lg"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                }}
-              >
-                <div
-                  className="text-sm font-bold"
-                  style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-                >
-                  v{resource.version}
-                </div>
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div>
-              <h3
-                className="text-sm font-semibold mb-2"
-                style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-              >
-                Tags
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {resource.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1 rounded text-xs"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Repository Link */}
-            {resource.repository && (
-              <div>
-                <h3
-                  className="text-sm font-semibold mb-2"
-                  style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                >
-                  Repository
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleOpenRepository}
-                  className="text-sm inline-flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.1)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
-                    color: '#3b82f6',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                  </svg>
-                  View on GitHub
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div
-          className="px-5 py-3 border-t flex items-center gap-2"
-          style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
-        >
+        {/* Actions */}
+        <div className="addon-detail-actions">
           {installed ? (
             <>
-              <button
-                type="button"
-                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium"
-                style={{
-                  background: 'rgba(34, 197, 94, 0.1)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  color: '#22c55e',
-                  cursor: 'default',
-                }}
-              >
-                Installed
-              </button>
+              <span className="addon-detail-installed-badge">Installed</span>
               {onUninstall && (
                 <button
                   type="button"
+                  className="addon-detail-btn addon-detail-btn-remove"
                   onClick={handleUninstall}
                   disabled={installing}
-                  className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#ef4444',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!installing) {
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                  }}
                 >
-                  {installing ? 'Removing...' : 'Uninstall'}
+                  {installing ? 'Removing...' : 'Remove'}
                 </button>
               )}
             </>
           ) : (
             <button
               type="button"
+              className="addon-detail-btn addon-detail-btn-install"
               onClick={handleInstall}
               disabled={installing}
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
-              style={{
-                background: 'rgba(242, 140, 82, 0.1)',
-                border: '1px solid rgba(242, 140, 82, 0.3)',
-                color: '#f28c52',
-              }}
-              onMouseEnter={(e) => {
-                if (!installing) {
-                  e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
-                  e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
-              }}
             >
               {installing ? 'Installing...' : 'Install'}
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: 'rgba(255, 255, 255, 0.9)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-            }}
-          >
-            Close
-          </button>
+          {resource.repository && (
+            <button
+              type="button"
+              className="addon-detail-btn addon-detail-btn-github"
+              onClick={handleOpenRepository}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg>
+              GitHub
+            </button>
+          )}
         </div>
       </div>
     </div>

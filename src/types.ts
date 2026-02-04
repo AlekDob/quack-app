@@ -970,7 +970,7 @@ export interface SessionDetails extends SessionInfo {
 }
 
 // Marketplace types
-export type MarketplaceCategory = 'agents' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills' | 'rules' | 'agent-bundles';
+export type MarketplaceCategory = 'agents' | 'droids' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills' | 'rules' | 'agent-bundles';
 
 /**
  * Agent Template from marketplace bundle.

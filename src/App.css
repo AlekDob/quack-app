@@ -52,11 +52,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: url("../images/quack-agent.jpeg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  opacity: 0.08;
+  background: transparent;
+  opacity: 0;
   pointer-events: none;
   z-index: -1;
 }
@@ -817,6 +814,11 @@ button.directory-chooser:disabled {
 .git-drawer-panel .git-panel {
   flex: 1;
   min-height: 0;
+}
+
+/* Addons Drawer Panel - Narrower width */
+.git-drawer-panel.addons-drawer-panel {
+  width: clamp(380px, 30vw, 480px);
 }
 
 /* Git Drawer Loading State */

@@ -218,8 +218,8 @@ export default function SkillsPanel({
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
                         {/* Lightning Icon */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(248, 183, 57, 0.15)" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f8b739" strokeWidth="2">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(242, 140, 82, 0.15)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth="2">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                           </svg>
                         </div>
@@ -272,8 +272,8 @@ export default function SkillsPanel({
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
                         {/* Lightning Icon */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(248, 183, 57, 0.15)" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f8b739" strokeWidth="2">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(242, 140, 82, 0.15)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth="2">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                           </svg>
                         </div>

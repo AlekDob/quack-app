@@ -17,7 +17,8 @@ interface MarketplaceDrawerProps {
 
 const CATEGORY_META: Record<MarketplaceCategory, { label: string }> = {
   skills: { label: 'Skills' },
-  agents: { label: 'Droids' },
+  agents: { label: 'Agents' },
+  droids: { label: 'Droids' },
   commands: { label: 'Commands' },
   hooks: { label: 'Hooks' },
   settings: { label: 'Settings' },

@@ -42,6 +42,9 @@ interface ActionIconsProps {
   onKanbanClick?: () => void;
   isKanbanActive?: boolean;
   inProgressTaskCount?: number;
+  // Addons
+  onAddonsClick?: () => void;
+  isAddonsOpen?: boolean;
 }
 
 function ActionIcons({
@@ -56,6 +59,8 @@ function ActionIcons({
   onKanbanClick,
   isKanbanActive = false,
   inProgressTaskCount = 0,
+  onAddonsClick,
+  isAddonsOpen = false,
 }: ActionIconsProps) {
   const [openMenuOpen, setOpenMenuOpen] = useState(false);
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
@@ -259,6 +264,23 @@ function ActionIcons({
         >
           <Brain size={14} />
           <span className="action-icon-tooltip">Brain</span>
+        </button>
+      )}
+
+      {/* Addons Icon */}
+      {onAddonsClick && (
+        <button
+          type="button"
+          className={`action-icon ${isAddonsOpen ? 'active' : ''}`}
+          onClick={onAddonsClick}
+          aria-label="Open Addons"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+          <span className="action-icon-tooltip">Addons</span>
         </button>
       )}
 

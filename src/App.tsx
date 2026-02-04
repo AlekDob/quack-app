@@ -27,7 +27,7 @@ import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FileP
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
-import MarketplaceDrawer from "./components/MarketplaceDrawer";
+import AddonsDrawer from "./components/AddonsDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
@@ -313,7 +313,6 @@ function AppContent() {
   const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
   const ducksPatternBackgroundImage = new URL("../images/backgrounds/ducks-pattern.png", import.meta.url).href;
   const duckPattern3BackgroundImage = new URL("../images/backgrounds/duck-pattern3.png", import.meta.url).href;
-  const quackAgentBackgroundImage = new URL("../images/backgrounds/quack-agent.jpeg", import.meta.url).href;
   const hackerBackgroundImage = new URL("../images/backgrounds/hacker.png", import.meta.url).href;
   const duckBusinessBackgroundImage = new URL("../images/backgrounds/duckbusiness.png", import.meta.url).href;
   const duckMotoBackgroundImage = new URL("../images/backgrounds/duckmoto.png", import.meta.url).href;
@@ -611,7 +610,7 @@ function AppContent() {
     const stored = localStorage.getItem('quackSoundEnabled');
     return stored === null ? true : stored === 'true';
   });
-  const [_booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(true);
   // Splash is now handled by native HTML splash in index.html only
   // React SplashScreen is only used for "Watch Intro" replay feature
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
@@ -649,7 +648,7 @@ function AppContent() {
   const [kanbanSidePanelExpanded, setKanbanSidePanelExpanded] = useState(false);
   // Show Kanban Mini Panel in sidebar (toggled via button in Kanban tab header)
   const [showKanbanMiniPanel, setShowKanbanMiniPanel] = useState(false);
-  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(true);
+  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(false);
 
   // Tab system state - restore from localStorage for wake-from-standby resilience
   const [tabs, setTabs] = useState<Tab[]>(() => {
@@ -5600,15 +5599,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadSkills to prevent re-load on every switch
 
-  // Auto-open DocsViewer when there are zero projects (true onboarding)
-  const hasOpenedDocsRef = useRef(false);
-  useEffect(() => {
-    if (hasBootstrapped && terminals.length === 0 && persistedProjects.size === 0 && !hasOpenedDocsRef.current) {
-      hasOpenedDocsRef.current = true;
-      openDocsTab();
-    }
-  }, [hasBootstrapped, terminals.length, persistedProjects.size, openDocsTab]);
-
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
     if (!tauriAvailable) {
@@ -5685,7 +5675,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         'duck.png': duckBackgroundImage,
         'ducks-pattern.png': ducksPatternBackgroundImage,
         'duck-pattern3.png': duckPattern3BackgroundImage,
-        'quack-agent.jpeg': quackAgentBackgroundImage,
         'hacker.png': hackerBackgroundImage,
         'duckbusiness.png': duckBusinessBackgroundImage,
         'duckmoto.png': duckMotoBackgroundImage,
@@ -10011,6 +10000,42 @@ You have access to all Bash tools to execute git commands like:
   // Splash screen removed - app loads directly with smooth CSS transition
   // The #root element in index.html has a smooth reveal animation
 
+  // Show minimal loader while app is booting
+  if (booting) {
+    return (
+      <div style={{
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0a0a0c',
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
+        }}>
+          {/* Minimal loading spinner */}
+          <div style={{
+            width: '24px',
+            height: '24px',
+            border: '2px solid rgba(242, 140, 82, 0.2)',
+            borderTopColor: '#f28c52',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
   if (!tauriAvailable) {
     return (
       <div className="app-fallback">
@@ -10228,60 +10253,59 @@ You have access to all Bash tools to execute git commands like:
                   </div>
                 </div>
               ) : (
-                /* Image background when no agents with Open Guide button */
+                /* Empty state with Open Guide button */
                 <>
-                  <img
-                    src="/images/quack-agent.jpeg"
-                    alt="Quack Agent"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center',
-                    }}
-                  />
-                  {/* Open Guide Button - positioned top right */}
-                  <button
-                    type="button"
-                    onClick={() => setEmptyStateShowGuide(true)}
-                    style={{
-                      position: 'absolute',
-                      top: '24px',
-                      right: '24px',
-                      padding: '12px 24px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      borderRadius: '8px',
-                      border: '1px solid rgba(242, 140, 82, 0.4)',
-                      background: 'rgba(18, 18, 22, 0.85)',
-                      backdropFilter: 'blur(12px)',
-                      color: '#f28c52',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(242, 140, 82, 0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.6)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(242, 140, 82, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(18, 18, 22, 0.85)';
-                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.4)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                    </svg>
-                    Open Guide
-                  </button>
+                  {/* Open Guide Button - centered */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    gap: '16px',
+                  }}>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '14px' }}>
+                      No agents yet
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEmptyStateShowGuide(true)}
+                      style={{
+                        padding: '12px 24px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        borderRadius: '8px',
+                        border: '1px solid rgba(242, 140, 82, 0.4)',
+                        background: 'rgba(18, 18, 22, 0.85)',
+                        backdropFilter: 'blur(12px)',
+                        color: '#f28c52',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(242, 140, 82, 0.15)';
+                        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.6)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(242, 140, 82, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(18, 18, 22, 0.85)';
+                        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.4)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                      </svg>
+                      Open Guide
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -10349,6 +10373,8 @@ You have access to all Bash tools to execute git commands like:
               onKanbanClick={handleOpenKanbanTab}
               isKanbanActive={tabs.some(t => t.type === 'kanban' && t.id === activeTabId)}
               inProgressTaskCount={inProgressTaskCount}
+              onAddonsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
+              isAddonsOpen={showPluginsDrawer}
             />
 
             {/* Tab Bar - VSCode style (always shown) */}
@@ -11269,18 +11295,9 @@ You have access to all Bash tools to execute git commands like:
             className="git-drawer-backdrop"
             onClick={() => setShowPluginsDrawer(false)}
           />
-          <div className="git-drawer-panel">
-            <header className="git-drawer-header">
-              <h2>Plugin Marketplace</h2>
-              <button
-                type="button"
-                className="git-drawer-close"
-                onClick={() => setShowPluginsDrawer(false)}
-              >
-                ✕
-              </button>
-            </header>
-            <MarketplaceDrawer
+          <div className="git-drawer-panel addons-drawer-panel">
+            <AddonsDrawer
+              onClose={() => setShowPluginsDrawer(false)}
               onRefresh={handleMarketplaceRefresh}
             />
           </div>

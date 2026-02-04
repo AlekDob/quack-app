@@ -12,8 +12,8 @@ export function CommandItem({ command, onEdit }: CommandItemProps) {
       onClick={() => onEdit?.(command)}
     >
       {/* Command Icon */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
-        <span className="text-sm">/</span>
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(242, 140, 82, 0.2), rgba(230, 115, 57, 0.2))' }}>
+        <span className="text-sm" style={{ color: '#f28c52' }}>/</span>
       </div>
 
       {/* Command Info */}
@@ -28,7 +28,7 @@ export function CommandItem({ command, onEdit }: CommandItemProps) {
             </span>
           )}
           {command.parameters && command.parameters.length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/20 text-purple-400">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ background: 'rgba(242, 140, 82, 0.2)', color: '#f28c52' }}>
               {command.parameters.length} param{command.parameters.length > 1 ? 's' : ''}
             </span>
           )}

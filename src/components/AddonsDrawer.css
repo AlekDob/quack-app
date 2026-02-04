@@ -1,0 +1,507 @@
+/* AddonsDrawer - Codex-style minimal design */
+
+.addons-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: rgba(12, 16, 24, 0.95);
+  backdrop-filter: blur(var(--blur-medium, 8px));
+}
+
+/* Header */
+.addons-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.addons-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.addons-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.addons-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addons-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.addons-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.addons-btn-new {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+.addons-btn-new:hover {
+  background: rgba(242, 140, 82, 0.25);
+}
+
+.addons-btn-close {
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Search */
+.addons-search {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.addons-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.addons-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.addons-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.addons-search-input:focus {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Tabs */
+.addons-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.addons-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.addons-tab {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.addons-tab:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.addons-tab.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Content */
+.addons-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+}
+
+.addons-loading,
+.addons-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+.addons-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+/* Sections */
+.addons-section {
+  margin-bottom: 20px;
+}
+
+.addons-section:last-child {
+  margin-bottom: 0;
+}
+
+.addons-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0 0 8px 0;
+}
+
+/* Addon List */
+.addons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Addon Row - Minimal */
+.addon-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.addon-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Gradient Icon */
+.addon-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Info */
+.addon-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.addon-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addon-description {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+/* Scope Badge */
+.addon-badge {
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.addon-badge-global {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+.addon-badge-project {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+/* Action Button */
+.addon-action {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.addon-action.visible {
+  opacity: 1;
+}
+
+.addon-btn-action {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.addon-btn-install {
+  background: #f28c52;
+  color: #0c1018;
+}
+
+.addon-btn-install:hover {
+  background: #f9a06e;
+}
+
+.addon-btn-installed {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.addon-btn-installed:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ========================================
+   Addon Detail Panel - Compact Inline View
+   ======================================== */
+
+.addon-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.addon-detail-panel {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(12, 16, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Header */
+.addon-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.addon-detail-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.addon-detail-title-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.addon-detail-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addon-detail-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.addon-detail-close {
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.addon-detail-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Description */
+.addon-detail-description {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 12px 0;
+}
+
+/* Tags */
+.addon-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.addon-detail-tag {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Scope selector */
+.addon-detail-scope {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.addon-scope-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.addon-scope-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.addon-scope-btn.active {
+  background: rgba(242, 140, 82, 0.15);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.addon-scope-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Actions */
+.addon-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addon-detail-installed-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.addon-detail-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.addon-detail-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.addon-detail-btn-install {
+  background: #f28c52;
+  color: #0c1018;
+}
+
+.addon-detail-btn-install:hover:not(:disabled) {
+  background: #f9a06e;
+}
+
+.addon-detail-btn-remove {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.addon-detail-btn-remove:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.addon-detail-btn-github {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: auto;
+}
+
+.addon-detail-btn-github:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}

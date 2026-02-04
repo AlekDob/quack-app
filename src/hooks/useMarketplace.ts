@@ -111,14 +111,18 @@ export function useMarketplace() {
 
         // Create resources for each agent
         if (pluginData.agents) {
-          discoveredCategories.add('agents');
           for (const agentPath of pluginData.agents) {
             const agentName = agentPath.split('/').pop()?.replace('.md', '') || agentPath;
+            const formattedName = formatName(agentName);
+            // Distinguish droids from agents: names containing Manager, Worker, Factory, Helper, Orchestrator = droids
+            const isDroid = /manager|worker|factory|helper|orchestrator|processor|handler/i.test(formattedName);
+            const category: MarketplaceCategory = isDroid ? 'droids' : 'agents';
+            discoveredCategories.add(category);
             allResources.push({
               id: `${plugin.name}--agent--${agentName}`,
-              name: formatName(agentName),
-              description: `Agent from ${plugin.name} plugin`,
-              category: 'agents',
+              name: formattedName,
+              description: `${isDroid ? 'Droid' : 'Agent'} from ${plugin.name} plugin`,
+              category,
               author,
               installCount: 0,
               tags: pluginData.keywords || plugin.tags || [],

@@ -162,10 +162,16 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     const hasNewMessage = messages.length > prevMessagesLengthRef.current;
     const lastMessage = messages[messages.length - 1];
 
+    // Detect lazy hydration: messages jumped from 0 to many (session loaded)
+    const isLazyHydration = prevMessagesLengthRef.current === 0 && messages.length > 1;
+
     // Determine if we should auto-scroll
     let shouldAutoScroll = false;
 
-    if (hasNewMessage) {
+    if (isLazyHydration) {
+      // Always scroll to bottom when session is hydrated (loaded from disk)
+      shouldAutoScroll = true;
+    } else if (hasNewMessage) {
       // Always auto-scroll for user messages or if already at bottom
       shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
     } else if (loading) {
@@ -175,10 +181,16 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     }
 
     if (shouldAutoScroll) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      // Use a small delay for lazy hydration to ensure DOM is ready
+      const delay = isLazyHydration ? 100 : 0;
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: isLazyHydration ? 'auto' : 'smooth' // Instant for hydration, smooth for streaming
+          });
+        }
+      }, delay);
     }
 
     prevMessagesLengthRef.current = messages.length;
