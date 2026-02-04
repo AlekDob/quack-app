@@ -177,12 +177,14 @@ function AgentSessionItem({
 
   return (
     <div
-      className="session-item-wrapper"
+      className={`session-item-wrapper${isActuallyLoading ? ' has-pulse' : ''}`}
       style={{
         display: 'flex',
         alignItems: 'center',
         position: 'relative',
-      }}
+        // Pass agent color for CSS animations
+        '--pulse-color': agentColor,
+      } as React.CSSProperties}
     >
       {/* Metro horizontal connector line */}
       <div

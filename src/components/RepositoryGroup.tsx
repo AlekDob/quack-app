@@ -615,9 +615,7 @@ function SortableAgent({
             border: isActive
               ? `2px solid ${agent.color}`
               : `1px solid ${agent.color}55`,
-            boxShadow: isActive
-              ? `0 0 8px ${agent.color}40`
-              : undefined,
+            boxShadow: isActive ? `0 0 8px ${agent.color}40` : undefined,
             // Reduce opacity for dormant/empty agents
             opacity: isActive ? 1 : isChatEmpty || isDormant ? 0.7 : 1,
           }}
@@ -1779,7 +1777,7 @@ export default function RepositoryGroup({
                 onClick={() => onRemoveProject(repoPath)}
                 title="Remove Project"
                 className="repo-action-btn"
-                style={{ color: 'rgba(255, 255, 255, 0.35)' }}
+                style={{ color: "rgba(255, 255, 255, 0.35)" }}
               >
                 <svg
                   width="14"
@@ -1925,12 +1923,16 @@ export default function RepositoryGroup({
                         {onSessionClick && (
                           <div
                             className="agent-sessions-container"
-                            style={{
-                              marginLeft: "8px",
-                              marginTop: "4px",
-                              position: "relative",
-                              paddingLeft: "20px", // Space for metro line
-                            }}
+                            style={
+                              {
+                                marginLeft: "8px",
+                                marginTop: "4px",
+                                position: "relative",
+                                paddingLeft: "20px", // Space for metro line
+                                // Pass agent color for pulse animations
+                                "--agent-color": agent.color,
+                              } as React.CSSProperties
+                            }
                           >
                             {/* Metro line connecting agent to sessions */}
                             <div
@@ -1939,11 +1941,12 @@ export default function RepositoryGroup({
                                 position: "absolute",
                                 left: "8px",
                                 top: "-4px", // Extend up to connect with agent card
-                                bottom: "22px", // Stop before going below last session's horizontal connector
+                                bottom: "22px", // Stop at center of last session's horizontal connector
                                 width: "2px",
                                 background: agent.color,
                                 opacity: 0.4,
                                 borderRadius: "1px",
+                                color: agent.color, // For currentColor in CSS animations
                               }}
                             />
                             <AgentSessionList

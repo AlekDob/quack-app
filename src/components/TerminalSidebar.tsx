@@ -100,11 +100,10 @@ function SortableRepositoryGroup({
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
-    // Glass effect background with project color
+    // Solid background with project color (no glass effect)
     background: projectColor
-      ? `linear-gradient(135deg, ${projectColor}12 0%, ${projectColor}08 100%)`
+      ? `${projectColor}10`
       : undefined,
-    backdropFilter: projectColor ? 'blur(8px)' : undefined,
     borderLeft: projectColor ? `3px solid ${projectColor}` : undefined,
     borderRadius: '0',
     marginBottom: '2px',
@@ -940,47 +939,55 @@ export default function TerminalSidebar({
         />
       )}
 
-      {/* Settings Button */}
-      {onOpenSettings && (
-        <button
-          type="button"
-          className={`sidebar-settings-button ${import.meta.env.DEV ? 'dev-mode' : ''}`}
-          onClick={onOpenSettings}
-        >
-          <div className="sidebar-settings-content">
-            <div className="sidebar-settings-top">
-              <svg className="sidebar-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Footer Bar - Minimal with text labels */}
+      <div className="sidebar-footer-bar">
+        {/* Left side: Settings + Docs with labels */}
+        <div className="sidebar-footer-left">
+          {/* Settings */}
+          {onOpenSettings && (
+            <button
+              type="button"
+              className="sidebar-footer-link"
+              onClick={onOpenSettings}
+              title="Settings"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
                 <circle cx="12" cy="12" r="3"/>
               </svg>
-              <span className="sidebar-settings-label">Settings</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="sidebar-settings-version">
-                {appVersion}
-                {import.meta.env.DEV && <span style={{ marginLeft: '4px', color: '#ef4444', fontWeight: 600 }}>DEV</span>}
-              </span>
-              {updateAvailable && latestRelease && (
-                <span
-                  style={{
-                    fontSize: '10px',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                    color: '#22c55e',
-                    border: '1px solid rgba(34, 197, 94, 0.3)',
-                    fontWeight: 600,
-                    animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-                  }}
-                  title={`New version ${latestRelease.tag_name} available`}
-                >
-                  UPDATE
-                </span>
-              )}
-            </div>
-          </div>
-        </button>
-      )}
+              <span>Settings</span>
+            </button>
+          )}
+
+          {/* Docs */}
+          <button
+            type="button"
+            className="sidebar-footer-link"
+            onClick={() => window.open('https://quack.build/docs', '_blank')}
+            title="Documentation"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            <span>Docs</span>
+          </button>
+        </div>
+
+        {/* Right side: Version Tag */}
+        <span
+          className={`sidebar-footer-version ${import.meta.env.DEV ? 'sidebar-footer-version-dev' : 'sidebar-footer-version-prod'}`}
+          title={`Version ${appVersion}${import.meta.env.DEV ? ' (DEV)' : ''}`}
+        >
+          v{appVersion}
+          {import.meta.env.DEV && <span className="sidebar-footer-dev">DEV</span>}
+          {updateAvailable && latestRelease && (
+            <span className="sidebar-footer-update" title={`Update to ${latestRelease.tag_name}`}>
+              •
+            </span>
+          )}
+        </span>
+      </div>
 
       {/* Commit History Modal */}
       {commitHistoryModal && (

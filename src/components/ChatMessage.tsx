@@ -13,6 +13,7 @@ import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import cyberducksAvatar from '../../images/cyberducks.png';
+import humanoidAvatar from '../../images/humanoid.jpeg';
 import './ChatMessage.css';
 import './StreamMessage.css';
 
@@ -505,9 +506,19 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
             {isUser ? (
               // User messages: render with mentions support
-              isLastUserMessage && !isExpanded
-                ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
-                : renderTextWithMentions(message.content)
+              <>
+                <span className="user-message-text">
+                  {isLastUserMessage && !isExpanded
+                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
+                    : renderTextWithMentions(message.content)
+                  }
+                </span>
+                <img
+                  src={humanoidAvatar}
+                  alt="User"
+                  className="user-message-avatar"
+                />
+              </>
             ) : (
               // Assistant messages: render with markdown formatting
               // This ensures proper formatting even when loaded from disk without events

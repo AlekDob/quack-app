@@ -211,3 +211,71 @@
   font-size: 11px !important;
   padding: 6px 10px !important;
 }
+
+/* ========================================
+ * Metro Line Pulse Animation
+ * Light travels from agent to session
+ * ======================================== */
+
+/* Horizontal line glow when session is loading */
+.session-item-wrapper.has-pulse .metro-horizontal-line {
+  opacity: 0.8 !important;
+  position: relative;
+  overflow: visible;
+}
+
+/* Pulse traveling along horizontal line */
+.session-item-wrapper.has-pulse .metro-horizontal-line::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pulse-color, #00D4FF);
+  box-shadow:
+    0 0 8px var(--pulse-color, #00D4FF),
+    0 0 16px var(--pulse-color, #00D4FF),
+    0 0 24px var(--pulse-color, #00D4FF);
+  animation: horizontalPulse 1.2s ease-in-out infinite;
+  animation-delay: 0.4s; /* Delay to sync with vertical pulse */
+}
+
+/* Station dot glow when pulse arrives */
+.session-item-wrapper.has-pulse .metro-station-dot {
+  animation: stationPulse 1.2s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+
+@keyframes horizontalPulse {
+  0%, 100% {
+    left: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  80% {
+    left: calc(100% - 6px);
+    opacity: 1;
+  }
+  90%, 100% {
+    left: calc(100% - 6px);
+    opacity: 0;
+  }
+}
+
+@keyframes stationPulse {
+  0%, 70% {
+    box-shadow: none;
+  }
+  80% {
+    box-shadow:
+      0 0 8px var(--pulse-color, #00D4FF),
+      0 0 16px var(--pulse-color, #00D4FF);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
