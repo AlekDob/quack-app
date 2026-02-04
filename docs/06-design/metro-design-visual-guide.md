@@ -125,10 +125,62 @@ Il design ora è:
 - 📱 **Moderno** - Flat design principles
 - ♿ **Accessibile** - Contrasti chiari, gerarchia ovvia
 
+## Session Items - Time-Based Color Indicators
+
+### Activity Indicator Dot
+
+Session items inside agent cards now feature a time-based color system for the activity indicator dot:
+
+```
+┌──────────────────────────────────────┐
+│  ● Session Title               2m   │  <- Green dot + green time
+│  ● Another Session            15m   │  <- Yellow dot + yellow time
+│  ● Old Session                2h    │  <- Gray dot + gray time
+└──────────────────────────────────────┘
+```
+
+### Color Logic
+
+```typescript
+function getTimeColor(updatedAt: number | undefined): string {
+  if (!updatedAt) return 'gray';
+  const diffMinutes = (Date.now() - updatedAt) / (1000 * 60);
+
+  if (diffMinutes < 5) return '#22c55e';  // Green - very recent
+  if (diffMinutes < 30) return '#f59e0b'; // Yellow - recent
+  return 'rgba(255, 255, 255, 0.45)';     // Gray - older
+}
+```
+
+### What Gets Colored
+
+- **Activity indicator dot** (inside session-item) - Uses time-based color
+- **Timestamp text** (e.g., "2m", "15m", "2h") - Uses same time-based color
+- **Metro horizontal line** - Uses time-based color (subtle, 60% opacity)
+- **Metro station dot** - Uses agent color (NOT time-based)
+
+### Session Ordering
+
+Sessions are now sorted by `updatedAt` descending - most recently active sessions appear first:
+
+```typescript
+const nonDoneSessions = sessions
+  .filter((s) => s.status !== 'done')
+  .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+```
+
+### Exception: Awaiting User Response
+
+When a session has a pending `AskUserQuestion`, the activity dot becomes:
+- **Purple (#a855f7)** with a "?" symbol
+- This overrides the time-based color to draw attention
+
 ## Files Modificati
 
 1. **MetroLine.tsx** - Componente semplificato (60 righe → 20 righe)
 2. **RepositoryGroup.tsx** - Layout pulito con metro dots
 3. **MetroStyle.css** - Solo stili essenziali (324 righe → 110 righe)
+4. **AgentSessionItem.tsx** - Time-based color indicators
+5. **AgentSessionList.tsx** - Session ordering by updatedAt
 
-Alek, ora la sidebar sembra VERAMENTE una mappa della metropolitana! Pulita, minimale, e la tua nonna capirebbe subito che Agent Mike è su un branch separato dal main! 🚇✨
+Alek, ora la sidebar sembra VERAMENTE una mappa della metropolitana! Pulita, minimale, e la tua nonna capirebbe subito che Agent Mike è su un branch separato dal main!

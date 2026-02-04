@@ -202,7 +202,93 @@ const handleClick = useCallback(() => {}, [id]);
    - Switch between them rapidly
    - Expected: Instant switching, no memory leak
 
-## 9. Future Optimizations
+## 9. CSS & GPU Optimizations (Phase 4)
+
+### 9.1 Backdrop-Filter Blur Reduction
+
+Identified 110+ instances of `backdrop-filter: blur()` causing GPU strain. Implemented CSS custom properties for consistent, optimized blur values:
+
+```css
+:root {
+  --blur-light: 4px;   /* Subtle blur for overlays */
+  --blur-medium: 8px;  /* Standard blur for modals */
+  --blur-heavy: 12px;  /* Max blur (reduced from 20-24px) */
+}
+```
+
+**Before**: Blur values ranged 4px-24px randomly
+**After**: Standardized to max 12px, reducing GPU composite operations
+
+### 9.2 Animation Performance
+
+Identified 120+ infinite CSS animations causing continuous GPU workload. Implemented two strategies:
+
+#### Window Focus Detection (`useWindowFocus` hook)
+```typescript
+// Adds 'window-blurred' class when window loses focus
+// Animations pause when class is present
+```
+
+```css
+/* Pause animations when window is blurred */
+.window-blurred .infinite-animation {
+  animation-play-state: paused;
+}
+```
+
+#### Reduced Motion Support
+```css
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+### 9.3 Box-Shadow Simplification
+
+Reduced multi-layer shadows from 3-4 layers to 1:
+
+```css
+/* Before - 3 shadow layers */
+box-shadow:
+  0 0 8px rgba(0, 0, 0, 0.3),
+  0 4px 16px rgba(0, 0, 0, 0.2),
+  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+/* After - Single shadow */
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+```
+
+### 9.4 Session List Time-Based Coloring
+
+Implemented lightweight visual feedback for session recency without additional DOM elements:
+
+```typescript
+// Time-based color calculation (no additional renders)
+function getTimeColor(updatedAt: number | undefined): string {
+  if (!updatedAt) return 'rgba(255, 255, 255, 0.45)';
+  const diffMinutes = (Date.now() - updatedAt) / (1000 * 60);
+
+  if (diffMinutes < 5) return '#22c55e';  // Green - very recent
+  if (diffMinutes < 30) return '#f59e0b'; // Yellow - recent
+  return 'rgba(255, 255, 255, 0.45)';     // Gray - older
+}
+```
+
+### 9.5 Session Ordering by Activity
+
+Sessions now sorted by `updatedAt` descending - most recently active sessions appear first:
+
+```typescript
+const nonDoneSessions = sessions
+  .filter((s) => s.status !== 'done')
+  .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+```
+
+## 10. Future Optimizations
 
 ### Potential Improvements
 1. **Web Workers**: Move heavy computations off main thread
@@ -254,13 +340,16 @@ const throttledResize = useMemo(
 
 ## Summary
 
-The performance optimizations implemented in Phase 3 provide:
+The performance optimizations implemented in Phase 3 and 4 provide:
 
 1. **Virtualization** for handling large lists efficiently
 2. **Memoization** to prevent unnecessary re-renders
 3. **Debouncing/Throttling** for expensive operations
 4. **Smart buffering** for background operations
 5. **Optimized contexts** with stable references
+6. **GPU optimization** via reduced blur and simplified shadows (Phase 4)
+7. **Animation pausing** when window loses focus (Phase 4)
+8. **Time-based session coloring** for visual activity feedback (Phase 4)
 
 These improvements ensure Quack App remains responsive even with:
 - Thousands of files in the explorer
