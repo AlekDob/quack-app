@@ -286,8 +286,10 @@ function AgentSessionList({
     }
   }, [renameDialogSession, updateSession]);
 
-  // Filter non-done sessions
-  const nonDoneSessions = sessions.filter((s) => s.status !== 'done');
+  // Filter non-done sessions and sort by most recent activity (updatedAt descending)
+  const nonDoneSessions = sessions
+    .filter((s) => s.status !== 'done')
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
   // Limit to 5 sessions unless "Show all" is clicked
   const visibleSessions = showAll

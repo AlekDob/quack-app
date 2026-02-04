@@ -45,6 +45,7 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onOpenFile?: (path: string) => void;
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void;
   onSessionIdClick?: (sessionId: string) => void;
   agentName?: string;
   agentAvatar?: string;
@@ -68,7 +69,7 @@ interface ChatMessageProps {
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -489,6 +490,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                 message={event}
                 streamMessages={message.events || []}
                 onFilePathClick={onFilePathClick}
+                onOpenInIDE={onOpenInIDE}
                 agentName={agentName}
                 agentAvatar={agentAvatar}
                 workingDirectory={workingDirectory}
@@ -505,11 +507,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
             {isUser ? (
-              // User messages: render with mentions support
+              // User messages: render with mentions support - always truncated unless expanded
               <>
                 <span className="user-message-text">
-                  {isLastUserMessage && !isExpanded
-                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
+                  {!isExpanded
+                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 20, 150))
                     : renderTextWithMentions(message.content)
                   }
                 </span>
