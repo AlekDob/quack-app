@@ -208,7 +208,7 @@ function AgentSessionItem({
         '--pulse-color': agentColor,
       } as React.CSSProperties}
     >
-      {/* Metro horizontal connector line - color based on time recency */}
+      {/* Metro horizontal connector line - uses agent color */}
       <div
         className="metro-horizontal-line"
         style={{
@@ -217,8 +217,8 @@ function AgentSessionItem({
           top: '50%',
           width: '10px',
           height: '2px',
-          background: getTimeColor(session.updatedAt),
-          opacity: 0.6,
+          background: agentColor,
+          opacity: 0.4,
           transform: 'translateY(-50%)',
         }}
       />

@@ -154,10 +154,19 @@
 .chat-message-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 4px;
-  margin-left: 40px; /* Align with system-init-widget and tools */
+  margin-left: 0; /* Avatar starts at edge */
   position: relative;
+}
+
+/* Agent avatar in message header */
+.chat-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .sticky-message-actions {
@@ -240,6 +249,11 @@
   color: rgba(255, 255, 255, 0.85);
   word-wrap: break-word;
   white-space: pre-wrap;
+}
+
+/* Assistant message body - align under the header text, offset by avatar + gap */
+.chat-message.assistant .chat-message-body {
+  margin-left: 40px; /* 32px avatar + 8px gap */
 }
 
 /* Sticky message body - force text wrapping for long URLs/commands */

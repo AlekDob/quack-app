@@ -263,7 +263,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     // Create user message
     const attachments = options?.attachments ?? [];
     const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -285,7 +285,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     });
 
     // Create assistant message placeholder
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',

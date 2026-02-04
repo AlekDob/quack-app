@@ -261,45 +261,9 @@ async function getCachedStore(filename: string) {
 // ============================================
 // Restore chat messages from Claude SDK sessions on app startup
 
-/**
- * Hydrate chat sessions from persisted Claude SDK session history.
- * Called during bootstrap to restore conversation state after app restart.
- */
-async function hydrateSessionMessages(
-  setChatSessions: React.Dispatch<React.SetStateAction<Map<string, ChatMessage[]>>>
-): Promise<number> {
-  const sessions = useSessionStore.getState().sessions;
-  let hydrated = 0;
-
-  for (const session of sessions) {
-    // Only hydrate sessions with a valid claudeSessionId
-    if (!session.claudeSessionId) continue;
-
-    try {
-      const details = await invoke<SessionDetails>('resume_session', {
-        sessionId: session.claudeSessionId
-      });
-
-      if (details.messages && details.messages.length > 0) {
-        const chatMessages: ChatMessage[] = details.messages.map((m) => ({
-          id: crypto.randomUUID(),
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          timestamp: m.timestamp || Date.now(),
-          status: 'complete' as const,
-        }));
-
-        setChatSessions(prev => new Map(prev).set(session.id, chatMessages));
-        hydrated++;
-      }
-    } catch (e) {
-      // Silently skip sessions that can't be restored (deleted, corrupted, etc.)
-      console.debug(`[Hydrate] Could not restore session ${session.id}:`, e);
-    }
-  }
-
-  return hydrated;
-}
+// 🚀 LAZY HYDRATION: hydrateSessionMessages removed - chat messages are now loaded
+// on-demand when a session is selected (see setActiveSessionIdExclusive)
+// This significantly improves app startup time by avoiding N resume_session calls at boot
 
 // ============================================
 // Terminal <-> UnifiedAgent Conversion Helpers
@@ -492,6 +456,44 @@ function AppContent() {
       // When setting a session, clear the task to prevent mixing
       setActiveTaskId(null);
       console.log(`[SESSION-FIX] Cleared activeTaskId because activeSessionId is now: ${newSessionId}`);
+
+      // 🚀 LAZY HYDRATION: Load chat messages only when session is selected
+      // This avoids loading ALL sessions at boot, improving startup time
+      setChatSessions(prev => {
+        // Skip if already hydrated
+        if (prev.has(newSessionId)) {
+          return prev;
+        }
+
+        // Async hydration - doesn't block the selection
+        (async () => {
+          const session = useSessionStore.getState().sessions.find(s => s.id === newSessionId);
+          if (!session?.claudeSessionId) return;
+
+          try {
+            const details = await invoke<SessionDetails>('resume_session', {
+              sessionId: session.claudeSessionId
+            });
+
+            if (details.messages && details.messages.length > 0) {
+              const chatMessages: ChatMessage[] = details.messages.map((m) => ({
+                id: crypto.randomUUID(),
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+                timestamp: m.timestamp || Date.now(),
+                status: 'complete' as const,
+              }));
+
+              setChatSessions(p => new Map(p).set(newSessionId, chatMessages));
+              console.log(`[LAZY HYDRATE] Loaded ${chatMessages.length} messages for session ${newSessionId}`);
+            }
+          } catch (e) {
+            console.debug(`[LAZY HYDRATE] Could not restore session ${newSessionId}:`, e);
+          }
+        })();
+
+        return prev;
+      });
     }
   }, []);
 
@@ -1985,7 +1987,7 @@ function AppContent() {
     // Check if chat is configured
     if (!isChatConfigured) {
       const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
+        id: `msg-${Date.now()}-error-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: 'Quack quack! 🦆 Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
         timestamp: Date.now(),
@@ -2039,7 +2041,7 @@ function AppContent() {
         : content;
 
     const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -2087,7 +2089,7 @@ function AppContent() {
     });
 
     // Create assistant message placeholder with settings metadata (SDK 0.1.54+)
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -2657,7 +2659,7 @@ function AppContent() {
     // Check if chat is configured
     if (!isChatConfigured) {
       const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
+        id: `msg-${Date.now()}-error-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: 'Quack quack! Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
         timestamp: Date.now(),
@@ -2722,7 +2724,7 @@ function AppContent() {
 
     // Create user message
     const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -2744,7 +2746,7 @@ function AppContent() {
     });
 
     // Create assistant message placeholder
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -6243,11 +6245,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions`);
 
-          // Hydrate chat messages from Claude SDK session history
-          const hydratedCount = await hydrateSessionMessages(setChatSessions);
-          if (hydratedCount > 0) {
-            console.log(`[Session Bootstrap] Hydrated ${hydratedCount} session(s) with chat history`);
-          }
+          // 🚀 LAZY HYDRATION: Chat messages are now loaded on-demand when session is selected
+          // This significantly improves startup time by avoiding N resume_session calls at boot
 
           // Load tabs by terminal from storage
           const savedTabsByTerminal = await loadTabsByTerminalFromStorage();
@@ -6262,16 +6261,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           }
         } else {
           console.log('No saved terminals found - empty state will be shown');
-          // Sessions-first: just load sessions, then hydrate chat history
+          // Sessions-first: just load sessions (chat messages loaded on-demand)
           await useSessionStore.getState().loadSessions();
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions (no terminals)`);
 
-          // Hydrate chat messages from Claude SDK session history
-          const hydratedCount = await hydrateSessionMessages(setChatSessions);
-          if (hydratedCount > 0) {
-            console.log(`[Session Bootstrap] Hydrated ${hydratedCount} session(s) with chat history`);
-          }
+          // 🚀 LAZY HYDRATION: Chat messages are now loaded on-demand when session is selected
+          // This significantly improves startup time by avoiding N resume_session calls at boot
         }
       } catch (error) {
         console.error("Error during initialization", error);

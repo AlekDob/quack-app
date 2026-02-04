@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef, useMemo } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import ToolCallMinimal from './ToolCallMinimal';
 import StreamMessage from './StreamMessage';
@@ -7,12 +7,8 @@ import MessageSettingsBadges from './MessageSettingsBadges';
 import SessionIdDisplay from './SessionIdDisplay';
 import MarkdownText from './MarkdownText';
 import { AgentMentionChip } from './AgentMentionChip';
-import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
-import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import cyberducksAvatar from '../../images/cyberducks.png';
 import humanoidAvatar from '../../images/humanoid.jpeg';
 import './ChatMessage.css';
 import './StreamMessage.css';
@@ -80,8 +76,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
   const isResumeMessage = message.metadata?.isResumeMessage === true;
   const sessionId = message.metadata?.sessionId as string | undefined;
 
-  // State for avatar URL (handles both default and custom avatars)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  // Use cached avatar hook - much faster than manual loading
+  const avatarUrl = useAgentAvatar(agentName, agentAvatar);
 
   // State for sticky message actions
   const [isExpanded, setIsExpanded] = useState(false);
@@ -90,61 +86,14 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
   const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
+  // Cleanup timeout on unmount
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadAvatarUrl() {
-      // If no avatar specified, use duck30.jpeg fallback
-      if (!agentAvatar) {
-        console.log('[ChatMessage] No avatar specified, using duck30.jpeg fallback');
-        if (isMounted) {
-          // Use duck30.jpeg as fallback for agents with undefined avatar
-          if (window.__TAURI__) {
-            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
-          } else {
-            setAvatarUrl('/duck30.jpeg');
-          }
-        }
-        return;
-      }
-
-      // Check if it's a custom avatar (UUID format)
-      if (isCustomAvatar(agentAvatar)) {
-        try {
-          const url = await getCustomAvatarUrl(agentAvatar);
-          if (isMounted) {
-            setAvatarUrl(url);
-          }
-        } catch (error) {
-          console.error('Failed to load custom avatar in chat:', error);
-          if (isMounted) {
-            // Fallback to duck30.jpeg if custom avatar fails
-            if (window.__TAURI__) {
-              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
-            } else {
-              setAvatarUrl('/duck30.jpeg');
-            }
-          }
-        }
-      } else {
-        // Default avatar - need to get full path with prefix
-        if (isMounted) {
-          setAvatarUrl(getAvatarUrl(agentAvatar));
-        }
-      }
-    }
-
-    loadAvatarUrl();
-
     return () => {
-      isMounted = false;
-      // Clean up timeout on unmount
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
       }
     };
-  }, [agentAvatar]);
+  }, []);
 
   // Auto-collapse with delay after hover is removed
   useEffect(() => {
@@ -412,6 +361,14 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
         onMouseLeave={() => isLastUserMessage && isUser && setIsHovering(false)}
       >
         <div className="chat-message-header">
+          {/* Agent avatar for assistant messages - always shows (cached) */}
+          {!isUser && (
+            <img
+              src={avatarUrl}
+              alt={agentName}
+              className="chat-message-avatar"
+            />
+          )}
           <span className="chat-message-role">
             {isUser
               ? 'You'
@@ -523,8 +480,10 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               </>
             ) : (
               // Assistant messages: render with markdown formatting
-              // This ensures proper formatting even when loaded from disk without events
-              <MarkdownText>{message.content}</MarkdownText>
+              // Use same wrapper structure as StreamMessage for consistent padding
+              <div className="assistant-message-text">
+                <MarkdownText>{message.content}</MarkdownText>
+              </div>
             )}
             {isStreaming && <span className="streaming-cursor">▊</span>}
           </div>
