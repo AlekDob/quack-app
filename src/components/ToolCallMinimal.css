@@ -248,37 +248,57 @@
   animation: expand-down 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* File path link - clickable to open in IDE */
+/* File path with Open in IDE button */
 .tool-minimal-file-path {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   margin-bottom: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.tool-minimal-file-path:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .tool-minimal-file-path-icon {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.35);
   flex-shrink: 0;
 }
 
 .tool-minimal-file-path-text {
+  flex: 1;
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.6);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tool-minimal-open-ide-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tool-minimal-open-ide-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tool-minimal-open-ide-btn svg {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 @keyframes expand-down {

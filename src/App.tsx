@@ -80,6 +80,7 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useSessionStore } from "./stores/sessionStore";
 import { useChatStore } from "./stores/chatStore";
+import { useIDEStore } from "./stores/ideStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -158,6 +159,7 @@ import type {
   UsageStats,
   AgentPersonality,
   SessionInfo,
+  SessionDetails,
   SavedAgent,
   HookConfig,
   KanbanTask,
@@ -252,6 +254,51 @@ async function getCachedStore(filename: string) {
     storeCache.set(filename, await Store.load(filename));
   }
   return storeCache.get(filename)!;
+}
+
+// ============================================
+// Session Message Hydration
+// ============================================
+// Restore chat messages from Claude SDK sessions on app startup
+
+/**
+ * Hydrate chat sessions from persisted Claude SDK session history.
+ * Called during bootstrap to restore conversation state after app restart.
+ */
+async function hydrateSessionMessages(
+  setChatSessions: React.Dispatch<React.SetStateAction<Map<string, ChatMessage[]>>>
+): Promise<number> {
+  const sessions = useSessionStore.getState().sessions;
+  let hydrated = 0;
+
+  for (const session of sessions) {
+    // Only hydrate sessions with a valid claudeSessionId
+    if (!session.claudeSessionId) continue;
+
+    try {
+      const details = await invoke<SessionDetails>('resume_session', {
+        sessionId: session.claudeSessionId
+      });
+
+      if (details.messages && details.messages.length > 0) {
+        const chatMessages: ChatMessage[] = details.messages.map((m) => ({
+          id: crypto.randomUUID(),
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: m.timestamp || Date.now(),
+          status: 'complete' as const,
+        }));
+
+        setChatSessions(prev => new Map(prev).set(session.id, chatMessages));
+        hydrated++;
+      }
+    } catch (e) {
+      // Silently skip sessions that can't be restored (deleted, corrupted, etc.)
+      console.debug(`[Hydrate] Could not restore session ${session.id}:`, e);
+    }
+  }
+
+  return hydrated;
 }
 
 // ============================================
@@ -6196,8 +6243,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions`);
 
-          // Note: Chat history is managed by Claude SDK via session resume
-          // No need to load local messages - SDK handles conversation continuity
+          // Hydrate chat messages from Claude SDK session history
+          const hydratedCount = await hydrateSessionMessages(setChatSessions);
+          if (hydratedCount > 0) {
+            console.log(`[Session Bootstrap] Hydrated ${hydratedCount} session(s) with chat history`);
+          }
 
           // Load tabs by terminal from storage
           const savedTabsByTerminal = await loadTabsByTerminalFromStorage();
@@ -6212,10 +6262,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           }
         } else {
           console.log('No saved terminals found - empty state will be shown');
-          // Sessions-first: just load sessions, SDK manages chat history
+          // Sessions-first: just load sessions, then hydrate chat history
           await useSessionStore.getState().loadSessions();
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions (no terminals)`);
+
+          // Hydrate chat messages from Claude SDK session history
+          const hydratedCount = await hydrateSessionMessages(setChatSessions);
+          if (hydratedCount > 0) {
+            console.log(`[Session Bootstrap] Hydrated ${hydratedCount} session(s) with chat history`);
+          }
         }
       } catch (error) {
         console.error("Error during initialization", error);
@@ -7885,6 +7941,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Use handleOpenFilePreview to actually load file content
     handleOpenFilePreview(fakeEntry, lineChanges);
   }, [handleOpenFilePreview]);
+
+  // Handler to open file in preferred IDE
+  const handleOpenInIDE = useCallback(async (path: string) => {
+    const { preferredIDE } = useIDEStore.getState();
+    if (!preferredIDE) {
+      console.warn('[App] No preferred IDE set, cannot open file');
+      return;
+    }
+    try {
+      await invoke('open_in_app', { appId: preferredIDE, path });
+    } catch (err) {
+      console.error('[App] Failed to open file in IDE:', err);
+    }
+  }, []);
 
   // Handler to open diff drawer from EditSummaryBar
   const handleDiffClick = useCallback(async (filePath: string, status: 'created' | 'modified' | 'deleted') => {
@@ -10444,6 +10514,7 @@ You have access to all Bash tools to execute git commands like:
                     agents={agents}
                     onSelectAgent={handleUseAgent}
                     onFilePathClick={handleFilePathClick}
+                    onOpenInIDE={handleOpenInIDE}
                     onSessionIdClick={handleSessionIdClick}
                     onDiffClick={handleDiffClick}
                     onEditsChange={handleEditsChange}
@@ -10588,6 +10659,7 @@ You have access to all Bash tools to execute git commands like:
                     agents={agents}
                     onSelectAgent={handleUseAgent}
                     onFilePathClick={handleFilePathClick}
+                    onOpenInIDE={handleOpenInIDE}
                     onSessionIdClick={handleSessionIdClick}
                     onDiffClick={handleDiffClick}
                     onEditsChange={handleEditsChange}
