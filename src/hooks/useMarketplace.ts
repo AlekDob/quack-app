@@ -462,6 +462,7 @@ export function useMarketplace() {
 
     const template = ext._agentTemplate;
     const installedRulePaths: string[] = [];
+    const installedSkillNames: string[] = []; // Track installed skill names
 
     try {
       // Install bundled skills (new field) or legacy bundledPlugins
@@ -516,6 +517,9 @@ export function useMarketplace() {
                   // Directory may already exist
                 }
                 await invoke('write_file_content', { path: targetPath, content });
+
+                // Track installed skill names
+                installedSkillNames.push(skillName);
               } catch (err) {
                 console.warn(`Failed to install skill ${skillName}:`, err);
               }
@@ -572,6 +576,7 @@ export function useMarketplace() {
           communicationStyle: template.communicationStyle,
           customNotes: template.customNotes,
           selectedRules: installedRulePaths,
+          selectedSkills: installedSkillNames.length > 0 ? installedSkillNames : undefined,
         },
         lastActiveAt: Date.now(),
       });

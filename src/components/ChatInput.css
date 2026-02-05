@@ -80,7 +80,7 @@
   left: 0;
   right: 0;
   margin-bottom: 8px;
-  max-height: 300px;
+  max-height: 240px;
   overflow-y: auto;
   background: rgba(12, 16, 24, 0.95);
   backdrop-filter: blur(20px);
@@ -211,6 +211,24 @@
   opacity: 0.6;
 }
 
+/* Skills header with orange star */
+.mention-section-header.skills-header {
+  color: rgba(242, 140, 82, 0.8);
+}
+
+.mention-section-header.skills-header svg {
+  opacity: 1;
+}
+
+/* Droids header with blue robot */
+.mention-section-header.droids-header {
+  color: rgba(74, 158, 255, 0.8);
+}
+
+.mention-section-header.droids-header svg {
+  opacity: 1;
+}
+
 /* File-specific styling */
 .file-badge {
   background: rgba(139, 92, 246, 0.15);
@@ -229,17 +247,22 @@
 
 /* Skill-specific styling */
 .skill-badge {
-  background: rgba(251, 191, 36, 0.15);
+  background: rgba(242, 140, 82, 0.15);
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
-  color: #fbbf24;
+  color: #f28c52;
 }
 
 .skill-item .agent-autocomplete-name {
-  color: #fbbf24;
+  color: #f28c52;
+}
+
+/* Droid-specific styling */
+.droid-item .agent-autocomplete-name {
+  color: #4A9EFF;
 }
 
 /* Skill mention chip in chat input */
@@ -248,12 +271,12 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(242, 140, 82, 0.15);
+  border: 1px solid rgba(242, 140, 82, 0.3);
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
-  color: #fbbf24;
+  color: #f28c52;
   animation: chipSlideIn 0.2s ease-out;
 }
 

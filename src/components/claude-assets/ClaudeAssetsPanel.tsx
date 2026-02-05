@@ -207,19 +207,20 @@ export default function ClaudeAssetsPanel({ projectPaths, initialProjectPath, on
     }
   }, [projectPaths, loadMultipleProjects]);
 
-  // Select initial project if specified (runs once after projects are loaded)
-  const initialProjectSelectedRef = useRef(false);
+  // Select project when initialProjectPath changes (reacts to every change)
+  const lastInitialProjectPathRef = useRef<string | undefined>(undefined);
   useEffect(() => {
+    // Only react when initialProjectPath actually changes and is defined
     if (
       initialProjectPath &&
-      !initialProjectSelectedRef.current &&
+      initialProjectPath !== lastInitialProjectPathRef.current &&
       projects.length > 0 &&
       !loading
     ) {
       const targetProject = projects.find(p => p.path === initialProjectPath);
       if (targetProject) {
         selectProject(targetProject.path);
-        initialProjectSelectedRef.current = true;
+        lastInitialProjectPathRef.current = initialProjectPath;
       }
     }
   }, [initialProjectPath, projects, loading, selectProject]);

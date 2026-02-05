@@ -30,9 +30,11 @@ interface MessageListProps {
   onRewindFiles?: (userMessageId: string) => void;
   // Image preview
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Open Agent Personality panel
+  onOpenPersonality?: () => void;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -206,7 +208,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     return (
       <div className="message-list-empty">
         <div className="empty-state">
-          <DuckAnimation />
+          <DuckAnimation onClick={onOpenPersonality} />
         </div>
       </div>
     );

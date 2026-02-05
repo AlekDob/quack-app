@@ -131,6 +131,8 @@ interface ChatViewProps {
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
   // Open file in Quack tab (for markdown files)
   onOpenInQuack?: (filePath: string) => void;
+  // Open Agent Personality panel in sidebar
+  onOpenPersonality?: () => void;
 }
 
 export default function ChatView({
@@ -211,6 +213,7 @@ export default function ChatView({
   onOpenImageTab,
   onRewindFiles,
   onOpenInQuack,
+  onOpenPersonality,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -665,6 +668,7 @@ export default function ChatView({
         showThinkingBlocks={showThinkingBlocks}
         onRewindFiles={onRewindFiles}
         onOpenImageTab={onOpenImageTab}
+        onOpenPersonality={onOpenPersonality}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar

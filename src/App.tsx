@@ -675,6 +675,8 @@ function AppContent() {
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  // Force expand a specific section in the side panel accordion
+  const [forceExpandSection, setForceExpandSection] = useState<string | null>(null);
   // Chat fullscreen mode - hides side panel and expands chat
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   // Track sidebar state before Kanban view to restore it on exit
@@ -10843,6 +10845,14 @@ You have access to all Bash tools to execute git commands like:
                     onOpenImageTab={handleOpenImageTab}
                     // Open markdown files in Quack tab
                     onOpenInQuack={handleFilePathClick}
+                    // Open Agent Personality in sidebar
+                    onOpenPersonality={() => {
+                      // Ensure side panel is not collapsed, then expand Agent Personality section
+                      if (sidePanelCollapsed) {
+                        setSidePanelCollapsed(false);
+                      }
+                      setForceExpandSection('agent-context');
+                    }}
                   />
                 );
               })()}
@@ -10972,6 +10982,14 @@ You have access to all Bash tools to execute git commands like:
                     onOpenImageTab={handleOpenImageTab}
                     // Open markdown files in Quack tab
                     onOpenInQuack={handleFilePathClick}
+                    // Open Agent Personality in sidebar
+                    onOpenPersonality={() => {
+                      // Ensure side panel is not collapsed, then expand Agent Personality section
+                      if (sidePanelCollapsed) {
+                        setSidePanelCollapsed(false);
+                      }
+                      setForceExpandSection('agent-context');
+                    }}
                   />
                 );
               })()}
@@ -11324,6 +11342,9 @@ You have access to all Bash tools to execute git commands like:
           }}
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
+          // Force expand section
+          forceExpandSection={forceExpandSection}
+          onForceExpandHandled={() => setForceExpandSection(null)}
         />
 
         <NewTerminalModal

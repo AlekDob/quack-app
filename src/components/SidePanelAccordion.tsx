@@ -251,6 +251,10 @@ interface SidePanelAccordionProps {
 
   // MCP props
   onOpenMcpConfig?: (filePath: string) => void;
+
+  // Force expand a specific section (controlled from parent)
+  forceExpandSection?: string | null;
+  onForceExpandHandled?: () => void;
 }
 
 export default function SidePanelAccordion({
@@ -330,6 +334,10 @@ export default function SidePanelAccordion({
 
   // MCP
   onOpenMcpConfig,
+
+  // Force expand
+  forceExpandSection,
+  onForceExpandHandled,
 }: SidePanelAccordionProps) {
   // Track focused section (single accordion in focus mode)
   const [focusedSection, setFocusedSection] = useState<string | null>(null);
@@ -372,6 +380,15 @@ export default function SidePanelAccordion({
       containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [focusedSection]);
+
+  // Handle forceExpandSection from parent
+  useEffect(() => {
+    if (forceExpandSection && sectionIds.includes(forceExpandSection)) {
+      setFocusedSection(forceExpandSection);
+      // Notify parent that we handled it
+      onForceExpandHandled?.();
+    }
+  }, [forceExpandSection, onForceExpandHandled]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
   const sectionIds = ['context', 'agent-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];

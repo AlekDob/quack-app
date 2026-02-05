@@ -467,13 +467,30 @@ function NewTerminalModal({
 
   // "Use" a marketplace template - pre-populate and show inline creation form
   async function handleUseMarketplaceTemplate(template: AgentTemplate, _resource: MarketplaceResource) {
-    // Get skills from template (new field) or fallback to bundledPlugins (legacy)
-    const skills = template.skills || template.bundledPlugins || [];
+    // Get plugin names from template (new field) or fallback to bundledPlugins (legacy)
+    const bundledPluginNames = template.skills || template.bundledPlugins || [];
 
-    // If there are skills to install, show confirmation dialog
-    if (skills.length > 0) {
-      const skillList = skills.map(s => `  • ${s}`).join('\n');
-      const message = `This template includes ${skills.length} ${skills.length === 1 ? 'skill' : 'skills'} that will be set as Preferred Skills:\n\n${skillList}\n\nProceed?`;
+    // Filter to get only actual skills (not rules) by checking allResources
+    // Resources with category 'skills' that belong to these plugins
+    const actualSkillNames: string[] = [];
+    for (const pluginName of bundledPluginNames) {
+      // Find skill resources that belong to this plugin (id format: "pluginName--skill--skillName")
+      const skillResources = allResources.filter(r =>
+        r.category === 'skills' && r.id.startsWith(`${pluginName}--skill--`)
+      );
+      for (const sr of skillResources) {
+        // Extract skill name from id: "pluginName--skill--skillName"
+        const parts = sr.id.split('--skill--');
+        if (parts.length === 2) {
+          actualSkillNames.push(parts[1]);
+        }
+      }
+    }
+
+    // If there are actual skills to install, show confirmation dialog
+    if (actualSkillNames.length > 0) {
+      const skillList = actualSkillNames.map(s => `  • ${s}`).join('\n');
+      const message = `This template includes ${actualSkillNames.length} ${actualSkillNames.length === 1 ? 'skill' : 'skills'} that will be set as Preferred Skills:\n\n${skillList}\n\nProceed?`;
 
       const confirmed = await ask(message, {
         title: 'Install Skills',
@@ -495,8 +512,8 @@ function NewTerminalModal({
       role: template.role,
       communicationStyle: template.communicationStyle,
       customNotes: template.customNotes || '',
-      // Set skills as Preferred Skills
-      selectedSkills: skills.length > 0 ? skills : undefined,
+      // Set only actual skills as Preferred Skills (not rules)
+      selectedSkills: actualSkillNames.length > 0 ? actualSkillNames : undefined,
     };
     onPersonalityChange?.(templatePersonality);
     setLocalPersonality(templatePersonality);

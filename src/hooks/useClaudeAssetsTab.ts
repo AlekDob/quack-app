@@ -35,9 +35,14 @@ export function useClaudeAssetsTab({
 
   // Open or focus the Claude Assets tab, optionally with a pre-selected project
   const openClaudeAssetsTab = useCallback((initialProjectPath?: string) => {
-    // If tab already exists, just focus it
-    // (note: we can't change the initialProjectPath after tab is created)
+    // If tab already exists, update its initialProjectPath and focus it
     if (existingTabId) {
+      // Update the existing tab's initialProjectPath
+      setTabs(prev => prev.map(tab =>
+        tab.id === existingTabId
+          ? { ...tab, initialProjectPath }
+          : tab
+      ));
       setActiveTabId(existingTabId);
       return;
     }
