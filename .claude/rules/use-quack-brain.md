@@ -1,20 +1,17 @@
 ---
-description: "Use Quack Brain as Second Brain - file-based knowledge storage in ~/.quack/brain/"
+description: "Use Quack Brain as Second Brain - two-level knowledge storage"
 ---
-# Quack Brain - Second Brain
+
+# Quack Brain - Two-Level Second Brain
 
 You have access to **Quack Brain** - the user's **Second Brain**. This is a file-based knowledge store using markdown files with YAML frontmatter.
 
-## Brain Path Discovery
-
-The brain path is configurable. **ALWAYS read `~/.quack/brain-path` first** to discover the actual location. If the file doesn't exist, fall back to `~/.quack/brain/`.
-
 ## Architecture
 
-Quack Brain uses a **file-first** approach:
-- **Markdown files** organized by type and project
-- **Claude Skill** (`quack-brain`) for AI access patterns
-- **Auto-learn**: LLM self-evaluation (Claudeception-style, language-agnostic)
+Quack Brain uses a **two-level architecture**:
+
+1. **Project Brain** (`{project}/.quack/brain/`) - Project-specific knowledge, shareable with team
+2. **Global Brain** (`~/.quack/brain/global/`) - Personal knowledge, cross-project patterns, preferences
 
 No database, no MCP server, no corruption risk.
 
@@ -28,29 +25,30 @@ No database, no MCP server, no corruption risk.
 - When the user asks about past work or decisions
 - When you need context about patterns used in the project
 
-### Search Priority Order
+### Search Priority: Project Brain → Global Brain
 
-1. **FIRST**: Read `map.md` if you need to locate components or understand architecture
-2. **THEN**: List files in the current project's brain folder (file names are self-descriptive)
-3. **THEN**: Check `inbox/` for pending items relevant to current task
-4. **THEN**: Only if nothing relevant, search globally across `~/.quack/brain/`
-5. **LAST**: Read specific files only when the title matches your need.
+1. **FIRST**: Read project's `map.md` for architecture orientation
+2. **THEN**: List files in project brain folder (file names are self-descriptive)
+3. **THEN**: Check project's `inbox/` for pending items relevant to current task
+4. **THEN**: Search global brain for cross-project patterns and preferences
+5. **LAST**: Read specific files only when the title matches your need
 
 ```bash
-# STEP 1: Read map for architecture orientation
-Read "~/.quack/brain/projects/quack-app/map.md"
+# STEP 1: Read map for architecture orientation (PROJECT BRAIN)
+Read "{project}/.quack/brain/map.md"
 
-# STEP 2: List project files (titles tell you what's inside)
-Glob "~/.quack/brain/projects/quack-app/**/*.md"
+# STEP 2: List project brain files (titles tell you what's inside)
+Glob "{project}/.quack/brain/**/*.md"
 
 # STEP 3: Check inbox for pending items
-Glob "~/.quack/brain/projects/quack-app/inbox/*.md"
+Glob "{project}/.quack/brain/inbox/*.md"
 
-# STEP 4: Only if needed, search globally
-Grep pattern="dropdown" path="~/.quack/brain/"
+# STEP 4: Search global brain for cross-project knowledge
+Glob "~/.quack/brain/global/**/*.md"
+Grep pattern="dropdown" path="~/.quack/brain/global/"
 
 # STEP 5: Read only what matches
-Read file_path="~/.quack/brain/projects/quack-app/bugs/fix-dropdown-z-index.md"
+Read "{project}/.quack/brain/bugs/fix-dropdown-z-index.md"
 ```
 
 ### Inbox (Mobile-First Ideas)
@@ -71,14 +69,26 @@ The `inbox/` folder captures quick ideas from mobile (Obsidian Sync). Rules:
 
 ## When to SAVE to Brain (Write)
 
-**ALWAYS save important discoveries:**
+### Where to Save
 
+| Knowledge Type | Location | Example |
+|----------------|----------|---------|
+| **Project-specific** | `{project}/.quack/brain/` | Bug fix for this project, architecture decision |
+| **Cross-project** | `~/.quack/brain/global/` | Reusable patterns, personal preferences |
+
+### What to Save
+
+**Project Brain** (`{project}/.quack/brain/`):
 - Bug fixes that were tricky to solve
-- Patterns that work well in this project
+- Patterns specific to this project
 - Architectural decisions and their rationale
+- Project-specific gotchas
+
+**Global Brain** (`~/.quack/brain/global/`):
+- Reusable patterns across projects
 - User preferences you learn during conversation
-- Solutions that might be useful in the future
-- Configuration quirks or gotchas
+- People and contacts
+- Tool configurations
 
 ## File Format
 
@@ -100,34 +110,33 @@ Use useMemo for filtered/sorted lists to avoid re-computation on every render...
 ## Directory Structure
 
 ```
-~/.quack/brain/
-├── global/
-│   ├── patterns/     # Cross-project patterns
-│   ├── preferences/  # User preferences
-│   ├── people/       # People & contacts
-│   └── tools/        # Tool configurations
-└── projects/
-    └── {project-name}/
-        ├── patterns/   # Project-specific patterns
-        ├── bugs/       # Bug fixes
-        ├── decisions/  # Architecture decisions
-        ├── gotchas/    # Pitfalls to avoid
-        ├── diary/      # Daily logs (YYYY-MM-DD.md)
-        ├── inbox/      # Quick ideas & todos (mobile-first via Obsidian Sync)
-        └── map.md      # Architecture map & glossary
+{project}/.quack/brain/        # Project-specific (shareable, NOT gitignored)
+├── patterns/                  # Project-specific patterns
+├── bugs/                      # Bug fixes
+├── decisions/                 # Architecture decisions
+├── gotchas/                   # Pitfalls to avoid
+├── diary/                     # Daily logs (YYYY-MM-DD.md)
+├── inbox/                     # Quick ideas & todos (mobile-first)
+└── map.md                     # Architecture map & glossary
+
+~/.quack/brain/global/         # Personal (cross-project)
+├── patterns/                  # Reusable code patterns
+├── preferences/               # User preferences
+├── people/                    # People & contacts
+└── tools/                     # Tool configurations
 ```
 
 ## Entity Types
 
-| Type | Folder | When to use |
-|------|--------|-------------|
-| `pattern` | patterns/ | Reusable code patterns |
-| `bug_fix` | bugs/ | Non-trivial bug solutions |
-| `decision` | decisions/ | Architecture choices |
-| `gotcha` | gotchas/ | Pitfalls and caveats |
-| `preference` | preferences/ | User preferences |
-| `person` | people/ | People & contacts |
-| `tool` | tools/ | Tool configs |
+| Type | Folder | Brain | When to use |
+|------|--------|-------|-------------|
+| `pattern` | patterns/ | Project or Global | Reusable code patterns |
+| `bug_fix` | bugs/ | Project | Non-trivial bug solutions |
+| `decision` | decisions/ | Project | Architecture choices |
+| `gotcha` | gotchas/ | Project or Global | Pitfalls and caveats |
+| `preference` | preferences/ | Global | User preferences |
+| `person` | people/ | Global | People & contacts |
+| `tool` | tools/ | Global | Tool configs |
 
 ## Naming Convention
 
@@ -144,7 +153,7 @@ File names MUST be **explicit and self-descriptive**. Someone should understand 
 
 ## Diary Rules
 
-- Path: `diary/YYYY-MM-DD.md`
+- Path: `{project}/.quack/brain/diary/YYYY-MM-DD.md`
 - **NO tags in diary frontmatter** — diary is temporal, not categorical
 - Use only `type: diary`, `project`, `date` in frontmatter
 - Tags belong only on knowledge files (bugs, patterns, decisions, gotchas)
@@ -165,7 +174,7 @@ Write in the same language the user communicates in.
 ## Critical Behavior
 
 1. **During Analysis**: Search brain files for relevant context BEFORE starting work
-2. **Search project folder first**: List file names before grepping everywhere
+2. **Search project brain first**: Then global brain for cross-project knowledge
 3. **After completing tasks**: Self-evaluate and save if knowledge qualifies
-4. **DO NOT use MCP tools** - use Grep, Read, Write directly on `~/.quack/brain/`
+4. **DO NOT use MCP tools** - use Grep, Read, Write directly
 5. **This is the user's Second Brain** - use it actively, not passively!
