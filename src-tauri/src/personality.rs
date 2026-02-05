@@ -24,6 +24,10 @@ pub struct AgentPersonality {
     #[serde(rename = "selectedRules", skip_serializing_if = "Option::is_none")]
     pub selected_rules: Option<Vec<String>>, // Array of rule file paths to follow
 
+    // Selected skills (injected into CLAUDE.md for proactive use)
+    #[serde(rename = "selectedSkills", skip_serializing_if = "Option::is_none")]
+    pub selected_skills: Option<Vec<String>>, // Array of skill names
+
     // Legacy fields (kept for backwards compatibility)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub personality: Option<String>,
@@ -54,6 +58,7 @@ impl Default for AgentPersonality {
             communication_style: "friendly".to_string(),
             custom_notes: Some("Experienced PM specializing in feature delivery and team coordination. Works on specific branches and delegates to specialists.".to_string()),
             selected_rules: None, // No pre-selected rules by default
+            selected_skills: None, // No pre-selected skills by default
             // Legacy fields (backwards compatibility)
             personality: Some("You coordinate feature development and sprint planning. You work on specific branches and invoke Protocol Droids when you need specialized expertise.".to_string()),
             quirks: Some("You always respond with frequent 'quack quack' expressions and focus on coordinating work rather than doing it yourself.".to_string()),
@@ -352,6 +357,7 @@ fn inject_personality_to_claude_md_impl(
     log::info!("🔍 Role: {}", personality.role);
     log::info!("🔍 Skills: {:?}", personality.skills);
     log::info!("🔍 SelectedRules: {:?}", personality.selected_rules);
+    log::info!("🔍 SelectedSkills: {:?}", personality.selected_skills);
     log::info!("🔍 CustomNotes: {:?}", personality.custom_notes);
 
     // Generate agent header with NEW structure
@@ -440,6 +446,19 @@ fn inject_personality_to_claude_md_impl(
                 };
 
                 agent_header.push_str(&format!("| {} | `{}` | {} |\n", display_name, rule_path, scope));
+            }
+            agent_header.push_str("\n");
+        }
+    }
+
+    // 📋 Selected Skills section - Skills the agent should use proactively
+    if let Some(selected_skills) = &personality.selected_skills {
+        if !selected_skills.is_empty() {
+            agent_header.push_str("**Selected Skills:**\n");
+            agent_header.push_str("*IMPORTANT: Use these skills proactively before proceeding with work.*\n\n");
+
+            for skill_name in selected_skills {
+                agent_header.push_str(&format!("- {}\n", skill_name));
             }
             agent_header.push_str("\n");
         }

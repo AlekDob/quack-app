@@ -283,6 +283,9 @@ export interface AgentPersonality {
   // Selected Claude Code rules (file paths from .claude/rules/)
   selectedRules?: string[]; // Array of rule file paths to follow
 
+  // Selected skills (injected into CLAUDE.md for proactive use)
+  selectedSkills?: string[]; // Array of skill names (e.g., "frontend-design", "code-review")
+
   // Quick-access tools for this agent (shown in chat EquipBar)
   toolkit?: AgentToolkit;
 

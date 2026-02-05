@@ -260,13 +260,13 @@ function AgentSessionItem({
           padding: '4px 8px',
           marginBottom: isLast ? '16px' : '6px', // Extra margin for last session
           flex: 1,
-          background: isActive ? `${agentColor}35` : `${agentColor}15`,
+          background: isActive ? `${agentColor}55` : `${agentColor}15`,
           borderRadius: '4px',
           cursor: 'pointer',
           fontSize: '10px',
           color: isActive ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.7)',
           transition: 'all 0.2s ease',
-          boxShadow: isActive ? `0 0 8px ${agentColor}40` : 'none',
+          boxShadow: isActive ? `0 0 10px ${agentColor}60` : 'none',
         }}
         onMouseEnter={(e) => {
           if (!isActive) {

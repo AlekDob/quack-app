@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from '@tauri-apps/plugin-shell';
 import { Store } from '@tauri-apps/plugin-store';
 import { getCurrentVersion } from '../utils/version';
 import { useUpdateChecker } from '../hooks/useUpdateChecker';
@@ -963,8 +964,8 @@ export default function TerminalSidebar({
           <button
             type="button"
             className="sidebar-footer-link"
-            onClick={() => window.open('https://quack.build/docs', '_blank')}
-            title="Documentation"
+            onClick={() => open('https://quack.build/docs')}
+            title="Opens in browser"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>

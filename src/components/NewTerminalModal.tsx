@@ -676,6 +676,8 @@ function NewTerminalModal({
               onUseAgent={handleUseAgent}
               onEditAgent={handleEditAgent}
               onCreateNew={handleCreateNewAgent}
+              // Project path for loading skills
+              projectPath={path}
               // Inline editing props
               editingMode={inlineEditingMode}
               editingAgent={editingAgentData}

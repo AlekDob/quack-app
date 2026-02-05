@@ -1,0 +1,243 @@
+/* Skill Selector - Chip/Tag based skill selection */
+
+.skill-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.skill-selector-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.skill-selector-spinner {
+  width: 14px;
+  height: 14px;
+  animation: skill-spin 1s linear infinite;
+  stroke: currentColor;
+  fill: none;
+}
+
+.skill-selector-spinner circle {
+  stroke-dasharray: 30 70;
+  stroke-linecap: round;
+}
+
+@keyframes skill-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.skill-selector-empty {
+  padding: 12px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* Compact search input */
+.skill-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.skill-search-icon {
+  position: absolute;
+  left: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.skill-search-input {
+  width: 100%;
+  padding: 6px 24px 6px 28px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  color: var(--color-text);
+  transition: all 0.15s ease;
+  box-shadow: none !important;
+}
+
+.skill-search-input:focus {
+  outline: none;
+  border-color: rgba(242, 140, 82, 0.4) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: none !important;
+}
+
+.skill-search-input:hover {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.skill-search-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.skill-search-clear {
+  position: absolute;
+  right: 6px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.skill-search-clear:hover {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.skill-chips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skill-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skill-group-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skill-group-icon.installed {
+  background: linear-gradient(135deg, #f28c52, #e67339);
+}
+
+.skill-group-icon.not-installed {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+.skill-star-icon {
+  width: 12px;
+  height: 12px;
+  color: white;
+}
+
+.skill-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+}
+
+.skill-group-count {
+  font-size: 9px;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.skill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.skill-chip:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.skill-chip.selected {
+  background: rgba(242, 140, 82, 0.15);
+  border-color: rgba(242, 140, 82, 0.4);
+  color: rgba(242, 140, 82, 1);
+}
+
+.skill-chip.selected:hover {
+  background: rgba(242, 140, 82, 0.25);
+  border-color: rgba(242, 140, 82, 0.6);
+}
+
+/* Marketplace (not installed) skills - slightly dimmed */
+.skill-chip.marketplace {
+  opacity: 0.7;
+}
+
+.skill-chip.marketplace:hover {
+  opacity: 1;
+}
+
+.skill-chip.marketplace.selected {
+  opacity: 1;
+  background: rgba(107, 114, 128, 0.15);
+  border-color: rgba(107, 114, 128, 0.4);
+  color: rgba(156, 163, 175, 1);
+}
+
+.skill-chip-name {
+  white-space: nowrap;
+}
+
+.skill-chip-check {
+  flex-shrink: 0;
+}
+
+.skill-selector-toggle {
+  align-self: flex-start;
+  padding: 4px 0;
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.skill-selector-toggle:hover {
+  color: var(--color-text);
+}
+
+.skill-selector-selected-count {
+  font-size: 10px;
+  color: rgba(242, 140, 82, 0.8);
+  font-style: italic;
+}

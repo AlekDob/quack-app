@@ -54,6 +54,7 @@ export interface SkillMetadata {
   description: string;
   path: string;
   isGlobal: boolean;
+  isMarketplace?: boolean; // True if skill is from marketplace (not installed)
 }
 
 // Droid metadata for agent configuration

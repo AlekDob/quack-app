@@ -19,6 +19,7 @@ import { AVAILABLE_AVATARS, getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
 import type { CustomAvatarInfo } from '../utils/customAvatarStorage';
+import SkillSelector from './SkillSelector';
 import './AgentSelector.css';
 
 // Communication styles for personality
@@ -34,6 +35,8 @@ interface AgentSelectorProps {
   onUseAgent: (agent: SavedAgent) => void;
   onEditAgent: (agent: SavedAgent) => void;
   onCreateNew: () => void;
+  // Project path for loading skills
+  projectPath?: string;
   // New props for inline editing
   editingMode?: 'create' | 'edit' | null;
   editingAgent?: SavedAgent | null;
@@ -65,6 +68,8 @@ export default function AgentSelector({
   onUseAgent,
   onEditAgent,
   onCreateNew,
+  // Project path for loading skills
+  projectPath = '',
   // Inline editing props
   editingMode,
   editingAgent,
@@ -112,7 +117,7 @@ export default function AgentSelector({
     }
   }, [editingMode, randomizedAvatars, avatar, onAvatarChange]);
 
-  const handlePersonalityFieldChange = (field: string, value: string) => {
+  const handlePersonalityFieldChange = (field: string, value: string | string[]) => {
     onPersonalityChange?.({
       ...personality,
       [field]: value,
@@ -405,6 +410,22 @@ export default function AgentSelector({
               className="personality-textarea"
             />
           </label>
+
+          {/* Selected Skills */}
+          {projectPath && (
+            <>
+              <div className="modal-section-divider" />
+              <div className="modal-field personality-field skills-section">
+                <h3 className="personality-section-title">Selected Skills</h3>
+              <p className="skills-section-hint">Skills this agent will use proactively</p>
+              <SkillSelector
+                projectPath={projectPath}
+                selectedSkills={personality.selectedSkills || []}
+                onSkillsChange={(skills) => handlePersonalityFieldChange('selectedSkills', skills)}
+              />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Actions - Create or Save */}

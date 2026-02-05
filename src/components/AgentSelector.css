@@ -448,3 +448,18 @@
   border-color: rgba(34, 197, 94, 0.6);
   transform: translateY(-1px);
 }
+
+/* Skills Section */
+.skills-section {
+  margin-top: 8px;
+}
+
+.skills-section .personality-section-title {
+  margin-bottom: 6px;
+}
+
+.skills-section-hint {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px 0;
+}

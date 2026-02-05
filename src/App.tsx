@@ -7004,6 +7004,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             communicationStyle: agent.personality.communicationStyle || 'professional',
             customNotes: agent.personality.customNotes,
             selectedRules: agent.personality.selectedRules,
+            selectedSkills: agent.personality.selectedSkills,
             intro: '',
             personality: '',
             quirks: '',
@@ -7181,6 +7182,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             customNotes: agentPersonality.customNotes || undefined,
             // Claude Code rules (new simplified flow)
             selectedRules: agentPersonality.selectedRules || undefined,
+            // Selected skills (for proactive use)
+            selectedSkills: agentPersonality.selectedSkills || undefined,
             // Toolkit (skills, droids, commands for quick-access)
             toolkit: agentPersonality.toolkit || undefined,
             // Legacy fields (kept for backwards compatibility)
@@ -7358,6 +7361,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               customNotes: agentPersonality.customNotes || undefined,
               // Claude Code rules (new simplified flow)
               selectedRules: agentPersonality.selectedRules || undefined,
+              // Selected skills (for proactive use)
+              selectedSkills: agentPersonality.selectedSkills || undefined,
               // Legacy fields (kept for backwards compatibility)
               intro: agentPersonality.intro || '',
               personality: agentPersonality.personality || '',

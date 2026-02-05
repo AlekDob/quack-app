@@ -799,11 +799,6 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               Stop: {message.stop_reason}
             </span>
           )}
-          {message.session_id && (
-            <span className="result-stat-inline">
-              Session: {message.session_id.substring(0, 8)}...
-            </span>
-          )}
         </div>
       );
     }
