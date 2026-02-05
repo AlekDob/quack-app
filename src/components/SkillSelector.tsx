@@ -86,9 +86,13 @@ export default function SkillSelector({
     }
   };
 
-  // Filter skills by search query
+  // Filter skills by search query (search in both name and displayName)
   const filteredSkills = searchQuery.trim()
-    ? availableSkills.filter(s => fuzzyMatch(s.name, searchQuery) || fuzzyMatch(s.description, searchQuery))
+    ? availableSkills.filter(s =>
+        fuzzyMatch(s.name, searchQuery) ||
+        fuzzyMatch(s.displayName, searchQuery) ||
+        fuzzyMatch(s.description, searchQuery)
+      )
     : availableSkills;
 
   // Group skills: installed (project + global) vs not installed (marketplace)
@@ -172,7 +176,7 @@ export default function SkillSelector({
                   onClick={() => toggleSkill(skill.name)}
                   title={skill.description}
                 >
-                  <span className="skill-chip-name">{skill.name}</span>
+                  <span className="skill-chip-name">{skill.displayName}</span>
                   {selectedSkills.includes(skill.name) && (
                     <svg className="skill-chip-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <polyline points="20 6 9 17 4 12"></polyline>
@@ -203,7 +207,7 @@ export default function SkillSelector({
                   onClick={() => toggleSkill(skill.name)}
                   title={`${skill.description} (will be installed)`}
                 >
-                  <span className="skill-chip-name">{skill.name}</span>
+                  <span className="skill-chip-name">{skill.displayName}</span>
                   {selectedSkills.includes(skill.name) && (
                     <svg className="skill-chip-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <polyline points="20 6 9 17 4 12"></polyline>

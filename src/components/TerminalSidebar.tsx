@@ -79,6 +79,8 @@ interface SortableRepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  // Open Agent Personality accordion
+  onOpenPersonality?: () => void;
 }
 
 function SortableRepositoryGroup({
@@ -216,6 +218,8 @@ interface TerminalSidebarProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  // Open Agent Personality accordion
+  onOpenPersonality?: () => void;
 }
 
 export default function TerminalSidebar({
@@ -265,6 +269,7 @@ export default function TerminalSidebar({
   onCreateTask,
   onSessionClick,
   activeSessionId,
+  onOpenPersonality,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -826,6 +831,7 @@ export default function TerminalSidebar({
                     chatLoadingMap={chatLoadingMap}
                     onSessionClick={onSessionClick}
                     activeSessionId={activeSessionId}
+                    onOpenPersonality={onOpenPersonality}
                   />
                 );
               })}

@@ -10265,6 +10265,18 @@ You have access to all Bash tools to execute git commands like:
           // Session props
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
+          // Open Agent Personality accordion
+          onOpenPersonality={() => {
+            console.log('[App] onOpenPersonality from sidebar clicked');
+            if (sidePanelCollapsed) {
+              setSidePanelCollapsed(false);
+              setTimeout(() => {
+                setForceExpandSection('agent-context');
+              }, 50);
+            } else {
+              setForceExpandSection('agent-context');
+            }
+          }}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
         />}
@@ -10719,6 +10731,19 @@ You have access to all Bash tools to execute git commands like:
                     <SessionEmptyState
                       agent={activeTerminal}
                       onSessionClick={handleSessionClick}
+                      onOpenPersonality={() => {
+                        console.log('[SessionEmptyState] onOpenPersonality clicked, sidePanelCollapsed:', sidePanelCollapsed);
+                        // Ensure side panel is not collapsed, then expand Agent Personality section
+                        if (sidePanelCollapsed) {
+                          setSidePanelCollapsed(false);
+                          // Wait for side panel to expand before setting force expand
+                          setTimeout(() => {
+                            setForceExpandSection('agent-context');
+                          }, 50);
+                        } else {
+                          setForceExpandSection('agent-context');
+                        }
+                      }}
                     />
                   );
                 }

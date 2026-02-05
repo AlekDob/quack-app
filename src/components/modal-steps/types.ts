@@ -50,7 +50,8 @@ export interface StepProgressProps {
 // Skill metadata for agent configuration
 export interface SkillMetadata {
   id: string;
-  name: string;
+  name: string;          // Original name with hyphens (e.g., "rust-async") - used for matching
+  displayName: string;   // Formatted name for display (e.g., "rust async")
   description: string;
   path: string;
   isGlobal: boolean;

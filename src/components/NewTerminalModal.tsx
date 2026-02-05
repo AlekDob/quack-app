@@ -104,7 +104,7 @@ function NewTerminalModal({
   onInstallStarterBundles,
 }: NewTerminalModalProps) {
   // Marketplace for starter bundles
-  const { getStarterBundles, loading: marketplaceLoading, allResources } = useMarketplace();
+  const { getStarterBundles, loading: marketplaceLoading, allResources, installResource } = useMarketplace();
 
   // Step management - PROJECT-FIRST FLOW (2 steps: project → agent)
   // Edit mode: agent step with inline editing form
@@ -467,30 +467,36 @@ function NewTerminalModal({
 
   // "Use" a marketplace template - pre-populate and show inline creation form
   async function handleUseMarketplaceTemplate(template: AgentTemplate, _resource: MarketplaceResource) {
-    // Get plugin names from template (new field) or fallback to bundledPlugins (legacy)
-    const bundledPluginNames = template.skills || template.bundledPlugins || [];
+    // Get skill names from template (new field) or fallback to bundledPlugins (legacy)
+    const templateSkillNames = template.skills || template.bundledPlugins || [];
 
-    // Filter to get only actual skills (not rules) by checking allResources
-    // Resources with category 'skills' that belong to these plugins
-    const actualSkillNames: string[] = [];
-    for (const pluginName of bundledPluginNames) {
-      // Find skill resources that belong to this plugin (id format: "pluginName--skill--skillName")
-      const skillResources = allResources.filter(r =>
-        r.category === 'skills' && r.id.startsWith(`${pluginName}--skill--`)
-      );
-      for (const sr of skillResources) {
+    // Build a map of skill name -> MarketplaceResource for installation
+    const skillResourceMap = new Map<string, MarketplaceResource>();
+    for (const r of allResources) {
+      if (r.category === 'skills') {
         // Extract skill name from id: "pluginName--skill--skillName"
-        const parts = sr.id.split('--skill--');
+        const parts = r.id.split('--skill--');
         if (parts.length === 2) {
-          actualSkillNames.push(parts[1]);
+          skillResourceMap.set(parts[1], r);
         }
       }
     }
 
-    // If there are actual skills to install, show confirmation dialog
-    if (actualSkillNames.length > 0) {
-      const skillList = actualSkillNames.map(s => `  • ${s}`).join('\n');
-      const message = `This template includes ${actualSkillNames.length} ${actualSkillNames.length === 1 ? 'skill' : 'skills'} that will be set as Preferred Skills:\n\n${skillList}\n\nProceed?`;
+    // Find MarketplaceResource for each skill in the template
+    const skillsToInstall: { name: string; resource: MarketplaceResource }[] = [];
+    for (const skillName of templateSkillNames) {
+      const resource = skillResourceMap.get(skillName);
+      if (resource) {
+        skillsToInstall.push({ name: skillName, resource });
+      } else {
+        console.warn(`Skill ${skillName} not found in marketplace resources`);
+      }
+    }
+
+    // If there are skills to install, show confirmation dialog
+    if (skillsToInstall.length > 0) {
+      const skillList = skillsToInstall.map(s => `  • ${s.name}`).join('\n');
+      const message = `This template includes ${skillsToInstall.length} ${skillsToInstall.length === 1 ? 'skill' : 'skills'} that will be installed and set as Preferred Skills:\n\n${skillList}\n\nProceed?`;
 
       const confirmed = await ask(message, {
         title: 'Install Skills',
@@ -499,6 +505,16 @@ function NewTerminalModal({
 
       if (!confirmed) {
         return; // User cancelled
+      }
+
+      // Install each skill
+      for (const { name, resource } of skillsToInstall) {
+        try {
+          await installResource(resource, 'global');
+          console.log(`Installed skill: ${name}`);
+        } catch (err) {
+          console.error(`Failed to install skill ${name}:`, err);
+        }
       }
     }
 
@@ -512,8 +528,8 @@ function NewTerminalModal({
       role: template.role,
       communicationStyle: template.communicationStyle,
       customNotes: template.customNotes || '',
-      // Set only actual skills as Preferred Skills (not rules)
-      selectedSkills: actualSkillNames.length > 0 ? actualSkillNames : undefined,
+      // Set the skill names as Preferred Skills
+      selectedSkills: skillsToInstall.length > 0 ? skillsToInstall.map(s => s.name) : undefined,
     };
     onPersonalityChange?.(templatePersonality);
     setLocalPersonality(templatePersonality);

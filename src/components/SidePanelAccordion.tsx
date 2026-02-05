@@ -381,17 +381,18 @@ export default function SidePanelAccordion({
     }
   }, [focusedSection]);
 
+  // Section IDs for reference (order is determined by DOM position, not dynamically)
+  const sectionIds = ['context', 'agent-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
+
   // Handle forceExpandSection from parent
   useEffect(() => {
-    if (forceExpandSection && sectionIds.includes(forceExpandSection)) {
+    if (forceExpandSection) {
+      console.log('[SidePanelAccordion] forceExpandSection received:', forceExpandSection);
       setFocusedSection(forceExpandSection);
       // Notify parent that we handled it
       onForceExpandHandled?.();
     }
   }, [forceExpandSection, onForceExpandHandled]);
-
-  // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['context', 'agent-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
 
   // Simple fixed order - no reordering when focused
   const getOrder = (sectionId: string): number => {

@@ -68,6 +68,8 @@ interface RepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  // Open Agent Personality accordion
+  onOpenPersonality?: () => void;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -156,6 +158,8 @@ interface SortableAgentProps {
   onToggleKanbanView?: () => void;
   // New session button
   onNewSession?: (agentId: string) => void;
+  // Open Agent Personality accordion
+  onOpenPersonality?: () => void;
 }
 
 function SortableAgent({
@@ -175,6 +179,7 @@ function SortableAgent({
   isKanbanViewActive = false,
   onToggleKanbanView,
   onNewSession,
+  onOpenPersonality,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -494,6 +499,8 @@ function SortableAgent({
 
   // Memoize callbacks to prevent recreation
   const handleSelect = useCallback(() => {
+    console.log('[RepositoryGroup] agent-card clicked, agent:', agent.label || agent.id);
+
     // Don't trigger click if we just finished dragging
     if (wasDraggedRef.current) {
       wasDraggedRef.current = false;
@@ -512,7 +519,13 @@ function SortableAgent({
       });
     }
     onSelect(agent);
-  }, [onSelect, agent, isKanbanViewActive]);
+
+    // Open Agent Personality accordion in sidebar
+    if (onOpenPersonality) {
+      console.log('[RepositoryGroup] Opening Agent Personality accordion');
+      onOpenPersonality();
+    }
+  }, [onSelect, agent, isKanbanViewActive, onOpenPersonality]);
 
   const handleContextMenu = useCallback(
     (e: MouseEvent) => onContextMenu(e, agent),
@@ -1101,6 +1114,7 @@ export default function RepositoryGroup({
   chatLoadingMap,
   onSessionClick,
   activeSessionId,
+  onOpenPersonality,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1920,6 +1934,7 @@ export default function RepositoryGroup({
                               ? setNewSessionModalAgentId
                               : undefined
                           }
+                          onOpenPersonality={onOpenPersonality}
                         />
                         {/* Sessions under this agent - always visible - with metro line */}
                         {onSessionClick && (
