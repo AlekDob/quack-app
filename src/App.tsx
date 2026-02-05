@@ -94,6 +94,8 @@ import type { DiffInfo } from "./components/CodeEditorMonaco";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
+import { useModelsConfig } from "./hooks/useAppConfig";
+import { getModelId } from "./services/modelService";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
@@ -350,6 +352,9 @@ function AppContent() {
     setDroidFactoryOpen,
     userStats,
   } = useDroidFactory();
+
+  // Model configuration from Supabase - needed for model ID mapping
+  const { models: remoteModels } = useModelsConfig();
 
   // System wake handler - prevents blank screen after macOS standby
   useSystemWakeHandler({ debug: true });
@@ -2247,7 +2252,14 @@ function AppContent() {
           agentId: capturedAgentId,
           request: {
             prompt,
-            model: options?.model || 'sonnet',
+            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
+            model: (() => {
+              const friendlyName = options?.model || 'sonnet';
+              const resolvedId = getModelId(friendlyName, remoteModels);
+              console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, remoteModels=${remoteModels?.length ?? 0}, resolvedId=${resolvedId}`);
+              console.log(`🦆 [MODEL DEBUG] remoteModels:`, remoteModels?.map(m => `${m.id}→${m.modelId}`).join(', ') || 'EMPTY');
+              return resolvedId;
+            })(),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             attachments: attachments.map(a => a.path),
@@ -2256,7 +2268,7 @@ function AppContent() {
             agents: availableDroids.length > 0 ? availableDroids.map(droid => ({
               name: droid.id.replace('global-', ''), // Use ID as name for @mention matching
               description: droid.description,
-              model: 'sonnet', // Default model for droids
+              model: getModelId('sonnet', remoteModels), // Default model for droids
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
@@ -2456,7 +2468,7 @@ function AppContent() {
 
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for session ${messageKey}:`, activeStreamsRef.current.get(messageKey)?.size || 0);
     }
-  }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession]);
+  }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession, remoteModels]);
 
   // 📱 Keep ref always up-to-date for external integrations (WhatsApp auto-start, Telegram)
   sendMessageForAgentRef.current = sendMessageForAgent;
@@ -2885,7 +2897,8 @@ function AppContent() {
           agentId: targetAgentId,
           request: {
             prompt,
-            model: options?.model || 'sonnet',
+            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
+            model: getModelId(options?.model || 'sonnet', remoteModels),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
@@ -3043,7 +3056,7 @@ function AppContent() {
       activeStreamsRef.current.get(targetAgentId)?.delete(streamKey);
       abortControllersRef.current.delete(streamKey);
     }
-  }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession]);
+  }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession, remoteModels]);
 
   // Abort stream for a specific agent (used by Kanban)
   const abortStreamForTargetAgent = useCallback((targetAgentId: string) => {
@@ -3167,7 +3180,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         agentId: targetAgentId,
         request: {
           prompt: compactPrompt,
-          model: 'haiku', // Use faster model for summaries
+          // 🦆 MODEL FIX: Map friendly name to API model ID
+          model: getModelId('haiku', remoteModels), // Use faster model for summaries
           permissionMode: 'bypass',
           cwd: workingDir,
           allowedTools: [
@@ -3239,7 +3253,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
     }
-  }, [chatSessions, chatTokensMap, explorerPath]);
+  }, [chatSessions, chatTokensMap, explorerPath, remoteModels]);
 
   // ============================================
   // END KANBAN CHAT INTEGRATION FUNCTIONS
@@ -3322,7 +3336,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         agentId: activeId,
         request: {
           prompt: compactPrompt,
-          model: 'haiku', // Use faster model for summaries
+          // 🦆 MODEL FIX: Map friendly name to API model ID
+          model: getModelId('haiku', remoteModels), // Use faster model for summaries
           permissionMode: 'bypass',
           cwd: activeTerminal?.cwd ?? explorerPath,
           // 🗣️ Enable interactive tools (SDK v0.1.71+) - though AskUserQuestion unlikely for /compact
@@ -3396,7 +3411,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
     }
-  }, [activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
+  }, [activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath, remoteModels]);
 
   // Clear conversation for current agent (Claude SDK /clear command)
   const clearCurrentAgentConversation = useCallback(async () => {

@@ -68,7 +68,8 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const CACHE_KEY = 'quack_app_config';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
 // Bump version when adding new config keys to invalidate stale caches
-const CACHE_VERSION = 2;
+// v3: Added opus46 (Opus 4.6) and renamed opus45 (Legacy) in Supabase models
+const CACHE_VERSION = 3;
 
 interface CachedConfig {
   data: AppConfig;
@@ -161,6 +162,7 @@ async function fetchAppConfig(): Promise<AppConfig> {
     setCachedConfig(mergedConfig);
 
     console.log('[AppConfig] Loaded successfully. Models:', mergedConfig.models?.length ?? 'none');
+    console.log('[AppConfig] Models detail:', JSON.stringify(mergedConfig.models?.map(m => ({ id: m.id, modelId: m.modelId })) || []));
     return mergedConfig;
   } catch (error) {
     console.error('❌ Error fetching app config:', error);

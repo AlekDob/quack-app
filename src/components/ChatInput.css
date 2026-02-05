@@ -313,11 +313,19 @@
 }
 
 .chat-input-wrapper {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 12px 8px 12px;
+  padding: 6px 10px;
+  padding-bottom: 6px;
   overflow: visible; /* Allow tooltips to escape */
+  transition: padding-bottom 0.2s ease;
+}
+
+/* Add padding for actions when focused */
+.chat-input-container.focused .chat-input-wrapper {
+  padding-bottom: 42px;
 }
 
 /* Agent tag inside input */
@@ -492,33 +500,44 @@
 }
 
 .chat-input-actions {
-  display: flex;
+  display: none; /* Hidden by default */
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  width: 100%;
+  gap: 2px;
+  width: calc(100% - 20px);
   overflow: visible; /* Allow tooltips to escape */
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  background: transparent;
+  z-index: 10;
+}
+
+/* Show actions only when input is focused */
+.chat-input-container.focused .chat-input-actions {
+  display: flex;
 }
 
 .chat-input-actions-left {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .chat-input-actions-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .chat-input-action-btn,
 .chat-input-send {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -532,13 +551,18 @@
 
 .chat-input-action-btn {
   position: relative;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.chat-input-action-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .chat-input-action-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .chat-input-action-btn:disabled {
@@ -549,7 +573,7 @@
 /* Focus-only helper icons - inline with other actions, will wrap to separate row */
 .focus-helper-icon-wrapper {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   animation: focusHelpersSlideIn 0.2s ease-out;
   overflow: visible;
 }
@@ -564,21 +588,18 @@
 /* Note: Snippet popover now uses fixed positioning set via inline styles */
 
 .focus-helper-icon {
-  background: rgba(139, 92, 246, 0.12) !important;
-  color: rgba(139, 92, 246, 0.9) !important;
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(139, 92, 246, 0.08) !important;
+  color: rgba(139, 92, 246, 0.7) !important;
+  border: none;
 }
 
 .focus-helper-icon:hover:not(:disabled) {
-  background: rgba(139, 92, 246, 0.25) !important;
-  color: rgba(139, 92, 246, 1) !important;
-  border-color: rgba(139, 92, 246, 0.4);
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
+  background: rgba(139, 92, 246, 0.15) !important;
+  color: rgba(139, 92, 246, 0.9) !important;
 }
 
 .focus-helper-icon:active:not(:disabled) {
-  transform: scale(0.95);
+  opacity: 0.8;
 }
 
 @keyframes focusHelpersSlideIn {

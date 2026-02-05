@@ -2,7 +2,7 @@
 // import { query } from '@anthropic-ai/claude-agent-sdk';
 import { invoke } from '@tauri-apps/api/core';
 import type { ClaudeEvent, MCPServer, StructuredOutputFormat, EffortLevel } from '../types';
-import { getModelId } from './modelService';
+import { getModelId, type ModelConfig } from './modelService';
 
 export interface ClaudeSDKOptions {
   model?: string;
@@ -20,6 +20,7 @@ export interface ClaudeSDKOptions {
   streamId?: string;
   outputFormat?: StructuredOutputFormat;
   effort?: EffortLevel;
+  remoteModels?: ModelConfig[]; // Remote model configs from Supabase for ID mapping
 }
 
 /**
@@ -249,9 +250,10 @@ export async function* streamClaudeMessage(
 
     // Build options object - SDK expects { prompt, options }
     // getModelId resolves friendly name to full API model ID via modelService
-    const modelId = getModelId(model);
+    // Pass remoteModels from options to enable Supabase-configured models
+    const modelId = getModelId(model, options.remoteModels);
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - Input: "${model}" → Mapped to: "${modelId}"`);
-    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - getModelId function returned:`, modelId);
+    console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - remoteModels available:`, options.remoteModels?.length ?? 'none');
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - typeof modelId:`, typeof modelId);
 
     const sdkOptions: any = {

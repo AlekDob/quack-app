@@ -6,6 +6,7 @@ import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
+import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
 import TodoProgressBar from './TodoProgressBar';
 import type { TodoItem } from './TodoProgressBar';
@@ -689,6 +690,17 @@ export default function ChatView({
         <TodoProgressBar todos={currentTodos} />
       )}
       <div className="chat-view-footer">
+        {/* Stamina bar as border-top replacement */}
+        <StaminaBarBorder
+          inputTokens={sessionTokens.inputTokens}
+          outputTokens={sessionTokens.outputTokens}
+          cacheCreationTokens={sessionTokens.cacheCreationTokens}
+          cacheReadTokens={sessionTokens.cacheReadTokens}
+          totalCost={sessionTokens.totalCost}
+          overhead={sessionTokens.overhead}
+          onCompact={onCompactConversation}
+          onClear={onClearConversation}
+        />
         <div className="chat-view-footer-controls">
           <ChatSettingsMenu
             model={model}
@@ -715,16 +727,6 @@ export default function ChatView({
                 <Brain size={16} />
             </button>
           )}
-          <TokenUsageIndicator
-            inputTokens={sessionTokens.inputTokens}
-            outputTokens={sessionTokens.outputTokens}
-            cacheCreationTokens={sessionTokens.cacheCreationTokens}
-            cacheReadTokens={sessionTokens.cacheReadTokens}
-            totalCost={sessionTokens.totalCost}
-            overhead={sessionTokens.overhead}
-            onCompact={onCompactConversation}
-            onClear={onClearConversation}
-          />
           {isLoading && onAbortStream && (
             <button
               className="chat-stop-btn"
