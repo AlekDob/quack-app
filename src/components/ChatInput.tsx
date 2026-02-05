@@ -22,6 +22,7 @@ import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
+import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import {
   compressImage,
   blobToBase64,
@@ -301,16 +302,37 @@ export default function ChatInput({
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
   }, []);
 
-  // Filter skills based on current @ mention (from agentToolkit)
+  // State for all available skills (loaded from project + global)
+  const [allAvailableSkills, setAllAvailableSkills] = useState<string[]>([]);
+
+  // Load all available skills when basePath changes or @ autocomplete opens
+  useEffect(() => {
+    if (!basePath) return;
+
+    const loadSkills = async () => {
+      try {
+        const skills = await loadAvailableSkills(basePath);
+        // Extract just the skill names
+        const skillNames = skills.map(s => s.name);
+        setAllAvailableSkills(skillNames);
+      } catch (err) {
+        console.error('[ChatInput] Failed to load skills:', err);
+      }
+    };
+
+    loadSkills();
+  }, [basePath]);
+
+  // Filter skills based on current @ mention (from all available skills)
   const filteredSkills = useMemo(() => {
-    if (!agentToolkit?.skills || !showAgentAutocomplete) return [];
+    if (!allAvailableSkills.length || !showAgentAutocomplete) return [];
 
     const filter = agentFilter.toLowerCase();
-    return agentToolkit.skills.filter(skill => {
+    return allAvailableSkills.filter(skill => {
       const name = skill.toLowerCase().replace(/-/g, ' ');
       return name.includes(filter);
     });
-  }, [agentToolkit?.skills, showAgentAutocomplete, agentFilter]);
+  }, [allAvailableSkills, showAgentAutocomplete, agentFilter]);
 
   // Filter agents based on current @ mention
   const filteredAgents = useMemo(() => {
