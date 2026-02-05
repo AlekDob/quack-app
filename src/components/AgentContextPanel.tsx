@@ -95,6 +95,12 @@ export default function AgentContextPanel({
           rules: activeAgentPersonality.rules,
           communicationStyle: activeAgentPersonality.communicationStyle || 'friendly',
           customNotes: activeAgentPersonality.customNotes,
+          // Claude Code rules (new simplified flow)
+          selectedRules: activeAgentPersonality.selectedRules,
+          // Selected skills (for proactive use)
+          selectedSkills: activeAgentPersonality.selectedSkills,
+          // Toolkit (skills, droids, commands for quick-access)
+          toolkit: activeAgentPersonality.toolkit,
           // Legacy fields (for backwards compatibility)
           intro: activeAgentPersonality.intro,
           personality: activeAgentPersonality.personality,

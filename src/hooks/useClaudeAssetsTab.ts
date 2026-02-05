@@ -16,7 +16,7 @@ interface UseClaudeAssetsTabParams {
 }
 
 interface UseClaudeAssetsTabReturn {
-  openClaudeAssetsTab: () => void;
+  openClaudeAssetsTab: (initialProjectPath?: string) => void;
   isClaudeAssetsTabOpen: boolean;
 }
 
@@ -33,20 +33,22 @@ export function useClaudeAssetsTab({
   );
   const isClaudeAssetsTabOpen = !!existingTabId;
 
-  // Open or focus the Claude Assets tab
-  const openClaudeAssetsTab = useCallback(() => {
+  // Open or focus the Claude Assets tab, optionally with a pre-selected project
+  const openClaudeAssetsTab = useCallback((initialProjectPath?: string) => {
     // If tab already exists, just focus it
+    // (note: we can't change the initialProjectPath after tab is created)
     if (existingTabId) {
       setActiveTabId(existingTabId);
       return;
     }
 
-    // Create new tab
+    // Create new tab with optional initialProjectPath
     const newTab: Tab = {
       id: `claude-assets-${Date.now()}`,
       label: 'Project Assets',
       type: 'claude-assets',
       closable: true,
+      initialProjectPath,
     };
 
     setTabs(prev => [...prev, newTab]);

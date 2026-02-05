@@ -111,7 +111,47 @@
   padding-left: 2px;
 }
 
-/* Proactive Skills - Compact chips */
+/* Preferred Skills Section */
+.personality-skills-section {
+  margin-bottom: 16px;
+}
+
+.skills-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.skills-header svg {
+  flex-shrink: 0;
+}
+
+.skills-title {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.skills-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.skill-chip-compact {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(247, 147, 30, 0.85);
+  background: rgba(247, 147, 30, 0.08);
+  border: 1px solid rgba(247, 147, 30, 0.15);
+  border-radius: 4px;
+}
+
+/* Legacy styles (keep for compatibility) */
 .personality-skills-compact {
   display: flex;
   flex-wrap: wrap;
@@ -132,18 +172,6 @@
 
 .skills-label svg {
   flex-shrink: 0;
-}
-
-.skill-chip-compact {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  font-size: 9px;
-  font-weight: 500;
-  color: rgba(247, 147, 30, 0.85);
-  background: rgba(247, 147, 30, 0.08);
-  border: 1px solid rgba(247, 147, 30, 0.15);
-  border-radius: 3px;
 }
 
 /* Technical Context - Subtle */

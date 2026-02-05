@@ -70,6 +70,7 @@ interface SortableRepositoryGroupProps {
   onCreateAgent?: (projectPath?: string) => void; // Create new agent, optionally with pre-selected project path
   onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
+  onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
   // Kanban tab props
   isKanbanTabActive?: boolean;
   onOpenKanbanTab?: () => void;
@@ -208,6 +209,7 @@ interface TerminalSidebarProps {
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
+  onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
   onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
   persistedProjects?: Map<string, string>; // Projects that persist even with 0 agents (path -> name)
   onCreateTask?: (terminal: TerminalInfo) => void; // Create Kanban task for this agent
@@ -257,6 +259,7 @@ export default function TerminalSidebar({
   onOpenTerminalWindow,
   gitRefreshTrigger,
   onOpenDashboard,
+  onOpenClaudeAssets,
   onRemoveProject,
   persistedProjects,
   onCreateTask,
@@ -817,6 +820,7 @@ export default function TerminalSidebar({
                     onCreateAgent={onCreateAgent}
                     onRemoveProject={onRemoveProject}
                     onOpenDashboard={onOpenDashboard}
+                    onOpenClaudeAssets={onOpenClaudeAssets}
                     isKanbanTabActive={isKanbanTabActive}
                     onOpenKanbanTab={onOpenKanbanTab}
                     chatLoadingMap={chatLoadingMap}

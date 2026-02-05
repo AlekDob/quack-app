@@ -988,7 +988,9 @@ export interface AgentTemplate {
   suggestedAvatar?: string;
   /** Gender hint for random name generation ('male' | 'female') */
   suggestedGender?: 'male' | 'female';
-  /** References to other plugins (skills, rules) to install alongside */
+  /** Skills to install and set as Preferred Skills for this agent */
+  skills?: string[];
+  /** @deprecated Use `skills` instead. Kept for backward compatibility */
   bundledPlugins?: string[];
 }
 

@@ -104,6 +104,10 @@ import {
   loadTabsByTerminalFromStorage,
   saveNativeTerminalsToStorage,
   loadNativeTerminalsFromStorage,
+  addActiveAgent,
+  removeActiveAgent,
+  migrateToActiveAgentsIndex,
+  loadActiveAgentsWithData,
   STORAGE_KEY,
   TABS_BY_TERMINAL_KEY,
   NATIVE_TERMINALS_STORAGE_KEY,
@@ -6732,6 +6736,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setTerminals((prev) => [...prev, createdWithState]);
       setActiveId(created.id);
 
+      // Add to active-agents.json index (file-based persistence)
+      void addActiveAgent(terminal.cwd, created.id);
+
       // Try to copy personality from original agent
       try {
         const originalPersonality = await invoke<AgentPersonality>('load_agent_personality', {
@@ -7080,6 +7087,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         next.set(projectPath, projectName);
         return next;
       });
+      // Add all new agents to active-agents.json index
+      for (const terminal of newTerminals) {
+        void addActiveAgent(projectPath, terminal.id);
+      }
     }
   }, [installAgentBundle]);
 
@@ -7376,6 +7387,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setActiveId(createdWithState.id);
         clearTerminalAttention(createdWithState.id);
 
+        // Add to active-agents.json index (file-based persistence)
+        void addActiveAgent(effectivePath, createdWithState.id);
+
         // Persist project in sidebar
         const projectPath = effectivePath;
         const projectName = projectPath.split('/').pop() || 'Unknown';
@@ -7537,6 +7551,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setActiveId(createdWithState.id);
       clearTerminalAttention(createdWithState.id);
 
+      // Add to active-agents.json index (file-based persistence)
+      void addActiveAgent(cwd, createdWithState.id);
+
       // Load directory
       await loadDirectory(createdWithState.cwd);
 
@@ -7670,10 +7687,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         visualIdleTimersRef.current.delete(id);
       }
 
+      // Get the terminal's project path before closing
+      const closingTerminal = terminals.find(t => t.id === id);
+      const projectPath = closingTerminal?.cwd;
+
       try {
         await invoke("close_terminal", { id });
       } catch (error) {
         console.error("Unable to close terminal", error);
+      }
+
+      // Remove from active-agents.json index
+      if (projectPath) {
+        void removeActiveAgent(projectPath, id);
       }
 
       let nextActive: string | null = activeId;
@@ -7710,6 +7736,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       clearTerminalAttention,
       loadDirectory,
       tauriAvailable,
+      terminals,
     ]
   );
 
@@ -9253,6 +9280,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           setTerminals((prev) => [...prev, terminalWithState]);
           targetTerminalId = terminalWithState.id;
           setActiveId(targetTerminalId);
+
+          // Add to active-agents.json index (file-based persistence)
+          if (command.cwd) {
+            void addActiveAgent(command.cwd, terminalWithState.id);
+          }
         }
 
         if (targetTerminalId) {
@@ -9901,6 +9933,9 @@ You have access to all Bash tools to execute git commands like:
       setActiveId(createdWithState.id);
       clearTerminalAttention(createdWithState.id);
 
+      // Add to active-agents.json index (file-based persistence)
+      void addActiveAgent(workingDirectory, createdWithState.id);
+
       // 6. Load conversation history into chat
       setChatSessions((prev) => {
         const updated = new Map(prev);
@@ -10221,6 +10256,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           onOpenDashboard={handleOpenProjectDashboard}
+          onOpenClaudeAssets={openClaudeAssetsTab}
           onRemoveProject={handleRemoveProject}
           persistedProjects={persistedProjects}
           // onCreateTask={handleCreateTaskFromAgent} // Temporarily hidden

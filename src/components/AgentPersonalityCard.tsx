@@ -266,9 +266,9 @@ export default function AgentPersonalityCard({
         if (skillNames.length === 0) return null;
 
         return (
-          <div className="personality-skills-compact">
-            <span className="skills-label">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="url(#skillGradientCard)" strokeWidth="2">
+          <div className="personality-skills-section">
+            <div className="skills-header">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="url(#skillGradientCard)" strokeWidth="2">
                 <defs>
                   <linearGradient id="skillGradientCard" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#f28c52" />
@@ -277,11 +277,13 @@ export default function AgentPersonalityCard({
                 </defs>
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
-              Skills
-            </span>
-            {skillNames.map((skill, index) => (
-              <span key={index} className="skill-chip-compact">{skill}</span>
-            ))}
+              <span className="skills-title">Preferred Skills</span>
+            </div>
+            <div className="skills-chips-row">
+              {skillNames.map((skill, index) => (
+                <span key={index} className="skill-chip-compact">{skill}</span>
+              ))}
+            </div>
           </div>
         );
       })()}

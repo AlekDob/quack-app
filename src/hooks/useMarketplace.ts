@@ -464,8 +464,9 @@ export function useMarketplace() {
     const installedRulePaths: string[] = [];
 
     try {
-      // Install bundled plugins (skills and rules)
-      if (template.bundledPlugins && template.bundledPlugins.length > 0) {
+      // Install bundled skills (new field) or legacy bundledPlugins
+      const bundledSkills = template.skills || template.bundledPlugins;
+      if (bundledSkills && bundledSkills.length > 0) {
         // Re-fetch marketplace.json to get plugin sources
         const fetchOpts: RequestInit = { cache: 'no-store' };
         const marketplaceRes = await fetch(MARKETPLACE_JSON_URL + cacheBust(), fetchOpts);
@@ -474,7 +475,7 @@ export function useMarketplace() {
         }
         const marketplace: MarketplaceJson = await marketplaceRes.json();
 
-        for (const pluginName of template.bundledPlugins) {
+        for (const pluginName of bundledSkills) {
           // Find the plugin in marketplace
           const pluginEntry = marketplace.plugins.find(p => p.name === pluginName);
           if (!pluginEntry) {

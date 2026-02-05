@@ -59,6 +59,7 @@ interface RepositoryGroupProps {
   onCreateAgent?: (projectPath: string) => void; // Create new agent associated with this project (passes project path)
   onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
+  onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
   // Kanban mode props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
@@ -1094,6 +1095,7 @@ export default function RepositoryGroup({
   onCreateAgent,
   onRemoveProject,
   onOpenDashboard,
+  onOpenClaudeAssets,
   isKanbanViewActive = false,
   onToggleKanbanView,
   chatLoadingMap,
@@ -1645,19 +1647,19 @@ export default function RepositoryGroup({
                 />
               </svg>
             </button>
-            {/* Project name - click to open dashboard */}
+            {/* Project name - click to open Claude Assets */}
             <span
               onClick={(e) => {
                 e.stopPropagation();
-                if (onOpenDashboard) {
-                  onOpenDashboard(repoPath, repoName);
+                if (onOpenClaudeAssets) {
+                  onOpenClaudeAssets(repoPath);
                 } else {
                   onToggle();
                 }
               }}
               style={{ cursor: "pointer" }}
               className="font-semibold text-sm text-white/90 hover:text-orange-400 transition-colors"
-              title="Open Project Dashboard"
+              title="Open Project Assets"
             >
               {displayName}
             </span>

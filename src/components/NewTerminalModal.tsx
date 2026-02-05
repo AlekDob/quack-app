@@ -9,9 +9,10 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import type { AgentPersonality, GitBranch, SavedAgent } from '../types';
+import type { AgentPersonality, GitBranch, SavedAgent, AgentTemplate, MarketplaceResource } from '../types';
 import AgentSelector from './AgentSelector';
 import { invoke } from '@tauri-apps/api/core';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   listCustomAvatars,
   deleteCustomAvatar,
@@ -464,6 +465,50 @@ function NewTerminalModal({
     setInlineEditingMode('create');
   }
 
+  // "Use" a marketplace template - pre-populate and show inline creation form
+  async function handleUseMarketplaceTemplate(template: AgentTemplate, _resource: MarketplaceResource) {
+    // Get skills from template (new field) or fallback to bundledPlugins (legacy)
+    const skills = template.skills || template.bundledPlugins || [];
+
+    // If there are skills to install, show confirmation dialog
+    if (skills.length > 0) {
+      const skillList = skills.map(s => `  • ${s}`).join('\n');
+      const message = `This template includes ${skills.length} ${skills.length === 1 ? 'skill' : 'skills'} that will be set as Preferred Skills:\n\n${skillList}\n\nProceed?`;
+
+      const confirmed = await ask(message, {
+        title: 'Install Skills',
+        kind: 'info',
+      });
+
+      if (!confirmed) {
+        return; // User cancelled
+      }
+    }
+
+    // Pre-populate from template
+    onNameChange(template.suggestedName);
+    onColorChange(template.suggestedColor);
+    onAvatarChange?.(template.suggestedAvatar || '');
+    onWorkingOnChange?.('');
+
+    const templatePersonality: Partial<AgentPersonality> = {
+      role: template.role,
+      communicationStyle: template.communicationStyle,
+      customNotes: template.customNotes || '',
+      // Set skills as Preferred Skills
+      selectedSkills: skills.length > 0 ? skills : undefined,
+    };
+    onPersonalityChange?.(templatePersonality);
+    setLocalPersonality(templatePersonality);
+
+    setIsEditingAgent(false);
+    setEditingAgentId(null);
+    setEditingAgentData(null);
+
+    // Show inline creation form (user can customize before confirming)
+    setInlineEditingMode('create');
+  }
+
   // Back to agent selection from inline editing
   function handleCancelInlineEdit() {
     setInlineEditingMode(null);
@@ -676,6 +721,7 @@ function NewTerminalModal({
               onUseAgent={handleUseAgent}
               onEditAgent={handleEditAgent}
               onCreateNew={handleCreateNewAgent}
+              onUseMarketplaceTemplate={handleUseMarketplaceTemplate}
               // Project path for loading skills
               projectPath={path}
               // Inline editing props

@@ -110,7 +110,7 @@ export function StepStarterBundles({
           {bundles.map((bundle) => {
             const isSelected = selectedIds.has(bundle.resource.id);
             const template = bundle.template;
-            const skillCount = template.bundledPlugins?.length || 0;
+            const skillCount = (template.skills || template.bundledPlugins)?.length || 0;
 
             return (
               <button
@@ -194,7 +194,7 @@ export function StepStarterBundles({
                     whiteSpace: 'nowrap',
                   }}>
                     {template.communicationStyle} style
-                    {skillCount > 0 && ` · ${skillCount} plugins`}
+                    {skillCount > 0 && ` · ${skillCount} ${skillCount === 1 ? 'skill' : 'skills'}`}
                   </div>
                 </div>
               </button>
