@@ -1,7 +1,7 @@
 /**
  * Step Progress Indicator - Compact Codex Style
  * Shows current step and completed steps in the agent creation flow
- * Project-first flow: project → agent → basics → rules → toolkit
+ * 2-step flow: project → agent
  */
 
 import type { StepProgressProps, ModalStep } from './types';
@@ -27,35 +27,12 @@ const StepIcons: Record<ModalStep, React.ReactNode> = {
       <line x1="16" y1="16" x2="16" y2="16" />
     </svg>
   ),
-  basics: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
-  ),
-  rules: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  ),
-  toolkit: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </svg>
-  ),
 };
 
-// Project-first 5-step flow: project → agent → basics → rules → toolkit
+// 2-step flow: project → agent
 const STEPS: Array<{ id: ModalStep; label: string }> = [
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agent' },
-  { id: 'basics', label: 'Basics' },
-  { id: 'rules', label: 'Rules' },
-  { id: 'toolkit', label: 'Toolkit' },
 ];
 
 export function StepProgress({ currentStep, completedSteps, isEditing }: StepProgressProps) {

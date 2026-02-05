@@ -11275,7 +11275,6 @@ You have access to all Bash tools to execute git commands like:
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
-          onOpenDroidFactory={() => setDroidFactoryOpen(true)}
           isOnboarding={terminals.length === 0 && !hasSavedAgents}
           onInstallStarterBundles={handleInstallStarterBundles}
         />

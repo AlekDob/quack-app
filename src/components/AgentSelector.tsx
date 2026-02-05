@@ -3,10 +3,11 @@
  *
  * Allows users to select from saved agents or create a new one.
  * Shows agent cards with avatars, names, and personalities.
+ * Includes inline editing/creation form when triggered.
  */
 
-import { useState, useMemo } from 'react';
-import type { SavedAgent } from '../types';
+import { useState, useMemo, useEffect } from 'react';
+import type { SavedAgent, AgentPersonality } from '../types';
 import {
   getSavedAgents,
   getRecentAgents,
@@ -14,24 +15,109 @@ import {
   searchAgents,
   deleteAgent
 } from '../utils/agentStorage';
-import { getAvatarUrl } from '../utils/agentAvatars';
+import { AVAILABLE_AVATARS, getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
+import type { CustomAvatarInfo } from '../utils/customAvatarStorage';
 import './AgentSelector.css';
+
+// Communication styles for personality
+const COMMUNICATION_STYLES = [
+  { id: 'professional', label: 'Professional', description: 'Formal and precise' },
+  { id: 'friendly', label: 'Friendly', description: 'Warm and approachable' },
+  { id: 'casual', label: 'Casual', description: 'Relaxed and informal' },
+  { id: 'technical', label: 'Technical', description: 'Highly detailed and technical' },
+  { id: 'sarcastic', label: 'Sarcastic', description: 'Witty and ironic' },
+];
 
 interface AgentSelectorProps {
   onUseAgent: (agent: SavedAgent) => void;
   onEditAgent: (agent: SavedAgent) => void;
   onCreateNew: () => void;
+  // New props for inline editing
+  editingMode?: 'create' | 'edit' | null;
+  editingAgent?: SavedAgent | null;
+  // Form state props
+  name?: string;
+  color?: string;
+  avatar?: string;
+  availableColors?: readonly string[];
+  customAvatars?: CustomAvatarInfo[];
+  customAvatarUrls?: Record<string, string>;
+  loadingAvatars?: boolean;
+  uploadingAvatar?: boolean;
+  uploadError?: string | null;
+  personality?: Partial<AgentPersonality>;
+  onNameChange?: (name: string) => void;
+  onColorChange?: (color: string) => void;
+  onAvatarChange?: (avatar: string) => void;
+  onPersonalityChange?: (personality: Partial<AgentPersonality>) => void;
+  onAvatarUpload?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onDeleteCustomAvatar?: (avatarId: string, event: React.MouseEvent) => void;
+  fileInputRef?: React.RefObject<HTMLInputElement | null>;
+  onConfirm?: () => void;
+  onCancelEdit?: () => void;
 }
 
 type SortMode = 'recent' | 'frequent' | 'alphabetical';
 
-export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps) {
+export default function AgentSelector({
+  onUseAgent,
+  onEditAgent,
+  onCreateNew,
+  // Inline editing props
+  editingMode,
+  editingAgent,
+  name = '',
+  color = '#FF6B35',
+  avatar = '',
+  availableColors = [],
+  customAvatars = [],
+  customAvatarUrls = {},
+  loadingAvatars = false,
+  uploadingAvatar = false,
+  uploadError = null,
+  personality = {},
+  onNameChange,
+  onColorChange,
+  onAvatarChange,
+  onPersonalityChange,
+  onAvatarUpload,
+  onDeleteCustomAvatar,
+  fileInputRef,
+  onConfirm,
+  onCancelEdit,
+}: AgentSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Force re-render after delete
+
+  // Randomize avatar order (memoized so it doesn't change on re-renders)
+  const randomizedAvatars = useMemo(() => {
+    const avatars = [...AVAILABLE_AVATARS];
+    // Fisher-Yates shuffle
+    for (let i = avatars.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [avatars[i], avatars[j]] = [avatars[j], avatars[i]];
+    }
+    return avatars;
+  }, []);
+
+  // Auto-select first avatar if none selected (only in editing mode)
+  useEffect(() => {
+    if (editingMode && (!avatar || avatar.trim() === '') && randomizedAvatars.length > 0) {
+      const firstAvatar = randomizedAvatars[0];
+      onAvatarChange?.(firstAvatar);
+    }
+  }, [editingMode, randomizedAvatars, avatar, onAvatarChange]);
+
+  const handlePersonalityFieldChange = (field: string, value: string) => {
+    onPersonalityChange?.({
+      ...personality,
+      [field]: value,
+    });
+  };
 
   // Get agents based on sort mode
   const agents = useMemo(() => {
@@ -92,6 +178,254 @@ export default function AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: 
     }
   };
 
+  // If in editing mode, show the edit/create form
+  if (editingMode) {
+    return (
+      <div className="agent-selector agent-selector-editing">
+        {/* Header */}
+        <div className="agent-selector-header">
+          <div className="agent-selector-title-section">
+            <h3 className="agent-selector-title">
+              {editingMode === 'create' ? 'Create New Agent' : `Edit ${editingAgent?.name || 'Agent'}`}
+            </h3>
+            <p className="agent-selector-subtitle">
+              Configure your agent&apos;s identity and personality
+            </p>
+          </div>
+        </div>
+
+        {/* Agent Name */}
+        <label className="modal-field">
+          <span className="field-label">Agent name</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => onNameChange?.(event.target.value)}
+            placeholder="e.g. API Server"
+            autoFocus
+          />
+        </label>
+
+        {/* Avatar Selection */}
+        <div className="modal-field">
+          <span className="field-label">Avatar</span>
+          <span className="field-hint">
+            {customAvatars.length > 0 ? 'Custom and default avatars' : 'Scroll for more avatars'}
+          </span>
+          {uploadError && (
+            <div className="avatar-upload-error">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              {uploadError}
+            </div>
+          )}
+          <div className="avatar-grid-container">
+            <div className="avatar-grid">
+              {/* Upload Button */}
+              <button
+                type="button"
+                className="avatar-upload-button"
+                onClick={() => fileInputRef?.current?.click()}
+                disabled={uploadingAvatar}
+                aria-label="Upload custom avatar"
+              >
+                {uploadingAvatar ? (
+                  <div className="avatar-upload-spinner">
+                    <svg className="spinner-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                    </svg>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="plus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span className="upload-label">Upload</span>
+                  </>
+                )}
+              </button>
+
+              {fileInputRef && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={onAvatarUpload}
+                  style={{ display: 'none' }}
+                />
+              )}
+
+              {/* Custom Avatars */}
+              {customAvatars.map((customAvatar) => (
+                <button
+                  key={customAvatar.id}
+                  type="button"
+                  className={`avatar-option custom-avatar ${avatar === customAvatar.id ? 'selected' : ''} ${!customAvatarUrls[customAvatar.id] && loadingAvatars ? 'loading' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (customAvatarUrls[customAvatar.id]) {
+                      onAvatarChange?.(customAvatar.id);
+                    }
+                  }}
+                  aria-label={`Select custom avatar ${customAvatar.originalName}`}
+                  disabled={!customAvatarUrls[customAvatar.id] && loadingAvatars}
+                >
+                  {customAvatarUrls[customAvatar.id] ? (
+                    <img
+                      src={customAvatarUrls[customAvatar.id]}
+                      alt={customAvatar.originalName}
+                      className="avatar-image"
+                    />
+                  ) : loadingAvatars ? (
+                    <div className="avatar-loading-spinner">
+                      <svg className="spinner-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" strokeWidth="3" />
+                      </svg>
+                    </div>
+                  ) : null}
+                  {customAvatarUrls[customAvatar.id] && onDeleteCustomAvatar && (
+                    <button
+                      type="button"
+                      className="avatar-delete-button"
+                      onClick={(e) => onDeleteCustomAvatar(customAvatar.id, e)}
+                      aria-label="Delete custom avatar"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  )}
+                </button>
+              ))}
+
+              {/* Default Avatars - Randomized Order */}
+              {randomizedAvatars.map((avatarName) => (
+                <button
+                  key={avatarName}
+                  type="button"
+                  className={`avatar-option ${avatar === avatarName ? 'selected' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAvatarChange?.(avatarName);
+                  }}
+                  aria-label={`Select ${avatarName} avatar`}
+                >
+                  <img
+                    src={getAvatarUrl(avatarName)}
+                    alt={avatarName}
+                    className="avatar-image"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Color Selection */}
+        <div className="modal-field">
+          <span className="field-label">Agent color</span>
+          <div className="modal-color-grid">
+            {availableColors.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`modal-color-swatch ${preset === color ? 'selected' : ''}`}
+                style={{ backgroundColor: preset }}
+                onClick={() => onColorChange?.(preset)}
+                aria-label={`Select color ${preset}`}
+              />
+            ))}
+            <label className="modal-color-picker">
+              <input
+                type="color"
+                value={color}
+                onChange={(event) => onColorChange?.(event.target.value)}
+                aria-label="Choose a custom color"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="modal-section-divider" />
+
+        {/* Personality Configuration */}
+        <div className="personality-section">
+          <h3 className="personality-section-title">Agent Personality</h3>
+
+          {/* Role/Mission */}
+          <label className="modal-field personality-field">
+            <span className="field-label">Role / Mission</span>
+            <input
+              type="text"
+              value={personality.role || ''}
+              onChange={(e) => handlePersonalityFieldChange('role', e.target.value)}
+              placeholder="e.g. Feature Coordinator, Frontend Developer, API Architect..."
+              className="personality-input"
+            />
+          </label>
+
+          {/* Communication Style */}
+          <div className="modal-field personality-field">
+            <span className="field-label">Communication Style</span>
+            <div className="communication-styles-grid">
+              {COMMUNICATION_STYLES.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  className={`communication-style-option ${personality.communicationStyle === style.id ? 'selected' : ''}`}
+                  onClick={() => handlePersonalityFieldChange('communicationStyle', style.id)}
+                >
+                  <span className="style-label">{style.label}</span>
+                  <span className="style-description">{style.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Notes */}
+          <label className="modal-field personality-field">
+            <span className="field-label">Custom Notes</span>
+            <span className="field-hint">Additional instructions for this agent</span>
+            <textarea
+              value={personality.customNotes || ''}
+              onChange={(e) => handlePersonalityFieldChange('customNotes', e.target.value)}
+              placeholder="Any special instructions, preferences, or guidelines..."
+              rows={5}
+              className="personality-textarea"
+            />
+          </label>
+        </div>
+
+        {/* Actions - Create or Save */}
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={onCancelEdit}>
+            Back
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={onConfirm}
+            disabled={!name.trim()}
+          >
+            {editingMode === 'create' ? 'Create' : 'Save'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal agent selector view
   return (
     <div className="agent-selector">
       {/* Header */}

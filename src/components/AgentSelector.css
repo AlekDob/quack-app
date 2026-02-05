@@ -8,6 +8,49 @@
   overflow: hidden;
 }
 
+/* Editing mode - allow scrolling */
+.agent-selector.agent-selector-editing {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.agent-selector-editing::-webkit-scrollbar {
+  width: 6px;
+}
+
+.agent-selector-editing::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.agent-selector-editing::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.agent-selector-editing::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Inline editing avatar grid - compact, 7 columns */
+.agent-selector-editing .avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.agent-selector-editing .avatar-option,
+.agent-selector-editing .avatar-upload-button {
+  width: 68px;
+  height: 68px;
+}
+
+.agent-selector-editing .avatar-grid-container {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 /* Header */
 .agent-selector-header {
   display: flex;
