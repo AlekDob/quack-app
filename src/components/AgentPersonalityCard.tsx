@@ -243,6 +243,49 @@ export default function AgentPersonalityCard({
         </div>
       )}
 
+      {/* Proactive Skills - chip display */}
+      {/* Use selectedSkills if available, otherwise extract from legacy skills field */}
+      {(() => {
+        let skillNames: string[] = [];
+
+        if (personality.selectedSkills && personality.selectedSkills.length > 0) {
+          skillNames = personality.selectedSkills;
+        } else if (personality.skills && personality.skills.length > 0) {
+          // Extract skill names from legacy format: "/path/to/skill-name/SKILL.md | WHEN: ..."
+          skillNames = personality.skills.map(s => {
+            // Extract the folder name before /SKILL.md or .md
+            const match = s.match(/\/([^/]+)(?:\/SKILL)?\.md/i);
+            if (match) return match[1];
+            // Fallback: just use the last path segment
+            const parts = s.split('/');
+            const last = parts[parts.length - 1];
+            return last.replace(/\.md$/i, '').replace(/\/SKILL$/i, '');
+          });
+        }
+
+        if (skillNames.length === 0) return null;
+
+        return (
+          <div className="personality-skills-compact">
+            <span className="skills-label">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="url(#skillGradientCard)" strokeWidth="2">
+                <defs>
+                  <linearGradient id="skillGradientCard" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#f28c52" />
+                    <stop offset="100%" stopColor="#e67339" />
+                  </linearGradient>
+                </defs>
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              Skills
+            </span>
+            {skillNames.map((skill, index) => (
+              <span key={index} className="skill-chip-compact">{skill}</span>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Technical Context - inline without section title */}
       {personality.technicalContext && (
         <div className="personality-context">

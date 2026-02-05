@@ -1544,6 +1544,38 @@ function AppContent() {
     previousActiveIdRef.current = activeId;
   }, [activeId]); // Only depend on activeId change
 
+  // 🎯 Load personality from Rust when activeId changes (for AgentPersonalityCard)
+  // This ensures selectedSkills and other fields are loaded from filesystem
+  useEffect(() => {
+    if (!activeId) return;
+
+    const activeTerminal = terminals.find(t => t.id === activeId);
+    if (!activeTerminal?.cwd) return;
+
+    // Load personality from Rust in background
+    const loadPersonality = async () => {
+      try {
+        const personality = await invoke<AgentPersonality>('load_agent_personality', {
+          projectPath: activeTerminal.cwd,
+          personalityId: activeTerminal.id,
+        });
+
+        // Update terminal state with loaded personality (merging with existing)
+        setTerminals(prev => prev.map(t =>
+          t.id === activeId
+            ? { ...t, personality: { ...t.personality, ...personality } }
+            : t
+        ));
+        console.log('✅ Loaded personality for active agent:', activeTerminal.label, 'skills:', personality.selectedSkills);
+      } catch (error) {
+        // No personality found - that's fine, use existing state
+        console.log('No personality found for:', activeTerminal.label);
+      }
+    };
+
+    loadPersonality();
+  }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 🦆 Ref to sendMessageForAgent function (to avoid circular dependency)
   const sendMessageForAgentRef = useRef<((content: string, options?: ChatSendOptions) => Promise<void>) | null>(null);
 
@@ -6485,33 +6517,39 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalAvatar(activeTerminal.avatar || ""); // Use empty string as fallback
     setNewTerminalError(null);
 
-    // Load personality from terminal state
-    if (activeTerminal.personality && Object.keys(activeTerminal.personality).length > 0) {
+    // ALWAYS try to load personality from Rust first (has most recent data from filesystem)
+    // This ensures selectedSkills and other fields are loaded correctly even after app restart
+    try {
+      const personality = await invoke<AgentPersonality>('load_agent_personality', {
+        projectPath: activeTerminal.cwd,
+        personalityId: activeTerminal.id,
+      });
       setNewTerminalPersonality({
         technicalContext: '',
         rules: [],
         customNotes: '',
-        ...activeTerminal.personality,
+        ...personality,
       });
-      console.log('✅ Loaded personality from state for:', activeTerminal.label);
-    } else {
-      // Try to load from Rust as fallback
-      try {
-        const personality = await invoke<AgentPersonality>('load_agent_personality', {
-          projectPath: activeTerminal.cwd,
-          personalityId: activeTerminal.id,
-        });
+      console.log('✅ Loaded personality from Rust for:', activeTerminal.label, 'skills:', personality.selectedSkills);
+
+      // Also update terminal state with loaded personality (for AgentPersonalityCard)
+      setTerminals(prev => prev.map(t =>
+        t.id === activeTerminal.id
+          ? { ...t, personality: { ...t.personality, ...personality } }
+          : t
+      ));
+    } catch (error) {
+      // No personality found in Rust - use terminal state or default
+      console.log('No personality found in Rust, using state/default for:', activeTerminal.label);
+      if (activeTerminal.personality && Object.keys(activeTerminal.personality).length > 0) {
         setNewTerminalPersonality({
           technicalContext: '',
           rules: [],
           customNotes: '',
-          ...personality,
+          ...activeTerminal.personality,
         });
-        console.log('✅ Loaded personality from Rust for:', activeTerminal.label);
-      } catch (error) {
-        // No personality found - use current personality or default
-        console.log('No existing personality found, using current or default');
-        setNewTerminalPersonality(activeTerminal.personality || {
+      } else {
+        setNewTerminalPersonality({
           role: 'Feature Coordinator',
           intro: 'Experienced PM specializing in feature delivery and team coordination',
           communicationStyle: 'friendly',

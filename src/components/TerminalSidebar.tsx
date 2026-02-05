@@ -980,7 +980,7 @@ export default function TerminalSidebar({
           className={`sidebar-footer-version ${import.meta.env.DEV ? 'sidebar-footer-version-dev' : 'sidebar-footer-version-prod'}`}
           title={`Version ${appVersion}${import.meta.env.DEV ? ' (DEV)' : ''}`}
         >
-          v{appVersion}
+          {appVersion.startsWith('v') ? appVersion : `v${appVersion}`}
           {import.meta.env.DEV && <span className="sidebar-footer-dev">DEV</span>}
           {updateAvailable && latestRelease && (
             <span className="sidebar-footer-update" title={`Update to ${latestRelease.tag_name}`}>
