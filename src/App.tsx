@@ -606,9 +606,9 @@ function AppContent() {
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
   const [quackSoundEnabled, setQuackSoundEnabled] = useState(() => {
-    // Load from localStorage, default to true
+    // Default to true (sound ON by default)
     const stored = localStorage.getItem('quackSoundEnabled');
-    return stored === null ? true : stored === 'true';
+    return stored !== 'false';
   });
   const [booting, setBooting] = useState(true);
   // Splash is now handled by native HTML splash in index.html only
@@ -622,6 +622,37 @@ function AppContent() {
   useEffect(() => {
     getCurrentVersion().then(version => setIntroVersion(`v${version}`));
   }, []);
+
+  // Load quack sound setting from Tauri Store and listen for changes
+  useEffect(() => {
+    const loadSoundSetting = async () => {
+      try {
+        const store = await Store.load('.quack-ui-prefs.dat');
+        const sound = await store.get<boolean>('quack-sound-enabled');
+        // Only enable if explicitly set to true (opt-in)
+        const enabled = sound === true;
+        setQuackSoundEnabled(enabled);
+        // Sync localStorage with Tauri Store
+        localStorage.setItem('quackSoundEnabled', String(enabled));
+      } catch (err) {
+        console.warn('Failed to load quack sound setting:', err);
+      }
+    };
+    loadSoundSetting();
+
+    const handleSoundSettingChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ enabled: boolean }>;
+      setQuackSoundEnabled(customEvent.detail.enabled);
+      // Sync localStorage with custom event
+      localStorage.setItem('quackSoundEnabled', String(customEvent.detail.enabled));
+    };
+
+    window.addEventListener('quack-sound-setting-changed', handleSoundSettingChange);
+    return () => {
+      window.removeEventListener('quack-sound-setting-changed', handleSoundSettingChange);
+    };
+  }, []);
+
   const [previewFile, setPreviewFile] = useState<{
     name: string;
     path: string;
@@ -3798,12 +3829,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Grid columns: Always show left sidebar (360px), Kanban replaces main content area
   // Right side panel can be toggled in both normal and Kanban mode
   // In Kanban mode: default collapsed unless kanbanSidePanelExpanded is true (user clicked on project)
+  // When no agents/projects: hide sidebar completely (empty state)
+  const showSidebar = terminals.length > 0 || persistedProjects.size > 0;
   const shouldShowSidePanel = isKanbanTabActive
     ? kanbanSidePanelExpanded && !sidePanelCollapsed
     : !sidePanelCollapsed;
-  const gridTemplateColumns = shouldShowSidePanel
-    ? "360px minmax(0, 1fr) 420px"
-    : "360px minmax(0, 1fr) 0px";
+
+  // When no agents, use 0px for sidebar column to completely hide it
+  const gridTemplateColumns = !showSidebar
+    ? "0px minmax(0, 1fr) 0px"  // Empty state: full width center
+    : shouldShowSidePanel
+      ? "360px minmax(0, 1fr) 420px"
+      : "360px minmax(0, 1fr) 0px";
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -9999,41 +10036,12 @@ You have access to all Bash tools to execute git commands like:
 
   // Splash screen removed - app loads directly with smooth CSS transition
   // The #root element in index.html has a smooth reveal animation
+  // The HTML duck parade loader (#app-loader) stays visible until agents load
 
-  // Show minimal loader while app is booting
+  // While booting, render nothing - the HTML loader (#app-loader) is already visible
+  // This prevents flickering caused by showing a React spinner on top of the HTML loader
   if (booting) {
-    return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#0a0a0c',
-      }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '16px',
-        }}>
-          {/* Minimal loading spinner */}
-          <div style={{
-            width: '24px',
-            height: '24px',
-            border: '2px solid rgba(242, 140, 82, 0.2)',
-            borderTopColor: '#f28c52',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-          <style>{`
-            @keyframes spin {
-              to { transform: rotate(360deg); }
-            }
-          `}</style>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (!tauriAvailable) {
@@ -10070,8 +10078,9 @@ You have access to all Bash tools to execute git commands like:
 
       {/* Drag region removed - now using data-tauri-drag-region on sidebar-header only */}
 
-      {/* 🔐 Claude Auth Banner - Fixed at bottom when CLI not available */}
-      {claudeCliAvailable === false && !claudeAuthBannerDismissed && (
+      {/* 🔐 Claude Auth Banner - Disabled for now */}
+      {/* TODO: Re-enable when auth flow is properly implemented */}
+      {false && showSidebar && claudeCliAvailable === false && !claudeAuthBannerDismissed && (
         <ClaudeAuthBanner
           onOpenSettings={() => {
             setShowSettings(true);
@@ -10096,10 +10105,11 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents sidebar-hidden' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
-        <TerminalSidebar
+        {/* Hide sidebar when no projects/agents */}
+        {(terminals.length > 0 || persistedProjects.size > 0) && <TerminalSidebar
           terminals={terminals}
           activeId={activeId}
           creating={creatingTerminal}
@@ -10176,7 +10186,7 @@ You have access to all Bash tools to execute git commands like:
           activeSessionId={activeSessionId ?? undefined}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
-        />
+        />}
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
         <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') ? 'full-width-tab' : ''}`}>
@@ -10253,60 +10263,176 @@ You have access to all Bash tools to execute git commands like:
                   </div>
                 </div>
               ) : (
-                /* Empty state with Open Guide button */
-                <>
-                  {/* Open Guide Button - centered */}
+                /* Empty state with ASCII duck - Codex-style centered layout */
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '24px',
+                  textAlign: 'center',
+                }}>
+                  {/* ASCII Duck with morphing animation */}
+                  <div className="empty-state-duck">
+                    <span className="duck-frame">{'>°)>'}</span>
+                    <span className="duck-frame">{'>^)>'}</span>
+                    <span className="duck-frame">{'>·)>'}</span>
+                    <span className="duck-frame">{'>~)>'}</span>
+                    <span className="duck-frame">{'>´)>'}</span>
+                  </div>
+
+                  {/* Tagline */}
+                  <p style={{
+                    fontSize: '14px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    margin: 0,
+                    fontWeight: 400,
+                  }}>
+                    What will you build today?
+                  </p>
+
+                  {/* Primary action: New Project */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenNewTerminalModal()}
+                    style={{
+                      padding: '12px 24px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #f28c52, #e67339)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 16px rgba(242, 140, 82, 0.35)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(242, 140, 82, 0.45)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(242, 140, 82, 0.35)';
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    New project
+                  </button>
+
+                  {/* Secondary links - horizontal layout */}
                   <div style={{
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    gap: '16px',
+                    gap: '20px',
+                    marginTop: '8px',
                   }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '14px' }}>
-                      No agents yet
-                    </span>
+                    {/* Open Guide */}
                     <button
                       type="button"
                       onClick={() => setEmptyStateShowGuide(true)}
                       style={{
-                        padding: '12px 24px',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        borderRadius: '8px',
-                        border: '1px solid rgba(242, 140, 82, 0.4)',
-                        background: 'rgba(18, 18, 22, 0.85)',
-                        backdropFilter: 'blur(12px)',
-                        color: '#f28c52',
+                        padding: '0',
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'rgba(255, 255, 255, 0.4)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s ease',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                        gap: '5px',
+                        transition: 'color 0.15s ease',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(242, 140, 82, 0.15)';
-                        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.6)';
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(242, 140, 82, 0.2)';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(18, 18, 22, 0.85)';
-                        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.4)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)';
                       }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
                         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
                       </svg>
-                      Open Guide
+                      Guide
+                    </button>
+
+                    <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>·</span>
+
+                    {/* Discord */}
+                    <button
+                      type="button"
+                      onClick={() => window.open('https://discord.gg/wUnTXGPvUt', '_blank')}
+                      style={{
+                        padding: '0',
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)';
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                      </svg>
+                      Discord
+                    </button>
+
+                    <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>·</span>
+
+                    {/* Email */}
+                    <button
+                      type="button"
+                      onClick={() => window.open('mailto:quack@quack.build', '_blank')}
+                      style={{
+                        padding: '0',
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)';
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2"/>
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                      </svg>
+                      Contact
                     </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           ) : (

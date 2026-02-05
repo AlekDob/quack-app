@@ -396,6 +396,53 @@ fn find_system_node_executable() -> Option<PathBuf> {
             }
         }
 
+        // 🎯 PRIORITY 6: Check fnm installations
+        // fnm stores versions in ~/.local/share/fnm/node-versions/ or ~/.fnm/node-versions/
+        let fnm_dirs = vec![
+            home.join(".local/share/fnm/node-versions"),
+            home.join(".fnm/node-versions"),
+        ];
+
+        for fnm_dir in fnm_dirs {
+            if fnm_dir.exists() {
+                log::info!("[Node.js] Found fnm directory at: {:?}, scanning versions...", fnm_dir);
+                if let Ok(entries) = fs::read_dir(&fnm_dir) {
+                    // Get all version directories
+                    let mut versions: Vec<_> = entries
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().is_dir())
+                        .collect();
+
+                    // Sort by version number (extract from dir name like "v20.18.0")
+                    versions.sort_by(|a, b| {
+                        let a_ver = a.file_name().to_string_lossy()
+                            .trim_start_matches('v')
+                            .split('.')
+                            .next()
+                            .and_then(|s| s.parse::<u32>().ok())
+                            .unwrap_or(0);
+                        let b_ver = b.file_name().to_string_lossy()
+                            .trim_start_matches('v')
+                            .split('.')
+                            .next()
+                            .and_then(|s| s.parse::<u32>().ok())
+                            .unwrap_or(0);
+                        b_ver.cmp(&a_ver) // Descending order (latest first)
+                    });
+
+                    // Try each version, latest first, but only compatible ones
+                    for entry in versions {
+                        // fnm uses installation/bin/node inside each version dir
+                        let node_path = entry.path().join("installation/bin/node");
+                        if node_path.exists() && is_node_version_compatible(&node_path) {
+                            log::info!("[Node.js] ✅ Found fnm version: {:?}", node_path);
+                            return Some(node_path);
+                        }
+                    }
+                }
+            }
+        }
+
         // Check user-specific paths
         let user_paths = vec![
             home.join(".local/bin/node"),
@@ -411,7 +458,7 @@ fn find_system_node_executable() -> Option<PathBuf> {
     }
 
     log::warn!("[Node.js] ❌ System Node.js executable not found in any common location");
-    log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, user directories");
+    log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, fnm, user directories");
     log::warn!("[Node.js] Minimum required version: Node.js {}", MIN_NODE_VERSION);
     None
 }

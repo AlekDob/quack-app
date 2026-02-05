@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { Store } from '@tauri-apps/plugin-store';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
 import { useSettingsStore } from '../../../stores/settingsStore';
-import StorageMetrics from '../../StorageMetrics';
 
 export default function GeneralSettings() {
-  const [performanceMonitor, setPerformanceMonitor] = useState(false);
-  const [loading, setLoading] = useState(false);
-
   // PiP and Quack Sound settings
   const [pipEnabled, setPipEnabled] = useState(false);
   const [quackSoundEnabled, setQuackSoundEnabled] = useState(true);
@@ -44,18 +39,8 @@ export default function GeneralSettings() {
   };
 
   useEffect(() => {
-    loadPreferences();
     loadUiPreferences();
   }, []);
-
-  const loadPreferences = async () => {
-    try {
-      const prefs = await invoke<{ show_performance_monitor: boolean }>('get_preferences');
-      setPerformanceMonitor(prefs.show_performance_monitor);
-    } catch (err) {
-      console.error('Failed to load general preferences:', err);
-    }
-  };
 
   const loadUiPreferences = async () => {
     try {
@@ -63,7 +48,8 @@ export default function GeneralSettings() {
       const pip = await store.get<boolean>('pip-enabled');
       const sound = await store.get<boolean>('quack-sound-enabled');
       if (pip !== null && pip !== undefined) setPipEnabled(pip);
-      if (sound !== null && sound !== undefined) setQuackSoundEnabled(sound);
+      // Sound defaults to true, only set to false if explicitly saved as false
+      setQuackSoundEnabled(sound !== false);
     } catch (err) {
       console.error('Failed to load UI preferences:', err);
     }
@@ -95,38 +81,8 @@ export default function GeneralSettings() {
     }
   };
 
-  const handleTogglePerformanceMonitor = async (enabled: boolean) => {
-    setLoading(true);
-    try {
-      await invoke('toggle_performance_monitor');
-      setPerformanceMonitor(enabled);
-    } catch (err) {
-      console.error('Failed to toggle performance monitor:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="settings-category">
-      <SectionHeader
-        title="Performance"
-        description="Monitor and optimize app performance"
-      />
-      <div className="settings-group">
-        <SettingsRow
-          label="Performance Monitor"
-          description="Show real-time performance metrics overlay"
-          control={
-            <IOSSwitch
-              checked={performanceMonitor}
-              onChange={handleTogglePerformanceMonitor}
-              disabled={loading}
-            />
-          }
-        />
-      </div>
-
       <SectionHeader
         title="Chat Experience"
         description="Customize your AI chat experience"
@@ -253,30 +209,6 @@ export default function GeneralSettings() {
         />
       </div>
 
-      <SectionHeader
-        title="Application"
-        description="General application settings"
-      />
-      <div className="settings-group">
-        <SettingsRow
-          label="Launch on Startup"
-          description="Automatically start Quack when you log in"
-          control={<IOSSwitch checked={false} onChange={() => {}} disabled />}
-        />
-        <SettingsRow
-          label="Auto-save Sessions"
-          description="Automatically save terminal sessions and restore them on restart"
-          control={<IOSSwitch checked={true} onChange={() => {}} disabled />}
-        />
-      </div>
-
-      <SectionHeader
-        title="Storage"
-        description="Manage session storage and cleanup"
-      />
-      <div className="settings-group">
-        <StorageMetrics />
-      </div>
     </div>
   );
 }

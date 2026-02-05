@@ -217,10 +217,10 @@ export default function SkillsPanel({
                         draggable
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
-                        {/* Lightning Icon */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(242, 140, 82, 0.15)" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth="2">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        {/* Star Icon - Orange gradient background with white icon (matches AddonsDrawer) */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f28c52, #e67339)' }}>
+                          <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
+                            <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
                           </svg>
                         </div>
 
@@ -271,10 +271,10 @@ export default function SkillsPanel({
                         draggable
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
-                        {/* Lightning Icon */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(242, 140, 82, 0.15)" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth="2">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        {/* Star Icon - Orange gradient background with white icon (matches AddonsDrawer) */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f28c52, #e67339)' }}>
+                          <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
+                            <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
                           </svg>
                         </div>
 

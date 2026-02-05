@@ -92,7 +92,7 @@ export function SlashCommandAutocomplete({
                 </span>
               )}
               {command.parameters && command.parameters.length > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ background: 'rgba(242, 140, 82, 0.2)', color: '#f28c52' }}>
+                <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ background: 'rgba(244, 114, 182, 0.15)', color: '#f472b6' }}>
                   {command.parameters.length} param{command.parameters.length > 1 ? 's' : ''}
                 </span>
               )}

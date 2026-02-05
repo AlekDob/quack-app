@@ -4,7 +4,6 @@ import type { AgentDetails } from "../types";
 import MarkdownText from "./MarkdownText";
 import CodeEditorCodeMirror from "./CodeEditorCodeMirror";
 import RevealInFinderButton from "./RevealInFinderButton";
-import { AgentAvatar } from "./AgentAvatar";
 import "./AgentViewer.css";
 
 interface AgentViewerProps {
@@ -44,6 +43,16 @@ const getShortModelName = (model: string): string => {
 
 // Icon components
 const icons: Record<string, ReactNode> = {
+  // Robot icon for Droids - matching AddonsDrawer
+  droid: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <circle cx="12" cy="5" r="2" />
+      <path d="M12 7v4" />
+      <line x1="8" y1="16" x2="8" y2="16" />
+      <line x1="16" y1="16" x2="16" y2="16" />
+    </svg>
+  ),
   edit: (
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path
@@ -318,33 +327,21 @@ export default function AgentViewer({
     <div className="agent-viewer">
       {!isEditing && agent ? (
         <>
-          {/* Header with avatar and metadata */}
+          {/* Header Section - Compact like other viewers */}
           <div className="agent-viewer-header">
-            <div className="agent-viewer-avatar-section">
-              <AgentAvatar
-                agentName={agent.name}
-                avatarFilename={agent.avatar}
-                alt={agent.name}
-                className="agent-viewer-avatar"
-              />
+            {/* Droid Icon - Solid gradient background with white icon */}
+            <div className="agent-viewer-icon">
+              {icons.droid}
             </div>
 
             <div className="agent-viewer-info">
-              <div className="agent-viewer-title-row">
-                <span
-                  className="agent-viewer-badge"
-                  style={{
-                    backgroundColor: getAgentColor(agent.color),
-                  }}
-                />
-                <h1 className="agent-viewer-title">{agent.name.replace(/-/g, " ")}</h1>
-              </div>
-
+              <h3 className="agent-viewer-title">{agent.name.replace(/-/g, " ")}</h3>
               <div className="agent-viewer-meta">
-                <span className="agent-viewer-model">Model: {getModelDisplayName(agent.model)}</span>
                 <span className="agent-viewer-scope">
-                  {agentScope === 'global' ? 'Global' : 'Project'}
+                  {agentScope === 'global' ? 'global' : 'project'}
                 </span>
+                <span className="agent-viewer-model">{getModelDisplayName(agent.model)}</span>
+                <span>{agent.description}</span>
               </div>
             </div>
 
@@ -367,16 +364,18 @@ export default function AgentViewer({
               >
                 {icons.delete}
               </button>
+              <RevealInFinderButton path={agent.file_path} iconOnly />
             </div>
           </div>
 
-          {/* Markdown Content */}
+          {/* Content Section */}
           <div className="agent-viewer-content">
-            <MarkdownText>
-              {agent.description
-                ? `**${agent.description}**\n\n${agent.content}`
-                : agent.content}
-            </MarkdownText>
+            <div className="agent-viewer-content-inner">
+              {/* Agent content (markdown) */}
+              <div className="agent-viewer-markdown">
+                <MarkdownText>{agent.content}</MarkdownText>
+              </div>
+            </div>
           </div>
 
           {/* Footer with file path */}

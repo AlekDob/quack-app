@@ -72,166 +72,40 @@ export function StepProjectSelection({
     return `.../${parts.slice(-2).join('/')}`;
   };
 
+  // Separator component
+  const Separator = () => (
+    <div style={{
+      height: '1px',
+      background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent)',
+      margin: '12px 0'
+    }} />
+  );
+
+  // Section title component
+  const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+    <h4 style={{
+      fontSize: '10px',
+      fontWeight: '600',
+      color: 'rgba(255, 255, 255, 0.45)',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      margin: '0 0 8px 0'
+    }}>
+      {children}
+    </h4>
+  );
+
   return (
     <>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: 'rgba(255, 255, 255, 0.95)',
-          margin: '0 0 8px 0'
-        }}>
-          Select a project
-        </h3>
-        <p style={{
-          fontSize: '14px',
-          color: 'rgba(255, 255, 255, 0.6)',
-          margin: 0
-        }}>
-          Choose an existing project or browse for a new one
-        </p>
-      </div>
-
-      {/* Active Projects Grid */}
-      {activeProjects.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '12px',
-          marginBottom: '20px'
-        }}>
-          {activeProjects.map((project) => {
-            const isSelected = selectedPath === project.path;
-            return (
-              <button
-                key={project.path}
-                type="button"
-                onClick={() => onSelectProject(project.path, project.color)}
-                style={{
-                  position: 'relative',
-                  padding: '16px',
-                  background: isSelected
-                    ? 'rgba(255, 107, 53, 0.15)'
-                    : 'rgba(255, 255, 255, 0.03)',
-                  border: isSelected
-                    ? '2px solid #FF6B35'
-                    : '2px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  textAlign: 'left',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-              >
-                {/* Checkmark for selected */}
-                {isSelected && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    width: '20px',
-                    height: '20px',
-                    background: '#FF6B35',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </div>
-                )}
-
-                {/* Project Name + Color Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: project.color,
-                    flexShrink: 0,
-                    boxShadow: `0 0 8px ${project.color}40`
-                  }} />
-                  <div style={{
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    color: 'rgba(255, 255, 255, 0.95)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {project.name}
-                  </div>
-                </div>
-
-                {/* Path (truncated) */}
-                <div style={{
-                  fontSize: '12px',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontFamily: "'Fira Code', 'Monaco', monospace",
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }} title={project.path}>
-                  {truncatePath(project.path)}
-                </div>
-
-                {/* Agent Count Badge */}
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  background: 'rgba(0, 217, 255, 0.1)',
-                  border: '1px solid rgba(0, 217, 255, 0.2)',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  color: '#00D9FF',
-                  alignSelf: 'flex-start'
-                }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                  </svg>
-                  {project.agentCount} {project.agentCount === 1 ? 'agent' : 'agents'}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Browse for New Project Button */}
+      {/* Section 1: Browse for new project - always first */}
+      <SectionTitle>Create a new project</SectionTitle>
       <button
         type="button"
         className="directory-chooser"
         onClick={onBrowse}
         disabled={selectingDirectory}
-        style={{
-          width: '100%',
-          marginBottom: selectedPath ? '24px' : '0'
-        }}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
         {selectingDirectory ? 'Opening Finder...' : 'Browse for new project'}
@@ -239,11 +113,146 @@ export function StepProjectSelection({
 
       {/* Show selected path if browsed (not from active projects) */}
       {selectedPath && !activeProjects.some(p => p.path === selectedPath) && (
-        <div className="modal-field" style={{ marginBottom: '24px' }}>
-          <span className="field-label">Selected directory</span>
-          <div className="modal-selected-path">{selectedPath}</div>
+        <div className="modal-field" style={{ marginTop: '8px' }}>
+          <span className="field-label" style={{ fontSize: '10px' }}>Selected directory</span>
+          <div className="modal-selected-path" style={{ fontSize: '10px', padding: '6px 10px' }}>{selectedPath}</div>
         </div>
       )}
+
+      {/* Separator between browse and existing projects */}
+      {activeProjects.length > 0 && (
+        <div style={{
+          height: '1px',
+          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent)',
+          margin: '16px 0'
+        }} />
+      )}
+
+      {/* Section 2: Select existing project */}
+      {activeProjects.length > 0 && (
+        <>
+          <SectionTitle>Or select an existing project</SectionTitle>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '8px'
+          }}>
+            {activeProjects.map((project) => {
+              const isSelected = selectedPath === project.path;
+              return (
+                <button
+                  key={project.path}
+                  type="button"
+                  onClick={() => onSelectProject(project.path, project.color)}
+                  style={{
+                    position: 'relative',
+                    padding: '10px 12px',
+                    background: isSelected
+                      ? 'rgba(255, 107, 53, 0.12)'
+                      : 'rgba(255, 255, 255, 0.03)',
+                    border: isSelected
+                      ? '1px solid #FF6B35'
+                      : '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                    }
+                  }}
+                >
+                  {/* Checkmark for selected */}
+                  {isSelected && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      width: '16px',
+                      height: '16px',
+                      background: '#FF6B35',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* Project Name + Color Badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: project.color,
+                      flexShrink: 0
+                    }} />
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: 'rgba(255, 255, 255, 0.95)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {project.name}
+                    </div>
+                  </div>
+
+                  {/* Path (truncated) */}
+                  <div style={{
+                    fontSize: '10px',
+                    color: 'rgba(255, 255, 255, 0.45)',
+                    fontFamily: "'Fira Code', 'Monaco', monospace",
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }} title={project.path}>
+                    {truncatePath(project.path)}
+                  </div>
+
+                  {/* Agent Count Badge */}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    padding: '2px 6px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    fontSize: '9px',
+                    fontWeight: '500',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    alignSelf: 'flex-start'
+                  }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                    </svg>
+                    {project.agentCount}</div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
 
       {/* Git Warning - Not a Repository */}
       {isGitRepository === false && selectedPath && (
@@ -347,7 +356,7 @@ export function StepProjectSelection({
                 ) : (
                   availableBranches.map((b) => (
                     <option key={b.name} value={b.name}>
-                      {b.name} {b.isCurrent ? '⭐' : ''} {b.hasRemote ? '☁️' : ''}
+                      {b.name}{b.isCurrent ? ' (current)' : ''}{b.hasRemote ? ' (remote)' : ''}
                     </option>
                   ))
                 )}

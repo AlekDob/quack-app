@@ -191,33 +191,33 @@
 
 .modal-panel {
   width: 100%;
-  max-width: 70vw;
-  max-height: 90vh;
-  background: rgba(12, 17, 33, 0.92);
-  border-radius: 16px;
+  max-width: 60vw;
+  max-height: 85vh;
+  background: #0F1116;
+  border-radius: 10px;
   border: 1px solid var(--panel-border);
-  padding: 1.8rem;
-  padding-bottom: 0; /* Rimosso padding bottom per evitare conflitto con modal-actions sticky */
+  padding: 1.2rem;
+  padding-bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  box-shadow: 0 22px 60px rgba(4, 8, 20, 0.55);
+  gap: 0.6rem;
+  box-shadow: 0 16px 40px rgba(4, 8, 20, 0.5);
   overflow-y: auto;
-  overflow-x: hidden; /* Elimina scroll orizzontale */
+  overflow-x: hidden;
 }
 
 .modal-panel h2 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
 .modal-field {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.4rem;
   padding: 0;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #a8b6dd;
 }
 
@@ -345,198 +345,89 @@
 }
 
 button.secondary {
-  background: rgba(18, 26, 46, 0.8);
-  color: #aab7da;
-  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 button.secondary:hover {
-  background: rgba(18, 26, 46, 0.95);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* Browse for New Project - Minimal Left-Aligned Style */
 button.directory-chooser {
-  /* Base Structure */
   position: relative;
-  width: 100%;
-  margin-top: 0.3rem;
-  padding: 1.5rem 1.8rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  width: auto;
+  padding: 0.75rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
 
-  /* Cyberpunk Glassmorphism */
-  background:
-    linear-gradient(135deg,
-      rgba(255, 107, 53, 0.15) 0%,
-      rgba(247, 147, 30, 0.12) 50%,
-      rgba(0, 217, 255, 0.08) 100%
-    );
-  backdrop-filter: blur(16px) saturate(180%);
-  border: 2px solid transparent;
-  border-radius: 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: none;
 
-  /* Neon Glow Effect */
-  box-shadow:
-    0 0 30px rgba(255, 107, 53, 0.4),
-    0 0 60px rgba(247, 147, 30, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-
-  /* Text & Layout */
-  color: #ffffff;
-  text-shadow: 0 0 20px rgba(255, 107, 53, 0.8);
-  display: flex;
+  color: rgba(255, 255, 255, 0.6);
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
 
   cursor: pointer;
   overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* Pulse Animation */
-  animation: directory-chooser-pulse 2.5s ease-in-out infinite;
+  transition: all 0.2s ease;
 }
 
-/* Animated Gradient Border */
+/* Subtle shimmer animation on border */
 button.directory-chooser::before {
   content: '';
   position: absolute;
-  inset: -2px;
-  border-radius: 16px;
-  padding: 2px;
-  background: linear-gradient(
-    135deg,
-    #FF6B35 0%,
-    #F7931E 25%,
-    #00D9FF 50%,
-    #FF6B35 75%,
-    #F7931E 100%
-  );
-  background-size: 200% 200%;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.8;
-  animation: directory-chooser-border-rotate 3s linear infinite;
-}
-
-/* Scan Line Effect */
-button.directory-chooser::after {
-  content: '';
-  position: absolute;
-  top: -100%;
-  left: 0;
+  top: 0;
+  left: -100%;
   width: 100%;
   height: 100%;
   background: linear-gradient(
-    180deg,
+    90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.05) 50%,
     transparent 100%
   );
-  animation: directory-chooser-scan 2s ease-in-out infinite;
+  animation: directory-shimmer 3s ease-in-out infinite;
 }
 
-/* Icon Glow */
 button.directory-chooser svg {
-  filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.8));
-  transition: all 0.3s ease;
-  animation: directory-chooser-icon-float 3s ease-in-out infinite;
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+  transition: all 0.2s ease;
 }
 
-/* Hover State - EXPLOSIVE */
 button.directory-chooser:hover {
-  transform: translateY(-4px) scale(1.02);
-  background:
-    linear-gradient(135deg,
-      rgba(255, 107, 53, 0.25) 0%,
-      rgba(247, 147, 30, 0.22) 50%,
-      rgba(0, 217, 255, 0.15) 100%
-    );
-  box-shadow:
-    0 0 50px rgba(255, 107, 53, 0.7),
-    0 0 100px rgba(247, 147, 30, 0.4),
-    0 8px 32px rgba(255, 107, 53, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  text-shadow:
-    0 0 30px rgba(255, 107, 53, 1),
-    0 0 10px rgba(255, 255, 255, 0.8);
-}
-
-button.directory-chooser:hover::before {
-  opacity: 1;
-  animation-duration: 1.5s;
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 button.directory-chooser:hover svg {
-  transform: scale(1.15) rotate(5deg);
-  filter: drop-shadow(0 0 15px rgba(255, 107, 53, 1));
+  opacity: 0.85;
 }
 
-/* Active State */
 button.directory-chooser:active {
-  transform: translateY(-1px) scale(1.01);
-  box-shadow:
-    0 0 40px rgba(255, 107, 53, 0.6),
-    0 4px 20px rgba(255, 107, 53, 0.4);
+  transform: scale(0.98);
 }
 
-/* Disabled State */
 button.directory-chooser:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
-  animation: none;
-  box-shadow: none;
 }
 
-/* Keyframe Animations */
-@keyframes directory-chooser-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 30px rgba(255, 107, 53, 0.4),
-      0 0 60px rgba(247, 147, 30, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  }
-  50% {
-    box-shadow:
-      0 0 40px rgba(255, 107, 53, 0.6),
-      0 0 80px rgba(247, 147, 30, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  }
-}
-
-@keyframes directory-chooser-border-rotate {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
-}
-
-@keyframes directory-chooser-scan {
-  0% {
-    top: -100%;
-  }
-  50% {
-    top: 100%;
-  }
-  100% {
-    top: 100%;
-  }
-}
-
-@keyframes directory-chooser-icon-float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
+@keyframes directory-shimmer {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
 }
 
 .modal-actions {
@@ -1341,7 +1232,7 @@ button.directory-chooser:disabled {
   border-bottom: none;
   box-shadow: none;
   padding: 12px;
-  padding-top: 38px; /* Space for macOS traffic lights */
+  padding-top: 0;
   gap: 8px;
 }
 
@@ -2166,7 +2057,92 @@ button.directory-chooser:disabled {
   grid-row: 2;
 }
 
-/* When no agents are active and side panel is hidden, extend terminal pane to full width */
+/* When no agents are active - hide sidebar and extend terminal pane to full width */
+.app-shell.sidebar-hidden .sidebar {
+  display: none;
+}
+
+.app-shell.sidebar-hidden .terminal-pane {
+  grid-column: 1 / 4; /* Full width - span all columns */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Empty state ASCII duck animation - matches splash screen */
+.empty-state-duck {
+  position: relative;
+  width: 80px;
+  height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.empty-state-duck .duck-frame {
+  position: absolute;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-size: 24px;
+  font-weight: 600;
+  color: #f28c52;
+  white-space: nowrap;
+  text-shadow: 0 2px 12px rgba(242, 140, 82, 0.5);
+  animation: duckBob 0.4s ease-in-out infinite;
+  opacity: 0;
+}
+
+.empty-state-duck .duck-frame:nth-child(1) { animation: duckFrame1 2s linear infinite, duckBob 0.4s ease-in-out infinite; }
+.empty-state-duck .duck-frame:nth-child(2) { animation: duckFrame2 2s linear infinite, duckBob 0.4s ease-in-out infinite; }
+.empty-state-duck .duck-frame:nth-child(3) { animation: duckFrame3 2s linear infinite, duckBob 0.4s ease-in-out infinite; }
+.empty-state-duck .duck-frame:nth-child(4) { animation: duckFrame4 2s linear infinite, duckBob 0.4s ease-in-out infinite; }
+.empty-state-duck .duck-frame:nth-child(5) { animation: duckFrame5 2s linear infinite, duckBob 0.4s ease-in-out infinite; }
+
+@keyframes duckFrame1 {
+  0%, 19.9%   { opacity: 1; }
+  20%, 100%   { opacity: 0; }
+}
+@keyframes duckFrame2 {
+  0%, 19.9%   { opacity: 0; }
+  20%, 39.9%  { opacity: 1; }
+  40%, 100%   { opacity: 0; }
+}
+@keyframes duckFrame3 {
+  0%, 39.9%   { opacity: 0; }
+  40%, 59.9%  { opacity: 1; }
+  60%, 100%   { opacity: 0; }
+}
+@keyframes duckFrame4 {
+  0%, 59.9%   { opacity: 0; }
+  60%, 79.9%  { opacity: 1; }
+  80%, 100%   { opacity: 0; }
+}
+@keyframes duckFrame5 {
+  0%, 79.9%   { opacity: 0; }
+  80%, 100%   { opacity: 1; }
+}
+
+@keyframes duckBob {
+  0%, 100% {
+    transform: translateY(-3px) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(3px) rotate(2deg);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .empty-state-duck .duck-frame {
+    animation: none !important;
+  }
+  .empty-state-duck .duck-frame:not(:first-child) {
+    display: none;
+  }
+  .empty-state-duck .duck-frame:first-child {
+    opacity: 1;
+  }
+}
+
 .app-shell.side-panel-collapsed.no-agents .terminal-pane {
   grid-column: 2 / 4; /* Extend to cover both column 2 and 3 */
   background: transparent; /* Remove background for clean video display */
@@ -9504,39 +9480,39 @@ button.directory-chooser:disabled {
 }
 
 /* ========================================= */
-/* Agent Modal - Modern Styling */
+/* Agent Modal - Compact Codex Style */
 /* ========================================= */
 
 .agent-modal {
-  max-width: 720px;
-  animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 600px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Wider modal for Equipment step (Fallout-style UI) */
 .agent-modal.equipment-step-wide {
-  max-width: 900px;
-  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 800px;
+  transition: max-width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .agent-modal .modal-header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.1);
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .agent-modal .modal-header h2 {
-  font-size: 1.35rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #e5ecff;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.2rem;
 }
 
 .agent-modal .modal-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
@@ -9544,13 +9520,13 @@ button.directory-chooser:disabled {
 .modal-close-button {
   background: transparent;
   border: none;
-  padding: 0.5rem;
+  padding: 0.35rem;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.4);
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   transition: all 0.2s ease;
   flex-shrink: 0;
-  margin-top: -0.25rem;
+  margin-top: -0.15rem;
 }
 
 .modal-close-button:hover {
@@ -9565,19 +9541,21 @@ button.directory-chooser:disabled {
 .agent-modal .field-label {
   font-weight: 500;
   color: #a8b6dd;
-  font-size: 0.85rem;
+  font-size: 0.7rem;
 }
 
 .agent-modal .field-hint {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: rgba(255, 255, 255, 0.45);
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
   display: block;
   line-height: 1.4;
 }
 
 .agent-modal .modal-field input[type="text"] {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 0.75rem;
+  padding: 0.45rem 0.6rem;
 }
 
 .agent-modal .modal-field input[type="text"]:hover {
@@ -9630,35 +9608,35 @@ button.directory-chooser:disabled {
 /* Directory chooser uses global cyberpunk styling - no overrides needed */
 
 .agent-modal .modal-actions {
-  gap: 0.75rem;
-  padding: 1rem 1.8rem; /* Padding verticale uniforme a 1rem */
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
   border-top: 1px solid rgba(var(--accent-rgb), 0.08);
-  /* Fixed in basso */
   position: sticky;
   bottom: 0;
-  background: rgba(12, 17, 33, 0.98);
-  backdrop-filter: blur(12px);
-  margin-left: -1.8rem;
-  margin-right: -1.8rem;
+  background: #0F1116;
+  backdrop-filter: blur(8px);
+  margin-left: -1.2rem;
+  margin-right: -1.2rem;
   margin-bottom: 0;
-  max-width: calc(100% + 3.6rem);
+  max-width: calc(100% + 2.4rem);
   z-index: 10;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 10px 10px;
 }
 
 .agent-modal .modal-actions button {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   font-weight: 500;
+  font-size: 0.75rem;
+  padding: 0.45rem 0.9rem;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .agent-modal .modal-actions button.primary {
   background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.25), rgba(var(--accent-rgb), 0.18));
-  backdrop-filter: blur(8px);
 }
 
 /* ========================================= */
@@ -9666,68 +9644,65 @@ button.directory-chooser:disabled {
 /* ========================================= */
 
 .git-warning-section {
-  margin: 1rem 0;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 152, 0, 0.08));
-  border: 1px solid rgba(255, 193, 7, 0.25);
-  border-radius: 10px;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: rgba(255, 193, 7, 0.06);
+  border: 1px solid rgba(255, 193, 7, 0.15);
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .git-warning-section:hover {
-  border-color: rgba(255, 193, 7, 0.4);
-  box-shadow: 0 8px 32px rgba(255, 193, 7, 0.15);
-  transform: translateY(-2px);
+  border-color: rgba(255, 193, 7, 0.25);
 }
 
 .git-warning-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .git-warning-header svg {
-  color: rgba(255, 193, 7, 0.9);
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 193, 7, 0.8);
   flex-shrink: 0;
 }
 
 .git-warning-title {
-  font-size: 0.9rem;
+  font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 193, 7, 0.95);
-  letter-spacing: 0.5px;
+  color: rgba(255, 193, 7, 0.9);
 }
 
 .git-warning-text {
-  font-size: 0.825rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 1rem 0;
-  line-height: 1.5;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.4;
 }
 
 .git-init-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   width: 100%;
-  padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, rgba(77, 212, 179, 0.15), rgba(105, 179, 231, 0.15));
-  border: 1.5px solid rgba(77, 212, 179, 0.3);
-  border-radius: 8px;
-  color: rgba(77, 212, 179, 0.95);
-  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(77, 212, 179, 0.1);
+  border: 1px solid rgba(77, 212, 179, 0.2);
+  border-radius: 6px;
+  color: rgba(77, 212, 179, 0.9);
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s ease;
 }
 
 .git-init-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(77, 212, 179, 0.25), rgba(105, 179, 231, 0.25));
-  border-color: rgba(77, 212, 179, 0.5);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(77, 212, 179, 0.25);
+  background: rgba(77, 212, 179, 0.15);
+  border-color: rgba(77, 212, 179, 0.3);
 }
 
 .git-init-button:disabled {
@@ -9737,15 +9712,15 @@ button.directory-chooser:disabled {
 }
 
 .git-init-button svg {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   stroke: currentColor;
 }
 
 .git-init-button .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(77, 212, 179, 0.3);
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid rgba(77, 212, 179, 0.3);
   border-top-color: rgba(77, 212, 179, 0.9);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -9755,129 +9730,90 @@ button.directory-chooser:disabled {
   to { transform: rotate(360deg); }
 }
 
-/* Git Branch Section - Cool & Prominent */
+/* Git Branch Section - Compact */
 /* ========================================= */
 
 .git-branch-section {
-  margin: 1rem 0;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(77, 212, 179, 0.08), rgba(105, 179, 231, 0.08));
-  border: 1px solid rgba(77, 212, 179, 0.25);
-  border-radius: 10px;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: rgba(77, 212, 179, 0.05);
+  border: 1px solid rgba(77, 212, 179, 0.15);
+  border-radius: 6px;
   position: relative;
   overflow: visible;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Removed ::before animated top border to avoid double border effect */
-
-@keyframes gitGradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  transition: all 0.15s ease;
 }
 
 .git-branch-section:hover {
-  border-color: rgba(77, 212, 179, 0.4);
-  box-shadow: 0 8px 32px rgba(77, 212, 179, 0.15);
-  transform: translateY(-2px);
+  border-color: rgba(77, 212, 179, 0.25);
 }
 
 /* Git Branch Header */
 .git-branch-header {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  margin-bottom: 1rem;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .git-branch-icon {
-  width: 26px;
-  height: 26px;
-  stroke: #4dd4b3;
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 8px rgba(77, 212, 179, 0.4));
-  animation: gitIconPulse 2s ease-in-out infinite;
-}
-
-@keyframes gitIconPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
+  width: 16px;
+  height: 16px;
+  stroke: rgba(77, 212, 179, 0.8);
+  stroke-width: 2;
 }
 
 .git-branch-header-text {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.125rem;
   flex: 1;
 }
 
 .git-branch-title {
-  font-size: 0.9rem;
+  font-size: 11px;
   font-weight: 600;
-  color: #4dd4b3;
+  color: rgba(77, 212, 179, 0.9);
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
 .git-branch-subtitle {
-  font-size: 0.7rem;
-  color: rgba(77, 212, 179, 0.6);
+  font-size: 9px;
+  color: rgba(77, 212, 179, 0.5);
   font-weight: 400;
 }
 
 .git-badge {
-  padding: 0.3rem 0.625rem;
-  background: linear-gradient(135deg, rgba(77, 212, 179, 0.25), rgba(105, 179, 231, 0.25));
-  border: 1px solid rgba(77, 212, 179, 0.3);
-  border-radius: 5px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: #4dd4b3;
-  text-shadow: 0 0 8px rgba(77, 212, 179, 0.5);
-  box-shadow: 0 2px 8px rgba(77, 212, 179, 0.2);
+  padding: 0.2rem 0.4rem;
+  background: rgba(77, 212, 179, 0.12);
+  border: 1px solid rgba(77, 212, 179, 0.2);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: rgba(77, 212, 179, 0.8);
 }
 
 /* Git Mode Selector */
 .git-branch-mode-selector {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.625rem;
-  margin-bottom: 0.875rem;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
 }
 
 .git-mode-option {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0.875rem;
+  gap: 0.4rem;
+  padding: 0.5rem 0.625rem;
   background: rgba(255, 255, 255, 0.03);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
-}
-
-.git-mode-option::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(77, 212, 179, 0.15), rgba(105, 179, 231, 0.15));
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.git-mode-option:hover::before {
-  opacity: 0.5;
-}
-
-.git-mode-option.active::before {
-  opacity: 1;
+  transition: all 0.15s ease;
 }
 
 .git-mode-option input[type="radio"] {
@@ -9888,51 +9824,44 @@ button.directory-chooser:disabled {
 }
 
 .git-mode-option:hover {
-  border-color: rgba(77, 212, 179, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(77, 212, 179, 0.2);
+  border-color: rgba(77, 212, 179, 0.2);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .git-mode-option.active {
-  background: rgba(77, 212, 179, 0.12);
-  border-color: rgba(77, 212, 179, 0.5);
-  box-shadow: 0 0 0 3px rgba(77, 212, 179, 0.15), 0 4px 16px rgba(77, 212, 179, 0.25);
+  background: rgba(77, 212, 179, 0.1);
+  border-color: rgba(77, 212, 179, 0.3);
 }
 
 .git-mode-icon {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   stroke: rgba(255, 255, 255, 0.5);
-  stroke-width: 2.5;
-  transition: all 0.25s ease;
-  position: relative;
-  z-index: 1;
+  stroke-width: 2;
+  transition: all 0.15s ease;
 }
 
 .git-mode-option:hover .git-mode-icon {
-  stroke: rgba(77, 212, 179, 0.8);
+  stroke: rgba(77, 212, 179, 0.7);
 }
 
 .git-mode-option.active .git-mode-icon {
-  stroke: #4dd4b3;
-  filter: drop-shadow(0 0 6px rgba(77, 212, 179, 0.6));
+  stroke: rgba(77, 212, 179, 0.9);
 }
 
 .git-mode-option span {
-  font-size: 0.825rem;
+  font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-  transition: color 0.25s ease;
-  position: relative;
-  z-index: 1;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 0.15s ease;
 }
 
 .git-mode-option:hover span {
-  color: rgba(77, 212, 179, 0.9);
+  color: rgba(77, 212, 179, 0.8);
 }
 
 .git-mode-option.active span {
-  color: #4dd4b3;
+  color: rgba(77, 212, 179, 0.9);
   font-weight: 600;
 }
 
@@ -9944,31 +9873,29 @@ button.directory-chooser:disabled {
 
 .git-branch-select {
   width: 100%;
-  padding: 0.75rem 2.75rem 0.75rem 0.875rem;
-  font-size: 0.875rem;
+  padding: 0.5rem 2rem 0.5rem 0.625rem;
+  font-size: 11px;
   font-weight: 500;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
-  border: 1.5px solid rgba(77, 212, 179, 0.3);
-  border-radius: 8px;
+  border: 1px solid rgba(77, 212, 179, 0.2);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s ease;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
 }
 
 .git-branch-select:hover {
-  background: rgba(77, 212, 179, 0.08);
-  border-color: rgba(77, 212, 179, 0.5);
-  box-shadow: 0 4px 16px rgba(77, 212, 179, 0.15);
+  background: rgba(77, 212, 179, 0.06);
+  border-color: rgba(77, 212, 179, 0.3);
 }
 
 .git-branch-select:focus {
   outline: none;
-  background: rgba(77, 212, 179, 0.1);
-  border-color: #4dd4b3;
-  box-shadow: 0 0 0 3px rgba(77, 212, 179, 0.2), 0 4px 16px rgba(77, 212, 179, 0.2);
+  background: rgba(77, 212, 179, 0.08);
+  border-color: rgba(77, 212, 179, 0.4);
 }
 
 .git-branch-select:disabled {
@@ -9978,38 +9905,37 @@ button.directory-chooser:disabled {
 
 .git-select-chevron {
   position: absolute;
-  right: 1rem;
+  right: 0.625rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  stroke: rgba(77, 212, 179, 0.6);
+  width: 14px;
+  height: 14px;
+  stroke: rgba(77, 212, 179, 0.5);
   pointer-events: none;
-  transition: all 0.25s ease;
+  transition: all 0.15s ease;
 }
 
 .git-branch-select:hover ~ .git-select-chevron {
-  stroke: #4dd4b3;
-  transform: translateY(-50%) scale(1.1);
+  stroke: rgba(77, 212, 179, 0.7);
 }
 
 /* Git Branch Create Mode */
 .git-branch-create-mode {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .git-branch-input {
   width: 100%;
-  padding: 0.75rem 0.875rem;
-  font-size: 0.875rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 11px;
   font-weight: 500;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
-  border: 1.5px solid rgba(77, 212, 179, 0.3);
-  border-radius: 8px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(77, 212, 179, 0.2);
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .git-branch-input::placeholder {
@@ -10017,35 +9943,33 @@ button.directory-chooser:disabled {
 }
 
 .git-branch-input:hover {
-  background: rgba(77, 212, 179, 0.08);
-  border-color: rgba(77, 212, 179, 0.5);
-  box-shadow: 0 4px 16px rgba(77, 212, 179, 0.15);
+  background: rgba(77, 212, 179, 0.06);
+  border-color: rgba(77, 212, 179, 0.3);
 }
 
 .git-branch-input:focus {
   outline: none;
-  background: rgba(77, 212, 179, 0.1);
-  border-color: #4dd4b3;
-  box-shadow: 0 0 0 3px rgba(77, 212, 179, 0.2), 0 4px 16px rgba(77, 212, 179, 0.2);
+  background: rgba(77, 212, 179, 0.08);
+  border-color: rgba(77, 212, 179, 0.4);
 }
 
 /* Git Branch Custom Checkbox */
 .git-branch-checkbox {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   cursor: pointer;
   position: relative;
-  padding: 0.5rem 0.75rem;
+  padding: 0.375rem 0.5rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  border-radius: 5px;
+  transition: all 0.15s ease;
 }
 
 .git-branch-checkbox:hover {
-  background: rgba(77, 212, 179, 0.06);
-  border-color: rgba(77, 212, 179, 0.2);
+  background: rgba(77, 212, 179, 0.05);
+  border-color: rgba(77, 212, 179, 0.15);
 }
 
 .git-branch-checkbox input[type="checkbox"] {
@@ -10057,12 +9981,12 @@ button.directory-chooser:disabled {
 
 .git-checkbox-checkmark {
   position: relative;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(77, 212, 179, 0.4);
-  border-radius: 4px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(77, 212, 179, 0.3);
+  border-radius: 3px;
   background: rgba(255, 255, 255, 0.03);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s ease;
   flex-shrink: 0;
 }
 
@@ -10072,18 +9996,17 @@ button.directory-chooser:disabled {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) scale(0);
-  width: 5px;
-  height: 9px;
-  border: solid #4dd4b3;
-  border-width: 0 2.5px 2.5px 0;
+  width: 4px;
+  height: 7px;
+  border: solid rgba(77, 212, 179, 0.9);
+  border-width: 0 2px 2px 0;
   transform-origin: center;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.15s ease;
 }
 
 .git-branch-checkbox input[type="checkbox"]:checked ~ .git-checkbox-checkmark {
-  background: rgba(77, 212, 179, 0.2);
-  border-color: #4dd4b3;
-  box-shadow: 0 0 0 3px rgba(77, 212, 179, 0.15);
+  background: rgba(77, 212, 179, 0.15);
+  border-color: rgba(77, 212, 179, 0.5);
 }
 
 .git-branch-checkbox input[type="checkbox"]:checked ~ .git-checkbox-checkmark::after {
@@ -10091,25 +10014,25 @@ button.directory-chooser:disabled {
 }
 
 .git-checkbox-label {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
-  transition: color 0.2s ease;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 0.15s ease;
 }
 
 .git-branch-checkbox:hover .git-checkbox-label {
-  color: rgba(77, 212, 179, 0.9);
+  color: rgba(77, 212, 179, 0.8);
 }
 
 .git-branch-checkbox input[type="checkbox"]:checked ~ .git-checkbox-label {
-  color: #4dd4b3;
+  color: rgba(77, 212, 179, 0.9);
   font-weight: 500;
 }
 
 /* Git Branch Hint */
 .git-branch-hint {
-  font-size: 0.75rem;
-  color: rgba(77, 212, 179, 0.6);
-  padding-left: 0.5rem;
+  font-size: 9px;
+  color: rgba(77, 212, 179, 0.5);
+  padding-left: 0.25rem;
   display: block;
   line-height: 1.3;
 }
@@ -10125,8 +10048,8 @@ button.directory-chooser:disabled {
 }
 
 .agent-modal .modal-actions button.secondary:hover {
-  background: rgba(18, 26, 46, 0.95);
-  border-color: rgba(var(--accent-rgb), 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
 

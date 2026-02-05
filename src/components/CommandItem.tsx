@@ -11,9 +11,9 @@ export function CommandItem({ command, onEdit }: CommandItemProps) {
       className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
       onClick={() => onEdit?.(command)}
     >
-      {/* Command Icon */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(242, 140, 82, 0.2), rgba(230, 115, 57, 0.2))' }}>
-        <span className="text-sm" style={{ color: '#f28c52' }}>/</span>
+      {/* Command Icon - Pink gradient background with white icon (matches AddonsDrawer) */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f472b6, #ec4899)' }}>
+        <span className="text-sm font-bold" style={{ color: 'white' }}>/</span>
       </div>
 
       {/* Command Info */}
@@ -28,7 +28,7 @@ export function CommandItem({ command, onEdit }: CommandItemProps) {
             </span>
           )}
           {command.parameters && command.parameters.length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ background: 'rgba(242, 140, 82, 0.2)', color: '#f28c52' }}>
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ background: 'rgba(244, 114, 182, 0.15)', color: '#f472b6' }}>
               {command.parameters.length} param{command.parameters.length > 1 ? 's' : ''}
             </span>
           )}

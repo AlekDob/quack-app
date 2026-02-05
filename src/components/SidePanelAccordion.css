@@ -157,7 +157,7 @@
 }
 
 .accordion-section.expanded .accordion-icon {
-  color: #f28c52;
+  color: var(--category-color, #f28c52);
 }
 
 /* Title */
@@ -180,8 +180,8 @@
 }
 
 .accordion-section.expanded .accordion-badge {
-  background: rgba(242, 140, 82, 0.2);
-  color: #f28c52;
+  background: color-mix(in srgb, var(--category-color, #f28c52) 20%, transparent);
+  color: var(--category-color, #f28c52);
 }
 
 /* Content */
@@ -325,7 +325,7 @@
 .accordion-content input[type="text"],
 .accordion-content input[type="search"],
 .accordion-content .search-input {
-  padding: 6px 10px !important;
+  padding: 6px 10px 6px 32px !important; /* Extra left padding for search icon */
   font-size: 12px !important;
   border-radius: 4px !important;
 }

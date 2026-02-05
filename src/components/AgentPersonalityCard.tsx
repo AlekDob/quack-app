@@ -193,9 +193,13 @@ export default function AgentPersonalityCard({
     );
   }
 
+  // Filter custom notes to show
+  const filteredNotes = filterDroidsFromCustomNotes(personality.customNotes);
+
   return (
     <div className="agent-personality-card">
-      <div className="personality-header">
+      {/* Compact Header: Avatar + Name + Role + Style Badge inline */}
+      <div className="personality-header-compact">
         <div className="personality-avatar">
           {avatarUrl ? (
             <img
@@ -205,7 +209,6 @@ export default function AgentPersonalityCard({
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 console.error('[AgentPersonalityCard] Image failed to load, using fallback duck15.jpeg:', avatarUrl);
-                // Always fallback to duck15.jpeg on error
                 if (window.__TAURI__) {
                   target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
                 } else {
@@ -220,142 +223,140 @@ export default function AgentPersonalityCard({
             </svg>
           )}
         </div>
-        <div className="personality-identity">
-          <h3 className="personality-name">{agentName || personality.name}</h3>
+        <div className="personality-identity-compact">
+          <div className="personality-name-row">
+            <span className="personality-name">{agentName || personality.name}</span>
+            {personality.communicationStyle && (
+              <span className="style-badge-inline">
+                {COMMUNICATION_STYLES_MAP[personality.communicationStyle] || personality.communicationStyle}
+              </span>
+            )}
+          </div>
           <p className="personality-role">{personality.role}</p>
-          {agentWorkingOn && (
-            <div className="personality-working-on">
-              <span className="working-on-label">Working on:</span>
-              <span className="working-on-text">{agentWorkingOn}</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Bundle Export/Import Actions */}
-      <div className="personality-section bundle-actions">
-        <div className="bundle-buttons">
-          <button
-            className="bundle-btn bundle-btn-export"
-            onClick={handleExport}
-            disabled={exporting}
-            title="Export agent as bundle"
-          >
-            {exporting ? 'Exporting...' : 'Export Bundle'}
-          </button>
-          <button
-            className="bundle-btn bundle-btn-import"
-            onClick={handleImport}
-            disabled={importing}
-            title="Import agent from bundle"
-          >
-            {importing ? 'Importing...' : 'Import Bundle'}
-          </button>
+      {/* Bio/Notes Section - directly under header without title */}
+      {filteredNotes && (
+        <div className="personality-bio">
+          {filteredNotes}
         </div>
-        {error && (
-          <div className="bundle-error" onClick={clearError}>
-            {error}
+      )}
+
+      {/* Technical Context - inline without section title */}
+      {personality.technicalContext && (
+        <div className="personality-context">
+          {personality.technicalContext}
+        </div>
+      )}
+
+      {/* Workspace + Context Files Row */}
+      <div className="personality-meta-row">
+        {/* Workspace Info */}
+        {(projectName || gitBranch) && (
+          <div className="workspace-chips">
+            {projectName && (
+              <span className="meta-chip workspace-chip">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 7h18M3 12h18M3 17h18"/>
+                </svg>
+                {projectName}
+              </span>
+            )}
+            {gitBranch && (
+              <span className="meta-chip branch-chip">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="6" cy="6" r="2"/>
+                  <circle cx="18" cy="18" r="2"/>
+                  <path d="M6 8v8c0 2 2 4 4 4h2"/>
+                </svg>
+                {gitBranch}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Context Files */}
+        {(projectFiles.length > 0 || globalFiles.length > 0) && (
+          <div className="context-chips">
+            {projectFiles.map((file) => (
+              <span
+                key={`${file.scope}-${file.name}`}
+                className={`meta-chip context-chip ${!file.exists ? 'not-exists' : ''}`}
+                onClick={() => file.exists && onFileClick?.(file)}
+              >
+                {file.name}
+                {projectStats && projectStats.char_count > 0 && (
+                  <span className={`chip-size stats-${projectStats.score}`}>
+                    {projectStats.char_count >= 1000
+                      ? `${(projectStats.char_count / 1000).toFixed(1)}k`
+                      : projectStats.char_count}
+                  </span>
+                )}
+              </span>
+            ))}
+            {globalFiles.map((file) => (
+              <span
+                key={`${file.scope}-${file.name}`}
+                className={`meta-chip context-chip global ${!file.exists ? 'not-exists' : ''}`}
+                onClick={() => file.exists && onFileClick?.(file)}
+              >
+                {file.name}
+                {globalStats && globalStats.char_count > 0 && (
+                  <span className={`chip-size stats-${globalStats.score}`}>
+                    {globalStats.char_count >= 1000
+                      ? `${(globalStats.char_count / 1000).toFixed(1)}k`
+                      : globalStats.char_count}
+                  </span>
+                )}
+              </span>
+            ))}
           </div>
         )}
       </div>
 
-      {personality.technicalContext && (
-        <div className="personality-section">
-          <h4 className="section-title">Technical Context</h4>
-          <p className="personality-intro">{personality.technicalContext}</p>
-        </div>
-      )}
-
+      {/* Rules as compact chips - only if present */}
       {personality.rules && personality.rules.length > 0 && (
-        <div className="personality-section">
-          <h4 className="section-title">Rules & Best Practices</h4>
-          <div className="rules-list">
-            {personality.rules.map((rule, index) => (
-              <div key={index} className="rule-item">
-                <span className="rule-bullet">•</span>
-                <span className="rule-text">{rule}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {personality.communicationStyle && (
-        <div className="personality-section">
-          <h4 className="section-title">Communication Style</h4>
-          <div className="communication-badge">
-            {COMMUNICATION_STYLES_MAP[personality.communicationStyle] ||
-              personality.communicationStyle}
-          </div>
-        </div>
-      )}
-
-      {personality.customNotes && (
-        <div className="personality-section">
-          <h4 className="section-title">Custom Notes</h4>
-          <p className="personality-intro">{filterDroidsFromCustomNotes(personality.customNotes)}</p>
-        </div>
-      )}
-
-      {/* Workspace Info - Minimal OpenAI style */}
-      {(projectName || gitBranch) && (
-        <div className="workspace-info-minimal">
-          {projectName && <span className="workspace-project">{projectName}</span>}
-          {gitBranch && <span className="workspace-branch">{gitBranch}</span>}
-        </div>
-      )}
-
-      {/* Context Files - Combined minimal style */}
-      {(projectFiles.length > 0 || globalFiles.length > 0) && (
-        <div className="context-files-minimal">
-          {projectFiles.map((file) => (
-            <span
-              key={`${file.scope}-${file.name}`}
-              className={`context-file-tag ${!file.exists ? 'not-exists' : ''}`}
-              onClick={() => file.exists && onFileClick?.(file)}
-            >
-              {file.name}
-              {projectStats && projectStats.char_count > 0 && (
-                <span className={`file-size stats-${projectStats.score}`}>
-                  {projectStats.char_count >= 1000
-                    ? `${(projectStats.char_count / 1000).toFixed(1)}k`
-                    : projectStats.char_count}
-                </span>
-              )}
-            </span>
+        <div className="personality-rules-compact">
+          {personality.rules.slice(0, 3).map((rule, index) => (
+            <span key={index} className="rule-chip">{rule}</span>
           ))}
-          {globalFiles.map((file) => (
-            <span
-              key={`${file.scope}-${file.name}`}
-              className={`context-file-tag global ${!file.exists ? 'not-exists' : ''}`}
-              onClick={() => file.exists && onFileClick?.(file)}
-            >
-              {file.name}
-              {globalStats && globalStats.char_count > 0 && (
-                <span className={`file-size stats-${globalStats.score}`}>
-                  {globalStats.char_count >= 1000
-                    ? `${(globalStats.char_count / 1000).toFixed(1)}k`
-                    : globalStats.char_count}
-                </span>
-              )}
-            </span>
-          ))}
+          {personality.rules.length > 3 && (
+            <span className="rule-chip more">+{personality.rules.length - 3}</span>
+          )}
         </div>
       )}
 
-      {/* HIDDEN: Favorite Expressions section - not editable in UI yet */}
-      {/* {personality.expressions && personality.expressions.length > 0 && (
-        <div className="personality-section">
-          <h4 className="section-title">Favorite Expressions</h4>
-          <div className="expressions-list">
-            {personality.expressions.map((expression, index) => (
-              <div key={index} className="expression-item">
-                💬 {expression}
-              </div>
-            ))}
-          </div>
+      {/* Bundle Actions - Show on hover */}
+      <div className="bundle-actions-compact">
+        <button
+          className="bundle-btn-compact"
+          onClick={handleExport}
+          disabled={exporting}
+          title="Export agent as bundle"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          {exporting ? 'Exporting...' : 'Export'}
+        </button>
+        <button
+          className="bundle-btn-compact"
+          onClick={handleImport}
+          disabled={importing}
+          title="Import agent from bundle"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          {importing ? 'Importing...' : 'Import'}
+        </button>
+      </div>
+      {error && (
+        <div className="bundle-error-compact" onClick={clearError}>
+          {error}
         </div>
-      )} */}
+      )}
     </div>
   );
 }

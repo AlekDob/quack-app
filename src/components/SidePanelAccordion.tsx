@@ -19,6 +19,21 @@ import "./SidePanelAccordion.css";
  * All sections visible, collapsible individually
  */
 
+// Category-specific colors matching AddonsDrawer
+const CATEGORY_COLORS: Record<string, string> = {
+  skills: '#f28c52',      // Orange - main accent
+  agents: '#f28c52',      // Orange - personas
+  droids: '#4ecdc4',      // Teal - automation
+  rules: '#60a5fa',       // Blue - governance
+  hooks: '#a78bfa',       // Purple - events
+  mcp: '#34d399',         // Green - servers
+  commands: '#f472b6',    // Pink - snippets
+  snippets: '#f472b6',    // Pink - snippets
+  context: '#f28c52',     // Orange - file explorer
+  'agent-context': '#f28c52', // Orange - personality
+  default: '#f28c52',     // Orange fallback
+};
+
 // Accordion Section Component
 interface AccordionSectionProps {
   id: string;
@@ -28,16 +43,20 @@ interface AccordionSectionProps {
   isExpanded: boolean;
   isFocused?: boolean;
   order?: number;
+  category?: string;
   onToggle: () => void;
   children: ReactNode;
 }
 
-function AccordionSection({ id, title, icon, badge, isExpanded, isFocused = false, order = 0, onToggle, children }: AccordionSectionProps) {
+function AccordionSection({ id, title, icon, badge, isExpanded, isFocused = false, order = 0, category, onToggle, children }: AccordionSectionProps) {
+  const color = CATEGORY_COLORS[category || id] || CATEGORY_COLORS.default;
+
   return (
     <div
       className={`accordion-section ${isExpanded ? 'expanded' : ''} ${isFocused ? 'focused' : ''}`}
       data-section={id}
-      style={{ order }}
+      data-category={category || id}
+      style={{ order, '--category-color': color } as React.CSSProperties}
     >
       <button
         type="button"
@@ -355,7 +374,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['agent-context', 'rules', 'context', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
+  const sectionIds = ['context', 'agent-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
 
   // Simple fixed order - no reordering when focused
   const getOrder = (sectionId: string): number => {
@@ -408,7 +427,31 @@ export default function SidePanelAccordion({
       )}
 
       <div className={`accordion-container ${focusedSection ? 'has-focus' : ''}`} ref={containerRef}>
-        {/* Agent Personality (includes Current Workspace info) */}
+        {/* File Explorer - First accordion */}
+        <AccordionSection
+          id="context"
+          title="File Explorer"
+          icon={icons.explorer}
+          isExpanded={focusedSection === "context"}
+          isFocused={focusedSection === "context"}
+          order={getOrder("context")}
+          onToggle={() => toggleSection("context")}
+        >
+          <FileExplorer
+            rootPath={rootPath}
+            tree={tree}
+            loading={loading}
+            error={error}
+            activePath={activePath}
+            activeFilePath={activeFilePath}
+            modifiedFiles={modifiedFiles}
+            onOpenFile={onOpenFile}
+            onLoadChildren={onLoadChildren}
+            onMentionFile={onMentionFile}
+          />
+        </AccordionSection>
+
+        {/* Agent Personality - Second accordion */}
         <AccordionSection
           id="agent-context"
           title="Agent Personality"
@@ -449,6 +492,7 @@ export default function SidePanelAccordion({
           isExpanded={focusedSection === "rules"}
           isFocused={focusedSection === "rules"}
           order={getOrder("rules")}
+          category="rules"
           onToggle={() => toggleSection("rules")}
         >
           <RulesPanel
@@ -457,32 +501,8 @@ export default function SidePanelAccordion({
           />
         </AccordionSection>
 
-        {/* File Explorer */}
-        <AccordionSection
-          id="context"
-          title="File Explorer"
-          icon={icons.explorer}
-          isExpanded={focusedSection === "context"}
-          isFocused={focusedSection === "context"}
-          order={getOrder("context")}
-          onToggle={() => toggleSection("context")}
-        >
-          <FileExplorer
-            rootPath={rootPath}
-            tree={tree}
-            loading={loading}
-            error={error}
-            activePath={activePath}
-            activeFilePath={activeFilePath}
-            modifiedFiles={modifiedFiles}
-            onOpenFile={onOpenFile}
-            onLoadChildren={onLoadChildren}
-            onMentionFile={onMentionFile}
-          />
-        </AccordionSection>
-
-        {/* Droids */}
-        <AccordionSection
+        {/* Droids - Hidden for UI simplification */}
+        {/* <AccordionSection
           id="agents"
           title="Droids"
           icon={icons.agents}
@@ -490,6 +510,7 @@ export default function SidePanelAccordion({
           isExpanded={focusedSection === "agents"}
           isFocused={focusedSection === "agents"}
           order={getOrder("agents")}
+          category="droids"
           onToggle={() => toggleSection("agents")}
         >
           <AgentsPanel
@@ -505,7 +526,7 @@ export default function SidePanelAccordion({
             onCreateAgent={onCreateAgent}
             onSelectDroid={onSelectDroid}
           />
-        </AccordionSection>
+        </AccordionSection> */}
 
         {/* Skills */}
         <AccordionSection
@@ -516,6 +537,7 @@ export default function SidePanelAccordion({
           isExpanded={focusedSection === "skills"}
           isFocused={focusedSection === "skills"}
           order={getOrder("skills")}
+          category="skills"
           onToggle={() => toggleSection("skills")}
         >
           <SkillsPanel
@@ -528,22 +550,23 @@ export default function SidePanelAccordion({
           />
         </AccordionSection>
 
-        {/* Commands/Snippets */}
-        <AccordionSection
+        {/* Commands - Hidden for UI simplification */}
+        {/* <AccordionSection
           id="commands"
-          title="Snippets"
+          title="Commands"
           icon={icons.commands}
           badge={commandsCount}
           isExpanded={focusedSection === "commands"}
           isFocused={focusedSection === "commands"}
           order={getOrder("commands")}
+          category="snippets"
           onToggle={() => toggleSection("commands")}
         >
           <CommandsPanel
             basePath={rootPath || ''}
             onSelectCommand={onSelectCommand}
           />
-        </AccordionSection>
+        </AccordionSection> */}
 
         {/* MCP Servers */}
         <AccordionSection
@@ -554,6 +577,7 @@ export default function SidePanelAccordion({
           isExpanded={focusedSection === "mcp"}
           isFocused={focusedSection === "mcp"}
           order={getOrder("mcp")}
+          category="mcp"
           onToggle={() => toggleSection("mcp")}
         >
           <MCPPanel workingDir={workingDir} onOpenMcpConfig={onOpenMcpConfig} />
@@ -568,6 +592,7 @@ export default function SidePanelAccordion({
           isExpanded={focusedSection === "hooks"}
           isFocused={focusedSection === "hooks"}
           order={getOrder("hooks")}
+          category="hooks"
           onToggle={() => toggleSection("hooks")}
         >
           <HooksPanel

@@ -367,7 +367,10 @@ function FileExplorer({
             : isDirectory && isLoadingNode
               ? "…"
               : null;
-          const paddingLeft = 8 + depth * 10; // Reduced from 12 + depth * 14 for compact VSCode style
+          // Files get extra indentation to visually distinguish from parent folder
+          const paddingLeft = isDirectory
+            ? 12 + depth * 24
+            : 12 + depth * 24 + 10; // Files: +10px extra indent
 
           // Add modified file background class
           const modificationStatus = !isDirectory && modifiedFiles?.has(entry.path)
@@ -578,7 +581,7 @@ function FileExplorer({
     return hierarchicalSearchResults.map((node) => {
       if (node.type === 'folder') {
         const isExpanded = expandedSearchFolders.has(node.path);
-        const paddingLeft = 8 + node.depth * 10;
+        const paddingLeft = 8 + node.depth * 16;
 
         return (
           <Fragment key={node.path}>
@@ -633,7 +636,7 @@ function FileExplorer({
                 .filter(Boolean)
                 .join(" ");
 
-              const filePaddingLeft = 8 + (node.depth + 1) * 10;
+              const filePaddingLeft = 8 + (node.depth + 1) * 16;
 
               return (
                 <button
@@ -744,7 +747,7 @@ function FileExplorer({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search files or folders"
-            className="w-full px-3 py-2 pl-8 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+            className="w-full px-3 py-2 pl-10 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"

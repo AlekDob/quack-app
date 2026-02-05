@@ -774,11 +774,19 @@ fn parse_session_messages(
                 if let Some(content) = content_text {
                     // Skip command messages
                     if !content.contains("<command-name>") && !content.contains("<local-command") {
-                        messages.push(SessionHistoryMessage {
-                            role: "user".to_string(),
-                            content: content.to_string(),
-                            timestamp: None,
-                        });
+                        // Skip context messages that contain both User: and Assistant: prefixes
+                        // These are conversation summaries sent when resuming a session
+                        // and would show duplicated content in the UI
+                        let is_context_message = content.starts_with("User:")
+                            && content.contains("\nAssistant:");
+
+                        if !is_context_message {
+                            messages.push(SessionHistoryMessage {
+                                role: "user".to_string(),
+                                content: content.to_string(),
+                                timestamp: None,
+                            });
+                        }
                     }
                 }
             }

@@ -5,6 +5,12 @@ description: Expert consultant for the Claude Agent SDK (formerly Claude Code SD
 
 # Claude Agent SDK Expert
 
+> **Current SDK Versions** (as of 2025-02-05):
+> - `@anthropic-ai/claude-agent-sdk`: **0.2.31**
+> - `@anthropic-ai/sdk`: **0.72.1**
+>
+> To check for updates: `npm view @anthropic-ai/claude-agent-sdk version`
+
 Expert consultant for the Claude Agent SDK with comprehensive knowledge of agent development, tool integration, and best practices.
 
 ## Overview
