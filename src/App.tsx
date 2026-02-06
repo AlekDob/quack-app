@@ -2302,6 +2302,20 @@ function AppContent() {
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
+            // Agent Teams: pass teamContext when active agent is the Team Lead
+            teamContext: (() => {
+              const team = useTeamStore.getState().activeTeam;
+              if (!team || team.leadAgentId !== capturedAgentId) return undefined;
+              return {
+                teamName: team.name,
+                members: team.members.map(m => ({
+                  name: m.name,
+                  role: m.role,
+                  communicationStyle: m.communicationStyle,
+                  isLead: m.isLead,
+                })),
+              };
+            })(),
           },
         }),
         abortPromise,

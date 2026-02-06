@@ -1767,6 +1767,8 @@ export interface TeamMember {
   communicationStyle: string;
   selectedSkills?: string[];
   isLead: boolean;
+  avatar?: string;
+  color?: string;
 }
 
 export interface TeamConfig {

@@ -42,6 +42,36 @@
   font-weight: 600;
   color: rgba(147, 197, 253, 0.9);
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-mode-badge {
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(0, 217, 255, 0.8);
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  border-radius: 10px;
+  padding: 1px 8px 1px 3px;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-mode-badge-avatars {
+  display: inline-flex;
+  align-items: center;
+}
+
+.team-mode-badge-avatars img {
+  margin-left: -3px;
+}
+
+.team-mode-badge-avatars img:first-child {
+  margin-left: 0;
 }
 
 .assistant-message-text {

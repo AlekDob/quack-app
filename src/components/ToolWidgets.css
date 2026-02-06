@@ -793,3 +793,9 @@
   background: rgba(139, 92, 246, 1);
   transform: scale(1.05);
 }
+
+/* Teammate Widget pulse animation */
+@keyframes teammate-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { TerminalInfo } from '../types';
+import type { TerminalInfo, TeamConfig } from '../types';
 import { useTeamStore } from '../stores/teamStore';
 
 interface TeamCreationModalProps {
@@ -7,6 +7,7 @@ interface TeamCreationModalProps {
   onClose: () => void;
   projectPath: string;
   agents: TerminalInfo[];
+  editingTeam?: TeamConfig | null;
 }
 
 export default function TeamCreationModal({
@@ -14,6 +15,7 @@ export default function TeamCreationModal({
   onClose,
   projectPath,
   agents,
+  editingTeam,
 }: TeamCreationModalProps) {
   const [teamName, setTeamName] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
@@ -21,17 +23,27 @@ export default function TeamCreationModal({
   const [leadAgentId, setLeadAgentId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createTeam = useTeamStore((s) => s.createTeam);
+  const disbandTeam = useTeamStore((s) => s.disbandTeam);
 
-  // Reset form when modal opens
+  const isEditMode = !!editingTeam;
+
+  // Reset or pre-populate form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setTeamName('');
-      setTaskDescription('');
-      setSelectedAgentIds(new Set());
-      setLeadAgentId('');
+      if (editingTeam) {
+        setTeamName(editingTeam.name);
+        setTaskDescription(editingTeam.taskDescription || '');
+        setSelectedAgentIds(new Set(editingTeam.members.map((m) => m.agentId)));
+        setLeadAgentId(editingTeam.leadAgentId);
+      } else {
+        setTeamName('');
+        setTaskDescription('');
+        setSelectedAgentIds(new Set());
+        setLeadAgentId('');
+      }
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, editingTeam]);
 
   const toggleAgent = useCallback((agentId: string) => {
     setSelectedAgentIds((prev) => {
@@ -53,19 +65,33 @@ export default function TeamCreationModal({
 
     try {
       const name = teamName.trim() || `Team ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      // Build avatar map from agents for team enrichment
+      const agentAvatars = new Map<string, { avatar?: string; color?: string }>();
+      for (const agent of agents) {
+        agentAvatars.set(agent.id, { avatar: agent.avatar, color: agent.color });
+      }
+
+      // In edit mode: create new team FIRST, then disband old
+      // This way if createTeam fails, the old team is still intact
       await createTeam(
         projectPath,
         name,
         leadAgentId,
         Array.from(selectedAgentIds),
         taskDescription.trim() || undefined,
+        agentAvatars,
       );
+
+      if (isEditMode && editingTeam) {
+        await disbandTeam(projectPath, editingTeam.id);
+      }
+
       onClose();
     } catch (err) {
-      console.error('Failed to create team:', err);
+      console.error('Failed to save team:', err);
       setIsSubmitting(false);
     }
-  }, [isSubmitting, selectedAgentIds, leadAgentId, teamName, taskDescription, projectPath, createTeam, onClose]);
+  }, [isSubmitting, selectedAgentIds, leadAgentId, teamName, taskDescription, projectPath, createTeam, disbandTeam, isEditMode, editingTeam, onClose, agents]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -90,7 +116,7 @@ export default function TeamCreationModal({
       <div className="new-session-modal" role="dialog" aria-modal="true" style={{ maxWidth: 480 }}>
         {/* Header */}
         <div className="new-session-modal-header">
-          <h2>Create Agent Team</h2>
+          <h2>{isEditMode ? 'Edit Agent Team' : 'Create Agent Team'}</h2>
           <button className="new-session-modal-close" onClick={onClose}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -248,7 +274,7 @@ export default function TeamCreationModal({
               borderColor: 'rgba(255, 107, 53, 0.3)',
             }}
           >
-            {isSubmitting ? 'Creating...' : 'Create Team'}
+            {isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Team'}
           </button>
         </div>
       </div>

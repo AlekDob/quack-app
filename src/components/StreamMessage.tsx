@@ -19,9 +19,46 @@ import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage
 import type { ClaudeEvent, AskUserQuestionAnswers, DiffLine, ToolDiff } from '../types';
 import { BugReportWidget, WebAnalysisCard } from './structured-outputs';
 import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
+import { TeammateWidget } from './TeammateWidget';
+import { useTeamStore } from '../stores/teamStore';
+import { useAgentAvatar } from '../hooks/useAgentAvatar';
+import type { TeamConfig } from '../types';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
+
+// Mini avatar for team badge - uses useAgentAvatar with avatar filename from TeamMember
+function TeamMemberMiniAvatar({ name, avatar }: { name: string; avatar?: string }) {
+  const avatarUrl = useAgentAvatar(name, avatar);
+  return (
+    <img
+      src={avatarUrl}
+      alt={name}
+      title={name}
+      style={{
+        width: '14px',
+        height: '14px',
+        borderRadius: '50%',
+        objectFit: 'cover',
+        border: '1px solid rgba(0, 217, 255, 0.3)',
+      }}
+    />
+  );
+}
+
+// Team mode badge with mini avatars
+function TeamModeBadge({ team }: { team: TeamConfig }) {
+  return (
+    <span className="team-mode-badge">
+      <span className="team-mode-badge-avatars">
+        {team.members.map(m => (
+          <TeamMemberMiniAvatar key={m.agentId} name={m.name} avatar={m.avatar} />
+        ))}
+      </span>
+      {team.name}
+    </span>
+  );
+}
 
 // Helper function to convert old/new strings to ToolDiff
 function createDiffFromStrings(oldString: string, newString: string, fileName?: string): ToolDiff {
@@ -462,7 +499,29 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       }
 
       // Task tool (subagent) - special widget
+      // Check if task description mentions a team member → show TeammateWidget
       if (toolName === 'task' && input?.subagent_type) {
+        const activeTeam = useTeamStore.getState().activeTeam;
+        if (activeTeam) {
+          const taskText = `${input.description || ''} ${input.prompt || ''}`.toLowerCase();
+          const matchedMember = activeTeam.members.find(m =>
+            taskText.includes(m.name.toLowerCase())
+          );
+          if (matchedMember) {
+            return (
+              <TeammateWidget
+                key={idx}
+                name={matchedMember.name}
+                role={input.description || matchedMember.role}
+                agentId={matchedMember.agentId}
+                action={toolResult ? 'stop' : 'start'}
+                avatar={matchedMember.avatar}
+                color={matchedMember.color}
+              />
+            );
+          }
+        }
+
         return (
           <MemoizedTaskWidget
             key={idx}
@@ -586,7 +645,14 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             )}
           </div>
           <div className="assistant-content">
-            <div className="assistant-name">{agentName}</div>
+            <div className="assistant-name">
+              {agentName}
+              {(() => {
+                const team = useTeamStore.getState().activeTeam;
+                if (!team) return null;
+                return <TeamModeBadge team={team} />;
+              })()}
+            </div>
             {ruleNames.length > 0 && (
               <div className="rules-pills">
                 <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -698,8 +764,34 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   if (message.type === 'agent') {
     const agentEvent = message as any;
     const agentType = agentEvent.agent_type || agentEvent.agent_name || 'subagent';
+    const eventAction = agentEvent.action as 'start' | 'stop';
 
-    if (agentEvent.action === 'start') {
+    // Check if this agent event matches a team member
+    const activeTeam = useTeamStore.getState().activeTeam;
+    if (activeTeam && agentEvent.agent_name) {
+      const eventName = (agentEvent.agent_name as string).toLowerCase();
+      const matchedMember = activeTeam.members.find(m =>
+        m.name.toLowerCase() === eventName ||
+        m.name.toLowerCase().includes(eventName) ||
+        eventName.includes(m.name.toLowerCase())
+      );
+
+      if (matchedMember) {
+        return (
+          <TeammateWidget
+            name={matchedMember.name}
+            role={matchedMember.role}
+            agentId={matchedMember.agentId}
+            action={eventAction || 'start'}
+            avatar={matchedMember.avatar}
+            color={matchedMember.color}
+          />
+        );
+      }
+    }
+
+    // Default: use TaskWidget for droids/subagents
+    if (eventAction === 'start') {
       return (
         <TaskWidget
           subagentType={agentType}
@@ -710,7 +802,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       );
     }
 
-    if (agentEvent.action === 'stop') {
+    if (eventAction === 'stop') {
       return (
         <TaskWidget
           subagentType={agentType}

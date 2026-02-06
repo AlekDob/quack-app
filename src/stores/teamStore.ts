@@ -15,13 +15,14 @@ interface TeamStore {
   loading: boolean;
 
   // Actions
-  loadActiveTeam: (projectPath: string) => Promise<void>;
+  loadActiveTeam: (projectPath: string, agentAvatars?: Map<string, { avatar?: string; color?: string }>) => Promise<void>;
   createTeam: (
     projectPath: string,
     teamName: string,
     leadAgentId: string,
     memberAgentIds: string[],
     taskDescription?: string,
+    agentAvatars?: Map<string, { avatar?: string; color?: string }>,
   ) => Promise<TeamConfig>;
   disbandTeam: (projectPath: string, teamId: string) => Promise<void>;
   updateTeammateStatus: (agentName: string, status: TeammateStatus, sessionId?: string) => void;
@@ -33,10 +34,19 @@ export const useTeamStore = create<TeamStore>()((set) => ({
   teammateStatus: new Map(),
   loading: false,
 
-  loadActiveTeam: async (projectPath: string) => {
+  loadActiveTeam: async (projectPath: string, agentAvatars?: Map<string, { avatar?: string; color?: string }>) => {
     set({ loading: true });
     try {
       const team = await invoke<TeamConfig | null>('get_active_team', { projectPath });
+      if (team && agentAvatars) {
+        for (const member of team.members) {
+          const data = agentAvatars.get(member.agentId);
+          if (data) {
+            member.avatar = data.avatar;
+            member.color = data.color;
+          }
+        }
+      }
       set({ activeTeam: team });
     } catch (err) {
       console.error('Failed to load active team:', err);
@@ -45,7 +55,7 @@ export const useTeamStore = create<TeamStore>()((set) => ({
     }
   },
 
-  createTeam: async (projectPath, teamName, leadAgentId, memberAgentIds, taskDescription) => {
+  createTeam: async (projectPath, teamName, leadAgentId, memberAgentIds, taskDescription, agentAvatars) => {
     const team = await invoke<TeamConfig>('create_team', {
       projectPath,
       teamName,
@@ -53,6 +63,16 @@ export const useTeamStore = create<TeamStore>()((set) => ({
       memberAgentIds,
       taskDescription,
     });
+    // Enrich members with avatar/color from frontend agent data
+    if (agentAvatars) {
+      for (const member of team.members) {
+        const data = agentAvatars.get(member.agentId);
+        if (data) {
+          member.avatar = data.avatar;
+          member.color = data.color;
+        }
+      }
+    }
     set({ activeTeam: team });
     return team;
   },

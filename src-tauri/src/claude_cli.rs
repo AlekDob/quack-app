@@ -1398,11 +1398,11 @@ pub async fn send_message_via_sdk_streaming(
         command.env("CLAUDE_CODE_TASK_LIST_ID", &task_list_id);
     }
 
-    // Propagate Agent Teams env var when team context is present
-    if team_context.is_some() {
-        command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
-        log::info!("[SDK] Agent Teams mode enabled via env var");
-    }
+    // Always propagate Agent Teams env var so TeammateTool is available in SDK
+    // The user enables this via Settings toggle → stored in ~/.claude/settings.json
+    // Without this, F8() in the SDK returns false and TeammateTool is not registered
+    command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+    log::info!("[SDK] Agent Teams mode enabled via env var");
 
     log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);
     log::info!("[SDK DEBUG] Working directory: {:?}", node_sdk_dir);
