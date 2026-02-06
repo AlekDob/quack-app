@@ -1,0 +1,118 @@
+/**
+ * UpdateToast Styles
+ *
+ * Glassmorphism toast for update notifications.
+ * Consistent with ProjectToast design language.
+ */
+
+.update-toast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  min-width: 320px;
+  max-width: 440px;
+  background: rgba(15, 18, 28, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 0 30px rgba(34, 197, 94, 0.15);
+  overflow: hidden;
+  animation: update-toast-enter 0.35s cubic-bezier(0.21, 1.02, 0.73, 1);
+}
+
+/* Icon container */
+.update-toast__icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+/* Content */
+.update-toast__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-toast__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #22c55e;
+  margin-bottom: 2px;
+}
+
+.update-toast__version {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 500;
+}
+
+/* Action buttons */
+.update-toast__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.update-toast__btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.update-toast__btn--download {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+}
+
+.update-toast__btn--download:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
+}
+
+.update-toast__btn--dismiss {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.update-toast__btn--dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Accent line at bottom */
+.update-toast__accent {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  opacity: 0.9;
+  background: linear-gradient(90deg, #22c55e, rgba(34, 197, 94, 0.3));
+}
+
+@keyframes update-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
