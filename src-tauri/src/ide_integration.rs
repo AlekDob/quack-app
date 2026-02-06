@@ -377,6 +377,28 @@ fn is_cli_available(cli: &str) -> bool {
     }
 }
 
+/// Spawn a CLI command - on Windows uses cmd.exe /c to properly handle .cmd files
+#[cfg(target_os = "windows")]
+fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process::Child> {
+    // Build the full command string for cmd.exe
+    let mut cmd_args = vec!["/c".to_string(), cli.to_string()];
+    cmd_args.extend(args.iter().cloned());
+
+    log::info!("[IDE] Windows: Executing via cmd.exe: {:?}", cmd_args);
+
+    Command::new("cmd")
+        .args(&cmd_args)
+        .spawn()
+}
+
+/// Spawn a CLI command - on non-Windows just run directly
+#[cfg(not(target_os = "windows"))]
+fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process::Child> {
+    Command::new(cli)
+        .args(args)
+        .spawn()
+}
+
 /// Detect all installed IDEs on the system
 #[tauri::command]
 pub fn detect_installed_ides() -> Vec<IDEInfo> {
@@ -572,9 +594,7 @@ pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String,
         // Try CLI first
         let cli_available = is_cli_available(ide.cli);
         if cli_available {
-            let result = Command::new(ide.cli)
-                .arg(&folder_path)
-                .spawn();
+            let result = spawn_cli_command(ide.cli, &[folder_path.clone()]);
 
             match result {
                 Ok(_) => return Ok(format!("Opened {} in {}", folder_path, ide.name)),
@@ -601,9 +621,7 @@ pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String,
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         // Fallback to CLI command
-        let result = Command::new(ide.cli)
-            .arg(&folder_path)
-            .spawn();
+        let result = spawn_cli_command(ide.cli, &[folder_path.clone()]);
 
         match result {
             Ok(_) => Ok(format!("Opened {} in {}", folder_path, ide.name)),
@@ -879,9 +897,7 @@ pub fn open_file_in_ide(
             // Step 1: Open project folder first (if found)
             if let Some(ref root) = project_root {
                 log::info!("[IDE] Step 1: Opening project folder with CLI '{}': {}", entry.cli, root);
-                let _ = Command::new(entry.cli)
-                    .arg(root)
-                    .spawn();
+                let _ = spawn_cli_command(entry.cli, &[root.clone()]);
 
                 // Small delay to let IDE initialize
                 std::thread::sleep(std::time::Duration::from_millis(500));
@@ -906,9 +922,7 @@ pub fn open_file_in_ide(
 
             log::info!("[IDE] Step 2: Opening file with CLI '{}' and args: {:?}", entry.cli, args);
 
-            let result = Command::new(entry.cli)
-                .args(&args)
-                .spawn();
+            let result = spawn_cli_command(entry.cli, &args);
 
             match result {
                 Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
@@ -931,9 +945,7 @@ pub fn open_file_in_ide(
 
             log::info!("[IDE] JetBrains args: {:?}", args);
 
-            let result = Command::new(entry.cli)
-                .args(&args)
-                .spawn();
+            let result = spawn_cli_command(entry.cli, &args);
 
             match result {
                 Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
@@ -1017,9 +1029,7 @@ pub fn open_file_in_ide(
 
             log::info!("[IDE] Zed args: {:?}", args);
 
-            let result = Command::new(entry.cli)
-                .args(&args)
-                .spawn();
+            let result = spawn_cli_command(entry.cli, &args);
 
             match result {
                 Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
@@ -1043,9 +1053,7 @@ pub fn open_file_in_ide(
 
             log::info!("[IDE] Sublime args: {:?}", args);
 
-            let result = Command::new(entry.cli)
-                .args(&args)
-                .spawn();
+            let result = spawn_cli_command(entry.cli, &args);
 
             match result {
                 Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
@@ -1053,9 +1061,7 @@ pub fn open_file_in_ide(
             }
         }
         _ => {
-            let result = Command::new(entry.cli)
-                .arg(&file_path)
-                .spawn();
+            let result = spawn_cli_command(entry.cli, &[file_path.clone()]);
 
             match result {
                 Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
