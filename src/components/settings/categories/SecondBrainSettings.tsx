@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
@@ -8,6 +7,7 @@ import {
   setBrainCustomPath,
   getCustomBrainPath,
   initBrainStructure,
+  openBrainFolder,
 } from '../../../services/brainFileService';
 
 export default function SecondBrainSettings() {
@@ -57,7 +57,7 @@ export default function SecondBrainSettings() {
 
   const handleOpenBrain = async () => {
     try {
-      await invoke('reveal_in_finder', { path: brainPath });
+      await openBrainFolder();
     } catch (err) {
       console.error('Failed to open brain folder:', err);
     }
@@ -65,8 +65,7 @@ export default function SecondBrainSettings() {
 
   const handleOpenInObsidian = async () => {
     try {
-      const uri = `obsidian://open?path=${encodeURIComponent(brainPath)}`;
-      await invoke('open_external_url', { url: uri });
+      await openBrainFolder(true);
     } catch (err) {
       console.error('Failed to open in Obsidian:', err);
     }

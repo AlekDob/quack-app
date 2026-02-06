@@ -72,3 +72,14 @@ export function getFileManagerName(): string {
 export function cleanPath(path: string): string {
   return path.replace(/^\\\\\?\\/, '');
 }
+
+/**
+ * Normalize path separators for the current platform.
+ * On Windows, converts forward slashes to backslashes.
+ */
+export function normalizePath(path: string): string {
+  if (isWindows()) {
+    return path.replace(/\//g, '\\');
+  }
+  return path;
+}

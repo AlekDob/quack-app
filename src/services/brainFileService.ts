@@ -9,6 +9,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { normalizePath } from '../utils/platform';
 
 const DEFAULT_BRAIN_DIR = '.quack/brain';
 const BRAIN_PATH_KEY = 'quack-brain-path';
@@ -43,7 +44,7 @@ async function getBrainPath(): Promise<string> {
   if (customPath) return customPath;
 
   const home = await invoke<string>('get_home_directory');
-  return `${home}/${DEFAULT_BRAIN_DIR}`;
+  return normalizePath(`${home}/${DEFAULT_BRAIN_DIR}`);
 }
 
 /**
@@ -66,8 +67,8 @@ export async function setBrainCustomPath(path: string | null): Promise<void> {
 async function writeBrainPathMarker(customPath: string | null): Promise<void> {
   try {
     const home = await invoke<string>('get_home_directory');
-    const markerPath = `${home}/${BRAIN_PATH_MARKER}`;
-    const brainPath = customPath || `${home}/${DEFAULT_BRAIN_DIR}`;
+    const markerPath = normalizePath(`${home}/${BRAIN_PATH_MARKER}`);
+    const brainPath = customPath || normalizePath(`${home}/${DEFAULT_BRAIN_DIR}`);
     await invoke('write_file_content', { path: markerPath, content: brainPath });
   } catch (err) {
     console.error('Failed to write brain-path marker:', err);
@@ -218,6 +219,13 @@ export async function readBrainEntry(filePath: string): Promise<BrainEntry | nul
  */
 export async function openBrainFolder(inObsidian?: boolean): Promise<void> {
   const brainPath = await getBrainPath();
+
+  // Ensure the brain root directory exists before revealing
+  try {
+    await invoke('create_directory', { path: brainPath });
+  } catch {
+    // Already exists
+  }
 
   if (inObsidian) {
     // Try to open via Obsidian URI scheme
