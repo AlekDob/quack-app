@@ -8,6 +8,7 @@ import { getCurrentVersion } from "./utils/version";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
 import {
   isPermissionGranted,
   requestPermission,
@@ -10469,7 +10470,7 @@ You have access to all Bash tools to execute git commands like:
                     {/* Open Guide */}
                     <button
                       type="button"
-                      onClick={() => setEmptyStateShowGuide(true)}
+                      onClick={() => openExternal('https://quack.build/docs')}
                       style={{
                         padding: '0',
                         fontSize: '12px',
@@ -10502,7 +10503,7 @@ You have access to all Bash tools to execute git commands like:
                     {/* Discord */}
                     <button
                       type="button"
-                      onClick={() => window.open('https://discord.gg/wUnTXGPvUt', '_blank')}
+                      onClick={() => openExternal('https://discord.gg/bQd39uDhnc')}
                       style={{
                         padding: '0',
                         fontSize: '12px',
@@ -10534,7 +10535,7 @@ You have access to all Bash tools to execute git commands like:
                     {/* Email */}
                     <button
                       type="button"
-                      onClick={() => window.open('mailto:quack@quack.build', '_blank')}
+                      onClick={() => openExternal('mailto:quack@quack.build')}
                       style={{
                         padding: '0',
                         fontSize: '12px',

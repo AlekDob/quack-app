@@ -282,10 +282,10 @@ export default function AboutSettings() {
 
           <div
             className="resource-link"
-            onClick={() => open('https://discord.gg/5P9VegN5')}
+            onClick={() => open('https://discord.gg/bQd39uDhnc')}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && open('https://discord.gg/5P9VegN5')}
+            onKeyDown={(e) => e.key === 'Enter' && open('https://discord.gg/bQd39uDhnc')}
           >
             <svg className="resource-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
