@@ -224,6 +224,21 @@
   border-color: rgba(155, 89, 182, 0.15);
 }
 
+/* Skill tool - distinctive background */
+.tool-minimal-line.skill {
+  background: rgba(233, 121, 64, 0.15);
+  border-color: rgba(233, 121, 64, 0.3);
+}
+
+.tool-minimal-line.skill:hover {
+  background: rgba(233, 121, 64, 0.22);
+  border-color: rgba(233, 121, 64, 0.4);
+}
+
+.tool-minimal-line.skill .tool-minimal-name {
+  color: #E97940 !important;
+}
+
 /* Chevron for expandable */
 .tool-minimal-chevron {
   color: rgba(255, 255, 255, 0.3);
