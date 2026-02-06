@@ -37,6 +37,9 @@ import {
   isCustomAvatar,
 } from "../utils/customAvatarStorage";
 import { useSessionStore } from "../stores/sessionStore";
+import { useTeamStore } from "../stores/teamStore";
+import TeamCreationModal from "./TeamCreationModal";
+import TeamStatusBadge from "./TeamStatusBadge";
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult } from "../types";
 
@@ -1134,6 +1137,16 @@ export default function RepositoryGroup({
   const displayName = getRepoDisplayName(repoName);
   const isDraggingAny = activeAgentId !== null;
 
+  // Team state
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const activeTeam = useTeamStore((s) => s.activeTeam);
+  const loadActiveTeam = useTeamStore((s) => s.loadActiveTeam);
+
+  // Load active team on mount
+  useEffect(() => {
+    loadActiveTeam(repoPath);
+  }, [repoPath, loadActiveTeam]);
+
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
   const { sessions: allSessionsForRepo, createSession } = useSessionStore();
 
@@ -1677,6 +1690,9 @@ export default function RepositoryGroup({
             >
               {displayName}
             </span>
+            {activeTeam && activeTeam.projectPath === repoPath && (
+              <TeamStatusBadge team={activeTeam} />
+            )}
           </div>
 
           {/* Action buttons - consistent style */}
@@ -1763,6 +1779,32 @@ export default function RepositoryGroup({
                 <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
               </svg>
             </button>
+            {/* Create Team button (only when Agent Teams feature is enabled) */}
+            {mainAgents.length >= 2 && !activeTeam && (
+              <button
+                type="button"
+                onClick={() => setShowTeamModal(true)}
+                title="Create Agent Team"
+                className="repo-action-btn"
+                style={{ color: "rgba(255, 107, 53, 0.7)" }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
+            )}
             {/* New Agent button */}
             {onCreateAgent && (
               <button
@@ -3018,6 +3060,14 @@ export default function RepositoryGroup({
               )?.label
             : undefined
         }
+      />
+
+      {/* Team Creation Modal */}
+      <TeamCreationModal
+        isOpen={showTeamModal}
+        onClose={() => setShowTeamModal(false)}
+        projectPath={repoPath}
+        agents={[...mainAgents, ...worktreeAgents]}
       />
     </div>
   );

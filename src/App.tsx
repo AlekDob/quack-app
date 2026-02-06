@@ -79,6 +79,7 @@ import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useSessionStore } from "./stores/sessionStore";
+import { useTeamStore } from "./stores/teamStore";
 import { useChatStore } from "./stores/chatStore";
 import { useIDEStore } from "./stores/ideStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
@@ -1151,6 +1152,19 @@ function AppContent() {
       contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
     });
 
+    // Intercept Agent events for Team teammate tracking
+    if (claudeEvent.type === 'agent') {
+      const agentEvt = claudeEvent as any;
+      const teamState = useTeamStore.getState();
+      if (teamState.activeTeam && agentEvt.agent_name) {
+        if (agentEvt.action === 'start') {
+          teamState.updateTeammateStatus(agentEvt.agent_name, 'active', agentEvt.session_id);
+        } else if (agentEvt.action === 'stop') {
+          teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped');
+        }
+      }
+    }
+
     // Update chat session with incoming events using messageKey
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
@@ -2213,9 +2227,9 @@ function AppContent() {
     });
 
     try {
-      // Build context from agent's conversation history
-      // 🦆 RACE CONDITION FIX: Use capturedAgentId
-      const agentHistory = chatConversationHistoryRef.current.get(capturedAgentId) ?? [];
+      // Build context from SESSION's conversation history (not agent!)
+      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so sessions don't share history
+      const agentHistory = chatConversationHistoryRef.current.get(messageKey) ?? [];
       let prompt = contentWithAttachments;
       if (agentHistory.length > 0) {
         const history = agentHistory
@@ -2324,8 +2338,8 @@ function AppContent() {
           content: response.result,
         },
       ];
-      // 🦆 RACE CONDITION FIX: Use CAPTURED agentId, not current activeId
-      chatConversationHistoryRef.current.set(capturedAgentId, updatedHistory);
+      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so each session has its own history
+      chatConversationHistoryRef.current.set(messageKey, updatedHistory);
 
 
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
@@ -3436,8 +3450,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newSessions;
       });
 
-      // Clear conversation history
-      chatConversationHistoryRef.current.set(activeId, []);
+      // Clear conversation history (keyed by sessionId)
+      const sessionToClear = activeSessionId || activeId;
+      chatConversationHistoryRef.current.set(sessionToClear, []);
 
       // Clear last prompt
       lastPromptsRef.current.delete(activeId);
@@ -5259,7 +5274,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             const appLoader = document.getElementById('app-loader');
             if (appLoader) {
               appLoader.classList.add('fade-out');
-              setTimeout(() => appLoader.remove(), 500); // Match CSS transition duration
+              setTimeout(() => appLoader.remove(), 800); // Match CSS transition duration
             }
           }, 150); // Delay for layout stabilization before fade
         });
@@ -5651,21 +5666,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
 
   // Load Quack Agency agents on startup
-  // No longer blocking splash - agents load in background while native splash shows
+  // Load agents in parallel with main bootstrap (non-blocking)
+  // booting/hasBootstrapped are controlled by main bootstrap only (line ~6355)
   useEffect(() => {
     if (!tauriAvailable) {
       return;
     }
-    const loadInitialAgents = async () => {
-      console.log('[Startup] Loading agents...');
-      await loadAgents();
-      console.log('[Startup] Agents loaded');
-      setBooting(false);
-      if (!hasBootstrapped) {
-        setHasBootstrapped(true);
-      }
-    };
-    void loadInitialAgents();
+    console.log('[Startup] Loading agents...');
+    void loadAgents().then(() => console.log('[Startup] Agents loaded'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable]);
 

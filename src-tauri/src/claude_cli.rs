@@ -200,6 +200,23 @@ pub struct AgentConfig {
     pub file_path: String,
 }
 
+/// Team context for Agent Teams mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamContext {
+    pub team_name: String,
+    pub members: Vec<TeamContextMember>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamContextMember {
+    pub name: String,
+    pub role: String,
+    pub communication_style: String,
+    pub is_lead: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCliRequest {
@@ -223,6 +240,8 @@ pub struct ClaudeCliRequest {
     // 🦆 SESSION-FIRST: Frontend session key for routing events to correct chat session
     // This allows parallel conversations - each stream knows where to write its events
     pub session_key: Option<String>,
+    // 🦆 Agent Teams context (team name + members for prompt augmentation)
+    pub team_context: Option<TeamContext>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -1031,6 +1050,7 @@ pub async fn send_message_via_sdk_streaming(
         setting_sources, // ✅ Extract setting_sources to control prompt length
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
         session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
+        team_context, // 🦆 Agent Teams context
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
@@ -1110,6 +1130,12 @@ pub async fn send_message_via_sdk_streaming(
     // Add agents if provided
     if let Some(agent_list) = agents {
         config["agents"] = serde_json::json!(agent_list);
+    }
+
+    // Add teamContext if provided (Agent Teams mode)
+    if let Some(tc) = &team_context {
+        config["teamContext"] = serde_json::json!(tc);
+        log::info!("[SDK] Adding teamContext: team={}, {} members", tc.team_name, tc.members.len());
     }
 
     // Add attachments if provided (for image support)
@@ -1370,6 +1396,12 @@ pub async fn send_message_via_sdk_streaming(
         let task_list_id = format!("quack-{}", sid);
         log::info!("[SDK] Setting CLAUDE_CODE_TASK_LIST_ID: {}", task_list_id);
         command.env("CLAUDE_CODE_TASK_LIST_ID", &task_list_id);
+    }
+
+    // Propagate Agent Teams env var when team context is present
+    if team_context.is_some() {
+        command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+        log::info!("[SDK] Agent Teams mode enabled via env var");
     }
 
     log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);

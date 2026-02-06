@@ -134,6 +134,7 @@ const {
   effort, // Effort parameter: 'low' | 'medium' | 'high' (SDK 0.1.54+)
   mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
   allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
+  teamContext, // Agent Teams context (team name + members for prompt augmentation)
 } = config;
 
 // DEBUG: Log what we received from Rust
@@ -396,6 +397,32 @@ function checkAuthentication() {
   };
 }
 
+/**
+ * Build system prompt augmentation for Agent Teams mode.
+ * Tells the Team Lead about its role and how to spawn teammates.
+ */
+function buildTeamPromptAugmentation(tc) {
+  const lead = tc.members.find(m => m.isLead);
+  const teammates = tc.members.filter(m => !m.isLead);
+
+  let aug = `\n\n## Agent Teams Mode\n\n`;
+  aug += `You are the **TEAM LEAD** of team "${tc.teamName}".\n`;
+  aug += `Quack is the visual display layer - do NOT use tmux.\n\n`;
+
+  if (teammates.length > 0) {
+    aug += `### Your Teammates\n\n`;
+    aug += `When you need to delegate work, spawn teammates using the TeammateTool. `;
+    aug += `Each teammate will read CLAUDE.md and find their personality in the Team Roster.\n\n`;
+
+    for (const mate of teammates) {
+      aug += `- **${mate.name}** (${mate.role}) - Style: ${mate.communicationStyle}\n`;
+    }
+    aug += `\n`;
+  }
+
+  return aug;
+}
+
 async function main() {
   try {
     // Check authentication and log warnings, but don't block
@@ -500,6 +527,7 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
+        + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
       },
 
       // =============================================================================

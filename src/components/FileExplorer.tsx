@@ -368,7 +368,7 @@ function FileExplorer({
               ? "…"
               : null;
           // Files get extra indentation to visually distinguish from parent folder
-          const paddingLeft = isDirectory
+          const marginLeft = isDirectory
             ? 12 + depth * 24
             : 12 + depth * 24 + 10; // Files: +10px extra indent
 
@@ -392,7 +392,7 @@ function FileExplorer({
               <button
                 type="button"
                 className={rowClass}
-                style={{ paddingLeft: `${paddingLeft}px` }}
+                style={{ marginLeft: `${marginLeft}px`, paddingLeft: '6px' }}
                 title={entry.name}
                 onClick={() => {
                   if (isDirectory) {
@@ -460,8 +460,14 @@ function FileExplorer({
               {isDirectory &&
                 isExpanded &&
                 tree[entry.path] &&
-                tree[entry.path].length > 0 &&
-                renderEntries(tree[entry.path], depth + 1)}
+                tree[entry.path].length > 0 && (
+                  <div
+                    className="explorer-tree-indent"
+                    style={{ '--indent-left': `${20 + depth * 24}px` } as React.CSSProperties}
+                  >
+                    {renderEntries(tree[entry.path], depth + 1)}
+                  </div>
+                )}
             </Fragment>
           );
         }),
@@ -581,7 +587,7 @@ function FileExplorer({
     return hierarchicalSearchResults.map((node) => {
       if (node.type === 'folder') {
         const isExpanded = expandedSearchFolders.has(node.path);
-        const paddingLeft = 8 + node.depth * 16;
+        const searchMarginLeft = 8 + node.depth * 16;
 
         return (
           <Fragment key={node.path}>
@@ -589,7 +595,7 @@ function FileExplorer({
             <button
               type="button"
               className="explorer-row directory"
-              style={{ paddingLeft: `${paddingLeft}px` }}
+              style={{ marginLeft: `${searchMarginLeft}px`, paddingLeft: '6px' }}
               onClick={() => {
                 setExpandedSearchFolders((prev) => {
                   const next = new Set(prev);
@@ -636,14 +642,14 @@ function FileExplorer({
                 .filter(Boolean)
                 .join(" ");
 
-              const filePaddingLeft = 8 + (node.depth + 1) * 16;
+              const fileMarginLeft = 8 + (node.depth + 1) * 16;
 
               return (
                 <button
                   key={result.path}
                   type="button"
                   className={rowClass}
-                  style={{ paddingLeft: `${filePaddingLeft}px` }}
+                  style={{ marginLeft: `${fileMarginLeft}px`, paddingLeft: '6px' }}
                   title={result.relative_path}
                   onClick={() => onOpenFile(entry)}
                   onContextMenu={(event) => handleContextMenu(event, entry)}
