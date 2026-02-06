@@ -61,6 +61,41 @@ Write-Host "npm: $(npm --version)" -ForegroundColor Green
 Write-Host "Cargo: $(cargo --version)" -ForegroundColor Green
 Write-Host ""
 
+# Load .env file if it exists (required for Rust compile-time variables)
+$envFile = Join-Path $projectRoot ".env"
+if (Test-Path $envFile) {
+    Write-Host "Loading .env file..." -ForegroundColor Yellow
+    Get-Content $envFile | ForEach-Object {
+        # Skip comments and empty lines
+        if ($_ -match '^\s*#' -or $_ -match '^\s*$') { return }
+        # Skip lines with 'export ' prefix (bash syntax)
+        $line = $_ -replace '^export\s+', ''
+        # Parse KEY=VALUE
+        if ($line -match '^([^=]+)=(.*)$') {
+            $key = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            # Remove surrounding quotes if present
+            $value = $value -replace '^["'']|["'']$', ''
+            [System.Environment]::SetEnvironmentVariable($key, $value, "Process")
+        }
+    }
+    Write-Host "  Environment variables loaded" -ForegroundColor Green
+
+    # Verify critical variables
+    $criticalVars = @("GUMROAD_PRODUCT_ID", "SUPABASE_URL", "SUPABASE_ANON_KEY")
+    foreach ($var in $criticalVars) {
+        $value = [System.Environment]::GetEnvironmentVariable($var, "Process")
+        if ($value) {
+            Write-Host "  $var : OK" -ForegroundColor Green
+        } else {
+            Write-Host "  $var : NOT SET" -ForegroundColor Red
+        }
+    }
+} else {
+    Write-Host "No .env file found - some features may not work" -ForegroundColor Yellow
+}
+Write-Host ""
+
 # Kill any process using port 5174
 Write-Host "Checking port 5174..." -ForegroundColor Yellow
 $processOnPort = Get-NetTCPConnection -LocalPort 5174 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1

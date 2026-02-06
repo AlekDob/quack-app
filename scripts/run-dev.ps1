@@ -1,4 +1,4 @@
-# Run Tauri Dev with proper PATH
+# Run Tauri Dev with proper PATH and .env loading
 $ErrorActionPreference = "Stop"
 
 # Setup PATH
@@ -10,6 +10,42 @@ Set-Location $projectRoot
 Write-Host ""
 Write-Host "Quack Development Server (Windows)" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Load .env file if it exists (required for Rust compile-time variables)
+$envFile = Join-Path $projectRoot ".env"
+if (Test-Path $envFile) {
+    Write-Host "Loading .env file..." -ForegroundColor Yellow
+    Get-Content $envFile | ForEach-Object {
+        # Skip comments and empty lines
+        if ($_ -match '^\s*#' -or $_ -match '^\s*$') { return }
+        # Skip lines with 'export ' prefix (bash syntax)
+        $line = $_ -replace '^export\s+', ''
+        # Parse KEY=VALUE
+        if ($line -match '^([^=]+)=(.*)$') {
+            $key = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            # Remove surrounding quotes if present
+            $value = $value -replace '^["'']|["'']$', ''
+            [System.Environment]::SetEnvironmentVariable($key, $value, "Process")
+        }
+    }
+    Write-Host "Environment variables loaded from .env" -ForegroundColor Green
+
+    # Verify critical variables for Rust
+    if ($env:GUMROAD_PRODUCT_ID) {
+        Write-Host "  GUMROAD_PRODUCT_ID: configured" -ForegroundColor Green
+    } else {
+        Write-Host "  GUMROAD_PRODUCT_ID: NOT SET" -ForegroundColor Red
+    }
+    if ($env:SUPABASE_URL) {
+        Write-Host "  SUPABASE_URL: configured" -ForegroundColor Green
+    } else {
+        Write-Host "  SUPABASE_URL: NOT SET" -ForegroundColor Red
+    }
+} else {
+    Write-Host "No .env file found - using defaults" -ForegroundColor Yellow
+}
 Write-Host ""
 
 # Verify
