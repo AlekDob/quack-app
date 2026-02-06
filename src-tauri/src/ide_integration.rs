@@ -68,17 +68,73 @@ impl IDEEntry {
         }
         // Try Program Files
         if let Some(program_path) = self.app_path_program {
-            if let Ok(program_files) = std::env::var("ProgramFiles") {
-                let full_path = format!("{}\\{}", program_files, program_path);
-                if std::path::Path::new(&full_path).exists() {
-                    return Some(full_path);
+            // Check if path contains wildcard
+            if program_path.contains('*') {
+                // Handle glob pattern for JetBrains IDEs
+                if let Some(found) = Self::find_jetbrains_path(program_path) {
+                    return Some(found);
+                }
+            } else {
+                if let Ok(program_files) = std::env::var("ProgramFiles") {
+                    let full_path = format!("{}\\{}", program_files, program_path);
+                    if std::path::Path::new(&full_path).exists() {
+                        return Some(full_path);
+                    }
+                }
+                // Also try Program Files (x86)
+                if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
+                    let full_path = format!("{}\\{}", program_files_x86, program_path);
+                    if std::path::Path::new(&full_path).exists() {
+                        return Some(full_path);
+                    }
                 }
             }
-            // Also try Program Files (x86)
-            if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
-                let full_path = format!("{}\\{}", program_files_x86, program_path);
-                if std::path::Path::new(&full_path).exists() {
-                    return Some(full_path);
+        }
+        None
+    }
+
+    #[cfg(target_os = "windows")]
+    fn find_jetbrains_path(pattern: &str) -> Option<String> {
+        // Pattern like "JetBrains\\IntelliJ IDEA*\\bin\\idea64.exe"
+        // Split by wildcard to get prefix and suffix
+        let parts: Vec<&str> = pattern.split('*').collect();
+        if parts.len() != 2 {
+            return None;
+        }
+
+        let prefix = parts[0]; // "JetBrains\\IntelliJ IDEA"
+        let suffix = parts[1]; // "\\bin\\idea64.exe"
+
+        // Try both Program Files locations
+        let program_dirs = [
+            std::env::var("ProgramFiles").ok(),
+            std::env::var("ProgramFiles(x86)").ok(),
+        ];
+
+        for program_dir in program_dirs.into_iter().flatten() {
+            let jetbrains_dir = format!("{}\\JetBrains", program_dir);
+            if let Ok(entries) = std::fs::read_dir(&jetbrains_dir) {
+                // Get the IDE folder name prefix (e.g., "IntelliJ IDEA")
+                let ide_prefix = prefix.trim_start_matches("JetBrains\\");
+
+                // Find matching directories, sort by name descending to get latest version
+                let mut matching_dirs: Vec<_> = entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| {
+                        e.file_name()
+                            .to_string_lossy()
+                            .starts_with(ide_prefix)
+                    })
+                    .collect();
+
+                // Sort descending to get latest version first
+                matching_dirs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+
+                for dir in matching_dirs {
+                    let exe_path = format!("{}{}", dir.path().display(), suffix);
+                    if std::path::Path::new(&exe_path).exists() {
+                        return Some(exe_path);
+                    }
                 }
             }
         }
@@ -192,6 +248,17 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/RubyMine.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\RubyMine*\\bin\\rubymine64.exe"),
+        cli_style: "jetbrains",
+        supports_diff: true,
+    },
+    IDEEntry {
+        id: "phpstorm",
+        name: "PhpStorm",
+        bundle_id: "com.jetbrains.PhpStorm",
+        cli: "phpstorm",
+        app_path: "/Applications/PhpStorm.app",
+        app_path_local: None,
+        app_path_program: Some("JetBrains\\PhpStorm*\\bin\\phpstorm64.exe"),
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -468,6 +535,8 @@ pub fn execute_ide_command(cli: String, args: Vec<String>) -> Result<String, Str
 /// This is more reliable than using CLI commands which may not be in PATH
 #[tauri::command]
 pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String, String> {
+    // Normalize the path (remove \\?\ prefix on Windows)
+    let folder_path = normalize_path(&folder_path);
     log::info!("[IDE] Opening folder {} in IDE {}", folder_path, ide_id);
 
     // Find IDE entry
@@ -498,7 +567,38 @@ pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String,
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // Try CLI first
+        let cli_available = is_cli_available(ide.cli);
+        if cli_available {
+            let result = Command::new(ide.cli)
+                .arg(&folder_path)
+                .spawn();
+
+            match result {
+                Ok(_) => return Ok(format!("Opened {} in {}", folder_path, ide.name)),
+                Err(e) => log::warn!("[IDE] CLI failed: {}, trying exe path", e),
+            }
+        }
+
+        // Fallback to exe path
+        if let Some(app_path) = ide.get_app_path() {
+            log::info!("[IDE] Using exe path: {}", app_path);
+            let result = Command::new(&app_path)
+                .arg(&folder_path)
+                .spawn();
+
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", folder_path, ide.name)),
+                Err(e) => Err(format!("Failed to open in {}: {}", ide.name, e)),
+            };
+        }
+
+        Err(format!("{} not found on this system", ide.name))
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         // Fallback to CLI command
         let result = Command::new(ide.cli)
@@ -684,6 +784,8 @@ pub fn open_file_in_ide(
     line: Option<u32>,
     column: Option<u32>,
 ) -> Result<String, String> {
+    // Normalize the path (remove \\?\ prefix on Windows)
+    let file_path = normalize_path(&file_path);
     log::info!(
         "[IDE] open_file_in_ide called: ide_id={}, file_path={}, line={:?}, column={:?}",
         ide_id, file_path, line, column
@@ -1156,41 +1258,161 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
                 });
             }
         }
+        // Git Bash
+        let git_bash_paths = [
+            std::env::var("ProgramFiles")
+                .map(|pf| format!("{}\\Git\\git-bash.exe", pf))
+                .ok(),
+            std::env::var("ProgramFiles(x86)")
+                .map(|pf| format!("{}\\Git\\git-bash.exe", pf))
+                .ok(),
+        ];
+        for git_bash_path in git_bash_paths.into_iter().flatten() {
+            if Path::new(&git_bash_path).exists() {
+                apps.push(InstalledApp {
+                    id: "git-bash".to_string(),
+                    name: "Git Bash".to_string(),
+                    app_path: git_bash_path,
+                    category: "terminal".to_string(),
+                    icon_base64: None,
+                });
+                break; // Only add once
+            }
+        }
     }
 
     log::info!("[IDE] Found {} installed apps", apps.len());
     apps
 }
 
+/// Normalize Windows extended paths (remove \\?\ prefix)
+fn normalize_path(path: &str) -> String {
+    if path.starts_with(r"\\?\") {
+        path[4..].to_string()
+    } else {
+        path.to_string()
+    }
+}
+
 /// Open path in an app (IDE, terminal, or Finder)
 #[tauri::command]
 pub fn open_in_app(app_id: String, path: String) -> Result<String, String> {
+    // Normalize the path (remove \\?\ prefix on Windows)
+    let path = normalize_path(&path);
     log::info!("[IDE] Opening {} in {}", path, app_id);
 
     // Check if it's an IDE
-    if let Some(ide) = IDE_REGISTRY.iter().find(|e| e.id == app_id) {
+    if IDE_REGISTRY.iter().any(|e| e.id == app_id) {
         return open_folder_in_ide(app_id, path);
     }
 
-    // Check if it's a terminal or Finder
+    // Check if it's a terminal or Finder (macOS)
+    #[cfg(target_os = "macos")]
     if let Some(app) = APP_REGISTRY.iter().find(|e| e.id == app_id) {
-        #[cfg(target_os = "macos")]
-        {
-            let result = Command::new("open")
-                .arg("-a")
-                .arg(app.app_path)
-                .arg(&path)
-                .spawn();
+        let result = Command::new("open")
+            .arg("-a")
+            .arg(app.app_path)
+            .arg(&path)
+            .spawn();
 
-            return match result {
-                Ok(_) => Ok(format!("Opened {} in {}", path, app.name)),
-                Err(e) => Err(format!("Failed to open: {}", e)),
-            };
-        }
+        return match result {
+            Ok(_) => Ok(format!("Opened {} in {}", path, app.name)),
+            Err(e) => Err(format!("Failed to open: {}", e)),
+        };
+    }
 
-        #[cfg(not(target_os = "macos"))]
-        {
-            return Err("Only supported on macOS".to_string());
+    // Handle Windows-specific apps
+    #[cfg(target_os = "windows")]
+    {
+        match app_id.as_str() {
+            "explorer" => {
+                // Windows File Explorer - use full path
+                let explorer_path = std::env::var("SystemRoot")
+                    .map(|sr| format!("{}\\explorer.exe", sr))
+                    .unwrap_or_else(|_| "C:\\Windows\\explorer.exe".to_string());
+
+                let result = Command::new(&explorer_path)
+                    .arg(&path)
+                    .spawn();
+
+                return match result {
+                    Ok(_) => Ok(format!("Opened {} in File Explorer", path)),
+                    Err(e) => Err(format!("Failed to open File Explorer: {}", e)),
+                };
+            }
+            "windows-terminal" => {
+                // Windows Terminal with Command Prompt profile
+                let wt_paths = [
+                    std::env::var("LOCALAPPDATA")
+                        .map(|la| format!("{}\\Microsoft\\WindowsApps\\wt.exe", la))
+                        .ok(),
+                    Some("wt.exe".to_string()), // fallback to PATH
+                ];
+
+                for wt_path in wt_paths.into_iter().flatten() {
+                    // Open Command Prompt in Windows Terminal
+                    let result = Command::new(&wt_path)
+                        .arg("-d")
+                        .arg(&path)
+                        .arg("cmd")
+                        .spawn();
+
+                    if result.is_ok() {
+                        return Ok(format!("Opened Command Prompt in {}", path));
+                    }
+                }
+
+                return Err("Windows Terminal not found".to_string());
+            }
+            "powershell" => {
+                // PowerShell via Windows Terminal (default profile)
+                let wt_paths = [
+                    std::env::var("LOCALAPPDATA")
+                        .map(|la| format!("{}\\Microsoft\\WindowsApps\\wt.exe", la))
+                        .ok(),
+                    Some("wt.exe".to_string()), // fallback to PATH
+                ];
+
+                for wt_path in wt_paths.into_iter().flatten() {
+                    let result = Command::new(&wt_path)
+                        .arg("-d")
+                        .arg(&path)
+                        .spawn();
+
+                    if result.is_ok() {
+                        return Ok(format!("Opened PowerShell in {}", path));
+                    }
+                }
+
+                return Err("Windows Terminal not found".to_string());
+            }
+            "git-bash" => {
+                // Git Bash - try multiple locations
+                let git_bash_paths = [
+                    std::env::var("ProgramFiles")
+                        .map(|pf| format!("{}\\Git\\git-bash.exe", pf))
+                        .ok(),
+                    std::env::var("ProgramFiles(x86)")
+                        .map(|pf| format!("{}\\Git\\git-bash.exe", pf))
+                        .ok(),
+                ];
+
+                for git_bash_path in git_bash_paths.into_iter().flatten() {
+                    if Path::new(&git_bash_path).exists() {
+                        let result = Command::new(&git_bash_path)
+                            .arg(format!("--cd={}", path))
+                            .spawn();
+
+                        return match result {
+                            Ok(_) => Ok(format!("Opened Git Bash in {}", path)),
+                            Err(e) => Err(format!("Failed to open Git Bash: {}", e)),
+                        };
+                    }
+                }
+
+                return Err("Git Bash not found".to_string());
+            }
+            _ => {}
         }
     }
 
