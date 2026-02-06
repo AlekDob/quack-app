@@ -12,6 +12,7 @@ import FileContextMenu from "./FileContextMenu";
 import RevealInFinderButton from "./RevealInFinderButton";
 import OpenInIDEButton from "./OpenInIDEButton";
 import FileIcon from "./FileIcon";
+import { cleanPath, getFileManagerName } from "../utils/platform";
 import "./FileExplorer.compact.css";
 
 const normalize = (value: string) => value.toLowerCase();
@@ -730,11 +731,11 @@ function FileExplorer({
                     const { invoke } = await import('@tauri-apps/api/core');
                     await invoke('reveal_in_finder', { path: activePath });
                   } catch (err) {
-                    console.error('Failed to reveal in Finder:', err);
+                    console.error(`Failed to reveal in ${getFileManagerName()}:`, err);
                   }
                 }}
                 className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                title="Reveal in Finder"
+                title={`Reveal in ${getFileManagerName()}`}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -743,7 +744,7 @@ function FileExplorer({
             )}
           </div>
         </div>
-        <span className="explorer-path">{activePath}</span>
+        <span className="explorer-path">{activePath ? cleanPath(activePath) : ''}</span>
         {error && <span className="explorer-error">{error}</span>}
 
         {/* Search - with icon, matching other panels */}
