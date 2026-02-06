@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { TerminalMain } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useSystemWakeHandler } from '../hooks/useSystemWakeHandler';
+import { extractProjectId } from '../utils/projectUtils';
 import type { ProjectTerminal } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
 import './TerminalWindowApp.css';
@@ -418,8 +419,7 @@ export function TerminalWindowApp() {
     // Then add projects that have terminals (in case they weren't in URL or manual)
     terminals.forEach(terminal => {
       if (!projectMap.has(terminal.projectPath)) {
-        const pathParts = terminal.projectPath.split('/');
-        const projectName = pathParts[pathParts.length - 1] || 'Unknown';
+        const projectName = extractProjectId(terminal.projectPath) || 'Unknown';
         projectMap.set(terminal.projectPath, {
           path: terminal.projectPath,
           name: projectName,
@@ -574,8 +574,7 @@ export function TerminalWindowApp() {
       });
 
       if (selected && typeof selected === 'string') {
-        const pathParts = selected.split('/');
-        const projectName = pathParts[pathParts.length - 1] || 'Unknown';
+        const projectName = extractProjectId(selected) || 'Unknown';
 
         // Add to Zustand store (persisted)
         addManualProject({ path: selected, name: projectName });

@@ -38,9 +38,57 @@ struct IDEEntry {
     name: &'static str,
     bundle_id: &'static str,
     cli: &'static str,
+    /// macOS: /Applications/App.app, Windows: use app_path_windows()
     app_path: &'static str,
+    /// Windows-specific: path in LocalAppData (e.g., %LOCALAPPDATA%\Programs\...)
+    app_path_local: Option<&'static str>,
+    /// Windows-specific: path in Program Files
+    app_path_program: Option<&'static str>,
     cli_style: &'static str,
     supports_diff: bool,
+}
+
+impl IDEEntry {
+    /// Get the app path for the current platform
+    #[cfg(target_os = "macos")]
+    fn get_app_path(&self) -> &str {
+        self.app_path
+    }
+
+    #[cfg(target_os = "windows")]
+    fn get_app_path(&self) -> Option<String> {
+        // Try LocalAppData first
+        if let Some(local_path) = self.app_path_local {
+            if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+                let full_path = format!("{}\\{}", local_app_data, local_path);
+                if std::path::Path::new(&full_path).exists() {
+                    return Some(full_path);
+                }
+            }
+        }
+        // Try Program Files
+        if let Some(program_path) = self.app_path_program {
+            if let Ok(program_files) = std::env::var("ProgramFiles") {
+                let full_path = format!("{}\\{}", program_files, program_path);
+                if std::path::Path::new(&full_path).exists() {
+                    return Some(full_path);
+                }
+            }
+            // Also try Program Files (x86)
+            if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
+                let full_path = format!("{}\\{}", program_files_x86, program_path);
+                if std::path::Path::new(&full_path).exists() {
+                    return Some(full_path);
+                }
+            }
+        }
+        None
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    fn get_app_path(&self) -> Option<String> {
+        None
+    }
 }
 
 /// All supported IDEs
@@ -52,6 +100,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.microsoft.VSCode",
         cli: "code",
         app_path: "/Applications/Visual Studio Code.app",
+        app_path_local: Some("Programs\\Microsoft VS Code\\Code.exe"),
+        app_path_program: Some("Microsoft VS Code\\Code.exe"),
         cli_style: "vscode",
         supports_diff: true,
     },
@@ -61,6 +111,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.todesktop.230313mzl4w4u92",
         cli: "cursor",
         app_path: "/Applications/Cursor.app",
+        app_path_local: Some("Programs\\cursor\\Cursor.exe"),
+        app_path_program: None,
         cli_style: "vscode",
         supports_diff: true,
     },
@@ -70,6 +122,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.codeium.windsurf",
         cli: "windsurf",
         app_path: "/Applications/Windsurf.app",
+        app_path_local: Some("Programs\\Windsurf\\Windsurf.exe"),
+        app_path_program: None,
         cli_style: "vscode",
         supports_diff: false,
     },
@@ -80,6 +134,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "dev.zed.Zed",
         cli: "zed",
         app_path: "/Applications/Zed.app",
+        app_path_local: Some("Programs\\Zed\\Zed.exe"),
+        app_path_program: None,
         cli_style: "zed",
         supports_diff: false,
     },
@@ -90,6 +146,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.jetbrains.intellij",
         cli: "idea",
         app_path: "/Applications/IntelliJ IDEA.app",
+        app_path_local: None,
+        app_path_program: Some("JetBrains\\IntelliJ IDEA*\\bin\\idea64.exe"),
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -99,6 +157,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.jetbrains.WebStorm",
         cli: "webstorm",
         app_path: "/Applications/WebStorm.app",
+        app_path_local: None,
+        app_path_program: Some("JetBrains\\WebStorm*\\bin\\webstorm64.exe"),
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -108,6 +168,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.jetbrains.pycharm",
         cli: "pycharm",
         app_path: "/Applications/PyCharm.app",
+        app_path_local: None,
+        app_path_program: Some("JetBrains\\PyCharm*\\bin\\pycharm64.exe"),
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -117,6 +179,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.jetbrains.goland",
         cli: "goland",
         app_path: "/Applications/GoLand.app",
+        app_path_local: None,
+        app_path_program: Some("JetBrains\\GoLand*\\bin\\goland64.exe"),
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -126,6 +190,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.jetbrains.rubymine",
         cli: "rubymine",
         app_path: "/Applications/RubyMine.app",
+        app_path_local: None,
+        app_path_program: Some("JetBrains\\RubyMine*\\bin\\rubymine64.exe"),
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -136,16 +202,20 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.sublimetext.4",
         cli: "subl",
         app_path: "/Applications/Sublime Text.app",
+        app_path_local: None,
+        app_path_program: Some("Sublime Text\\sublime_text.exe"),
         cli_style: "sublime",
         supports_diff: false,
     },
-    // Xcode
+    // Xcode (macOS only)
     IDEEntry {
         id: "xcode",
         name: "Xcode",
         bundle_id: "com.apple.dt.Xcode",
         cli: "xed",
         app_path: "/Applications/Xcode.app",
+        app_path_local: None,
+        app_path_program: None, // Not available on Windows
         cli_style: "xcode",
         supports_diff: false,
     },
@@ -156,6 +226,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "com.google.android.studio",
         cli: "studio",
         app_path: "/Applications/Android Studio.app",
+        app_path_local: None,
+        app_path_program: Some("Android\\Android Studio\\bin\\studio64.exe"),
         cli_style: "jetbrains",
         supports_diff: false,
     },
@@ -166,6 +238,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         bundle_id: "dev.niceprogrammer.Antigravity",
         cli: "antigravity",
         app_path: "/Applications/Antigravity.app",
+        app_path_local: Some("Programs\\Antigravity\\Antigravity.exe"),
+        app_path_program: None,
         cli_style: "vscode",
         supports_diff: false,
     },
@@ -218,11 +292,22 @@ const APP_REGISTRY: &[AppEntry] = &[
 
 /// Check if a CLI command is available in PATH
 fn is_cli_available(cli: &str) -> bool {
-    Command::new("which")
-        .arg(cli)
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("where")
+            .arg(cli)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new("which")
+            .arg(cli)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
 }
 
 /// Detect all installed IDEs on the system
@@ -231,14 +316,31 @@ pub fn detect_installed_ides() -> Vec<IDEInfo> {
     let mut installed = Vec::new();
 
     for entry in IDE_REGISTRY {
-        let app_exists = Path::new(entry.app_path).exists();
+        #[cfg(target_os = "macos")]
+        let (app_exists, resolved_path) = {
+            let exists = Path::new(entry.app_path).exists();
+            (exists, entry.app_path.to_string())
+        };
+
+        #[cfg(target_os = "windows")]
+        let (app_exists, resolved_path) = {
+            if let Some(path) = entry.get_app_path() {
+                (true, path)
+            } else {
+                (false, String::new())
+            }
+        };
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let (app_exists, resolved_path) = (false, String::new());
+
         let cli_available = is_cli_available(entry.cli);
 
         if app_exists || cli_available {
             installed.push(IDEInfo {
                 id: entry.id.to_string(),
                 name: entry.name.to_string(),
-                app_path: entry.app_path.to_string(),
+                app_path: resolved_path,
                 cli: entry.cli.to_string(),
                 cli_available,
                 app_exists,
@@ -610,31 +712,66 @@ pub fn open_file_in_ide(
 
     match entry.cli_style {
         "vscode" => {
-            // If CLI not available, try using 'open -a' with the app
+            // If CLI not available, try platform-specific fallback
             if !cli_available {
-                log::info!("[IDE] CLI not available, using 'open -a' with app: {}", entry.app_path);
+                #[cfg(target_os = "macos")]
+                {
+                    log::info!("[IDE] CLI not available, using 'open -a' with app: {}", entry.app_path);
 
-                // Open project folder first
-                if let Some(ref root) = project_root {
-                    let _ = Command::new("open")
+                    // Open project folder first
+                    if let Some(ref root) = project_root {
+                        let _ = Command::new("open")
+                            .arg("-a")
+                            .arg(entry.app_path)
+                            .arg(root)
+                            .spawn();
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+
+                    // Then open the file
+                    let result = Command::new("open")
                         .arg("-a")
                         .arg(entry.app_path)
-                        .arg(root)
+                        .arg(&file_path)
                         .spawn();
-                    std::thread::sleep(std::time::Duration::from_millis(500));
+
+                    return match result {
+                        Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                        Err(e) => Err(format!("Failed to open file: {}", e)),
+                    };
                 }
 
-                // Then open the file
-                let result = Command::new("open")
-                    .arg("-a")
-                    .arg(entry.app_path)
-                    .arg(&file_path)
-                    .spawn();
+                #[cfg(target_os = "windows")]
+                {
+                    if let Some(app_path) = entry.get_app_path() {
+                        log::info!("[IDE] CLI not available, launching app directly: {}", app_path);
 
-                return match result {
-                    Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
-                    Err(e) => Err(format!("Failed to open file: {}", e)),
-                };
+                        // Open project folder first
+                        if let Some(ref root) = project_root {
+                            let _ = Command::new(&app_path)
+                                .arg(root)
+                                .spawn();
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                        }
+
+                        // Then open the file
+                        let result = Command::new(&app_path)
+                            .arg(&file_path)
+                            .spawn();
+
+                        return match result {
+                            Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                            Err(e) => Err(format!("Failed to open file: {}", e)),
+                        };
+                    } else {
+                        return Err(format!("{} not found on this system", entry.name));
+                    }
+                }
+
+                #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+                {
+                    return Err(format!("{} CLI not available and no fallback for this platform", entry.name));
+                }
             }
 
             // Step 1: Open project folder first (if found)
@@ -702,31 +839,64 @@ pub fn open_file_in_ide(
             }
         }
         "zed" => {
-            // Zed: If CLI not available, use 'open -a'
+            // Zed: If CLI not available, use platform-specific fallback
             if !cli_available {
-                log::info!("[IDE] Zed CLI not available, using 'open -a' with app: {}", entry.app_path);
+                #[cfg(target_os = "macos")]
+                {
+                    log::info!("[IDE] Zed CLI not available, using 'open -a' with app: {}", entry.app_path);
 
-                // Open project folder first
-                if let Some(ref root) = project_root {
-                    let _ = Command::new("open")
+                    // Open project folder first
+                    if let Some(ref root) = project_root {
+                        let _ = Command::new("open")
+                            .arg("-a")
+                            .arg(entry.app_path)
+                            .arg(root)
+                            .spawn();
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+
+                    // Then open the file
+                    let result = Command::new("open")
                         .arg("-a")
                         .arg(entry.app_path)
-                        .arg(root)
+                        .arg(&file_path)
                         .spawn();
-                    std::thread::sleep(std::time::Duration::from_millis(500));
+
+                    return match result {
+                        Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                        Err(e) => Err(format!("Failed to open file: {}", e)),
+                    };
                 }
 
-                // Then open the file
-                let result = Command::new("open")
-                    .arg("-a")
-                    .arg(entry.app_path)
-                    .arg(&file_path)
-                    .spawn();
+                #[cfg(target_os = "windows")]
+                {
+                    if let Some(app_path) = entry.get_app_path() {
+                        log::info!("[IDE] Zed CLI not available, launching app directly: {}", app_path);
 
-                return match result {
-                    Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
-                    Err(e) => Err(format!("Failed to open file: {}", e)),
-                };
+                        if let Some(ref root) = project_root {
+                            let _ = Command::new(&app_path)
+                                .arg(root)
+                                .spawn();
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                        }
+
+                        let result = Command::new(&app_path)
+                            .arg(&file_path)
+                            .spawn();
+
+                        return match result {
+                            Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                            Err(e) => Err(format!("Failed to open file: {}", e)),
+                        };
+                    } else {
+                        return Err(format!("Zed not found on this system"));
+                    }
+                }
+
+                #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+                {
+                    return Err(format!("Zed CLI not available and no fallback for this platform"));
+                }
             }
 
             // Zed with CLI: project then file:line
@@ -901,19 +1071,36 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
 
     // Check IDEs
     for entry in IDE_REGISTRY {
-        if Path::new(entry.app_path).exists() {
-            let icon = get_app_icon_base64(entry.app_path);
-            apps.push(InstalledApp {
-                id: entry.id.to_string(),
-                name: entry.name.to_string(),
-                app_path: entry.app_path.to_string(),
-                category: "ide".to_string(),
-                icon_base64: icon,
-            });
+        #[cfg(target_os = "macos")]
+        {
+            if Path::new(entry.app_path).exists() {
+                let icon = get_app_icon_base64(entry.app_path);
+                apps.push(InstalledApp {
+                    id: entry.id.to_string(),
+                    name: entry.name.to_string(),
+                    app_path: entry.app_path.to_string(),
+                    category: "ide".to_string(),
+                    icon_base64: icon,
+                });
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(app_path) = entry.get_app_path() {
+                apps.push(InstalledApp {
+                    id: entry.id.to_string(),
+                    name: entry.name.to_string(),
+                    app_path,
+                    category: "ide".to_string(),
+                    icon_base64: None, // TODO: Windows icon extraction
+                });
+            }
         }
     }
 
-    // Check terminals and Finder
+    // Check terminals and Finder (macOS only for now)
+    #[cfg(target_os = "macos")]
     for entry in APP_REGISTRY {
         if Path::new(entry.app_path).exists() {
             let icon = get_app_icon_base64(entry.app_path);
@@ -924,6 +1111,50 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
                 category: entry.category.to_string(),
                 icon_base64: icon,
             });
+        }
+    }
+
+    // On Windows, add common terminals
+    #[cfg(target_os = "windows")]
+    {
+        // Windows Terminal
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let wt_path = format!("{}\\Microsoft\\WindowsApps\\wt.exe", local_app_data);
+            if Path::new(&wt_path).exists() {
+                apps.push(InstalledApp {
+                    id: "windows-terminal".to_string(),
+                    name: "Windows Terminal".to_string(),
+                    app_path: wt_path,
+                    category: "terminal".to_string(),
+                    icon_base64: None,
+                });
+            }
+        }
+        // PowerShell
+        if let Ok(sys_root) = std::env::var("SystemRoot") {
+            let ps_path = format!("{}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", sys_root);
+            if Path::new(&ps_path).exists() {
+                apps.push(InstalledApp {
+                    id: "powershell".to_string(),
+                    name: "PowerShell".to_string(),
+                    app_path: ps_path,
+                    category: "terminal".to_string(),
+                    icon_base64: None,
+                });
+            }
+        }
+        // File Explorer
+        if let Ok(sys_root) = std::env::var("SystemRoot") {
+            let explorer_path = format!("{}\\explorer.exe", sys_root);
+            if Path::new(&explorer_path).exists() {
+                apps.push(InstalledApp {
+                    id: "explorer".to_string(),
+                    name: "File Explorer".to_string(),
+                    app_path: explorer_path,
+                    category: "finder".to_string(),
+                    icon_base64: None,
+                });
+            }
         }
     }
 

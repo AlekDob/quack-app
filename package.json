@@ -37,7 +37,11 @@
     "test:reset": "npm run test:clean && echo '🧪 Starting Quack in TEST MODE...' && npm run test:dev",
     "whatsapp:watch": "node src-tauri/node-sdk/whatsapp-watcher.cjs",
     "whatsapp:watch:test": "node src-tauri/node-sdk/whatsapp-watcher.cjs --allow-own-messages --verbose",
-    "whatsapp:watch:dry": "node src-tauri/node-sdk/whatsapp-watcher.cjs --dry-run --verbose"
+    "whatsapp:watch:dry": "node src-tauri/node-sdk/whatsapp-watcher.cjs --dry-run --verbose",
+    "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "tauri:build:win": "powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1",
+    "tauri:build:win:debug": "powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Debug",
+    "setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.32",

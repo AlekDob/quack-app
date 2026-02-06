@@ -316,9 +316,13 @@ fn find_system_node_executable() -> Option<PathBuf> {
         }
     }
 
-    // 🎯 PRIORITY 2: Check Volta directory directly (for Finder launch)
+    // 🎯 PRIORITY 2: Check Volta directory directly (for Finder/Explorer launch)
     if let Some(ref home) = home_dir {
+        #[cfg(target_os = "windows")]
+        let volta_node = home.join(".volta").join("bin").join("node.exe");
+        #[cfg(not(target_os = "windows"))]
         let volta_node = home.join(".volta/bin/node");
+
         if volta_node.exists() && is_node_version_compatible(&volta_node) {
             log::info!("[Node.js] ✅ Found Volta Node.js at: {:?}", volta_node);
             return Some(volta_node);
@@ -326,88 +330,123 @@ fn find_system_node_executable() -> Option<PathBuf> {
     }
 
     // 🎯 PRIORITY 3: Try standard PATH (works for dev mode and Terminal launch)
-    if let Ok(output) = std::process::Command::new("which").arg("node").output() {
-        if output.status.success() {
-            if let Ok(path_str) = String::from_utf8(output.stdout) {
-                let path = PathBuf::from(path_str.trim());
-                if path.exists() && is_node_version_compatible(&path) {
-                    log::info!("[Node.js] ✅ Found via PATH: {:?}", path);
-                    return Some(path);
-                }
-            }
-        }
-    }
-
-    // 🎯 PRIORITY 4: Common installation paths (macOS/Linux)
-    let common_paths = vec![
-        "/opt/homebrew/bin/node",        // Homebrew ARM Mac (most common now)
-        "/usr/local/bin/node",           // Homebrew Intel Mac
-        "/usr/bin/node",                 // System package managers
-        "/opt/local/bin/node",           // MacPorts
-    ];
-
-    for path_str in &common_paths {
-        let path = PathBuf::from(path_str);
-        if path.exists() && is_node_version_compatible(&path) {
-            log::info!("[Node.js] ✅ Found at common path: {:?}", path);
-            return Some(path);
-        }
-    }
-
-    // 🎯 PRIORITY 5: Check NVM installations (~/.nvm/versions/node/*/bin/node)
-    // Important: This works even when NVM is not initialized (Finder launch)
-    if let Some(ref home) = home_dir {
-        let nvm_dir = home.join(".nvm/versions/node");
-
-        if nvm_dir.exists() {
-            log::info!("[Node.js] Found NVM directory, scanning versions...");
-            if let Ok(entries) = fs::read_dir(&nvm_dir) {
-                // Get all version directories
-                let mut versions: Vec<_> = entries
-                    .filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_dir())
-                    .collect();
-
-                // Sort by version number (extract from dir name like "v20.18.0")
-                versions.sort_by(|a, b| {
-                    let a_ver = a.file_name().to_string_lossy()
-                        .trim_start_matches('v')
-                        .split('.')
-                        .next()
-                        .and_then(|s| s.parse::<u32>().ok())
-                        .unwrap_or(0);
-                    let b_ver = b.file_name().to_string_lossy()
-                        .trim_start_matches('v')
-                        .split('.')
-                        .next()
-                        .and_then(|s| s.parse::<u32>().ok())
-                        .unwrap_or(0);
-                    b_ver.cmp(&a_ver) // Descending order (latest first)
-                });
-
-                // Try each version, latest first, but only compatible ones
-                for entry in versions {
-                    let node_path = entry.path().join("bin/node");
-                    if node_path.exists() && is_node_version_compatible(&node_path) {
-                        log::info!("[Node.js] ✅ Found NVM version: {:?}", node_path);
-                        return Some(node_path);
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, use 'where' command instead of 'which'
+        if let Ok(output) = std::process::Command::new("where").arg("node").output() {
+            if output.status.success() {
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    // 'where' can return multiple lines, take the first one
+                    if let Some(first_line) = path_str.lines().next() {
+                        let path = PathBuf::from(first_line.trim());
+                        if path.exists() && is_node_version_compatible(&path) {
+                            log::info!("[Node.js] ✅ Found via PATH (where): {:?}", path);
+                            return Some(path);
+                        }
                     }
                 }
             }
         }
+    }
 
-        // 🎯 PRIORITY 6: Check fnm installations
-        // fnm stores versions in ~/.local/share/fnm/node-versions/ or ~/.fnm/node-versions/
-        let fnm_dirs = vec![
-            home.join(".local/share/fnm/node-versions"),
-            home.join(".fnm/node-versions"),
-        ];
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(output) = std::process::Command::new("which").arg("node").output() {
+            if output.status.success() {
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    let path = PathBuf::from(path_str.trim());
+                    if path.exists() && is_node_version_compatible(&path) {
+                        log::info!("[Node.js] ✅ Found via PATH: {:?}", path);
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
 
-        for fnm_dir in fnm_dirs {
-            if fnm_dir.exists() {
-                log::info!("[Node.js] Found fnm directory at: {:?}, scanning versions...", fnm_dir);
-                if let Ok(entries) = fs::read_dir(&fnm_dir) {
-                    // Get all version directories
+    // 🎯 PRIORITY 4: Common installation paths
+    #[cfg(target_os = "windows")]
+    let common_paths: Vec<PathBuf> = vec![
+        PathBuf::from(r"C:\Program Files\nodejs\node.exe"),      // Standard Node.js installer
+        PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"), // 32-bit Node.js
+        PathBuf::from(r"C:\nodejs\node.exe"),                     // Custom install location
+    ];
+
+    #[cfg(not(target_os = "windows"))]
+    let common_paths: Vec<PathBuf> = vec![
+        PathBuf::from("/opt/homebrew/bin/node"),        // Homebrew ARM Mac (most common now)
+        PathBuf::from("/usr/local/bin/node"),           // Homebrew Intel Mac
+        PathBuf::from("/usr/bin/node"),                 // System package managers
+        PathBuf::from("/opt/local/bin/node"),           // MacPorts
+    ];
+
+    for path in &common_paths {
+        if path.exists() && is_node_version_compatible(path) {
+            log::info!("[Node.js] ✅ Found at common path: {:?}", path);
+            return Some(path.clone());
+        }
+    }
+
+    // 🎯 PRIORITY 5: Check NVM installations
+    if let Some(ref home) = home_dir {
+        // Windows: Check nvm-windows at %APPDATA%\nvm
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let nvm_dir = PathBuf::from(&appdata).join("nvm");
+                if nvm_dir.exists() {
+                    log::info!("[Node.js] Found nvm-windows directory, scanning versions...");
+                    if let Ok(entries) = fs::read_dir(&nvm_dir) {
+                        let mut versions: Vec<_> = entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().is_dir())
+                            .filter(|e| e.file_name().to_string_lossy().starts_with('v'))
+                            .collect();
+
+                        // Sort by version number descending
+                        versions.sort_by(|a, b| {
+                            let a_ver = a.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            let b_ver = b.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            b_ver.cmp(&a_ver)
+                        });
+
+                        for entry in versions {
+                            let node_path = entry.path().join("node.exe");
+                            if node_path.exists() && is_node_version_compatible(&node_path) {
+                                log::info!("[Node.js] ✅ Found nvm-windows version: {:?}", node_path);
+                                return Some(node_path);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also check Volta on Windows
+            let volta_node = home.join(".volta").join("bin").join("node.exe");
+            if volta_node.exists() && is_node_version_compatible(&volta_node) {
+                log::info!("[Node.js] ✅ Found Volta Node.js (Windows) at: {:?}", volta_node);
+                return Some(volta_node);
+            }
+        }
+
+        // macOS/Linux: Check NVM at ~/.nvm/versions/node
+        #[cfg(not(target_os = "windows"))]
+        {
+            let nvm_dir = home.join(".nvm/versions/node");
+
+            if nvm_dir.exists() {
+                log::info!("[Node.js] Found NVM directory, scanning versions...");
+                if let Ok(entries) = fs::read_dir(&nvm_dir) {
                     let mut versions: Vec<_> = entries
                         .filter_map(|e| e.ok())
                         .filter(|e| e.path().is_dir())
@@ -432,27 +471,71 @@ fn find_system_node_executable() -> Option<PathBuf> {
 
                     // Try each version, latest first, but only compatible ones
                     for entry in versions {
-                        // fnm uses installation/bin/node inside each version dir
-                        let node_path = entry.path().join("installation/bin/node");
+                        let node_path = entry.path().join("bin/node");
                         if node_path.exists() && is_node_version_compatible(&node_path) {
-                            log::info!("[Node.js] ✅ Found fnm version: {:?}", node_path);
+                            log::info!("[Node.js] ✅ Found NVM version: {:?}", node_path);
                             return Some(node_path);
                         }
                     }
                 }
             }
-        }
 
-        // Check user-specific paths
-        let user_paths = vec![
-            home.join(".local/bin/node"),
-            home.join("bin/node"),
-        ];
+            // 🎯 PRIORITY 6: Check fnm installations (Unix only)
+            // fnm stores versions in ~/.local/share/fnm/node-versions/ or ~/.fnm/node-versions/
+            let fnm_dirs = vec![
+                home.join(".local/share/fnm/node-versions"),
+                home.join(".fnm/node-versions"),
+            ];
 
-        for path in user_paths {
-            if path.exists() && is_node_version_compatible(&path) {
-                log::info!("[Node.js] ✅ Found in user directory: {:?}", path);
-                return Some(path);
+            for fnm_dir in &fnm_dirs {
+                if fnm_dir.exists() {
+                    log::info!("[Node.js] Found fnm directory at: {:?}, scanning versions...", fnm_dir);
+                    if let Ok(entries) = fs::read_dir(fnm_dir) {
+                        let mut versions: Vec<_> = entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().is_dir())
+                            .collect();
+
+                        // Sort by version number descending
+                        versions.sort_by(|a, b| {
+                            let a_ver = a.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            let b_ver = b.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            b_ver.cmp(&a_ver)
+                        });
+
+                        for entry in versions {
+                            // fnm uses installation/bin/node inside each version dir
+                            let node_path = entry.path().join("installation/bin/node");
+                            if node_path.exists() && is_node_version_compatible(&node_path) {
+                                log::info!("[Node.js] ✅ Found fnm version: {:?}", node_path);
+                                return Some(node_path);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check user-specific paths (Unix only)
+            let user_paths = vec![
+                home.join(".local/bin/node"),
+                home.join("bin/node"),
+            ];
+
+            for path in user_paths {
+                if path.exists() && is_node_version_compatible(&path) {
+                    log::info!("[Node.js] ✅ Found in user directory: {:?}", path);
+                    return Some(path);
+                }
             }
         }
     }

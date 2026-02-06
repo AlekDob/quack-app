@@ -27,6 +27,7 @@ import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
+import { extractProjectId } from "../utils/projectUtils";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
 // Storage format for project order and colors
@@ -448,8 +449,7 @@ export default function TerminalSidebar({
 
       // Extract base repository name more intelligently
       let repoName: string;
-      const parts = cwd.split('/');
-      const lastPart = parts[parts.length - 1];
+      const lastPart = extractProjectId(cwd);
 
       if (isWorktree) {
         // For worktrees, extract the base repo name
@@ -503,7 +503,7 @@ export default function TerminalSidebar({
     // Add persisted projects that have no terminals (empty projects)
     if (persistedProjects) {
       for (const [projectPath, projectName] of persistedProjects) {
-        const dirName = projectPath.split('/').pop() || projectName;
+        const dirName = extractProjectId(projectPath) || projectName;
         if (!repoMap.has(dirName)) {
           repoMap.set(dirName, {
             mainAgents: [],

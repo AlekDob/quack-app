@@ -26,19 +26,25 @@ export function extractProjectId(path: string | undefined | null): string {
     return '';
   }
 
-  // Remove trailing slashes and get the last segment
-  const normalized = path.replace(/\/+$/, '');
-  const segments = normalized.split('/');
+  // Remove trailing slashes (both / and \) and get the last segment
+  const normalized = path.replace(/[/\\]+$/, '');
+  // Split by both / and \ to support Unix and Windows paths
+  const segments = normalized.split(/[/\\]/);
   const lastSegment = segments[segments.length - 1];
 
-  return lastSegment || '';
+  // Return empty string for root paths (like "C:" or drive letters)
+  if (!lastSegment || /^[A-Za-z]:?$/.test(lastSegment)) {
+    return '';
+  }
+
+  return lastSegment;
 }
 
 /**
  * Check if a path looks like a valid project path.
  *
  * A valid project path should:
- * - Be an absolute path (starts with /)
+ * - Be an absolute path (starts with / on Unix/Mac or drive letter on Windows)
  * - Have at least 2 path segments
  * - End with a non-empty folder name
  *
@@ -50,8 +56,11 @@ export function isValidProjectPath(path: string | undefined | null): boolean {
     return false;
   }
 
-  // Must be absolute path
-  if (!path.startsWith('/')) {
+  // Must be absolute path (Unix/Mac: starts with /, Windows: C:\ or UNC path \\?\)
+  const isAbsolute = path.startsWith('/') ||
+                     /^[A-Za-z]:[/\\]/.test(path) ||
+                     path.startsWith('\\\\?\\');
+  if (!isAbsolute) {
     return false;
   }
 
