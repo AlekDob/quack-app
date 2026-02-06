@@ -143,15 +143,22 @@ pub fn disband_team(
         .map_err(|e| e.to_string())
 }
 
-fn disband_team_impl(project_path: &Path, team_id: &str) -> Result<()> {
+fn disband_team_impl(project_path: &Path, _team_id: &str) -> Result<()> {
     // Remove roster from CLAUDE.md first
     remove_team_roster_impl(project_path)?;
 
-    // Delete team file
-    let file_path = get_team_file(project_path, team_id);
-    if file_path.exists() {
-        fs::remove_file(&file_path)
-            .context("Failed to delete team config file")?;
+    // Delete ALL team files (not just the specific one)
+    // This prevents orphan files from previous create/disband cycles
+    let teams_dir = get_teams_dir(project_path);
+    if teams_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&teams_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+        }
     }
 
     Ok(())

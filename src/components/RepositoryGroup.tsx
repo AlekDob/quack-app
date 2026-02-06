@@ -1142,7 +1142,7 @@ export default function RepositoryGroup({
   const activeTeam = useTeamStore((s) => s.activeTeam);
   const loadActiveTeam = useTeamStore((s) => s.loadActiveTeam);
 
-  // Build avatar map from agents for team enrichment
+  // Build avatar map from agents for team enrichment (stable ref, called on demand)
   const buildAgentAvatarMap = useCallback(() => {
     const map = new Map<string, { avatar?: string; color?: string }>();
     for (const agent of [...mainAgents, ...worktreeAgents]) {
@@ -1151,10 +1151,13 @@ export default function RepositoryGroup({
     return map;
   }, [mainAgents, worktreeAgents]);
 
-  // Load active team on mount
+  // Load active team ONLY on mount / repoPath change (not on agent list changes)
+  const buildAgentAvatarMapRef = useRef(buildAgentAvatarMap);
+  buildAgentAvatarMapRef.current = buildAgentAvatarMap;
   useEffect(() => {
-    loadActiveTeam(repoPath, buildAgentAvatarMap());
-  }, [repoPath, loadActiveTeam, buildAgentAvatarMap]);
+    loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoPath]);
 
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
   const { sessions: allSessionsForRepo, createSession } = useSessionStore();
