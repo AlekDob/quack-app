@@ -4,14 +4,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 2px 6px;
-  height: 20px; /* Aligned with edit count tag and IDE button */
+  gap: 3px;
+  padding: 1px 5px;
+  height: 16px;
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 4px;
+  border-radius: 3px;
   color: #3b82f6;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 500;
   line-height: 1;
   cursor: pointer;

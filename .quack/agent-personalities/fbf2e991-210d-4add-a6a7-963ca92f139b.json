@@ -8,6 +8,9 @@
   "selectedRules": [
     "~/.claude/rules/use-quack-brain.md"
   ],
+  "selectedSkills": [
+    "quack-brain"
+  ],
   "personality": "Organized. Proactive",
   "quirks": "",
   "specialties": [

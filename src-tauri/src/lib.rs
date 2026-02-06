@@ -28,6 +28,7 @@ mod notifications;
 mod native_terminal;
 mod personality;
 mod plugins;
+mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
 mod preferences;
 mod preview;
 mod proxy;
@@ -1052,6 +1053,8 @@ pub fn run() {
             hooks::save_hook,
             hooks::delete_hook,
             hooks::toggle_hook,
+            hooks::get_claude_env_vars,
+            hooks::set_claude_env_var,
             plugins::list_available_plugins,
             plugins::list_installed_plugins,
             plugins::install_plugin,
@@ -1081,6 +1084,10 @@ pub fn run() {
             personality::add_active_agent,
             personality::remove_active_agent,
             personality::load_active_agents_with_data,
+            // 🦆 Agent Teams commands
+            teams::create_team,
+            teams::disband_team,
+            teams::get_active_team,
             sessions::list_sessions,
             sessions::get_session_info,
             sessions::get_all_sessions_info,

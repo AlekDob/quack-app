@@ -484,6 +484,59 @@ pub fn toggle_hook(working_dir: Option<String>, hook_id: String, enabled: bool) 
     toggle_hook_impl(working_dir.as_deref(), &hook_id, enabled).map_err(|e| e.to_string())
 }
 
+/// Get Claude Code env vars from global settings.json
+#[tauri::command]
+pub fn get_claude_env_vars() -> Result<HashMap<String, String>, String> {
+    get_claude_env_vars_impl().map_err(|e| e.to_string())
+}
+
+fn get_claude_env_vars_impl() -> Result<HashMap<String, String>> {
+    let path = get_global_settings_path();
+    let settings = read_settings(&path)?;
+    let mut result = HashMap::new();
+
+    if let Some(env_val) = settings.other.get("env") {
+        if let Some(env_obj) = env_val.as_object() {
+            for (key, val) in env_obj {
+                if let Some(s) = val.as_str() {
+                    result.insert(key.clone(), s.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Set a Claude Code env var in global settings.json
+#[tauri::command]
+pub fn set_claude_env_var(key: String, value: Option<String>) -> Result<(), String> {
+    set_claude_env_var_impl(&key, value.as_deref()).map_err(|e| e.to_string())
+}
+
+fn set_claude_env_var_impl(key: &str, value: Option<&str>) -> Result<()> {
+    let path = get_global_settings_path();
+    let mut settings = read_settings(&path).unwrap_or_default();
+
+    let env_obj = settings.other
+        .entry("env".to_string())
+        .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
+
+    if let Some(obj) = env_obj.as_object_mut() {
+        match value {
+            Some(v) => { obj.insert(key.to_string(), serde_json::Value::String(v.to_string())); }
+            None => { obj.remove(key); }
+        }
+        // Clean up empty env object
+        if obj.is_empty() {
+            settings.other.remove("env");
+        }
+    }
+
+    write_settings(&path, &settings)?;
+    Ok(())
+}
+
 fn toggle_hook_impl(working_dir: Option<&str>, hook_id: &str, enabled: bool) -> Result<()> {
     // Try both project and global metadata
     for scope in [HookScope::Project, HookScope::Global] {

@@ -1755,3 +1755,42 @@ export interface PowerRatingBreakdown {
   ruleCount: number;
   commandCount: number;
 }
+
+// ============================================
+// Agent Teams Types
+// ============================================
+
+export interface TeamMember {
+  agentId: string;
+  name: string;
+  role: string;
+  communicationStyle: string;
+  selectedSkills?: string[];
+  isLead: boolean;
+  avatar?: string;
+  color?: string;
+}
+
+export interface TeamConfig {
+  id: string;
+  name: string;
+  projectPath: string;
+  leadAgentId: string;
+  members: TeamMember[];
+  createdAt: number;
+  taskDescription?: string;
+}
+
+export interface TeamContext {
+  teamName: string;
+  members: TeamContextMember[];
+}
+
+export interface TeamContextMember {
+  name: string;
+  role: string;
+  communicationStyle: string;
+  isLead: boolean;
+}
+
+export type TeammateStatus = 'spawning' | 'active' | 'idle' | 'stopped';

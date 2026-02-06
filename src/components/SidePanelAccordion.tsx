@@ -519,8 +519,8 @@ export default function SidePanelAccordion({
           />
         </AccordionSection>
 
-        {/* Droids - Hidden for UI simplification */}
-        {/* <AccordionSection
+        {/* Droids */}
+        <AccordionSection
           id="agents"
           title="Droids"
           icon={icons.agents}
@@ -544,7 +544,7 @@ export default function SidePanelAccordion({
             onCreateAgent={onCreateAgent}
             onSelectDroid={onSelectDroid}
           />
-        </AccordionSection> */}
+        </AccordionSection>
 
         {/* Skills */}
         <AccordionSection

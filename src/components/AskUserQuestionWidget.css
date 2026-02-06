@@ -3,9 +3,9 @@
 .ask-user-widget {
   background: rgba(139, 92, 246, 0.08);
   border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 12px;
-  padding: 16px;
-  margin: 12px 0;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 8px 0;
   transition: all 0.2s ease;
 }
 
@@ -27,8 +27,8 @@
 .ask-user-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 10px;
   color: rgba(139, 92, 246, 0.9);
 }
 
@@ -38,16 +38,16 @@
 
 .ask-user-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .ask-user-answered-badge {
   margin-left: auto;
   background: rgba(34, 197, 94, 0.2);
   color: rgba(34, 197, 94, 1);
-  padding: 3px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -57,29 +57,29 @@
 .ask-user-questions {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 /* Individual question */
 .ask-user-question {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .ask-user-question-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .ask-user-chip {
   background: rgba(139, 92, 246, 0.2);
   color: rgba(139, 92, 246, 1);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -92,13 +92,13 @@
 
 .ask-user-question-text {
   color: rgba(255, 255, 255, 0.95);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .ask-user-multi-hint {
   color: rgba(255, 255, 255, 0.4);
-  font-size: 11px;
+  font-size: 9px;
   font-style: italic;
 }
 
@@ -106,15 +106,15 @@
 .ask-user-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Individual option button */
 .ask-user-option {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -141,8 +141,8 @@
 
 .ask-user-option-check {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,19 +157,19 @@
 .ask-user-option-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
 .ask-user-option-label {
   color: rgba(255, 255, 255, 0.95);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
 }
 
 .ask-user-option-desc {
   color: rgba(255, 255, 255, 0.5);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.4;
 }
 
@@ -186,12 +186,12 @@
 
 .ask-user-other-input input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 6px 10px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.95);
-  font-size: 13px;
+  font-size: 11px;
   outline: none;
   transition: border-color 0.15s ease;
 }
@@ -213,21 +213,21 @@
 .ask-user-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .ask-user-submit {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 6px;
+  padding: 6px 14px;
   background: rgba(139, 92, 246, 0.9);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: white;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;

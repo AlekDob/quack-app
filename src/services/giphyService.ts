@@ -6,7 +6,7 @@
  */
 
 // Giphy API key - user must provide their own key in Settings
-let giphyApiKey = import.meta.env.VITE_giphyApiKey || '';
+let giphyApiKey = import.meta.env.VITE_GIPHY_API_KEY || '';
 const GIPHY_API_URL = 'https://api.giphy.com/v1/gifs';
 
 /**

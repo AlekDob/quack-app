@@ -123,7 +123,7 @@ function SortableRepositoryGroup({
     >
       {/* 🦆 Drag Handle for Repository Groups - ENABLED (important for project organization) */}
       <div
-        className="absolute left-0 top-[10px] z-10"
+        className="absolute left-[6px] top-[10px] z-10"
         style={{
           opacity: isHovered ? 0.6 : 0,
           transition: 'opacity 0.2s ease',

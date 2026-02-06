@@ -37,6 +37,9 @@ import {
   isCustomAvatar,
 } from "../utils/customAvatarStorage";
 import { useSessionStore } from "../stores/sessionStore";
+import { useTeamStore } from "../stores/teamStore";
+import TeamCreationModal from "./TeamCreationModal";
+import TeamStatusBadge from "./TeamStatusBadge";
 import { extractProjectId } from "../utils/projectUtils";
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult } from "../types";
@@ -1134,6 +1137,25 @@ export default function RepositoryGroup({
   const displayName = getRepoDisplayName(repoName);
   const isDraggingAny = activeAgentId !== null;
 
+  // Team state
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const activeTeam = useTeamStore((s) => s.activeTeam);
+  const loadActiveTeam = useTeamStore((s) => s.loadActiveTeam);
+
+  // Build avatar map from agents for team enrichment
+  const buildAgentAvatarMap = useCallback(() => {
+    const map = new Map<string, { avatar?: string; color?: string }>();
+    for (const agent of [...mainAgents, ...worktreeAgents]) {
+      map.set(agent.id, { avatar: agent.avatar, color: agent.color });
+    }
+    return map;
+  }, [mainAgents, worktreeAgents]);
+
+  // Load active team on mount
+  useEffect(() => {
+    loadActiveTeam(repoPath, buildAgentAvatarMap());
+  }, [repoPath, loadActiveTeam, buildAgentAvatarMap]);
+
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
   const { sessions: allSessionsForRepo, createSession } = useSessionStore();
 
@@ -1763,6 +1785,32 @@ export default function RepositoryGroup({
                 <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
               </svg>
             </button>
+            {/* Create Team button (only when Agent Teams feature is enabled) */}
+            {mainAgents.length >= 2 && !activeTeam && (
+              <button
+                type="button"
+                onClick={() => setShowTeamModal(true)}
+                title="Create Agent Team"
+                className="repo-action-btn"
+                style={{ color: "rgba(255, 107, 53, 0.7)" }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
+            )}
             {/* New Agent button */}
             {onCreateAgent && (
               <button
@@ -1812,6 +1860,51 @@ export default function RepositoryGroup({
             )}
           </div>
         </div>
+        {activeTeam && activeTeam.projectPath === repoPath && (
+          <div style={{ marginTop: '4px', paddingLeft: '28px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => { e.stopPropagation(); setShowTeamModal(true); }}
+              title="Edit team"
+            >
+              <TeamStatusBadge team={activeTeam} />
+            </div>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (window.confirm(`Disband team "${activeTeam.name}"?`)) {
+                  try {
+                    await useTeamStore.getState().disbandTeam(repoPath, activeTeam.id);
+                    await loadActiveTeam(repoPath, buildAgentAvatarMap());
+                  } catch (err) {
+                    console.error('Failed to disband team:', err);
+                  }
+                }
+              }}
+              title="Disband team"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '1px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '3px',
+                transition: 'color 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(239, 68, 68, 0.8)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.3)'; }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Expanded Content with Metro Map Design */}
@@ -3018,6 +3111,15 @@ export default function RepositoryGroup({
               )?.label
             : undefined
         }
+      />
+
+      {/* Team Creation Modal */}
+      <TeamCreationModal
+        isOpen={showTeamModal}
+        onClose={() => { setShowTeamModal(false); loadActiveTeam(repoPath, buildAgentAvatarMap()); }}
+        projectPath={repoPath}
+        agents={[...mainAgents, ...worktreeAgents]}
+        editingTeam={activeTeam?.projectPath === repoPath ? activeTeam : null}
       />
     </div>
   );

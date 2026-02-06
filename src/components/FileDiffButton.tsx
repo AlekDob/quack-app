@@ -29,8 +29,8 @@ export default function FileDiffButton({ filePath, onDiffClick, disabled = false
       type="button"
     >
       <svg
-        width="12"
-        height="12"
+        width="10"
+        height="10"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
