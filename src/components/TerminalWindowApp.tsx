@@ -507,18 +507,19 @@ export function TerminalWindowApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Listen for projects update from main window (when agents change)
+  // Listen for projects update from main window (when activeProjects change)
   useEffect(() => {
-    console.log('[TerminalWindowApp] Setting up projects update listener');
     const unlistenPromise = listen<ProjectInfo[]>('terminal-window-projects-update', (event) => {
-      console.log('[TerminalWindowApp] Received projects update:', event.payload.length, 'projects', event.payload.map(p => p.name));
-      setUrlProjects(event.payload);
-      // Expand new projects
-      setExpandedProjects(prev => {
-        const next = new Set(prev);
-        event.payload.forEach(p => next.add(p.path));
-        return next;
-      });
+      // Only update if we received projects (don't clear the list with empty array)
+      if (event.payload.length > 0) {
+        setUrlProjects(event.payload);
+        // Expand new projects
+        setExpandedProjects(prev => {
+          const next = new Set(prev);
+          event.payload.forEach(p => next.add(p.path));
+          return next;
+        });
+      }
     });
 
     return () => {

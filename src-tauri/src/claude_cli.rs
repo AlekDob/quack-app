@@ -625,11 +625,12 @@ pub struct ToolDiffEvent {
 pub fn find_claude_cli_path() -> Option<String> {
     // Strategy: Search in order of preference
     // 1. Try Volta's 'which claude' first (respects Volta toolchain)
-    // 2. Common system paths (Homebrew, MacPorts, system-wide)
-    // 3. User-specific paths (~/.local/bin, ~/bin)
-    // 4. NVM paths (~/.nvm/versions/node/*/bin/claude)
-    // 5. Volta paths (~/.volta/bin/claude)
-    // 6. Fallback to system 'which claude'
+    // 2. Try 'where claude' on Windows or 'which claude' on Unix (system PATH)
+    // 3. Common system paths (Homebrew, MacPorts, system-wide)
+    // 4. User-specific paths (~/.local/bin, ~/bin)
+    // 5. NVM paths (~/.nvm/versions/node/*/bin/claude)
+    // 6. Volta paths (~/.volta/bin/claude)
+    // 7. Windows npm global paths (%APPDATA%\npm, %ProgramFiles%\nodejs)
 
     log::info!("[Claude CLI] Starting search for Claude executable...");
 
@@ -652,45 +653,144 @@ pub fn find_claude_cli_path() -> Option<String> {
         }
     }
 
-    let mut search_paths: Vec<String> = vec![
-        // Standard package manager paths
-        "/opt/homebrew/bin/claude".to_string(),         // Homebrew on Apple Silicon
-        "/usr/local/bin/claude".to_string(),            // Homebrew on Intel Mac
-        "/opt/local/bin/claude".to_string(),            // MacPorts
-        "/usr/bin/claude".to_string(),                  // System-wide install
-    ];
+    // 🎯 PRIORITY 2: Try system PATH via 'where' (Windows) or 'which' (Unix)
+    #[cfg(target_os = "windows")]
+    {
+        log::info!("[Claude CLI] Trying 'where claude' (Windows)...");
+        let mut cmd = std::process::Command::new("where");
+        cmd.arg("claude");
+        hide_console_window(&mut cmd);
 
-    // Add user-specific paths
-    if let Ok(home) = std::env::var("HOME") {
-        // Volta-managed global binaries (high priority)
-        search_paths.push(format!("{}/.volta/bin/claude", home));
-
-        search_paths.push(format!("{}/.local/bin/claude", home));
-        search_paths.push(format!("{}/bin/claude", home));
-
-        // Search in NVM directories
-        let nvm_base = format!("{}/.nvm/versions/node", home);
-        if let Ok(entries) = fs::read_dir(&nvm_base) {
-            for entry in entries.filter_map(Result::ok) {
-                let node_version_path = entry.path();
-                if node_version_path.is_dir() {
-                    let claude_path = node_version_path.join("bin/claude");
-                    if let Some(path_str) = claude_path.to_str() {
-                        search_paths.push(path_str.to_string());
+        if let Ok(output) = cmd.output() {
+            if output.status.success() {
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    // 'where' can return multiple lines, take the first one
+                    if let Some(first_line) = path_str.lines().next() {
+                        let path = first_line.trim();
+                        if !path.is_empty() && Path::new(path).exists() {
+                            log::info!("[Claude CLI] ✅ Found via 'where' at: {}", path);
+                            return Some(path.to_string());
+                        }
                     }
                 }
             }
         }
+    }
 
-        // Search in Volta toolchain directories
-        let volta_base = format!("{}/.volta/tools/image/claude", home);
-        if let Ok(entries) = fs::read_dir(&volta_base) {
-            for entry in entries.filter_map(Result::ok) {
-                let version_path = entry.path();
-                if version_path.is_dir() {
-                    let claude_path = version_path.join("bin/claude");
-                    if let Some(path_str) = claude_path.to_str() {
-                        search_paths.push(path_str.to_string());
+    #[cfg(not(target_os = "windows"))]
+    {
+        log::info!("[Claude CLI] Trying 'which claude' (Unix)...");
+        let mut cmd = std::process::Command::new("which");
+        cmd.arg("claude");
+
+        if let Ok(output) = cmd.output() {
+            if output.status.success() {
+                if let Ok(path) = String::from_utf8(output.stdout) {
+                    let path = path.trim();
+                    if !path.is_empty() && Path::new(path).exists() {
+                        log::info!("[Claude CLI] ✅ Found via 'which' at: {}", path);
+                        return Some(path.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 🎯 PRIORITY 3: Build search paths based on platform
+    let mut search_paths: Vec<String> = vec![];
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Unix/macOS paths
+        search_paths.extend(vec![
+            "/opt/homebrew/bin/claude".to_string(),         // Homebrew on Apple Silicon
+            "/usr/local/bin/claude".to_string(),            // Homebrew on Intel Mac
+            "/opt/local/bin/claude".to_string(),            // MacPorts
+            "/usr/bin/claude".to_string(),                  // System-wide install
+        ]);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows npm global paths
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            search_paths.push(format!("{}\\npm\\claude.cmd", appdata));
+            search_paths.push(format!("{}\\npm\\claude", appdata));
+        }
+
+        if let Ok(programfiles) = std::env::var("ProgramFiles") {
+            search_paths.push(format!("{}\\nodejs\\claude.cmd", programfiles));
+            search_paths.push(format!("{}\\nodejs\\claude", programfiles));
+        }
+
+        // Add common Windows paths
+        search_paths.extend(vec![
+            r"C:\Program Files\nodejs\claude.cmd".to_string(),
+            r"C:\Program Files (x86)\nodejs\claude.cmd".to_string(),
+        ]);
+    }
+
+    // Add user-specific paths (cross-platform)
+    if let Ok(home) = std::env::var("HOME") {
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Volta-managed global binaries (high priority)
+            search_paths.push(format!("{}/.volta/bin/claude", home));
+
+            search_paths.push(format!("{}/.local/bin/claude", home));
+            search_paths.push(format!("{}/bin/claude", home));
+
+            // Search in NVM directories
+            let nvm_base = format!("{}/.nvm/versions/node", home);
+            if let Ok(entries) = fs::read_dir(&nvm_base) {
+                for entry in entries.filter_map(Result::ok) {
+                    let node_version_path = entry.path();
+                    if node_version_path.is_dir() {
+                        let claude_path = node_version_path.join("bin/claude");
+                        if let Some(path_str) = claude_path.to_str() {
+                            search_paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+
+            // Search in Volta toolchain directories
+            let volta_base = format!("{}/.volta/tools/image/claude", home);
+            if let Ok(entries) = fs::read_dir(&volta_base) {
+                for entry in entries.filter_map(Result::ok) {
+                    let version_path = entry.path();
+                    if version_path.is_dir() {
+                        let claude_path = version_path.join("bin/claude");
+                        if let Some(path_str) = claude_path.to_str() {
+                            search_paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows-specific: Add USERPROFILE paths
+        if let Ok(userprofile) = std::env::var("USERPROFILE") {
+            search_paths.push(format!("{}\\AppData\\Roaming\\npm\\claude.cmd", userprofile));
+            search_paths.push(format!("{}\\AppData\\Roaming\\npm\\claude", userprofile));
+        }
+
+        // Windows NVM paths
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let nvm_dir = PathBuf::from(&appdata).join("nvm");
+            if nvm_dir.exists() {
+                if let Ok(entries) = fs::read_dir(&nvm_dir) {
+                    for entry in entries.filter_map(Result::ok) {
+                        let version_path = entry.path();
+                        if version_path.is_dir() {
+                            let claude_cmd = version_path.join("claude.cmd");
+                            if let Some(path_str) = claude_cmd.to_str() {
+                                search_paths.push(path_str.to_string());
+                            }
+                        }
                     }
                 }
             }
@@ -717,25 +817,6 @@ pub fn find_claude_cli_path() -> Option<String> {
                     } else {
                         log::info!("[Claude CLI] ✅ Found at: {}", path);
                     }
-                    return Some(path.to_string());
-                }
-            }
-        }
-    }
-
-    // Fallback: Try using 'which' to find claude in PATH
-    log::info!("[Claude CLI] Trying 'which claude' as fallback...");
-    let mut cmd = std::process::Command::new("which");
-    cmd.arg("claude");
-    #[cfg(target_os = "windows")]
-    hide_console_window(&mut cmd);
-
-    if let Ok(output) = cmd.output() {
-        if output.status.success() {
-            if let Ok(path) = String::from_utf8(output.stdout) {
-                let path = path.trim();
-                if !path.is_empty() && Path::new(path).exists() {
-                    log::info!("[Claude CLI] ✅ Found via 'which' at: {}", path);
                     return Some(path.to_string());
                 }
             }

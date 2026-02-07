@@ -7,6 +7,7 @@ import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
 import SearchToolbar, { type SearchOptions } from "./SearchToolbar";
 import type { CodeEditorRef } from "./CodeEditorMonaco";
+import { formatShortcut } from "../utils/platform";
 
 // Lazy load Monaco editor (better diff support, minimap, VS Code-like experience)
 const CodeEditor = lazy(() => import("./CodeEditorMonaco"));
@@ -242,7 +243,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                         className={`preview-action save ${hasUnsavedChanges ? "active" : ""}`}
                         onClick={() => handleSave()}
                         disabled={!hasUnsavedChanges}
-                        title={hasUnsavedChanges ? "Save changes (⌘S)" : "No changes to save"}
+                        title={hasUnsavedChanges ? `Save changes (${formatShortcut("⌘S")})` : "No changes to save"}
                       >
                         {hasUnsavedChanges ? "Save *" : "Saved"}
                       </button>
@@ -251,7 +252,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                       type="button"
                       className="preview-action"
                       onClick={() => setIsSearchActive(true)}
-                      title="Search in file (⌘F)"
+                      title={`Search in file (${formatShortcut("⌘F")})`}
                     >
                       Search
                     </button>

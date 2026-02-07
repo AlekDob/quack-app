@@ -116,6 +116,7 @@ import {
   TABS_BY_TERMINAL_KEY,
   NATIVE_TERMINALS_STORAGE_KEY,
 } from "./services/terminalStorage";
+import { extractProjectId } from "./utils/projectUtils";
 import {
   loadAgents as loadUnifiedAgents,
   saveAgents as saveUnifiedAgents,
@@ -282,7 +283,7 @@ async function getCachedStore(filename: string) {
  */
 function terminalToUnifiedAgent(terminal: TerminalInfo): UnifiedAgent {
   // Extract project name from cwd (last segment of path)
-  const projectName = terminal.cwd?.split("/").pop() ?? "Unknown";
+  const projectName = extractProjectId(terminal.cwd) || "Unknown";
 
   return {
     id: terminal.id,
@@ -541,7 +542,7 @@ function AppContent() {
 
     terminals.forEach(terminal => {
       const path = terminal.cwd;
-      const name = path.split('/').pop() || path;
+      const name = extractProjectId(path) || path;
 
       if (!projectMap.has(path)) {
         projectMap.set(path, { name, path, agentCount: 0 });
@@ -3735,15 +3736,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || '~';
       const terminalLabel = `Resume ${sessionId.slice(0, 8)}`;
 
-      // Prepare projects list from agent chats
-      const projects = agentChats.map(agent => ({
-        path: agent.cwd,
-        name: agent.cwd.split('/').pop() || agent.cwd,
+      // Prepare projects list from active projects (terminals in sidebar)
+      const projects = activeProjects.map(project => ({
+        path: project.path,
+        name: project.name,
       }));
-      // Remove duplicates by path
-      const uniqueProjects = projects.filter(
-        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-      );
 
       // Open terminal window with initial command to resume session
       await openTerminalWindow(uniqueProjects, {
@@ -3778,15 +3775,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const terminalCwd = session.projectPath || explorerPath || process.env.HOME || '~';
       const terminalLabel = `Resume ${session.claudeSessionId.slice(0, 8)}`;
 
-      // Prepare projects list from agent chats
-      const projects = agentChats.map(agent => ({
-        path: agent.cwd,
-        name: agent.cwd.split('/').pop() || agent.cwd,
+      // Prepare projects list from active projects (terminals in sidebar)
+      const projects = activeProjects.map(project => ({
+        path: project.path,
+        name: project.name,
       }));
-      // Remove duplicates by path
-      const uniqueProjects = projects.filter(
-        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-      );
 
       // Open terminal window with initial command to resume session
       await openTerminalWindow(uniqueProjects, {
@@ -6223,7 +6216,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const projectMap = new Map<string, string>();
         for (const agent of savedAgents) {
           if (agent.projectPath && !projectMap.has(agent.projectPath)) {
-            projectMap.set(agent.projectPath, agent.projectName || agent.projectPath.split('/').pop() || 'Unknown');
+            projectMap.set(agent.projectPath, agent.projectName || extractProjectId(agent.projectPath) || 'Unknown');
           }
         }
         setPersistedProjects(projectMap);
@@ -7347,9 +7340,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               console.log(`Creating worktree for new branch: ${newTerminalBranch}`);
 
               // Calculate worktree path: /path/to/repo-branchname
-              const repoName = trimmedPath.split('/').pop() || 'repo';
+              const repoName = extractProjectId(trimmedPath) || 'repo';
               const sanitizedBranch = newTerminalBranch.replace(/\//g, '-');
-              const parentDir = trimmedPath.split('/').slice(0, -1).join('/');
+              // Get parent directory using cross-platform path separator
+              const pathSegments = trimmedPath.replace(/[/\\]+$/, '').split(/[/\\]/);
+              const parentDir = pathSegments.slice(0, -1).join('/');
               worktreePath = `${parentDir}/${repoName}-${sanitizedBranch}`;
 
               await invoke('git_add_worktree', {
@@ -7432,7 +7427,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         // Persist project in sidebar
         const projectPath = effectivePath;
-        const projectName = projectPath.split('/').pop() || 'Unknown';
+        const projectName = extractProjectId(projectPath) || 'Unknown';
         setPersistedProjects(prev => {
           if (prev.has(projectPath)) return prev;
           const next = new Map(prev);
@@ -7840,51 +7835,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Handler to open terminal window with projects from agents
   const handleCreateAgentTerminal = useCallback(() => {
     // NEW BEHAVIOR: Open separate Tauri window for terminals
-    // Pass projects derived from agentChats
-    const projects = agentChats.map(agent => ({
-      path: agent.cwd,
-      name: agent.cwd.split('/').pop() || agent.cwd,
+    // Pass projects derived from terminals (activeProjects)
+    const projects = activeProjects.map(project => ({
+      path: project.path,
+      name: project.name,
     }));
-    // Remove duplicates by path
-    const uniqueProjects = projects.filter(
-      (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-    );
-    openTerminalWindow(uniqueProjects);
-  }, [agentChats, openTerminalWindow]);
+    openTerminalWindow(projects);
+  }, [activeProjects, openTerminalWindow]);
 
-  // Sync terminal window projects when agentChats change
+  // Sync terminal window projects when activeProjects change
   // updateTerminalWindowProjects now handles the window lookup internally
   useEffect(() => {
-    const projects = agentChats.map(agent => ({
-      path: agent.cwd,
-      name: agent.cwd.split('/').pop() || agent.cwd,
+    const projects = activeProjects.map(project => ({
+      path: project.path,
+      name: project.name,
     }));
-    // Remove duplicates by path
-    const uniqueProjects = projects.filter(
-      (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-    );
-    // This will only emit if the window exists
-    updateTerminalWindowProjects(uniqueProjects);
-  }, [agentChats, updateTerminalWindowProjects]);
+    // Only update if there are projects (don't clear the list with empty array)
+    if (projects.length > 0) {
+      updateTerminalWindowProjects(projects);
+    }
+  }, [activeProjects, updateTerminalWindowProjects]);
 
   // Listen for sync request from terminal window (manual sync button)
   useEffect(() => {
     const unlistenPromise = listen('terminal-window-request-sync', () => {
       console.log('[App] Received sync request from terminal window');
-      const projects = agentChats.map(agent => ({
-        path: agent.cwd,
-        name: agent.cwd.split('/').pop() || agent.cwd,
+      const projects = activeProjects.map(project => ({
+        path: project.path,
+        name: project.name,
       }));
-      const uniqueProjects = projects.filter(
-        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-      );
-      updateTerminalWindowProjects(uniqueProjects);
+      updateTerminalWindowProjects(projects);
     });
 
     return () => {
       unlistenPromise.then(unlisten => unlisten());
     };
-  }, [agentChats, updateTerminalWindowProjects]);
+  }, [activeProjects, updateTerminalWindowProjects]);
 
   const handleColorChange = useCallback(
     async (id: string, color: string) => {
@@ -9545,10 +9531,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const handleOpenTerminalWindowForRepo = useCallback(
     async (repoPath: string, repoName: string) => {
       try {
-        // Get all existing projects from agentChats (same pattern as Terminals button)
-        const projects = agentChats.map(agent => ({
-          path: agent.cwd,
-          name: agent.cwd.split('/').pop() || agent.cwd,
+        // Get all existing projects from activeProjects (same pattern as Terminals button)
+        const projects = activeProjects.map(project => ({
+          path: project.path,
+          name: project.name,
         }));
 
         // Add the clicked project if not already in list
@@ -9571,7 +9557,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         toast.error('Failed to open terminal window');
       }
     },
-    [agentChats, openTerminalWindow]
+    [activeProjects, openTerminalWindow]
   );
 
   const handleStageEntry = useCallback(
@@ -10578,14 +10564,11 @@ You have access to all Bash tools to execute git commands like:
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
                   // Open in Terminal Window (separate Tauri window) instead of tab
-                  const projects = agentChats.map(agent => ({
-                    path: agent.cwd,
-                    name: agent.cwd.split('/').pop() || agent.cwd,
+                  const projects = activeProjects.map(project => ({
+                    path: project.path,
+                    name: project.name,
                   }));
-                  const uniqueProjects = projects.filter(
-                    (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-                  );
-                  await openTerminalWindow(uniqueProjects, {
+                  await openTerminalWindow(projects, {
                     projectPath: cwd,
                     command: 'claude /usage',
                     terminalLabel: 'Claude Plan Usage',
@@ -10611,14 +10594,11 @@ You have access to all Bash tools to execute git commands like:
               onLoginClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                  const projects = agentChats.map(agent => ({
-                    path: agent.cwd,
-                    name: agent.cwd.split('/').pop() || agent.cwd,
+                  const projects = activeProjects.map(project => ({
+                    path: project.path,
+                    name: project.name,
                   }));
-                  const uniqueProjects = projects.filter(
-                    (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-                  );
-                  await openTerminalWindow(uniqueProjects, {
+                  await openTerminalWindow(projects, {
                     projectPath: cwd,
                     command: 'claude /login',
                     terminalLabel: 'Claude Login',
@@ -10691,7 +10671,7 @@ You have access to all Bash tools to execute git commands like:
                       onExitKanban={() => setActiveTabId('chat')}
                       onOpenTerminal={async (path, label) => {
                         // Open terminal in specified directory (worktree or project path)
-                        const projectName = label || path.split('/').pop() || 'Terminal';
+                        const projectName = label || extractProjectId(path) || 'Terminal';
                         const uniqueProjects = [{ path, name: projectName }];
                         await openTerminalWindow(uniqueProjects, {
                           projectPath: path,

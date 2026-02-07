@@ -3,6 +3,7 @@ import { Brain } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import { useIDEStore } from '../stores/ideStore';
+import { formatShortcut } from '../utils/platform';
 import './ActionIcons.css';
 
 // Installed app from Rust backend
@@ -290,12 +291,12 @@ function ActionIcons({
       {/* Right side - Action icons */}
       {/* Kanban Icon */}
       {onKanbanClick && (
-        <KeyboardShortcutTooltip label="Kanban" shortcut="⌘K">
+        <KeyboardShortcutTooltip label="Kanban" shortcut={formatShortcut("⌘K")}>
           <button
             type="button"
             className={`action-icon ${isKanbanActive ? 'active' : ''}`}
             onClick={onKanbanClick}
-            aria-label="Open Kanban (⌘K)"
+            aria-label={`Open Kanban (${formatShortcut("⌘K")})`}
             style={{ position: 'relative' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -345,12 +346,12 @@ function ActionIcons({
       </button>
 
       {/* Terminal Icon */}
-      <KeyboardShortcutTooltip label="Terminal" shortcut="⌘T">
+      <KeyboardShortcutTooltip label="Terminal" shortcut={formatShortcut("⌘T")}>
         <button
           type="button"
           className={`action-icon ${terminalWindowOpen ? 'active' : ''}`}
           onClick={onTerminalClick}
-          aria-label="Open Terminals (⌘T)"
+          aria-label={`Open Terminals (${formatShortcut("⌘T")})`}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect
@@ -524,12 +525,12 @@ function ActionIcons({
       )}
 
       {/* Side Panel Toggle Icon - LAST */}
-      <KeyboardShortcutTooltip label="Side Panel" shortcut="⌘B">
+      <KeyboardShortcutTooltip label="Side Panel" shortcut={formatShortcut("⌘B")}>
         <button
           type="button"
           className={`action-icon ${!sidePanelCollapsed ? 'active' : ''}`}
           onClick={onToggleSidePanel}
-          aria-label={sidePanelCollapsed ? "Open side panel (⌘B)" : "Close side panel (⌘B)"}
+          aria-label={sidePanelCollapsed ? `Open side panel (${formatShortcut("⌘B")})` : `Close side panel (${formatShortcut("⌘B")})`}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect

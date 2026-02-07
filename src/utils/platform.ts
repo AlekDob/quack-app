@@ -83,3 +83,31 @@ export function normalizePath(path: string): string {
   }
   return path;
 }
+
+/**
+ * Get the modifier key symbol for the current platform
+ * @returns '⌘' for macOS, 'Ctrl' for Windows/Linux
+ */
+export function getModifierKey(): string {
+  return isMacOS() ? '⌘' : 'Ctrl';
+}
+
+/**
+ * Convert a keyboard shortcut to the current platform format
+ * Replaces ⌘ with Ctrl on Windows/Linux
+ *
+ * @param shortcut - The shortcut string (e.g., "⌘K", "⌘T")
+ * @returns Platform-specific shortcut (e.g., "Ctrl+K" on Windows)
+ *
+ * @example
+ * formatShortcut("⌘K") // Returns "⌘K" on Mac, "Ctrl+K" on Windows
+ * formatShortcut("⌘T") // Returns "⌘T" on Mac, "Ctrl+T" on Windows
+ */
+export function formatShortcut(shortcut: string): string {
+  if (isMacOS()) {
+    return shortcut;
+  }
+
+  // Replace ⌘ with Ctrl+ for Windows/Linux
+  return shortcut.replace(/⌘/g, 'Ctrl+');
+}
