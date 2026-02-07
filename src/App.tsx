@@ -3743,7 +3743,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }));
 
       // Open terminal window with initial command to resume session
-      await openTerminalWindow(uniqueProjects, {
+      await openTerminalWindow(projects, {
         projectPath: terminalCwd,
         command: `claude --resume ${sessionId}`,
         terminalLabel: terminalLabel,
@@ -3782,7 +3782,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }));
 
       // Open terminal window with initial command to resume session
-      await openTerminalWindow(uniqueProjects, {
+      await openTerminalWindow(projects, {
         projectPath: terminalCwd,
         command: `claude --resume ${session.claudeSessionId}`,
         terminalLabel: terminalLabel,
