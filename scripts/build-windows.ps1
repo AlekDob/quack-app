@@ -70,6 +70,52 @@ Write-Host ""
 # Set production environment
 $env:NODE_ENV = "production"
 
+# Load .env if present (for Rust compile-time variables like GUMROAD_PRODUCT_ID)
+$envFile = Join-Path $projectRoot ".env"
+if (Test-Path $envFile) {
+    Write-Host "Loading .env file..." -ForegroundColor Yellow
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*#' -or $_ -match '^\s*$') { return }
+        $line = $_ -replace '^export\s+', ''
+        if ($line -match '^([^=]+)=(.*)$') {
+            $key = $matches[1].Trim()
+            $value = $matches[2].Trim() -replace '^["'']|["'']$', ''
+            [System.Environment]::SetEnvironmentVariable($key, $value, "Process")
+        }
+    }
+    Write-Host "  Done" -ForegroundColor Green
+}
+
+# Step 0: Clean previous build artifacts
+Write-Host ""
+Write-Host "[0/4] Cleaning previous build artifacts..." -ForegroundColor Yellow
+
+# Kill any running app.exe from previous builds
+$appProcess = Get-Process -Name "app" -ErrorAction SilentlyContinue | Where-Object {
+    $_.Path -like "*quack-app*"
+}
+if ($appProcess) {
+    Write-Host "  Stopping running Quack instance (PID: $($appProcess.Id))..." -ForegroundColor Yellow
+    $appProcess | Stop-Process -Force
+    Start-Sleep -Seconds 1
+}
+
+# Remove previous bundle output
+$bundlePath = Join-Path $projectRoot "src-tauri\target\release\bundle"
+if (Test-Path $bundlePath) {
+    Write-Host "  Removing previous bundle directory..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $bundlePath
+}
+
+# Remove previous exe to avoid access denied errors
+$exePath = Join-Path $projectRoot "src-tauri\target\release\app.exe"
+if (Test-Path $exePath) {
+    Write-Host "  Removing previous app.exe..." -ForegroundColor Yellow
+    Remove-Item -Force $exePath
+}
+
+Write-Host "  Done" -ForegroundColor Green
+
 # Step 1: Prepare node-sdk
 Write-Host "[1/4] Preparing node-sdk..." -ForegroundColor Yellow
 Set-Location "src-tauri/node-sdk"
