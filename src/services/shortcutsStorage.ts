@@ -10,134 +10,156 @@
 import { Store } from "@tauri-apps/plugin-store";
 import type { ShortcutConfig, ShortcutActionId } from "../types";
 import { getTestModeStoreName } from "../utils/testModeStorage";
+import { isMacOS } from "../utils/platform";
 
 // Storage key for keyboard shortcuts
 const SHORTCUTS_KEY = "keyboardShortcuts";
 
 /**
- * Default keyboard shortcuts configuration
+ * Get the primary modifier key for the current platform
+ * macOS: Meta (Command key)
+ * Windows/Linux: Ctrl
  */
-export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = {
-  toggleKanban: {
-    id: "toggleKanban",
-    label: "Toggle Kanban",
-    description: "Switch between Agent list and Kanban board view",
-    defaultKeys: "Meta+K",
-    currentKeys: "Meta+K",
-  },
-  openTerminalWindow: {
-    id: "openTerminalWindow",
-    label: "Terminal Window",
-    description: "Open the Terminal Window application",
-    defaultKeys: "Meta+T",
-    currentKeys: "Meta+T",
-  },
-  newAgent: {
-    id: "newAgent",
-    label: "New Agent",
-    description: "Create a new agent",
-    defaultKeys: "Meta+N",
-    currentKeys: "Meta+N",
-  },
-  toggleSidePanel: {
-    id: "toggleSidePanel",
-    label: "Toggle Side Panel",
-    description: "Show or hide the right side panel",
-    defaultKeys: "Meta+B",
-    currentKeys: "Meta+B",
-  },
-  focusFileSearch: {
-    id: "focusFileSearch",
-    label: "Focus File Search",
-    description: "Focus the File Explorer search input",
-    defaultKeys: "Meta+F",
-    currentKeys: "Meta+F",
-  },
-  newKanbanTask: {
-    id: "newKanbanTask",
-    label: "New Kanban Task",
-    description: "Create a new task in Kanban view",
-    defaultKeys: "Meta+Shift+N",
-    currentKeys: "Meta+Shift+N",
-  },
-  chatAttachFile: {
-    id: "chatAttachFile",
-    label: "Attach File",
-    description: "Open file picker to attach files",
-    defaultKeys: "Meta+U",
-    currentKeys: "Meta+U",
-  },
-  chatMentionAgent: {
-    id: "chatMentionAgent",
-    label: "Mention Agent",
-    description: "Mention an agent in the chat",
-    defaultKeys: "Meta+M",
-    currentKeys: "Meta+M",
-  },
-  chatToggleLock: {
-    id: "chatToggleLock",
-    label: "Toggle Agent Lock",
-    description: "Lock or unlock current agent",
-    defaultKeys: "Meta+L",
-    currentKeys: "Meta+L",
-  },
-  chatToggleFullscreen: {
-    id: "chatToggleFullscreen",
-    label: "Toggle Fullscreen",
-    description: "Open fullscreen compose mode",
-    defaultKeys: "Meta+Shift+F",
-    currentKeys: "Meta+Shift+F",
-  },
-  chatVoiceRecord: {
-    id: "chatVoiceRecord",
-    label: "Voice Record",
-    description: "Start voice recording",
-    defaultKeys: "Meta+Shift+V",
-    currentKeys: "Meta+Shift+V",
-  },
-  chatSendMessage: {
-    id: "chatSendMessage",
-    label: "Send Message",
-    description: "Send the current message",
-    defaultKeys: "Meta+Enter",
-    currentKeys: "Meta+Enter",
-  },
-  chatOpenSnippets: {
-    id: "chatOpenSnippets",
-    label: "Open Snippets",
-    description: "Open snippets panel",
-    defaultKeys: "Meta+Shift+S",
-    currentKeys: "Meta+Shift+S",
-  },
-  chatOpenDroids: {
-    id: "chatOpenDroids",
-    label: "Open Droids",
-    description: "Open droids panel",
-    defaultKeys: "Meta+D",
-    currentKeys: "Meta+D",
-  },
-  chatOpenCommands: {
-    id: "chatOpenCommands",
-    label: "Open Commands",
-    description: "Open commands panel",
-    defaultKeys: "Meta+/",
-    currentKeys: "Meta+/",
-  },
-  chatInsertXml: {
-    id: "chatInsertXml",
-    label: "Insert XML Tag",
-    description: "Insert smart XML tag at cursor",
-    defaultKeys: "Meta+Shift+X",
-    currentKeys: "Meta+Shift+X",
-  },
-  chatNewLine: {
-    id: "chatNewLine",
-    label: "New Line with _",
-    description: "Insert new line with underscore prefix",
-    defaultKeys: "Meta+Shift+L",
-    currentKeys: "Meta+Shift+L",
-  },
+const getPrimaryModifier = (): string => {
+  return isMacOS() ? "Meta" : "Ctrl";
 };
+
+/**
+ * Build shortcut string with platform-specific modifier
+ */
+const buildShortcut = (key: string, withShift = false): string => {
+  const modifier = getPrimaryModifier();
+  return withShift ? `${modifier}+Shift+${key}` : `${modifier}+${key}`;
+};
+
+/**
+ * Default keyboard shortcuts configuration
+ * Uses platform-specific modifiers (Meta on Mac, Ctrl on Windows/Linux)
+ */
+export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() => {
+  const shortcuts = {
+    toggleKanban: {
+      id: "toggleKanban" as const,
+      label: "Toggle Kanban",
+      description: "Switch between Agent list and Kanban board view",
+      defaultKeys: buildShortcut("K"),
+      currentKeys: buildShortcut("K"),
+    },
+    openTerminalWindow: {
+      id: "openTerminalWindow" as const,
+      label: "Terminal Window",
+      description: "Open the Terminal Window application",
+      defaultKeys: buildShortcut("T"),
+      currentKeys: buildShortcut("T"),
+    },
+    newAgent: {
+      id: "newAgent" as const,
+      label: "New Agent",
+      description: "Create a new agent",
+      defaultKeys: buildShortcut("N"),
+      currentKeys: buildShortcut("N"),
+    },
+    toggleSidePanel: {
+      id: "toggleSidePanel" as const,
+      label: "Toggle Side Panel",
+      description: "Show or hide the right side panel",
+      defaultKeys: buildShortcut("B"),
+      currentKeys: buildShortcut("B"),
+    },
+    focusFileSearch: {
+      id: "focusFileSearch" as const,
+      label: "Focus File Search",
+      description: "Focus the File Explorer search input",
+      defaultKeys: buildShortcut("F"),
+      currentKeys: buildShortcut("F"),
+    },
+    newKanbanTask: {
+      id: "newKanbanTask" as const,
+      label: "New Kanban Task",
+      description: "Create a new task in Kanban view",
+      defaultKeys: buildShortcut("N", true),
+      currentKeys: buildShortcut("N", true),
+    },
+    chatAttachFile: {
+      id: "chatAttachFile" as const,
+      label: "Attach File",
+      description: "Open file picker to attach files",
+      defaultKeys: buildShortcut("U"),
+      currentKeys: buildShortcut("U"),
+    },
+    chatMentionAgent: {
+      id: "chatMentionAgent" as const,
+      label: "Mention Agent",
+      description: "Mention an agent in the chat",
+      defaultKeys: buildShortcut("M"),
+      currentKeys: buildShortcut("M"),
+    },
+    chatToggleLock: {
+      id: "chatToggleLock" as const,
+      label: "Toggle Agent Lock",
+      description: "Lock or unlock current agent",
+      defaultKeys: buildShortcut("L"),
+      currentKeys: buildShortcut("L"),
+    },
+    chatToggleFullscreen: {
+      id: "chatToggleFullscreen" as const,
+      label: "Toggle Fullscreen",
+      description: "Open fullscreen compose mode",
+      defaultKeys: buildShortcut("F", true),
+      currentKeys: buildShortcut("F", true),
+    },
+    chatVoiceRecord: {
+      id: "chatVoiceRecord" as const,
+      label: "Voice Record",
+      description: "Start voice recording",
+      defaultKeys: buildShortcut("V", true),
+      currentKeys: buildShortcut("V", true),
+    },
+    chatSendMessage: {
+      id: "chatSendMessage" as const,
+      label: "Send Message",
+      description: "Send the current message",
+      defaultKeys: `${getPrimaryModifier()}+Enter`,
+      currentKeys: `${getPrimaryModifier()}+Enter`,
+    },
+    chatOpenSnippets: {
+      id: "chatOpenSnippets" as const,
+      label: "Open Snippets",
+      description: "Open snippets panel",
+      defaultKeys: buildShortcut("S", true),
+      currentKeys: buildShortcut("S", true),
+    },
+    chatOpenDroids: {
+      id: "chatOpenDroids" as const,
+      label: "Open Droids",
+      description: "Open droids panel",
+      defaultKeys: buildShortcut("D"),
+      currentKeys: buildShortcut("D"),
+    },
+    chatOpenCommands: {
+      id: "chatOpenCommands" as const,
+      label: "Open Commands",
+      description: "Open commands panel",
+      defaultKeys: buildShortcut("/"),
+      currentKeys: buildShortcut("/"),
+    },
+    chatInsertXml: {
+      id: "chatInsertXml" as const,
+      label: "Insert XML Tag",
+      description: "Insert smart XML tag at cursor",
+      defaultKeys: buildShortcut("X", true),
+      currentKeys: buildShortcut("X", true),
+    },
+    chatNewLine: {
+      id: "chatNewLine" as const,
+      label: "New Line with _",
+      description: "Insert new line with underscore prefix",
+      defaultKeys: buildShortcut("L", true),
+      currentKeys: buildShortcut("L", true),
+    },
+  };
+  return shortcuts;
+})();
 
 /**
  * Saves keyboard shortcuts to persistent storage

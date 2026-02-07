@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { RotateCcw } from "lucide-react";
+import { isMacOS } from "../../../utils/platform";
 import "./ShortcutInput.css";
 
 interface ShortcutInputProps {
@@ -19,16 +20,29 @@ interface ShortcutInputProps {
 }
 
 /**
- * Format raw keys to display format (Meta+K -> ⌘K)
+ * Format raw keys to display format
+ * macOS: Meta+K -> ⌘K, Ctrl+K -> ⌃K
+ * Windows/Linux: Meta+K -> Ctrl+K, Ctrl+K -> Ctrl+K (readable text)
  */
 const formatKeys = (keys: string): string => {
   if (!keys) return "";
-  return keys
-    .replace(/Meta\+/gi, "⌘")
-    .replace(/Ctrl\+/gi, "⌃")
-    .replace(/Alt\+/gi, "⌥")
-    .replace(/Shift\+/gi, "⇧")
-    .replace(/\+/g, "");
+
+  if (isMacOS()) {
+    // Mac: use symbols
+    return keys
+      .replace(/Meta\+/gi, "⌘")
+      .replace(/Ctrl\+/gi, "⌃")
+      .replace(/Alt\+/gi, "⌥")
+      .replace(/Shift\+/gi, "⇧")
+      .replace(/\+/g, "");
+  } else {
+    // Windows/Linux: use readable text
+    return keys
+      .replace(/Meta\+/gi, "Ctrl+")
+      .replace(/Ctrl\+/gi, "Ctrl+")
+      .replace(/Alt\+/gi, "Alt+")
+      .replace(/Shift\+/gi, "Shift+");
+  }
 };
 
 /**
