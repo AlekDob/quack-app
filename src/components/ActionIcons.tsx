@@ -263,6 +263,14 @@ function ActionIcons({
             <text x="6" y="16" fill="#fff" fontSize="11" fontWeight="bold">S</text>
           </svg>
         );
+      // Notepad++
+      case 'notepadpp':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#90BE6D"/>
+            <text x="3" y="16" fill="#fff" fontSize="8" fontWeight="bold">N++</text>
+          </svg>
+        );
       default:
         // Generic fallback
         return (
