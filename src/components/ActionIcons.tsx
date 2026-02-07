@@ -50,6 +50,7 @@ interface ActionIconsProps {
 function ActionIcons({
   projectPath,
   onGitClick,
+  onTelegramClick,
   onTerminalClick,
   onToggleSidePanel,
   sidePanelCollapsed,
@@ -283,6 +284,20 @@ function ActionIcons({
           <span className="action-icon-tooltip">Addons</span>
         </button>
       )}
+
+      {/* Telegram Icon */}
+      <button
+        type="button"
+        className="action-icon"
+        onClick={onTelegramClick}
+        aria-label="Telegram Setup"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 2L11 13" />
+          <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+        </svg>
+        <span className="action-icon-tooltip">Telegram</span>
+      </button>
 
       {/* Open Dropdown - Codex style with real app icons */}
       {projectPath && (
