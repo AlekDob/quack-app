@@ -235,26 +235,35 @@ export default function AgentViewer({
     setIsSaving(true);
 
     try {
-      const nameToUse = isNewAgent ? editName : agent!.name;
-      const scopeToUse = isNewAgent ? editScope : agentScope;
-
-      await invoke("save_agent_content", {
-        name: nameToUse,
-        content: editContent,
-        model: editModel,
-        color: editColor,
-        description: editDescription,
-        scope: scopeToUse,
-        workingDir,
-      });
-
       if (isNewAgent) {
-        // For new agents, just close and refresh the list
+        // Use create_agent which auto-creates the .claude/agents/ directory
+        await invoke("create_agent", {
+          name: editName,
+          description: editDescription,
+          model: editModel,
+          color: editColor,
+          content: editContent,
+          scope: editScope,
+          workingDir,
+        });
+
         setIsEditing(false);
         if (onRefresh) {
           onRefresh();
         }
       } else {
+        const nameToUse = agent!.name;
+
+        await invoke("save_agent_content", {
+          name: nameToUse,
+          content: editContent,
+          model: editModel,
+          color: editColor,
+          description: editDescription,
+          scope: agentScope,
+          workingDir,
+        });
+
         // Refresh agent details
         const updatedDetails = await invoke<AgentDetails>("get_agent_details", {
           name: agentName,

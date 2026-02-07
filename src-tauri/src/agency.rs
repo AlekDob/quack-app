@@ -3,6 +3,13 @@ use std::{fs, path::PathBuf};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
+/// Get home directory cross-platform (HOME on Unix, USERPROFILE on Windows)
+fn get_home_dir() -> Option<String> {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AgentInfo {
     pub name: String,
@@ -116,7 +123,7 @@ fn list_agents_impl(working_dir: Option<String>) -> Result<Vec<AgentInfo>> {
     let mut agents = Vec::new();
 
     // 1. Read GLOBAL agents from ~/.claude/agents/
-    if let Ok(home_dir) = std::env::var("HOME") {
+    if let Some(home_dir) = get_home_dir() {
         let global_agents_dir = PathBuf::from(home_dir).join(".claude").join("agents");
 
         if global_agents_dir.exists() {
@@ -228,8 +235,8 @@ fn get_agent_details_impl(
     let agents_dir = match scope.as_deref() {
         Some("global") => {
             // Global agents: ~/.claude/agents/
-            let home = std::env::var("HOME")
-                .context("Unable to get HOME directory")?;
+            let home = get_home_dir()
+                .ok_or_else(|| anyhow!("Unable to get home directory"))?;
             PathBuf::from(home).join(".claude").join("agents")
         }
         _ => {
@@ -499,8 +506,8 @@ fn save_agent_content_impl(
     let agents_dir = match scope.as_deref() {
         Some("global") => {
             // Global agents: ~/.claude/agents/
-            let home = std::env::var("HOME")
-                .context("Unable to get HOME directory")?;
+            let home = get_home_dir()
+                .ok_or_else(|| anyhow!("Unable to get home directory"))?;
             PathBuf::from(home).join(".claude").join("agents")
         }
         _ => {
@@ -568,8 +575,8 @@ fn delete_agent_impl(
     let agents_dir = match scope.as_deref() {
         Some("global") => {
             // Global agents: ~/.claude/agents/
-            let home = std::env::var("HOME")
-                .context("Unable to get HOME directory")?;
+            let home = get_home_dir()
+                .ok_or_else(|| anyhow!("Unable to get home directory"))?;
             PathBuf::from(home).join(".claude").join("agents")
         }
         _ => {
@@ -624,8 +631,8 @@ fn create_agent_impl(
     let agents_dir = match scope.as_str() {
         "global" => {
             // Global agents: ~/.claude/agents/
-            let home = std::env::var("HOME")
-                .context("Unable to get HOME directory")?;
+            let home = get_home_dir()
+                .ok_or_else(|| anyhow!("Unable to get home directory"))?;
             PathBuf::from(home).join(".claude").join("agents")
         }
         _ => {
