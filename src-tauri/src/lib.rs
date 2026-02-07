@@ -654,24 +654,15 @@ pub fn run() {
                     .accelerator("Cmd+Shift+A")
                     .build(app)?;
 
-                let watch_intro_id = "watch_intro";
-                let watch_intro = tauri::menu::MenuItemBuilder::with_id(watch_intro_id, "Watch Intro")
-                    .accelerator("Cmd+Shift+I")
-                    .build(app)?;
-
-                // DevTools option (for debugging production builds)
-                let open_devtools_id = "open_devtools";
-                let open_devtools = tauri::menu::MenuItemBuilder::with_id(open_devtools_id, "Open DevTools")
-                    .accelerator("Cmd+Option+D")
+                let check_updates_id = "check_for_updates";
+                let check_updates = tauri::menu::MenuItemBuilder::with_id(check_updates_id, "Check for Updates...")
                     .build(app)?;
 
                 let quack_menu = SubmenuBuilder::new(app, "Quack")
                     .item(&toggle_perf)
                     .separator()
+                    .item(&check_updates)
                     .item(&ai_settings)
-                    .item(&watch_intro)
-                    .separator()
-                    .item(&open_devtools)
                     .separator()
                     .quit()
                     .build()?;
@@ -710,19 +701,13 @@ pub fn run() {
                                 log::error!("Failed to emit open-ai-settings event: {}", e);
                             }
                         });
-                    } else if event.id() == watch_intro_id {
+                    } else if event.id() == check_updates_id {
                         let app_handle = app.clone();
                         tauri::async_runtime::spawn(async move {
-                            if let Err(e) = app_handle.emit("watch-intro", ()) {
-                                log::error!("Failed to emit watch-intro event: {}", e);
+                            if let Err(e) = app_handle.emit("check-for-updates", ()) {
+                                log::error!("Failed to emit check-for-updates event: {}", e);
                             }
                         });
-                    } else if event.id() == open_devtools_id {
-                        // Open DevTools for debugging
-                        if let Some(window) = app.get_webview_window("main") {
-                            window.open_devtools();
-                            log::info!("DevTools opened");
-                        }
                     }
                 });
             }

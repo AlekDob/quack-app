@@ -1,0 +1,129 @@
+.mode-presets-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mode-preset-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 3px solid;
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.15s ease;
+}
+
+.mode-preset-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mode-preset-header {
+  margin-bottom: 16px;
+}
+
+.mode-preset-title {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mode-icon {
+  font-size: 12px;
+}
+
+.mode-preset-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+.mode-preset-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mode-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-preset-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  min-width: 64px;
+  flex-shrink: 0;
+}
+
+.mode-preset-select {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #f3f4f6;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+  font-family: inherit;
+}
+
+.mode-preset-select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mode-preset-select:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mode-preset-select option {
+  background: #1a1a1a;
+  color: #f3f4f6;
+}
+
+.mode-presets-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+.mode-presets-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.rule-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.rule-dot.active {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+}
+
+.rule-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 500;
+}
+
+.rule-badge-active {
+  background: rgba(74, 222, 128, 0.1);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.2);
+}

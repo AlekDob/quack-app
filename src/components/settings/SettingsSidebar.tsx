@@ -9,6 +9,7 @@ export type SettingsCategory =
   | 'codebase-map'
   | 'ide'
   | 'license'
+  | 'integrations'
   | 'notifications'
   | 'appearance'
   | 'terminal'
@@ -35,6 +36,7 @@ const categories: CategoryItem[] = [
   { id: 'codebase-map', label: 'Codebase Map' },
   { id: 'ide', label: 'External IDE' },
   { id: 'license', label: 'License' },
+  { id: 'integrations', label: 'Integrations' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'terminal', label: 'Terminal' },

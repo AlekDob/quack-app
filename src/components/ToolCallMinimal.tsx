@@ -103,6 +103,7 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
   })();
 
   const isRunning = tool.status === 'running';
+  const isSkill = tool.name.toLowerCase() === 'skill';
 
   // Status indicator with typing animation for running state
   const StatusIndicator = () => {
@@ -127,7 +128,7 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
   return (
     <div className="tool-minimal">
       <div
-        className={`tool-minimal-line ${hasContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isRunning ? 'running' : ''}`}
+        className={`tool-minimal-line ${hasContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isRunning ? 'running' : ''} ${isSkill ? 'skill' : ''}`}
         onClick={() => hasContent && setIsExpanded(!isExpanded)}
       >
         <span className="tool-minimal-text">

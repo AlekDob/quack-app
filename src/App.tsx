@@ -91,6 +91,7 @@ import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
 import { useDroidFactory } from "./hooks/useDroidFactory";
 import IDEOnboarding from "./components/settings/IDEOnboarding";
+import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorMonaco";
 import { parseDiff } from "./lib/diffParser";
@@ -682,6 +683,7 @@ function AppContent() {
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsInitialCategory, setSettingsInitialCategory] = useState<'general' | 'about' | undefined>(undefined);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
   // Force expand a specific section in the side panel accordion
   const [forceExpandSection, setForceExpandSection] = useState<string | null>(null);
@@ -4347,6 +4349,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       showIntroReplay();
     });
 
+    // Listen for menu event to check for updates (opens Settings > About)
+    const unlistenCheckUpdatesPromise = listen("check-for-updates", () => {
+      setSettingsInitialCategory('about');
+      setShowSettings(true);
+    });
+
     // Listen for menu event to open Backgrounds modal
     const unlistenBackgroundsPromise = listen("open-backgrounds", () => {
       setShowBackgroundsModal(true);
@@ -4500,6 +4508,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenCheckUpdatesPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -11639,7 +11648,16 @@ You have access to all Bash tools to execute git commands like:
 
         {showSettings && (
           <UnifiedSettings
-            onClose={() => setShowSettings(false)}
+            onClose={() => {
+              setShowSettings(false);
+              setSettingsInitialCategory(undefined);
+            }}
+            initialCategory={settingsInitialCategory}
+            onOpenTelegramSetup={() => {
+              setShowSettings(false);
+              setSettingsInitialCategory(undefined);
+              setShowTelegramSetup(true);
+            }}
           />
         )}
 
@@ -11738,6 +11756,9 @@ You have access to all Bash tools to execute git commands like:
       <IDEOnboarding />
 
       {/* Terminal Window - Now opens as separate Tauri window via useTerminalWindowManager */}
+
+      {/* Update notification toast — checks GitHub releases on mount */}
+      <UpdateToast />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>

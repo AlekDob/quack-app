@@ -10,6 +10,7 @@ import SecondBrainSettings from './categories/SecondBrainSettings';
 import CodebaseMapSettings from './categories/CodebaseMapSettings';
 import IDESettings from './categories/IDESettings';
 import LicenseSettings from './categories/LicenseSettings';
+import IntegrationsSettings from './categories/IntegrationsSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
 import TerminalSettings from './categories/TerminalSettings';
@@ -23,13 +24,15 @@ interface UnifiedSettingsProps {
   initialCategory?: SettingsCategory;
   currentBackground?: string;
   onSelectBackground?: (background: string) => void;
+  onOpenTelegramSetup?: () => void;
 }
 
 export default function UnifiedSettings({
   onClose,
   initialCategory = 'general',
   currentBackground,
-  onSelectBackground
+  onSelectBackground,
+  onOpenTelegramSetup,
 }: UnifiedSettingsProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory);
   const [closing, setClosing] = useState(false);
@@ -59,6 +62,8 @@ export default function UnifiedSettings({
         return <IDESettings />;
       case 'license':
         return <LicenseSettings />;
+      case 'integrations':
+        return <IntegrationsSettings onOpenTelegramSetup={onOpenTelegramSetup} />;
       case 'notifications':
         return <NotificationSettings />;
       case 'appearance':

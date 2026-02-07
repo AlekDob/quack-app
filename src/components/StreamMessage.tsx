@@ -358,6 +358,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     };
   }, [agentAvatar]);
 
+  // Reactive subscription to active team (avoids getState() in render)
+  const activeTeam = useTeamStore((s) => s.activeTeam);
+
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
     const results = new Map<string, any>();
@@ -501,7 +504,6 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       // Task tool (subagent) - special widget
       // Check if task description mentions a team member → show TeammateWidget
       if (toolName === 'task' && input?.subagent_type) {
-        const activeTeam = useTeamStore.getState().activeTeam;
         if (activeTeam) {
           const taskText = `${input.description || ''} ${input.prompt || ''}`.toLowerCase();
           const matchedMember = activeTeam.members.find(m =>
@@ -647,10 +649,13 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
           <div className="assistant-content">
             <div className="assistant-name">
               {agentName}
-              {(() => {
-                const team = useTeamStore.getState().activeTeam;
-                if (!team) return null;
-                return <TeamModeBadge team={team} />;
+              {activeTeam && (() => {
+                const normalizedAgent = agentName.toLowerCase().replace('agent ', '');
+                const isMember = activeTeam.members.some(m =>
+                  m.name.toLowerCase().replace('agent ', '') === normalizedAgent
+                );
+                if (!isMember) return null;
+                return <TeamModeBadge team={activeTeam} />;
               })()}
             </div>
             {ruleNames.length > 0 && (
@@ -767,7 +772,6 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     const eventAction = agentEvent.action as 'start' | 'stop';
 
     // Check if this agent event matches a team member
-    const activeTeam = useTeamStore.getState().activeTeam;
     if (activeTeam && agentEvent.agent_name) {
       const eventName = (agentEvent.agent_name as string).toLowerCase();
       const matchedMember = activeTeam.members.find(m =>

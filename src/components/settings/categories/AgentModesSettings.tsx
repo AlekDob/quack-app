@@ -3,6 +3,7 @@ import type { EffortLevel, ThinkingMode } from '../../../types';
 import { getModelOptions } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
 import SectionHeader from '../controls/SectionHeader';
+import './AgentModesSettings.css';
 
 const thinkingModeOptions = [
   { value: 'auto' as ThinkingMode, label: 'Auto', desc: 'Let model decide' },
