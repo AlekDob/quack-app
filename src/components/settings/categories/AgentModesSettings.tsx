@@ -1,7 +1,4 @@
-import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '../../../stores/settingsStore';
-import { useSessionStore } from '../../../stores/sessionStore';
 import type { EffortLevel, ThinkingMode } from '../../../types';
 import { getModelOptions } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
@@ -20,11 +17,6 @@ const effortOptions = [
   { value: 'medium' as EffortLevel, label: 'Balanced', desc: 'Default quality', icon: '>>' },
   { value: 'high' as EffortLevel, label: 'Quality', desc: 'Thorough responses', icon: '>>>' },
 ];
-
-interface RuleInfo {
-  name: string;
-  exists: boolean;
-}
 
 interface ModePresetCardProps {
   mode: 'bypass' | 'plan';
@@ -100,38 +92,9 @@ function ModePresetCard({ mode, title, description, color, icon }: ModePresetCar
 
 export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
-  const selectedSession = useSessionStore((s) => s.getSelectedSession());
-  const [rules, setRules] = useState<RuleInfo[]>([]);
-
-  const projectPath = selectedSession?.projectPath;
-  const projectName = selectedSession?.projectName || 'No project';
-
-  useEffect(() => {
-    if (!projectPath) return;
-    checkRules(projectPath);
-  }, [projectPath]);
-
-  const checkRules = async (projPath: string) => {
-    const ruleFiles = [
-      { name: 'use-codebase-map', file: 'use-codebase-map.md' },
-      { name: 'use-quack-brain', file: 'use-quack-brain.md' },
-      { name: 'apatr-d', file: 'Analyze-Plan-act-test-review-document.md' },
-    ];
-
-    const results: RuleInfo[] = [];
-    for (const r of ruleFiles) {
-      try {
-        await invoke<string>('read_file_content', { path: `${projPath}/.claude/rules/${r.file}` });
-        results.push({ name: r.name, exists: true });
-      } catch {
-        results.push({ name: r.name, exists: false });
-      }
-    }
-    setRules(results);
-  };
 
   const handleReset = () => {
-    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.5')) {
+    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.6')) {
       resetModePresets();
     }
   };
@@ -167,40 +130,6 @@ export default function AgentModesSettings() {
         <div className="mode-presets-hint">
           Anthropic recommends: Bypass = Sonnet, Plan = Opus
         </div>
-      </div>
-
-      {/* Active Rules */}
-      <SectionHeader
-        title="Active Rules"
-        description={`Rules detected in ${projectName}`}
-      />
-
-      <div className="settings-group">
-        {rules.length === 0 ? (
-          <div className="settings-row">
-            <div className="settings-row-left">
-              <div className="settings-row-description">
-                {projectPath ? 'Checking rules...' : 'Select a session to view project rules'}
-              </div>
-            </div>
-          </div>
-        ) : (
-          rules.map((rule) => (
-            <div key={rule.name} className="settings-row">
-              <div className="settings-row-left">
-                <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span className={`rule-dot ${rule.exists ? 'active' : ''}`} />
-                  {rule.name}
-                </div>
-              </div>
-              <div className="settings-row-control">
-                <span className={`rule-badge ${rule.exists ? 'rule-badge-active' : ''}`}>
-                  {rule.exists ? 'Active' : 'Not installed'}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
       </div>
 
       <style>{`
@@ -304,35 +233,6 @@ export default function AgentModesSettings() {
           color: rgba(255, 255, 255, 0.4);
         }
 
-        .rule-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.15);
-          display: inline-block;
-          flex-shrink: 0;
-        }
-
-        .rule-dot.active {
-          background: #4ade80;
-          box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
-        }
-
-        .rule-badge {
-          font-size: 11px;
-          padding: 3px 10px;
-          border-radius: 6px;
-          background: rgba(255, 255, 255, 0.05);
-          color: rgba(255, 255, 255, 0.35);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          font-weight: 500;
-        }
-
-        .rule-badge-active {
-          background: rgba(74, 222, 128, 0.1);
-          color: #4ade80;
-          border-color: rgba(74, 222, 128, 0.2);
-        }
       `}</style>
     </div>
   );

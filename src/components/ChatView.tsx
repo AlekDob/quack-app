@@ -159,7 +159,7 @@ export default function ChatView({
   // Agent Chat Settings - controlled from parent
   inputDraft = '',
   onInputDraftChange,
-  model = 'sonnet',
+  model = 'sonnet45',
   onModelChange,
   thinkingMode = 'auto',
   onThinkingModeChange,
@@ -294,7 +294,7 @@ export default function ChatView({
             description: prompt,
             agentId: agentName,
             prompt: prompt,
-            model: 'sonnet',
+            model: 'sonnet45',
             workingDirectory: projectPath,
             notifyOnComplete: true,
             kanbanTaskId: newTask.id, // Link to Kanban for status sync

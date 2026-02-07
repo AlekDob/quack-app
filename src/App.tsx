@@ -2172,7 +2172,7 @@ function AppContent() {
       agent_name: capturedAgentLabel,
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
-      model: options?.model || 'sonnet',
+      model: options?.model || 'sonnet45',
       thinking_mode: options?.thinkingMode || 'auto',
       message_length: content.length,
     });
@@ -2189,7 +2189,7 @@ function AppContent() {
       status: 'streaming',
       // Store settings used for this message (for UI display)
       settings: {
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2270,7 +2270,7 @@ function AppContent() {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
             model: (() => {
-              const friendlyName = options?.model || 'sonnet';
+              const friendlyName = options?.model || 'sonnet45';
               const resolvedId = getModelId(friendlyName, remoteModels);
               console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, remoteModels=${remoteModels?.length ?? 0}, resolvedId=${resolvedId}`);
               console.log(`🦆 [MODEL DEBUG] remoteModels:`, remoteModels?.map(m => `${m.id}→${m.modelId}`).join(', ') || 'EMPTY');
@@ -2401,7 +2401,7 @@ function AppContent() {
         agent_name: capturedAgentLabel,
         response_time_ms: responseTime,
         response_length: response.result?.length || 0,
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
         session_id: response.session_id,
         total_cost_usd: response.total_cost_usd,
       });
@@ -2419,7 +2419,7 @@ function AppContent() {
         agent_id: capturedAgentId,
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMsg.substring(0, 200),
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
       });
 
       // Check if this was an abort
@@ -2864,7 +2864,7 @@ function AppContent() {
       timestamp: 0,
       status: 'streaming',
       settings: {
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2928,7 +2928,7 @@ function AppContent() {
           request: {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
-            model: getModelId(options?.model || 'sonnet', remoteModels),
+            model: getModelId(options?.model || 'sonnet45', remoteModels),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
@@ -3043,7 +3043,7 @@ function AppContent() {
         timestamp: Date.now(),
         status: 'complete' as const,
         settings: {
-          model: options?.model || 'sonnet',
+          model: options?.model || 'sonnet45',
           effort: options?.effort || 'medium',
           thinkingMode: options?.thinkingMode || 'auto',
         },
@@ -3526,17 +3526,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     // 🦆 FIX: Helper to find requestId with retry support for race conditions
     // Now filters by BOTH agentId AND sessionKey to prevent session mixing
+    // 🦆 FIX: Returns the MOST RECENT (last inserted) match to avoid stale requestIds
     const findRequestId = (): { requestId: string | null; sessionKey?: string; questions: unknown[] } => {
+      let latest: { requestId: string; sessionKey?: string; questions: unknown[] } | null = null;
+
       for (const [requestId, data] of pendingUserQuestions.entries()) {
         // 🦆 FIX: Match by agentId AND sessionKey (if provided) to prevent cross-session contamination
         const agentMatches = data.agentId === activeId;
         const sessionMatches = !targetSessionKey || data.sessionKey === targetSessionKey;
 
         if (agentMatches && sessionMatches) {
-          return { requestId, sessionKey: data.sessionKey, questions: data.questions };
+          // Keep iterating to find the LAST (most recent) match in insertion order
+          latest = { requestId, sessionKey: data.sessionKey, questions: data.questions };
         }
       }
-      return { requestId: null, sessionKey: undefined, questions: [] };
+
+      return latest || { requestId: null, sessionKey: undefined, questions: [] };
     };
 
     // 🦆 FIX: Retry with exponential backoff for race conditions
@@ -4039,17 +4044,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
   // Agent Chat Settings helpers - get or create settings for current agent
-  // Normalize legacy full model IDs (e.g. "claude-sonnet-4-5-20250929") to short names
-  // Short IDs from modelService (e.g. "sonnet5", "opus") pass through unchanged
+  // Normalize model IDs to Supabase IDs (e.g. "sonnet45", "opus46", "haiku45")
+  // Handles both legacy short names ("sonnet", "opus") and full API IDs ("claude-sonnet-4-5-...")
   const normalizeModelName = (model: string): string => {
-    // Only normalize legacy full API model IDs (contain "claude-")
+    // Map legacy short names to Supabase IDs
+    const legacyMap: Record<string, string> = {
+      'sonnet': 'sonnet45',
+      'opus': 'opus46',
+      'haiku': 'haiku45',
+    };
+    if (legacyMap[model]) return legacyMap[model];
+
+    // Normalize full API model IDs to Supabase IDs
     if (model.startsWith("claude-")) {
-      if (model.includes("opus")) return "opus";
-      if (model.includes("haiku")) return "haiku";
-      // Match sonnet last since it's the broadest
-      if (model.includes("sonnet")) return "sonnet";
+      if (model.includes("opus")) return "opus46";
+      if (model.includes("haiku")) return "haiku45";
+      if (model.includes("sonnet")) return "sonnet45";
     }
-    // Short IDs (opus, sonnet, sonnet5, haiku, etc.) pass through as-is
+    // Supabase IDs (sonnet45, opus46, haiku45) pass through as-is
     return model;
   };
 
@@ -4064,7 +4076,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       return {
         inputDraft: '',
-        model: bypassPreset?.model || 'sonnet',
+        model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
         effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -4073,7 +4085,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const existing = agentChatSettings.get(settingsKey);
     if (existing) {
-      // Normalize the model name in case it's a legacy full ID
+      // Normalize the model name in case it's a legacy ID
       return {
         ...existing,
         model: normalizeModelName(existing.model),
@@ -4087,7 +4099,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const defaultSettings: AgentChatSettings = {
       inputDraft: '',
-      model: bypassPreset?.model || 'sonnet',
+      model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
       thinkingMode: bypassPreset?.thinkingMode || 'auto',
       permissionMode: 'bypass',
       effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -4116,7 +4128,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       const current = newMap.get(key) ?? {
         inputDraft: '',
-        model: bypassPreset?.model || 'sonnet',
+        model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
         effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -4127,7 +4139,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
         const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
         if (preset) {
-          finalUpdates.model = preset.model;
+          finalUpdates.model = normalizeModelName(preset.model);
           finalUpdates.thinkingMode = preset.thinkingMode;
           finalUpdates.effort = preset.effort;
         }
@@ -4360,8 +4372,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       // Store the pending question for when user responds
       // 🦆 FIX: Include sessionKey for proper per-session tracking when removing
+      // 🦆 FIX: Remove stale pending questions for the same agent+session before adding new one
+      // This prevents requestId mismatch when agent asks multiple questions in sequence
       setPendingUserQuestions((prev) => {
         const next = new Map(prev);
+
+        // Remove any stale pending questions for the same agent+session
+        for (const [existingId, existingData] of next.entries()) {
+          if (existingData.agentId === agentId &&
+              (!sessionKey || existingData.sessionKey === sessionKey)) {
+            console.log(`🗣️ [GLOBAL] Removing stale pending question: ${existingId} (replaced by ${requestId})`);
+            next.delete(existingId);
+          }
+        }
+
         next.set(requestId, { agentId, sessionKey, questions });
         return next;
       });
@@ -4530,8 +4554,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         // Store the pending question for when user responds
         // 🦆 FIX: Include sessionKey for proper per-session tracking
+        // 🦆 FIX: Remove stale pending questions for the same agent+session before adding new one
         setPendingUserQuestions((prev) => {
           const next = new Map(prev);
+
+          // Remove any stale pending questions for the same agent+session
+          for (const [existingId, existingData] of next.entries()) {
+            if (existingData.agentId === agentId &&
+                (!sessionKey || existingData.sessionKey === sessionKey)) {
+              console.log(`🗣️ [Agent] Removing stale pending question: ${existingId} (replaced by ${requestId})`);
+              next.delete(existingId);
+            }
+          }
+
           next.set(requestId, { agentId, sessionKey, questions });
           return next;
         });

@@ -16,6 +16,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.32",
     "@anthropic-ai/sdk": "^0.72.1",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "discord.js": "^14.14.1"
   },
   "devDependencies": {
