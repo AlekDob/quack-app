@@ -39,9 +39,13 @@ pub fn open_external_url(url: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("cmd")
-            .args(["/C", "start", "", &url])
-            .output()
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "start", "", &url]);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let output = cmd.output()
             .map_err(|e| format!("Failed to execute start command: {}", e))?;
 
         if !output.status.success() {
@@ -100,11 +104,15 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
         // On Windows, use explorer.exe /select, to highlight the file
-        let output = Command::new("explorer")
-            .arg("/select,")
-            .arg(clean_path)
-            .output()
+        let mut cmd = Command::new("explorer");
+        cmd.arg("/select,").arg(clean_path);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let output = cmd.output()
             .map_err(|e| format!("Failed to execute explorer command: {}", e))?;
 
         // explorer.exe returns exit code 1 even on success, so we don't check status

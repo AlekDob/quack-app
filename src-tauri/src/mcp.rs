@@ -521,6 +521,14 @@ async fn start_mcp_server(
         }
     }
 
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
     let mut child = cmd.spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -1049,12 +1057,21 @@ async fn test_stdio_connection(
     let (actual_command, actual_args) = (command.to_string(), args.to_vec());
 
     // Try to spawn the process
-    let mut child = Command::new(&actual_command)
-        .args(&actual_args)
+    let mut cmd = Command::new(&actual_command);
+    cmd.args(&actual_args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .stderr(std::process::Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 format!("Command '{}' not found. Make sure it's installed and in PATH.", command)

@@ -10,6 +10,14 @@ use std::path::Path;
 use std::process::Command;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
+// Windows-specific helper to hide console windows
+#[cfg(target_os = "windows")]
+fn hide_console_window(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
 /// Information about a detected IDE
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IDEInfo {
@@ -310,6 +318,18 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         cli_style: "vscode",
         supports_diff: false,
     },
+    // Notepad++ (Windows only)
+    IDEEntry {
+        id: "notepadpp",
+        name: "Notepad++",
+        bundle_id: "",
+        cli: "notepad++",
+        app_path: "", // Not available on macOS
+        app_path_local: None,
+        app_path_program: Some("Notepad++\\notepad++.exe"),
+        cli_style: "notepadpp",
+        supports_diff: false,
+    },
 ];
 
 /// App entry for terminals and Finder
@@ -361,9 +381,10 @@ const APP_REGISTRY: &[AppEntry] = &[
 fn is_cli_available(cli: &str) -> bool {
     #[cfg(target_os = "windows")]
     {
-        Command::new("where")
-            .arg(cli)
-            .output()
+        let mut cmd = Command::new("where");
+        cmd.arg(cli);
+        hide_console_window(&mut cmd);
+        cmd.output()
             .map(|output| output.status.success())
             .unwrap_or(false)
     }
@@ -386,9 +407,10 @@ fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process
 
     log::info!("[IDE] Windows: Executing via cmd.exe: {:?}", cmd_args);
 
-    Command::new("cmd")
-        .args(&cmd_args)
-        .spawn()
+    let mut cmd = Command::new("cmd");
+    cmd.args(&cmd_args);
+    hide_console_window(&mut cmd);
+    cmd.spawn()
 }
 
 /// Spawn a CLI command - on non-Windows just run directly

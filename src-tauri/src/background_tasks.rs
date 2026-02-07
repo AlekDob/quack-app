@@ -171,6 +171,14 @@ pub async fn execute_background_agent(
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
     // Spawn the process
     let mut child = cmd.spawn().map_err(|e| {
         log::error!("[BackgroundTask:{}] Failed to spawn claude: {}", task_id, e);
@@ -353,6 +361,14 @@ pub async fn execute_background_command(
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = cmd.spawn().map_err(|e| {
         log::error!("[BackgroundTask:{}] Failed to spawn command: {}", task_id, e);

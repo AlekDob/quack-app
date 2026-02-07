@@ -279,13 +279,23 @@ pub fn get_auth_debug_info() -> Result<AuthDebugInfo, String> {
         .unwrap_or(false);
 
     // Get Node.js version
-    let node_version = std::process::Command::new("node")
-        .arg("--version")
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|v| v.trim().to_string())
-        .unwrap_or_else(|| "Not found".to_string());
+    let node_version = {
+        let mut cmd = std::process::Command::new("node");
+        cmd.arg("--version");
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        cmd.output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|v| v.trim().to_string())
+            .unwrap_or_else(|| "Not found".to_string())
+    };
 
     // Get platform
     let platform = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
@@ -299,9 +309,17 @@ pub fn get_auth_debug_info() -> Result<AuthDebugInfo, String> {
     };
 
     let cli_version = cli_path.as_ref().and_then(|path| {
-        std::process::Command::new(path)
-            .arg("--version")
-            .output()
+        let mut cmd = std::process::Command::new(path);
+        cmd.arg("--version");
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        cmd.output()
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
             .map(|v| v.trim().to_string())

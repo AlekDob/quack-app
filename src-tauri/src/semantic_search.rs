@@ -392,14 +392,23 @@ async fn execute_semantic_search_command(
     log::info!("[SemanticSearch] Executing command: {} with script: {}", command, script_path);
 
     // Execute node with the bridge script: node semantic-search-bridge.js <command> <args-json>
-    let mut child = Command::new("node")
-        .arg(&script_path)
+    let mut cmd = Command::new("node");
+    cmd.arg(&script_path)
         .arg(command)
         .arg(args_json)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to spawn node process: {}", e))?;
 
     // Wait for the command to finish

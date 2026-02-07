@@ -7,6 +7,14 @@ use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::Mutex as TokioMutex;
 use once_cell::sync::Lazy;
 
+// Windows-specific helper to hide console windows
+#[cfg(target_os = "windows")]
+fn hide_console_window(cmd: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
 // =============================================================================
 // ACTIVE PROCESS MANAGEMENT (for bidirectional communication)
 // =============================================================================
@@ -289,10 +297,17 @@ fn parse_node_major_version(version_str: &str) -> Option<u32> {
 
 /// Check if Node.js version is compatible (>= MIN_NODE_VERSION)
 fn is_node_version_compatible(node_path: &Path) -> bool {
-    if let Ok(output) = std::process::Command::new(node_path)
-        .arg("--version")
-        .output()
+    let mut cmd = std::process::Command::new(node_path);
+    cmd.arg("--version");
+
+    #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(version_str) = String::from_utf8(output.stdout) {
                 if let Some(major) = parse_node_major_version(&version_str) {
@@ -320,10 +335,12 @@ fn find_system_node_executable() -> Option<PathBuf> {
 
     // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
     // Volta respects the toolchain and version management even from Finder
-    if let Ok(output) = std::process::Command::new("volta")
-        .args(["which", "node"])
-        .output()
-    {
+    let mut cmd = std::process::Command::new("volta");
+    cmd.args(["which", "node"]);
+    #[cfg(target_os = "windows")]
+    hide_console_window(&mut cmd);
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
                 let path = PathBuf::from(path_str.trim());
@@ -352,7 +369,11 @@ fn find_system_node_executable() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         // On Windows, use 'where' command instead of 'which'
-        if let Ok(output) = std::process::Command::new("where").arg("node").output() {
+        let mut cmd = std::process::Command::new("where");
+        cmd.arg("node");
+        hide_console_window(&mut cmd);
+
+        if let Ok(output) = cmd.output() {
             if output.status.success() {
                 if let Ok(path_str) = String::from_utf8(output.stdout) {
                     // 'where' can return multiple lines, take the first one
@@ -614,10 +635,12 @@ pub fn find_claude_cli_path() -> Option<String> {
 
     // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
     // This respects Volta's toolchain and version management
-    if let Ok(output) = std::process::Command::new("volta")
-        .args(["which", "claude"])
-        .output()
-    {
+    let mut cmd = std::process::Command::new("volta");
+    cmd.args(["which", "claude"]);
+    #[cfg(target_os = "windows")]
+    hide_console_window(&mut cmd);
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
                 let path = path_str.trim();
@@ -680,9 +703,12 @@ pub fn find_claude_cli_path() -> Option<String> {
         if Path::new(path).exists() {
             // Verify it's executable by running --version
             log::debug!("[Claude CLI] Testing path: {}", path);
-            let output = std::process::Command::new(path)
-                .arg("--version")
-                .output();
+            let mut cmd = std::process::Command::new(path);
+            cmd.arg("--version");
+            #[cfg(target_os = "windows")]
+            hide_console_window(&mut cmd);
+
+            let output = cmd.output();
 
             if let Ok(output) = output {
                 if output.status.success() {
@@ -699,10 +725,12 @@ pub fn find_claude_cli_path() -> Option<String> {
 
     // Fallback: Try using 'which' to find claude in PATH
     log::info!("[Claude CLI] Trying 'which claude' as fallback...");
-    if let Ok(output) = std::process::Command::new("which")
-        .arg("claude")
-        .output()
-    {
+    let mut cmd = std::process::Command::new("which");
+    cmd.arg("claude");
+    #[cfg(target_os = "windows")]
+    hide_console_window(&mut cmd);
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(path) = String::from_utf8(output.stdout) {
                 let path = path.trim();
@@ -845,6 +873,14 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = command
         .spawn()
@@ -1035,6 +1071,14 @@ pub async fn send_message_via_cli_streaming(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = command
         .spawn()
@@ -1490,6 +1534,14 @@ pub async fn send_message_via_sdk_streaming(
     log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);
     log::info!("[SDK DEBUG] Working directory: {:?}", node_sdk_dir);
 
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
     let mut child = command
         .spawn()
         .map_err(|e| {
@@ -1756,6 +1808,14 @@ pub async fn send_tool_result_to_sdk(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
     let child = command.spawn()
         .map_err(|e| format!("Failed to spawn Node.js for tool result: {}", e))?;
 
@@ -1928,12 +1988,21 @@ pub async fn rewind_files(
     log::info!("[SDK REWIND] Node path: {:?}", node_path);
 
     // Spawn the rewind process
-    let mut child = Command::new(&node_path)
-        .arg(&script_path)
+    let mut cmd = Command::new(&node_path);
+    cmd.arg(&script_path)
         .arg(&config_str)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to spawn rewind process: {}", e))?;
 
     let stdout = child.stdout.take()

@@ -471,10 +471,18 @@ pub fn git_init(path: String) -> Result<String, String> {
     }
 
     // Initialize git repository
-    let output = Command::new("git")
-        .current_dir(&dir)
-        .args(&["init"])
-        .output()
+    let mut cmd = Command::new("git");
+    cmd.current_dir(&dir).args(&["init"]);
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd.output()
         .map_err(|e| format!("Failed to run git init: {}", e))?;
 
     if !output.status.success() {
@@ -484,17 +492,31 @@ pub fn git_init(path: String) -> Result<String, String> {
 
     // Create an initial commit to establish the main branch
     // First, check if there's a .gitignore or any files to commit
-    let add_output = Command::new("git")
-        .current_dir(&dir)
-        .args(&["add", "-A"])
-        .output()
+    let mut add_cmd = Command::new("git");
+    add_cmd.current_dir(&dir).args(&["add", "-A"]);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        add_cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let add_output = add_cmd.output()
         .map_err(|e| format!("Failed to stage files: {}", e))?;
 
     // Create initial commit (allow empty if no files exist)
-    let commit_output = Command::new("git")
-        .current_dir(&dir)
-        .args(&["commit", "--allow-empty", "-m", "Initial commit"])
-        .output()
+    let mut commit_cmd = Command::new("git");
+    commit_cmd.current_dir(&dir).args(&["commit", "--allow-empty", "-m", "Initial commit"]);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        commit_cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let commit_output = commit_cmd.output()
         .map_err(|e| format!("Failed to create initial commit: {}", e))?;
 
     if !commit_output.status.success() {
@@ -507,10 +529,18 @@ pub fn git_init(path: String) -> Result<String, String> {
 }
 
 fn run_git(root: &PathBuf, args: &[&str], allow_non_zero: bool) -> Result<String> {
-    let output = Command::new("git")
-        .current_dir(root)
-        .args(args)
-        .output()
+    let mut cmd = Command::new("git");
+    cmd.current_dir(root).args(args);
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd.output()
         .with_context(|| format!("Impossibile eseguire git {:?}", args))?;
 
     if !output.status.success()

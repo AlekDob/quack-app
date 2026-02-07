@@ -546,6 +546,9 @@ fn open_file_in_editor_impl(path: String) -> Result<()> {
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
         // Try common Windows code editors
         let editors = [
             "code.cmd",      // VS Code
@@ -556,20 +559,21 @@ fn open_file_in_editor_impl(path: String) -> Result<()> {
 
         let mut opened = false;
         for editor in &editors {
-            let result = std::process::Command::new(editor)
-                .arg(&file_path)
-                .spawn();
+            let mut cmd = std::process::Command::new(editor);
+            cmd.arg(&file_path);
+            cmd.creation_flags(CREATE_NO_WINDOW);
 
-            if result.is_ok() {
+            if cmd.spawn().is_ok() {
                 opened = true;
                 break;
             }
         }
 
         if !opened {
-            std::process::Command::new("cmd")
-                .args(&["/C", "start", "", path.as_str()])
-                .spawn()
+            let mut cmd = std::process::Command::new("cmd");
+            cmd.args(&["/C", "start", "", path.as_str()]);
+            cmd.creation_flags(CREATE_NO_WINDOW);
+            cmd.spawn()
                 .with_context(|| format!("Failed to open file {:?}", file_path))?;
         }
     }
@@ -603,9 +607,12 @@ fn open_file_externally_impl(path: String) -> Result<()> {
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("cmd")
-            .args(&["/C", "start", "", path.as_str()])
-            .spawn()
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.args(&["/C", "start", "", path.as_str()]);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.spawn()
             .with_context(|| format!("Failed to open file {:?}", file_path))?;
     }
 

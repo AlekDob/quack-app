@@ -25,9 +25,17 @@ pub struct WeeklyUsage {
 /// Get Claude plan usage by executing `claude /usage` command
 #[tauri::command]
 pub async fn get_claude_plan_usage() -> Result<PlanUsageData, String> {
-    let output = Command::new("claude")
-        .arg("/usage")
-        .output()
+    let mut cmd = Command::new("claude");
+    cmd.arg("/usage");
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd.output()
         .map_err(|e| format!("Failed to execute claude command: {}", e))?;
 
     if !output.status.success() {
