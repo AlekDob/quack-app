@@ -1643,13 +1643,24 @@ pub async fn send_message_via_sdk_streaming(
         .ok_or("Failed to capture stdout".to_string())?;
     let mut stdout_reader = BufReader::new(stdout).lines();
 
-    // Capture stderr for error reporting
+    // Capture stderr for logging (Node.js SDK uses stderr for debug/info messages
+    // since stdout is reserved for JSON data in stdio MCP transport)
     let stderr_handle = if let Some(stderr) = child.stderr.take() {
         Some(tokio::spawn(async move {
             let mut stderr_reader = BufReader::new(stderr).lines();
             let mut stderr_lines = Vec::new();
             while let Ok(Some(line)) = stderr_reader.next_line().await {
-                log::error!("[Node.js SDK stderr] {}", line);
+                // Classify log level based on content
+                let line_upper = line.to_uppercase();
+                if line_upper.contains("[DEBUG]") || line_upper.contains("[MCP]") || line_upper.contains("[AUTH]") || line_upper.contains("[IDE-MCP]") {
+                    log::debug!("[Node.js SDK] {}", line);
+                } else if line_upper.contains("[ERROR]") || line_upper.contains("ERROR:") || line_upper.contains("FATAL") {
+                    log::error!("[Node.js SDK] {}", line);
+                } else if line_upper.contains("⚠") || line_upper.contains("[WARN]") || line_upper.contains("WARNING") {
+                    log::warn!("[Node.js SDK] {}", line);
+                } else {
+                    log::info!("[Node.js SDK] {}", line);
+                }
                 stderr_lines.push(line);
             }
             stderr_lines
