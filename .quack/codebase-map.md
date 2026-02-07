@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-02T08:27:55Z
-files: 401
-exports: 1174
+generated: 2026-02-07T17:15:06Z
+files: 402
+exports: 1175
 ---
 
 # Codebase Map
@@ -1977,6 +1977,9 @@ exports: 1174
 
 ## src/views/ProjectDashboardTabView.tsx
 - export default fn `ProjectDashboardTabView()`
+
+## src\App.tsx
+- export default `App`
 
 ## vite.config.ts
 - export default `defineConfig(({ mode }) => {`
