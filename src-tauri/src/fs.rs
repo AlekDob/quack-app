@@ -133,9 +133,18 @@ pub fn search_files_recursive(
     search_files_recursive_impl(path, query, max_results, max_depth).map_err(|err| err.to_string())
 }
 
+/// Normalize path by removing \\?\ prefix added by fs::canonicalize on Windows
+fn normalize_path(path: &str) -> String {
+    if path.starts_with(r"\\?\") {
+        path[4..].to_string()
+    } else {
+        path.to_string()
+    }
+}
+
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
     let target_path = match path {
-        Some(value) if !value.trim().is_empty() => PathBuf::from(value),
+        Some(value) if !value.trim().is_empty() => PathBuf::from(normalize_path(&value)),
         _ => PathBuf::from(get_home()?),
     };
 
@@ -143,7 +152,7 @@ fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
 
     let mut entries = Vec::new();
     let iterator = fs::read_dir(&canonical)
-        .with_context(|| format!("Impossibile leggere la cartella {:?}", canonical))?;
+        .with_context(|| format!("Unable to read directory {:?}", canonical))?;
 
     for entry in iterator {
         let entry = entry?;
@@ -153,7 +162,7 @@ fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
 
         entries.push(DirectoryEntry {
             name: entry_name,
-            path: entry_path.to_string_lossy().to_string(),
+            path: normalize_path(&entry_path.to_string_lossy()),
             is_dir: file_type.is_dir(),
             is_symlink: file_type.is_symlink(),
         });
@@ -166,7 +175,7 @@ fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
     });
 
     Ok(DirectoryListing {
-        path: canonical.to_string_lossy().to_string(),
+        path: normalize_path(&canonical.to_string_lossy()),
         entries,
     })
 }

@@ -84,12 +84,18 @@ export default function SkillViewer({
 
         // If this is a directory skill (has SKILL.md), load the directory contents
         if (details.file_path.endsWith("SKILL.md")) {
-          const skillDir = details.file_path.replace(/\/SKILL\.md$/, "");
-          const listing = await invoke<{ path: string; entries: DirectoryEntry[] }>("list_directory", {
-            path: skillDir,
-          });
-          // Filter out SKILL.md from the list (we're already showing it)
-          setSkillFiles(listing.entries.filter(f => f.name !== "SKILL.md"));
+          const skillDir = details.file_path.replace(/[/\\]SKILL\.md$/, "");
+          try {
+            const listing = await invoke<{ path: string; entries: DirectoryEntry[] }>("list_directory", {
+              path: skillDir,
+            });
+            // Filter out SKILL.md from the list (we're already showing it)
+            setSkillFiles(listing.entries.filter(f => f.name !== "SKILL.md"));
+          } catch (dirErr) {
+            // Directory listing failed but skill content loaded OK - just skip file list
+            console.warn("Failed to list skill directory:", dirErr);
+            setSkillFiles([]);
+          }
         } else {
           setSkillFiles([]);
         }

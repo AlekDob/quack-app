@@ -11145,7 +11145,7 @@ You have access to all Bash tools to execute git commands like:
                       key={activeTab.id} // Force new instance when tab changes
                       agentName={activeTab.agentName}
                       agentScope={activeTab.agentScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={() => {
                         // Close tab after delete or cancel new agent
                         if (activeTab.isNewAgent) {
@@ -11177,7 +11177,7 @@ You have access to all Bash tools to execute git commands like:
                     <SkillViewer
                       skillName={activeTab.skillName}
                       skillScope={activeTab.skillScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={loadSkills}
                     />
                   );
@@ -11195,7 +11195,7 @@ You have access to all Bash tools to execute git commands like:
                       key={activeTab.id} // Force new instance when tab changes
                       commandName={activeTab.commandName}
                       commandScope={activeTab.commandScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={() => {
                         // Close tab after delete or cancel new command
                         handleTabClose(activeTab.id);
@@ -11217,7 +11217,7 @@ You have access to all Bash tools to execute git commands like:
                       key={activeTab.id} // Force new instance when tab changes
                       ruleName={activeTab.ruleName}
                       ruleScope={activeTab.ruleScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={() => {
                         // Close tab after delete or cancel new rule
                         handleTabClose(activeTab.id);
