@@ -1409,8 +1409,7 @@ function AppContent() {
 
     // Extract project name from cwd (last folder in path)
     const cwd = activeTerminal.cwd || '';
-    const pathParts = cwd.split('/').filter(Boolean);
-    const project = pathParts[pathParts.length - 1] || '';
+    const project = extractProjectId(cwd) || '';
     setProjectName(project);
 
     // Use the branch associated with this terminal (agent workspace)
@@ -8470,8 +8469,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Opens the Kanban tab and the new task modal with pre-populated agent data
   const handleCreateTaskFromAgent = useCallback((terminal: TerminalInfo) => {
     // Extract project name from path
-    const pathParts = terminal.cwd.split('/');
-    const projectName = pathParts[pathParts.length - 1];
+    const projectName = extractProjectId(terminal.cwd) || 'Unknown';
 
     // Build initial values for the task modal
     const initialValues: KanbanTaskInitialValues = {
