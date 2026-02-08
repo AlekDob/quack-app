@@ -15,7 +15,7 @@ export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
       onClick={() => onEdit(rule)}
       title="Click to edit rule"
     >
-      {/* Rule Icon - Blue gradient background with white icon (matches AddonsDrawer) */}
+      {/* Rule Icon - Blue gradient background with white icon (matches Quack Store) */}
       <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #60a5fa, #3b82f6)' }}>
         <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
           <path d="M4 3h8l4 4v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2z" fill="none" stroke="currentColor" strokeWidth="1.5" />

@@ -19,7 +19,7 @@ import "./SidePanelAccordion.css";
  * All sections visible, collapsible individually
  */
 
-// Category-specific colors matching AddonsDrawer
+// Category-specific colors matching Quack Store
 const CATEGORY_COLORS: Record<string, string> = {
   skills: '#f28c52',      // Orange - main accent
   agents: '#f28c52',      // Orange - personas

@@ -28,7 +28,7 @@ import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FileP
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
-import AddonsDrawer from "./components/AddonsDrawer";
+import QuackStoreDrawer from "./components/QuackStoreDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
@@ -680,7 +680,7 @@ function AppContent() {
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
-  const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
+  const [showStoreDrawer, setShowStoreDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsInitialCategory, setSettingsInitialCategory] = useState<'general' | 'about' | undefined>(undefined);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
@@ -10582,7 +10582,6 @@ You have access to all Bash tools to execute git commands like:
               <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
-              onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
               onUsageClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
@@ -10639,8 +10638,8 @@ You have access to all Bash tools to execute git commands like:
               onKanbanClick={handleOpenKanbanTab}
               isKanbanActive={tabs.some(t => t.type === 'kanban' && t.id === activeTabId)}
               inProgressTaskCount={inProgressTaskCount}
-              onAddonsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
-              isAddonsOpen={showPluginsDrawer}
+              onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
+              isStoreOpen={showStoreDrawer}
             />
 
             {/* Tab Bar - VSCode style (always shown) */}
@@ -11587,14 +11586,14 @@ You have access to all Bash tools to execute git commands like:
           />
         )}
 
-        <div className={`git-drawer ${showPluginsDrawer ? "open" : ""}`}>
+        <div className={`git-drawer ${showStoreDrawer ? "open" : ""}`}>
           <div
             className="git-drawer-backdrop"
-            onClick={() => setShowPluginsDrawer(false)}
+            onClick={() => setShowStoreDrawer(false)}
           />
-          <div className="git-drawer-panel addons-drawer-panel">
-            <AddonsDrawer
-              onClose={() => setShowPluginsDrawer(false)}
+          <div className="git-drawer-panel quack-store-drawer-panel">
+            <QuackStoreDrawer
+              onClose={() => setShowStoreDrawer(false)}
               onRefresh={handleMarketplaceRefresh}
             />
           </div>

@@ -43,7 +43,7 @@ const getShortModelName = (model: string): string => {
 
 // Icon components
 const icons: Record<string, ReactNode> = {
-  // Robot icon for Droids - matching AddonsDrawer
+  // Robot icon for Droids - matching Quack Store
   droid: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="10" rx="2" />

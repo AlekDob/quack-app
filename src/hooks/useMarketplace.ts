@@ -26,6 +26,7 @@ interface PluginJson {
   name: string;
   version: string;
   description: string;
+  longDescription?: string;
   author?: { name: string; url?: string };
   repository?: string;
   license?: string;
@@ -172,6 +173,7 @@ export function useMarketplace() {
             id: `${plugin.name}--bundle`,
             name: pluginData.agentTemplate.suggestedName,
             description: plugin.description,
+            longDescription: pluginData.longDescription,
             category: 'agent-bundles',
             author,
             installCount: 0,
@@ -179,6 +181,7 @@ export function useMarketplace() {
             version: pluginData.version,
             installCommand: '',
             repository: pluginData.repository,
+            icon: pluginData.agentTemplate.suggestedAvatar,
             verified: true,
             featured: (pluginData.keywords || plugin.tags || []).includes('starter'),
             createdAt: new Date().toISOString(),
@@ -216,10 +219,15 @@ export function useMarketplace() {
         const res = await fetch(skillMdUrl);
         if (!res.ok) return;
         const content = await res.text();
-        // Extract description from first paragraph after frontmatter
+        // Extract short description from first paragraph after frontmatter
         const descMatch = content.match(/^---[\s\S]*?---\s*\n\s*#[^\n]*\n\s*\n([^\n]+)/);
         if (descMatch) {
-          resource.description = descMatch[1].trim().slice(0, 120);
+          resource.description = descMatch[1].trim().slice(0, 200);
+        }
+        // Extract long description: everything after the title line
+        const bodyMatch = content.match(/^---[\s\S]*?---\s*\n\s*#[^\n]*\n\s*\n([\s\S]+)/);
+        if (bodyMatch) {
+          resource.longDescription = bodyMatch[1].trim().slice(0, 2000);
         }
       } catch {
         // Silent fail - keep default description

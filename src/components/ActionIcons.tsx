@@ -17,7 +17,6 @@ interface InstalledApp {
 interface ActionIconsProps {
   projectPath?: string;
   onGitClick: () => void;
-  onPluginsClick: () => void;
   onUsageClick: () => void;
   onTelegramClick: () => void;
   onTerminalClick: () => void;
@@ -42,9 +41,9 @@ interface ActionIconsProps {
   onKanbanClick?: () => void;
   isKanbanActive?: boolean;
   inProgressTaskCount?: number;
-  // Addons
-  onAddonsClick?: () => void;
-  isAddonsOpen?: boolean;
+  // Quack Store
+  onStoreClick?: () => void;
+  isStoreOpen?: boolean;
 }
 
 function ActionIcons({
@@ -60,8 +59,8 @@ function ActionIcons({
   onKanbanClick,
   isKanbanActive = false,
   inProgressTaskCount = 0,
-  onAddonsClick,
-  isAddonsOpen = false,
+  onStoreClick,
+  isStoreOpen = false,
 }: ActionIconsProps) {
   const [openMenuOpen, setOpenMenuOpen] = useState(false);
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
@@ -268,20 +267,20 @@ function ActionIcons({
         </button>
       )}
 
-      {/* Addons Icon */}
-      {onAddonsClick && (
+      {/* Quack Store Icon */}
+      {onStoreClick && (
         <button
           type="button"
-          className={`action-icon ${isAddonsOpen ? 'active' : ''}`}
-          onClick={onAddonsClick}
-          aria-label="Open Addons"
+          className={`action-icon ${isStoreOpen ? 'active' : ''}`}
+          onClick={onStoreClick}
+          aria-label="Open Quack Store"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M2 17l10 5 10-5" />
             <path d="M2 12l10 5 10-5" />
           </svg>
-          <span className="action-icon-tooltip">Addons</span>
+          <span className="action-icon-tooltip">Quack Store</span>
         </button>
       )}
 
