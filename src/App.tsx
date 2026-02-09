@@ -10704,35 +10704,22 @@ You have access to all Bash tools to execute git commands like:
                     <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>·</span>
 
                     {/* Email */}
-                    <button
-                      type="button"
-                      onClick={() => openExternal('mailto:quack@quack.build')}
+                    <span
                       style={{
-                        padding: '0',
                         fontSize: '12px',
                         fontWeight: 400,
-                        border: 'none',
-                        background: 'transparent',
                         color: 'rgba(255, 255, 255, 0.4)',
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '5px',
-                        transition: 'color 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)';
                       }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="2" y="4" width="20" height="16" rx="2"/>
                         <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
                       </svg>
-                      Contact
-                    </button>
+                      quack@quack.build
+                    </span>
                   </div>
                 </div>
               )}
