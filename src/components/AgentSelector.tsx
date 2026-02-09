@@ -707,8 +707,8 @@ export default function AgentSelector({
         </div>
       )}
 
-      {/* Marketplace Templates Section */}
-      {filteredMarketplaceAgents.length > 0 && (
+      {/* Quack Store Templates Section */}
+      {(filteredMarketplaceAgents.length > 0 || marketplaceLoading) && (
         <>
           <div className="agent-selector-section-header marketplace">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -716,7 +716,7 @@ export default function AgentSelector({
               <line x1="2" y1="12" x2="22" y2="12"></line>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>
-            <span>From Marketplace</span>
+            <span>From Quack Store</span>
             {marketplaceLoading && (
               <span className="agent-selector-loading-indicator">
                 <svg className="spinner-mini" width="12" height="12" viewBox="0 0 24 24">
@@ -728,92 +728,114 @@ export default function AgentSelector({
               <span className="agent-selector-section-count">{filteredMarketplaceAgents.length}</span>
             )}
           </div>
-          <div className="agent-selector-grid marketplace-grid">
-            {filteredMarketplaceAgents.map((bundle) => {
-              const template = bundle._agentTemplate;
-              if (!template) return null;
 
-              return (
-                <div
-                  key={bundle.id}
-                  className="agent-card marketplace-card"
-                  style={{ borderColor: template.suggestedColor }}
-                >
-                  {/* Avatar */}
+          {/* Loading skeleton while fetching from Quack Store */}
+          {marketplaceLoading && filteredMarketplaceAgents.length === 0 && (
+            <div className="agent-selector-grid marketplace-grid">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="agent-card marketplace-card skeleton-card">
                   <div className="agent-card-avatar-wrapper">
-                    <div
-                      className="agent-card-avatar"
-                      style={{
-                        backgroundColor: template.suggestedColor + '15',
-                        borderColor: template.suggestedColor
-                      }}
-                    >
-                      {template.suggestedAvatar ? (
-                        <img
-                          src={getAvatarUrl(template.suggestedAvatar)}
-                          alt={template.suggestedName}
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (window.__TAURI__) {
-                              target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
-                            } else {
-                              target.src = '/images/ducks/new-avatars/duck15.jpeg';
-                            }
-                          }}
-                        />
-                      ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={template.suggestedColor} strokeWidth="2">
+                    <div className="agent-card-avatar skeleton-avatar" />
+                  </div>
+                  <div className="agent-card-info">
+                    <div className="skeleton-line skeleton-name" />
+                    <div className="skeleton-line skeleton-role" />
+                    <div className="skeleton-line skeleton-style" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Loaded templates */}
+          {filteredMarketplaceAgents.length > 0 && (
+            <div className="agent-selector-grid marketplace-grid">
+              {filteredMarketplaceAgents.map((bundle) => {
+                const template = bundle._agentTemplate;
+                if (!template) return null;
+
+                return (
+                  <div
+                    key={bundle.id}
+                    className="agent-card marketplace-card"
+                    style={{ borderColor: template.suggestedColor }}
+                  >
+                    {/* Avatar */}
+                    <div className="agent-card-avatar-wrapper">
+                      <div
+                        className="agent-card-avatar"
+                        style={{
+                          backgroundColor: template.suggestedColor + '15',
+                          borderColor: template.suggestedColor
+                        }}
+                      >
+                        {template.suggestedAvatar ? (
+                          <img
+                            src={getAvatarUrl(template.suggestedAvatar)}
+                            alt={template.suggestedName}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (window.__TAURI__) {
+                                target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
+                              } else {
+                                target.src = '/images/ducks/new-avatars/duck15.jpeg';
+                              }
+                            }}
+                          />
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={template.suggestedColor} strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                          </svg>
+                        )}
+                      </div>
+                      {/* Quack Store badge */}
+                      <div className="marketplace-badge" title="From Quack Store">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                           <circle cx="12" cy="12" r="10"></circle>
                           <line x1="2" y1="12" x2="22" y2="12"></line>
                           <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                         </svg>
-                      )}
+                      </div>
                     </div>
-                    {/* Marketplace badge */}
-                    <div className="marketplace-badge" title="From Marketplace">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                      </svg>
+
+                    {/* Info */}
+                    <div className="agent-card-info">
+                      <h4 className="agent-card-name">{template.suggestedName}</h4>
+                      <p className="agent-card-role">{template.role}</p>
+                      <p className="agent-card-style">
+                        {template.communicationStyle} style
+                        {(() => {
+                          const skills = template.skills || template.bundledPlugins;
+                          return skills && skills.length > 0 && (
+                            <> · {skills.length} {skills.length === 1 ? 'skill' : 'skills'}</>
+                          );
+                        })()}
+                      </p>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="agent-card-actions">
+                      <button
+                        type="button"
+                        className="agent-card-action-btn agent-card-use-btn marketplace-use-btn"
+                        onClick={() => onUseMarketplaceTemplate?.(template, bundle)}
+                        title="Use this template"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Use Template
+                      </button>
                     </div>
                   </div>
-
-                  {/* Info */}
-                  <div className="agent-card-info">
-                    <h4 className="agent-card-name">{template.suggestedName}</h4>
-                    <p className="agent-card-role">{template.role}</p>
-                    <p className="agent-card-style">
-                      {template.communicationStyle} style
-                      {(() => {
-                        const skills = template.skills || template.bundledPlugins;
-                        return skills && skills.length > 0 && (
-                          <> · {skills.length} {skills.length === 1 ? 'skill' : 'skills'}</>
-                        );
-                      })()}
-                    </p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="agent-card-actions">
-                    <button
-                      type="button"
-                      className="agent-card-action-btn agent-card-use-btn marketplace-use-btn"
-                      onClick={() => onUseMarketplaceTemplate?.(template, bundle)}
-                      title="Use this template"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                      Use Template
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
     </div>

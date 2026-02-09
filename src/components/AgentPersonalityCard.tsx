@@ -96,7 +96,7 @@ export default function AgentPersonalityCard({
   onFileClick,
 }: AgentPersonalityCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const { exporting, importing, error, exportAgent, importBundle, clearError } = useBundleOperations();
+  const { exporting, importing, error, success, exportAgent, importBundle, clearError } = useBundleOperations();
 
   // Handle export button click
   async function handleExport() {
@@ -400,6 +400,11 @@ export default function AgentPersonalityCard({
       {error && (
         <div className="bundle-error-compact" onClick={clearError}>
           {error}
+        </div>
+      )}
+      {success && (
+        <div className="bundle-success-compact">
+          {success}
         </div>
       )}
     </div>

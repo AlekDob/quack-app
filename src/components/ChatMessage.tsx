@@ -63,9 +63,12 @@ interface ChatMessageProps {
   onRewindFiles?: (userMessageId: string) => void;
   // Image preview
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -458,6 +461,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 onOpenImageTab={onOpenImageTab}
                 sessionId={currentSessionId}
                 onRewindFiles={onRewindFiles}
+                pendingPlanApprovalIds={pendingPlanApprovalIds}
+                onPlanApprovalResponse={onPlanApprovalResponse}
               />
             ))}
           </div>

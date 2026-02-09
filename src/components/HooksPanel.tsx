@@ -83,7 +83,7 @@ const HOOK_TEMPLATES: (HookTemplate & { svgIcon: React.ReactNode })[] = [
   },
 ];
 
-// Unified hook color (viola - matches AddonsDrawer)
+// Unified hook color (viola - matches Quack Store)
 const HOOK_COLOR = '#a78bfa';
 // Hook type colors for subtle differentiation (all shades of purple)
 const HOOK_TYPE_COLORS: Record<HookType, string> = {
@@ -168,7 +168,7 @@ export default function HooksPanel({
       style={{ opacity: hook.enabled ? 1 : 0.5 }}
       onClick={() => setEditingHook(hook)}
     >
-      {/* Icon - Purple gradient background with white icon (matches AddonsDrawer) */}
+      {/* Icon - Purple gradient background with white icon (matches Quack Store) */}
       <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' }}>
         <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" strokeWidth="1.5">
           <path d="M10 3v7" strokeLinecap="round" />
@@ -330,7 +330,7 @@ export default function HooksPanel({
                       onClick={() => handleTemplateClick(template)}
                       className="w-full flex items-start gap-3 p-3 rounded-lg text-left hover:bg-white/5 transition-all duration-200"
                     >
-                      {/* Icon - Purple gradient background with white icon (matches AddonsDrawer) */}
+                      {/* Icon - Purple gradient background with white icon (matches Quack Store) */}
                       <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' }}>
                         <span style={{ color: 'white' }}>{template.svgIcon}</span>
                       </div>

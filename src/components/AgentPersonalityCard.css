@@ -336,6 +336,23 @@
   cursor: pointer;
 }
 
+.bundle-success-compact {
+  margin-top: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: #00D9FF;
+  background: rgba(0, 217, 255, 0.1);
+  border-radius: 3px;
+  animation: bundleFadeInOut 3s ease-in-out forwards;
+}
+
+@keyframes bundleFadeInOut {
+  0% { opacity: 0; transform: translateY(-2px); }
+  15% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Legacy styles for backward compatibility */
 .personality-header {
   display: flex;

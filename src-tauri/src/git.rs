@@ -427,7 +427,7 @@ fn parse_numstat_value(value: &str) -> Option<i32> {
     }
 }
 
-fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
+pub(crate) fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
     let mut dir = if let Some(path) = starting_path {
         path
     } else {

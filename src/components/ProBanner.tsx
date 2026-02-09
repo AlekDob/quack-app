@@ -39,7 +39,8 @@ export const ProBanner: React.FC<ProBannerProps> = ({
         style={{
           position: 'fixed',
           bottom: '12px',
-          right: '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
           zIndex: 100,
           animation: 'popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         }}
@@ -82,7 +83,7 @@ export const ProBanner: React.FC<ProBannerProps> = ({
           ? 'slideDownFadeOut 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards'
           : 'slideUpFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
       }}
-      className="bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-yellow-500/20 border-t border-yellow-500/50 px-6 py-3 flex items-center justify-between overflow-hidden backdrop-blur-sm"
+      className="bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-yellow-500/20 border-t border-yellow-500/50 px-6 py-3 flex items-center justify-center overflow-hidden backdrop-blur-sm"
     >
       <style>{`
         @keyframes slideUpFadeIn {
@@ -114,12 +115,12 @@ export const ProBanner: React.FC<ProBannerProps> = ({
         <Sparkles className="absolute top-2 right-40 w-2.5 h-2.5 text-yellow-300 animate-pulse delay-500" />
       </div>
 
-      {/* Left side: Icon + Text */}
-      <div className="flex items-center gap-3 relative z-10 flex-1">
+      {/* Centered content */}
+      <div className="flex items-center gap-4 relative z-10">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-lg">
           <Crown className="w-5 h-5 text-white" />
         </div>
-        <div className="flex-1 min-w-0">
+        <div>
           <p className="text-sm font-semibold text-white">
             Upgrade to <span className="text-yellow-300">Quack Pro</span>
           </p>
@@ -127,10 +128,16 @@ export const ProBanner: React.FC<ProBannerProps> = ({
             Get unlimited <span className="font-medium text-yellow-200">Agents</span> and advanced features
           </p>
         </div>
-      </div>
 
-      {/* Right side: Buttons */}
-      <div className="flex items-center gap-2 relative z-10">
+        {/* Upgrade button */}
+        <button
+          onClick={onUpgrade}
+          className="px-5 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold transition-all shadow-lg shadow-yellow-500/30 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+        >
+          <Sparkles className="w-4 h-4" />
+          Upgrade Now
+        </button>
+
         {/* Collapse button */}
         {onToggle && (
           <button
@@ -141,15 +148,6 @@ export const ProBanner: React.FC<ProBannerProps> = ({
             <ChevronDown className="w-4 h-4 text-gray-400 hover:text-gray-200" />
           </button>
         )}
-
-        {/* Upgrade button */}
-        <button
-          onClick={onUpgrade}
-          className="px-5 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold transition-all shadow-lg shadow-yellow-500/30 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-        >
-          <Sparkles className="w-4 h-4" />
-          Upgrade Now
-        </button>
 
         {/* Dismiss button */}
         {dismissible && onDismiss && (

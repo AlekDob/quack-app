@@ -3,9 +3,13 @@ type: component
 project: quack-app
 created: 2026-01-08
 migrated: true
+deprecated: true
+superseded_by: quack-store-system.md
 ---
 
 # Marketplace and Plugin System
+
+**⚠️ DEPRECATED**: This document is outdated. The Addons system was renamed to **Quack Store** and completely redesigned with Apple App Store-style layout on 2026-02-08. See `quack-store-system.md` for current documentation.
 
 ## Marketplace e Sistema Plugin
 

@@ -140,6 +140,15 @@ pub enum ClaudeEvent {
         #[serde(flatten)]
         extra: serde_json::Value,
     },
+    // PlanApprovalRequest event - ExitPlanMode requires user approval
+    #[serde(rename = "plan_approval_request")]
+    PlanApprovalRequest {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        plan: serde_json::Value,
+        #[serde(flatten)]
+        extra: serde_json::Value,
+    },
 }
 
 /// Question structure for AskUserQuestion tool
@@ -1748,6 +1757,26 @@ pub async fn send_message_via_sdk_streaming(
                             }
                             Err(e) => {
                                 log::error!("[SDK] ❌ Failed to emit ask-user-question event (global): {:?}", e);
+                            }
+                        }
+                    }
+                    ClaudeEvent::PlanApprovalRequest { request_id, plan, .. } => {
+                        log::info!("[SDK] 📋 PlanApprovalRequest event: requestId={}, sessionKey={}", request_id, event_session_key);
+
+                        let payload = serde_json::json!({
+                            "requestId": request_id,
+                            "plan": plan,
+                            "agentId": agent_id,
+                            "sessionKey": event_session_key
+                        });
+
+                        // Emit to global listener
+                        match app.emit("plan-approval-request", payload) {
+                            Ok(_) => {
+                                log::info!("[SDK] 📋 Emitted plan-approval-request event to frontend");
+                            }
+                            Err(e) => {
+                                log::error!("[SDK] ❌ Failed to emit plan-approval-request event: {:?}", e);
                             }
                         }
                     }

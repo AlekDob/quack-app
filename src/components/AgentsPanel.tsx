@@ -267,7 +267,7 @@ export default function AgentsPanel({
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
-                        {/* Robot Icon - Teal gradient background with white icon (matches AddonsDrawer) */}
+                        {/* Robot Icon - Teal gradient background with white icon (matches Quack Store) */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ecdc4, #26a69a)' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <rect x="4" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -326,7 +326,7 @@ export default function AgentsPanel({
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
-                        {/* Robot Icon - Teal gradient background with white icon (matches AddonsDrawer) */}
+                        {/* Robot Icon - Teal gradient background with white icon (matches Quack Store) */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ecdc4, #26a69a)' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <rect x="4" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />

@@ -84,6 +84,19 @@ pub fn write_file_content(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
+    }
+    std::fs::write(&path, &data).map_err(|e| format!("Failed to write binary file: {}", e))
+}
+
+#[tauri::command]
+pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|e| format!("Failed to read binary file: {}", e))
+}
+
+#[tauri::command]
 pub fn create_directory(path: String) -> Result<(), String> {
     create_directory_impl(path).map_err(|err| err.to_string())
 }
