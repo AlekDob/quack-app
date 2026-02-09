@@ -11578,11 +11578,6 @@ You have access to all Bash tools to execute git commands like:
             const activeTerminal = terminals.find((t) => t.id === activeId);
             return activeTerminal?.color || null;
           })()}
-          onImportAgent={async (importedAgent) => {
-            // Refresh agent list after bundle import
-            console.log('[App] Agent imported from bundle:', importedAgent.name);
-            await loadAgents();
-          }}
           projectName={projectName}
           gitBranch={gitBranch}
           agentRefreshKey={agentRefreshKey}

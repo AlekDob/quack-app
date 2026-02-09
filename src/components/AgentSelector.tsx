@@ -21,6 +21,7 @@ import { ask } from '@tauri-apps/plugin-dialog';
 import type { CustomAvatarInfo } from '../utils/customAvatarStorage';
 import SkillSelector from './SkillSelector';
 import { useMarketplace } from '../hooks/useMarketplace';
+import { useBundleOperations } from '../hooks/useBundleOperations';
 import './AgentSelector.css';
 
 // Communication styles for personality
@@ -44,6 +45,8 @@ interface AgentSelectorProps {
   onCreateNew: () => void;
   // Callback when user selects a marketplace template
   onUseMarketplaceTemplate?: (template: AgentTemplate, resource: MarketplaceResource) => void;
+  // Callback when an agent is imported from bundle
+  onImportAgent?: (agent: SavedAgent) => void;
   // Project path for loading skills
   projectPath?: string;
   // New props for inline editing
@@ -78,6 +81,7 @@ export default function AgentSelector({
   onEditAgent,
   onCreateNew,
   onUseMarketplaceTemplate,
+  onImportAgent,
   // Project path for loading skills
   projectPath = '',
   // Inline editing props
@@ -110,6 +114,20 @@ export default function AgentSelector({
 
   // Load marketplace agent bundles
   const { allResources, loading: marketplaceLoading } = useMarketplace();
+
+  // Bundle import operations
+  const {
+    importing, error: bundleError, success: bundleSuccess,
+    importBundle, clearError: clearBundleError,
+  } = useBundleOperations();
+
+  async function handleImportBundle() {
+    const imported = await importBundle();
+    if (imported) {
+      setRefreshKey(prev => prev + 1);
+      onImportAgent?.(imported);
+    }
+  }
 
   // Filter to get only agent-bundles (templates)
   const marketplaceAgentBundles = useMemo(() => {
@@ -506,6 +524,32 @@ export default function AgentSelector({
           </svg>
           Create New Agent
         </button>
+      </div>
+
+      {/* Bundle Import Action */}
+      <div className="agent-selector-bundle-actions">
+        <button
+          type="button"
+          className="agent-selector-import-btn"
+          onClick={handleImportBundle}
+          disabled={importing}
+          title="Import agent from .quack bundle"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          {importing ? 'Importing...' : 'Import from bundle'}
+        </button>
+        {bundleError && (
+          <div className="agent-selector-bundle-error" onClick={clearBundleError}>
+            {bundleError}
+          </div>
+        )}
+        {bundleSuccess && (
+          <div className="agent-selector-bundle-success">
+            {bundleSuccess}
+          </div>
+        )}
       </div>
 
       {/* Search and Sort Controls */}

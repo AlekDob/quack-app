@@ -27,7 +27,6 @@ interface AgentPersonalityCardProps {
   agentWorkingOn?: string | null;
   agentColor?: string | null;
   agentId?: string | null;
-  onImportAgent?: (agent: SavedAgent) => void;
   // Workspace info
   projectName?: string;
   gitBranch?: string;
@@ -86,7 +85,6 @@ export default function AgentPersonalityCard({
   agentWorkingOn,
   agentColor,
   agentId,
-  onImportAgent,
   projectName,
   gitBranch,
   projectFiles = [],
@@ -96,16 +94,10 @@ export default function AgentPersonalityCard({
   onFileClick,
 }: AgentPersonalityCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const { exporting, importing, error, success, exportAgent, importBundle, clearError } = useBundleOperations();
+  const { exporting, error, success, exportAgent, clearError } = useBundleOperations();
 
-  // Handle export button click
   async function handleExport() {
-    console.log('[AgentPersonalityCard] handleExport called', { personality, agentName, agentId, agentColor });
-
-    if (!personality || !agentName) {
-      console.warn('[AgentPersonalityCard] Export aborted - missing personality or agentName', { personality: !!personality, agentName });
-      return;
-    }
+    if (!personality || !agentName) return;
 
     const agent: SavedAgent = {
       id: agentId || `agent-${Date.now()}`,
@@ -120,14 +112,6 @@ export default function AgentPersonalityCard({
     };
 
     await exportAgent(agent);
-  }
-
-  // Handle import button click
-  async function handleImport() {
-    const imported = await importBundle();
-    if (imported && onImportAgent) {
-      onImportAgent(imported);
-    }
   }
 
   // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
@@ -372,7 +356,7 @@ export default function AgentPersonalityCard({
         </div>
       )}
 
-      {/* Bundle Actions - Show on hover */}
+      {/* Export Action - Show on hover */}
       <div className="bundle-actions-compact">
         <button
           className="bundle-btn-compact"
@@ -384,17 +368,6 @@ export default function AgentPersonalityCard({
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
           </svg>
           {exporting ? 'Exporting...' : 'Export'}
-        </button>
-        <button
-          className="bundle-btn-compact"
-          onClick={handleImport}
-          disabled={importing}
-          title="Import agent from bundle"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-          </svg>
-          {importing ? 'Importing...' : 'Import'}
         </button>
       </div>
       {error && (

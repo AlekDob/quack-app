@@ -32,7 +32,6 @@ interface AgentContextPanelProps {
   onOpenContextDrawer?: (scope: string) => void;
   onEditAgent?: () => void;
   onOpenRulesTab?: () => void; // Navigate to Rules tab in SidePanel
-  onImportAgent?: (agent: import('../types').SavedAgent) => void; // Callback after bundle import
   onSessionClick?: (sessionId: string) => void; // Navigate to session chat
   activeSessionId?: string; // Currently active session
   projectName?: string;
@@ -53,7 +52,6 @@ export default function AgentContextPanel({
   onOpenContextDrawer,
   onEditAgent,
   onOpenRulesTab,
-  onImportAgent,
   onSessionClick,
   activeSessionId,
   projectName,
@@ -330,7 +328,6 @@ export default function AgentContextPanel({
             agentWorkingOn={activeAgentWorkingOn}
             agentColor={activeAgentColor}
             agentId={activeAgentId}
-            onImportAgent={onImportAgent}
             projectName={projectName}
             gitBranch={gitBranch}
             projectFiles={projectFiles}

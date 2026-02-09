@@ -282,7 +282,7 @@
   font-weight: 500;
 }
 
-/* Bundle Actions - Compact on hover */
+/* Bundle Export - Show on hover */
 .bundle-actions-compact {
   display: flex;
   gap: 4px;
@@ -433,11 +433,6 @@
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
-}
-
-/* Legacy bundle actions */
-.bundle-actions {
-  display: none;
 }
 
 /* Legacy workspace/context (hidden - using new compact styles) */

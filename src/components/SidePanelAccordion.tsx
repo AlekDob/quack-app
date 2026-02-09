@@ -227,7 +227,6 @@ interface SidePanelAccordionProps {
   activeAgentCwd?: string | null;
   activeAgentPersonality?: Partial<AgentPersonality> | null;
   activeAgentColor?: string | null;
-  onImportAgent?: (agent: import('../types').SavedAgent) => void;
   projectName?: string;
   gitBranch?: string;
   agentRefreshKey?: number;
@@ -310,7 +309,6 @@ export default function SidePanelAccordion({
   activeAgentCwd,
   activeAgentPersonality,
   activeAgentColor,
-  onImportAgent,
   projectName,
   gitBranch,
   agentRefreshKey,
@@ -490,7 +488,6 @@ export default function SidePanelAccordion({
             onOpenFile={onOpenFile}
             onOpenContextDrawer={onOpenContextDrawer}
             onOpenRulesTab={() => toggleSection("rules")}
-            onImportAgent={onImportAgent}
             projectName={projectName}
             gitBranch={gitBranch}
             refreshKey={agentRefreshKey}

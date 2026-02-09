@@ -120,6 +120,60 @@
   flex-shrink: 0;
 }
 
+/* Bundle Import/Export Actions */
+.agent-selector-bundle-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-selector-import-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.agent-selector-import-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.agent-selector-import-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-selector-import-btn svg {
+  flex-shrink: 0;
+}
+
+.agent-selector-bundle-error {
+  font-size: 10px;
+  color: rgba(239, 68, 68, 0.8);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.agent-selector-bundle-success {
+  font-size: 10px;
+  color: rgba(34, 197, 94, 0.8);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(34, 197, 94, 0.08);
+}
+
 /* Controls */
 .agent-selector-controls {
   display: flex;
