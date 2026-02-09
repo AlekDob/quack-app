@@ -298,6 +298,9 @@ interface StreamMessageProps {
   onRewindFiles?: (userMessageId: string) => void; // Callback to rewind files to a specific message
   // Image preview
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>; // Request IDs with pending plan approvals
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -316,6 +319,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   sessionId,
   onRewindFiles,
   onOpenImageTab,
+  pendingPlanApprovalIds,
+  onPlanApprovalResponse,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -443,12 +448,19 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
 
       // ExitPlanMode tool - special widget
       if (toolName === 'exitplanmode' && input?.plan) {
+        // Find matching pending plan approval requestId for this agent
+        const pendingRequestId = pendingPlanApprovalIds
+          ? Array.from(pendingPlanApprovalIds)[0]
+          : undefined;
+
         return (
           <MemoizedExitPlanModeWidget
             key={idx}
             plan={input.plan}
             workingDirectory={workingDirectory}
             defaultExpanded={true}
+            pendingApprovalRequestId={pendingRequestId}
+            onApprovalResponse={onPlanApprovalResponse}
           />
         );
       }

@@ -382,12 +382,6 @@
   min-width: 0;
 }
 
-.store-item-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .store-item-name {
   font-size: 13px;
   font-weight: 600;
@@ -444,7 +438,7 @@
 /* === Get / Remove Buttons === */
 .store-item-action {
   flex-shrink: 0;
-  align-self: center;
+  align-self: flex-start;
 }
 
 .store-get-btn {
@@ -611,7 +605,14 @@
 .store-detail-signals { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 
 .store-detail-body { flex: 1; overflow-y: auto; margin-bottom: 14px; min-height: 0; }
-.store-detail-description { font-size: 13px; line-height: 1.7; color: rgba(255, 255, 255, 0.6); margin: 0; white-space: pre-line; }
+.store-detail-body .markdown-content { font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, 0.7); }
+.store-detail-body .md-paragraph { font-size: 13px; }
+.store-detail-body .md-h1 { font-size: 16px; }
+.store-detail-body .md-h2 { font-size: 15px; }
+.store-detail-body .md-h3 { font-size: 14px; }
+.store-detail-body .md-list li { font-size: 13px; }
+.store-detail-body .md-code-block { font-size: 12px; }
+.store-detail-body .md-inline-code { font-size: 12px; }
 
 .store-detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .store-detail-tag { font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.5); }

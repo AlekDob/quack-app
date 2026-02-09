@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import type { MarketplaceResource } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
 import { getCategoryGradient, getCategoryIcon, VerifiedIcon, formatInstallCount, hasDuckAvatar, getDuckAvatarUrl } from './store/StoreIcons';
+import MarkdownText from './MarkdownText';
 
 interface MarketplaceInstallModalProps {
   resource: MarketplaceResource | null;
@@ -95,9 +96,7 @@ export default function MarketplaceInstallModal({
 
         {/* Description body - scrollable for long content */}
         <div className="store-detail-body">
-          <p className="store-detail-description">
-            {resource.longDescription || resource.description}
-          </p>
+          <MarkdownText>{resource.longDescription || resource.description}</MarkdownText>
         </div>
 
         {/* Tags */}

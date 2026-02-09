@@ -12,7 +12,7 @@ interface StoreSidebarProps {
 
 function NavIcon({ tab }: { tab: StoreTab }) {
   if (tab === 'all') return getDiscoverIcon(16);
-  return getCategoryIcon(tab === 'snippets' ? 'commands' : tab, 16);
+  return getCategoryIcon(tab, 16);
 }
 
 export default function StoreSidebar({

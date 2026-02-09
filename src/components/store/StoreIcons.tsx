@@ -11,7 +11,6 @@ export const CATEGORY_GRADIENTS: Record<string, string> = {
   hooks: 'linear-gradient(135deg, #a78bfa, #8b5cf6)',
   mcp: 'linear-gradient(135deg, #34d399, #10b981)',
   commands: 'linear-gradient(135deg, #f472b6, #ec4899)',
-  snippets: 'linear-gradient(135deg, #f472b6, #ec4899)',
   default: 'linear-gradient(135deg, #6b7280, #4b5563)',
 };
 
@@ -101,7 +100,6 @@ export function getCategoryIcon(category: string, size = 14): ReactElement {
         </svg>
       );
     case 'commands':
-    case 'snippets':
       return (
         <svg viewBox="0 0 20 20" style={s}>
           <path d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z" fill="none" stroke="currentColor" strokeWidth="1.5" />

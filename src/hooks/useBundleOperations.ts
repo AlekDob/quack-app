@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { homeDir } from '@tauri-apps/api/path';
 import type { SavedAgent } from '../types';
 import {
   exportAgentBundleAsZip,
@@ -6,89 +8,138 @@ import {
 } from '../services/bundleService';
 import { saveAgent } from '../utils/agentStorage';
 import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
-import { writeFile, readFile } from '@tauri-apps/plugin-fs';
 
 interface BundleOperationsState {
   exporting: boolean;
   importing: boolean;
   error: string | null;
+  success: string | null;
 }
 
 interface BundleOperations {
   exporting: boolean;
   importing: boolean;
   error: string | null;
+  success: string | null;
   exportAgent: (agent: SavedAgent) => Promise<void>;
   importBundle: () => Promise<SavedAgent | null>;
   clearError: () => void;
+}
+
+/** Read a file from disk via Tauri, return content or empty string */
+async function readFileContent(path: string): Promise<string> {
+  try {
+    return await invoke<string>('read_file_content', { path });
+  } catch {
+    return '';
+  }
+}
+
+/** Resolve home directory with trailing slash */
+async function getHome(): Promise<string> {
+  let home = await homeDir();
+  if (!home.endsWith('/')) home += '/';
+  return home;
 }
 
 /**
  * Hook for bundle export/import operations
  *
  * Provides functions to:
- * - Export an agent as a .zip bundle
- * - Import an agent from a .zip bundle
+ * - Export an agent as a .quack bundle (ZIP with real file contents)
+ * - Import an agent from a .quack bundle and install files to ~/.claude/
  */
 export function useBundleOperations(): BundleOperations {
   const [state, setState] = useState<BundleOperationsState>({
     exporting: false,
     importing: false,
     error: null,
+    success: null,
   });
 
   /**
-   * Export an agent as a downloadable .zip bundle
+   * Export an agent as a downloadable .quack bundle
+   * Reads real skill, rule, and command files from disk
    */
   async function exportAgent(agent: SavedAgent): Promise<void> {
-    console.log('[useBundleOperations] exportAgent called', { agentName: agent.name, agentId: agent.id });
     setState((prev) => ({ ...prev, exporting: true, error: null }));
 
     try {
-      // Prepare equipment data from personality
-      const skills = (agent.personality?.skills || []).map((id) => ({
-        id,
-        content: '', // In real implementation, we'd read the actual skill content
-      }));
+      const home = await getHome();
 
-      const rules = (agent.personality?.selectedRules || []).map((id) => ({
-        id,
-        content: '', // In real implementation, we'd read the actual rule content
-      }));
-
-      // Export as ZIP
-      const zipData = await exportAgentBundleAsZip(
-        agent,
-        skills,
-        [], // droids
-        rules,
-        [] // commands
+      // Read real skill files from disk
+      const skillNames = agent.personality?.selectedSkills || agent.personality?.skills || [];
+      const skills = await Promise.all(
+        skillNames.map(async (name) => {
+          const dirPath = `${home}.claude/skills/${name}/SKILL.md`;
+          const flatPath = `${home}.claude/skills/${name}.md`;
+          let content = await readFileContent(dirPath);
+          if (!content) content = await readFileContent(flatPath);
+          return { id: name, content };
+        })
       );
 
-      // Create download link
-      const blob = new Blob([zipData], { type: 'application/zip' });
+      // Read real rule files from disk
+      const rulePaths = agent.personality?.selectedRules || [];
+      const rules = await Promise.all(
+        rulePaths.map(async (rulePath) => {
+          const name = rulePath.split('/').pop()?.replace('.md', '') || rulePath;
+          const content = await readFileContent(rulePath);
+          return { id: name, content };
+        })
+      );
 
-      const filename = `${agent.name.toLowerCase().replace(/\s+/g, '-')}-bundle.zip`;
+      // Read real command files from disk
+      const commandNames = agent.personality?.toolkit?.commands || [];
+      const commands = await Promise.all(
+        commandNames.map(async (name) => {
+          const path = `${home}.claude/commands/${name}.md`;
+          const content = await readFileContent(path);
+          return { id: name, content };
+        })
+      );
+
+      // Read avatar file if present
+      let avatarData: Uint8Array | undefined;
+      if (agent.avatar) {
+        try {
+          const avatarPath = `${home}.claude/avatars/${agent.avatar}`;
+          const data = await invoke<number[]>('read_binary_file', { path: avatarPath });
+          avatarData = new Uint8Array(data);
+        } catch {
+          // Avatar not found, export without it
+        }
+      }
+
+      // Export as ZIP with real contents
+      const zipData = await exportAgentBundleAsZip(
+        agent,
+        skills.filter(s => s.content),
+        [], // droids
+        rules.filter(r => r.content),
+        commands.filter(c => c.content),
+        avatarData
+      );
+
+      const filename = `${agent.name.toLowerCase().replace(/\s+/g, '-')}.quack`;
 
       // Use Tauri's native save dialog
       const savePath = await saveDialog({
         defaultPath: filename,
         filters: [{
           name: 'Quack Agent Bundle',
-          extensions: ['zip']
+          extensions: ['quack', 'zip']
         }]
       });
 
       if (!savePath) {
-        // User cancelled the dialog
         setState((prev) => ({ ...prev, exporting: false }));
         return;
       }
 
-      // Write the file using Tauri's fs plugin
-      await writeFile(savePath, zipData);
-
-      setState((prev) => ({ ...prev, exporting: false }));
+      await invoke('write_binary_file', { path: savePath, data: Array.from(zipData) });
+      setState((prev) => ({ ...prev, exporting: false, success: 'Agent bundle exported successfully' }));
+      setTimeout(() => setState((prev) => ({ ...prev, success: null })), 3000);
     } catch (err) {
       console.error('Failed to export agent bundle:', err);
       setState((prev) => ({
@@ -100,19 +151,18 @@ export function useBundleOperations(): BundleOperations {
   }
 
   /**
-   * Import an agent from a .zip bundle file
-   * Opens file picker and returns the imported agent
+   * Import an agent from a .quack bundle file
+   * Installs skills, rules, and commands to ~/.claude/
    */
   async function importBundle(): Promise<SavedAgent | null> {
     setState((prev) => ({ ...prev, importing: true, error: null }));
 
     try {
-      // Use Tauri's native file picker
       const selectedPath = await openDialog({
         multiple: false,
         filters: [{
           name: 'Quack Agent Bundle',
-          extensions: ['zip']
+          extensions: ['quack', 'zip']
         }]
       });
 
@@ -121,22 +171,64 @@ export function useBundleOperations(): BundleOperations {
         return null;
       }
 
-      // Read file using Tauri's fs plugin
-      const bundleData = await readFile(selectedPath as string);
-
-      // Import bundle
+      const rawData = await invoke<number[]>('read_binary_file', { path: selectedPath as string });
+      const bundleData = new Uint8Array(rawData);
       const result = await importAgentBundle(bundleData);
+      const home = await getHome();
 
-      // Save to agent storage
+      // Install skills to ~/.claude/skills/
+      for (const skill of result.skills) {
+        if (!skill.content) continue;
+        const targetDir = `${home}.claude/skills/${skill.id}`;
+        try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+        await invoke('write_file_content', {
+          path: `${targetDir}/SKILL.md`,
+          content: skill.content,
+        });
+      }
+
+      // Install rules to ~/.claude/rules/
+      for (const rule of result.rules) {
+        if (!rule.content) continue;
+        const targetDir = `${home}.claude/rules`;
+        try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+        await invoke('write_file_content', {
+          path: `${targetDir}/${rule.id}.md`,
+          content: rule.content,
+        });
+      }
+
+      // Install commands to ~/.claude/commands/
+      for (const cmd of result.commands) {
+        if (!cmd.content) continue;
+        const targetDir = `${home}.claude/commands`;
+        try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+        await invoke('write_file_content', {
+          path: `${targetDir}/${cmd.id}.md`,
+          content: cmd.content,
+        });
+      }
+
+      // Update rule paths to point to installed location
+      const installedRulePaths = result.rules
+        .filter(r => r.content)
+        .map(r => `${home}.claude/rules/${r.id}.md`);
+
+      // Save agent with correct references
       saveAgent({
         name: result.agent.name,
         avatar: result.agent.avatar,
         color: result.agent.color,
         workingOn: result.agent.workingOn,
-        personality: result.agent.personality,
+        personality: {
+          ...result.agent.personality,
+          selectedRules: installedRulePaths,
+          selectedSkills: result.skills.filter(s => s.content).map(s => s.id),
+        },
       });
 
-      setState((prev) => ({ ...prev, importing: false }));
+      setState((prev) => ({ ...prev, importing: false, success: 'Agent bundle imported successfully' }));
+      setTimeout(() => setState((prev) => ({ ...prev, success: null })), 3000);
       return result.agent;
     } catch (err) {
       console.error('Failed to import agent bundle:', err);
@@ -157,6 +249,7 @@ export function useBundleOperations(): BundleOperations {
     exporting: state.exporting,
     importing: state.importing,
     error: state.error,
+    success: state.success,
     exportAgent,
     importBundle,
     clearError,

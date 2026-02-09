@@ -76,6 +76,22 @@
   white-space: nowrap;
 }
 
+.tool-minimal-target.copyable {
+  cursor: copy;
+  border-radius: 3px;
+  padding: 0 3px;
+  transition: all 0.15s ease;
+}
+
+.tool-minimal-target.copyable:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tool-minimal-target.copied {
+  color: #22c55e;
+}
+
 /* Status indicators */
 .tool-status-dot {
   display: inline-block;

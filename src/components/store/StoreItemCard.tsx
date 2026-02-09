@@ -33,10 +33,7 @@ export default function StoreItemCard({
       )}
 
       <div className="store-item-body">
-        <div className="store-item-name-row">
-          <span className="store-item-name">{resource.name}</span>
-          {installed && <span className="store-installed-badge">Installed</span>}
-        </div>
+        <span className="store-item-name">{resource.name}</span>
         <div className="store-item-meta">
           {resource.author} · v{resource.version}
         </div>
@@ -54,6 +51,7 @@ export default function StoreItemCard({
               {formatInstallCount(resource.installCount)} installs
             </span>
           )}
+          {installed && <span className="store-installed-badge">Installed</span>}
         </div>
       </div>
 

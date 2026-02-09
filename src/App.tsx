@@ -44,6 +44,7 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
+import SupportChatWidget from "./components/SupportChatWidget";
 // Old Background Tasks system - replaced by Kanban shell tasks
 // import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
 // import { runDroidInBackground } from "./services/backgroundAgentService";
@@ -512,6 +513,10 @@ function AppContent() {
   // Maps requestId -> { agentId, sessionKey, questions } for responding via stdin
   // 🦆 FIX: Added sessionKey to track which specific session has the pending question
   const [pendingUserQuestions, setPendingUserQuestions] = useState<Map<string, { agentId: string; sessionKey?: string; questions: unknown[] }>>(new Map());
+
+  // 📋 PlanApproval: Track pending plan approval requests from ExitPlanMode
+  // Maps requestId -> { agentId, sessionKey, plan } for responding via stdin
+  const [pendingPlanApprovals, setPendingPlanApprovals] = useState<Map<string, { agentId: string; sessionKey?: string; plan: unknown }>>(new Map());
 
   // 🔵 Read-once notification badge system: Track last read timestamp for each agent
   // When user clicks an agent, we mark it as "read" by storing current timestamp
@@ -1428,7 +1433,43 @@ function AppContent() {
           setGitBranch(''); // Not a git repository or error
         });
     }
+
+    // Start git branch watcher for this project (idempotent — safe to call repeatedly)
+    if (cwd) {
+      invoke('start_git_branch_watcher', { projectPath: cwd }).catch(() => {
+        // Not a git repo or watcher failed — silent
+      });
+    }
   }, [activeTerminal, tauriAvailable]);
+
+  // Listen for real-time git branch changes from file watcher
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const unlistenPromise = listen<{ projectPath: string; branch: string }>(
+      'git:branch-changed',
+      (event) => {
+        const { projectPath, branch } = event.payload;
+        const activeCwd = activeTerminal?.cwd || '';
+
+        // Update displayed branch if event matches the active terminal's project
+        if (activeCwd && projectPath === activeCwd) {
+          setGitBranch(branch);
+        }
+
+        // Update branch on ALL terminals that share this project path (persistence)
+        setTerminals((prev) =>
+          prev.map((t) =>
+            t.cwd === projectPath ? { ...t, branch } : t
+          )
+        );
+      }
+    );
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten()).catch(() => undefined);
+    };
+  }, [tauriAvailable, activeTerminal?.cwd]);
 
   // Handle deep link file opening from Quack Inspector
   useDeepLinkHandler(
@@ -3721,6 +3762,87 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId, pendingUserQuestions]);
 
+  // 📋 PlanApproval: Approve or reject a plan from ExitPlanMode
+  // Reuses the same stdin communication as AskUserQuestion
+  const respondToPlanApproval = useCallback(async (
+    requestId: string,
+    approved: boolean,
+    feedback?: string
+  ) => {
+    if (!activeId) {
+      console.error('[App] Cannot respond to plan: no active agent');
+      return;
+    }
+
+    const planData = pendingPlanApprovals.get(requestId);
+    if (!planData) {
+      console.error('[App] Cannot respond to plan: no pending request for', requestId);
+      return;
+    }
+
+    const processKey = planData.sessionKey || planData.agentId;
+    const pendingKey = planData.sessionKey || planData.agentId;
+
+    console.info('[App] 📋 Responding to plan approval:', {
+      requestId,
+      approved,
+      feedback,
+      processKey,
+    });
+
+    // Remove from pending state
+    setPendingPlanApprovals(prev => {
+      const next = new Map(prev);
+      next.delete(requestId);
+      return next;
+    });
+    setPendingQuestionIdsMap(prev => {
+      const newMap = new Map(prev);
+      const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+      pending.delete(requestId);
+      if (pending.size === 0) {
+        newMap.delete(pendingKey);
+      } else {
+        newMap.set(pendingKey, pending);
+      }
+      return newMap;
+    });
+
+    try {
+      const { answerUserQuestionViaStdin } = await import('./services/claudeSDK');
+
+      // Send response via stdin - reuse the same mechanism as AskUserQuestion
+      // The backend expects { requestId, answers } format
+      // We encode approved/feedback as answers that stream-claude.js will parse
+      await answerUserQuestionViaStdin(
+        processKey,
+        requestId,
+        { approved: approved ? 'true' : 'false', feedback: feedback || '' }
+      );
+
+      console.log('[App] 📋 Plan approval response sent successfully');
+    } catch (error) {
+      console.error('[App] Failed to send plan approval response:', error);
+      toast.error('Failed to send plan response. Please try again.');
+
+      // Revert state on error
+      if (planData) {
+        setPendingPlanApprovals(prev => {
+          const next = new Map(prev);
+          next.set(requestId, planData);
+          return next;
+        });
+        setPendingQuestionIdsMap(prev => {
+          const newMap = new Map(prev);
+          const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+          pending.add(requestId);
+          newMap.set(pendingKey, pending);
+          return newMap;
+        });
+      }
+    }
+  }, [activeId, pendingPlanApprovals]);
+
   // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
     if (!activeId) return;
@@ -4415,6 +4537,46 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     });
 
+    // 📋 GLOBAL PlanApprovalRequest listener - catches ExitPlanMode events
+    const unlistenPlanApprovalGlobalPromise = listen<{
+      requestId: string;
+      plan: unknown;
+      agentId: string;
+      sessionKey?: string;
+    }>('plan-approval-request', async (event) => {
+      console.log(`📋 [GLOBAL] PlanApprovalRequest event received:`, event.payload);
+      const { requestId, plan, agentId, sessionKey } = event.payload;
+
+      // Store the pending plan approval for when user responds
+      setPendingPlanApprovals((prev) => {
+        const next = new Map(prev);
+        next.set(requestId, { agentId, sessionKey, plan });
+        return next;
+      });
+
+      // Also add to pending question IDs for UI state (shows indicator on agent)
+      const pendingKey = sessionKey || agentId;
+      setPendingQuestionIdsMap((prev) => {
+        const newMap = new Map(prev);
+        const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+        pending.add(requestId);
+        newMap.set(pendingKey, pending);
+        return newMap;
+      });
+
+      // Send desktop notification
+      try {
+        const agentChat = agentChats.find((a: { id: string }) => a.id === agentId);
+        const agentName = agentChat?.name || 'Agent';
+        await sendNotification({
+          title: `${agentName} needs plan approval`,
+          body: 'Review and approve the plan to proceed',
+        });
+      } catch (notifyError) {
+        console.warn('Failed to send notification:', notifyError);
+      }
+    });
+
     // 📱 Listen for session updates from external sources (WhatsApp, Telegram, etc.)
     // When the Rust backend creates sessions via HTTP API, it emits this event
     const unlistenSessionsUpdatedPromise = listen<{
@@ -4496,6 +4658,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenPlanApprovalGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionAutoStartPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
@@ -10221,8 +10384,7 @@ You have access to all Bash tools to execute git commands like:
       )}
 
       {/* 💰 Pro Banner - Fixed at bottom with collapse to badge */}
-      {/* Only show if auth banner is not visible (priority system) */}
-      {!isProUser && !(claudeCliAvailable === false && !claudeAuthBannerDismissed) && (
+      {!isProUser && (
         <ProBanner
           onUpgrade={() => handleShowUpgrade('terminals')}
           isExpanded={proBannerExpanded}
@@ -10924,6 +11086,18 @@ You have access to all Bash tools to execute git commands like:
                       }
                       setForceExpandSection('agent-context');
                     }}
+                    // Plan approval
+                    pendingPlanApprovalIds={(() => {
+                      const ids = new Set<string>();
+                      const key = isTaskChat ? activeTaskId! : (activeId ?? '');
+                      for (const [reqId, data] of pendingPlanApprovals.entries()) {
+                        if (data.agentId === key || data.sessionKey === key) {
+                          ids.add(reqId);
+                        }
+                      }
+                      return ids;
+                    })()}
+                    onPlanApprovalResponse={respondToPlanApproval}
                   />
                 );
               })()}
@@ -11061,6 +11235,17 @@ You have access to all Bash tools to execute git commands like:
                       }
                       setForceExpandSection('agent-context');
                     }}
+                    // Plan approval
+                    pendingPlanApprovalIds={(() => {
+                      const ids = new Set<string>();
+                      for (const [reqId, data] of pendingPlanApprovals.entries()) {
+                        if (data.agentId === taskSessionId || data.sessionKey === taskSessionId) {
+                          ids.add(reqId);
+                        }
+                      }
+                      return ids;
+                    })()}
+                    onPlanApprovalResponse={respondToPlanApproval}
                   />
                 );
               })()}
@@ -11745,6 +11930,9 @@ You have access to all Bash tools to execute git commands like:
 
       {/* Update notification toast — checks GitHub releases on mount */}
       <UpdateToast />
+
+      {/* Live support chat widget */}
+      <SupportChatWidget />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>
