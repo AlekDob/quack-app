@@ -45,7 +45,7 @@
   align-items: flex-start;
   gap: 1rem;
   padding: 1rem 1.5rem;
-  /* Pink gradient background for Commands - matching AddonsDrawer */
+  /* Pink gradient background for Commands - matching Quack Store */
   background: linear-gradient(135deg, rgba(244, 114, 182, 0.06) 0%, rgba(236, 72, 153, 0.04) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -61,7 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Pink gradient for Commands - matching AddonsDrawer */
+  /* Pink gradient for Commands - matching Quack Store */
   background: linear-gradient(135deg, #f472b6, #ec4899);
   border: none;
   color: white;
@@ -115,7 +115,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0.1875rem 0.5rem;
-  /* Pink for Commands - matching AddonsDrawer */
+  /* Pink for Commands - matching Quack Store */
   background: rgba(244, 114, 182, 0.12);
   border: 1px solid rgba(244, 114, 182, 0.2);
   border-radius: 4px;
@@ -223,7 +223,7 @@
 }
 
 .command-viewer-icon-button.command-viewer-edit:hover:not(:disabled) {
-  /* Pink for Commands - matching AddonsDrawer */
+  /* Pink for Commands - matching Quack Store */
   background: rgba(244, 114, 182, 0.12);
   border-color: rgba(244, 114, 182, 0.3);
   color: #f472b6;
@@ -308,7 +308,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 2rem;
-  /* Pink gradient for Commands - matching AddonsDrawer */
+  /* Pink gradient for Commands - matching Quack Store */
   background: linear-gradient(135deg, rgba(244, 114, 182, 0.08) 0%, rgba(236, 72, 153, 0.06) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -365,7 +365,7 @@
 }
 
 .command-viewer-save {
-  /* Pink gradient for Commands - matching AddonsDrawer */
+  /* Pink gradient for Commands - matching Quack Store */
   background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%);
   border: none;
   color: white;
@@ -434,7 +434,7 @@
 .command-viewer-input:focus,
 .command-viewer-textarea:focus {
   outline: none;
-  /* Pink for Commands - matching AddonsDrawer */
+  /* Pink for Commands - matching Quack Store */
   border-color: rgba(244, 114, 182, 0.5);
   background: rgba(0, 0, 0, 0.35);
   box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.1);
@@ -492,7 +492,7 @@
 }
 
 .command-viewer-radio-label input[type="radio"]:checked {
-  /* Pink for Commands - matching AddonsDrawer */
+  /* Pink for Commands - matching Quack Store */
   border-color: #f472b6;
   background: #f472b6;
 }
@@ -516,13 +516,13 @@
 }
 
 .command-viewer-radio-label:has(input:checked) {
-  /* Pink for Commands - matching AddonsDrawer */
+  /* Pink for Commands - matching Quack Store */
   background: rgba(244, 114, 182, 0.12);
   border-color: rgba(244, 114, 182, 0.35);
 }
 
 .command-viewer-radio-label:has(input:checked) span {
-  /* Pink for Commands - matching AddonsDrawer */
+  /* Pink for Commands - matching Quack Store */
   color: #f472b6;
   font-weight: 600;
 }

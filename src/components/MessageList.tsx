@@ -32,9 +32,12 @@ interface MessageListProps {
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
   // Open Agent Personality panel
   onOpenPersonality?: () => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality, pendingPlanApprovalIds, onPlanApprovalResponse }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -238,6 +241,8 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
                 showThinkingBlocks={showThinkingBlocks}
                 onRewindFiles={onRewindFiles}
                 onOpenImageTab={onOpenImageTab}
+                pendingPlanApprovalIds={pendingPlanApprovalIds}
+                onPlanApprovalResponse={onPlanApprovalResponse}
               />
             </div>
         ))}

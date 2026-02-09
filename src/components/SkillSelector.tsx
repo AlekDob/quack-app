@@ -17,7 +17,7 @@ interface SkillSelectorProps {
   onSkillsChange: (skills: string[]) => void;
 }
 
-// Star icon for skills - same as AddonsDrawer
+// Star icon for skills - same as Quack Store
 function SkillStarIcon() {
   return (
     <svg viewBox="0 0 20 20" className="skill-star-icon">

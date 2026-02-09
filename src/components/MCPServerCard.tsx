@@ -87,7 +87,7 @@ export default function MCPServerCard({
       style={{ opacity: server.enabled ? 1 : 0.5 }}
       onClick={() => onEdit(server)}
     >
-      {/* Type icon - MCP green gradient background with white icon (matches AddonsDrawer) */}
+      {/* Type icon - MCP green gradient background with white icon (matches Quack Store) */}
       <div
         className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
         style={{ background: 'linear-gradient(135deg, #34d399, #10b981)' }}

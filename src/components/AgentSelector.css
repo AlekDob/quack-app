@@ -581,3 +581,46 @@
   border-color: rgba(99, 179, 237, 0.4);
   color: rgba(99, 179, 237, 1);
 }
+
+/* Skeleton loading cards */
+.skeleton-card {
+  pointer-events: none;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line {
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-name {
+  width: 120px;
+  height: 14px;
+  margin-bottom: 6px;
+}
+
+.skeleton-role {
+  width: 90px;
+  height: 11px;
+  margin-bottom: 4px;
+}
+
+.skeleton-style {
+  width: 70px;
+  height: 9px;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}

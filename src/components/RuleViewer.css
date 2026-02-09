@@ -45,7 +45,7 @@
   align-items: flex-start;
   gap: 1rem;
   padding: 1rem 1.5rem;
-  /* Blue gradient for Rules - matching AddonsDrawer */
+  /* Blue gradient for Rules - matching Quack Store */
   background: linear-gradient(135deg, rgba(96, 165, 250, 0.06) 0%, rgba(59, 130, 246, 0.04) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -61,7 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Blue gradient for Rules - matching AddonsDrawer */
+  /* Blue gradient for Rules - matching Quack Store */
   background: linear-gradient(135deg, #60a5fa, #3b82f6);
   border: none;
   color: white;
@@ -114,7 +114,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0.1875rem 0.5rem;
-  /* Blue for Rules - matching AddonsDrawer */
+  /* Blue for Rules - matching Quack Store */
   background: rgba(96, 165, 250, 0.12);
   border: 1px solid rgba(96, 165, 250, 0.2);
   border-radius: 4px;
@@ -214,7 +214,7 @@
 }
 
 .rule-viewer-icon-button.rule-viewer-edit:hover:not(:disabled) {
-  /* Blue for Rules - matching AddonsDrawer */
+  /* Blue for Rules - matching Quack Store */
   background: rgba(96, 165, 250, 0.12);
   border-color: rgba(96, 165, 250, 0.3);
   color: #60a5fa;
@@ -299,7 +299,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 2rem;
-  /* Blue gradient for Rules - matching AddonsDrawer */
+  /* Blue gradient for Rules - matching Quack Store */
   background: linear-gradient(135deg, rgba(96, 165, 250, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -356,7 +356,7 @@
 }
 
 .rule-viewer-save {
-  /* Blue gradient for Rules - matching AddonsDrawer */
+  /* Blue gradient for Rules - matching Quack Store */
   background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
   border: none;
   color: white;
@@ -417,7 +417,7 @@
 
 .rule-viewer-input:focus {
   outline: none;
-  /* Blue for Rules - matching AddonsDrawer */
+  /* Blue for Rules - matching Quack Store */
   border-color: rgba(96, 165, 250, 0.5);
   background: rgba(0, 0, 0, 0.35);
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
@@ -474,7 +474,7 @@
 }
 
 .rule-viewer-radio-label input[type="radio"]:checked {
-  /* Blue for Rules - matching AddonsDrawer */
+  /* Blue for Rules - matching Quack Store */
   border-color: #60a5fa;
   background: #60a5fa;
 }
@@ -498,13 +498,13 @@
 }
 
 .rule-viewer-radio-label:has(input:checked) {
-  /* Blue for Rules - matching AddonsDrawer */
+  /* Blue for Rules - matching Quack Store */
   background: rgba(96, 165, 250, 0.12);
   border-color: rgba(96, 165, 250, 0.35);
 }
 
 .rule-viewer-radio-label:has(input:checked) span {
-  /* Blue for Rules - matching AddonsDrawer */
+  /* Blue for Rules - matching Quack Store */
   color: #60a5fa;
   font-weight: 600;
 }

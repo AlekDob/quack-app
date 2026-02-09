@@ -1,4 +1,4 @@
-/* SkillViewer.css - Matching AddonsDrawer style */
+/* SkillViewer.css - Matching Quack Store style */
 
 .skill-viewer {
   display: flex;
@@ -33,7 +33,7 @@
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  /* Orange gradient for Skills - matching AddonsDrawer */
+  /* Orange gradient for Skills - matching Quack Store */
   background: linear-gradient(135deg, rgba(242, 140, 82, 0.06) 0%, rgba(230, 115, 57, 0.04) 100%);
 }
 
@@ -46,7 +46,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Orange gradient for Skills - matching AddonsDrawer */
+  /* Orange gradient for Skills - matching Quack Store */
   background: linear-gradient(135deg, #f28c52, #e67339);
 }
 
@@ -161,7 +161,7 @@
 }
 
 .skill-viewer-icon-button.skill-viewer-edit:hover:not(:disabled) {
-  /* Orange for Skills - matching AddonsDrawer */
+  /* Orange for Skills - matching Quack Store */
   background: rgba(242, 140, 82, 0.12);
   border-color: rgba(242, 140, 82, 0.3);
   color: #f28c52;

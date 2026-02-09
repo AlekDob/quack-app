@@ -198,6 +198,127 @@
   height: 14px;
 }
 
+/* Pending approval state */
+.plan-widget-pending {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.15);
+}
+
+.plan-widget-badge-pending {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Plan approval actions */
+.plan-approval-actions {
+  width: 100%;
+}
+
+.plan-approval-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plan-approval-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.plan-approval-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.plan-approval-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.plan-approve-btn {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+.plan-approve-btn:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);
+}
+
+.plan-reject-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.plan-reject-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.plan-cancel-btn {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.2);
+}
+
+.plan-cancel-btn:hover {
+  background: rgba(100, 116, 139, 0.2);
+}
+
+/* Feedback input row */
+.plan-feedback-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-feedback-input {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.05);
+  color: inherit;
+  outline: none;
+}
+
+.plan-feedback-input:focus {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.plan-feedback-input::placeholder {
+  color: #94a3b8;
+}
+
+/* Approved state */
+.plan-widget-approved {
+  color: #22c55e !important;
+}
+
+.plan-widget-approved svg {
+  color: #22c55e !important;
+}
+
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .plan-widget {
@@ -258,5 +379,19 @@
 
   .plan-widget-info {
     color: #94a3b8;
+  }
+
+  .plan-widget-pending {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 2px 12px rgba(245, 158, 11, 0.2);
+  }
+
+  .plan-approval-label {
+    color: #94a3b8;
+  }
+
+  .plan-feedback-input {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.4);
   }
 }

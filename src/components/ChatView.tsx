@@ -134,6 +134,9 @@ interface ChatViewProps {
   onOpenInQuack?: (filePath: string) => void;
   // Open Agent Personality panel in sidebar
   onOpenPersonality?: () => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
 export default function ChatView({
@@ -215,6 +218,8 @@ export default function ChatView({
   onRewindFiles,
   onOpenInQuack,
   onOpenPersonality,
+  pendingPlanApprovalIds,
+  onPlanApprovalResponse,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -670,6 +675,8 @@ export default function ChatView({
         onRewindFiles={onRewindFiles}
         onOpenImageTab={onOpenImageTab}
         onOpenPersonality={onOpenPersonality}
+        pendingPlanApprovalIds={pendingPlanApprovalIds}
+        onPlanApprovalResponse={onPlanApprovalResponse}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar

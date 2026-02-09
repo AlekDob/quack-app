@@ -217,7 +217,7 @@ export default function SkillsPanel({
                         draggable
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
-                        {/* Star Icon - Orange gradient background with white icon (matches AddonsDrawer) */}
+                        {/* Star Icon - Orange gradient background with white icon (matches Quack Store) */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f28c52, #e67339)' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
@@ -271,7 +271,7 @@ export default function SkillsPanel({
                         draggable
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
-                        {/* Star Icon - Orange gradient background with white icon (matches AddonsDrawer) */}
+                        {/* Star Icon - Orange gradient background with white icon (matches Quack Store) */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f28c52, #e67339)' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
