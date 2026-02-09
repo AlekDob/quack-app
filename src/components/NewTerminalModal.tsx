@@ -67,7 +67,7 @@ interface NewTerminalModalProps {
   /** @deprecated Starter bundles now handled via Quack Store */
   isOnboarding?: boolean
   /** @deprecated Starter bundles now handled via Quack Store */
-  onInstallStarterBundles?: (bundles: unknown[], projectPath: string, projectName: string) => Promise<void>
+  onInstallStarterBundles?: (bundles: Array<{ resource: import('../types').MarketplaceResource; template: import('../types').AgentTemplate }>, projectPath: string, projectName: string) => Promise<void>
 }
 
 function NewTerminalModal({
