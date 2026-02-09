@@ -28,6 +28,7 @@ mod notifications;
 mod native_terminal;
 mod personality;
 mod plugins;
+mod prerequisites; // ✅ Prerequisites checker (Git, Node.js, Claude CLI)
 mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
 mod preferences;
 mod preview;
@@ -952,8 +953,14 @@ pub fn run() {
             git::git_has_uncommitted_changes,
             git::git_get_remote_url,
             git::git_uncommitted_files_count,
+            git::git_get_user_config,
+            git::git_set_user_config,
             git::is_git_repository,
             git::git_init,
+            prerequisites::check_prerequisites,
+            prerequisites::install_claude_cli,
+            prerequisites::check_claude_auth_status,
+            prerequisites::open_claude_login_terminal,
             preview::create_preview_webview,
             preview::update_preview_webview_position,
             preview::destroy_preview_webview,

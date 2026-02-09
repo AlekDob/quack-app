@@ -90,6 +90,8 @@ import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
 import { useDroidFactory } from "./hooks/useDroidFactory";
+import PrerequisitesCheck from "./components/settings/PrerequisitesCheck";
+import GitConfigOnboarding from "./components/settings/GitConfigOnboarding";
 import IDEOnboarding from "./components/settings/IDEOnboarding";
 import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
@@ -11752,7 +11754,13 @@ You have access to all Bash tools to execute git commands like:
         limitType={upgradeLimitType}
       />
 
-      {/* IDE Onboarding - First-run dialog to select preferred IDE */}
+      {/* Prerequisites Check - FIRST: Check Git, Node.js, Claude CLI installation */}
+      <PrerequisitesCheck />
+
+      {/* Git Config Onboarding - SECOND: Configure Git user.name and user.email */}
+      <GitConfigOnboarding />
+
+      {/* IDE Onboarding - THIRD: Select preferred IDE */}
       <IDEOnboarding />
 
       {/* Terminal Window - Now opens as separate Tauri window via useTerminalWindowManager */}

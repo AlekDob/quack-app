@@ -1323,3 +1323,81 @@ fn git_uncommitted_files_count_impl(root_path: Option<String>) -> Result<usize> 
 
     Ok(count)
 }
+
+#[derive(Serialize, Clone)]
+pub struct GitUserConfig {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+
+#[tauri::command]
+pub fn git_get_user_config() -> Result<GitUserConfig, String> {
+    git_get_user_config_impl().map_err(|err| err.to_string())
+}
+
+fn git_get_user_config_impl() -> Result<GitUserConfig> {
+    // Get user.name from global git config
+    let name = Command::new("git")
+        .args(["config", "--global", "--get", "user.name"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            }
+        });
+
+    // Get user.email from global git config
+    let email = Command::new("git")
+        .args(["config", "--global", "--get", "user.email"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            }
+        });
+
+    Ok(GitUserConfig { name, email })
+}
+
+#[tauri::command]
+pub fn git_set_user_config(name: String, email: String) -> Result<(), String> {
+    git_set_user_config_impl(name, email).map_err(|err| err.to_string())
+}
+
+fn git_set_user_config_impl(name: String, email: String) -> Result<()> {
+    // Set user.name in global git config
+    let name_output = Command::new("git")
+        .args(["config", "--global", "user.name", &name])
+        .output()
+        .context("Failed to execute git config command for user.name")?;
+
+    if !name_output.status.success() {
+        let stderr = String::from_utf8_lossy(&name_output.stderr);
+        return Err(anyhow!("Failed to set user.name: {}", stderr));
+    }
+
+    // Set user.email in global git config
+    let email_output = Command::new("git")
+        .args(["config", "--global", "user.email", &email])
+        .output()
+        .context("Failed to execute git config command for user.email")?;
+
+    if !email_output.status.success() {
+        let stderr = String::from_utf8_lossy(&email_output.stderr);
+        return Err(anyhow!("Failed to set user.email: {}", stderr));
+    }
+
+    Ok(())
+}

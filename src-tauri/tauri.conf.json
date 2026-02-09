@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Quack",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "identifier": "com.quack.terminal",
   "build": {
     "frontendDist": "../dist",
@@ -98,7 +98,8 @@
         "sidebarImage": null,
         "installMode": "currentUser",
         "languages": ["English"],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": "windows/hooks.nsh"
       },
       "wix": null
     }
