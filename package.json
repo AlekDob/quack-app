@@ -44,7 +44,7 @@
     "setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.32",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.37",
     "@anthropic-ai/sdk": "^0.72.1",
     "@codemirror/commands": "^6.10.0",
     "@codemirror/lang-css": "^6.3.1",

@@ -48,7 +48,7 @@ Quack is a multi-agentic Tauri desktop app with integrated terminals, file explo
 - Real users depend on stability and quality
 
 **Tech Stack:** Tauri 2.8.5, React 19.1.1, TypeScript 5.8.3, Rust 1.77.2, xterm.js 5.5.0, Monaco Editor, Vite 7.1.7
-**AI/SDK:** Claude Agent SDK 0.2.1, Anthropic SDK 0.71.0 (see `docs/04-build-setup/claude-agent-sdk-upgrade-0.2.1.md`)
+**AI/SDK:** Claude Agent SDK 0.2.37, Anthropic SDK 0.71.0
 **Testing:** Vitest 4.0.10 (unit & integration tests)
 
 **📖 Documentation Hub:** All project documentation is in `/docs` - see `docs/README.md` for complete index
