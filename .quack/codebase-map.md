@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-07T17:15:06Z
-files: 402
-exports: 1175
+generated: 2026-02-09T17:11:05Z
+files: 403
+exports: 1176
 ---
 
 # Codebase Map
@@ -66,7 +66,7 @@ exports: 1175
 - export default fn `AgentRulesBanner()`
 
 ## src/components/AgentSelector.tsx
-- export default fn `AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps)`
+- export default fn `AgentSelector()`
 
 ## src/components/AgentSessionItem.tsx
 - export default `memo(AgentSessionItem)`
@@ -674,6 +674,9 @@ exports: 1175
 
 ## src/components/SidePanel.tsx
 - export default fn `SidePanel()`
+
+## src/components/SidePanelAccordion.tsx
+- export default fn `SidePanelAccordion()`
 
 ## src/components/SkeletonMessage.tsx
 - export default fn `SkeletonMessage()`
