@@ -39,6 +39,19 @@ export interface PrerequisitesState {
 }
 
 // =============================================================================
+// Test Mode: simulate all prerequisites as missing
+// =============================================================================
+
+const IS_TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
+
+const MOCK_PREREQUISITES: PrerequisitesCheck = {
+  git: { name: 'Git', installed: false, version: null, download_url: 'https://git-scm.com/downloads' },
+  nodejs: { name: 'Node.js', installed: false, version: null, download_url: 'https://nodejs.org/en/download' },
+  claude_cli: { name: 'Claude Code CLI', installed: false, version: null, download_url: null },
+  all_installed: false,
+};
+
+// =============================================================================
 // Store
 // =============================================================================
 
@@ -58,6 +71,18 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
       checkPrerequisites: async () => {
         set({ isChecking: true });
 
+        // Test mode: simulate everything as not installed
+        if (IS_TEST_MODE) {
+          console.warn('[Prerequisites] TEST MODE: simulating all prerequisites as missing');
+          set({
+            prerequisites: MOCK_PREREQUISITES,
+            isChecking: false,
+            isLoggedIn: false,
+            isLoggingIn: false,
+          });
+          return;
+        }
+
         try {
           const result = await invoke<PrerequisitesCheck>('check_prerequisites');
 
@@ -76,7 +101,6 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
             isChecking: false,
             isLoggedIn,
             isLoggingIn: false,
-            // Never auto-complete: always show the screen so the user can review and click Continue
           });
         } catch (error) {
           console.error('[Prerequisites Store] Failed to check prerequisites:', error);
