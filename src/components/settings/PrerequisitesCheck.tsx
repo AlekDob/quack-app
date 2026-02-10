@@ -54,10 +54,13 @@ export default function PrerequisitesCheck() {
   };
 
   const handleContinue = () => {
-    if (prerequisites?.all_installed && isLoggedIn) {
-      completeOnboarding();
-      handleClose();
-    }
+    completeOnboarding();
+    handleClose();
+  };
+
+  const handleSkip = () => {
+    completeOnboarding();
+    handleClose();
   };
 
   const handleClose = () => {
@@ -71,7 +74,7 @@ export default function PrerequisitesCheck() {
     window.open(url, '_blank');
   };
 
-  const canContinue = (prerequisites?.all_installed ?? false) && isLoggedIn;
+  const allReady = (prerequisites?.all_installed ?? false) && isLoggedIn;
 
   return (
     <div className={`prerequisites-overlay ${isClosing ? 'closing' : ''}`}>
@@ -290,23 +293,34 @@ export default function PrerequisitesCheck() {
           >
             {isChecking ? 'Checking...' : 'Re-check'}
           </button>
-          <button
-            className="prerequisites-continue"
-            onClick={handleContinue}
-            disabled={!canContinue}
-          >
-            Continue
-          </button>
+          {allReady ? (
+            <button
+              className="prerequisites-continue"
+              onClick={handleContinue}
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              className="prerequisites-skip"
+              onClick={handleSkip}
+              title="Skip and configure later"
+            >
+              Skip for now
+            </button>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="prerequisites-footer">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="7" cy="7" r="5.5" />
-            <path d="M7 4.5v3M7 9.5h.01" strokeLinecap="round" />
-          </svg>
-          <span>All components must be installed and authenticated to continue</span>
-        </div>
+        {!allReady && (
+          <div className="prerequisites-footer">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="7" cy="7" r="5.5" />
+              <path d="M7 4.5v3M7 9.5h.01" strokeLinecap="round" />
+            </svg>
+            <span>Some features may not work without all components installed</span>
+          </div>
+        )}
       </div>
     </div>
   );

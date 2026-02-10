@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::path::PathBuf;
+use std::env;
 use anyhow::{Result, Context};
 use serde::Serialize;
 
@@ -24,6 +25,48 @@ pub fn check_prerequisites() -> Result<PrerequisitesCheck, String> {
     check_prerequisites_impl().map_err(|err| err.to_string())
 }
 
+/// Build extended PATH for macOS app bundles.
+/// When launched as .app, Tauri processes don't inherit the user's shell PATH,
+/// so tools installed via Homebrew, nvm, volta, fnm, etc. are invisible.
+fn get_extended_path() -> String {
+    let current = env::var("PATH").unwrap_or_default();
+    let home = dirs::home_dir().unwrap_or_default();
+
+    let extra_dirs: Vec<String> = vec![
+        // Homebrew (Apple Silicon + Intel)
+        "/opt/homebrew/bin".to_string(),
+        "/usr/local/bin".to_string(),
+        // nvm
+        home.join(".nvm/versions/node").to_string_lossy().to_string(),
+        // volta
+        home.join(".volta/bin").to_string_lossy().to_string(),
+        // fnm
+        home.join(".local/share/fnm/aliases/default/bin").to_string_lossy().to_string(),
+        home.join("Library/Application Support/fnm/aliases/default/bin").to_string_lossy().to_string(),
+        // n (tj/n)
+        "/usr/local/n/versions/node".to_string(),
+        // asdf
+        home.join(".asdf/shims").to_string_lossy().to_string(),
+        // mise/rtx
+        home.join(".local/share/mise/shims").to_string_lossy().to_string(),
+        // pnpm global
+        home.join(".local/share/pnpm").to_string_lossy().to_string(),
+        // User local bin
+        home.join(".local/bin").to_string_lossy().to_string(),
+    ];
+
+    let mut parts: Vec<String> = extra_dirs;
+    parts.push(current);
+    parts.join(":")
+}
+
+/// Create a Command with extended PATH so tools are found in macOS .app bundles
+fn command_with_path(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.env("PATH", get_extended_path());
+    cmd
+}
+
 fn check_prerequisites_impl() -> Result<PrerequisitesCheck> {
     let git = check_git()?;
     let nodejs = check_nodejs()?;
@@ -40,7 +83,7 @@ fn check_prerequisites_impl() -> Result<PrerequisitesCheck> {
 }
 
 fn check_git() -> Result<PrerequisiteStatus> {
-    let output = Command::new("git")
+    let output = command_with_path("git")
         .arg("--version")
         .output();
 
@@ -68,37 +111,118 @@ fn check_git() -> Result<PrerequisiteStatus> {
     }
 }
 
+/// Find the node executable, checking extended PATH and common install locations
+fn find_node_executable() -> Option<(PathBuf, String)> {
+    // 1. Try "node" with extended PATH
+    if let Ok(output) = command_with_path("node").arg("--version").output() {
+        if output.status.success() {
+            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            return Some((PathBuf::from("node"), version));
+        }
+    }
+
+    // 2. Check common installation paths on macOS
+    if let Some(home) = dirs::home_dir() {
+        let static_paths = vec![
+            // Homebrew (Apple Silicon)
+            PathBuf::from("/opt/homebrew/bin/node"),
+            // Homebrew (Intel)
+            PathBuf::from("/usr/local/bin/node"),
+            // volta
+            home.join(".volta/bin/node"),
+            // asdf shims
+            home.join(".asdf/shims/node"),
+            // mise shims
+            home.join(".local/share/mise/shims/node"),
+        ];
+
+        for path in &static_paths {
+            if path.exists() {
+                if let Ok(output) = Command::new(path).arg("--version").output() {
+                    if output.status.success() {
+                        let version = String::from_utf8_lossy(&output.stdout)
+                            .trim().to_string();
+                        return Some((path.clone(), version));
+                    }
+                }
+            }
+        }
+
+        // 3. Search nvm directories (version-specific paths)
+        let nvm_dir = home.join(".nvm/versions/node");
+        if nvm_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
+                let mut versions: Vec<PathBuf> = entries
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.path().join("bin/node"))
+                    .filter(|p| p.exists())
+                    .collect();
+                // Sort descending to pick the latest version
+                versions.sort();
+                versions.reverse();
+                for node_path in versions {
+                    if let Ok(output) = Command::new(&node_path).arg("--version").output() {
+                        if output.status.success() {
+                            let version = String::from_utf8_lossy(&output.stdout)
+                                .trim().to_string();
+                            return Some((node_path, version));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Search fnm directories
+        let fnm_dirs = vec![
+            home.join(".local/share/fnm/aliases/default/bin/node"),
+            home.join("Library/Application Support/fnm/aliases/default/bin/node"),
+        ];
+        for path in &fnm_dirs {
+            if path.exists() {
+                if let Ok(output) = Command::new(path).arg("--version").output() {
+                    if output.status.success() {
+                        let version = String::from_utf8_lossy(&output.stdout)
+                            .trim().to_string();
+                        return Some((path.clone(), version));
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 fn check_nodejs() -> Result<PrerequisiteStatus> {
-    let output = Command::new("node")
-        .arg("--version")
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            let version = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
-
+    match find_node_executable() {
+        Some((_path, version)) => Ok(PrerequisiteStatus {
+            name: "Node.js".to_string(),
+            installed: true,
+            version: Some(version),
+            download_url: None,
+        }),
+        None => {
+            let download_url = if cfg!(target_os = "macos") {
+                "https://nodejs.org/en/download"
+            } else if cfg!(target_os = "windows") {
+                "https://nodejs.org/en/download"
+            } else {
+                "https://nodejs.org/en/download"
+            };
             Ok(PrerequisiteStatus {
                 name: "Node.js".to_string(),
-                installed: true,
-                version: Some(version),
-                download_url: None,
+                installed: false,
+                version: None,
+                download_url: Some(download_url.to_string()),
             })
         }
-        _ => Ok(PrerequisiteStatus {
-            name: "Node.js".to_string(),
-            installed: false,
-            version: None,
-            download_url: Some("https://nodejs.org/".to_string()),
-        }),
     }
 }
 
 /// Find the claude CLI executable, checking PATH and common install locations
 fn find_claude_executable() -> Option<PathBuf> {
-    // 1. Try "claude" directly from PATH
-    if let Ok(output) = Command::new("claude").arg("--version").output() {
+    // 1. Try "claude" with extended PATH
+    if let Ok(output) = command_with_path("claude").arg("--version").output() {
         if output.status.success() {
             return Some(PathBuf::from("claude"));
         }
@@ -183,7 +307,7 @@ fn check_claude_cli() -> Result<PrerequisiteStatus> {
     }
 
     // Fallback: try npm list as last resort
-    if let Ok(npm_output) = Command::new("npm")
+    if let Ok(npm_output) = command_with_path("npm")
         .args(["list", "-g", "@anthropic-ai/claude-code", "--depth=0"])
         .output()
     {
@@ -219,7 +343,7 @@ pub fn install_claude_cli() -> Result<String, String> {
 }
 
 fn install_claude_cli_impl() -> Result<String> {
-    let output = Command::new("npm")
+    let output = command_with_path("npm")
         .args(["install", "-g", "@anthropic-ai/claude-code"])
         .output()
         .context("Failed to execute npm install command")?;
