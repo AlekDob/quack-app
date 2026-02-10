@@ -183,9 +183,14 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
 // Selectors
 // =============================================================================
 
+// Session-level flag: reset onboarding at startup in test mode
+let testModeInitialized = false;
+
 export const selectShouldShowPrerequisites = (state: PrerequisitesState): boolean => {
-  // In test mode, always show prerequisites check for testing
-  if (import.meta.env.VITE_TEST_MODE === 'true') {
+  // In test mode, reset onboarding once per session so the dialog shows
+  if (import.meta.env.VITE_TEST_MODE === 'true' && !testModeInitialized) {
+    testModeInitialized = true;
+    usePrerequisitesStore.getState().resetOnboarding();
     return true;
   }
   return !state.hasCompletedOnboarding;

@@ -70,10 +70,6 @@ export default function PrerequisitesCheck() {
     }, 250);
   };
 
-  const handleOpenURL = (url: string) => {
-    window.open(url, '_blank');
-  };
-
   const allReady = (prerequisites?.all_installed ?? false) && isLoggedIn;
 
   return (
@@ -123,13 +119,8 @@ export default function PrerequisitesCheck() {
                     <div className="prerequisite-version">{prerequisites.git.version}</div>
                   )}
                 </div>
-                {!prerequisites.git.installed && prerequisites.git.download_url && (
-                  <button
-                    className="prerequisite-action"
-                    onClick={() => handleOpenURL(prerequisites.git.download_url!)}
-                  >
-                    Download
-                  </button>
+                {!prerequisites.git.installed && (
+                  <span className="prerequisite-hint">xcode-select --install</span>
                 )}
               </div>
 
@@ -154,13 +145,8 @@ export default function PrerequisitesCheck() {
                     <div className="prerequisite-version">{prerequisites.nodejs.version}</div>
                   )}
                 </div>
-                {!prerequisites.nodejs.installed && prerequisites.nodejs.download_url && (
-                  <button
-                    className="prerequisite-action"
-                    onClick={() => handleOpenURL(prerequisites.nodejs.download_url!)}
-                  >
-                    Download
-                  </button>
+                {!prerequisites.nodejs.installed && (
+                  <span className="prerequisite-hint">brew install node</span>
                 )}
               </div>
 

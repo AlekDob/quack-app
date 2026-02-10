@@ -159,6 +159,16 @@
   font-family: 'Courier New', monospace;
 }
 
+.prerequisite-hint {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+  user-select: all;
+}
+
 .prerequisite-action {
   padding: 6px 12px;
   background: linear-gradient(135deg, #f28c52, #e67a42);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { homeDir } from '@tauri-apps/api/path';
+import { homeDir, join } from '@tauri-apps/api/path';
 import type { MarketplaceResource, MarketplaceCategory, MarketplaceFilters, MarketplaceLibrary, AgentTemplate } from '../types';
 import { createAgent, type UnifiedAgent } from '../services/unifiedAgentStorage';
 import { getRandomGenderedName, getRandomName } from '../utils/agentNames';
@@ -274,8 +274,7 @@ export function useMarketplace() {
   // Check which resources are installed locally
   const checkInstalledResources = async (allResources: MarketplaceResource[]) => {
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      const home = await homeDir();
       const installed: MarketplaceResource[] = [];
 
       for (const resource of allResources) {
@@ -290,16 +289,16 @@ export function useMarketplace() {
         let checkPath = '';
         if (ext._skillPath) {
           const skillName = ext._skillPath.split('/').pop() || '';
-          checkPath = `${home}.claude/skills/${skillName}/SKILL.md`;
+          checkPath = await join(home, '.claude', 'skills', skillName, 'SKILL.md');
         } else if (ext._commandPath) {
           const cmdFile = ext._commandPath.split('/').pop() || '';
-          checkPath = `${home}.claude/commands/${cmdFile}`;
+          checkPath = await join(home, '.claude', 'commands', cmdFile);
         } else if (ext._agentPath) {
           const agentFile = ext._agentPath.split('/').pop() || '';
-          checkPath = `${home}.claude/agents/${agentFile}`;
+          checkPath = await join(home, '.claude', 'agents', agentFile);
         } else if (ext._rulePath) {
           const ruleFile = ext._rulePath.split('/').pop() || '';
-          checkPath = `${home}.claude/rules/${ruleFile}`;
+          checkPath = await join(home, '.claude', 'rules', ruleFile);
         }
 
         if (checkPath) {
@@ -373,11 +372,10 @@ export function useMarketplace() {
       // Determine base path based on scope
       let basePath: string;
       if (scope === 'project' && projectPath) {
-        basePath = projectPath.endsWith('/') ? `${projectPath}.claude` : `${projectPath}/.claude`;
+        basePath = await join(projectPath, '.claude');
       } else {
-        let home = await homeDir();
-        if (!home.endsWith('/')) home += '/';
-        basePath = `${home}.claude`;
+        const home = await homeDir();
+        basePath = await join(home, '.claude');
       }
 
       if (ext._skillPath && ext._pluginSource) {
@@ -390,8 +388,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/skills/{skillName}/SKILL.md
-        const targetDir = `${basePath}/skills/${skillName}`;
-        const targetPath = `${targetDir}/SKILL.md`;
+        const targetDir = await join(basePath, 'skills', skillName);
+        const targetPath = await join(targetDir, 'SKILL.md');
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -409,8 +407,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/commands/{cmdFile}
-        const targetDir = `${basePath}/commands`;
-        const targetPath = `${targetDir}/${cmdFile}`;
+        const targetDir = await join(basePath, 'commands');
+        const targetPath = await join(targetDir, cmdFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -428,8 +426,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/agents/{agentFile}
-        const targetDir = `${basePath}/agents`;
-        const targetPath = `${targetDir}/${agentFile}`;
+        const targetDir = await join(basePath, 'agents');
+        const targetPath = await join(targetDir, agentFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -447,8 +445,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/rules/{ruleFile}
-        const targetDir = `${basePath}/rules`;
-        const targetPath = `${targetDir}/${ruleFile}`;
+        const targetDir = await join(basePath, 'rules');
+        const targetPath = await join(targetDir, ruleFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -487,24 +485,23 @@ export function useMarketplace() {
     };
 
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      const home = await homeDir();
 
       if (ext._skillPath) {
         const skillName = ext._skillPath.split('/').pop() || '';
-        const targetDir = `${home}.claude/skills/${skillName}`;
+        const targetDir = await join(home, '.claude', 'skills', skillName);
         await invoke('remove_directory', { path: targetDir });
       } else if (ext._commandPath) {
         const cmdFile = ext._commandPath.split('/').pop() || '';
-        const targetPath = `${home}.claude/commands/${cmdFile}`;
+        const targetPath = await join(home, '.claude', 'commands', cmdFile);
         await invoke('remove_file', { path: targetPath });
       } else if (ext._agentPath) {
         const agentFile = ext._agentPath.split('/').pop() || '';
-        const targetPath = `${home}.claude/agents/${agentFile}`;
+        const targetPath = await join(home, '.claude', 'agents', agentFile);
         await invoke('remove_file', { path: targetPath });
       } else if (ext._rulePath) {
         const ruleFile = ext._rulePath.split('/').pop() || '';
-        const targetPath = `${home}.claude/rules/${ruleFile}`;
+        const targetPath = await join(home, '.claude', 'rules', ruleFile);
         await invoke('remove_file', { path: targetPath });
       }
 
@@ -578,10 +575,9 @@ export function useMarketplace() {
                 if (!res.ok) continue;
                 const content = await res.text();
 
-                let home = await homeDir();
-                if (!home.endsWith('/')) home += '/';
-                const targetDir = `${home}.claude/skills/${skillName}`;
-                const targetPath = `${targetDir}/SKILL.md`;
+                const home = await homeDir();
+                const targetDir = await join(home, '.claude', 'skills', skillName);
+                const targetPath = await join(targetDir, 'SKILL.md');
 
                 try {
                   await invoke('create_directory', { path: targetDir });
@@ -609,10 +605,9 @@ export function useMarketplace() {
                 if (!res.ok) continue;
                 const content = await res.text();
 
-                let home = await homeDir();
-                if (!home.endsWith('/')) home += '/';
-                const targetDir = `${home}.claude/rules`;
-                const targetPath = `${targetDir}/${ruleFile}`;
+                const home = await homeDir();
+                const targetDir = await join(home, '.claude', 'rules');
+                const targetPath = await join(targetDir, ruleFile);
 
                 try {
                   await invoke('create_directory', { path: targetDir });

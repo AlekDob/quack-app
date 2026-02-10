@@ -37,9 +37,6 @@ export default function StoreItemCard({
         <div className="store-item-meta">
           {resource.author} · v{resource.version}
         </div>
-        <div className="store-item-description">
-          {resource.description}
-        </div>
         <div className="store-item-signals">
           {resource.verified && (
             <span className="store-item-verified">

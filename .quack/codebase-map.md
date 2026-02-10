@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-10T18:27:08Z
-files: 405
-exports: 1183
+generated: 2026-02-10T19:01:57Z
+files: 407
+exports: 1185
 ---
 
 # Codebase Map
@@ -538,6 +538,9 @@ exports: 1183
 ## src/components/QuackAgencySetupWizard.tsx
 - export default fn `QuackAgencySetupWizard()`
 
+## src/components/QuackStoreDrawer.tsx
+- export default fn `QuackStoreDrawer({ onClose, onRefresh }: QuackStoreDrawerProps)`
+
 ## src/components/RepositoryGroup.tsx
 - export default fn `RepositoryGroup()`
 
@@ -721,6 +724,9 @@ exports: 1183
 
 ## src/components/StorageMetrics.tsx
 - export default fn `StorageMetrics({ className }: StorageMetricsProps)`
+
+## src/components/store/StoreItemCard.tsx
+- export default fn `StoreItemCard()`
 
 ## src/components/StreamMessage.tsx
 - export default `memo(StreamMessage)`
