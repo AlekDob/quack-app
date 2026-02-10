@@ -60,10 +60,21 @@ fn get_extended_path() -> String {
     parts.join(":")
 }
 
-/// Create a Command with extended PATH so tools are found in macOS .app bundles
+/// Hide the console window on Windows to prevent command prompts from flashing
+#[cfg(target_os = "windows")]
+fn hide_console_window(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+/// Create a Command with extended PATH so tools are found in macOS .app bundles.
+/// On Windows, also hides the console window to prevent command prompts from flashing.
 fn command_with_path(program: &str) -> Command {
     let mut cmd = Command::new(program);
     cmd.env("PATH", get_extended_path());
+    #[cfg(target_os = "windows")]
+    hide_console_window(&mut cmd);
     cmd
 }
 
@@ -138,7 +149,11 @@ fn find_node_executable() -> Option<(PathBuf, String)> {
 
         for path in &static_paths {
             if path.exists() {
-                if let Ok(output) = Command::new(path).arg("--version").output() {
+                let mut cmd = Command::new(path);
+                cmd.arg("--version");
+                #[cfg(target_os = "windows")]
+                hide_console_window(&mut cmd);
+                if let Ok(output) = cmd.output() {
                     if output.status.success() {
                         let version = String::from_utf8_lossy(&output.stdout)
                             .trim().to_string();
@@ -161,7 +176,11 @@ fn find_node_executable() -> Option<(PathBuf, String)> {
                 versions.sort();
                 versions.reverse();
                 for node_path in versions {
-                    if let Ok(output) = Command::new(&node_path).arg("--version").output() {
+                    let mut cmd = Command::new(&node_path);
+                    cmd.arg("--version");
+                    #[cfg(target_os = "windows")]
+                    hide_console_window(&mut cmd);
+                    if let Ok(output) = cmd.output() {
                         if output.status.success() {
                             let version = String::from_utf8_lossy(&output.stdout)
                                 .trim().to_string();
@@ -179,7 +198,11 @@ fn find_node_executable() -> Option<(PathBuf, String)> {
         ];
         for path in &fnm_dirs {
             if path.exists() {
-                if let Ok(output) = Command::new(path).arg("--version").output() {
+                let mut cmd = Command::new(path);
+                cmd.arg("--version");
+                #[cfg(target_os = "windows")]
+                hide_console_window(&mut cmd);
+                if let Ok(output) = cmd.output() {
                     if output.status.success() {
                         let version = String::from_utf8_lossy(&output.stdout)
                             .trim().to_string();
@@ -232,7 +255,10 @@ fn find_claude_executable() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         for ext in &["claude.exe", "claude.cmd"] {
-            if let Ok(output) = Command::new(ext).arg("--version").output() {
+            let mut cmd = Command::new(ext);
+            cmd.arg("--version");
+            hide_console_window(&mut cmd);
+            if let Ok(output) = cmd.output() {
                 if output.status.success() {
                     return Some(PathBuf::from(ext));
                 }
@@ -270,7 +296,10 @@ fn find_claude_executable() -> Option<PathBuf> {
                 // Use extended PATH: claude is a Node.js wrapper that needs node in PATH
                 let mut cmd = Command::new(path);
                 cmd.env("PATH", get_extended_path());
-                if let Ok(output) = cmd.arg("--version").output() {
+                cmd.arg("--version");
+                #[cfg(target_os = "windows")]
+                hide_console_window(&mut cmd);
+                if let Ok(output) = cmd.output() {
                     if output.status.success() {
                         return Some(path.clone());
                     }
@@ -383,8 +412,11 @@ fn open_claude_login_terminal_impl() -> Result<String> {
     {
         // On Windows, open cmd.exe with claude login command
         // Use "start" to open a new terminal window
-        let output = Command::new("cmd")
-            .args(["/c", "start", "cmd", "/k", "claude login"])
+        // Hide the wrapper command's console window (the new terminal opened by "start" will still be visible)
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/c", "start", "cmd", "/k", "claude login"]);
+        hide_console_window(&mut cmd);
+        let output = cmd
             .output()
             .context("Failed to open terminal on Windows")?;
 
