@@ -27,13 +27,14 @@
 
 /* ===== Dialog ===== */
 .prerequisites-dialog {
-  width: 560px;
+  width: 460px;
   max-width: 90vw;
+  max-height: 90vh;
   background: #0f1115;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  border-radius: 16px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
-  overflow: hidden;
+  overflow: hidden auto;
   display: flex;
   flex-direction: column;
   animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -67,56 +68,61 @@
 
 /* ===== Header ===== */
 .prerequisites-header {
-  padding: 32px 32px 24px;
+  padding: 20px 24px 16px;
   text-align: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .prerequisites-icon {
-  width: 64px;
-  height: 64px;
+  width: 44px;
+  height: 44px;
   background: linear-gradient(135deg, rgba(242, 140, 82, 0.2), rgba(242, 140, 82, 0.1));
-  border-radius: 16px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px;
+  margin: 0 auto 10px;
   color: #f28c52;
 }
 
+.prerequisites-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
 .prerequisites-header h2 {
-  margin: 0 0 8px 0;
-  font-size: 22px;
+  margin: 0 0 4px 0;
+  font-size: 16px;
   font-weight: 700;
   color: #f3f4f6;
 }
 
 .prerequisites-header p {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: #9ca3af;
-  line-height: 1.6;
-  max-width: 450px;
+  line-height: 1.5;
+  max-width: 380px;
   margin: 0 auto;
 }
 
 /* ===== Prerequisites List ===== */
 .prerequisites-list {
-  padding: 24px 32px;
+  padding: 16px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 240px;
+  gap: 8px;
+  min-height: 0;
 }
 
 .prerequisite-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: 10px;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.02);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   transition: all 0.2s ease;
 }
 
@@ -138,36 +144,36 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .prerequisite-name {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: #f3f4f6;
 }
 
 .prerequisite-version {
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
   font-family: 'Courier New', monospace;
 }
 
 .prerequisite-action {
-  padding: 8px 16px;
+  padding: 6px 12px;
   background: linear-gradient(135deg, #f28c52, #e67a42);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: white;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(242, 140, 82, 0.3);
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 100px;
+  gap: 5px;
+  min-width: 80px;
   justify-content: center;
 }
 
@@ -202,16 +208,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 40px;
+  gap: 10px;
+  padding: 24px;
   color: #9ca3af;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .prerequisites-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(242, 140, 82, 0.2);
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(242, 140, 82, 0.2);
   border-top-color: #f28c52;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -245,13 +251,13 @@
 .prerequisites-auth-hint {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 6px;
+  padding: 8px 12px;
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 10px;
+  border-radius: 6px;
   color: #fbbf24;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .prerequisites-auth-hint svg {
@@ -262,13 +268,13 @@
 .prerequisites-error {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 6px;
+  padding: 8px 12px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 10px;
+  border-radius: 6px;
   color: #fca5a5;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .prerequisites-error svg {
@@ -278,19 +284,19 @@
 /* ===== Actions ===== */
 .prerequisites-actions {
   display: flex;
-  gap: 12px;
-  padding: 20px 32px;
+  gap: 8px;
+  padding: 14px 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .prerequisites-refresh {
   flex: 1;
-  padding: 14px 20px;
+  padding: 10px 16px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border-radius: 8px;
   color: #9ca3af;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -308,12 +314,12 @@
 
 .prerequisites-continue {
   flex: 2;
-  padding: 14px 20px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, #f28c52, #e67a42);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   color: white;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -337,9 +343,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 32px 20px;
-  font-size: 12px;
+  gap: 6px;
+  padding: 8px 24px 14px;
+  font-size: 11px;
   color: #6b7280;
 }
 
