@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-09T17:11:05Z
-files: 403
-exports: 1176
+generated: 2026-02-10T18:27:08Z
+files: 405
+exports: 1183
 ---
 
 # Codebase Map
@@ -643,6 +643,9 @@ exports: 1176
 
 ## src/components/settings/IDEOnboarding.tsx
 - export default fn `IDEOnboarding()`
+
+## src/components/settings/PrerequisitesCheck.tsx
+- export default fn `PrerequisitesCheck()`
 
 ## src/components/settings/SettingsContent.tsx
 - export default fn `SettingsContent({ children }: SettingsContentProps)`
@@ -1541,6 +1544,14 @@ exports: 1176
 - export const `usePopoutWindowStore`
 - export fn `generateWindowLabel(tab: Tab): string`
 - export fn `canPopoutTab(tab: Tab): boolean`
+
+## src/stores/prerequisitesStore.ts
+- export type `PrerequisiteStatus { name, installed, version, download_url }`
+- export type `PrerequisitesCheck { git, nodejs, claude_cli, all_installed }`
+- export type `PrerequisitesState { hasCompletedOnboarding, prerequisites, isChecking, isInstalling, isLoggedIn, isCheckingAuth, isLoggingIn, checkPrerequisites, installClaudeCLI, checkAuthStatus, openLoginTerminal, completeOnboarding, resetOnboarding }`
+- export const `usePrerequisitesStore`
+- export fn `selectShouldShowPrerequisites(state: PrerequisitesState): boolean`
+- export fn `selectAllPrerequisitesInstalled(state: PrerequisitesState): boolean`
 
 ## src/stores/sessionStore.ts
 - export fn `shouldArchiveSession(session: AgentSession): boolean`

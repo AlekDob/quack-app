@@ -267,7 +267,10 @@ fn find_claude_executable() -> Option<PathBuf> {
 
         for path in &common_paths {
             if path.exists() {
-                if let Ok(output) = Command::new(path).arg("--version").output() {
+                // Use extended PATH: claude is a Node.js wrapper that needs node in PATH
+                let mut cmd = Command::new(path);
+                cmd.env("PATH", get_extended_path());
+                if let Ok(output) = cmd.arg("--version").output() {
                     if output.status.success() {
                         return Some(path.clone());
                     }
@@ -282,9 +285,10 @@ fn find_claude_executable() -> Option<PathBuf> {
 fn check_claude_cli() -> Result<PrerequisiteStatus> {
     // Try to find claude executable in PATH or common locations
     if let Some(claude_path) = find_claude_executable() {
-        let output = Command::new(&claude_path)
-            .arg("--version")
-            .output();
+        // Use extended PATH: claude is a Node.js wrapper that needs node in PATH
+        let mut cmd = Command::new(&claude_path);
+        cmd.env("PATH", get_extended_path());
+        let output = cmd.arg("--version").output();
 
         if let Ok(output) = output {
             if output.status.success() {

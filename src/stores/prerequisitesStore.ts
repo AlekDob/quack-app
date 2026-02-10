@@ -158,6 +158,10 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
 // =============================================================================
 
 export const selectShouldShowPrerequisites = (state: PrerequisitesState): boolean => {
+  // In test mode, always show prerequisites check for testing
+  if (import.meta.env.VITE_TEST_MODE === 'true') {
+    return true;
+  }
   return !state.hasCompletedOnboarding;
 };
 

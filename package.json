@@ -1,7 +1,7 @@
 {
   "name": "quack-app",
   "private": true,
-  "version": "0.5.2",
+  "version": "0.5.21",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -33,6 +33,7 @@
     "test:coverage": "vitest run --coverage",
     "test:dedup": "vitest run src/tests/eventDeduplication.test.ts src/tests/sessionKeyStability.test.ts",
     "test:dev": "cross-env VITE_TEST_MODE=true npm run tauri:dev",
+    "testinstall:dev": "cross-env VITE_TEST_MODE=true npm run build:secure && cargo tauri build --debug && echo '✅ Debug build ready!' && open src-tauri/target/debug/bundle/macos/Quack.app",
     "test:clean": "rm -f ~/Library/Application\\ Support/com.quack.terminal/*-TEST.json && echo '✅ Test data cleaned!'",
     "test:reset": "npm run test:clean && echo '🧪 Starting Quack in TEST MODE...' && npm run test:dev",
     "whatsapp:watch": "node src-tauri/node-sdk/whatsapp-watcher.cjs",
