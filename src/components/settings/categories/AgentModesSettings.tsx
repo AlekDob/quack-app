@@ -3,6 +3,7 @@ import type { EffortLevel, ThinkingMode } from '../../../types';
 import { getModelOptions } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
 import SectionHeader from '../controls/SectionHeader';
+import './AgentModesSettings.css';
 
 const thinkingModeOptions = [
   { value: 'auto' as ThinkingMode, label: 'Auto', desc: 'Let model decide' },
@@ -23,23 +24,20 @@ interface ModePresetCardProps {
   title: string;
   description: string;
   color: string;
+  icon: string;
 }
 
-function ModePresetCard({ mode, title, description, color }: ModePresetCardProps) {
+function ModePresetCard({ mode, title, description, color, icon }: ModePresetCardProps) {
   const { agentModePresets, updateModePreset } = useSettingsStore();
   const { models: remoteModels } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
   const preset = agentModePresets[mode];
 
   return (
-    <div className="mode-preset-card" style={{ borderColor: color }}>
+    <div className="mode-preset-card" style={{ borderLeftColor: color }}>
       <div className="mode-preset-header">
         <div className="mode-preset-title" style={{ color }}>
-          {mode === 'bypass' ? (
-            <span className="mode-icon">&#x2B22;</span>
-          ) : (
-            <span className="mode-icon">&#x25C7;</span>
-          )}
+          <span className="mode-icon">{icon}</span>
           {title}
         </div>
         <div className="mode-preset-desc">{description}</div>
@@ -54,9 +52,7 @@ function ModePresetCard({ mode, title, description, color }: ModePresetCardProps
             className="mode-preset-select"
           >
             {modelOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         </div>
@@ -99,7 +95,7 @@ export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
 
   const handleReset = () => {
-    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.5')) {
+    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.6')) {
       resetModePresets();
     }
   };
@@ -111,27 +107,25 @@ export default function AgentModesSettings() {
         description="Configure default parameters for each permission mode. When you switch modes, these settings will be applied automatically."
       />
 
-      <div className="mode-presets-container">
+      <div className="mode-presets-grid">
         <ModePresetCard
           mode="bypass"
           title="Bypass Mode"
           description="No confirmations needed - agent executes autonomously"
           color="#f87171"
+          icon="&#x2B22;"
         />
-
         <ModePresetCard
           mode="plan"
           title="Plan Mode"
           description="Planning only - agent creates plans without executing"
           color="#60a5fa"
+          icon="&#x25C7;"
         />
       </div>
 
       <div className="mode-presets-actions">
-        <button
-          className="ios-button ios-button-secondary"
-          onClick={handleReset}
-        >
+        <button className="ios-button ios-button-secondary" onClick={handleReset}>
           Reset to Anthropic Defaults
         </button>
         <div className="mode-presets-hint">
@@ -140,19 +134,23 @@ export default function AgentModesSettings() {
       </div>
 
       <style>{`
-        .mode-presets-container {
+        .mode-presets-grid {
           display: flex;
           flex-direction: column;
           gap: 16px;
-          margin-bottom: 24px;
         }
 
         .mode-preset-card {
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-left: 3px solid;
-          border-radius: 8px;
-          padding: 16px;
+          border-radius: 12px;
+          padding: 20px;
+          transition: border-color 0.15s ease;
+        }
+
+        .mode-preset-card:hover {
+          border-color: rgba(255, 255, 255, 0.15);
         }
 
         .mode-preset-header {
@@ -175,25 +173,26 @@ export default function AgentModesSettings() {
         .mode-preset-desc {
           font-size: 12px;
           color: rgba(255, 255, 255, 0.5);
+          line-height: 1.4;
         }
 
         .mode-preset-options {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 10px;
         }
 
         .mode-preset-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
           gap: 12px;
         }
 
         .mode-preset-label {
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.7);
-          min-width: 70px;
+          color: rgba(255, 255, 255, 0.6);
+          min-width: 64px;
+          flex-shrink: 0;
         }
 
         .mode-preset-select {
@@ -203,10 +202,11 @@ export default function AgentModesSettings() {
           border-radius: 6px;
           padding: 8px 12px;
           font-size: 13px;
-          color: #fff;
+          color: #f3f4f6;
           cursor: pointer;
           outline: none;
-          transition: border-color 0.2s;
+          transition: border-color 0.15s ease;
+          font-family: inherit;
         }
 
         .mode-preset-select:hover {
@@ -219,16 +219,14 @@ export default function AgentModesSettings() {
 
         .mode-preset-select option {
           background: #1a1a1a;
-          color: #fff;
+          color: #f3f4f6;
         }
 
         .mode-presets-actions {
           display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 8px;
-          padding-top: 16px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 8px;
         }
 
         .mode-presets-hint {
@@ -236,21 +234,6 @@ export default function AgentModesSettings() {
           color: rgba(255, 255, 255, 0.4);
         }
 
-        .ios-button-secondary {
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          color: rgba(255, 255, 255, 0.8);
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 13px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .ios-button-secondary:hover {
-          background: rgba(255, 255, 255, 0.15);
-          border-color: rgba(255, 255, 255, 0.2);
-        }
       `}</style>
     </div>
   );

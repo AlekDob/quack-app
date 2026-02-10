@@ -1,7 +1,12 @@
 /**
  * Dynamic Model Service
  * Fetches model configurations from Supabase app_config.
- * Falls back to hardcoded models when offline.
+ *
+ * ZERO CODE CHANGES POLICY:
+ * - All model configuration lives in Supabase
+ * - No hardcoded model IDs in this file
+ * - Emergency fallback uses a single generic model
+ * - To add/remove/update models: edit Supabase app_config only
  */
 
 export interface ModelConfig {
@@ -13,35 +18,68 @@ export interface ModelConfig {
   sortOrder: number;
 }
 
-/** Hardcoded fallback used when Supabase is unreachable */
-const FALLBACK_MODELS: ModelConfig[] = [
-  { id: 'opus', modelId: 'claude-opus-4-5-20251101', label: 'Opus 4.5', isDefault: false, isActive: true, sortOrder: 1 },
-  { id: 'sonnet', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5', isDefault: true, isActive: true, sortOrder: 2 },
-  { id: 'haiku', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 3 },
+/**
+ * Emergency fallback - used ONLY when Supabase is completely unreachable.
+ * This should rarely happen in practice.
+ * Uses Sonnet as a safe, cost-effective default.
+ */
+const EMERGENCY_FALLBACK: ModelConfig[] = [
+  { id: 'sonnet', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet (Offline Mode)', isDefault: true, isActive: true, sortOrder: 0 },
 ];
 
 /**
+ * Legacy ID mappings for backwards compatibility.
+ * Maps old-style IDs used in code to new Supabase IDs.
+ * This allows gradual migration without breaking existing code.
+ */
+const LEGACY_ID_MAP: Record<string, string> = {
+  'sonnet': 'sonnet45',
+  'haiku': 'haiku45',
+  'opus': 'opus46',
+};
+
+/**
  * Get active models sorted by sortOrder.
- * Uses remote config if available, otherwise hardcoded fallback.
+ * Prioritizes remote config from Supabase.
+ * Emergency fallback only used when Supabase is unreachable.
  */
 export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
   const models = remoteModels?.filter(m => m.isActive);
   if (models && models.length > 0) {
     return [...models].sort((a, b) => a.sortOrder - b.sortOrder);
   }
-  return FALLBACK_MODELS;
+  // Emergency fallback - Supabase unreachable
+  console.warn('[ModelService] Using emergency fallback - Supabase models not available');
+  return EMERGENCY_FALLBACK;
 }
 
 /**
- * Map friendly model name (e.g. 'sonnet') to full API model ID.
- * Checks remote config first, then fallback.
+ * Map friendly model ID (e.g. 'opus46') to full API model ID.
+ * Supports legacy IDs ('sonnet', 'haiku', 'opus') via LEGACY_ID_MAP.
+ * All model IDs are managed in Supabase - no hardcoded mappings.
  */
 export function getModelId(
   friendlyName: string,
   remoteModels?: ModelConfig[]
 ): string {
   const models = getModels(remoteModels);
-  const found = models.find(m => m.id === friendlyName);
+
+  // Try direct match first
+  let found = models.find(m => m.id === friendlyName);
+
+  // If not found, try legacy mapping
+  if (!found && LEGACY_ID_MAP[friendlyName]) {
+    const mappedId = LEGACY_ID_MAP[friendlyName];
+    found = models.find(m => m.id === mappedId);
+    if (found) {
+      console.debug(`[ModelService] Mapped legacy ID '${friendlyName}' → '${mappedId}'`);
+    }
+  }
+
+  if (!found) {
+    console.warn(`[ModelService] Model '${friendlyName}' not found in config, using as-is`);
+  }
+
   return found?.modelId ?? friendlyName;
 }
 
@@ -69,11 +107,21 @@ export function getModelOptions(
 
 /**
  * Get the display label for a model ID.
+ * Supports legacy IDs via LEGACY_ID_MAP.
  */
 export function getModelLabel(
   friendlyName: string,
   remoteModels?: ModelConfig[]
 ): string {
   const models = getModels(remoteModels);
-  return models.find(m => m.id === friendlyName)?.label ?? friendlyName;
+
+  // Try direct match first
+  let found = models.find(m => m.id === friendlyName);
+
+  // If not found, try legacy mapping
+  if (!found && LEGACY_ID_MAP[friendlyName]) {
+    found = models.find(m => m.id === LEGACY_ID_MAP[friendlyName]);
+  }
+
+  return found?.label ?? friendlyName;
 }

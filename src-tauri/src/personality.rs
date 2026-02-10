@@ -24,6 +24,10 @@ pub struct AgentPersonality {
     #[serde(rename = "selectedRules", skip_serializing_if = "Option::is_none")]
     pub selected_rules: Option<Vec<String>>, // Array of rule file paths to follow
 
+    // Selected skills (injected into CLAUDE.md for proactive use)
+    #[serde(rename = "selectedSkills", skip_serializing_if = "Option::is_none")]
+    pub selected_skills: Option<Vec<String>>, // Array of skill names
+
     // Legacy fields (kept for backwards compatibility)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub personality: Option<String>,
@@ -54,6 +58,7 @@ impl Default for AgentPersonality {
             communication_style: "friendly".to_string(),
             custom_notes: Some("Experienced PM specializing in feature delivery and team coordination. Works on specific branches and delegates to specialists.".to_string()),
             selected_rules: None, // No pre-selected rules by default
+            selected_skills: None, // No pre-selected skills by default
             // Legacy fields (backwards compatibility)
             personality: Some("You coordinate feature development and sprint planning. You work on specific branches and invoke Protocol Droids when you need specialized expertise.".to_string()),
             quirks: Some("You always respond with frequent 'quack quack' expressions and focus on coordinating work rather than doing it yourself.".to_string()),
@@ -352,6 +357,7 @@ fn inject_personality_to_claude_md_impl(
     log::info!("🔍 Role: {}", personality.role);
     log::info!("🔍 Skills: {:?}", personality.skills);
     log::info!("🔍 SelectedRules: {:?}", personality.selected_rules);
+    log::info!("🔍 SelectedSkills: {:?}", personality.selected_skills);
     log::info!("🔍 CustomNotes: {:?}", personality.custom_notes);
 
     // Generate agent header with NEW structure
@@ -445,6 +451,29 @@ fn inject_personality_to_claude_md_impl(
         }
     }
 
+    // 📋 Preferred Skills section - Skills the agent should use proactively
+    if let Some(selected_skills) = &personality.selected_skills {
+        if !selected_skills.is_empty() {
+            agent_header.push_str("**Preferred Skills:**\n");
+            agent_header.push_str("*IMPORTANT: Use these skills proactively before proceeding with work.*\n\n");
+
+            for skill_name in selected_skills {
+                agent_header.push_str(&format!("- {}\n", skill_name));
+            }
+            agent_header.push_str("\n");
+        }
+    }
+
+    // 🎯 QUACK CORE: Agent Communication Norms (always injected)
+    // These are the golden rules that make Quack agents effective.
+    // Based on industry best practices for AI agent behavior (2026).
+    agent_header.push_str("**Agent Communication Protocol:**\n");
+    agent_header.push_str("*CRITICAL: Follow these norms in EVERY interaction:*\n\n");
+    agent_header.push_str("1. **Explain before acting** - Always state what you plan to do BEFORE doing it\n");
+    agent_header.push_str("2. **Surface uncertainties** - Highlight doubts and ask for clarification instead of assuming\n");
+    agent_header.push_str("3. **Report failures immediately** - Never silently retry or work around errors\n");
+    agent_header.push_str("4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review\n\n");
+
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 
     // Read existing CLAUDE.md or create new one
@@ -507,4 +536,104 @@ fn inject_personality_to_claude_md_impl(
         .context("Failed to write CLAUDE.md")?;
 
     Ok(final_content)
+}
+
+// ============================================
+// Active Agents Index Functions
+// ============================================
+
+/// Get the path to the active-agents.json file for a project
+fn get_active_agents_path(project_path: &Path) -> PathBuf {
+    get_quack_dir(project_path).join("active-agents.json")
+}
+
+/// Load active agent IDs from the index file
+#[tauri::command]
+pub fn load_active_agents(project_path: String) -> Result<Vec<String>, String> {
+    load_active_agents_impl(&PathBuf::from(project_path))
+        .map_err(|e| e.to_string())
+}
+
+fn load_active_agents_impl(project_path: &Path) -> Result<Vec<String>> {
+    let index_path = get_active_agents_path(project_path);
+
+    if !index_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let json = fs::read_to_string(&index_path)
+        .context("Failed to read active-agents.json")?;
+
+    let active_ids: Vec<String> = serde_json::from_str(&json)
+        .context("Failed to parse active-agents.json")?;
+
+    Ok(active_ids)
+}
+
+/// Save active agent IDs to the index file
+#[tauri::command]
+pub fn save_active_agents(project_path: String, agent_ids: Vec<String>) -> Result<(), String> {
+    save_active_agents_impl(&PathBuf::from(project_path), agent_ids)
+        .map_err(|e| e.to_string())
+}
+
+fn save_active_agents_impl(project_path: &Path, agent_ids: Vec<String>) -> Result<()> {
+    let quack_dir = get_quack_dir(project_path);
+
+    // Ensure .quack directory exists
+    fs::create_dir_all(&quack_dir)
+        .context("Failed to create .quack directory")?;
+
+    let index_path = get_active_agents_path(project_path);
+    let json = serde_json::to_string_pretty(&agent_ids)
+        .context("Failed to serialize active agents")?;
+
+    fs::write(&index_path, json)
+        .context("Failed to write active-agents.json")?;
+
+    Ok(())
+}
+
+/// Add an agent ID to the active index
+#[tauri::command]
+pub fn add_active_agent(project_path: String, agent_id: String) -> Result<(), String> {
+    let path = PathBuf::from(&project_path);
+    let mut active_ids = load_active_agents_impl(&path).unwrap_or_default();
+
+    if !active_ids.contains(&agent_id) {
+        active_ids.push(agent_id);
+        save_active_agents_impl(&path, active_ids).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Remove an agent ID from the active index
+#[tauri::command]
+pub fn remove_active_agent(project_path: String, agent_id: String) -> Result<(), String> {
+    let path = PathBuf::from(&project_path);
+    let mut active_ids = load_active_agents_impl(&path).unwrap_or_default();
+
+    active_ids.retain(|id| id != &agent_id);
+    save_active_agents_impl(&path, active_ids).map_err(|e| e.to_string())
+}
+
+/// Load all active agents with their full personality data
+#[tauri::command]
+pub fn load_active_agents_with_data(project_path: String) -> Result<Vec<AgentPersonality>, String> {
+    let path = PathBuf::from(&project_path);
+    let active_ids = load_active_agents_impl(&path).unwrap_or_default();
+
+    let mut agents = Vec::new();
+    for id in active_ids {
+        match load_agent_personality_impl(&path, &id) {
+            Ok(personality) => agents.push(personality),
+            Err(e) => {
+                eprintln!("⚠️  Failed to load personality for agent {}: {}", id, e);
+                // Skip this agent but continue loading others
+            }
+        }
+    }
+
+    Ok(agents)
 }

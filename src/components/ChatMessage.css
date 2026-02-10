@@ -17,89 +17,133 @@
   }
 }
 
+/* iMessage style for user messages - bubble aligned right */
 .chat-message.user {
-  background: rgba(242, 140, 82, 0.05);
+  background: transparent;
+  justify-content: flex-end;
+  padding: 8px 16px;
+}
+
+.chat-message.user .chat-message-content {
+  flex: none;
+  max-width: 70%;
+}
+
+.chat-message.user .chat-message-header {
+  display: none; /* Hide "You 11:39" header - not needed for iMessage style */
+}
+
+.chat-message.user .chat-message-body {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: transparent;
+  padding: 0;
+}
+
+.chat-message.user .chat-message-body .user-message-text {
+  background: linear-gradient(135deg, #f28c52 0%, #e67a40 100%);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 18px 18px 4px 18px; /* iMessage tail on bottom-right */
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* Size constraints */
+  max-width: 350px;
+  min-width: 0;
+  /* Truncation */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.chat-message.user .chat-message-body .user-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .chat-message.assistant {
   background: transparent;
 }
 
-/* Sticky last user message */
+/* Sticky last user message - iMessage style */
 .chat-message.sticky-user-message {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(242, 140, 82, 0.4) !important;
-  box-shadow:
-    0 2px 12px rgba(242, 140, 82, 0.2),
-    0 0 0 1px rgba(242, 140, 82, 0.25),
-    0 4px 24px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(16px);
-  border-bottom: 2px solid rgba(242, 140, 82, 0.4);
+  background: transparent !important;
+  justify-content: flex-end;
+  padding: 8px 16px;
+  border-bottom: none;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.chat-message.sticky-user-message:hover {
-  background: rgba(242, 140, 82, 0.3) !important;
+.chat-message.sticky-user-message .chat-message-content {
+  flex: none;
+  max-width: 70%;
+}
+
+.chat-message.sticky-user-message .chat-message-header {
+  display: flex; /* Show header for sticky to allow actions */
+  justify-content: flex-end;
+  margin-left: 0;
+  margin-bottom: 4px;
+}
+
+.chat-message.sticky-user-message .chat-message-body {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: transparent;
+  padding: 0;
+}
+
+.chat-message.sticky-user-message .chat-message-body .user-message-text {
+  background: linear-gradient(135deg, #f28c52 0%, #e67a40 100%);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 18px 18px 4px 18px;
+  font-size: 13px;
+  line-height: 1.4;
   box-shadow:
-    0 2px 16px rgba(242, 140, 82, 0.3),
-    0 0 0 1px rgba(242, 140, 82, 0.4),
-    0 4px 32px rgba(0, 0, 0, 0.5);
-  border-bottom-color: rgba(242, 140, 82, 0.6);
+    0 2px 8px rgba(242, 140, 82, 0.3),
+    0 4px 16px rgba(0, 0, 0, 0.2);
+  flex: 1;
+  min-width: 0;
+  /* Truncation */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.chat-message.sticky-user-message .chat-message-body .user-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.chat-message.sticky-user-message:hover .chat-message-body .user-message-text {
+  box-shadow:
+    0 2px 12px rgba(242, 140, 82, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .chat-message.error {
   background: rgba(255, 59, 48, 0.05);
-}
-
-.chat-message-avatar {
-  flex-shrink: 0;
-}
-
-.avatar-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-
-.avatar-icon img {
-  width: 110%;
-  height: 110%;
-  object-fit: contain;
-  object-position: center;
-  transform: scale(1.1);
-}
-
-.avatar-icon svg {
-  width: 14px;
-  height: 14px;
-  opacity: 0.7;
-}
-
-.user-avatar {
-  background-image: url('/images/humanoid.jpeg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  border-color: rgba(242, 140, 82, 0.3);
-}
-
-/* Nascondi l'iconcina SVG per l'utente */
-.user-avatar svg {
-  display: none;
-}
-
-.assistant-avatar {
-  background: rgba(77, 212, 179, 0.2);
-  border-color: rgba(77, 212, 179, 0.3);
 }
 
 .chat-message-content {
@@ -110,9 +154,19 @@
 .chat-message-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 4px;
+  margin-left: 0; /* Avatar starts at edge */
   position: relative;
+}
+
+/* Agent avatar in message header */
+.chat-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .sticky-message-actions {
@@ -197,18 +251,19 @@
   white-space: pre-wrap;
 }
 
+/* Assistant message body - align under the header text, offset by avatar + gap */
+.chat-message.assistant .chat-message-body {
+  margin-left: 40px; /* 32px avatar + 8px gap */
+}
+
 /* Sticky message body - force text wrapping for long URLs/commands */
-.chat-message.sticky-user-message .chat-message-body {
+.chat-message.sticky-user-message .chat-message-body .user-message-text {
   overflow-wrap: anywhere; /* Break even within long words/URLs */
-  word-break: break-word;
-  max-height: 4.5rem; /* ~3 lines at 1.5 line-height */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: max-height 0.7s cubic-bezier(0.25, 0.1, 0.25, 1); /* Morbido e graduale */
 }
 
 /* Remove height constraint when expanded */
-.chat-message.sticky-user-message .chat-message-body.expanded {
+.chat-message.sticky-user-message .chat-message-body.expanded .user-message-text {
+  -webkit-line-clamp: unset;
   max-height: none;
   overflow: visible;
 }
@@ -332,6 +387,14 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Minimal tool calls - Codex style */
+.chat-message-tools-minimal {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 /* System messages (agent invocation notifications) */

@@ -9,6 +9,7 @@ interface MessageListProps {
   messages: ChatMessageType[];
   loading?: boolean;
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void;
   onSessionIdClick?: (sessionId: string) => void;
   agentName?: string;
   agentAvatar?: string;
@@ -29,9 +30,14 @@ interface MessageListProps {
   onRewindFiles?: (userMessageId: string) => void;
   // Image preview
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Open Agent Personality panel
+  onOpenPersonality?: () => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality, pendingPlanApprovalIds, onPlanApprovalResponse }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -161,10 +167,16 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
     const hasNewMessage = messages.length > prevMessagesLengthRef.current;
     const lastMessage = messages[messages.length - 1];
 
+    // Detect lazy hydration: messages jumped from 0 to many (session loaded)
+    const isLazyHydration = prevMessagesLengthRef.current === 0 && messages.length > 1;
+
     // Determine if we should auto-scroll
     let shouldAutoScroll = false;
 
-    if (hasNewMessage) {
+    if (isLazyHydration) {
+      // Always scroll to bottom when session is hydrated (loaded from disk)
+      shouldAutoScroll = true;
+    } else if (hasNewMessage) {
       // Always auto-scroll for user messages or if already at bottom
       shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
     } else if (loading) {
@@ -174,10 +186,16 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
     }
 
     if (shouldAutoScroll) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      // Use a small delay for lazy hydration to ensure DOM is ready
+      const delay = isLazyHydration ? 100 : 0;
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: isLazyHydration ? 'auto' : 'smooth' // Instant for hydration, smooth for streaming
+          });
+        }
+      }, delay);
     }
 
     prevMessagesLengthRef.current = messages.length;
@@ -193,7 +211,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
     return (
       <div className="message-list-empty">
         <div className="empty-state">
-          <DuckAnimation />
+          <DuckAnimation onClick={onOpenPersonality} />
         </div>
       </div>
     );
@@ -207,6 +225,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
               <ChatMessage
                 message={message}
                 onFilePathClick={onFilePathClick}
+                onOpenInIDE={onOpenInIDE}
                 onSessionIdClick={onSessionIdClick}
                 agentName={agentName}
                 agentAvatar={agentAvatar}
@@ -222,6 +241,8 @@ export default function MessageList({ messages, loading, onFilePathClick, onSess
                 showThinkingBlocks={showThinkingBlocks}
                 onRewindFiles={onRewindFiles}
                 onOpenImageTab={onOpenImageTab}
+                pendingPlanApprovalIds={pendingPlanApprovalIds}
+                onPlanApprovalResponse={onPlanApprovalResponse}
               />
             </div>
         ))}

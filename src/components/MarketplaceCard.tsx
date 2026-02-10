@@ -22,134 +22,165 @@ export default function MarketplaceCard({
   onViewDetails,
   onToggleFavorite,
 }: MarketplaceCardProps) {
-  const getCategoryColor = (category: string) => {
+  // Unified accent color for all categories
+  const getCategoryColor = (_category: string) => {
+    return '#f28c52';
+  };
+
+  /** Icons matching SidePanel.tsx tab icons */
+  const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'agents':
-        return '#f28c52'; // Orange
-      case 'commands':
-        return '#3b82f6'; // Blue
-      case 'hooks':
-        return '#8b5cf6'; // Purple
-      case 'settings':
-        return '#6b7280'; // Gray
-      case 'mcp':
-        return '#10b981'; // Green
-      case 'stacks':
-        return '#f59e0b'; // Amber
       case 'skills':
-        return '#ec4899'; // Pink
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path d="M10 2l2 4 4.5 0.5-3.25 3 1 4.5-4.25-2.5-4.25 2.5 1-4.5L3.5 6.5 8 6z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M10 11v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        );
+      case 'agents':
+      case 'agent-bundles':
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <line x1="10" y1="2" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="10" cy="2" r="1" fill="currentColor" />
+            <circle cx="7.5" cy="9" r="1.3" fill="currentColor" />
+            <circle cx="12.5" cy="9" r="1.3" fill="currentColor" />
+            <line x1="7.5" y1="13" x2="12.5" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        );
+      case 'rules':
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path d="M4 3h8l4 4v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 3v4h4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 10l1.5 1.5L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 14l1.5 1.5L9 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
+      case 'commands':
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M6 7l2 2-2 2M10 11h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="14" cy="7" r="1.5" fill="currentColor" />
+          </svg>
+        );
+      case 'hooks':
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path d="M10 3v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M10 10c0 2.5-2 4-4 4s-4-1.5-4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="10" cy="3" r="1.5" fill="currentColor" />
+            <circle cx="15" cy="7" r="1.5" fill="currentColor" />
+            <circle cx="17" cy="11" r="1.5" fill="currentColor" />
+            <path d="M10 6l5 1M10 8l7 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeDasharray="2 1" />
+          </svg>
+        );
+      case 'mcp':
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path d="M3 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="7" cy="8" r="1.5" fill="currentColor" />
+            <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+            <path d="M7 12h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        );
       default:
-        return '#6b7280';
+        return (
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        );
     }
   };
+
+  /** Display label - "agents" becomes "droids" */
+  const getCategoryLabel = (category: string): string => {
+    switch (category) {
+      case 'agents': return 'droids';
+      case 'agent-bundles': return 'bundles';
+      default: return category;
+    }
+  };
+
+  const catColor = getCategoryColor(resource.category);
 
   return (
     <div
       className="marketplace-card"
       style={{
-        background: 'rgba(20, 24, 32, 0.8)',
+        background: 'rgba(255, 255, 255, 0.03)',
         border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderLeft: `3px solid ${catColor}`,
         borderRadius: '10px',
-        padding: '12px',
+        padding: '14px 14px 14px 16px',
         transition: 'all 0.2s ease',
         cursor: 'pointer',
         position: 'relative',
       }}
       onClick={() => onViewDetails(resource)}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(242, 140, 82, 0.08)';
-        e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.2)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(242, 140, 82, 0.15)';
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+        e.currentTarget.style.borderLeftColor = catColor;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(20, 24, 32, 0.8)';
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
         e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.borderLeftColor = catColor;
       }}
     >
-      {/* Badges Row */}
-      <div className="flex items-center gap-1.5 mb-2">
-        {/* Category Badge */}
-        <span
-          className="px-2 py-1 rounded text-xs font-medium"
-          style={{
-            background: `${getCategoryColor(resource.category)}20`,
-            color: getCategoryColor(resource.category),
-          }}
-        >
-          {resource.category}
-        </span>
-
-        {/* Verified Badge */}
-        {resource.verified && (
-          <span
-            className="px-2 py-1 rounded text-xs font-medium"
+      {/* Top Row: Icon + Name + Favorite */}
+      <div className="flex items-start justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center justify-center"
             style={{
-              background: 'rgba(34, 197, 94, 0.1)',
-              color: '#22c55e',
+              width: '26px',
+              height: '26px',
+              borderRadius: '7px',
+              background: `${catColor}18`,
+              color: catColor,
+              flexShrink: 0,
             }}
           >
-            Verified
-          </span>
-        )}
-
-        {/* Featured Badge */}
-        {resource.featured && (
-          <span
-            className="px-2 py-1 rounded text-xs font-medium"
-            style={{
-              background: 'rgba(251, 191, 36, 0.1)',
-              color: '#fbbf24',
-            }}
+            {getCategoryIcon(resource.category)}
+          </div>
+          <h4
+            className="text-sm font-semibold"
+            style={{ color: 'rgba(255, 255, 255, 0.9)' }}
           >
-            Featured
-          </span>
-        )}
-
-        {/* Favorite Button */}
+            {resource.name}
+          </h4>
+        </div>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggleFavorite(resource.id);
           }}
-          className="ml-auto"
           style={{
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            padding: '4px',
-            transition: 'transform 0.2s ease',
-            color: favorited ? '#f28c52' : 'rgba(255, 255, 255, 0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
+            padding: '2px',
+            color: favorited ? '#f28c52' : 'rgba(255, 255, 255, 0.2)',
+            transition: 'color 0.15s ease',
+            flexShrink: 0,
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill={favorited ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={favorited ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
         </button>
       </div>
 
-      {/* Resource Name */}
-      <h4
-        className="text-sm font-semibold mb-1"
-        style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-      >
-        {resource.name}
-      </h4>
-
       {/* Description */}
       <p
-        className="text-xs mb-2"
+        className="text-xs mb-2.5"
         style={{
-          color: 'rgba(255, 255, 255, 0.6)',
+          color: 'rgba(255, 255, 255, 0.5)',
           lineHeight: '1.5',
           display: '-webkit-box',
           WebkitLineClamp: 2,
@@ -160,49 +191,27 @@ export default function MarketplaceCard({
         {resource.description}
       </p>
 
-      {/* Author */}
-      <div
-        className="flex items-center gap-1.5 text-xs mb-2"
-        style={{ color: 'rgba(255, 255, 255, 0.5)' }}
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
+      {/* Meta Row: Category + Author + Version */}
+      <div className="flex items-center gap-2 mb-3" style={{ fontSize: '11px' }}>
+        <span
+          className="px-1.5 py-0.5 rounded"
+          style={{
+            background: `${catColor}15`,
+            color: catColor,
+            fontWeight: 500,
+          }}
         >
-          <circle cx="12" cy="8" r="4" />
-          <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
-        </svg>
-        {resource.author}
-      </div>
-
-      {/* Tags */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {resource.tags.slice(0, 3).map((tag) => (
-          <span
-            key={tag}
-            className="px-2 py-0.5 rounded text-xs"
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              color: 'rgba(255, 255, 255, 0.6)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-            }}
-          >
-            #{tag}
-          </span>
-        ))}
-        {resource.tags.length > 3 && (
-          <span
-            className="px-2 py-0.5 rounded text-xs"
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              color: 'rgba(255, 255, 255, 0.6)',
-            }}
-          >
-            +{resource.tags.length - 3}
+          {getCategoryLabel(resource.category)}
+        </span>
+        <span style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
+          {resource.author}
+        </span>
+        <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
+          v{resource.version}
+        </span>
+        {resource.featured && (
+          <span style={{ color: '#fbbf24', fontWeight: 500 }}>
+            Featured
           </span>
         )}
       </div>
@@ -212,12 +221,13 @@ export default function MarketplaceCard({
         {installed ? (
           <button
             type="button"
-            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold"
             style={{
-              background: 'rgba(34, 197, 94, 0.1)',
-              border: '1px solid rgba(34, 197, 94, 0.3)',
-              color: '#22c55e',
+              background: 'rgba(34, 197, 94, 0.12)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              color: '#4ade80',
               cursor: 'default',
+              letterSpacing: '0.02em',
             }}
           >
             Installed
@@ -229,19 +239,23 @@ export default function MarketplaceCard({
               e.stopPropagation();
               onInstall(resource);
             }}
-            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
+            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
             style={{
-              background: 'rgba(242, 140, 82, 0.1)',
-              border: '1px solid rgba(242, 140, 82, 0.3)',
-              color: '#f28c52',
+              background: '#f28c52',
+              border: '1px solid #f28c52',
+              color: '#0c1018',
+              letterSpacing: '0.02em',
+              boxShadow: '0 2px 8px rgba(242, 140, 82, 0.3)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(242, 140, 82, 0.2)';
-              e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.5)';
+              e.currentTarget.style.background = '#f9a06e';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(242, 140, 82, 0.45)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(242, 140, 82, 0.1)';
-              e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.3)';
+              e.currentTarget.style.background = '#f28c52';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(242, 140, 82, 0.3)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             Install
@@ -254,17 +268,19 @@ export default function MarketplaceCard({
             e.stopPropagation();
             onViewDetails(resource);
           }}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
+          className="px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200"
           style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: 'rgba(255, 255, 255, 0.9)',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: 'rgba(255, 255, 255, 0.6)',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
           }}
         >
           Details

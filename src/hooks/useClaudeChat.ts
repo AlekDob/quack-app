@@ -87,6 +87,8 @@ export interface ChatSendOptions {
   onTokenWarning?: (status: TokenBudgetStatus) => void; // Called when token usage is high
   onTokenBlocked?: (reason: string) => void; // Called when message is blocked due to token limit
   bypassTokenCheck?: boolean; // Skip token check (use with caution)
+  // Model configuration from Supabase
+  remoteModels?: import('../services/modelService').ModelConfig[]; // Remote models for ID mapping
 }
 
 export interface UseClaudeChatOptions {
@@ -263,7 +265,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     // Create user message
     const attachments = options?.attachments ?? [];
     const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -285,7 +287,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     });
 
     // Create assistant message placeholder
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -323,6 +325,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
         // New SDK 0.1.54+ features
         outputFormat: options?.outputFormat, // Structured outputs (beta)
         effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
+        // Model configuration from Supabase for ID mapping
+        remoteModels: options?.remoteModels,
       });
 
       const events: ClaudeEvent[] = [];

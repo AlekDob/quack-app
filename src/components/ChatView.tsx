@@ -6,6 +6,7 @@ import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
+import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
 import TodoProgressBar from './TodoProgressBar';
 import type { TodoItem } from './TodoProgressBar';
@@ -49,6 +50,7 @@ interface ChatViewProps {
   agents?: AgentInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
   onFilePathClick?: (path: string, lineChanges?: LineChange[]) => void;
+  onOpenInIDE?: (path: string) => void;
   onSessionIdClick?: (sessionId: string) => void;
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void; // NEW: Diff drawer handler
   onEditsChange?: (edits: FileEdit[], deletes: FileDeleted[]) => void; // NEW: Notify parent when edits change
@@ -130,6 +132,11 @@ interface ChatViewProps {
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
   // Open file in Quack tab (for markdown files)
   onOpenInQuack?: (filePath: string) => void;
+  // Open Agent Personality panel in sidebar
+  onOpenPersonality?: () => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
 export default function ChatView({
@@ -141,6 +148,7 @@ export default function ChatView({
   agents,
   onSelectAgent,
   onFilePathClick,
+  onOpenInIDE,
   onSessionIdClick,
   onDiffClick, // NEW: Diff drawer handler
   onEditsChange, // NEW: Notify parent when edits change
@@ -154,7 +162,7 @@ export default function ChatView({
   // Agent Chat Settings - controlled from parent
   inputDraft = '',
   onInputDraftChange,
-  model = 'sonnet',
+  model = 'sonnet45',
   onModelChange,
   thinkingMode = 'auto',
   onThinkingModeChange,
@@ -209,6 +217,9 @@ export default function ChatView({
   onOpenImageTab,
   onRewindFiles,
   onOpenInQuack,
+  onOpenPersonality,
+  pendingPlanApprovalIds,
+  onPlanApprovalResponse,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -288,7 +299,7 @@ export default function ChatView({
             description: prompt,
             agentId: agentName,
             prompt: prompt,
-            model: 'sonnet',
+            model: 'sonnet45',
             workingDirectory: projectPath,
             notifyOnComplete: true,
             kanbanTaskId: newTask.id, // Link to Kanban for status sync
@@ -649,6 +660,7 @@ export default function ChatView({
         messages={messages}
         loading={isLoading}
         onFilePathClick={onFilePathClick}
+        onOpenInIDE={onOpenInIDE}
         onSessionIdClick={onSessionIdClick}
         agentName={agentName}
         agentAvatar={agentAvatar}
@@ -662,6 +674,9 @@ export default function ChatView({
         showThinkingBlocks={showThinkingBlocks}
         onRewindFiles={onRewindFiles}
         onOpenImageTab={onOpenImageTab}
+        onOpenPersonality={onOpenPersonality}
+        pendingPlanApprovalIds={pendingPlanApprovalIds}
+        onPlanApprovalResponse={onPlanApprovalResponse}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar
@@ -682,6 +697,17 @@ export default function ChatView({
         <TodoProgressBar todos={currentTodos} />
       )}
       <div className="chat-view-footer">
+        {/* Stamina bar as border-top replacement */}
+        <StaminaBarBorder
+          inputTokens={sessionTokens.inputTokens}
+          outputTokens={sessionTokens.outputTokens}
+          cacheCreationTokens={sessionTokens.cacheCreationTokens}
+          cacheReadTokens={sessionTokens.cacheReadTokens}
+          totalCost={sessionTokens.totalCost}
+          overhead={sessionTokens.overhead}
+          onCompact={onCompactConversation}
+          onClear={onClearConversation}
+        />
         <div className="chat-view-footer-controls">
           <ChatSettingsMenu
             model={model}
@@ -708,16 +734,6 @@ export default function ChatView({
                 <Brain size={16} />
             </button>
           )}
-          <TokenUsageIndicator
-            inputTokens={sessionTokens.inputTokens}
-            outputTokens={sessionTokens.outputTokens}
-            cacheCreationTokens={sessionTokens.cacheCreationTokens}
-            cacheReadTokens={sessionTokens.cacheReadTokens}
-            totalCost={sessionTokens.totalCost}
-            overhead={sessionTokens.overhead}
-            onCompact={onCompactConversation}
-            onClear={onClearConversation}
-          />
           {isLoading && onAbortStream && (
             <button
               className="chat-stop-btn"

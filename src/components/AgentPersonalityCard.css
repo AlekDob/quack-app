@@ -1,9 +1,9 @@
 .agent-personality-card {
-  background: rgba(20, 20, 25, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 0.75rem; /* ← Ridotto da 1.25rem */
-  margin-bottom: 0.75rem; /* ← Ridotto da 1rem */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
 }
 
 .agent-personality-card.empty {
@@ -26,7 +26,6 @@
   font-weight: 600;
   margin-bottom: 0.5rem;
   color: rgba(255, 255, 255, 1) !important;
-  /* Quasi completamente bianco */
 }
 
 .personality-empty-state p {
@@ -34,37 +33,332 @@
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
-.personality-header {
+/* Compact Header Layout */
+.personality-header-compact {
   display: flex;
   align-items: center;
-  gap: 0.75rem; /* ← Ridotto da 1rem */
-  margin-bottom: 0.75rem; /* ← Ridotto da 1.25rem */
-  padding-bottom: 0.75rem; /* ← Ridotto da 1rem */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .personality-avatar {
-  width: 60px; /* ← Ridotto da 80px */
-  height: 60px; /* ← Ridotto da 80px */
-  border-radius: 12px; /* ← Ridotto da 16px */
-  background: linear-gradient(135deg, #f28c52, #ffb26f);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
-  position: relative;
 }
 
 .avatar-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 12px; /* ← Ridotto da 16px */
+  border-radius: 8px;
 }
 
-.avatar-icon {
-  font-size: 1.75rem; /* ← Ridotto da 2.5rem */
+.personality-identity-compact {
+  flex: 1;
+  min-width: 0;
+}
+
+.personality-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.personality-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.style-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: capitalize;
+}
+
+.personality-role {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 2px 0 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bio/Notes - Clean text block */
+.personality-bio {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 20px;
+  margin-bottom: 20px;
+  padding-left: 2px;
+}
+
+/* Preferred Skills Section */
+.personality-skills-section {
+  margin-bottom: 16px;
+}
+
+.skills-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.skills-header svg {
+  flex-shrink: 0;
+}
+
+.skills-title {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.skills-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.skill-chip-compact {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(247, 147, 30, 0.85);
+  background: rgba(247, 147, 30, 0.08);
+  border: 1px solid rgba(247, 147, 30, 0.15);
+  border-radius: 4px;
+}
+
+/* Legacy styles (keep for compatibility) */
+.personality-skills-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.skills-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  margin-right: 2px;
+}
+
+.skills-label svg {
+  flex-shrink: 0;
+}
+
+/* Technical Context - Subtle */
+.personality-context {
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Meta Row - Workspace + Context Files */
+.personality-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.workspace-chips,
+.context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.meta-chip svg {
+  opacity: 0.6;
+}
+
+.meta-chip.workspace-chip {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.meta-chip.branch-chip {
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  color: rgba(78, 205, 196, 0.7);
+}
+
+.meta-chip.context-chip {
+  cursor: pointer;
+}
+
+.meta-chip.context-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.meta-chip.context-chip.not-exists {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.meta-chip.context-chip.global {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chip-size {
+  font-size: 8px;
+  margin-left: 2px;
+  opacity: 0.8;
+}
+
+.chip-size.stats-good { color: #4ecdc4; }
+.chip-size.stats-warning { color: #f8b739; }
+.chip-size.stats-bad { color: #ff6b6b; }
+
+/* Rules Compact - Horizontal chips */
+.personality-rules-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.rule-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-chip.more {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+/* Bundle Export - Show on hover */
+.bundle-actions-compact {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.agent-personality-card:hover .bundle-actions-compact {
+  opacity: 1;
+}
+
+.bundle-btn-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bundle-btn-compact:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.bundle-btn-compact:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.bundle-btn-compact svg {
+  opacity: 0.7;
+}
+
+.bundle-error-compact {
+  margin-top: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.bundle-success-compact {
+  margin-top: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: #00D9FF;
+  background: rgba(0, 217, 255, 0.1);
+  border-radius: 3px;
+  animation: bundleFadeInOut 3s ease-in-out forwards;
+}
+
+@keyframes bundleFadeInOut {
+  0% { opacity: 0; transform: translateY(-2px); }
+  15% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Legacy styles for backward compatibility */
+.personality-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .personality-identity {
@@ -72,51 +366,17 @@
   min-width: 0;
 }
 
-.personality-name {
-  font-size: 0.8rem; /* ← Ridotto da 1rem */
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 0.25rem 0;
-}
-
-.personality-role {
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .personality-working-on {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(77, 212, 179, 0.1);
-  border: 1px solid rgba(77, 212, 179, 0.25);
-  border-radius: 6px;
-  font-size: 0.75rem;
+  display: none;
 }
 
-.working-on-label {
-  font-weight: 600;
-  color: rgba(77, 212, 179, 0.9);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
+.working-on-label,
 .working-on-text {
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .personality-section {
-  margin-bottom: 0.75rem; /* ← Ridotto da 1rem */
+  margin-bottom: 6px;
 }
 
 .personality-section:last-child {
@@ -124,249 +384,62 @@
 }
 
 .section-title {
-  font-size: 0.625rem; /* ← Ridotto da 0.75rem */
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0 0 0.375rem 0; /* ← Ridotto da 0.5rem */
-}
-
-.section-content {
-  font-size: 0.75rem; /* ← Ridotto da 0.875rem */
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0 0 3px 0;
 }
 
 .personality-intro {
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.6);
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 3px solid rgba(77, 212, 179, 0.5);
 }
 
 .communication-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.375rem 0.75rem;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
-  border-radius: 6px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  font-weight: 500;
-  color: #f28c52;
-}
-
-.focus-areas-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.5rem;
-}
-
-.focus-area-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 2px 6px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  color: rgba(255, 255, 255, 0.8);
-  transition: all 0.2s ease;
+  border-radius: 3px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-.focus-area-badge:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.focus-icon {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.focus-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.skills-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.skill-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.375rem 0.75rem;
-  background: rgba(77, 212, 179, 0.15);
-  border: 1px solid rgba(77, 212, 179, 0.3);
-  border-radius: 6px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  font-weight: 500;
-  color: #4dd4b3;
-}
-
-.expressions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.expression-item {
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.7);
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 3px solid rgba(242, 140, 82, 0.5);
-}
-
-.personality-traits-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.5rem;
-}
-
-.personality-trait-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(142, 107, 255, 0.1);
-  border: 1px solid rgba(142, 107, 255, 0.25);
-  border-radius: 8px;
-  font-size: 0.7rem; /* ← Ridotto da 0.875rem */
-  color: rgba(142, 107, 255, 0.95);
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.personality-trait-badge:hover {
-  background: rgba(142, 107, 255, 0.15);
-  border-color: rgba(142, 107, 255, 0.35);
-}
-
-.trait-icon {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.trait-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-/* Rules & Best Practices */
 .rules-list {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 2px;
 }
 
 .rule-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.625rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  transition: all 0.15s;
-}
-
-.rule-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
+  gap: 4px;
+  padding: 2px 0;
 }
 
 .rule-bullet {
-  color: rgba(242, 140, 82, 0.8);
-  font-size: 1rem;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-top: 0.125rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .rule-text {
   flex: 1;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
 }
 
-/* Bundle Export/Import Actions */
-.bundle-actions {
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+/* Legacy workspace/context (hidden - using new compact styles) */
+.workspace-info-minimal {
+  display: none;
 }
 
-.bundle-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.bundle-btn {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid;
-}
-
-.bundle-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.bundle-btn-export {
-  background: rgba(0, 212, 255, 0.1);
-  border-color: rgba(0, 212, 255, 0.3);
-  color: #00D4FF;
-}
-
-.bundle-btn-export:hover:not(:disabled) {
-  background: rgba(0, 212, 255, 0.2);
-  border-color: rgba(0, 212, 255, 0.5);
-  box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
-}
-
-.bundle-btn-import {
-  background: rgba(255, 51, 102, 0.1);
-  border-color: rgba(255, 51, 102, 0.3);
-  color: #FF3366;
-}
-
-.bundle-btn-import:hover:not(:disabled) {
-  background: rgba(255, 51, 102, 0.2);
-  border-color: rgba(255, 51, 102, 0.5);
-  box-shadow: 0 0 10px rgba(255, 51, 102, 0.2);
-}
-
-.bundle-error {
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.7rem;
-  color: #FF3366;
-  background: rgba(255, 51, 102, 0.1);
-  border: 1px solid rgba(255, 51, 102, 0.3);
-  border-radius: 6px;
-  cursor: pointer;
+.context-files-minimal {
+  display: none;
 }

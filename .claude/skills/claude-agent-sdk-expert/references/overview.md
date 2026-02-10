@@ -9,6 +9,16 @@ The Claude Agent SDK (formerly Claude Code SDK) is a powerful framework for buil
 npm install @anthropic-ai/claude-agent-sdk
 ```
 
+**Current versions** (as of 2025-02-05):
+- `@anthropic-ai/claude-agent-sdk`: **0.2.31**
+- `@anthropic-ai/sdk`: **0.72.1**
+
+To check for updates:
+```bash
+npm view @anthropic-ai/claude-agent-sdk version
+npm view @anthropic-ai/sdk version
+```
+
 ### Python
 ```bash
 pip install claude-agent-sdk

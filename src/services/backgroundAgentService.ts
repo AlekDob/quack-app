@@ -10,6 +10,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, emit } from '@tauri-apps/api/event';
 import { sendNotification } from '@tauri-apps/plugin-notification';
+import { Store } from '@tauri-apps/plugin-store';
 import { useBackgroundAgentStore } from '../stores/backgroundAgentStore';
 import { useKanbanStore } from '../stores/kanbanStore';
 import type {
@@ -193,7 +194,7 @@ async function notifyTaskCompletion(
 
     // Play quack sound for completed tasks
     if (success) {
-      playQuackSound();
+      void playQuackSound();
     }
   } catch (err) {
     console.warn('[BackgroundAgentService] Failed to send notification:', err);
@@ -201,10 +202,19 @@ async function notifyTaskCompletion(
 }
 
 /**
- * Play the quack sound effect
+ * Play the quack sound effect (respects user setting)
  */
-function playQuackSound(): void {
+async function playQuackSound(): Promise<void> {
   try {
+    // Check if sound is enabled in settings
+    const store = await Store.load('.quack-ui-prefs.dat');
+    const soundEnabled = await store.get<boolean>('quack-sound-enabled');
+
+    // Default to true if not set (sound is ON by default)
+    if (soundEnabled === false) {
+      return;
+    }
+
     // Use WebAudio to play quack sound
     const audio = new Audio('/quack.mp3');
     audio.volume = 0.3;

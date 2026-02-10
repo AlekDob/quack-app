@@ -8,6 +8,7 @@ import { getCurrentVersion } from "./utils/version";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog, confirm } from "@tauri-apps/plugin-dialog";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
 import {
   isPermissionGranted,
   requestPermission,
@@ -21,12 +22,13 @@ import { saveSessionBackup } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
+import SidePanelAccordion from "./components/SidePanelAccordion";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
-import MarketplaceDrawer from "./components/MarketplaceDrawer";
+import QuackStoreDrawer from "./components/QuackStoreDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
@@ -42,6 +44,7 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
+import SupportChatWidget from "./components/SupportChatWidget";
 // Old Background Tasks system - replaced by Kanban shell tasks
 // import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
 // import { runDroidInBackground } from "./services/backgroundAgentService";
@@ -78,7 +81,9 @@ import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useSessionStore } from "./stores/sessionStore";
+import { useTeamStore } from "./stores/teamStore";
 import { useChatStore } from "./stores/chatStore";
+import { useIDEStore } from "./stores/ideStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
@@ -86,25 +91,36 @@ import { ProBanner } from "./components/ProBanner";
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
 import { useDroidFactory } from "./hooks/useDroidFactory";
+import PrerequisitesCheck from "./components/settings/PrerequisitesCheck";
+import GitConfigOnboarding from "./components/settings/GitConfigOnboarding";
 import IDEOnboarding from "./components/settings/IDEOnboarding";
+import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorMonaco";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
+import { useModelsConfig } from "./hooks/useAppConfig";
+import { getModelId } from "./services/modelService";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
+import { useWindowFocus } from "./hooks/useWindowFocus";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
 import {
   saveTabsByTerminalToStorage,
   loadTabsByTerminalFromStorage,
   saveNativeTerminalsToStorage,
   loadNativeTerminalsFromStorage,
+  addActiveAgent,
+  removeActiveAgent,
+  migrateToActiveAgentsIndex,
+  loadActiveAgentsWithData,
   STORAGE_KEY,
   TABS_BY_TERMINAL_KEY,
   NATIVE_TERMINALS_STORAGE_KEY,
 } from "./services/terminalStorage";
+import { extractProjectId } from "./utils/projectUtils";
 import {
   loadAgents as loadUnifiedAgents,
   saveAgents as saveUnifiedAgents,
@@ -156,6 +172,7 @@ import type {
   UsageStats,
   AgentPersonality,
   SessionInfo,
+  SessionDetails,
   SavedAgent,
   HookConfig,
   KanbanTask,
@@ -253,6 +270,15 @@ async function getCachedStore(filename: string) {
 }
 
 // ============================================
+// Session Message Hydration
+// ============================================
+// Restore chat messages from Claude SDK sessions on app startup
+
+// 🚀 LAZY HYDRATION: hydrateSessionMessages removed - chat messages are now loaded
+// on-demand when a session is selected (see setActiveSessionIdExclusive)
+// This significantly improves app startup time by avoiding N resume_session calls at boot
+
+// ============================================
 // Terminal <-> UnifiedAgent Conversion Helpers
 // ============================================
 
@@ -261,7 +287,7 @@ async function getCachedStore(filename: string) {
  */
 function terminalToUnifiedAgent(terminal: TerminalInfo): UnifiedAgent {
   // Extract project name from cwd (last segment of path)
-  const projectName = terminal.cwd?.split("/").pop() ?? "Unknown";
+  const projectName = extractProjectId(terminal.cwd) || "Unknown";
 
   return {
     id: terminal.id,
@@ -300,7 +326,6 @@ function AppContent() {
   const duckBackgroundImage = new URL("../images/backgrounds/duck.png", import.meta.url).href;
   const ducksPatternBackgroundImage = new URL("../images/backgrounds/ducks-pattern.png", import.meta.url).href;
   const duckPattern3BackgroundImage = new URL("../images/backgrounds/duck-pattern3.png", import.meta.url).href;
-  const quackAgentBackgroundImage = new URL("../images/backgrounds/quack-agent.jpeg", import.meta.url).href;
   const hackerBackgroundImage = new URL("../images/backgrounds/hacker.png", import.meta.url).href;
   const duckBusinessBackgroundImage = new URL("../images/backgrounds/duckbusiness.png", import.meta.url).href;
   const duckMotoBackgroundImage = new URL("../images/backgrounds/duckmoto.png", import.meta.url).href;
@@ -335,8 +360,14 @@ function AppContent() {
     userStats,
   } = useDroidFactory();
 
+  // Model configuration from Supabase - needed for model ID mapping
+  const { models: remoteModels } = useModelsConfig();
+
   // System wake handler - prevents blank screen after macOS standby
   useSystemWakeHandler({ debug: true });
+
+  // Window focus handler - pauses animations when window is blurred for battery saving
+  useWindowFocus();
 
   // Background Agents initialization - needed for /background @agent commands
   useBackgroundAgentInit();
@@ -440,6 +471,44 @@ function AppContent() {
       // When setting a session, clear the task to prevent mixing
       setActiveTaskId(null);
       console.log(`[SESSION-FIX] Cleared activeTaskId because activeSessionId is now: ${newSessionId}`);
+
+      // 🚀 LAZY HYDRATION: Load chat messages only when session is selected
+      // This avoids loading ALL sessions at boot, improving startup time
+      setChatSessions(prev => {
+        // Skip if already hydrated
+        if (prev.has(newSessionId)) {
+          return prev;
+        }
+
+        // Async hydration - doesn't block the selection
+        (async () => {
+          const session = useSessionStore.getState().sessions.find(s => s.id === newSessionId);
+          if (!session?.claudeSessionId) return;
+
+          try {
+            const details = await invoke<SessionDetails>('resume_session', {
+              sessionId: session.claudeSessionId
+            });
+
+            if (details.messages && details.messages.length > 0) {
+              const chatMessages: ChatMessage[] = details.messages.map((m) => ({
+                id: crypto.randomUUID(),
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+                timestamp: m.timestamp || Date.now(),
+                status: 'complete' as const,
+              }));
+
+              setChatSessions(p => new Map(p).set(newSessionId, chatMessages));
+              console.log(`[LAZY HYDRATE] Loaded ${chatMessages.length} messages for session ${newSessionId}`);
+            }
+          } catch (e) {
+            console.debug(`[LAZY HYDRATE] Could not restore session ${newSessionId}:`, e);
+          }
+        })();
+
+        return prev;
+      });
     }
   }, []);
 
@@ -447,6 +516,10 @@ function AppContent() {
   // Maps requestId -> { agentId, sessionKey, questions } for responding via stdin
   // 🦆 FIX: Added sessionKey to track which specific session has the pending question
   const [pendingUserQuestions, setPendingUserQuestions] = useState<Map<string, { agentId: string; sessionKey?: string; questions: unknown[] }>>(new Map());
+
+  // 📋 PlanApproval: Track pending plan approval requests from ExitPlanMode
+  // Maps requestId -> { agentId, sessionKey, plan } for responding via stdin
+  const [pendingPlanApprovals, setPendingPlanApprovals] = useState<Map<string, { agentId: string; sessionKey?: string; plan: unknown }>>(new Map());
 
   // 🔵 Read-once notification badge system: Track last read timestamp for each agent
   // When user clicks an agent, we mark it as "read" by storing current timestamp
@@ -477,7 +550,7 @@ function AppContent() {
 
     terminals.forEach(terminal => {
       const path = terminal.cwd;
-      const name = path.split('/').pop() || path;
+      const name = extractProjectId(path) || path;
 
       if (!projectMap.has(path)) {
         projectMap.set(path, { name, path, agentCount: 0 });
@@ -553,11 +626,11 @@ function AppContent() {
   const [selectingDirectory, setSelectingDirectory] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState(false);
   const [quackSoundEnabled, setQuackSoundEnabled] = useState(() => {
-    // Load from localStorage, default to true
+    // Default to true (sound ON by default)
     const stored = localStorage.getItem('quackSoundEnabled');
-    return stored === null ? true : stored === 'true';
+    return stored !== 'false';
   });
-  const [_booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(true);
   // Splash is now handled by native HTML splash in index.html only
   // React SplashScreen is only used for "Watch Intro" replay feature
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
@@ -569,6 +642,37 @@ function AppContent() {
   useEffect(() => {
     getCurrentVersion().then(version => setIntroVersion(`v${version}`));
   }, []);
+
+  // Load quack sound setting from Tauri Store and listen for changes
+  useEffect(() => {
+    const loadSoundSetting = async () => {
+      try {
+        const store = await Store.load('.quack-ui-prefs.dat');
+        const sound = await store.get<boolean>('quack-sound-enabled');
+        // Only enable if explicitly set to true (opt-in)
+        const enabled = sound === true;
+        setQuackSoundEnabled(enabled);
+        // Sync localStorage with Tauri Store
+        localStorage.setItem('quackSoundEnabled', String(enabled));
+      } catch (err) {
+        console.warn('Failed to load quack sound setting:', err);
+      }
+    };
+    loadSoundSetting();
+
+    const handleSoundSettingChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ enabled: boolean }>;
+      setQuackSoundEnabled(customEvent.detail.enabled);
+      // Sync localStorage with custom event
+      localStorage.setItem('quackSoundEnabled', String(customEvent.detail.enabled));
+    };
+
+    window.addEventListener('quack-sound-setting-changed', handleSoundSettingChange);
+    return () => {
+      window.removeEventListener('quack-sound-setting-changed', handleSoundSettingChange);
+    };
+  }, []);
+
   const [previewFile, setPreviewFile] = useState<{
     name: string;
     path: string;
@@ -584,9 +688,12 @@ function AppContent() {
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
-  const [showPluginsDrawer, setShowPluginsDrawer] = useState(false);
+  const [showStoreDrawer, setShowStoreDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsInitialCategory, setSettingsInitialCategory] = useState<'general' | 'about' | undefined>(undefined);
   const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  // Force expand a specific section in the side panel accordion
+  const [forceExpandSection, setForceExpandSection] = useState<string | null>(null);
   // Chat fullscreen mode - hides side panel and expands chat
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   // Track sidebar state before Kanban view to restore it on exit
@@ -595,7 +702,7 @@ function AppContent() {
   const [kanbanSidePanelExpanded, setKanbanSidePanelExpanded] = useState(false);
   // Show Kanban Mini Panel in sidebar (toggled via button in Kanban tab header)
   const [showKanbanMiniPanel, setShowKanbanMiniPanel] = useState(false);
-  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(true);
+  const [emptyStateShowGuide, setEmptyStateShowGuide] = useState(false);
 
   // Tab system state - restore from localStorage for wake-from-standby resilience
   const [tabs, setTabs] = useState<Tab[]>(() => {
@@ -1056,6 +1163,19 @@ function AppContent() {
       contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
     });
 
+    // Intercept Agent events for Team teammate tracking
+    if (claudeEvent.type === 'agent') {
+      const agentEvt = claudeEvent as any;
+      const teamState = useTeamStore.getState();
+      if (teamState.activeTeam && agentEvt.agent_name) {
+        if (agentEvt.action === 'start') {
+          teamState.updateTeammateStatus(agentEvt.agent_name, 'active', agentEvt.session_id);
+        } else if (agentEvt.action === 'stop') {
+          teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped');
+        }
+      }
+    }
+
     // Update chat session with incoming events using messageKey
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
@@ -1298,8 +1418,7 @@ function AppContent() {
 
     // Extract project name from cwd (last folder in path)
     const cwd = activeTerminal.cwd || '';
-    const pathParts = cwd.split('/').filter(Boolean);
-    const project = pathParts[pathParts.length - 1] || '';
+    const project = extractProjectId(cwd) || '';
     setProjectName(project);
 
     // Use the branch associated with this terminal (agent workspace)
@@ -1316,7 +1435,43 @@ function AppContent() {
           setGitBranch(''); // Not a git repository or error
         });
     }
+
+    // Start git branch watcher for this project (idempotent — safe to call repeatedly)
+    if (cwd) {
+      invoke('start_git_branch_watcher', { projectPath: cwd }).catch(() => {
+        // Not a git repo or watcher failed — silent
+      });
+    }
   }, [activeTerminal, tauriAvailable]);
+
+  // Listen for real-time git branch changes from file watcher
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const unlistenPromise = listen<{ projectPath: string; branch: string }>(
+      'git:branch-changed',
+      (event) => {
+        const { projectPath, branch } = event.payload;
+        const activeCwd = activeTerminal?.cwd || '';
+
+        // Update displayed branch if event matches the active terminal's project
+        if (activeCwd && projectPath === activeCwd) {
+          setGitBranch(branch);
+        }
+
+        // Update branch on ALL terminals that share this project path (persistence)
+        setTerminals((prev) =>
+          prev.map((t) =>
+            t.cwd === projectPath ? { ...t, branch } : t
+          )
+        );
+      }
+    );
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten()).catch(() => undefined);
+    };
+  }, [tauriAvailable, activeTerminal?.cwd]);
 
   // Handle deep link file opening from Quack Inspector
   useDeepLinkHandler(
@@ -1459,6 +1614,38 @@ function AppContent() {
     // Update previous activeId ref
     previousActiveIdRef.current = activeId;
   }, [activeId]); // Only depend on activeId change
+
+  // 🎯 Load personality from Rust when activeId changes (for AgentPersonalityCard)
+  // This ensures selectedSkills and other fields are loaded from filesystem
+  useEffect(() => {
+    if (!activeId) return;
+
+    const activeTerminal = terminals.find(t => t.id === activeId);
+    if (!activeTerminal?.cwd) return;
+
+    // Load personality from Rust in background
+    const loadPersonality = async () => {
+      try {
+        const personality = await invoke<AgentPersonality>('load_agent_personality', {
+          projectPath: activeTerminal.cwd,
+          personalityId: activeTerminal.id,
+        });
+
+        // Update terminal state with loaded personality (merging with existing)
+        setTerminals(prev => prev.map(t =>
+          t.id === activeId
+            ? { ...t, personality: { ...t.personality, ...personality } }
+            : t
+        ));
+        console.log('✅ Loaded personality for active agent:', activeTerminal.label, 'skills:', personality.selectedSkills);
+      } catch (error) {
+        // No personality found - that's fine, use existing state
+        console.log('No personality found for:', activeTerminal.label);
+      }
+    };
+
+    loadPersonality();
+  }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 🦆 Ref to sendMessageForAgent function (to avoid circular dependency)
   const sendMessageForAgentRef = useRef<((content: string, options?: ChatSendOptions) => Promise<void>) | null>(null);
@@ -1933,7 +2120,7 @@ function AppContent() {
     // Check if chat is configured
     if (!isChatConfigured) {
       const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
+        id: `msg-${Date.now()}-error-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: 'Quack quack! 🦆 Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
         timestamp: Date.now(),
@@ -1987,7 +2174,7 @@ function AppContent() {
         : content;
 
     const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -2029,13 +2216,13 @@ function AppContent() {
       agent_name: capturedAgentLabel,
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
-      model: options?.model || 'sonnet',
+      model: options?.model || 'sonnet45',
       thinking_mode: options?.thinkingMode || 'auto',
       message_length: content.length,
     });
 
     // Create assistant message placeholder with settings metadata (SDK 0.1.54+)
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -2046,7 +2233,7 @@ function AppContent() {
       status: 'streaming',
       // Store settings used for this message (for UI display)
       settings: {
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2086,9 +2273,9 @@ function AppContent() {
     });
 
     try {
-      // Build context from agent's conversation history
-      // 🦆 RACE CONDITION FIX: Use capturedAgentId
-      const agentHistory = chatConversationHistoryRef.current.get(capturedAgentId) ?? [];
+      // Build context from SESSION's conversation history (not agent!)
+      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so sessions don't share history
+      const agentHistory = chatConversationHistoryRef.current.get(messageKey) ?? [];
       let prompt = contentWithAttachments;
       if (agentHistory.length > 0) {
         const history = agentHistory
@@ -2125,7 +2312,14 @@ function AppContent() {
           agentId: capturedAgentId,
           request: {
             prompt,
-            model: options?.model || 'sonnet',
+            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
+            model: (() => {
+              const friendlyName = options?.model || 'sonnet45';
+              const resolvedId = getModelId(friendlyName, remoteModels);
+              console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, remoteModels=${remoteModels?.length ?? 0}, resolvedId=${resolvedId}`);
+              console.log(`🦆 [MODEL DEBUG] remoteModels:`, remoteModels?.map(m => `${m.id}→${m.modelId}`).join(', ') || 'EMPTY');
+              return resolvedId;
+            })(),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             attachments: attachments.map(a => a.path),
@@ -2134,7 +2328,7 @@ function AppContent() {
             agents: availableDroids.length > 0 ? availableDroids.map(droid => ({
               name: droid.id.replace('global-', ''), // Use ID as name for @mention matching
               description: droid.description,
-              model: 'sonnet', // Default model for droids
+              model: getModelId('sonnet', remoteModels), // Default model for droids
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
@@ -2154,6 +2348,20 @@ function AppContent() {
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
+            // Agent Teams: pass teamContext when active agent is the Team Lead
+            teamContext: (() => {
+              const team = useTeamStore.getState().activeTeam;
+              if (!team || team.leadAgentId !== capturedAgentId) return undefined;
+              return {
+                teamName: team.name,
+                members: team.members.map(m => ({
+                  name: m.name,
+                  role: m.role,
+                  communicationStyle: m.communicationStyle,
+                  isLead: m.isLead,
+                })),
+              };
+            })(),
           },
         }),
         abortPromise,
@@ -2190,8 +2398,8 @@ function AppContent() {
           content: response.result,
         },
       ];
-      // 🦆 RACE CONDITION FIX: Use CAPTURED agentId, not current activeId
-      chatConversationHistoryRef.current.set(capturedAgentId, updatedHistory);
+      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so each session has its own history
+      chatConversationHistoryRef.current.set(messageKey, updatedHistory);
 
 
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
@@ -2237,7 +2445,7 @@ function AppContent() {
         agent_name: capturedAgentLabel,
         response_time_ms: responseTime,
         response_length: response.result?.length || 0,
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
         session_id: response.session_id,
         total_cost_usd: response.total_cost_usd,
       });
@@ -2255,7 +2463,7 @@ function AppContent() {
         agent_id: capturedAgentId,
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMsg.substring(0, 200),
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
       });
 
       // Check if this was an abort
@@ -2334,7 +2542,7 @@ function AppContent() {
 
       console.log(`[sendMessage] Stream ${streamKey} ended. Remaining streams for session ${messageKey}:`, activeStreamsRef.current.get(messageKey)?.size || 0);
     }
-  }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession]);
+  }, [activeId, activeSessionId, agentSessions, terminals, isChatConfigured, chatSessions, activeAgent, activeTerminal?.cwd, explorerPath, availableDroids, ensureListenerReady, updateSession, remoteModels]);
 
   // 📱 Keep ref always up-to-date for external integrations (WhatsApp auto-start, Telegram)
   sendMessageForAgentRef.current = sendMessageForAgent;
@@ -2605,7 +2813,7 @@ function AppContent() {
     // Check if chat is configured
     if (!isChatConfigured) {
       const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
+        id: `msg-${Date.now()}-error-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: 'Quack quack! Claude CLI is not available. Please make sure Claude Code CLI is installed and you are logged in.',
         timestamp: Date.now(),
@@ -2670,7 +2878,7 @@ function AppContent() {
 
     // Create user message
     const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -2692,7 +2900,7 @@ function AppContent() {
     });
 
     // Create assistant message placeholder
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
+    const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -2700,7 +2908,7 @@ function AppContent() {
       timestamp: 0,
       status: 'streaming',
       settings: {
-        model: options?.model || 'sonnet',
+        model: options?.model || 'sonnet45',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2763,7 +2971,8 @@ function AppContent() {
           agentId: targetAgentId,
           request: {
             prompt,
-            model: options?.model || 'sonnet',
+            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
+            model: getModelId(options?.model || 'sonnet45', remoteModels),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
@@ -2878,7 +3087,7 @@ function AppContent() {
         timestamp: Date.now(),
         status: 'complete' as const,
         settings: {
-          model: options?.model || 'sonnet',
+          model: options?.model || 'sonnet45',
           effort: options?.effort || 'medium',
           thinkingMode: options?.thinkingMode || 'auto',
         },
@@ -2921,7 +3130,7 @@ function AppContent() {
       activeStreamsRef.current.get(targetAgentId)?.delete(streamKey);
       abortControllersRef.current.delete(streamKey);
     }
-  }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession]);
+  }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession, remoteModels]);
 
   // Abort stream for a specific agent (used by Kanban)
   const abortStreamForTargetAgent = useCallback((targetAgentId: string) => {
@@ -3045,7 +3254,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         agentId: targetAgentId,
         request: {
           prompt: compactPrompt,
-          model: 'haiku', // Use faster model for summaries
+          // 🦆 MODEL FIX: Map friendly name to API model ID
+          model: getModelId('haiku', remoteModels), // Use faster model for summaries
           permissionMode: 'bypass',
           cwd: workingDir,
           allowedTools: [
@@ -3117,7 +3327,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
     }
-  }, [chatSessions, chatTokensMap, explorerPath]);
+  }, [chatSessions, chatTokensMap, explorerPath, remoteModels]);
 
   // ============================================
   // END KANBAN CHAT INTEGRATION FUNCTIONS
@@ -3200,7 +3410,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         agentId: activeId,
         request: {
           prompt: compactPrompt,
-          model: 'haiku', // Use faster model for summaries
+          // 🦆 MODEL FIX: Map friendly name to API model ID
+          model: getModelId('haiku', remoteModels), // Use faster model for summaries
           permissionMode: 'bypass',
           cwd: activeTerminal?.cwd ?? explorerPath,
           // 🗣️ Enable interactive tools (SDK v0.1.71+) - though AskUserQuestion unlikely for /compact
@@ -3274,7 +3485,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
     }
-  }, [activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath]);
+  }, [activeSessionId, chatSessions, chatTokensMap, activeTerminal, explorerPath, remoteModels]);
 
   // Clear conversation for current agent (Claude SDK /clear command)
   const clearCurrentAgentConversation = useCallback(async () => {
@@ -3299,8 +3510,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newSessions;
       });
 
-      // Clear conversation history
-      chatConversationHistoryRef.current.set(activeId, []);
+      // Clear conversation history (keyed by sessionId)
+      const sessionToClear = activeSessionId || activeId;
+      chatConversationHistoryRef.current.set(sessionToClear, []);
 
       // Clear last prompt
       lastPromptsRef.current.delete(activeId);
@@ -3358,17 +3570,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     // 🦆 FIX: Helper to find requestId with retry support for race conditions
     // Now filters by BOTH agentId AND sessionKey to prevent session mixing
+    // 🦆 FIX: Returns the MOST RECENT (last inserted) match to avoid stale requestIds
     const findRequestId = (): { requestId: string | null; sessionKey?: string; questions: unknown[] } => {
+      let latest: { requestId: string; sessionKey?: string; questions: unknown[] } | null = null;
+
       for (const [requestId, data] of pendingUserQuestions.entries()) {
         // 🦆 FIX: Match by agentId AND sessionKey (if provided) to prevent cross-session contamination
         const agentMatches = data.agentId === activeId;
         const sessionMatches = !targetSessionKey || data.sessionKey === targetSessionKey;
 
         if (agentMatches && sessionMatches) {
-          return { requestId, sessionKey: data.sessionKey, questions: data.questions };
+          // Keep iterating to find the LAST (most recent) match in insertion order
+          latest = { requestId, sessionKey: data.sessionKey, questions: data.questions };
         }
       }
-      return { requestId: null, sessionKey: undefined, questions: [] };
+
+      return latest || { requestId: null, sessionKey: undefined, questions: [] };
     };
 
     // 🦆 FIX: Retry with exponential backoff for race conditions
@@ -3552,6 +3769,87 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId, pendingUserQuestions]);
 
+  // 📋 PlanApproval: Approve or reject a plan from ExitPlanMode
+  // Reuses the same stdin communication as AskUserQuestion
+  const respondToPlanApproval = useCallback(async (
+    requestId: string,
+    approved: boolean,
+    feedback?: string
+  ) => {
+    if (!activeId) {
+      console.error('[App] Cannot respond to plan: no active agent');
+      return;
+    }
+
+    const planData = pendingPlanApprovals.get(requestId);
+    if (!planData) {
+      console.error('[App] Cannot respond to plan: no pending request for', requestId);
+      return;
+    }
+
+    const processKey = planData.sessionKey || planData.agentId;
+    const pendingKey = planData.sessionKey || planData.agentId;
+
+    console.info('[App] 📋 Responding to plan approval:', {
+      requestId,
+      approved,
+      feedback,
+      processKey,
+    });
+
+    // Remove from pending state
+    setPendingPlanApprovals(prev => {
+      const next = new Map(prev);
+      next.delete(requestId);
+      return next;
+    });
+    setPendingQuestionIdsMap(prev => {
+      const newMap = new Map(prev);
+      const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+      pending.delete(requestId);
+      if (pending.size === 0) {
+        newMap.delete(pendingKey);
+      } else {
+        newMap.set(pendingKey, pending);
+      }
+      return newMap;
+    });
+
+    try {
+      const { answerUserQuestionViaStdin } = await import('./services/claudeSDK');
+
+      // Send response via stdin - reuse the same mechanism as AskUserQuestion
+      // The backend expects { requestId, answers } format
+      // We encode approved/feedback as answers that stream-claude.js will parse
+      await answerUserQuestionViaStdin(
+        processKey,
+        requestId,
+        { approved: approved ? 'true' : 'false', feedback: feedback || '' }
+      );
+
+      console.log('[App] 📋 Plan approval response sent successfully');
+    } catch (error) {
+      console.error('[App] Failed to send plan approval response:', error);
+      toast.error('Failed to send plan response. Please try again.');
+
+      // Revert state on error
+      if (planData) {
+        setPendingPlanApprovals(prev => {
+          const next = new Map(prev);
+          next.set(requestId, planData);
+          return next;
+        });
+        setPendingQuestionIdsMap(prev => {
+          const newMap = new Map(prev);
+          const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+          pending.add(requestId);
+          newMap.set(pendingKey, pending);
+          return newMap;
+        });
+      }
+    }
+  }, [activeId, pendingPlanApprovals]);
+
   // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
     if (!activeId) return;
@@ -3568,18 +3866,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const terminalCwd = currentAgent?.cwd || explorerPath || process.env.HOME || '~';
       const terminalLabel = `Resume ${sessionId.slice(0, 8)}`;
 
-      // Prepare projects list from agent chats
-      const projects = agentChats.map(agent => ({
-        path: agent.cwd,
-        name: agent.cwd.split('/').pop() || agent.cwd,
+      // Prepare projects list from active projects (terminals in sidebar)
+      const projects = activeProjects.map(project => ({
+        path: project.path,
+        name: project.name,
       }));
-      // Remove duplicates by path
-      const uniqueProjects = projects.filter(
-        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-      );
 
       // Open terminal window with initial command to resume session
-      await openTerminalWindow(uniqueProjects, {
+      await openTerminalWindow(projects, {
         projectPath: terminalCwd,
         command: `claude --resume ${sessionId}`,
         terminalLabel: terminalLabel,
@@ -3611,18 +3905,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const terminalCwd = session.projectPath || explorerPath || process.env.HOME || '~';
       const terminalLabel = `Resume ${session.claudeSessionId.slice(0, 8)}`;
 
-      // Prepare projects list from agent chats
-      const projects = agentChats.map(agent => ({
-        path: agent.cwd,
-        name: agent.cwd.split('/').pop() || agent.cwd,
+      // Prepare projects list from active projects (terminals in sidebar)
+      const projects = activeProjects.map(project => ({
+        path: project.path,
+        name: project.name,
       }));
-      // Remove duplicates by path
-      const uniqueProjects = projects.filter(
-        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-      );
 
       // Open terminal window with initial command to resume session
-      await openTerminalWindow(uniqueProjects, {
+      await openTerminalWindow(projects, {
         projectPath: terminalCwd,
         command: `claude --resume ${session.claudeSessionId}`,
         terminalLabel: terminalLabel,
@@ -3745,12 +4035,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Grid columns: Always show left sidebar (360px), Kanban replaces main content area
   // Right side panel can be toggled in both normal and Kanban mode
   // In Kanban mode: default collapsed unless kanbanSidePanelExpanded is true (user clicked on project)
+  // When no agents/projects: hide sidebar completely (empty state)
+  const showSidebar = terminals.length > 0 || persistedProjects.size > 0;
   const shouldShowSidePanel = isKanbanTabActive
     ? kanbanSidePanelExpanded && !sidePanelCollapsed
     : !sidePanelCollapsed;
-  const gridTemplateColumns = shouldShowSidePanel
-    ? "360px minmax(0, 1fr) 420px"
-    : "360px minmax(0, 1fr) 0px";
+
+  // When no agents, use 0px for sidebar column to completely hide it
+  const gridTemplateColumns = !showSidebar
+    ? "0px minmax(0, 1fr) 0px"  // Empty state: full width center
+    : shouldShowSidePanel
+      ? "360px minmax(0, 1fr) 420px"
+      : "360px minmax(0, 1fr) 0px";
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -3873,17 +4169,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
   // Agent Chat Settings helpers - get or create settings for current agent
-  // Normalize legacy full model IDs (e.g. "claude-sonnet-4-5-20250929") to short names
-  // Short IDs from modelService (e.g. "sonnet5", "opus") pass through unchanged
+  // Normalize model IDs to Supabase IDs (e.g. "sonnet45", "opus46", "haiku45")
+  // Handles both legacy short names ("sonnet", "opus") and full API IDs ("claude-sonnet-4-5-...")
   const normalizeModelName = (model: string): string => {
-    // Only normalize legacy full API model IDs (contain "claude-")
+    // Map legacy short names to Supabase IDs
+    const legacyMap: Record<string, string> = {
+      'sonnet': 'sonnet45',
+      'opus': 'opus46',
+      'haiku': 'haiku45',
+    };
+    if (legacyMap[model]) return legacyMap[model];
+
+    // Normalize full API model IDs to Supabase IDs
     if (model.startsWith("claude-")) {
-      if (model.includes("opus")) return "opus";
-      if (model.includes("haiku")) return "haiku";
-      // Match sonnet last since it's the broadest
-      if (model.includes("sonnet")) return "sonnet";
+      if (model.includes("opus")) return "opus46";
+      if (model.includes("haiku")) return "haiku45";
+      if (model.includes("sonnet")) return "sonnet45";
     }
-    // Short IDs (opus, sonnet, sonnet5, haiku, etc.) pass through as-is
+    // Supabase IDs (sonnet45, opus46, haiku45) pass through as-is
     return model;
   };
 
@@ -3898,7 +4201,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       return {
         inputDraft: '',
-        model: bypassPreset?.model || 'sonnet',
+        model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
         effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -3907,7 +4210,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const existing = agentChatSettings.get(settingsKey);
     if (existing) {
-      // Normalize the model name in case it's a legacy full ID
+      // Normalize the model name in case it's a legacy ID
       return {
         ...existing,
         model: normalizeModelName(existing.model),
@@ -3921,7 +4224,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const defaultSettings: AgentChatSettings = {
       inputDraft: '',
-      model: bypassPreset?.model || 'sonnet',
+      model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
       thinkingMode: bypassPreset?.thinkingMode || 'auto',
       permissionMode: 'bypass',
       effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -3950,7 +4253,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       const current = newMap.get(key) ?? {
         inputDraft: '',
-        model: bypassPreset?.model || 'sonnet',
+        model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
         effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -3961,7 +4264,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
         const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
         if (preset) {
-          finalUpdates.model = preset.model;
+          finalUpdates.model = normalizeModelName(preset.model);
           finalUpdates.thinkingMode = preset.thinkingMode;
           finalUpdates.effort = preset.effort;
         }
@@ -4170,6 +4473,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       showIntroReplay();
     });
 
+    // Listen for menu event to check for updates (opens Settings > About)
+    const unlistenCheckUpdatesPromise = listen("check-for-updates", () => {
+      setSettingsInitialCategory('about');
+      setShowSettings(true);
+    });
+
     // Listen for menu event to open Backgrounds modal
     const unlistenBackgroundsPromise = listen("open-backgrounds", () => {
       setShowBackgroundsModal(true);
@@ -4194,8 +4503,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       // Store the pending question for when user responds
       // 🦆 FIX: Include sessionKey for proper per-session tracking when removing
+      // 🦆 FIX: Remove stale pending questions for the same agent+session before adding new one
+      // This prevents requestId mismatch when agent asks multiple questions in sequence
       setPendingUserQuestions((prev) => {
         const next = new Map(prev);
+
+        // Remove any stale pending questions for the same agent+session
+        for (const [existingId, existingData] of next.entries()) {
+          if (existingData.agentId === agentId &&
+              (!sessionKey || existingData.sessionKey === sessionKey)) {
+            console.log(`🗣️ [GLOBAL] Removing stale pending question: ${existingId} (replaced by ${requestId})`);
+            next.delete(existingId);
+          }
+        }
+
         next.set(requestId, { agentId, sessionKey, questions });
         return next;
       });
@@ -4229,6 +4550,46 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             : `The agent has ${questionCount} questions for you`,
         });
         console.log(`🔔 Desktop notification sent for ${agentName}`);
+      } catch (notifyError) {
+        console.warn('Failed to send notification:', notifyError);
+      }
+    });
+
+    // 📋 GLOBAL PlanApprovalRequest listener - catches ExitPlanMode events
+    const unlistenPlanApprovalGlobalPromise = listen<{
+      requestId: string;
+      plan: unknown;
+      agentId: string;
+      sessionKey?: string;
+    }>('plan-approval-request', async (event) => {
+      console.log(`📋 [GLOBAL] PlanApprovalRequest event received:`, event.payload);
+      const { requestId, plan, agentId, sessionKey } = event.payload;
+
+      // Store the pending plan approval for when user responds
+      setPendingPlanApprovals((prev) => {
+        const next = new Map(prev);
+        next.set(requestId, { agentId, sessionKey, plan });
+        return next;
+      });
+
+      // Also add to pending question IDs for UI state (shows indicator on agent)
+      const pendingKey = sessionKey || agentId;
+      setPendingQuestionIdsMap((prev) => {
+        const newMap = new Map(prev);
+        const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+        pending.add(requestId);
+        newMap.set(pendingKey, pending);
+        return newMap;
+      });
+
+      // Send desktop notification
+      try {
+        const agentChat = agentChats.find((a: { id: string }) => a.id === agentId);
+        const agentName = agentChat?.name || 'Agent';
+        await sendNotification({
+          title: `${agentName} needs plan approval`,
+          body: 'Review and approve the plan to proceed',
+        });
       } catch (notifyError) {
         console.warn('Failed to send notification:', notifyError);
       }
@@ -4311,9 +4672,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenWatchIntroPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenCheckUpdatesPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenPlanApprovalGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionAutoStartPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
@@ -4364,8 +4727,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         // Store the pending question for when user responds
         // 🦆 FIX: Include sessionKey for proper per-session tracking
+        // 🦆 FIX: Remove stale pending questions for the same agent+session before adding new one
         setPendingUserQuestions((prev) => {
           const next = new Map(prev);
+
+          // Remove any stale pending questions for the same agent+session
+          for (const [existingId, existingData] of next.entries()) {
+            if (existingData.agentId === agentId &&
+                (!sessionKey || existingData.sessionKey === sessionKey)) {
+              console.log(`🗣️ [Agent] Removing stale pending question: ${existingId} (replaced by ${requestId})`);
+              next.delete(existingId);
+            }
+          }
+
           next.set(requestId, { agentId, sessionKey, questions });
           return next;
         });
@@ -5106,6 +5480,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } finally {
       setLoadingAgents(false);
       setAgentsInitialized(true); // Mark first load as complete (for splash screen)
+
+      // Hide the overlay loader after React has finished rendering
+      // Use requestAnimationFrame to wait for paint, then a small delay for layout stabilization
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Double rAF ensures React render + browser paint are complete
+          setTimeout(() => {
+            const appLoader = document.getElementById('app-loader');
+            if (appLoader) {
+              appLoader.classList.add('fade-out');
+              setTimeout(() => appLoader.remove(), 800); // Match CSS transition duration
+            }
+          }, 150); // Delay for layout stabilization before fade
+        });
+      });
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
@@ -5493,21 +5882,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
 
   // Load Quack Agency agents on startup
-  // No longer blocking splash - agents load in background while native splash shows
+  // Load agents in parallel with main bootstrap (non-blocking)
+  // booting/hasBootstrapped are controlled by main bootstrap only (line ~6355)
   useEffect(() => {
     if (!tauriAvailable) {
       return;
     }
-    const loadInitialAgents = async () => {
-      console.log('[Startup] Loading agents...');
-      await loadAgents();
-      console.log('[Startup] Agents loaded');
-      setBooting(false);
-      if (!hasBootstrapped) {
-        setHasBootstrapped(true);
-      }
-    };
-    void loadInitialAgents();
+    console.log('[Startup] Loading agents...');
+    void loadAgents().then(() => console.log('[Startup] Agents loaded'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable]);
 
@@ -5530,15 +5912,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     void loadSkills();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including loadSkills to prevent re-load on every switch
-
-  // Auto-open DocsViewer when there are zero projects (true onboarding)
-  const hasOpenedDocsRef = useRef(false);
-  useEffect(() => {
-    if (hasBootstrapped && terminals.length === 0 && persistedProjects.size === 0 && !hasOpenedDocsRef.current) {
-      hasOpenedDocsRef.current = true;
-      openDocsTab();
-    }
-  }, [hasBootstrapped, terminals.length, persistedProjects.size, openDocsTab]);
 
   // Listen for plugin installation/uninstallation events and refresh agents list
   useEffect(() => {
@@ -5616,7 +5989,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         'duck.png': duckBackgroundImage,
         'ducks-pattern.png': ducksPatternBackgroundImage,
         'duck-pattern3.png': duckPattern3BackgroundImage,
-        'quack-agent.jpeg': quackAgentBackgroundImage,
         'hacker.png': hackerBackgroundImage,
         'duckbusiness.png': duckBusinessBackgroundImage,
         'duckmoto.png': duckMotoBackgroundImage,
@@ -6052,7 +6424,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const projectMap = new Map<string, string>();
         for (const agent of savedAgents) {
           if (agent.projectPath && !projectMap.has(agent.projectPath)) {
-            projectMap.set(agent.projectPath, agent.projectName || agent.projectPath.split('/').pop() || 'Unknown');
+            projectMap.set(agent.projectPath, agent.projectName || extractProjectId(agent.projectPath) || 'Unknown');
           }
         }
         setPersistedProjects(projectMap);
@@ -6176,8 +6548,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions`);
 
-          // Note: Chat history is managed by Claude SDK via session resume
-          // No need to load local messages - SDK handles conversation continuity
+          // 🚀 LAZY HYDRATION: Chat messages are now loaded on-demand when session is selected
+          // This significantly improves startup time by avoiding N resume_session calls at boot
 
           // Load tabs by terminal from storage
           const savedTabsByTerminal = await loadTabsByTerminalFromStorage();
@@ -6192,10 +6564,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           }
         } else {
           console.log('No saved terminals found - empty state will be shown');
-          // Sessions-first: just load sessions, SDK manages chat history
+          // Sessions-first: just load sessions (chat messages loaded on-demand)
           await useSessionStore.getState().loadSessions();
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions (no terminals)`);
+
+          // 🚀 LAZY HYDRATION: Chat messages are now loaded on-demand when session is selected
+          // This significantly improves startup time by avoiding N resume_session calls at boot
         }
       } catch (error) {
         console.error("Error during initialization", error);
@@ -6387,33 +6762,39 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setNewTerminalAvatar(activeTerminal.avatar || ""); // Use empty string as fallback
     setNewTerminalError(null);
 
-    // Load personality from terminal state
-    if (activeTerminal.personality && Object.keys(activeTerminal.personality).length > 0) {
+    // ALWAYS try to load personality from Rust first (has most recent data from filesystem)
+    // This ensures selectedSkills and other fields are loaded correctly even after app restart
+    try {
+      const personality = await invoke<AgentPersonality>('load_agent_personality', {
+        projectPath: activeTerminal.cwd,
+        personalityId: activeTerminal.id,
+      });
       setNewTerminalPersonality({
         technicalContext: '',
         rules: [],
         customNotes: '',
-        ...activeTerminal.personality,
+        ...personality,
       });
-      console.log('✅ Loaded personality from state for:', activeTerminal.label);
-    } else {
-      // Try to load from Rust as fallback
-      try {
-        const personality = await invoke<AgentPersonality>('load_agent_personality', {
-          projectPath: activeTerminal.cwd,
-          personalityId: activeTerminal.id,
-        });
+      console.log('✅ Loaded personality from Rust for:', activeTerminal.label, 'skills:', personality.selectedSkills);
+
+      // Also update terminal state with loaded personality (for AgentPersonalityCard)
+      setTerminals(prev => prev.map(t =>
+        t.id === activeTerminal.id
+          ? { ...t, personality: { ...t.personality, ...personality } }
+          : t
+      ));
+    } catch (error) {
+      // No personality found in Rust - use terminal state or default
+      console.log('No personality found in Rust, using state/default for:', activeTerminal.label);
+      if (activeTerminal.personality && Object.keys(activeTerminal.personality).length > 0) {
         setNewTerminalPersonality({
           technicalContext: '',
           rules: [],
           customNotes: '',
-          ...personality,
+          ...activeTerminal.personality,
         });
-        console.log('✅ Loaded personality from Rust for:', activeTerminal.label);
-      } catch (error) {
-        // No personality found - use current personality or default
-        console.log('No existing personality found, using current or default');
-        setNewTerminalPersonality(activeTerminal.personality || {
+      } else {
+        setNewTerminalPersonality({
           role: 'Feature Coordinator',
           intro: 'Experienced PM specializing in feature delivery and team coordination',
           communicationStyle: 'friendly',
@@ -6595,6 +6976,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       setTerminals((prev) => [...prev, createdWithState]);
       setActiveId(created.id);
+
+      // Add to active-agents.json index (file-based persistence)
+      void addActiveAgent(terminal.cwd, created.id);
 
       // Try to copy personality from original agent
       try {
@@ -6906,6 +7290,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             communicationStyle: agent.personality.communicationStyle || 'professional',
             customNotes: agent.personality.customNotes,
             selectedRules: agent.personality.selectedRules,
+            selectedSkills: agent.personality.selectedSkills,
             intro: '',
             personality: '',
             quirks: '',
@@ -6943,6 +7328,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         next.set(projectPath, projectName);
         return next;
       });
+      // Add all new agents to active-agents.json index
+      for (const terminal of newTerminals) {
+        void addActiveAgent(projectPath, terminal.id);
+      }
     }
   }, [installAgentBundle]);
 
@@ -7083,6 +7472,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             customNotes: agentPersonality.customNotes || undefined,
             // Claude Code rules (new simplified flow)
             selectedRules: agentPersonality.selectedRules || undefined,
+            // Selected skills (for proactive use)
+            selectedSkills: agentPersonality.selectedSkills || undefined,
             // Toolkit (skills, droids, commands for quick-access)
             toolkit: agentPersonality.toolkit || undefined,
             // Legacy fields (kept for backwards compatibility)
@@ -7157,9 +7548,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               console.log(`Creating worktree for new branch: ${newTerminalBranch}`);
 
               // Calculate worktree path: /path/to/repo-branchname
-              const repoName = trimmedPath.split('/').pop() || 'repo';
+              const repoName = extractProjectId(trimmedPath) || 'repo';
               const sanitizedBranch = newTerminalBranch.replace(/\//g, '-');
-              const parentDir = trimmedPath.split('/').slice(0, -1).join('/');
+              // Get parent directory using cross-platform path separator
+              const pathSegments = trimmedPath.replace(/[/\\]+$/, '').split(/[/\\]/);
+              const parentDir = pathSegments.slice(0, -1).join('/');
               worktreePath = `${parentDir}/${repoName}-${sanitizedBranch}`;
 
               await invoke('git_add_worktree', {
@@ -7237,9 +7630,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setActiveId(createdWithState.id);
         clearTerminalAttention(createdWithState.id);
 
+        // Add to active-agents.json index (file-based persistence)
+        void addActiveAgent(effectivePath, createdWithState.id);
+
         // Persist project in sidebar
         const projectPath = effectivePath;
-        const projectName = projectPath.split('/').pop() || 'Unknown';
+        const projectName = extractProjectId(projectPath) || 'Unknown';
         setPersistedProjects(prev => {
           if (prev.has(projectPath)) return prev;
           const next = new Map(prev);
@@ -7260,6 +7656,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               customNotes: agentPersonality.customNotes || undefined,
               // Claude Code rules (new simplified flow)
               selectedRules: agentPersonality.selectedRules || undefined,
+              // Selected skills (for proactive use)
+              selectedSkills: agentPersonality.selectedSkills || undefined,
               // Legacy fields (kept for backwards compatibility)
               intro: agentPersonality.intro || '',
               personality: agentPersonality.personality || '',
@@ -7396,6 +7794,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setActiveId(createdWithState.id);
       clearTerminalAttention(createdWithState.id);
 
+      // Add to active-agents.json index (file-based persistence)
+      void addActiveAgent(cwd, createdWithState.id);
+
       // Load directory
       await loadDirectory(createdWithState.cwd);
 
@@ -7529,10 +7930,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         visualIdleTimersRef.current.delete(id);
       }
 
+      // Get the terminal's project path before closing
+      const closingTerminal = terminals.find(t => t.id === id);
+      const projectPath = closingTerminal?.cwd;
+
       try {
         await invoke("close_terminal", { id });
       } catch (error) {
         console.error("Unable to close terminal", error);
+      }
+
+      // Remove from active-agents.json index
+      if (projectPath) {
+        void removeActiveAgent(projectPath, id);
       }
 
       let nextActive: string | null = activeId;
@@ -7569,6 +7979,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       clearTerminalAttention,
       loadDirectory,
       tauriAvailable,
+      terminals,
     ]
   );
 
@@ -7632,51 +8043,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Handler to open terminal window with projects from agents
   const handleCreateAgentTerminal = useCallback(() => {
     // NEW BEHAVIOR: Open separate Tauri window for terminals
-    // Pass projects derived from agentChats
-    const projects = agentChats.map(agent => ({
-      path: agent.cwd,
-      name: agent.cwd.split('/').pop() || agent.cwd,
+    // Pass projects derived from terminals (activeProjects)
+    const projects = activeProjects.map(project => ({
+      path: project.path,
+      name: project.name,
     }));
-    // Remove duplicates by path
-    const uniqueProjects = projects.filter(
-      (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-    );
-    openTerminalWindow(uniqueProjects);
-  }, [agentChats, openTerminalWindow]);
+    openTerminalWindow(projects);
+  }, [activeProjects, openTerminalWindow]);
 
-  // Sync terminal window projects when agentChats change
+  // Sync terminal window projects when activeProjects change
   // updateTerminalWindowProjects now handles the window lookup internally
   useEffect(() => {
-    const projects = agentChats.map(agent => ({
-      path: agent.cwd,
-      name: agent.cwd.split('/').pop() || agent.cwd,
+    const projects = activeProjects.map(project => ({
+      path: project.path,
+      name: project.name,
     }));
-    // Remove duplicates by path
-    const uniqueProjects = projects.filter(
-      (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-    );
-    // This will only emit if the window exists
-    updateTerminalWindowProjects(uniqueProjects);
-  }, [agentChats, updateTerminalWindowProjects]);
+    // Only update if there are projects (don't clear the list with empty array)
+    if (projects.length > 0) {
+      updateTerminalWindowProjects(projects);
+    }
+  }, [activeProjects, updateTerminalWindowProjects]);
 
   // Listen for sync request from terminal window (manual sync button)
   useEffect(() => {
     const unlistenPromise = listen('terminal-window-request-sync', () => {
       console.log('[App] Received sync request from terminal window');
-      const projects = agentChats.map(agent => ({
-        path: agent.cwd,
-        name: agent.cwd.split('/').pop() || agent.cwd,
+      const projects = activeProjects.map(project => ({
+        path: project.path,
+        name: project.name,
       }));
-      const uniqueProjects = projects.filter(
-        (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-      );
-      updateTerminalWindowProjects(uniqueProjects);
+      updateTerminalWindowProjects(projects);
     });
 
     return () => {
       unlistenPromise.then(unlisten => unlisten());
     };
-  }, [agentChats, updateTerminalWindowProjects]);
+  }, [activeProjects, updateTerminalWindowProjects]);
 
   const handleColorChange = useCallback(
     async (id: string, color: string) => {
@@ -7865,6 +8267,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Use handleOpenFilePreview to actually load file content
     handleOpenFilePreview(fakeEntry, lineChanges);
   }, [handleOpenFilePreview]);
+
+  // Handler to open file in preferred IDE
+  const handleOpenInIDE = useCallback(async (path: string) => {
+    const { preferredIDE } = useIDEStore.getState();
+    if (!preferredIDE) {
+      console.warn('[App] No preferred IDE set, cannot open file');
+      return;
+    }
+    try {
+      await invoke('open_in_app', { appId: preferredIDE, path });
+    } catch (err) {
+      console.error('[App] Failed to open file in IDE:', err);
+    }
+  }, []);
 
   // Handler to open diff drawer from EditSummaryBar
   const handleDiffClick = useCallback(async (filePath: string, status: 'created' | 'modified' | 'deleted') => {
@@ -8101,9 +8517,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[Quack] Memory Graph tab deprecated - use Obsidian vault directly');
   }, []);
 
-  // Handler for opening Second Brain tab (deprecated - brain modules removed)
-  const handleOpenSecondBrainTab = useCallback(() => {
-    console.log('[Quack] Second Brain tab deprecated - use Obsidian vault directly');
+  // Handler for opening Brain folder in Finder/Obsidian
+  const handleOpenSecondBrainTab = useCallback(async () => {
+    try {
+      const { openBrainFolder } = await import('./services/brainFileService');
+      openBrainFolder();
+    } catch (error) {
+      console.error('[Quack] Failed to open Brain folder:', error);
+    }
   }, []);
 
   // Handler for opening Second Brain tab with a specific node (deprecated)
@@ -8222,8 +8643,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Opens the Kanban tab and the new task modal with pre-populated agent data
   const handleCreateTaskFromAgent = useCallback((terminal: TerminalInfo) => {
     // Extract project name from path
-    const pathParts = terminal.cwd.split('/');
-    const projectName = pathParts[pathParts.length - 1];
+    const projectName = extractProjectId(terminal.cwd) || 'Unknown';
 
     // Build initial values for the task modal
     const initialValues: KanbanTaskInitialValues = {
@@ -9093,6 +9513,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           setTerminals((prev) => [...prev, terminalWithState]);
           targetTerminalId = terminalWithState.id;
           setActiveId(targetTerminalId);
+
+          // Add to active-agents.json index (file-based persistence)
+          if (command.cwd) {
+            void addActiveAgent(command.cwd, terminalWithState.id);
+          }
         }
 
         if (targetTerminalId) {
@@ -9313,10 +9738,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const handleOpenTerminalWindowForRepo = useCallback(
     async (repoPath: string, repoName: string) => {
       try {
-        // Get all existing projects from agentChats (same pattern as Terminals button)
-        const projects = agentChats.map(agent => ({
-          path: agent.cwd,
-          name: agent.cwd.split('/').pop() || agent.cwd,
+        // Get all existing projects from activeProjects (same pattern as Terminals button)
+        const projects = activeProjects.map(project => ({
+          path: project.path,
+          name: project.name,
         }));
 
         // Add the clicked project if not already in list
@@ -9339,7 +9764,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         toast.error('Failed to open terminal window');
       }
     },
-    [agentChats, openTerminalWindow]
+    [activeProjects, openTerminalWindow]
   );
 
   const handleStageEntry = useCallback(
@@ -9741,6 +10166,9 @@ You have access to all Bash tools to execute git commands like:
       setActiveId(createdWithState.id);
       clearTerminalAttention(createdWithState.id);
 
+      // Add to active-agents.json index (file-based persistence)
+      void addActiveAgent(workingDirectory, createdWithState.id);
+
       // 6. Load conversation history into chat
       setChatSessions((prev) => {
         const updated = new Map(prev);
@@ -9917,37 +10345,15 @@ You have access to all Bash tools to execute git commands like:
     tauriAvailable,
   ]);
 
-  // Track when app started for minimum splash duration
-  const appMountTimeRef = useRef(Date.now());
-  const MINIMUM_SPLASH_DURATION = 4000; // Show splash for at least 4 seconds
+  // Splash screen removed - app loads directly with smooth CSS transition
+  // The #root element in index.html has a smooth reveal animation
+  // The HTML duck parade loader (#app-loader) stays visible until agents load
 
-  // Hide native HTML splash when agents are loaded (sidebar populated)
-  useEffect(() => {
-    console.log('[Splash] agentsInitialized:', agentsInitialized);
-    if (!agentsInitialized) return; // Wait for first agent load to complete
-
-    const nativeSplash = document.getElementById('native-splash');
-    console.log('[Splash] nativeSplash element:', nativeSplash ? 'found' : 'NOT FOUND');
-    if (!nativeSplash) return;
-
-    // Calculate remaining time to meet minimum duration
-    const elapsed = Date.now() - appMountTimeRef.current;
-    const remainingTime = Math.max(0, MINIMUM_SPLASH_DURATION - elapsed);
-    console.log('[Splash] elapsed:', elapsed, 'remainingTime:', remainingTime);
-
-    // Wait for minimum duration, then fade out
-    const timeoutId = setTimeout(() => {
-      console.log('[Splash] Fading out now');
-      nativeSplash.classList.add('fade-out');
-      setTimeout(() => nativeSplash.remove(), 300);
-    }, remainingTime);
-
-    return () => clearTimeout(timeoutId);
-  }, [agentsInitialized]); // Run when agents finish loading
-
-  // REMOVED: React SplashScreen at startup
-  // Native splash in index.html now handles the intro animation
-  // SplashScreen component is only used for "Watch Intro" replay feature
+  // While booting, render nothing - the HTML loader (#app-loader) is already visible
+  // This prevents flickering caused by showing a React spinner on top of the HTML loader
+  if (booting) {
+    return null;
+  }
 
   if (!tauriAvailable) {
     return (
@@ -9983,8 +10389,9 @@ You have access to all Bash tools to execute git commands like:
 
       {/* Drag region removed - now using data-tauri-drag-region on sidebar-header only */}
 
-      {/* 🔐 Claude Auth Banner - Fixed at bottom when CLI not available */}
-      {claudeCliAvailable === false && !claudeAuthBannerDismissed && (
+      {/* 🔐 Claude Auth Banner - Disabled for now */}
+      {/* TODO: Re-enable when auth flow is properly implemented */}
+      {false && showSidebar && claudeCliAvailable === false && !claudeAuthBannerDismissed && (
         <ClaudeAuthBanner
           onOpenSettings={() => {
             setShowSettings(true);
@@ -9998,8 +10405,7 @@ You have access to all Bash tools to execute git commands like:
       )}
 
       {/* 💰 Pro Banner - Fixed at bottom with collapse to badge */}
-      {/* Only show if auth banner is not visible (priority system) */}
-      {!isProUser && !(claudeCliAvailable === false && !claudeAuthBannerDismissed) && (
+      {!isProUser && (
         <ProBanner
           onUpgrade={() => handleShowUpgrade('terminals')}
           isExpanded={proBannerExpanded}
@@ -10009,10 +10415,11 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents sidebar-hidden' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
-        <TerminalSidebar
+        {/* Hide sidebar when no projects/agents */}
+        {(terminals.length > 0 || persistedProjects.size > 0) && <TerminalSidebar
           terminals={terminals}
           activeId={activeId}
           creating={creatingTerminal}
@@ -10081,15 +10488,28 @@ You have access to all Bash tools to execute git commands like:
           onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
           onOpenDashboard={handleOpenProjectDashboard}
+          onOpenClaudeAssets={openClaudeAssetsTab}
           onRemoveProject={handleRemoveProject}
           persistedProjects={persistedProjects}
           // onCreateTask={handleCreateTaskFromAgent} // Temporarily hidden
           // Session props
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
+          // Open Agent Personality accordion
+          onOpenPersonality={() => {
+            console.log('[App] onOpenPersonality from sidebar clicked');
+            if (sidePanelCollapsed) {
+              setSidePanelCollapsed(false);
+              setTimeout(() => {
+                setForceExpandSection('agent-context');
+              }, 50);
+            } else {
+              setForceExpandSection('agent-context');
+            }
+          }}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
-        />
+        />}
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
         <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') ? 'full-width-tab' : ''}`}>
@@ -10166,61 +10586,163 @@ You have access to all Bash tools to execute git commands like:
                   </div>
                 </div>
               ) : (
-                /* Image background when no agents with Open Guide button */
-                <>
-                  <img
-                    src="/images/quack-agent.jpeg"
-                    alt="Quack Agent"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center',
-                    }}
-                  />
-                  {/* Open Guide Button - positioned top right */}
+                /* Empty state with ASCII duck - Codex-style centered layout */
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '24px',
+                  textAlign: 'center',
+                }}>
+                  {/* ASCII Duck with morphing animation */}
+                  <div className="empty-state-duck">
+                    <span className="duck-frame">{'>°)>'}</span>
+                    <span className="duck-frame">{'>^)>'}</span>
+                    <span className="duck-frame">{'>·)>'}</span>
+                    <span className="duck-frame">{'>~)>'}</span>
+                    <span className="duck-frame">{'>´)>'}</span>
+                  </div>
+
+                  {/* Tagline */}
+                  <p style={{
+                    fontSize: '14px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    margin: 0,
+                    fontWeight: 400,
+                  }}>
+                    What will you build today?
+                  </p>
+
+                  {/* Primary action: New Project */}
                   <button
                     type="button"
-                    onClick={() => setEmptyStateShowGuide(true)}
+                    onClick={() => handleOpenNewTerminalModal()}
                     style={{
-                      position: 'absolute',
-                      top: '24px',
-                      right: '24px',
                       padding: '12px 24px',
                       fontSize: '14px',
                       fontWeight: 600,
                       borderRadius: '8px',
-                      border: '1px solid rgba(242, 140, 82, 0.4)',
-                      background: 'rgba(18, 18, 22, 0.85)',
-                      backdropFilter: 'blur(12px)',
-                      color: '#f28c52',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #f28c52, #e67339)',
+                      color: 'white',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                      boxShadow: '0 4px 16px rgba(242, 140, 82, 0.35)',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(242, 140, 82, 0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(242, 140, 82, 0.2)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(242, 140, 82, 0.45)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(18, 18, 22, 0.85)';
-                      e.currentTarget.style.borderColor = 'rgba(242, 140, 82, 0.4)';
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(242, 140, 82, 0.35)';
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    Open Guide
+                    New project
                   </button>
-                </>
+
+                  {/* Secondary links - horizontal layout */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '20px',
+                    marginTop: '8px',
+                  }}>
+                    {/* Open Guide */}
+                    <button
+                      type="button"
+                      onClick={() => openExternal('https://quack.build/docs')}
+                      style={{
+                        padding: '0',
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)';
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                      </svg>
+                      Guide
+                    </button>
+
+                    <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>·</span>
+
+                    {/* Discord */}
+                    <button
+                      type="button"
+                      onClick={() => openExternal('https://discord.gg/bQd39uDhnc')}
+                      style={{
+                        padding: '0',
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)';
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                      </svg>
+                      Discord
+                    </button>
+
+                    <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>·</span>
+
+                    {/* Email */}
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2"/>
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                      </svg>
+                      quack@quack.build
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           ) : (
@@ -10230,19 +10752,15 @@ You have access to all Bash tools to execute git commands like:
               <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
-              onPluginsClick={() => setShowPluginsDrawer(!showPluginsDrawer)}
               onUsageClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
                   // Open in Terminal Window (separate Tauri window) instead of tab
-                  const projects = agentChats.map(agent => ({
-                    path: agent.cwd,
-                    name: agent.cwd.split('/').pop() || agent.cwd,
+                  const projects = activeProjects.map(project => ({
+                    path: project.path,
+                    name: project.name,
                   }));
-                  const uniqueProjects = projects.filter(
-                    (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-                  );
-                  await openTerminalWindow(uniqueProjects, {
+                  await openTerminalWindow(projects, {
                     projectPath: cwd,
                     command: 'claude /usage',
                     terminalLabel: 'Claude Plan Usage',
@@ -10268,14 +10786,11 @@ You have access to all Bash tools to execute git commands like:
               onLoginClick={async () => {
                 try {
                   const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                  const projects = agentChats.map(agent => ({
-                    path: agent.cwd,
-                    name: agent.cwd.split('/').pop() || agent.cwd,
+                  const projects = activeProjects.map(project => ({
+                    path: project.path,
+                    name: project.name,
                   }));
-                  const uniqueProjects = projects.filter(
-                    (p, i, arr) => arr.findIndex(x => x.path === p.path) === i
-                  );
-                  await openTerminalWindow(uniqueProjects, {
+                  await openTerminalWindow(projects, {
                     projectPath: cwd,
                     command: 'claude /login',
                     terminalLabel: 'Claude Login',
@@ -10284,6 +10799,11 @@ You have access to all Bash tools to execute git commands like:
                   console.error("Failed to open claude login:", error);
                 }
               }}
+              onKanbanClick={handleOpenKanbanTab}
+              isKanbanActive={tabs.some(t => t.type === 'kanban' && t.id === activeTabId)}
+              inProgressTaskCount={inProgressTaskCount}
+              onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
+              isStoreOpen={showStoreDrawer}
             />
 
             {/* Tab Bar - VSCode style (always shown) */}
@@ -10343,7 +10863,7 @@ You have access to all Bash tools to execute git commands like:
                       onExitKanban={() => setActiveTabId('chat')}
                       onOpenTerminal={async (path, label) => {
                         // Open terminal in specified directory (worktree or project path)
-                        const projectName = label || path.split('/').pop() || 'Terminal';
+                        const projectName = label || extractProjectId(path) || 'Terminal';
                         const uniqueProjects = [{ path, name: projectName }];
                         await openTerminalWindow(uniqueProjects, {
                           projectPath: path,
@@ -10421,6 +10941,19 @@ You have access to all Bash tools to execute git commands like:
                     <SessionEmptyState
                       agent={activeTerminal}
                       onSessionClick={handleSessionClick}
+                      onOpenPersonality={() => {
+                        console.log('[SessionEmptyState] onOpenPersonality clicked, sidePanelCollapsed:', sidePanelCollapsed);
+                        // Ensure side panel is not collapsed, then expand Agent Personality section
+                        if (sidePanelCollapsed) {
+                          setSidePanelCollapsed(false);
+                          // Wait for side panel to expand before setting force expand
+                          setTimeout(() => {
+                            setForceExpandSection('agent-context');
+                          }, 50);
+                        } else {
+                          setForceExpandSection('agent-context');
+                        }
+                      }}
                     />
                   );
                 }
@@ -10445,6 +10978,7 @@ You have access to all Bash tools to execute git commands like:
                     agents={agents}
                     onSelectAgent={handleUseAgent}
                     onFilePathClick={handleFilePathClick}
+                    onOpenInIDE={handleOpenInIDE}
                     onSessionIdClick={handleSessionIdClick}
                     onDiffClick={handleDiffClick}
                     onEditsChange={handleEditsChange}
@@ -10546,6 +11080,26 @@ You have access to all Bash tools to execute git commands like:
                     onOpenImageTab={handleOpenImageTab}
                     // Open markdown files in Quack tab
                     onOpenInQuack={handleFilePathClick}
+                    // Open Agent Personality in sidebar
+                    onOpenPersonality={() => {
+                      // Ensure side panel is not collapsed, then expand Agent Personality section
+                      if (sidePanelCollapsed) {
+                        setSidePanelCollapsed(false);
+                      }
+                      setForceExpandSection('agent-context');
+                    }}
+                    // Plan approval
+                    pendingPlanApprovalIds={(() => {
+                      const ids = new Set<string>();
+                      const key = isTaskChat ? activeTaskId! : (activeId ?? '');
+                      for (const [reqId, data] of pendingPlanApprovals.entries()) {
+                        if (data.agentId === key || data.sessionKey === key) {
+                          ids.add(reqId);
+                        }
+                      }
+                      return ids;
+                    })()}
+                    onPlanApprovalResponse={respondToPlanApproval}
                   />
                 );
               })()}
@@ -10589,6 +11143,7 @@ You have access to all Bash tools to execute git commands like:
                     agents={agents}
                     onSelectAgent={handleUseAgent}
                     onFilePathClick={handleFilePathClick}
+                    onOpenInIDE={handleOpenInIDE}
                     onSessionIdClick={handleSessionIdClick}
                     onDiffClick={handleDiffClick}
                     onEditsChange={handleEditsChange}
@@ -10674,6 +11229,25 @@ You have access to all Bash tools to execute git commands like:
                     onOpenImageTab={handleOpenImageTab}
                     // Open markdown files in Quack tab
                     onOpenInQuack={handleFilePathClick}
+                    // Open Agent Personality in sidebar
+                    onOpenPersonality={() => {
+                      // Ensure side panel is not collapsed, then expand Agent Personality section
+                      if (sidePanelCollapsed) {
+                        setSidePanelCollapsed(false);
+                      }
+                      setForceExpandSection('agent-context');
+                    }}
+                    // Plan approval
+                    pendingPlanApprovalIds={(() => {
+                      const ids = new Set<string>();
+                      for (const [reqId, data] of pendingPlanApprovals.entries()) {
+                        if (data.agentId === taskSessionId || data.sessionKey === taskSessionId) {
+                          ids.add(reqId);
+                        }
+                      }
+                      return ids;
+                    })()}
+                    onPlanApprovalResponse={respondToPlanApproval}
                   />
                 );
               })()}
@@ -10751,7 +11325,7 @@ You have access to all Bash tools to execute git commands like:
                       key={activeTab.id} // Force new instance when tab changes
                       agentName={activeTab.agentName}
                       agentScope={activeTab.agentScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={() => {
                         // Close tab after delete or cancel new agent
                         if (activeTab.isNewAgent) {
@@ -10783,7 +11357,7 @@ You have access to all Bash tools to execute git commands like:
                     <SkillViewer
                       skillName={activeTab.skillName}
                       skillScope={activeTab.skillScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={loadSkills}
                     />
                   );
@@ -10801,7 +11375,7 @@ You have access to all Bash tools to execute git commands like:
                       key={activeTab.id} // Force new instance when tab changes
                       commandName={activeTab.commandName}
                       commandScope={activeTab.commandScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={() => {
                         // Close tab after delete or cancel new command
                         handleTabClose(activeTab.id);
@@ -10823,7 +11397,7 @@ You have access to all Bash tools to execute git commands like:
                       key={activeTab.id} // Force new instance when tab changes
                       ruleName={activeTab.ruleName}
                       ruleScope={activeTab.ruleScope}
-                      workingDir={activeTerminal?.cwd ?? explorerPath ?? undefined}
+                      workingDir={activeTerminal?.cwd || explorerPath || undefined}
                       onRefresh={() => {
                         // Close tab after delete or cancel new rule
                         handleTabClose(activeTab.id);
@@ -10930,7 +11504,8 @@ You have access to all Bash tools to execute git commands like:
           )}
         </section>
 
-        <SidePanel
+        {/* Sidebar Accordion - Codex-style (NEW) */}
+        <SidePanelAccordion
           // FileExplorer props
           rootPath={(explorerRoot ?? explorerPath) || null}
           tree={explorerTree}
@@ -10953,8 +11528,6 @@ You have access to all Bash tools to execute git commands like:
           onUseAgent={handleUseAgent}
           onRefreshAgents={loadAgents}
           onCreateAgent={handleCreateAgent}
-          onTogglePip={togglePipWindow}
-          isPipOpen={isPipOpen}
           // Skills props
           skills={skills}
           loadingSkills={loadingSkills}
@@ -10971,7 +11544,6 @@ You have access to all Bash tools to execute git commands like:
           onDeleteHook={handleDeleteHook}
           onToggleHook={handleToggleHook}
           // Commands props
-          onUseCommand={handleUseCommand}
           onSelectCommand={handleSelectCommand}
           // Rules props
           onSelectRule={handleSelectRule}
@@ -11006,67 +11578,26 @@ You have access to all Bash tools to execute git commands like:
             const activeTerminal = terminals.find((t) => t.id === activeId);
             return activeTerminal?.color || null;
           })()}
-          onImportAgent={async (importedAgent) => {
-            // Refresh agent list after bundle import
-            console.log('[App] Agent imported from bundle:', importedAgent.name);
-            await loadAgents();
-          }}
           projectName={projectName}
           gitBranch={gitBranch}
           agentRefreshKey={agentRefreshKey}
           onEditAgent={handleEditAgentFromContext}
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
-          // Terminal props
-          activeTerminalId={activeId}
-          terminals={terminals}
-          onTerminalInput={handleTerminalInput}
-          onTerminalOutput={handleTerminalOutput}
-          onUpdateRecentCommands={(commands) => {
-            recentCommandsRef.current = commands;
-          }}
-          onSelectTerminal={handleSelectTerminal}
-          // TerminalToolBar props
-          onExecuteCommand={handleExecuteAICommand}
-          onToggleSavedCommands={() =>
-            setSavedCommandsDrawerOpen((value) => !value)
-          }
-          savedCommandsOpen={savedCommandsDrawerOpen}
-          onCreateTerminal={handleQuickCreateTerminal}
-          // Usage props
-          usageSessions={usageSessions}
-          onClearUsage={handleClearUsage}
-          onCreateTerminalWithCommand={handleCreateTerminalWithCommand}
-          // Sessions props
-          onSelectSession={handleSelectSession}
-          sessionsRefreshKey={sessionsRefreshKey}
-          // Collapse props - also collapse when special tabs (docs, second-brain, memory-graph, claude-assets, project-dashboard) are active
-          // In Kanban mode: use kanbanSidePanelExpanded to control visibility
+          // Collapse props
           isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded)}
           onToggleCollapse={() => {
             if (isKanbanTabActive) {
-              // In Kanban mode, toggle kanbanSidePanelExpanded
               setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);
             } else {
               setSidePanelCollapsed(!sidePanelCollapsed);
             }
           }}
-          isKanbanTabActive={isKanbanTabActive} // Used to show/hide toggle button
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
-          // Kanban Mini Panel props
-          chatLoadingMap={chatLoadingMap}
-          chatSessions={chatSessions}
-          onKanbanTaskClick={(taskId) => {
-            // Open Kanban tab and select the task
-            handleOpenKanbanTab();
-            // Select task in store
-            const { selectTask, openDrawer } = useKanbanStore.getState();
-            selectTask(taskId);
-            openDrawer();
-          }}
-          onOpenKanban={handleOpenKanbanTab}
-          showKanbanMiniPanel={showKanbanMiniPanel}
+          // Force expand section
+          forceExpandSection={forceExpandSection}
+          onForceExpandHandled={() => setForceExpandSection(null)}
         />
 
         <NewTerminalModal
@@ -11097,7 +11628,6 @@ You have access to all Bash tools to execute git commands like:
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
-          onOpenDroidFactory={() => setDroidFactoryOpen(true)}
           isOnboarding={terminals.length === 0 && !hasSavedAgents}
           onInstallStarterBundles={handleInstallStarterBundles}
         />
@@ -11238,23 +11768,14 @@ You have access to all Bash tools to execute git commands like:
           />
         )}
 
-        <div className={`git-drawer ${showPluginsDrawer ? "open" : ""}`}>
+        <div className={`git-drawer ${showStoreDrawer ? "open" : ""}`}>
           <div
             className="git-drawer-backdrop"
-            onClick={() => setShowPluginsDrawer(false)}
+            onClick={() => setShowStoreDrawer(false)}
           />
-          <div className="git-drawer-panel">
-            <header className="git-drawer-header">
-              <h2>Plugin Marketplace</h2>
-              <button
-                type="button"
-                className="git-drawer-close"
-                onClick={() => setShowPluginsDrawer(false)}
-              >
-                ✕
-              </button>
-            </header>
-            <MarketplaceDrawer
+          <div className="git-drawer-panel quack-store-drawer-panel">
+            <QuackStoreDrawer
+              onClose={() => setShowStoreDrawer(false)}
               onRefresh={handleMarketplaceRefresh}
             />
           </div>
@@ -11295,7 +11816,16 @@ You have access to all Bash tools to execute git commands like:
 
         {showSettings && (
           <UnifiedSettings
-            onClose={() => setShowSettings(false)}
+            onClose={() => {
+              setShowSettings(false);
+              setSettingsInitialCategory(undefined);
+            }}
+            initialCategory={settingsInitialCategory}
+            onOpenTelegramSetup={() => {
+              setShowSettings(false);
+              setSettingsInitialCategory(undefined);
+              setShowTelegramSetup(true);
+            }}
           />
         )}
 
@@ -11372,7 +11902,6 @@ You have access to all Bash tools to execute git commands like:
       {/* Watch Intro replay - uses SplashScreen component */}
       {introReplayActive && (
         <SplashScreen
-          version={introVersion}
           onComplete={() => setIntroReplayActive(false)}
         />
       )}
@@ -11391,10 +11920,22 @@ You have access to all Bash tools to execute git commands like:
         limitType={upgradeLimitType}
       />
 
-      {/* IDE Onboarding - First-run dialog to select preferred IDE */}
+      {/* Prerequisites Check - FIRST: Check Git, Node.js, Claude CLI installation */}
+      <PrerequisitesCheck />
+
+      {/* Git Config Onboarding - SECOND: Configure Git user.name and user.email */}
+      <GitConfigOnboarding />
+
+      {/* IDE Onboarding - THIRD: Select preferred IDE */}
       <IDEOnboarding />
 
       {/* Terminal Window - Now opens as separate Tauri window via useTerminalWindowManager */}
+
+      {/* Update notification toast — checks GitHub releases on mount */}
+      <UpdateToast />
+
+      {/* Live support chat widget */}
+      <SupportChatWidget />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>

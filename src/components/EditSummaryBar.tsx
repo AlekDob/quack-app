@@ -43,6 +43,13 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
   // Support both onClear and deprecated onClearEdits
   const handleClear = onClear || onClearEdits;
 
+  // Shorten long absolute paths to last 2 segments
+  const shortenPath = (fullPath: string) => {
+    const parts = fullPath.split('/').filter(Boolean);
+    if (parts.length <= 2) return fullPath;
+    return '.../' + parts.slice(-2).join('/');
+  };
+
   if (edits.length === 0 && deletes.length === 0) {
     return null; // Don't show if no edits or deletes
   }
@@ -122,7 +129,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
         <div className="edit-summary-bar-title">
           {hasCodeFiles && (
             <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
@@ -134,7 +141,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
           {hasCodeFiles && hasMarkdownFiles && <span className="edit-summary-bar-separator">•</span>}
           {hasMarkdownFiles && (
             <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="edit-summary-bar-markdown-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="edit-summary-bar-markdown-icon">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <path d="M14 2v6h6" />
                 <path d="M16 13H8" />
@@ -147,7 +154,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
           {(hasCodeFiles || hasMarkdownFiles) && hasDeletes && <span className="edit-summary-bar-separator">•</span>}
           {hasDeletes && (
             <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="edit-summary-bar-delete-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="edit-summary-bar-delete-icon">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
@@ -158,8 +165,8 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
         <div className="edit-summary-bar-actions">
           <svg
             className={`edit-summary-bar-chevron ${isExpanded ? 'expanded' : ''}`}
-            width="14"
-            height="14"
+            width="10"
+            height="10"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -188,13 +195,13 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                         className="edit-summary-bar-file"
                       >
                         <div className="edit-summary-bar-file-info">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
                             <polyline points="13 2 13 9 20 9" />
                           </svg>
                           <span className="edit-summary-bar-file-name">{fileName}</span>
                           <FileStatusBadge status="created" />
-                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                          {dirPath && <span className="edit-summary-bar-file-path" title={dirPath}>{shortenPath(dirPath)}</span>}
                         </div>
                         <div className="edit-summary-bar-file-actions">
                           <FileDiffButton
@@ -234,13 +241,13 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                         className="edit-summary-bar-file"
                       >
                         <div className="edit-summary-bar-file-info">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
                             <polyline points="13 2 13 9 20 9" />
                           </svg>
                           <span className="edit-summary-bar-file-name">{fileName}</span>
                           <FileStatusBadge status="modified" />
-                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                          {dirPath && <span className="edit-summary-bar-file-path" title={dirPath}>{shortenPath(dirPath)}</span>}
                         </div>
                         <div className="edit-summary-bar-file-actions">
                           <span className="edit-summary-bar-file-count">
@@ -285,7 +292,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                       >
                         <div className="edit-summary-bar-file-info">
                           {/* Markdown file icon */}
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                             <path d="M14 2v6h6" />
                             <path d="M16 13H8" />
@@ -294,7 +301,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                           </svg>
                           <span className="edit-summary-bar-file-name">{fileName}</span>
                           <FileStatusBadge status={isNew ? 'created' : 'modified'} />
-                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                          {dirPath && <span className="edit-summary-bar-file-path" title={dirPath}>{shortenPath(dirPath)}</span>}
                         </div>
                         <div className="edit-summary-bar-file-actions">
                           {!isNew && (
@@ -311,7 +318,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                               }}
                               title="Open in Quack"
                             >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M15 3h6v6" />
                                 <path d="M10 14L21 3" />
                                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -356,13 +363,13 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                         className="edit-summary-bar-file edit-summary-bar-file-deleted"
                       >
                         <div className="edit-summary-bar-file-info">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                           </svg>
                           <span className="edit-summary-bar-file-name">{fileName}</span>
                           <FileStatusBadge status="deleted" />
-                          {dirPath && <span className="edit-summary-bar-file-path">{dirPath}</span>}
+                          {dirPath && <span className="edit-summary-bar-file-path" title={dirPath}>{shortenPath(dirPath)}</span>}
                         </div>
                         <div className="edit-summary-bar-file-actions">
                           <FileDiffButton
@@ -385,7 +392,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                   disabled={isOpeningAll}
                 >
                   {hasPreferredIDE ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="2" y="3" width="20" height="14" rx="2" />
                       <path d="M8 21h8" />
                       <path d="M12 17v4" />
@@ -393,7 +400,7 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                       <path d="M13 11h4" />
                     </svg>
                   ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="3" y="3" width="7" height="7" />
                       <rect x="14" y="3" width="7" height="7" />
                       <rect x="14" y="14" width="7" height="7" />

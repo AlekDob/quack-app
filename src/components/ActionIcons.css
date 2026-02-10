@@ -79,38 +79,38 @@
 .action-icon::before {
   content: attr(data-tooltip) !important;
   position: absolute !important;
-  bottom: calc(100% + 10px) !important;
+  bottom: calc(100% + 8px) !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  padding: 8px 12px !important;
-  background: rgba(20, 20, 20, 0.98) !important;
-  color: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 6px !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
+  padding: 5px 8px !important;
+  background: #1A1B44 !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
   white-space: nowrap !important;
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
   transition: opacity 0.08s ease, visibility 0.08s ease !important;
   z-index: 100000 !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 .action-icon::after {
   content: '' !important;
   position: absolute !important;
-  bottom: calc(100% + 4px) !important;
+  bottom: calc(100% + 3px) !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
   width: 0 !important;
   height: 0 !important;
-  border-left: 5px solid transparent !important;
-  border-right: 5px solid transparent !important;
-  border-top: 6px solid rgba(20, 20, 20, 0.98) !important;
+  border-left: 4px solid transparent !important;
+  border-right: 4px solid transparent !important;
+  border-top: 5px solid #1A1B44 !important;
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -162,4 +162,225 @@
     color: #ff6b35;
     transform: scale(1.05);
   }
+}
+
+/* ===================================
+   MINIMAL ACTION ICONS - Codex Style
+   =================================== */
+
+.action-icons.action-icons-minimal {
+  background: transparent;
+  border-bottom: none;
+  padding: 8px 16px;
+  gap: 4px;
+  justify-content: flex-end;
+  /* Grid positioning - span columns 2 and 3 (terminal + sidebar) */
+  grid-column: 2 / 4;
+  grid-row: 1;
+}
+
+/* Left side container for New Project button */
+.action-icons-left {
+  display: flex;
+  align-items: center;
+  margin-left: 70px; /* Space for traffic lights */
+  -webkit-app-region: no-drag;
+}
+
+/* Spacer to push right icons to the end */
+.action-icons-spacer {
+  flex: 1;
+  -webkit-app-region: drag;
+}
+
+/* New Project Button - Codex style */
+.new-project-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.new-project-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.new-project-btn:active {
+  transform: scale(0.98);
+}
+
+.new-project-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.new-project-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Open Dropdown - Codex style split button */
+.open-dropdown-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  margin-right: 12px;
+}
+
+/* Main button - shows IDE name and opens directly */
+.open-dropdown-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  background: transparent;
+  border: none;
+  border-radius: 6px 0 0 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.open-dropdown-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.open-dropdown-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.open-dropdown-button img {
+  border-radius: 2px;
+}
+
+.open-dropdown-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Chevron button - opens dropdown */
+.open-dropdown-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 4px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 6px 6px 0;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.open-dropdown-chevron:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.open-dropdown-chevron.open {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.open-dropdown-chevron .chevron {
+  transition: transform 0.2s ease;
+}
+
+.open-dropdown-chevron.open .chevron {
+  transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+.open-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  background: rgba(30, 30, 32, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10000;
+  animation: dropdownFadeIn 0.15s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.open-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: left;
+}
+
+.open-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.open-dropdown-item svg {
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.open-dropdown-item:hover svg {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Section label */
+.open-dropdown-section-label {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Divider */
+.open-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
 }

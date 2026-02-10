@@ -572,11 +572,6 @@ function AppRefactored() {
             setLoadingSkills(false);
           }}
 
-          // Commands props
-          onUseCommand={(command) => {
-            setPendingSlashCommand(command);
-          }}
-
           // Context props
           tauriAvailable={tauriAvailable}
           onOpenContextDrawer={(scope) => {
@@ -764,7 +759,7 @@ function AppRefactored() {
         {/* Action Icons */}
         <ActionIcons
           onGitClick={() => setShowGitDrawer(true)}
-          onPluginsClick={() => setShowPluginsDrawer(true)}
+          onStoreClick={() => setShowPluginsDrawer(true)}
           onUsageClick={() => {}}
           onTelegramClick={() => setShowTelegramSetup(true)}
           onTerminalClick={() => setShowNewTerminalModal(true)}

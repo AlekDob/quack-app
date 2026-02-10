@@ -5,16 +5,14 @@ import { CommandsList } from './CommandsList';
 
 interface CommandsPanelProps {
   basePath: string;
-  onUseCommand: (command: SlashCommand) => void;
   onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
 }
 
-export function CommandsPanel({ basePath, onUseCommand, onSelectCommand }: CommandsPanelProps) {
+export function CommandsPanel({ basePath, onSelectCommand }: CommandsPanelProps) {
   const {
     commands,
     loading,
     error,
-    deleteCommand,
     loadCommands
   } = useSlashCommands(basePath);
 
@@ -40,18 +38,6 @@ export function CommandsPanel({ basePath, onUseCommand, onSelectCommand }: Comma
     }
   };
 
-  const handleDeleteCommand = async (command: SlashCommand) => {
-    if (!confirm(`Are you sure you want to delete the command "/${command.name}"?`)) {
-      return;
-    }
-
-    try {
-      await deleteCommand(command.name, command.scope);
-    } catch (err) {
-      console.error('Failed to delete command:', err);
-      alert('Failed to delete command. Please try again.');
-    }
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -111,9 +97,7 @@ export function CommandsPanel({ basePath, onUseCommand, onSelectCommand }: Comma
         ) : (
           <CommandsList
             customCommands={filteredCustom}
-            onUseCommand={onUseCommand}
             onEditCommand={handleEditCommand}
-            onDeleteCommand={handleDeleteCommand}
           />
         )}
       </div>

@@ -12,6 +12,7 @@ const HOOK_ID = 'codebase-map-auto-update';
 const HOOK_NAME = 'Codebase Map Auto-Update';
 const MAP_RELATIVE_PATH = '.quack/codebase-map.md';
 const SCRIPT_NAME = 'generate-codebase-map.mjs';
+const WRAPPER_NAME = 'codebase-map-hook.sh';
 
 /**
  * Get the global script path: ~/.quack/scripts/generate-codebase-map.mjs
@@ -23,7 +24,7 @@ export async function getScriptPath(): Promise<string> {
 }
 
 /**
- * Ensure the script is installed at ~/.quack/scripts/
+ * Ensure the script and wrapper are installed at ~/.quack/scripts/
  * Copies from project's scripts/ folder if not present
  */
 export async function ensureScriptInstalled(sourceProjectPath: string): Promise<string> {
@@ -31,11 +32,11 @@ export async function ensureScriptInstalled(sourceProjectPath: string): Promise<
   const sep = home.endsWith('/') ? '' : '/';
   const targetDir = `${home}${sep}.quack/scripts`;
   const targetPath = `${targetDir}/${SCRIPT_NAME}`;
+  const wrapperPath = `${targetDir}/${WRAPPER_NAME}`;
 
   try {
     // Check if script already exists
     await invoke<string>('read_file_content', { path: targetPath });
-    return targetPath;
   } catch {
     // Script doesn't exist — copy via separate commands (execute_command uses split_whitespace)
     try {
@@ -47,12 +48,28 @@ export async function ensureScriptInstalled(sourceProjectPath: string): Promise<
         command: `cp ${sourceProjectPath}/scripts/${SCRIPT_NAME} ${targetPath}`,
         cwd: sourceProjectPath,
       });
-      return targetPath;
     } catch (err) {
       console.error('Failed to install codebase map script:', err);
       throw err;
     }
   }
+
+  // Always update wrapper (it's small and ensures latest version)
+  try {
+    await invoke('execute_command', {
+      command: `cp ${sourceProjectPath}/scripts/${WRAPPER_NAME} ${wrapperPath}`,
+      cwd: sourceProjectPath,
+    });
+    await invoke('execute_command', {
+      command: `chmod +x ${wrapperPath}`,
+      cwd: sourceProjectPath,
+    });
+  } catch {
+    // Non-critical: wrapper copy failed, script still works for full scan
+    console.warn('Failed to copy hook wrapper script');
+  }
+
+  return targetPath;
 }
 
 /**
@@ -117,7 +134,9 @@ export async function generateMap(projectPath: string): Promise<boolean> {
  * Install the PostToolUse hook for auto-updating the map
  */
 export async function installHook(projectPath: string): Promise<boolean> {
-  const scriptPath = await getScriptPath();
+  const home = await homeDir();
+  const sep = home.endsWith('/') ? '' : '/';
+  const wrapperPath = `${home}${sep}.quack/scripts/${WRAPPER_NAME}`;
 
   try {
     await invoke('save_hook', {
@@ -126,11 +145,11 @@ export async function installHook(projectPath: string): Promise<boolean> {
         id: HOOK_ID,
         name: HOOK_NAME,
         type: 'PostToolUse',
-        matcher: 'Write',
-        command: `node ${scriptPath} --update-file "$TOOL_INPUT_FILE_PATH" . ${MAP_RELATIVE_PATH}`,
+        matcher: 'Write|Edit',
+        command: wrapperPath,
         enabled: true,
         scope: 'project',
-        description: 'Auto-updates codebase map when files are written by Claude',
+        description: 'Auto-updates codebase map when files are written or edited by Claude',
       },
     });
     return true;

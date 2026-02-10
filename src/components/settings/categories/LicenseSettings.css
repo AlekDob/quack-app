@@ -154,7 +154,8 @@
 /* CTA buttons */
 .license-cta-buttons {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 24px;
 }
 
@@ -202,6 +203,29 @@
 .license-purchase-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
+}
+
+.license-purchase-lifetime {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.license-purchase-lifetime:hover {
+  box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
+}
+
+.license-indie-message {
+  font-size: 13px;
+  color: #fdba74;
+  font-style: italic;
+  text-align: center;
+  margin-top: 12px;
+  line-height: 1.6;
+  padding: 10px 16px;
+  background: rgba(251, 146, 60, 0.1);
+  border: 1px solid rgba(251, 146, 60, 0.2);
+  border-radius: 8px;
 }
 
 .license-deactivate-button {

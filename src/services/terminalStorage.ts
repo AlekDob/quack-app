@@ -4,13 +4,17 @@
  * Handles all terminal-related storage operations using Tauri Store plugin.
  * Extracted from App.tsx for better separation of concerns and testability.
  *
+ * NEW: Uses .quack/active-agents.json as the source of truth for active agents,
+ * ensuring consistency between dev and build environments.
+ *
  * @module terminalStorage
  */
 
 import { Store } from "@tauri-apps/plugin-store";
+import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { getTestModeStoreName } from "../utils/testModeStorage";
-import type { TerminalInfo, NativeTerminal } from "../types";
+import type { TerminalInfo, NativeTerminal, AgentPersonality } from "../types";
 import type { Tab } from "../components/TabBar";
 
 // ============================================
@@ -260,4 +264,111 @@ export const loadNativeTerminalsFromStorage = async (): Promise<NativeTerminal[]
     toast.error("Failed to load native terminals - starting fresh");
     return [];
   }
+};
+
+// ============================================
+// Active Agents Index Functions (File-based)
+// ============================================
+
+/**
+ * Load active agent IDs from the project's .quack/active-agents.json
+ * This is the new source of truth for which agents are "open"
+ * @param projectPath The project path to load active agents for
+ */
+export const loadActiveAgentIds = async (projectPath: string): Promise<string[]> => {
+  try {
+    const ids = await invoke<string[]>('load_active_agents', { projectPath });
+    console.log(`[terminalStorage] Loaded ${ids.length} active agents from ${projectPath}`);
+    return ids;
+  } catch (error) {
+    console.warn("[terminalStorage] Could not load active agents index:", error);
+    return [];
+  }
+};
+
+/**
+ * Save active agent IDs to the project's .quack/active-agents.json
+ * @param projectPath The project path
+ * @param agentIds Array of agent IDs that are currently active
+ */
+export const saveActiveAgentIds = async (projectPath: string, agentIds: string[]): Promise<void> => {
+  try {
+    await invoke('save_active_agents', { projectPath, agentIds });
+    console.log(`[terminalStorage] Saved ${agentIds.length} active agents to ${projectPath}`);
+  } catch (error) {
+    console.error("[terminalStorage] Failed to save active agents index:", error);
+  }
+};
+
+/**
+ * Add an agent to the active index
+ * @param projectPath The project path
+ * @param agentId The agent ID to add
+ */
+export const addActiveAgent = async (projectPath: string, agentId: string): Promise<void> => {
+  try {
+    await invoke('add_active_agent', { projectPath, agentId });
+    console.log(`[terminalStorage] Added agent ${agentId} to active index`);
+  } catch (error) {
+    console.error("[terminalStorage] Failed to add active agent:", error);
+  }
+};
+
+/**
+ * Remove an agent from the active index
+ * @param projectPath The project path
+ * @param agentId The agent ID to remove
+ */
+export const removeActiveAgent = async (projectPath: string, agentId: string): Promise<void> => {
+  try {
+    await invoke('remove_active_agent', { projectPath, agentId });
+    console.log(`[terminalStorage] Removed agent ${agentId} from active index`);
+  } catch (error) {
+    console.error("[terminalStorage] Failed to remove active agent:", error);
+  }
+};
+
+/**
+ * Load active agents with full personality data
+ * @param projectPath The project path
+ */
+export const loadActiveAgentsWithData = async (projectPath: string): Promise<AgentPersonality[]> => {
+  try {
+    const agents = await invoke<AgentPersonality[]>('load_active_agents_with_data', { projectPath });
+    console.log(`[terminalStorage] Loaded ${agents.length} active agents with personality data`);
+    return agents;
+  } catch (error) {
+    console.error("[terminalStorage] Failed to load active agents with data:", error);
+    return [];
+  }
+};
+
+/**
+ * Migrate from old Tauri store to new file-based index
+ * This runs once per project when upgrading from the old system
+ * @param projectPath The project path to migrate
+ */
+export const migrateToActiveAgentsIndex = async (projectPath: string): Promise<string[]> => {
+  // Check if the new index already exists (already migrated)
+  const existingIds = await loadActiveAgentIds(projectPath);
+  if (existingIds.length > 0) {
+    console.log(`[terminalStorage] Project ${projectPath} already migrated, found ${existingIds.length} active agents`);
+    return existingIds;
+  }
+
+  // Try to migrate from old Tauri store
+  console.log(`[terminalStorage] Migrating project ${projectPath} to active-agents.json...`);
+
+  const oldTerminals = await loadTerminalsFromStorage();
+  const projectTerminals = oldTerminals.filter(t => t.cwd === projectPath);
+
+  if (projectTerminals.length > 0) {
+    const agentIds = projectTerminals.map(t => t.id);
+    await saveActiveAgentIds(projectPath, agentIds);
+    console.log(`[terminalStorage] Migrated ${agentIds.length} agents from old storage to ${projectPath}`);
+    return agentIds;
+  }
+
+  console.log(`[terminalStorage] No agents to migrate for ${projectPath}`);
+  return [];
 };

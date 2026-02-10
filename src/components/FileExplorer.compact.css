@@ -75,8 +75,8 @@
 
 /* Expander - comfortable size */
 .file-explorer .explorer-expander {
-  width: 14px;
-  font-size: 0.7rem;
+  width: 18px;
+  font-size: 0.85rem;
 }
 
 /* Icon size - comfortable */
@@ -204,6 +204,28 @@
 
 .file-explorer .open-in-ide-button:hover svg {
   opacity: 1 !important;
+}
+
+/* Tree indent guide lines */
+.explorer-tree-indent {
+  position: relative;
+}
+
+.explorer-tree-indent::before {
+  content: '';
+  position: absolute;
+  left: var(--indent-left, 20px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.file-explorer .explorer-row {
+  position: relative;
+  z-index: 1;
 }
 
 /* Content padding - comfortable */

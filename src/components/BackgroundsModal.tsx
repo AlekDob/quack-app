@@ -24,14 +24,12 @@ interface BackgroundGroup {
 const duckImage = new URL('../../images/backgrounds/duck.png', import.meta.url).href;
 const ducksPatternImage = new URL('../../images/backgrounds/ducks-pattern.png', import.meta.url).href;
 const duckPattern3Image = new URL('../../images/backgrounds/duck-pattern3.png', import.meta.url).href;
-const quackAgentImage = new URL('../../images/backgrounds/quack-agent.jpeg', import.meta.url).href;
 
 // Available backgrounds grouped by type
 const BACKGROUND_GROUPS: BackgroundGroup[] = [
   {
     title: 'Images',
     items: [
-      { name: 'quack-agent.jpeg', label: 'Quack Agent', preview: quackAgentImage, type: 'image' },
       { name: 'duck.png', label: 'Duck', preview: duckImage, type: 'image' },
       { name: 'ducks-pattern.png', label: 'Ducks Pattern', preview: ducksPatternImage, type: 'image' },
       { name: 'duck-pattern3.png', label: 'Duck Pattern 3', preview: duckPattern3Image, type: 'image' },

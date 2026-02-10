@@ -6,6 +6,20 @@ import { getAvatarUrl } from '../utils/agentAvatars';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useBundleOperations } from '../hooks/useBundleOperations';
 
+interface ContextFile {
+  name: string;
+  path: string;
+  scope: string;
+  exists: boolean;
+}
+
+interface ContextFileStats {
+  char_count: number;
+  word_count: number;
+  line_count: number;
+  score: 'good' | 'warning' | 'bad';
+}
+
 interface AgentPersonalityCardProps {
   personality: AgentPersonality | null;
   agentName?: string | null;
@@ -13,7 +27,15 @@ interface AgentPersonalityCardProps {
   agentWorkingOn?: string | null;
   agentColor?: string | null;
   agentId?: string | null;
-  onImportAgent?: (agent: SavedAgent) => void;
+  // Workspace info
+  projectName?: string;
+  gitBranch?: string;
+  // Context files
+  projectFiles?: ContextFile[];
+  globalFiles?: ContextFile[];
+  projectStats?: ContextFileStats | null;
+  globalStats?: ContextFileStats | null;
+  onFileClick?: (file: ContextFile) => void;
 }
 
 const COMMUNICATION_STYLES_MAP: Record<string, string> = {
@@ -63,19 +85,19 @@ export default function AgentPersonalityCard({
   agentWorkingOn,
   agentColor,
   agentId,
-  onImportAgent,
+  projectName,
+  gitBranch,
+  projectFiles = [],
+  globalFiles = [],
+  projectStats,
+  globalStats,
+  onFileClick,
 }: AgentPersonalityCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const { exporting, importing, error, exportAgent, importBundle, clearError } = useBundleOperations();
+  const { exporting, error, success, exportAgent, clearError } = useBundleOperations();
 
-  // Handle export button click
   async function handleExport() {
-    console.log('[AgentPersonalityCard] handleExport called', { personality, agentName, agentId, agentColor });
-
-    if (!personality || !agentName) {
-      console.warn('[AgentPersonalityCard] Export aborted - missing personality or agentName', { personality: !!personality, agentName });
-      return;
-    }
+    if (!personality || !agentName) return;
 
     const agent: SavedAgent = {
       id: agentId || `agent-${Date.now()}`,
@@ -90,14 +112,6 @@ export default function AgentPersonalityCard({
     };
 
     await exportAgent(agent);
-  }
-
-  // Handle import button click
-  async function handleImport() {
-    const imported = await importBundle();
-    if (imported && onImportAgent) {
-      onImportAgent(imported);
-    }
   }
 
   // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
@@ -163,9 +177,13 @@ export default function AgentPersonalityCard({
     );
   }
 
+  // Filter custom notes to show
+  const filteredNotes = filterDroidsFromCustomNotes(personality.customNotes);
+
   return (
     <div className="agent-personality-card">
-      <div className="personality-header">
+      {/* Compact Header: Avatar + Name + Role + Style Badge inline */}
+      <div className="personality-header-compact">
         <div className="personality-avatar">
           {avatarUrl ? (
             <img
@@ -175,7 +193,6 @@ export default function AgentPersonalityCard({
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 console.error('[AgentPersonalityCard] Image failed to load, using fallback duck15.jpeg:', avatarUrl);
-                // Always fallback to duck15.jpeg on error
                 if (window.__TAURI__) {
                   target.src = convertFileSrc('/images/ducks/new-avatars/duck15.jpeg', 'asset');
                 } else {
@@ -190,96 +207,179 @@ export default function AgentPersonalityCard({
             </svg>
           )}
         </div>
-        <div className="personality-identity">
-          <h3 className="personality-name">{agentName || personality.name}</h3>
+        <div className="personality-identity-compact">
+          <div className="personality-name-row">
+            <span className="personality-name">{agentName || personality.name}</span>
+            {personality.communicationStyle && (
+              <span className="style-badge-inline">
+                {COMMUNICATION_STYLES_MAP[personality.communicationStyle] || personality.communicationStyle}
+              </span>
+            )}
+          </div>
           <p className="personality-role">{personality.role}</p>
-          {agentWorkingOn && (
-            <div className="personality-working-on">
-              <span className="working-on-label">Working on:</span>
-              <span className="working-on-text">{agentWorkingOn}</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Bundle Export/Import Actions */}
-      <div className="personality-section bundle-actions">
-        <div className="bundle-buttons">
-          <button
-            className="bundle-btn bundle-btn-export"
-            onClick={handleExport}
-            disabled={exporting}
-            title="Export agent as bundle"
-          >
-            {exporting ? 'Exporting...' : 'Export Bundle'}
-          </button>
-          <button
-            className="bundle-btn bundle-btn-import"
-            onClick={handleImport}
-            disabled={importing}
-            title="Import agent from bundle"
-          >
-            {importing ? 'Importing...' : 'Import Bundle'}
-          </button>
+      {/* Bio/Notes Section - directly under header without title */}
+      {filteredNotes && (
+        <div className="personality-bio">
+          {filteredNotes}
         </div>
-        {error && (
-          <div className="bundle-error" onClick={clearError}>
-            {error}
+      )}
+
+      {/* Proactive Skills - chip display */}
+      {/* Use selectedSkills if available, otherwise extract from legacy skills field */}
+      {(() => {
+        let skillNames: string[] = [];
+
+        if (personality.selectedSkills && personality.selectedSkills.length > 0) {
+          skillNames = personality.selectedSkills;
+        } else if (personality.skills && personality.skills.length > 0) {
+          // Extract skill names from legacy format: "/path/to/skill-name/SKILL.md | WHEN: ..."
+          skillNames = personality.skills.map(s => {
+            // Extract the folder name before /SKILL.md or .md
+            const match = s.match(/\/([^/]+)(?:\/SKILL)?\.md/i);
+            if (match) return match[1];
+            // Fallback: just use the last path segment
+            const parts = s.split('/');
+            const last = parts[parts.length - 1];
+            return last.replace(/\.md$/i, '').replace(/\/SKILL$/i, '');
+          });
+        }
+
+        if (skillNames.length === 0) return null;
+
+        return (
+          <div className="personality-skills-section">
+            <div className="skills-header">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="url(#skillGradientCard)" strokeWidth="2">
+                <defs>
+                  <linearGradient id="skillGradientCard" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#f28c52" />
+                    <stop offset="100%" stopColor="#e67339" />
+                  </linearGradient>
+                </defs>
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              <span className="skills-title">Preferred Skills</span>
+            </div>
+            <div className="skills-chips-row">
+              {skillNames.map((skill, index) => (
+                <span key={index} className="skill-chip-compact">{skill}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Technical Context - inline without section title */}
+      {personality.technicalContext && (
+        <div className="personality-context">
+          {personality.technicalContext}
+        </div>
+      )}
+
+      {/* Workspace + Context Files Row */}
+      <div className="personality-meta-row">
+        {/* Workspace Info */}
+        {(projectName || gitBranch) && (
+          <div className="workspace-chips">
+            {projectName && (
+              <span className="meta-chip workspace-chip">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 7h18M3 12h18M3 17h18"/>
+                </svg>
+                {projectName}
+              </span>
+            )}
+            {gitBranch && (
+              <span className="meta-chip branch-chip">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="6" cy="6" r="2"/>
+                  <circle cx="18" cy="18" r="2"/>
+                  <path d="M6 8v8c0 2 2 4 4 4h2"/>
+                </svg>
+                {gitBranch}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Context Files */}
+        {(projectFiles.length > 0 || globalFiles.length > 0) && (
+          <div className="context-chips">
+            {projectFiles.map((file) => (
+              <span
+                key={`${file.scope}-${file.name}`}
+                className={`meta-chip context-chip ${!file.exists ? 'not-exists' : ''}`}
+                onClick={() => file.exists && onFileClick?.(file)}
+              >
+                {file.name}
+                {projectStats && projectStats.char_count > 0 && (
+                  <span className={`chip-size stats-${projectStats.score}`}>
+                    {projectStats.char_count >= 1000
+                      ? `${(projectStats.char_count / 1000).toFixed(1)}k`
+                      : projectStats.char_count}
+                  </span>
+                )}
+              </span>
+            ))}
+            {globalFiles.map((file) => (
+              <span
+                key={`${file.scope}-${file.name}`}
+                className={`meta-chip context-chip global ${!file.exists ? 'not-exists' : ''}`}
+                onClick={() => file.exists && onFileClick?.(file)}
+              >
+                {file.name}
+                {globalStats && globalStats.char_count > 0 && (
+                  <span className={`chip-size stats-${globalStats.score}`}>
+                    {globalStats.char_count >= 1000
+                      ? `${(globalStats.char_count / 1000).toFixed(1)}k`
+                      : globalStats.char_count}
+                  </span>
+                )}
+              </span>
+            ))}
           </div>
         )}
       </div>
 
-      {personality.technicalContext && (
-        <div className="personality-section">
-          <h4 className="section-title">Technical Context</h4>
-          <p className="personality-intro">{personality.technicalContext}</p>
-        </div>
-      )}
-
+      {/* Rules as compact chips - only if present */}
       {personality.rules && personality.rules.length > 0 && (
-        <div className="personality-section">
-          <h4 className="section-title">Rules & Best Practices</h4>
-          <div className="rules-list">
-            {personality.rules.map((rule, index) => (
-              <div key={index} className="rule-item">
-                <span className="rule-bullet">•</span>
-                <span className="rule-text">{rule}</span>
-              </div>
-            ))}
-          </div>
+        <div className="personality-rules-compact">
+          {personality.rules.slice(0, 3).map((rule, index) => (
+            <span key={index} className="rule-chip">{rule}</span>
+          ))}
+          {personality.rules.length > 3 && (
+            <span className="rule-chip more">+{personality.rules.length - 3}</span>
+          )}
         </div>
       )}
 
-      {personality.communicationStyle && (
-        <div className="personality-section">
-          <h4 className="section-title">Communication Style</h4>
-          <div className="communication-badge">
-            {COMMUNICATION_STYLES_MAP[personality.communicationStyle] ||
-              personality.communicationStyle}
-          </div>
+      {/* Export Action - Show on hover */}
+      <div className="bundle-actions-compact">
+        <button
+          className="bundle-btn-compact"
+          onClick={handleExport}
+          disabled={exporting}
+          title="Export agent as bundle"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          {exporting ? 'Exporting...' : 'Export'}
+        </button>
+      </div>
+      {error && (
+        <div className="bundle-error-compact" onClick={clearError}>
+          {error}
         </div>
       )}
-
-      {personality.customNotes && (
-        <div className="personality-section">
-          <h4 className="section-title">Custom Notes</h4>
-          <p className="personality-intro">{filterDroidsFromCustomNotes(personality.customNotes)}</p>
+      {success && (
+        <div className="bundle-success-compact">
+          {success}
         </div>
       )}
-
-      {/* HIDDEN: Favorite Expressions section - not editable in UI yet */}
-      {/* {personality.expressions && personality.expressions.length > 0 && (
-        <div className="personality-section">
-          <h4 className="section-title">Favorite Expressions</h4>
-          <div className="expressions-list">
-            {personality.expressions.map((expression, index) => (
-              <div key={index} className="expression-item">
-                💬 {expression}
-              </div>
-            ))}
-          </div>
-        </div>
-      )} */}
     </div>
   );
 }

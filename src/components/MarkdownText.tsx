@@ -57,6 +57,8 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     let listKey = 0;
     let codeBlock: string[] | null = null;
     let codeBlockKey = 0;
+    let tableRows: string[][] | null = null;
+    let tableKey = 0;
 
     const flushList = () => {
       if (currentList && currentList.length > 0) {
@@ -83,6 +85,36 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
           </div>
         );
         codeBlock = null;
+      }
+    };
+
+    const flushTable = () => {
+      if (tableRows && tableRows.length > 0) {
+        const headerRow = tableRows[0];
+        const bodyRows = tableRows.slice(1);
+        elements.push(
+          <div key={`table-wrap-${tableKey}`} className="md-table-wrapper">
+            <table key={`table-${tableKey++}`} className="md-table">
+              <thead>
+                <tr>
+                  {headerRow.map((cell, i) => (
+                    <th key={i} dangerouslySetInnerHTML={{ __html: processInlineMarkdown(cell) }} />
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, ri) => (
+                  <tr key={ri}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} dangerouslySetInnerHTML={{ __html: processInlineMarkdown(cell) }} />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        tableRows = null;
       }
     };
 
@@ -117,6 +149,29 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       if (codeBlock !== null) {
         codeBlock.push(line);
         return;
+      }
+
+      // Table rows (lines starting and containing |)
+      const isTableRow = line.trim().startsWith('|') && line.trim().endsWith('|');
+      const isSeparatorRow = isTableRow && /^\|[\s\-:|]+\|$/.test(line.trim());
+
+      if (isTableRow) {
+        if (isSeparatorRow) {
+          // Skip separator row (|---|---|)
+          return;
+        }
+        if (!tableRows) {
+          flushList();
+          tableRows = [];
+        }
+        const cells = line.trim().slice(1, -1).split('|').map(c => c.trim());
+        tableRows.push(cells);
+        return;
+      }
+
+      // Flush table if we hit non-table content
+      if (tableRows) {
+        flushTable();
       }
 
       // Horizontal rule
@@ -181,9 +236,10 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       );
     });
 
-    // Flush any remaining list or code block
+    // Flush any remaining list, code block, or table
     flushList();
     flushCodeBlock();
+    flushTable();
 
     return elements;
   };

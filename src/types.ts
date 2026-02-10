@@ -283,6 +283,9 @@ export interface AgentPersonality {
   // Selected Claude Code rules (file paths from .claude/rules/)
   selectedRules?: string[]; // Array of rule file paths to follow
 
+  // Selected skills (injected into CLAUDE.md for proactive use)
+  selectedSkills?: string[]; // Array of skill names (e.g., "frontend-design", "code-review")
+
   // Quick-access tools for this agent (shown in chat EquipBar)
   toolkit?: AgentToolkit;
 
@@ -970,7 +973,7 @@ export interface SessionDetails extends SessionInfo {
 }
 
 // Marketplace types
-export type MarketplaceCategory = 'agents' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills' | 'rules' | 'agent-bundles';
+export type MarketplaceCategory = 'agents' | 'droids' | 'commands' | 'hooks' | 'settings' | 'mcp' | 'stacks' | 'skills' | 'rules' | 'agent-bundles';
 
 /**
  * Agent Template from marketplace bundle.
@@ -985,7 +988,9 @@ export interface AgentTemplate {
   suggestedAvatar?: string;
   /** Gender hint for random name generation ('male' | 'female') */
   suggestedGender?: 'male' | 'female';
-  /** References to other plugins (skills, rules) to install alongside */
+  /** Skills to install and set as Preferred Skills for this agent */
+  skills?: string[];
+  /** @deprecated Use `skills` instead. Kept for backward compatibility */
   bundledPlugins?: string[];
 }
 
@@ -993,6 +998,7 @@ export interface MarketplaceResource {
   id: string;
   name: string;
   description: string;
+  longDescription?: string;
   category: MarketplaceCategory;
   author: string;
   authorAvatar?: string;
@@ -1750,3 +1756,42 @@ export interface PowerRatingBreakdown {
   ruleCount: number;
   commandCount: number;
 }
+
+// ============================================
+// Agent Teams Types
+// ============================================
+
+export interface TeamMember {
+  agentId: string;
+  name: string;
+  role: string;
+  communicationStyle: string;
+  selectedSkills?: string[];
+  isLead: boolean;
+  avatar?: string;
+  color?: string;
+}
+
+export interface TeamConfig {
+  id: string;
+  name: string;
+  projectPath: string;
+  leadAgentId: string;
+  members: TeamMember[];
+  createdAt: number;
+  taskDescription?: string;
+}
+
+export interface TeamContext {
+  teamName: string;
+  members: TeamContextMember[];
+}
+
+export interface TeamContextMember {
+  name: string;
+  role: string;
+  communicationStyle: string;
+  isLead: boolean;
+}
+
+export type TeammateStatus = 'spawning' | 'active' | 'idle' | 'stopped';

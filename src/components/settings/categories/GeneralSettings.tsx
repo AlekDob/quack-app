@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { Store } from '@tauri-apps/plugin-store';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
 import { useSettingsStore } from '../../../stores/settingsStore';
-import StorageMetrics from '../../StorageMetrics';
 
 export default function GeneralSettings() {
-  const [performanceMonitor, setPerformanceMonitor] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // PiP and Quack Sound settings
+  const [pipEnabled, setPipEnabled] = useState(false);
+  const [quackSoundEnabled, setQuackSoundEnabled] = useState(true);
 
   // GIF reactions settings
   const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? false);
@@ -39,50 +39,50 @@ export default function GeneralSettings() {
   };
 
   useEffect(() => {
-    loadPreferences();
+    loadUiPreferences();
   }, []);
 
-  const loadPreferences = async () => {
+  const loadUiPreferences = async () => {
     try {
-      const prefs = await invoke<{ show_performance_monitor: boolean }>('get_preferences');
-      setPerformanceMonitor(prefs.show_performance_monitor);
+      const store = await Store.load('.quack-ui-prefs.dat');
+      const pip = await store.get<boolean>('pip-enabled');
+      const sound = await store.get<boolean>('quack-sound-enabled');
+      if (pip !== null && pip !== undefined) setPipEnabled(pip);
+      // Sound defaults to true, only set to false if explicitly saved as false
+      setQuackSoundEnabled(sound !== false);
     } catch (err) {
-      console.error('Failed to load general preferences:', err);
+      console.error('Failed to load UI preferences:', err);
     }
   };
 
-  const handleTogglePerformanceMonitor = async (enabled: boolean) => {
-    setLoading(true);
+  const handleTogglePip = async (enabled: boolean) => {
+    setPipEnabled(enabled);
     try {
-      await invoke('toggle_performance_monitor');
-      setPerformanceMonitor(enabled);
+      const store = await Store.load('.quack-ui-prefs.dat');
+      await store.set('pip-enabled', enabled);
+      await store.save();
+      // Emit event to notify App.tsx
+      window.dispatchEvent(new CustomEvent('pip-setting-changed', { detail: { enabled } }));
     } catch (err) {
-      console.error('Failed to toggle performance monitor:', err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to save PiP preference:', err);
+    }
+  };
+
+  const handleToggleQuackSound = async (enabled: boolean) => {
+    setQuackSoundEnabled(enabled);
+    try {
+      const store = await Store.load('.quack-ui-prefs.dat');
+      await store.set('quack-sound-enabled', enabled);
+      await store.save();
+      // Emit event to notify App.tsx
+      window.dispatchEvent(new CustomEvent('quack-sound-setting-changed', { detail: { enabled } }));
+    } catch (err) {
+      console.error('Failed to save Quack Sound preference:', err);
     }
   };
 
   return (
     <div className="settings-category">
-      <SectionHeader
-        title="Performance"
-        description="Monitor and optimize app performance"
-      />
-      <div className="settings-group">
-        <SettingsRow
-          label="Performance Monitor"
-          description="Show real-time performance metrics overlay"
-          control={
-            <IOSSwitch
-              checked={performanceMonitor}
-              onChange={handleTogglePerformanceMonitor}
-              disabled={loading}
-            />
-          }
-        />
-      </div>
-
       <SectionHeader
         title="Chat Experience"
         description="Customize your AI chat experience"
@@ -183,29 +183,32 @@ export default function GeneralSettings() {
       </div>
 
       <SectionHeader
-        title="Application"
-        description="General application settings"
+        title="Display"
+        description="Visual and audio preferences"
       />
       <div className="settings-group">
         <SettingsRow
-          label="Launch on Startup"
-          description="Automatically start Quack when you log in"
-          control={<IOSSwitch checked={false} onChange={() => {}} disabled />}
+          label="Picture-in-Picture Mode"
+          description="Show floating agent status cards when minimized"
+          control={
+            <IOSSwitch
+              checked={pipEnabled}
+              onChange={handleTogglePip}
+            />
+          }
         />
         <SettingsRow
-          label="Auto-save Sessions"
-          description="Automatically save terminal sessions and restore them on restart"
-          control={<IOSSwitch checked={true} onChange={() => {}} disabled />}
+          label="Quack Sound"
+          description="Play a quack sound when agents complete tasks"
+          control={
+            <IOSSwitch
+              checked={quackSoundEnabled}
+              onChange={handleToggleQuackSound}
+            />
+          }
         />
       </div>
 
-      <SectionHeader
-        title="Storage"
-        description="Manage session storage and cleanup"
-      />
-      <div className="settings-group">
-        <StorageMetrics />
-      </div>
     </div>
   );
 }

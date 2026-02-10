@@ -17,6 +17,7 @@ import {
   resetShortcut as resetSingleStorage,
   DEFAULT_SHORTCUTS,
 } from "../services/shortcutsStorage";
+import { isMacOS } from "../utils/platform";
 
 interface ShortcutsState {
   // State
@@ -36,16 +37,29 @@ interface ShortcutsState {
 }
 
 /**
- * Format shortcut keys for display (Meta+K → ⌘K)
+ * Format shortcut keys for display
+ * macOS: Meta+K → ⌘K
+ * Windows/Linux: Meta+K → Ctrl+K (readable text)
  */
 const formatShortcutKeys = (keys: string): string => {
   if (!keys) return "";
-  return keys
-    .replace(/Meta\+/gi, "⌘")
-    .replace(/Ctrl\+/gi, "⌃")
-    .replace(/Alt\+/gi, "⌥")
-    .replace(/Shift\+/gi, "⇧")
-    .replace(/\+/g, "");
+
+  if (isMacOS()) {
+    // Mac: use symbols
+    return keys
+      .replace(/Meta\+/gi, "⌘")
+      .replace(/Ctrl\+/gi, "⌃")
+      .replace(/Alt\+/gi, "⌥")
+      .replace(/Shift\+/gi, "⇧")
+      .replace(/\+/g, "");
+  } else {
+    // Windows/Linux: use readable text
+    return keys
+      .replace(/Meta\+/gi, "Ctrl+")
+      .replace(/Ctrl\+/gi, "Ctrl+")
+      .replace(/Alt\+/gi, "Alt+")
+      .replace(/Shift\+/gi, "Shift+");
+  }
 };
 
 export const useShortcutsStore = create<ShortcutsState>()(

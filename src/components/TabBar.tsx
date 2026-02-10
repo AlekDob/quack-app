@@ -31,6 +31,7 @@ export interface Tab {
   taskId?: string; // Reference to Kanban task for task tabs
   imageData?: string; // Base64 image data for image tabs
   mediaType?: string; // MIME type (image/png, image/jpeg, etc.) for image tabs
+  initialProjectPath?: string; // Initial project to select for claude-assets tabs
 }
 
 interface ContextMenuState {

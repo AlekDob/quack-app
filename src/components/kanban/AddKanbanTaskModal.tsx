@@ -1066,7 +1066,7 @@ export default function AddKanbanTaskModal({
                         </svg>
                       </div>
                       <div className="kanban-selection-info">
-                        <span className="kanban-selection-name">{skill.name}</span>
+                        <span className="kanban-selection-name">{skill.displayName}</span>
                         <span className="kanban-selection-desc" title={skill.description}>
                           {skill.description.length > 50 ? skill.description.substring(0, 50) + '...' : skill.description}
                         </span>

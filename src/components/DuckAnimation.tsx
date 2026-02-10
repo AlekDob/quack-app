@@ -10,7 +10,11 @@ interface Duck {
   verticalOffset: number;
 }
 
-export default function DuckAnimation() {
+interface DuckAnimationProps {
+  onClick?: () => void;
+}
+
+export default function DuckAnimation({ onClick }: DuckAnimationProps) {
   const [ducks] = useState<Duck[]>(() =>
     Array.from({ length: 5 }, (_, i) => ({
       id: i,
@@ -21,7 +25,11 @@ export default function DuckAnimation() {
   );
 
   return (
-    <div className="duck-animation-container">
+    <div
+      className="duck-animation-container"
+      onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+    >
       <div className="duck-parade">
         {ducks.map((duck) => (
           <span

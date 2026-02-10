@@ -8,7 +8,7 @@
   gap: 0;
   background: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  height: 35px;
+  height: 30px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none; /* Firefox */
@@ -22,14 +22,14 @@
 .tab-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 35px;
-  padding: 0 10px;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
   background: transparent;
   border: none;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.6);
-  font-size: 0.72rem;
+  font-size: 11px;
   font-weight: 400;
   white-space: nowrap;
   cursor: pointer;
@@ -62,11 +62,10 @@
 /* Color Indicator - Agent Badge */
 .tab-color-indicator {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Tab Label */

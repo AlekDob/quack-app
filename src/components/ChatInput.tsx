@@ -22,6 +22,7 @@ import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
+import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import {
   compressImage,
   blobToBase64,
@@ -301,6 +302,38 @@ export default function ChatInput({
     return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
   }, []);
 
+  // State for all available skills (loaded from project + global)
+  const [allAvailableSkills, setAllAvailableSkills] = useState<string[]>([]);
+
+  // Load all available skills when basePath changes or @ autocomplete opens
+  useEffect(() => {
+    if (!basePath) return;
+
+    const loadSkills = async () => {
+      try {
+        const skills = await loadAvailableSkills(basePath);
+        // Extract just the skill names
+        const skillNames = skills.map(s => s.name);
+        setAllAvailableSkills(skillNames);
+      } catch (err) {
+        console.error('[ChatInput] Failed to load skills:', err);
+      }
+    };
+
+    loadSkills();
+  }, [basePath]);
+
+  // Filter skills based on current @ mention (from all available skills)
+  const filteredSkills = useMemo(() => {
+    if (!allAvailableSkills.length || !showAgentAutocomplete) return [];
+
+    const filter = agentFilter.toLowerCase();
+    return allAvailableSkills.filter(skill => {
+      const name = skill.toLowerCase().replace(/-/g, ' ');
+      return name.includes(filter);
+    });
+  }, [allAvailableSkills, showAgentAutocomplete, agentFilter]);
+
   // Filter agents based on current @ mention
   const filteredAgents = useMemo(() => {
     if (!agents || !showAgentAutocomplete) return [];
@@ -514,6 +547,32 @@ export default function ChatInput({
     const beforeMention = input.substring(0, atMentionStart);
     const afterMention = input.substring(textareaRef.current.selectionStart);
     const fullMention = `@${agent.name} `;
+    const newInput = beforeMention + fullMention + afterMention;
+
+    setInput(newInput);
+    setShowAgentAutocomplete(false);
+    setAgentFilter('');
+    setAtMentionStart(-1);
+    setFileSearchResults([]);
+
+    // Focus back to textarea and position cursor after mention
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeMention.length + fullMention.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [input, atMentionStart, setInput]);
+
+  // Select a skill from autocomplete
+  const selectSkill = useCallback((skillName: string) => {
+    if (!textareaRef.current) return;
+
+    // Replace the partial @mention with @skill:skillname
+    const beforeMention = input.substring(0, atMentionStart);
+    const afterMention = input.substring(textareaRef.current.selectionStart);
+    const fullMention = `@skill:${skillName} `;
     const newInput = beforeMention + fullMention + afterMention;
 
     setInput(newInput);
@@ -1724,9 +1783,9 @@ export default function ChatInput({
       }
     }
 
-    // Handle agent/file autocomplete navigation
-    if (showAgentAutocomplete && (filteredAgents.length > 0 || fileSearchResults.length > 0)) {
-      const totalItems = filteredAgents.length + fileSearchResults.length;
+    // Handle agent/file/skill autocomplete navigation
+    if (showAgentAutocomplete && (filteredSkills.length > 0 || filteredAgents.length > 0 || fileSearchResults.length > 0)) {
+      const totalItems = filteredSkills.length + filteredAgents.length + fileSearchResults.length;
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1741,14 +1800,23 @@ export default function ChatInput({
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
 
-        // Check if selecting an agent or a file
-        if (selectedAgentIndex < filteredAgents.length) {
-          const selectedAgent = filteredAgents[selectedAgentIndex];
+        // Check if selecting a skill, agent, or file
+        if (selectedAgentIndex < filteredSkills.length) {
+          // Selecting a skill
+          const selectedSkill = filteredSkills[selectedAgentIndex];
+          if (selectedSkill) {
+            selectSkill(selectedSkill);
+          }
+        } else if (selectedAgentIndex < filteredSkills.length + filteredAgents.length) {
+          // Selecting an agent (droid)
+          const agentIndex = selectedAgentIndex - filteredSkills.length;
+          const selectedAgent = filteredAgents[agentIndex];
           if (selectedAgent) {
             selectAgent(selectedAgent);
           }
         } else {
-          const fileIndex = selectedAgentIndex - filteredAgents.length;
+          // Selecting a file
+          const fileIndex = selectedAgentIndex - filteredSkills.length - filteredAgents.length;
           const selectedFile = fileSearchResults[fileIndex];
           if (selectedFile) {
             selectFile(selectedFile);
@@ -1848,28 +1916,78 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Agent & File autocomplete dropdown */}
-      {showAgentAutocomplete && (filteredAgents.length > 0 || fileSearchResults.length > 0) && (
+      {/* Agent, Skill & File autocomplete dropdown */}
+      {showAgentAutocomplete && (filteredSkills.length > 0 || filteredAgents.length > 0 || fileSearchResults.length > 0) && (
         <div className="agent-autocomplete mention-autocomplete">
-          {/* Agents Section */}
+          {/* Skills Section - FIRST */}
+          {filteredSkills.length > 0 && (
+            <div className="mention-section">
+              <div className="mention-section-header skills-header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <defs>
+                    <linearGradient id="skill-star-gradient-autocomplete" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#f28c52" />
+                      <stop offset="100%" stopColor="#e67339" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                    fill="url(#skill-star-gradient-autocomplete)"
+                  />
+                </svg>
+                <span>Skills</span>
+              </div>
+              {filteredSkills.map((skill, index) => (
+                <button
+                  key={skill}
+                  type="button"
+                  className={`agent-autocomplete-item skill-item ${selectedAgentIndex === index ? 'selected' : ''}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectSkill(skill);
+                  }}
+                  onMouseEnter={() => setSelectedAgentIndex(index)}
+                >
+                  <div className="agent-autocomplete-badge skill-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                        fill="#f28c52"
+                      />
+                    </svg>
+                  </div>
+                  <div className="agent-autocomplete-info">
+                    <div className="agent-autocomplete-name">
+                      {skill.replace(/-/g, ' ')}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Droids Section */}
           {filteredAgents.length > 0 && (
             <div className="mention-section">
-              <div className="mention-section-header">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L10.5 4.5H8C6.9 4.5 6 5.4 6 6.5V8.5H4V11.5H6V13.5H4V16.5H6V18.5C6 19.6 6.9 20.5 8 20.5H16C17.1 20.5 18 19.6 18 18.5V16.5H20V13.5H18V11.5H20V8.5H18V6.5C18 5.4 17.1 4.5 16 4.5H13.5L12 2M12 5.5C12.83 5.5 13.5 6.17 13.5 7C13.5 7.83 12.83 8.5 12 8.5C11.17 8.5 10.5 7.83 10.5 7C10.5 6.17 11.17 5.5 12 5.5M10 11C10.55 11 11 11.45 11 12C11 12.55 10.55 13 10 13C9.45 13 9 12.55 9 12C9 11.45 9.45 11 10 11M14 11C14.55 11 15 11.45 15 12C15 12.55 14.55 13 14 13C13.45 13 13 12.55 13 12C13 11.45 13.45 11 14 11M10 16H14V17H10V16Z" opacity="0.8"/>
+              <div className="mention-section-header droids-header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#4A9EFF">
+                  <path d="M12 2L10.5 4.5H8C6.9 4.5 6 5.4 6 6.5V8.5H4V11.5H6V13.5H4V16.5H6V18.5C6 19.6 6.9 20.5 8 20.5H16C17.1 20.5 18 19.6 18 18.5V16.5H20V13.5H18V11.5H20V8.5H18V6.5C18 5.4 17.1 4.5 16 4.5H13.5L12 2M12 5.5C12.83 5.5 13.5 6.17 13.5 7C13.5 7.83 12.83 8.5 12 8.5C11.17 8.5 10.5 7.83 10.5 7C10.5 6.17 11.17 5.5 12 5.5M10 11C10.55 11 11 11.45 11 12C11 12.55 10.55 13 10 13C9.45 13 9 12.55 9 12C9 11.45 9.45 11 10 11M14 11C14.55 11 15 11.45 15 12C15 12.55 14.55 13 14 13C13.45 13 13 12.55 13 12C13 11.45 13.45 11 14 11M10 16H14V17H10V16Z"/>
                 </svg>
                 <span>Droids</span>
               </div>
-              {filteredAgents.map((agent, index) => (
+              {filteredAgents.map((agent, index) => {
+                // Offset index by skills count
+                const globalIndex = filteredSkills.length + index;
+                return (
                 <button
                   key={agent.name}
                   type="button"
-                  className={`agent-autocomplete-item ${selectedAgentIndex === index ? 'selected' : ''}`}
+                  className={`agent-autocomplete-item droid-item ${selectedAgentIndex === globalIndex ? 'selected' : ''}`}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     selectAgent(agent);
                   }}
-                  onMouseEnter={() => setSelectedAgentIndex(index)}
+                  onMouseEnter={() => setSelectedAgentIndex(globalIndex)}
                 >
                   <div
                     className="agent-autocomplete-badge"
@@ -1887,7 +2005,8 @@ export default function ChatInput({
                   </div>
                   <div className="agent-autocomplete-model">{agent.model}</div>
                 </button>
-              ))}
+              );
+              })}
             </div>
           )}
 
@@ -1902,7 +2021,8 @@ export default function ChatInput({
                 <span>Files</span>
               </div>
               {fileSearchResults.map((file, index) => {
-                const globalIndex = filteredAgents.length + index;
+                // Offset index by skills + droids count
+                const globalIndex = filteredSkills.length + filteredAgents.length + index;
                 return (
                   <button
                     key={file.path}
@@ -1982,8 +2102,17 @@ export default function ChatInput({
             <div className="chat-input-mentions">
               {skillMentions.map((skillName, idx) => (
                 <div key={idx} className="chat-input-skill-chip">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                  <svg viewBox="0 0 24 24" fill="none" width="12" height="12">
+                    <defs>
+                      <linearGradient id={`skill-chip-gradient-${idx}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#f28c52" />
+                        <stop offset="100%" stopColor="#e67339" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                      fill={`url(#skill-chip-gradient-${idx})`}
+                    />
                   </svg>
                   <span>{skillName.replace(/-/g, ' ')}</span>
                 </div>

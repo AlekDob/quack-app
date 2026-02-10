@@ -17,6 +17,7 @@ import UsagePanel from "./UsagePanel";
 import { SessionsPanel } from "./SessionsPanel";
 import type { DirectoryEntry, GitStatusEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionUsage, SessionInfo, AgentPersonality, HookConfig, ChatMessage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
+import { formatShortcut } from "../utils/platform";
 
 /**
  * Side Panel with tab navigation
@@ -392,7 +393,6 @@ interface SidePanelProps {
   onRefreshSkills: () => void;
 
   // Commands props
-  onUseCommand: (command: SlashCommand) => void;
   onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
 
   // Rules props
@@ -413,7 +413,6 @@ interface SidePanelProps {
   activeAgentCwd?: string | null;
   activeAgentPersonality?: Partial<AgentPersonality> | null; // Added: personality from terminal state
   activeAgentColor?: string | null; // Added: agent color for bundles
-  onImportAgent?: (agent: import('../types').SavedAgent) => void; // Callback after bundle import
   projectName?: string;
   gitBranch?: string;
   agentRefreshKey?: number; // Added: forces context panel refresh when agent is edited
@@ -505,7 +504,6 @@ export default function SidePanel({
   onRefreshSkills,
 
   // Commands
-  onUseCommand,
   onSelectCommand,
 
   // Rules
@@ -526,7 +524,6 @@ export default function SidePanel({
   activeAgentCwd,
   activeAgentPersonality, // Added: personality from terminal state
   activeAgentColor, // Added: agent color for bundles
-  onImportAgent, // Callback after bundle import
   projectName,
   gitBranch,
   agentRefreshKey, // Added: forces context panel refresh when agent is edited
@@ -795,7 +792,6 @@ export default function SidePanel({
               onOpenFile={onOpenFile}
               onOpenContextDrawer={onOpenContextDrawer}
               onOpenRulesTab={() => setActiveTab("rules")}
-              onImportAgent={onImportAgent}
               projectName={projectName}
               gitBranch={gitBranch}
               refreshKey={agentRefreshKey}
@@ -879,7 +875,6 @@ export default function SidePanel({
           <div className="side-panel-pane">
             <CommandsPanel
               basePath={rootPath || ''}
-              onUseCommand={onUseCommand}
               onSelectCommand={onSelectCommand}
             />
           </div>
@@ -918,7 +913,7 @@ export default function SidePanel({
           <div className="side-panel-pane terminal-panel-pane">
             <div className="terminal-placeholder">
               <p>Terminal tab deprecated</p>
-              <p>Use the Terminals window instead (Cmd+T)</p>
+              <p>{`Use the Terminals window instead (${formatShortcut("⌘T")})`}</p>
             </div>
           </div>
         )}

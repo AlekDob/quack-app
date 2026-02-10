@@ -54,20 +54,17 @@ const icons: Record<string, ReactNode> = {
   ),
   terminal: (
     <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path
-        d="M3 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M5 8l3 2-3 2M10 12h4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <text
+        x="10"
+        y="14"
+        textAnchor="middle"
+        fill="currentColor"
+        fontSize="12"
+        fontWeight="600"
+        fontFamily="monospace"
+      >
+        /
+      </text>
     </svg>
   ),
 };

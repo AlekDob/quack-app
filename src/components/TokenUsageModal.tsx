@@ -283,13 +283,6 @@ export default function TokenUsageModal({
               <span className="context-summary-label">FREE</span>
               <span className="context-summary-value">{formatTokensK(remainingTokens)}</span>
             </div>
-            {totalCost > 0 && (
-              <div className="context-summary-row cost">
-                <span className="context-summary-label">COST</span>
-                <span className="context-summary-value">{formatCostUsd(totalCost)}</span>
-                <span className="context-summary-note">(API users only)</span>
-              </div>
-            )}
           </div>
 
           {/* Max Plan Status (if available) */}

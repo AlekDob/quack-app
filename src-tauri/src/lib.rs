@@ -28,6 +28,8 @@ mod notifications;
 mod native_terminal;
 mod personality;
 mod plugins;
+mod prerequisites; // ✅ Prerequisites checker (Git, Node.js, Claude CLI)
+mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
 mod preferences;
 mod preview;
 mod proxy;
@@ -45,6 +47,7 @@ mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
+mod git_watcher; // 🔀 Git branch change watcher
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -569,6 +572,7 @@ pub fn run() {
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
+        .manage(git_watcher::GitBranchWatcherManager::new()) // Register git branch watcher manager
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -653,24 +657,15 @@ pub fn run() {
                     .accelerator("Cmd+Shift+A")
                     .build(app)?;
 
-                let watch_intro_id = "watch_intro";
-                let watch_intro = tauri::menu::MenuItemBuilder::with_id(watch_intro_id, "Watch Intro")
-                    .accelerator("Cmd+Shift+I")
-                    .build(app)?;
-
-                // DevTools option (for debugging production builds)
-                let open_devtools_id = "open_devtools";
-                let open_devtools = tauri::menu::MenuItemBuilder::with_id(open_devtools_id, "Open DevTools")
-                    .accelerator("Cmd+Option+D")
+                let check_updates_id = "check_for_updates";
+                let check_updates = tauri::menu::MenuItemBuilder::with_id(check_updates_id, "Check for Updates...")
                     .build(app)?;
 
                 let quack_menu = SubmenuBuilder::new(app, "Quack")
                     .item(&toggle_perf)
                     .separator()
+                    .item(&check_updates)
                     .item(&ai_settings)
-                    .item(&watch_intro)
-                    .separator()
-                    .item(&open_devtools)
                     .separator()
                     .quit()
                     .build()?;
@@ -709,19 +704,13 @@ pub fn run() {
                                 log::error!("Failed to emit open-ai-settings event: {}", e);
                             }
                         });
-                    } else if event.id() == watch_intro_id {
+                    } else if event.id() == check_updates_id {
                         let app_handle = app.clone();
                         tauri::async_runtime::spawn(async move {
-                            if let Err(e) = app_handle.emit("watch-intro", ()) {
-                                log::error!("Failed to emit watch-intro event: {}", e);
+                            if let Err(e) = app_handle.emit("check-for-updates", ()) {
+                                log::error!("Failed to emit check-for-updates event: {}", e);
                             }
                         });
-                    } else if event.id() == open_devtools_id {
-                        // Open DevTools for debugging
-                        if let Some(window) = app.get_webview_window("main") {
-                            window.open_devtools();
-                            log::info!("DevTools opened");
-                        }
                     }
                 });
             }
@@ -900,6 +889,8 @@ pub fn run() {
             fs::get_current_username,
             fs::read_file_content,
             fs::write_file_content,
+            fs::write_binary_file,
+            fs::read_binary_file,
             fs::create_directory,
             fs::remove_file,
             fs::remove_directory,
@@ -937,6 +928,8 @@ pub fn run() {
             ide_integration::open_file_in_ide,
             ide_integration::open_multiple_files_in_ide,
             ide_integration::open_folder_in_ide,
+            ide_integration::get_installed_apps,
+            ide_integration::open_in_app,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,
@@ -964,8 +957,14 @@ pub fn run() {
             git::git_has_uncommitted_changes,
             git::git_get_remote_url,
             git::git_uncommitted_files_count,
+            git::git_get_user_config,
+            git::git_set_user_config,
             git::is_git_repository,
             git::git_init,
+            prerequisites::check_prerequisites,
+            prerequisites::install_claude_cli,
+            prerequisites::check_claude_auth_status,
+            prerequisites::open_claude_login_terminal,
             preview::create_preview_webview,
             preview::update_preview_webview_position,
             preview::destroy_preview_webview,
@@ -1050,6 +1049,8 @@ pub fn run() {
             hooks::save_hook,
             hooks::delete_hook,
             hooks::toggle_hook,
+            hooks::get_claude_env_vars,
+            hooks::set_claude_env_var,
             plugins::list_available_plugins,
             plugins::list_installed_plugins,
             plugins::install_plugin,
@@ -1074,6 +1075,15 @@ pub fn run() {
             personality::save_agent_personality,
             personality::load_agent_personality,
             personality::inject_personality_to_claude_md,
+            personality::load_active_agents,
+            personality::save_active_agents,
+            personality::add_active_agent,
+            personality::remove_active_agent,
+            personality::load_active_agents_with_data,
+            // 🦆 Agent Teams commands
+            teams::create_team,
+            teams::disband_team,
+            teams::get_active_team,
             sessions::list_sessions,
             sessions::get_session_info,
             sessions::get_all_sessions_info,
@@ -1119,6 +1129,10 @@ pub fn run() {
             semantic_search::semantic_search_code,
             semantic_search::semantic_search_get_status,
             semantic_search::semantic_search_generate_embeddings,
+            // 🔀 Git Branch Watcher commands
+            git_watcher::start_git_branch_watcher,
+            git_watcher::stop_git_branch_watcher,
+            git_watcher::stop_all_git_branch_watchers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

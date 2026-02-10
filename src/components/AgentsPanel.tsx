@@ -267,15 +267,15 @@ export default function AgentsPanel({
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
-                        {/* Robot Icon */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(78, 205, 196, 0.15)" }}>
-                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#4ecdc4" strokeWidth="1.5">
-                            <rect x="4" y="6" width="12" height="12" rx="2" />
-                            <circle cx="8" cy="10" r="1.3" fill="#4ecdc4"/>
-                            <circle cx="12" cy="10" r="1.3" fill="#4ecdc4"/>
-                            <line x1="7" y1="13" x2="13" y2="13"/>
-                            <line x1="10" y1="2" x2="10" y2="6"/>
-                            <circle cx="10" cy="2" r="1"/>
+                        {/* Robot Icon - Teal gradient background with white icon (matches Quack Store) */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ecdc4, #26a69a)' }}>
+                          <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
+                            <rect x="4" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                            <circle cx="8" cy="10" r="1.3" fill="currentColor"/>
+                            <circle cx="12" cy="10" r="1.3" fill="currentColor"/>
+                            <line x1="7" y1="13" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5"/>
+                            <line x1="10" y1="2" x2="10" y2="6" stroke="currentColor" strokeWidth="1.5"/>
+                            <circle cx="10" cy="2" r="1" fill="currentColor"/>
                           </svg>
                         </div>
 
@@ -291,17 +291,6 @@ export default function AgentsPanel({
                           )}
                         </div>
 
-                        {/* Use button on hover */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUseAgent(agent);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
-                        >
-                          Use
-                        </button>
                       </div>
                     ))}
                 </div>
@@ -337,15 +326,15 @@ export default function AgentsPanel({
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
-                        {/* Robot Icon */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(78, 205, 196, 0.15)" }}>
-                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#4ecdc4" strokeWidth="1.5">
-                            <rect x="4" y="6" width="12" height="12" rx="2" />
-                            <circle cx="8" cy="10" r="1.3" fill="#4ecdc4"/>
-                            <circle cx="12" cy="10" r="1.3" fill="#4ecdc4"/>
-                            <line x1="7" y1="13" x2="13" y2="13"/>
-                            <line x1="10" y1="2" x2="10" y2="6"/>
-                            <circle cx="10" cy="2" r="1"/>
+                        {/* Robot Icon - Teal gradient background with white icon (matches Quack Store) */}
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ecdc4, #26a69a)' }}>
+                          <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
+                            <rect x="4" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                            <circle cx="8" cy="10" r="1.3" fill="currentColor"/>
+                            <circle cx="12" cy="10" r="1.3" fill="currentColor"/>
+                            <line x1="7" y1="13" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5"/>
+                            <line x1="10" y1="2" x2="10" y2="6" stroke="currentColor" strokeWidth="1.5"/>
+                            <circle cx="10" cy="2" r="1" fill="currentColor"/>
                           </svg>
                         </div>
 
@@ -361,17 +350,6 @@ export default function AgentsPanel({
                           )}
                         </div>
 
-                        {/* Use button on hover */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUseAgent(agent);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded text-xs font-medium transition-all duration-200 bg-white/5 hover:bg-white/10 text-white/70"
-                        >
-                          Use
-                        </button>
                       </div>
                     ))}
                 </div>

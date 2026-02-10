@@ -5,7 +5,6 @@ import SectionHeader from '../controls/SectionHeader';
 // Import background images using Vite's URL constructor
 const ducksPatternImage = new URL('../../../../images/backgrounds/ducks-pattern.png', import.meta.url).href;
 const duckPattern3Image = new URL('../../../../images/backgrounds/duck-pattern3.png', import.meta.url).href;
-const quackAgentImage = new URL('../../../../images/backgrounds/quack-agent.jpeg', import.meta.url).href;
 const hackerImage = new URL('../../../../images/backgrounds/hacker.png', import.meta.url).href;
 const duckBusinessImage = new URL('../../../../images/backgrounds/duckbusiness.png', import.meta.url).href;
 const duckMotoImage = new URL('../../../../images/backgrounds/duckmoto.png', import.meta.url).href;
@@ -39,7 +38,6 @@ const BACKGROUND_GROUPS: BackgroundGroup[] = [
   {
     title: 'Images',
     items: [
-      { name: 'quack-agent.jpeg', label: 'Quack Agent', preview: quackAgentImage, type: 'image' },
       { name: 'hacker.png', label: 'Hacker', preview: hackerImage, type: 'image' },
       { name: 'duckbusiness.png', label: 'Business Duck', preview: duckBusinessImage, type: 'image' },
       { name: 'duckmoto.png', label: 'Moto Duck', preview: duckMotoImage, type: 'image' },

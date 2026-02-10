@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-02T08:27:55Z
-files: 401
-exports: 1174
+generated: 2026-02-09T17:11:05Z
+files: 403
+exports: 1176
 ---
 
 # Codebase Map
@@ -66,7 +66,7 @@ exports: 1174
 - export default fn `AgentRulesBanner()`
 
 ## src/components/AgentSelector.tsx
-- export default fn `AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps)`
+- export default fn `AgentSelector()`
 
 ## src/components/AgentSessionItem.tsx
 - export default `memo(AgentSessionItem)`
@@ -674,6 +674,9 @@ exports: 1174
 
 ## src/components/SidePanel.tsx
 - export default fn `SidePanel()`
+
+## src/components/SidePanelAccordion.tsx
+- export default fn `SidePanelAccordion()`
 
 ## src/components/SkeletonMessage.tsx
 - export default fn `SkeletonMessage()`
@@ -1977,6 +1980,9 @@ exports: 1174
 
 ## src/views/ProjectDashboardTabView.tsx
 - export default fn `ProjectDashboardTabView()`
+
+## src\App.tsx
+- export default `App`
 
 ## vite.config.ts
 - export default `defineConfig(({ mode }) => {`

@@ -3,7 +3,7 @@
  * Displays projects list and assets browser with drag & drop support
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   DndContext,
   pointerWithin,
@@ -27,6 +27,7 @@ import './ClaudeAssetsPanel.css';
 
 interface ClaudeAssetsPanelProps {
   projectPaths: string[];
+  initialProjectPath?: string; // Pre-select this project when opening
   onOpenFile?: (path: string) => void;
   onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
   onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
@@ -104,7 +105,7 @@ const AssetTypeIcon = ({ type, size = 14 }: { type: ClaudeAssetType | 'all'; siz
   return icons[type] || icons.all;
 };
 
-export default function ClaudeAssetsPanel({ projectPaths, onOpenFile, onSelectCommand, onSelectRule, onSelectDroid }: ClaudeAssetsPanelProps) {
+export default function ClaudeAssetsPanel({ projectPaths, initialProjectPath, onOpenFile, onSelectCommand, onSelectRule, onSelectDroid }: ClaudeAssetsPanelProps) {
   const {
     projects,
     selectedProject,
@@ -205,6 +206,24 @@ export default function ClaudeAssetsPanel({ projectPaths, onOpenFile, onSelectCo
       loadMultipleProjects(projectPaths);
     }
   }, [projectPaths, loadMultipleProjects]);
+
+  // Select project when initialProjectPath changes (reacts to every change)
+  const lastInitialProjectPathRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    // Only react when initialProjectPath actually changes and is defined
+    if (
+      initialProjectPath &&
+      initialProjectPath !== lastInitialProjectPathRef.current &&
+      projects.length > 0 &&
+      !loading
+    ) {
+      const targetProject = projects.find(p => p.path === initialProjectPath);
+      if (targetProject) {
+        selectProject(targetProject.path);
+        lastInitialProjectPathRef.current = initialProjectPath;
+      }
+    }
+  }, [initialProjectPath, projects, loading, selectProject]);
 
   // Update search filter
   useEffect(() => {

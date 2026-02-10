@@ -17,7 +17,7 @@ const EXCLUDED_DIRS = new Set([
   'node_modules', 'dist', '.next', 'target', '.quack', '.claude', '.git', 'coverage', 'build',
 ]);
 
-const VALID_EXTENSIONS = new Set(['.ts', '.tsx']);
+const VALID_EXTENSIONS = new Set(['.ts', '.tsx', '.swift']);
 
 const MAX_SIG_LENGTH = 100;
 
@@ -44,9 +44,107 @@ function collectFiles(dir, rootDir) {
   return results;
 }
 
-// --- Export extraction (regex-based) ---
+// --- Swift extraction (regex-based) ---
 
-function extractExports(content) {
+function extractSwiftDeclarations(content) {
+  const decls = [];
+  const lines = content.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed === '') continue;
+
+    // Access modifiers to detect public API
+    const accessMatch = trimmed.match(/^(public|open|internal)?\s*/);
+    const access = accessMatch?.[1] || '';
+
+    // protocol
+    const proto = trimmed.match(/^(?:public|open|internal)?\s*protocol\s+(\w+)/);
+    if (proto) {
+      decls.push(`protocol \`${proto[1]}\``);
+      continue;
+    }
+
+    // struct
+    const strct = trimmed.match(/^(?:public|open|internal)?\s*struct\s+(\w+)(<[^>]+>)?/);
+    if (strct) {
+      const fields = extractSwiftFields(lines, i);
+      decls.push(`struct \`${strct[1]}${strct[2] || ''}${fields}\``);
+      continue;
+    }
+
+    // class
+    const cls = trimmed.match(/^(?:public|open|internal|final)?\s*(?:final\s+)?class\s+(\w+)(<[^>]+>)?/);
+    if (cls) {
+      decls.push(`class \`${cls[1]}${cls[2] || ''}\``);
+      continue;
+    }
+
+    // enum
+    const enm = trimmed.match(/^(?:public|open|internal)?\s*enum\s+(\w+)(<[^>]+>)?/);
+    if (enm) {
+      decls.push(`enum \`${enm[1]}${enm[2] || ''}\``);
+      continue;
+    }
+
+    // Top-level func (skip if indented — likely method, not declaration)
+    if (lines[i].match(/^\S/) || lines[i].match(/^    \S/)) {
+      const fn = trimmed.match(/^(?:public|open|internal|static|@\w+\s+)*func\s+(\w+)\s*(\([^)]*\))?/);
+      if (fn && !isInsideBody(lines, i)) {
+        const params = fn[2] || '()';
+        const ret = extractSwiftReturn(trimmed);
+        decls.push(`func \`${truncate(`${fn[1]}${params}${ret}`)}\``);
+        continue;
+      }
+    }
+
+    // SwiftUI View body pattern (struct Foo: View)
+    const view = trimmed.match(/^(?:public|internal)?\s*struct\s+(\w+)\s*:\s*View/);
+    if (view) {
+      decls.push(`View \`${view[1]}\``);
+      continue;
+    }
+  }
+
+  return decls;
+}
+
+function extractSwiftReturn(line) {
+  const match = line.match(/\)\s*->\s*([^{]+)/);
+  return match ? ` -> ${match[1].trim()}` : '';
+}
+
+function extractSwiftFields(lines, startIdx) {
+  const line = lines[startIdx];
+  if (!line.includes('{')) return '';
+  const fields = [];
+  for (let i = startIdx + 1; i < Math.min(startIdx + 15, lines.length); i++) {
+    const t = lines[i].trim();
+    if (t === '}' || t.startsWith('}')) break;
+    const prop = t.match(/^(?:public|internal|private|var|let)\s+(?:var|let)?\s*(\w+)\s*:/);
+    if (prop) fields.push(prop[1]);
+    const letProp = t.match(/^(var|let)\s+(\w+)\s*:/);
+    if (letProp) fields.push(letProp[2]);
+  }
+  return fields.length > 0 ? ` { ${fields.join(', ')} }` : '';
+}
+
+function isInsideBody(lines, idx) {
+  // Heuristic: if the line is indented more than 4 spaces, it's likely inside a body
+  const indent = lines[idx].match(/^(\s*)/)[1].length;
+  return indent > 4;
+}
+
+// --- Export extraction (regex-based, dispatches by language) ---
+
+function extractExports(content, filePath) {
+  if (filePath && extname(filePath) === '.swift') {
+    return extractSwiftDeclarations(content);
+  }
+  return extractTsExports(content);
+}
+
+function extractTsExports(content) {
   const exports = [];
   const lines = content.split('\n');
 
@@ -220,7 +318,7 @@ function generateMap(projectPath, filePaths) {
     } catch {
       continue;
     }
-    const exports = extractExports(content);
+    const exports = extractExports(content, filePath);
     if (exports.length === 0) continue;
     const relPath = relative(projectPath, filePath);
     fileEntries.push({ relPath, exports });
@@ -258,7 +356,7 @@ function updateSingleFile(targetFile, projectPath, outputPath) {
     process.exit(1);
   }
 
-  const exports = extractExports(content);
+  const exports = extractExports(content, absTarget);
   let existingMap;
   try {
     existingMap = readFileSync(outputPath, 'utf-8');

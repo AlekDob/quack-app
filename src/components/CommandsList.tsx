@@ -4,16 +4,12 @@ import { CommandItem } from './CommandItem';
 
 interface CommandsListProps {
   customCommands: SlashCommand[];
-  onUseCommand: (command: SlashCommand) => void;
   onEditCommand: (command: SlashCommand) => void;
-  onDeleteCommand: (command: SlashCommand) => void;
 }
 
 export function CommandsList({
   customCommands,
-  onUseCommand,
   onEditCommand,
-  onDeleteCommand
 }: CommandsListProps) {
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
@@ -46,9 +42,7 @@ export function CommandsList({
                 <CommandItem
                   key={command.name}
                   command={command}
-                  onUse={onUseCommand}
                   onEdit={onEditCommand}
-                  onDelete={onDeleteCommand}
                 />
               ))}
             </div>
@@ -79,9 +73,7 @@ export function CommandsList({
                 <CommandItem
                   key={command.name}
                   command={command}
-                  onUse={onUseCommand}
                   onEdit={onEditCommand}
-                  onDelete={onDeleteCommand}
                 />
               ))}
             </div>

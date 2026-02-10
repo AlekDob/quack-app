@@ -2,6 +2,21 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { EffortLevel, ModePreset, AgentModePresets } from '../types';
 
+/**
+ * Normalize legacy model short names to Supabase IDs.
+ * Legacy values ('sonnet', 'opus', 'haiku') were used before Supabase config migration.
+ * These don't match <select> option values, causing visual mismatch bugs.
+ */
+const LEGACY_MODEL_MAP: Record<string, string> = {
+  'sonnet': 'sonnet45',
+  'opus': 'opus46',
+  'haiku': 'haiku45',
+};
+
+function normalizeModelId(model: string): string {
+  return LEGACY_MODEL_MAP[model] ?? model;
+}
+
 interface ClaudeSettings {
   apiKey: string | null;
   model: string;
@@ -114,7 +129,7 @@ const defaultGeneralSettings: GeneralSettings = {
 
 const defaultClaudeSettings: ClaudeSettings = {
   apiKey: null,
-  model: 'sonnet', // Use friendly names: 'sonnet' | 'opus' | 'haiku' (mapped in claudeSDK.ts)
+  model: 'sonnet45', // Use Supabase IDs: 'sonnet45' | 'opus46' | 'haiku45' (mapped in modelService.ts)
   permissionMode: 'act',
   maxTokens: 4096,
   temperature: 0.7,
@@ -122,14 +137,16 @@ const defaultClaudeSettings: ClaudeSettings = {
 };
 
 // Anthropic recommended defaults for agent modes
+// IMPORTANT: Use Supabase model IDs (sonnet45, opus46, haiku45), NOT legacy short names (sonnet, opus, haiku)
+// Legacy short names don't match <select> option values, causing a visual mismatch bug
 const defaultAgentModePresets: AgentModePresets = {
   bypass: {
-    model: 'sonnet',
+    model: 'sonnet45',
     thinkingMode: 'auto',
     effort: 'medium',
   },
   plan: {
-    model: 'opus',
+    model: 'opus46',
     thinkingMode: 'auto',
     effort: 'medium',
   },
@@ -250,6 +267,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
+        version: 1,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -257,6 +275,25 @@ export const useSettingsStore = create<SettingsState>()(
           general: state.general,
           agentModePresets: state.agentModePresets,
         }),
+        // Migrate persisted legacy model IDs (sonnet→sonnet45, opus→opus46, haiku→haiku45)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        migrate: (persisted: any, version: number) => {
+          if (version === 0 || version === undefined) {
+            // Normalize legacy model IDs in claude settings
+            if (persisted.claude?.model) {
+              persisted.claude.model = normalizeModelId(persisted.claude.model);
+            }
+            // Normalize legacy model IDs in mode presets
+            if (persisted.agentModePresets) {
+              for (const mode of ['bypass', 'plan'] as const) {
+                if (persisted.agentModePresets[mode]?.model) {
+                  persisted.agentModePresets[mode].model = normalizeModelId(persisted.agentModePresets[mode].model);
+                }
+              }
+            }
+          }
+          return persisted;
+        },
       }
     ),
     { name: 'settings-store' }

@@ -13,10 +13,42 @@
   position: relative;
 }
 
+/* Hide action buttons by default, show on hover */
+.repository-header .repo-action-btn {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.repository-header:hover .repo-action-btn {
+  opacity: 1;
+}
+
 /* Agent Card - Minimal Styling */
 .agent-card {
   position: relative;
   user-select: none;
+}
+
+/* Hide agent card action buttons by default, show on hover */
+.agent-card .icons-wrapper {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.agent-card:hover .icons-wrapper {
+  opacity: 1;
+}
+
+/* Make agent card buttons neutral color (not orange) */
+.agent-card .icons-wrapper .add-session-icon,
+.agent-card .icons-wrapper .terminal-close {
+  color: rgba(255, 255, 255, 0.5) !important;
+  background: none !important;
+}
+
+.agent-card .icons-wrapper .add-session-icon:hover,
+.agent-card .icons-wrapper .terminal-close:hover {
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Metro Lines - Keep them super thin! */

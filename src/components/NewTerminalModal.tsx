@@ -3,17 +3,16 @@
  *
  * Step 1: Project Selection (Choose project + Git Branch)
  * Step 2: Agent Selection (Use existing or create new)
- * Step 3: Agent Basics (Name, Color, Avatar, Personality) - only for Create/Edit
- * Step 4: Rules Selection (Claude Code rules to follow) - only for Create/Edit
- * Step 5: Toolkit Selection (Skills, droids, commands) - only for Create/Edit
+ * Step 3: Agent Basics (Name, Color, Avatar, Personality) - FINAL STEP
  *
  * Key UX change: "Use" on existing agent = direct confirmation (project already selected)
  */
 
 import { useState, useEffect, useRef } from 'react';
-import type { AgentPersonality, GitBranch, SavedAgent, RuleScope } from '../types';
+import type { AgentPersonality, GitBranch, SavedAgent, AgentTemplate, MarketplaceResource } from '../types';
 import AgentSelector from './AgentSelector';
 import { invoke } from '@tauri-apps/api/core';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   listCustomAvatars,
   deleteCustomAvatar,
@@ -24,22 +23,13 @@ import {
   type CustomAvatarInfo
 } from '../utils/customAvatarStorage';
 import { saveAgent, markAgentAsUsed } from '../utils/agentStorage';
-import { useRules } from '../hooks/useRules';
-import { normalizeRulePaths, areRulePathsEqual } from '../utils/rulePathUtils';
-import { loadAvailableSkills, loadAvailableDroids, loadAvailableCommands } from '../utils/skillsAndDroidsLoader';
+import { getRandomName } from '../utils/agentNames';
 import { useMarketplace } from '../hooks/useMarketplace';
 
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
 import { StepProjectSelection } from './modal-steps/StepProjectSelection';
-import { StepAgentBasics } from './modal-steps/StepAgentBasics';
-import { StepRules } from './modal-steps/StepRules';
-import { StepStarterBundles } from './modal-steps/StepStarterBundles';
-import type { StarterBundle } from './modal-steps/StepStarterBundles';
-import type { ModalStep, ActiveProject, SkillMetadata, DroidMetadata } from './modal-steps/types';
-
-// Cyberpunk Agent Bundle Editor
-import { AgentBundleEditor } from './agent-bundle';
+import type { ModalStep, ActiveProject } from './modal-steps/types';
 
 // Styles
 import './modal-steps/ModalSteps.css';
@@ -74,11 +64,10 @@ interface NewTerminalModalProps {
   onBrowse: () => void
   onCancel: () => void
   onConfirm: (agentData?: SavedAgent) => void
-  onOpenDroidFactory?: () => void
-  /** When true, show starter agent bundles step after project selection */
+  /** @deprecated Starter bundles now handled via Quack Store */
   isOnboarding?: boolean
-  /** Callback when user selects starter bundles to install */
-  onInstallStarterBundles?: (bundles: StarterBundle[], projectPath: string, projectName: string) => Promise<void>
+  /** @deprecated Starter bundles now handled via Quack Store */
+  onInstallStarterBundles?: (bundles: Array<{ resource: import('../types').MarketplaceResource; template: import('../types').AgentTemplate }>, projectPath: string, projectName: string) => Promise<void>
 }
 
 function NewTerminalModal({
@@ -109,31 +98,21 @@ function NewTerminalModal({
   onBrowse,
   onCancel,
   onConfirm,
-  onOpenDroidFactory,
-  isOnboarding = false,
-  onInstallStarterBundles,
 }: NewTerminalModalProps) {
-  // Marketplace for starter bundles
-  const { getStarterBundles, loading: marketplaceLoading, allResources } = useMarketplace();
+  // Marketplace for agent templates
+  const { allResources, installResource } = useMarketplace();
 
-  // Step management - PROJECT-FIRST FLOW
-  // Normal: project → agent → basics → rules → toolkit
-  // Edit mode: basics directly
+  // Step management - PROJECT-FIRST FLOW (2 steps: project → agent)
+  // Edit mode: agent step with inline editing form
   const [currentStep, setCurrentStep] = useState<ModalStep>('project');
   const [completedSteps, setCompletedSteps] = useState<ModalStep[]>([]);
   const [isEditingAgent, setIsEditingAgent] = useState(false); // Track internal edit mode
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null); // Preserve agent ID during edit
   const [selectedProjectColor, setSelectedProjectColor] = useState<string>(''); // Color from project selection
 
-  // Toolkit loading state
-  const [loadingEquipment, setLoadingEquipment] = useState(false);
-  // Starter bundles install state
-  const [installingBundles, setInstallingBundles] = useState(false);
-
-  // Available equipment for Cyberpunk Editor (loaded from filesystem)
-  const [skillsMetadata, setSkillsMetadata] = useState<SkillMetadata[]>([]);
-  const [droidsMetadata, setDroidsMetadata] = useState<DroidMetadata[]>([]);
-  const [commandsMetadata, setCommandsMetadata] = useState<string[]>([]);
+  // Inline editing mode within the agent step
+  const [inlineEditingMode, setInlineEditingMode] = useState<'create' | 'edit' | null>(null);
+  const [editingAgentData, setEditingAgentData] = useState<SavedAgent | null>(null);
 
   // Git branch state
   const [availableBranches, setAvailableBranches] = useState<GitBranch[]>([]);
@@ -148,14 +127,6 @@ function NewTerminalModal({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Rules state - using the useRules hook
-  const { rules, loading: loadingRules, createRule, loadRules } = useRules(path);
-  const [selectedRules, setSelectedRules] = useState<string[]>([]);
-  const [missingRules, setMissingRules] = useState<string[]>([]);
-
-  // Store editing agent data to restore rules after loading
-  const [editingAgentData, setEditingAgentData] = useState<SavedAgent | null>(null);
 
   // Local personality state to track changes across steps
   const [localPersonality, setLocalPersonality] = useState<Partial<AgentPersonality>>(personality || {});
@@ -177,41 +148,38 @@ function NewTerminalModal({
       hasInitializedRef.current = true;
 
       // If isEditing prop is true (editing from external source like sidebar),
-      // skip project + agent selection and go directly to Basics step
+      // go to agent step with inline editing form visible
       if (isEditing) {
-        setCurrentStep('basics');
+        setCurrentStep('agent');
+        setCompletedSteps(['project']); // Project already selected
         setIsEditingAgent(true);
-        // Create synthetic agent data from props to trigger skills/droids restore
+        setInlineEditingMode('edit');
         // Use the agent ID from personality if available, otherwise generate one
         const agentId = personality?.id as string || `editing-${Date.now()}`;
+        // Preserve agent ID for edit mode (so save updates instead of creates)
+        setEditingAgentId(agentId);
+        // Set editing agent data
         setEditingAgentData({
           id: agentId,
-          name: name,
+          name: name || '',
           avatar: avatar || '',
-          color: color,
+          color: color || '#FF6B35',
           workingOn: workingOn || '',
           personality: personality || {},
           createdAt: Date.now(),
           lastUsed: Date.now(),
           usageCount: 0,
         });
-        // Preserve agent ID for edit mode (so save updates instead of creates)
-        setEditingAgentId(agentId);
-        // Load equipment for Toolkit step (skills, droids, commands)
-        if (path) {
-          loadEquipmentForToolkitEditor(path);
-        }
       } else {
         // PROJECT-FIRST FLOW: Start with project selection or agent (if initialStep is 'agent')
         setCurrentStep(initialStep);
         setIsEditingAgent(false);
+        setInlineEditingMode(null);
         setEditingAgentData(null);
         // If starting at 'agent' step (from sidebar +), mark 'project' as completed
         setCompletedSteps(initialStep === 'agent' ? ['project'] : []);
       }
       setLocalPersonality(personality || {});
-      setSelectedRules([]);
-      setMissingRules([]);
       setSelectedProjectColor('');
     }
 
@@ -231,43 +199,6 @@ function NewTerminalModal({
     }
   }, [open, path]);
 
-  // Restore rules selections when editing and data is loaded
-  useEffect(() => {
-    if (!editingAgentData || loadingRules) return;
-
-    const personality = editingAgentData.personality;
-    if (!personality?.selectedRules) {
-      setEditingAgentData(null);
-      return;
-    }
-
-    const allRules = [...rules.project, ...rules.global];
-    const restoredRules: string[] = [];
-    const notFoundRules: string[] = [];
-
-    for (const rulePath of personality.selectedRules) {
-      // Use areRulePathsEqual to properly match normalized paths with absolute paths
-      // This handles cases like:
-      // - Saved: ".claude/rules/my-rule.md"
-      // - Backend: "/Users/xxx/project/.claude/rules/my-rule.md"
-      const matchedRule = allRules.find(r => areRulePathsEqual(r.filePath, rulePath));
-
-      if (matchedRule) {
-        restoredRules.push(matchedRule.filePath);
-      } else {
-        notFoundRules.push(rulePath);
-      }
-    }
-
-    if (restoredRules.length > 0) {
-      setSelectedRules(restoredRules);
-    }
-    setMissingRules(notFoundRules);
-
-    // Clear editing data after restore to prevent re-running
-    setEditingAgentData(null);
-  }, [editingAgentData, rules, loadingRules]);
-
   // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
@@ -280,37 +211,6 @@ function NewTerminalModal({
   }, []);
 
   // ===== Data Loading Functions =====
-
-  /**
-   * Load available equipment (skills, droids, commands) for the Toolkit Editor
-   */
-  async function loadEquipmentForToolkitEditor(projectPath: string) {
-    if (!projectPath) return;
-
-    setLoadingEquipment(true);
-    try {
-      console.log('[NewTerminalModal] Loading equipment for Toolkit Editor...');
-
-      // Load skills, droids, and commands in parallel
-      const [skills, droids, commands] = await Promise.all([
-        loadAvailableSkills(projectPath),
-        loadAvailableDroids(projectPath),
-        loadAvailableCommands(projectPath),
-      ]);
-
-      console.log('[NewTerminalModal] Loaded skills:', skills.length);
-      console.log('[NewTerminalModal] Loaded droids:', droids.length);
-      console.log('[NewTerminalModal] Loaded commands:', commands.length);
-
-      setSkillsMetadata(skills);
-      setDroidsMetadata(droids);
-      setCommandsMetadata(commands);
-    } catch (err) {
-      console.error('[NewTerminalModal] Failed to load equipment:', err);
-    } finally {
-      setLoadingEquipment(false);
-    }
-  }
 
   async function loadCustomAvatars() {
     setLoadingAvatars(true);
@@ -516,9 +416,8 @@ function NewTerminalModal({
     onConfirm(agent);
   }
 
-  // "Edit" an existing agent - go to basics step
+  // "Edit" an existing agent - show inline editing form
   function handleEditAgent(agent: SavedAgent) {
-    console.log('[NewTerminalModal] handleEditAgent - path:', path, 'agent:', agent.name);
     onNameChange(agent.name);
     onColorChange(agent.color);
     onAvatarChange?.(agent.avatar);
@@ -529,81 +428,165 @@ function NewTerminalModal({
     setLocalPersonality(agent.personality || {});
     markAgentAsUsed(agent.id);
 
-    // Store original agent data to restore rules after loading
-    setEditingAgentData(agent);
-    // Preserve agent ID separately (survives editingAgentData clearing)
+    // Preserve agent ID for edit mode (so save updates instead of creates)
     setEditingAgentId(agent.id);
+    setEditingAgentData(agent);
 
-    // Load equipment in background for Toolkit step
-    console.log('[NewTerminalModal] handleEditAgent - calling loadEquipmentForToolkitEditor with path:', path);
-    loadEquipmentForToolkitEditor(path);
-
-    // Go to Basics step for editing
+    // Show inline editing form
     setIsEditingAgent(true);
-    setCompletedSteps(prev => [...prev, 'agent']);
-    setCurrentStep('basics');
+    setInlineEditingMode('edit');
   }
 
-  // "Create New" agent - go to Basics step first, then Rules, then Toolkit
+  // "Create New" agent - show inline creation form
   function handleCreateNewAgent() {
+    // Auto-generate random agent name from international list
+    const randomName = getRandomName();
+
+    // Reset to defaults for new agent with random name
+    onNameChange(randomName);
+    onColorChange(selectedProjectColor || availableColors[0] || '#FF6B35');
+    onAvatarChange?.('');
+    onWorkingOnChange?.('');
+    onPersonalityChange?.({});
+    setLocalPersonality({});
+
     setIsEditingAgent(false);
-    setEditingAgentId(null); // Clear any previous editing ID
-    setCompletedSteps(prev => [...prev, 'agent']);
-    // Load equipment in background for later steps
-    loadEquipmentForToolkitEditor(path);
-    // Go to Basics step first (avatar, name, color)
-    setCurrentStep('basics');
+    setEditingAgentId(null);
+    setEditingAgentData(null);
+
+    // Show inline creation form
+    setInlineEditingMode('create');
   }
 
-  // Handle save from Toolkit Editor
-  function handleToolkitSave(agent: SavedAgent) {
-    console.log('[NewTerminalModal] Toolkit Editor save:', agent);
+  // "Use" a marketplace template - pre-populate and show inline creation form
+  async function handleUseMarketplaceTemplate(template: AgentTemplate, _resource: MarketplaceResource) {
+    // Get skill names from template (new field) or fallback to bundledPlugins (legacy)
+    const templateSkillNames = template.skills || template.bundledPlugins || [];
 
-    // Normalize rule paths for portable storage
-    const normalizedRules = agent.personality?.selectedRules?.length
-      ? normalizeRulePaths(agent.personality.selectedRules, path)
-      : undefined;
+    // Build a map of skill name -> MarketplaceResource for installation
+    const skillResourceMap = new Map<string, MarketplaceResource>();
+    for (const r of allResources) {
+      if (r.category === 'skills') {
+        // Extract skill name from id: "pluginName--skill--skillName"
+        const parts = r.id.split('--skill--');
+        if (parts.length === 2) {
+          skillResourceMap.set(parts[1], r);
+        }
+      }
+    }
 
-    // Build complete agent with normalized rules
+    // Find MarketplaceResource for each skill in the template
+    const skillsToInstall: { name: string; resource: MarketplaceResource }[] = [];
+    for (const skillName of templateSkillNames) {
+      const resource = skillResourceMap.get(skillName);
+      if (resource) {
+        skillsToInstall.push({ name: skillName, resource });
+      } else {
+        console.warn(`Skill ${skillName} not found in marketplace resources`);
+      }
+    }
+
+    // If there are skills to install, show confirmation dialog
+    if (skillsToInstall.length > 0) {
+      const skillList = skillsToInstall.map(s => `  • ${s.name}`).join('\n');
+      const message = `This template includes ${skillsToInstall.length} ${skillsToInstall.length === 1 ? 'skill' : 'skills'} that will be installed and set as Preferred Skills:\n\n${skillList}\n\nProceed?`;
+
+      const confirmed = await ask(message, {
+        title: 'Install Skills',
+        kind: 'info',
+      });
+
+      if (!confirmed) {
+        return; // User cancelled
+      }
+
+      // Install each skill
+      for (const { name, resource } of skillsToInstall) {
+        try {
+          await installResource(resource, 'global');
+          console.log(`Installed skill: ${name}`);
+        } catch (err) {
+          console.error(`Failed to install skill ${name}:`, err);
+        }
+      }
+    }
+
+    // Pre-populate from template
+    onNameChange(template.suggestedName);
+    onColorChange(template.suggestedColor);
+    onAvatarChange?.(template.suggestedAvatar || '');
+    onWorkingOnChange?.('');
+
+    const templatePersonality: Partial<AgentPersonality> = {
+      role: template.role,
+      communicationStyle: template.communicationStyle,
+      customNotes: template.customNotes || '',
+      // Set the skill names as Preferred Skills
+      selectedSkills: skillsToInstall.length > 0 ? skillsToInstall.map(s => s.name) : undefined,
+    };
+    onPersonalityChange?.(templatePersonality);
+    setLocalPersonality(templatePersonality);
+
+    setIsEditingAgent(false);
+    setEditingAgentId(null);
+    setEditingAgentData(null);
+
+    // Show inline creation form (user can customize before confirming)
+    setInlineEditingMode('create');
+  }
+
+  // Back to agent selection from inline editing
+  function handleCancelInlineEdit() {
+    setInlineEditingMode(null);
+    setEditingAgentData(null);
+    setIsEditingAgent(false);
+  }
+
+  // Confirm inline creation/editing
+  function handleInlineConfirm() {
+    if (!name.trim()) {
+      alert('Please enter an agent name');
+      return;
+    }
+
+    // Build complete agent
     const completeAgent: SavedAgent = {
-      ...agent,
-      personality: {
-        ...agent.personality,
-        selectedRules: normalizedRules,
-      },
+      id: editingAgentId || `agent-${Date.now()}`,
+      name,
+      avatar: avatar || '',
+      color,
+      workingOn,
+      personality: localPersonality,
+      createdAt: Date.now(),
+      lastUsed: Date.now(),
+      usageCount: 0,
     };
 
     // Save to storage (pass ID for edit mode to update correct agent)
     try {
       saveAgent(
         {
-          name: completeAgent.name,
-          avatar: completeAgent.avatar || '',
-          color: completeAgent.color,
-          workingOn: completeAgent.workingOn,
-          personality: completeAgent.personality,
+          name,
+          avatar: avatar || '',
+          color,
+          workingOn,
+          personality: localPersonality
         },
-        editingAgentId || undefined // Pass existing ID for edit mode
+        editingAgentId || undefined
       );
     } catch (err) {
       console.warn('Failed to save agent to storage:', err);
     }
 
-    // Confirm and close
+    // Confirm and close modal
     onConfirm(completeAgent);
   }
 
-  // Handle cancel from Toolkit Editor - go back to Rules step
-  function handleToolkitCancel() {
-    // Go back to Rules step
-    setCurrentStep('rules');
-    setCompletedSteps(prev => prev.filter(s => s !== 'rules'));
-  }
-
-  // Back to agent selection from basics
+  // Back to agent selection from basics (legacy - keep for safety)
   function handleBackToAgentSelection() {
     setCurrentStep('agent');
     setCompletedSteps(prev => prev.filter(s => s !== 'agent'));
+    setInlineEditingMode(null);
   }
 
   // ===== Personality Change Handler =====
@@ -629,12 +612,8 @@ function NewTerminalModal({
       return;
     }
     setCompletedSteps(prev => [...prev, 'project']);
-    // Show starter bundles during onboarding (first project creation)
-    if (isOnboarding) {
-      setCurrentStep('starters');
-    } else {
-      setCurrentStep('agent');
-    }
+    // Starter bundles step disabled - agents are now imported from the Quack Store
+    setCurrentStep('agent');
   }
 
   // Handle project selection from StepProjectSelection
@@ -645,105 +624,20 @@ function NewTerminalModal({
     checkGitRepository();
   }
 
-  // Step 3: Basics → Rules
-  function handleBasicsNext() {
-    if (!name.trim()) {
-      alert('Please enter an agent name');
-      return;
-    }
-    setCompletedSteps(prev => [...prev, 'basics']);
-    // Go to Rules step
-    setCurrentStep('rules');
-  }
-
-  // Back from Basics
-  function handleBasicsBack() {
-    if (isEditingAgent && isEditing) {
-      // External edit mode (from sidebar) - just cancel
-      onCancel();
-    } else {
-      // Go back to agent selection
-      handleBackToAgentSelection();
-    }
-  }
-
-  // Back from Rules
-  function handleRulesBack() {
-    setCurrentStep('basics');
-    setCompletedSteps(prev => prev.filter(s => s !== 'basics'));
-  }
-
-  // Step 4: Rules → Toolkit
-  function handleRulesNext() {
-    setCompletedSteps(prev => [...prev, 'rules']);
-    // Go to Toolkit step
-    setCurrentStep('toolkit');
-  }
-
-  // ===== Rules Selection =====
-
-  function handleRuleToggle(rulePath: string) {
-    setSelectedRules(prev =>
-      prev.includes(rulePath)
-        ? prev.filter(p => p !== rulePath)
-        : [...prev, rulePath]
-    );
-  }
-
-  // Create a new rule and auto-select it
-  async function handleCreateRule(
-    name: string,
-    content: string,
-    scope: RuleScope,
-    description?: string,
-    globs?: string[],
-    alwaysApply?: boolean
-  ) {
-    await createRule(name, content, scope, description, globs, alwaysApply);
-    // After creation, find the new rule and select it
-    // The rules will be reloaded by the hook automatically
-    // We'll select it by path in the next render
-    const expectedPath = scope === 'project'
-      ? `${path}/.claude/rules/${name}.md`
-      : `~/.claude/rules/${name}.md`;
-    setSelectedRules(prev => [...prev, expectedPath]);
-  }
-
-  // ===== Rules Confirmation - Goes to Toolkit =====
-
-  async function handleRulesConfirm() {
-    // Normalize rule paths for portable storage
-    // - Project rules: `.claude/rules/name.md` (relative)
-    // - Global rules: `~/.claude/rules/name.md` (tilde notation)
-    const normalizedRules = selectedRules.length > 0
-      ? normalizeRulePaths(selectedRules, path)
-      : undefined;
-
-    // Build updated personality with normalized rules
-    const updatedPersonality: Partial<AgentPersonality> = {
-      ...localPersonality,
-      selectedRules: normalizedRules,
-    };
-
-    // DEBUG: Log what we're sending
-    console.log('[MODAL] handleRulesConfirm called');
-    console.log('[MODAL] Selected rules (original):', selectedRules);
-    console.log('[MODAL] Selected rules (normalized):', normalizedRules);
-    console.log('[MODAL] Updated personality:', JSON.stringify(updatedPersonality, null, 2));
-
-    onPersonalityChange?.(updatedPersonality);
-    setLocalPersonality(updatedPersonality);
-
-    // Move to Toolkit step
-    handleRulesNext();
-  }
-
   if (!open) {
     return null;
   }
 
   // Determine modal title and subtitle based on current step
   const getModalHeader = () => {
+    // In inline editing mode, show appropriate title
+    if (inlineEditingMode === 'edit') {
+      return { title: 'Edit Agent', subtitle: 'Update agent configuration' };
+    }
+    if (inlineEditingMode === 'create') {
+      return { title: 'Create Agent', subtitle: 'Configure your new agent' };
+    }
+    // External edit mode (from sidebar)
     if (isEditing || isEditingAgent) {
       return { title: 'Edit Agent', subtitle: 'Update agent configuration' };
     }
@@ -752,12 +646,6 @@ function NewTerminalModal({
         return { title: 'Select Project', subtitle: 'Choose your workspace' };
       case 'agent':
         return { title: 'Select Agent', subtitle: 'Use existing or create new' };
-      case 'basics':
-        return { title: 'Configure Agent', subtitle: 'Set name, color, and personality' };
-      case 'rules':
-        return { title: 'Select Rules', subtitle: 'Choose Claude Code rules' };
-      case 'toolkit':
-        return { title: 'Agent Toolkit', subtitle: 'Select your quick-access tools' };
       default:
         return { title: 'New Agent', subtitle: 'Step-by-step configuration' };
     }
@@ -765,13 +653,10 @@ function NewTerminalModal({
 
   const header = getModalHeader();
 
-  // Determine if we need a wider modal (toolkit step)
-  const isToolkitStep = currentStep === 'toolkit';
-
   // Render the modal with project-first flow
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className={`modal-panel agent-modal ${isToolkitStep ? 'equipment-step-wide' : ''}`}>
+      <div className="modal-panel agent-modal">
         {/* Header */}
         <div className="modal-header">
           <div>
@@ -818,144 +703,56 @@ function NewTerminalModal({
           />
         )}
 
-        {/* Step 1.5: Starter Bundles (onboarding only) */}
-        {currentStep === 'starters' && (
-          <StepStarterBundles
-            bundles={getStarterBundles().map(resource => {
-              const ext = resource as typeof resource & { _agentTemplate?: import('../types').AgentTemplate };
-              return {
-                resource,
-                template: ext._agentTemplate!,
-              };
-            }).filter(b => b.template)}
-            loading={marketplaceLoading}
-            installing={installingBundles}
-            onConfirm={async (selected) => {
-              setInstallingBundles(true);
-              try {
-                const projectName = path.split('/').pop() || path;
-                await onInstallStarterBundles?.(selected, path, projectName);
-              } finally {
-                setInstallingBundles(false);
-                onCancel();
-              }
-            }}
-            onSkip={() => {
-              setCompletedSteps(prev => [...prev, 'starters']);
-              setCurrentStep('agent');
-            }}
-            onBack={() => {
-              setCurrentStep('project');
-              setCompletedSteps(prev => prev.filter(s => s !== 'project'));
-            }}
-          />
-        )}
+        {/* Starter Bundles step removed - agents are now imported from the Quack Store */}
 
-        {/* Step 2: Agent Selection */}
+        {/* Step 2: Agent Selection (with inline editing) */}
         {currentStep === 'agent' && (
           <>
             <AgentSelector
               onUseAgent={handleUseAgent}
               onEditAgent={handleEditAgent}
               onCreateNew={handleCreateNewAgent}
+              onUseMarketplaceTemplate={handleUseMarketplaceTemplate}
+              // Project path for loading skills
+              projectPath={path}
+              // Inline editing props
+              editingMode={inlineEditingMode}
+              editingAgent={editingAgentData}
+              name={name}
+              color={color}
+              avatar={avatar || ''}
+              availableColors={availableColors}
+              customAvatars={customAvatars}
+              customAvatarUrls={customAvatarUrls}
+              loadingAvatars={loadingAvatars}
+              uploadingAvatar={uploadingAvatar}
+              uploadError={uploadError}
+              personality={localPersonality}
+              onNameChange={onNameChange}
+              onColorChange={onColorChange}
+              onAvatarChange={onAvatarChange || (() => {})}
+              onPersonalityChange={handlePersonalityChangeLocal}
+              onAvatarUpload={handleAvatarUpload}
+              onDeleteCustomAvatar={handleDeleteCustomAvatar}
+              fileInputRef={fileInputRef}
+              onConfirm={handleInlineConfirm}
+              onCancelEdit={handleCancelInlineEdit}
             />
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setCurrentStep('project');
-                  setCompletedSteps(prev => prev.filter(s => s !== 'project'));
-                }}
-              >
-                Back
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Step 3: Agent Basics */}
-        {currentStep === 'basics' && (
-          <StepAgentBasics
-            name={name}
-            color={color}
-            avatar={avatar || ''}
-            availableColors={availableColors}
-            customAvatars={customAvatars}
-            customAvatarUrls={customAvatarUrls}
-            loadingAvatars={loadingAvatars}
-            uploadingAvatar={uploadingAvatar}
-            uploadError={uploadError}
-            personality={localPersonality}
-            onNameChange={onNameChange}
-            onColorChange={onColorChange}
-            onAvatarChange={onAvatarChange || (() => {})}
-            onPersonalityChange={handlePersonalityChangeLocal}
-            onAvatarUpload={handleAvatarUpload}
-            onDeleteCustomAvatar={handleDeleteCustomAvatar}
-            fileInputRef={fileInputRef}
-            onNext={handleBasicsNext}
-            onBack={handleBasicsBack}
-          />
-        )}
-
-        {/* Step 4: Rules Selection */}
-        {currentStep === 'rules' && (
-          <StepRules
-            availableRules={rules}
-            selectedRules={selectedRules}
-            loadingRules={loadingRules}
-            missingRules={missingRules}
-            onRuleToggle={handleRuleToggle}
-            onCreateRule={handleCreateRule}
-            onBack={handleRulesBack}
-            onConfirm={handleRulesConfirm}
-            creating={creating}
-            isEditing={isEditingAgent}
-          />
-        )}
-
-        {/* Step 5: Toolkit Editor (Fallout Style) */}
-        {currentStep === 'toolkit' && (
-          <>
-            {(() => {
-              // Convert metadata arrays to string arrays for the editor
-              const availableSkillNames = skillsMetadata.map(s => s.name);
-              const availableDroidNames = droidsMetadata.map(d => d.name);
-              const availableRuleNames = rules.project.concat(rules.global).map(r => r.name);
-              const availableCommandNames: string[] = commandsMetadata;
-
-              console.log('[NewTerminalModal] Toolkit step - skillsMetadata:', skillsMetadata.length, 'droidsMetadata:', droidsMetadata.length);
-              console.log('[NewTerminalModal] Toolkit step - availableSkillNames:', availableSkillNames);
-              console.log('[NewTerminalModal] Toolkit step - loadingEquipment:', loadingEquipment);
-
-              // Create agent object from Basics step data
-              // Use existing ID if editing, otherwise generate new
-              const agentFromBasics: SavedAgent = {
-                id: editingAgentId || `agent-${Date.now()}`,
-                name,
-                avatar: avatar || '',
-                color,
-                workingOn,
-                personality: localPersonality,
-                createdAt: Date.now(),
-                lastUsed: Date.now(),
-                usageCount: 0,
-              };
-
-              return (
-                <AgentBundleEditor
-                  agent={agentFromBasics}
-                  availableSkills={availableSkillNames}
-                  availableDroids={availableDroidNames}
-                  availableRules={availableRuleNames}
-                  availableCommands={availableCommandNames}
-                  onSave={handleToolkitSave}
-                  onCancel={handleToolkitCancel}
-                  isEditing={isEditingAgent}
-                />
-              );
-            })()}
+            {/* Back button only when not in inline editing mode */}
+            {!inlineEditingMode && (
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setCurrentStep('project');
+                    setCompletedSteps(prev => prev.filter(s => s !== 'project'));
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+            )}
           </>
         )}
 

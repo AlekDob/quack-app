@@ -130,12 +130,22 @@ pub struct MCPTemplate {
     pub config: MCPServerConfig,
 }
 
+/// Normalize Windows extended paths (remove \\?\ prefix)
+fn normalize_path(path: &str) -> String {
+    if path.starts_with(r"\\?\") {
+        path[4..].to_string()
+    } else {
+        path.to_string()
+    }
+}
+
 /// Get the path to .mcp.json file in the project root
 fn get_mcp_config_path(_app: &AppHandle, working_dir: Option<String>) -> Result<PathBuf, String> {
     let base_path = if let Some(dir) = working_dir {
         // Use provided working directory if not empty
         if !dir.is_empty() {
-            PathBuf::from(dir)
+            // Normalize path to remove \\?\ prefix on Windows
+            PathBuf::from(normalize_path(&dir))
         } else {
             // If empty string, use current working directory (project root)
             std::env::current_dir()
@@ -154,8 +164,10 @@ fn get_mcp_config_path(_app: &AppHandle, working_dir: Option<String>) -> Result<
 
 /// Get the path to global MCP config (~/.claude.json)
 fn get_global_mcp_config_path() -> Result<PathBuf, String> {
-    let home_dir = std::env::var("HOME")
-        .map_err(|_| "Failed to get HOME directory".to_string())?;
+    // On Windows, use USERPROFILE; on Unix, use HOME
+    let home_dir = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map_err(|_| "Failed to get home directory (neither USERPROFILE nor HOME set)".to_string())?;
     Ok(PathBuf::from(home_dir).join(".claude.json"))
 }
 
@@ -480,8 +492,24 @@ async fn start_mcp_server(
         .ok_or("Args required for stdio transport")?;
 
     // Spawn the MCP server process
-    let mut cmd = Command::new(command);
-    cmd.args(args)
+    // On Windows, use cmd /c to run npx/node commands to ensure PATH is resolved
+    #[cfg(target_os = "windows")]
+    let (actual_command, actual_args) = {
+        if command == "npx" || command == "node" || command == "npm" {
+            // Use cmd /c to run the command, which properly resolves .cmd files
+            let mut cmd_args = vec!["/c".to_string(), command.clone()];
+            cmd_args.extend(args.iter().cloned());
+            ("cmd".to_string(), cmd_args)
+        } else {
+            (command.clone(), args.clone())
+        }
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let (actual_command, actual_args) = (command.clone(), args.clone());
+
+    let mut cmd = Command::new(&actual_command);
+    cmd.args(&actual_args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -491,6 +519,14 @@ async fn start_mcp_server(
         for (key, value) in env {
             cmd.env(key, value);
         }
+    }
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
     let mut child = cmd.spawn()
@@ -1005,13 +1041,37 @@ async fn test_stdio_connection(
     use std::time::Duration;
     use tokio::process::Command;
 
+    // On Windows, use cmd /c to run npx/node commands to ensure PATH is resolved
+    #[cfg(target_os = "windows")]
+    let (actual_command, actual_args): (String, Vec<String>) = {
+        if command == "npx" || command == "node" || command == "npm" {
+            let mut cmd_args = vec!["/c".to_string(), command.to_string()];
+            cmd_args.extend(args.iter().cloned());
+            ("cmd".to_string(), cmd_args)
+        } else {
+            (command.to_string(), args.to_vec())
+        }
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let (actual_command, actual_args) = (command.to_string(), args.to_vec());
+
     // Try to spawn the process
-    let mut child = Command::new(command)
-        .args(args)
+    let mut cmd = Command::new(&actual_command);
+    cmd.args(&actual_args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .stderr(std::process::Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 format!("Command '{}' not found. Make sure it's installed and in PATH.", command)

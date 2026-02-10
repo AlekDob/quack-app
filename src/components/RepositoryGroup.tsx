@@ -37,6 +37,10 @@ import {
   isCustomAvatar,
 } from "../utils/customAvatarStorage";
 import { useSessionStore } from "../stores/sessionStore";
+import { useTeamStore } from "../stores/teamStore";
+import TeamCreationModal from "./TeamCreationModal";
+import TeamStatusBadge from "./TeamStatusBadge";
+import { extractProjectId } from "../utils/projectUtils";
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult } from "../types";
 
@@ -59,6 +63,7 @@ interface RepositoryGroupProps {
   onCreateAgent?: (projectPath: string) => void; // Create new agent associated with this project (passes project path)
   onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
+  onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
   // Kanban mode props
   isKanbanViewActive?: boolean;
   onToggleKanbanView?: () => void;
@@ -67,6 +72,8 @@ interface RepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  // Open Agent Personality accordion
+  onOpenPersonality?: () => void;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -82,19 +89,18 @@ function getAvatarUrl(avatarName: string): string {
 
 // Helper to extract repository name from path
 function getRepoDisplayName(path: string): string {
-  const parts = path.split("/");
-  const lastPart = parts[parts.length - 1];
-  if (lastPart.includes("-worktree-")) {
-    return lastPart.split("-worktree-")[0];
+  const projectName = extractProjectId(path);
+  // Handle worktree paths (e.g., "quack-app-worktree-feature-branch")
+  if (projectName.includes("-worktree-")) {
+    return projectName.split("-worktree-")[0];
   }
-  return lastPart;
+  return projectName;
 }
 
 // Helper to extract branch name from worktree path or terminal info
 function getBranchName(terminal: TerminalInfo): string {
   if (terminal.branch) return terminal.branch;
-  const pathParts = terminal.cwd.split("/");
-  const lastPart = pathParts[pathParts.length - 1];
+  const lastPart = extractProjectId(terminal.cwd);
   if (lastPart.includes("-worktree-")) {
     const branchPart = lastPart.split("-worktree-")[1];
     return branchPart.replace(/-/g, "/");
@@ -155,6 +161,8 @@ interface SortableAgentProps {
   onToggleKanbanView?: () => void;
   // New session button
   onNewSession?: (agentId: string) => void;
+  // Open Agent Personality accordion
+  onOpenPersonality?: () => void;
 }
 
 function SortableAgent({
@@ -174,6 +182,7 @@ function SortableAgent({
   isKanbanViewActive = false,
   onToggleKanbanView,
   onNewSession,
+  onOpenPersonality,
 }: SortableAgentProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -364,9 +373,9 @@ function SortableAgent({
     return lastReadTimestamps.get(agent.id) || 0;
   }, [lastReadTimestamps, agent.id]);
 
-  // Memoize agent card background style - NO highlight for waiting (badge dot instead!)
+  // Memoize agent card background style
   const agentCardBg = useMemo(() => {
-    if (isActive) return `${agent.color}28`; // Increased from 15 to 28 (2x opacity, ~16%)
+    if (isActive) return `${agent.color}28`; // ~16% opacity - active state
     if (isHovered) return "rgba(255, 255, 255, 0.03)";
     return "transparent";
   }, [isActive, isHovered, agent.color]);
@@ -493,6 +502,8 @@ function SortableAgent({
 
   // Memoize callbacks to prevent recreation
   const handleSelect = useCallback(() => {
+    console.log('[RepositoryGroup] agent-card clicked, agent:', agent.label || agent.id);
+
     // Don't trigger click if we just finished dragging
     if (wasDraggedRef.current) {
       wasDraggedRef.current = false;
@@ -511,7 +522,13 @@ function SortableAgent({
       });
     }
     onSelect(agent);
-  }, [onSelect, agent, isKanbanViewActive]);
+
+    // Open Agent Personality accordion in sidebar
+    if (onOpenPersonality) {
+      console.log('[RepositoryGroup] Opening Agent Personality accordion');
+      onOpenPersonality();
+    }
+  }, [onSelect, agent, isKanbanViewActive, onOpenPersonality]);
 
   const handleContextMenu = useCallback(
     (e: MouseEvent) => onContextMenu(e, agent),
@@ -589,65 +606,7 @@ function SortableAgent({
         onDragStart={handleNativeDragStart}
         onDragEnd={handleNativeDragEnd}
       >
-        {/* LEFT SECTION: Timing + Metro Station (OUTSIDE colored background) */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            minWidth: "35px",
-          }}
-        >
-          {/* 🦆 Relative Time - ALWAYS visible, positioned left of metro-station */}
-          {relativeTime ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "9px",
-                fontWeight: 600,
-                lineHeight: "1",
-                pointerEvents: "none",
-                userSelect: "none",
-                minWidth: "20px",
-              }}
-            >
-              {/* Value - agent color when <5 min, white otherwise */}
-              <div
-                style={{
-                  marginBottom: "1px",
-                  color:
-                    relativeTime.minutes < 5
-                      ? agent.color
-                      : `rgba(255, 255, 255, ${timestampOpacity})`,
-                  transition: "color 1s ease",
-                }}
-              >
-                {relativeTime.value}
-              </div>
-              {/* Unit - agent color when <5 min, slightly dimmer white otherwise */}
-              <div
-                style={{
-                  fontSize: "7px",
-                  color:
-                    relativeTime.minutes < 5
-                      ? agent.color
-                      : `rgba(255, 255, 255, ${timestampOpacity * 0.75})`,
-                  transition: "color 1s ease",
-                }}
-              >
-                {relativeTime.unit}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Metro Station Dot/Diamond */}
-          <div className="metro-station" style={metroStationStyle} />
-        </div>
-
-        {/* RIGHT SECTION: Colored Background with Avatar + Content */}
+        {/* Agent Card - No left timing section */}
         <div
           className="agent-card flex items-center"
           onClick={handleSelect}
@@ -656,36 +615,34 @@ function SortableAgent({
           onMouseLeave={() => setIsHovered(false)}
           style={{
             flex: 1,
-            padding: "8px 12px",
+            padding: "6px 10px",
             paddingLeft: "8px",
+            marginTop: "4px",
             background: agentCardBg,
-            borderRadius: "6px",
+            borderRadius: "5px",
             cursor: "pointer",
             transition:
               "background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
             position: "relative",
             display: "flex",
             alignItems: "center",
-            gap: "12px",
-            minHeight: "48px",
-            // Add white border only when selected (in focus)
+            gap: "8px",
+            minHeight: "36px",
+            // Border with agent color (more visible when active)
             border: isActive
-              ? "2px solid rgba(255, 255, 255, 0.6)"
-              : "1px solid rgba(255, 255, 255, 0.1)",
-            boxShadow: isActive
-              ? "0 0 12px rgba(255, 255, 255, 0.15)"
-              : undefined,
-            // Reduce opacity for dormant/empty agents (matches sleep icon in TerminalActivityBar)
-            // But always full opacity when selected (isActive)
+              ? `2px solid ${agent.color}`
+              : `1px solid ${agent.color}55`,
+            boxShadow: isActive ? `0 0 8px ${agent.color}40` : undefined,
+            // Reduce opacity for dormant/empty agents
             opacity: isActive ? 1 : isChatEmpty || isDormant ? 0.7 : 1,
           }}
         >
           {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
           <div
             style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "6px",
+              width: "32px",
+              height: "32px",
+              borderRadius: "5px",
               border: `2px solid ${agent.color}66`,
               display: "flex",
               alignItems: "center",
@@ -730,7 +687,7 @@ function SortableAgent({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "16px",
+                  fontSize: "13px",
                   fontWeight: 700,
                   color: agent.color,
                 }}
@@ -1154,11 +1111,13 @@ export default function RepositoryGroup({
   onCreateAgent,
   onRemoveProject,
   onOpenDashboard,
+  onOpenClaudeAssets,
   isKanbanViewActive = false,
   onToggleKanbanView,
   chatLoadingMap,
   onSessionClick,
   activeSessionId,
+  onOpenPersonality,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1177,6 +1136,28 @@ export default function RepositoryGroup({
   >(null);
   const displayName = getRepoDisplayName(repoName);
   const isDraggingAny = activeAgentId !== null;
+
+  // Team state
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const activeTeam = useTeamStore((s) => s.activeTeam);
+  const loadActiveTeam = useTeamStore((s) => s.loadActiveTeam);
+
+  // Build avatar map from agents for team enrichment (stable ref, called on demand)
+  const buildAgentAvatarMap = useCallback(() => {
+    const map = new Map<string, { avatar?: string; color?: string }>();
+    for (const agent of [...mainAgents, ...worktreeAgents]) {
+      map.set(agent.id, { avatar: agent.avatar, color: agent.color });
+    }
+    return map;
+  }, [mainAgents, worktreeAgents]);
+
+  // Load active team ONLY on mount / repoPath change (not on agent list changes)
+  const buildAgentAvatarMapRef = useRef(buildAgentAvatarMap);
+  buildAgentAvatarMapRef.current = buildAgentAvatarMap;
+  useEffect(() => {
+    loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoPath]);
 
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
   const { sessions: allSessionsForRepo, createSession } = useSessionStore();
@@ -1705,19 +1686,19 @@ export default function RepositoryGroup({
                 />
               </svg>
             </button>
-            {/* Project name - click to open dashboard */}
+            {/* Project name - click to open Claude Assets */}
             <span
               onClick={(e) => {
                 e.stopPropagation();
-                if (onOpenDashboard) {
-                  onOpenDashboard(repoPath, repoName);
+                if (onOpenClaudeAssets) {
+                  onOpenClaudeAssets(repoPath);
                 } else {
                   onToggle();
                 }
               }}
               style={{ cursor: "pointer" }}
               className="font-semibold text-sm text-white/90 hover:text-orange-400 transition-colors"
-              title="Open Project Dashboard"
+              title="Open Project Assets"
             >
               {displayName}
             </span>
@@ -1807,6 +1788,32 @@ export default function RepositoryGroup({
                 <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
               </svg>
             </button>
+            {/* Create Team button (only when Agent Teams feature is enabled) */}
+            {mainAgents.length >= 2 && !activeTeam && (
+              <button
+                type="button"
+                onClick={() => setShowTeamModal(true)}
+                title="Create Agent Team"
+                className="repo-action-btn"
+                style={{ color: "rgba(255, 107, 53, 0.7)" }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
+            )}
             {/* New Agent button */}
             {onCreateAgent && (
               <button
@@ -1837,7 +1844,7 @@ export default function RepositoryGroup({
                 onClick={() => onRemoveProject(repoPath)}
                 title="Remove Project"
                 className="repo-action-btn"
-                style={{ color: 'rgba(255, 255, 255, 0.35)' }}
+                style={{ color: "rgba(255, 255, 255, 0.35)" }}
               >
                 <svg
                   width="14"
@@ -1856,6 +1863,51 @@ export default function RepositoryGroup({
             )}
           </div>
         </div>
+        {activeTeam && activeTeam.projectPath === repoPath && (
+          <div style={{ marginTop: '4px', paddingLeft: '28px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => { e.stopPropagation(); setShowTeamModal(true); }}
+              title="Edit team"
+            >
+              <TeamStatusBadge team={activeTeam} />
+            </div>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (window.confirm(`Disband team "${activeTeam.name}"?`)) {
+                  try {
+                    await useTeamStore.getState().disbandTeam(repoPath, activeTeam.id);
+                    await loadActiveTeam(repoPath, buildAgentAvatarMap());
+                  } catch (err) {
+                    console.error('Failed to disband team:', err);
+                  }
+                }
+              }}
+              title="Disband team"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '1px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '3px',
+                transition: 'color 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(239, 68, 68, 0.8)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.3)'; }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Expanded Content with Metro Map Design */}
@@ -1978,13 +2030,38 @@ export default function RepositoryGroup({
                               ? setNewSessionModalAgentId
                               : undefined
                           }
+                          onOpenPersonality={onOpenPersonality}
                         />
-                        {/* Sessions under this agent - always visible */}
+                        {/* Sessions under this agent - always visible - with metro line */}
                         {onSessionClick && (
                           <div
                             className="agent-sessions-container"
-                            style={{ marginLeft: "44px", marginTop: "4px" }}
+                            style={
+                              {
+                                marginLeft: "8px",
+                                marginTop: "4px",
+                                position: "relative",
+                                paddingLeft: "20px", // Space for metro line
+                                // Pass agent color for pulse animations
+                                "--agent-color": agent.color,
+                              } as React.CSSProperties
+                            }
                           >
+                            {/* Metro line connecting agent to sessions */}
+                            <div
+                              className="metro-line-agent-sessions"
+                              style={{
+                                position: "absolute",
+                                left: "8px",
+                                top: "-4px", // Extend up to connect with agent card
+                                bottom: "22px", // Stop at center of last session's horizontal connector
+                                width: "2px",
+                                background: agent.color,
+                                opacity: 0.4,
+                                borderRadius: "1px",
+                                color: agent.color, // For currentColor in CSS animations
+                              }}
+                            />
                             <AgentSessionList
                               agentId={agent.id}
                               agentColor={agent.color}
@@ -2353,7 +2430,7 @@ export default function RepositoryGroup({
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "4px",
-                                minWidth: "35px",
+                                minWidth: "16px",
                               }}
                             >
                               {/* 🦆 Relative Time - ALWAYS visible, positioned left of metro-station */}
@@ -3037,6 +3114,15 @@ export default function RepositoryGroup({
               )?.label
             : undefined
         }
+      />
+
+      {/* Team Creation Modal */}
+      <TeamCreationModal
+        isOpen={showTeamModal}
+        onClose={() => { setShowTeamModal(false); loadActiveTeam(repoPath, buildAgentAvatarMap()); }}
+        projectPath={repoPath}
+        agents={[...mainAgents, ...worktreeAgents]}
+        editingTeam={activeTeam?.projectPath === repoPath ? activeTeam : null}
       />
     </div>
   );

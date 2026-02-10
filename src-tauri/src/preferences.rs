@@ -40,7 +40,7 @@ fn default_image_model() -> String {
 }
 
 fn default_background() -> String {
-    "duckmoto.png".to_string()
+    "gradient-midnight".to_string()
 }
 
 impl Default for AppPreferences {

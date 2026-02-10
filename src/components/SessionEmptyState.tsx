@@ -35,11 +35,13 @@ function getAvatarUrl(avatarPath: string): string {
 interface SessionEmptyStateProps {
   agent: TerminalInfo;
   onSessionClick: (sessionId: string) => void;
+  onOpenPersonality?: () => void;
 }
 
 export default function SessionEmptyState({
   agent,
   onSessionClick,
+  onOpenPersonality,
 }: SessionEmptyStateProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string>('');
@@ -124,6 +126,10 @@ export default function SessionEmptyState({
     >
       {/* Agent Avatar */}
       <div
+        onClick={() => {
+          console.log('[SessionEmptyState] Avatar clicked, onOpenPersonality:', !!onOpenPersonality);
+          onOpenPersonality?.();
+        }}
         style={{
           width: '80px',
           height: '80px',
@@ -134,6 +140,18 @@ export default function SessionEmptyState({
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
+          cursor: onOpenPersonality ? 'pointer' : 'default',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        }}
+        onMouseEnter={(e) => {
+          if (onOpenPersonality) {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = `0 8px 24px ${agent.color || '#00D4FF'}30`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = 'none';
         }}
       >
         {avatarUrl ? (

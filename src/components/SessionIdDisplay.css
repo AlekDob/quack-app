@@ -2,17 +2,18 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
-  font-size: 10px;
+  padding: 4px 6px;
+  font-size: 9px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
   color: var(--text-secondary);
-  background: transparent;
-  border: 1px solid transparent;
+  background: rgba(180, 100, 40, 0.12);
+  border: 1px solid rgba(180, 100, 40, 0.2);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .session-id-display:hover {
@@ -41,7 +42,7 @@
 }
 
 .session-id-text {
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
 }
 

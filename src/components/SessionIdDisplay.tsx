@@ -39,8 +39,8 @@ export default function SessionIdDisplay({ sessionId, className = '' }: SessionI
     }
   };
 
-  // Truncate to first 8 chars
-  const truncatedId = sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
+  // Show full session ID
+  const displayId = sessionId;
 
   return (
     <button
@@ -68,7 +68,7 @@ export default function SessionIdDisplay({ sessionId, className = '' }: SessionI
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         )}
       </svg>
-      <span className="session-id-text">{truncatedId}</span>
+      <span className="session-id-text">{displayId}</span>
     </button>
   );
 }

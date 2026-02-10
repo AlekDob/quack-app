@@ -83,13 +83,15 @@ const HOOK_TEMPLATES: (HookTemplate & { svgIcon: React.ReactNode })[] = [
   },
 ];
 
-// Hook type colors
+// Unified hook color (viola - matches Quack Store)
+const HOOK_COLOR = '#a78bfa';
+// Hook type colors for subtle differentiation (all shades of purple)
 const HOOK_TYPE_COLORS: Record<HookType, string> = {
-  'PreToolUse': '#f59e0b',
-  'PostToolUse': '#10b981',
-  'Notification': '#3b82f6',
-  'Stop': '#ef4444',
-  'SubagentStop': '#8b5cf6',
+  'PreToolUse': '#a78bfa',
+  'PostToolUse': '#a78bfa',
+  'Notification': '#a78bfa',
+  'Stop': '#a78bfa',
+  'SubagentStop': '#a78bfa',
 };
 
 export default function HooksPanel({
@@ -166,12 +168,12 @@ export default function HooksPanel({
       style={{ opacity: hook.enabled ? 1 : 0.5 }}
       onClick={() => setEditingHook(hook)}
     >
-      {/* Icon with toggle color */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${HOOK_TYPE_COLORS[hook.type]}15` }}>
-        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke={HOOK_TYPE_COLORS[hook.type]} strokeWidth="1.5">
+      {/* Icon - Purple gradient background with white icon (matches Quack Store) */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' }}>
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" strokeWidth="1.5">
           <path d="M10 3v7" strokeLinecap="round" />
           <path d="M10 10c0 2.5-2 4-4 4s-4-1.5-4-4" strokeLinecap="round" />
-          <circle cx="10" cy="3" r="1.5" fill={HOOK_TYPE_COLORS[hook.type]} stroke="none" />
+          <circle cx="10" cy="3" r="1.5" fill="white" stroke="none" />
         </svg>
       </div>
 
@@ -328,9 +330,9 @@ export default function HooksPanel({
                       onClick={() => handleTemplateClick(template)}
                       className="w-full flex items-start gap-3 p-3 rounded-lg text-left hover:bg-white/5 transition-all duration-200"
                     >
-                      {/* Icon */}
-                      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${HOOK_TYPE_COLORS[template.type]}20` }}>
-                        <span style={{ color: HOOK_TYPE_COLORS[template.type] }}>{template.svgIcon}</span>
+                      {/* Icon - Purple gradient background with white icon (matches Quack Store) */}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' }}>
+                        <span style={{ color: 'white' }}>{template.svgIcon}</span>
                       </div>
                       {/* Content */}
                       <div className="flex-1 min-w-0">

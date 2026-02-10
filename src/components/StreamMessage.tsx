@@ -1,40 +1,275 @@
 import React, { useMemo, useState, useEffect, memo, useCallback } from 'react';
 import './ToolWidgets.css';
+import './ToolCallMinimal.css';
 import {
   SystemInitializedWidget,
-  EditWidget,
-  WriteWidget,
-  BashWidget,
-  ReadWidget,
-  GrepWidget,
   TodoWriteWidget,
   ExitPlanModeWidget,
   EnterPlanModeWidget,
   ImagePreviewWidget,
-  ToolIcon,
-  getToolColor,
 } from './ToolWidgets';
 import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
 import { TaskWidget } from './TaskWidget';
 import { TaskOutputWidget } from './TaskOutputWidget';
 import AskUserQuestionWidget from './AskUserQuestionWidget';
-import ToolGifInline from './ToolGifInline';
+import DiffViewer from './DiffViewer';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
-import type { ClaudeEvent, AskUserQuestionAnswers } from '../types';
+import type { ClaudeEvent, AskUserQuestionAnswers, DiffLine, ToolDiff } from '../types';
 import { BugReportWidget, WebAnalysisCard } from './structured-outputs';
 import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
+import { TeammateWidget } from './TeammateWidget';
+import { useTeamStore } from '../stores/teamStore';
+import { useAgentAvatar } from '../hooks/useAgentAvatar';
+import type { TeamConfig } from '../types';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
 
-// Memoized tool widget components for performance
-const MemoizedEditWidget = memo(EditWidget);
-const MemoizedWriteWidget = memo(WriteWidget);
-const MemoizedBashWidget = memo(BashWidget);
-const MemoizedReadWidget = memo(ReadWidget);
-const MemoizedGrepWidget = memo(GrepWidget);
+// Mini avatar for team badge - uses useAgentAvatar with avatar filename from TeamMember
+function TeamMemberMiniAvatar({ name, avatar }: { name: string; avatar?: string }) {
+  const avatarUrl = useAgentAvatar(name, avatar);
+  return (
+    <img
+      src={avatarUrl}
+      alt={name}
+      title={name}
+      style={{
+        width: '14px',
+        height: '14px',
+        borderRadius: '50%',
+        objectFit: 'cover',
+        border: '1px solid rgba(0, 217, 255, 0.3)',
+      }}
+    />
+  );
+}
+
+// Team mode badge with mini avatars
+function TeamModeBadge({ team }: { team: TeamConfig }) {
+  return (
+    <span className="team-mode-badge">
+      <span className="team-mode-badge-avatars">
+        {team.members.map(m => (
+          <TeamMemberMiniAvatar key={m.agentId} name={m.name} avatar={m.avatar} />
+        ))}
+      </span>
+      {team.name}
+    </span>
+  );
+}
+
+// Helper function to convert old/new strings to ToolDiff
+function createDiffFromStrings(oldString: string, newString: string, fileName?: string): ToolDiff {
+  const oldLines = oldString.split('\n');
+  const newLines = newString.split('\n');
+  const lines: DiffLine[] = [];
+
+  oldLines.forEach((line) => {
+    lines.push({ type: 'removed', content: line });
+  });
+  newLines.forEach((line) => {
+    lines.push({ type: 'added', content: line });
+  });
+
+  return { fileName, lines };
+}
+
+// Get tool color based on type - minimal style
+const getToolColorMinimal = (name: string): string => {
+  const toolName = name.toLowerCase();
+  if (toolName === 'edit' || toolName === 'multiedit') return '#F7931E'; // orange
+  if (toolName === 'read') return '#00D9FF'; // cyan
+  if (toolName === 'write') return '#22c55e'; // green
+  if (toolName === 'bash') return '#9B59B6'; // purple
+  if (toolName === 'glob' || toolName === 'grep') return '#6b7280'; // gray
+  if (toolName === 'task') return '#fbbf24'; // yellow
+  if (toolName === 'webfetch' || toolName === 'websearch') return '#10b981'; // emerald
+  if (toolName.startsWith('mcp__') || toolName.startsWith('mcp_')) return '#f97316'; // orange
+  return '#6b7280'; // default gray
+};
+
+// Extract target from tool input for minimal display
+const getToolTarget = (toolName: string, input: Record<string, unknown> | undefined): string => {
+  if (!input) return '';
+  const name = toolName.toLowerCase();
+
+  // File operations
+  if (input.file_path) {
+    const fullPath = input.file_path as string;
+    return fullPath.split('/').pop() || fullPath;
+  }
+
+  // Bash command
+  if (name === 'bash' && input.command) {
+    const cmd = input.command as string;
+    return cmd.length > 50 ? cmd.substring(0, 47) + '...' : cmd;
+  }
+
+  // Grep/Glob pattern
+  if (input.pattern) {
+    return input.pattern as string;
+  }
+
+  // Task description
+  if (input.description) {
+    return input.description as string;
+  }
+
+  // Read path
+  if (input.path) {
+    const p = input.path as string;
+    return p.split('/').pop() || p;
+  }
+
+  return '';
+};
+
+// Minimal tool display component for streaming
+interface ToolMinimalStreamProps {
+  toolName: string;
+  input: Record<string, unknown> | undefined;
+  isLoading: boolean;
+  hasError?: boolean;
+  result?: any;
+  onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void;
+  onUndoEdit?: (filePath: string) => void;
+}
+
+const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
+  toolName,
+  input,
+  isLoading,
+  hasError,
+  result,
+  onFilePathClick,
+  onOpenInIDE,
+  onUndoEdit,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const toolColor = getToolColorMinimal(toolName);
+  const toolTarget = getToolTarget(toolName, input);
+  const name = toolName.toLowerCase();
+
+  // Determine if we have expandable content
+  const hasExpandableContent = result?.content ||
+    (name === 'edit' && input?.old_string && input?.new_string);
+
+  const StatusIndicator = () => {
+    if (isLoading) {
+      return (
+        <span className="tool-status-typing">
+          <span /><span /><span />
+        </span>
+      );
+    }
+    if (hasError) {
+      return <span className="tool-status-error">&#10005;</span>;
+    }
+    return <span className="tool-status-check">&#10003;</span>;
+  };
+
+  return (
+    <div className="tool-minimal">
+      <div
+        className={`tool-minimal-line ${hasExpandableContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isLoading ? 'running' : ''}`}
+        onClick={() => hasExpandableContent && setIsExpanded(!isExpanded)}
+      >
+        <span className="tool-minimal-text">
+          <span className="tool-minimal-prefix">using</span>
+          <span className="tool-minimal-name" style={{ color: toolColor }}>
+            {toolName}
+          </span>
+          {toolTarget && (
+            <>
+              <span className="tool-minimal-on">on</span>
+              <span className="tool-minimal-target">{toolTarget}</span>
+            </>
+          )}
+        </span>
+        <StatusIndicator />
+        {hasExpandableContent && (
+          <span className={`tool-minimal-chevron ${isExpanded ? 'rotated' : ''}`}>
+            &#8250;
+          </span>
+        )}
+      </div>
+
+      {isExpanded && hasExpandableContent && (
+        <div className="tool-minimal-content">
+          {/* File path with Open in IDE button */}
+          {typeof input?.file_path === 'string' && (
+            <div className="tool-minimal-file-path">
+              <svg className="tool-minimal-file-path-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span
+                className="tool-minimal-file-path-text"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onFilePathClick) onFilePathClick(input.file_path as string);
+                }}
+                style={{ cursor: onFilePathClick ? 'pointer' : 'default' }}
+                title={onFilePathClick ? "Open in Quack" : undefined}
+              >
+                {input.file_path}
+              </span>
+              {onOpenInIDE && (
+                <button
+                  className="tool-minimal-open-ide-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenInIDE(input.file_path as string);
+                  }}
+                  title="Open in IDE"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Open
+                </button>
+              )}
+            </div>
+          )}
+
+          {name === 'edit' && input?.old_string && input?.new_string ? (
+            <>
+              <DiffViewer diff={createDiffFromStrings(
+                input.old_string as string,
+                input.new_string as string,
+                input.file_path as string | undefined
+              )} />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                {typeof input.file_path === 'string' && onUndoEdit && (
+                  <button
+                    className="tool-minimal-undo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUndoEdit(input.file_path as string);
+                    }}
+                  >
+                    Undo Changes
+                  </button>
+                )}
+              </div>
+            </>
+          ) : result?.content ? (
+            <pre className="tool-minimal-result">
+              <code>{typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2)}</code>
+            </pre>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Memoized components for performance
 const MemoizedTaskWidget = memo(TaskWidget);
 const MemoizedTaskOutputWidget = memo(TaskOutputWidget);
 const MemoizedTodoWriteWidget = memo(TodoWriteWidget);
@@ -42,81 +277,15 @@ const MemoizedExitPlanModeWidget = memo(ExitPlanModeWidget);
 const MemoizedEnterPlanModeWidget = memo(EnterPlanModeWidget);
 const MemoizedAskUserQuestionWidget = memo(AskUserQuestionWidget);
 const MemoizedImagePreviewWidget = memo(ImagePreviewWidget);
+const MemoizedToolMinimalStream = memo(ToolMinimalStream);
 
-/**
- * CollapsibleToolWidget - A collapsible widget for generic MCP tools
- * Shows tool name in header, collapsed by default, expandable to show input
- */
-interface CollapsibleToolWidgetProps {
-  toolName: string;
-  toolColor: string;
-  input: any;
-  isLoading: boolean;
-}
-
-const CollapsibleToolWidget: React.FC<CollapsibleToolWidgetProps> = ({
-  toolName,
-  toolColor,
-  input,
-  isLoading,
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  // Get friendly display name
-  const getDisplayName = (name: string): string => {
-    // Remove mcp__ prefix and clean up
-    return name.replace(/^mcp__\w+__/, '').replace(/_/g, ' ');
-  };
-
-  return (
-    <div
-      className="tool-widget collapsible-tool-widget"
-      style={{ borderColor: toolColor }}
-    >
-      <div
-        className="tool-widget-header collapsible-header"
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{ cursor: 'pointer' }}
-      >
-        <div className="tool-widget-title" style={{ color: toolColor }}>
-          <ToolIcon name={toolName} />
-          <span>{getDisplayName(toolName)}</span>
-        </div>
-        <div className="tool-widget-actions">
-          {isLoading && (
-            <div className="tool-widget-loading">
-              <div className="spinner"></div>
-            </div>
-          )}
-          <svg
-            className={`collapse-chevron ${isExpanded ? 'expanded' : ''}`}
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            style={{
-              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
-              opacity: 0.6,
-            }}
-          >
-            <path d="M4.427 6.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 6H4.604a.25.25 0 00-.177.427z" />
-          </svg>
-        </div>
-      </div>
-      {isExpanded && (
-        <div className="tool-widget-content">
-          <pre className="tool-widget-code">{JSON.stringify(input, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-};
 
 interface StreamMessageProps {
   message: ClaudeEvent;
   streamMessages: ClaudeEvent[];
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void; // Callback to open file in preferred IDE
+  onUndoEdit?: (filePath: string) => void; // Callback to undo file edit
   agentName?: string;
   agentAvatar?: string;
   workingDirectory?: string; // Current working directory for file operations
@@ -129,12 +298,17 @@ interface StreamMessageProps {
   onRewindFiles?: (userMessageId: string) => void; // Callback to rewind files to a specific message
   // Image preview
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>; // Request IDs with pending plan approvals
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
   message,
   streamMessages,
   onFilePathClick,
+  onOpenInIDE,
+  onUndoEdit,
   agentName = 'Jack',
   agentAvatar,
   workingDirectory,
@@ -145,6 +319,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   sessionId,
   onRewindFiles,
   onOpenImageTab,
+  pendingPlanApprovalIds,
+  onPlanApprovalResponse,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -186,6 +362,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       isMounted = false;
     };
   }, [agentAvatar]);
+
+  // Reactive subscription to active team (avoids getState() in render)
+  const activeTeam = useTeamStore((s) => s.activeTeam);
 
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
@@ -249,438 +428,345 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       return null;
     }
 
-    // Debug: Log all content blocks for this message (expanded)
-    msg.content.forEach((c: any, idx: number) => {
-      console.log(`🔍 [StreamMessage] Content block ${idx}:`, {
-        type: c.type,
-        name: c.name,
-        text: c.text?.substring(0, 50),
-        hasInput: !!c.input,
-        inputKeys: c.input ? Object.keys(c.input) : [],
-        subagent_type: c.input?.subagent_type,
-      });
+    // Render tools separately (after the main avatar+text block)
+    const renderToolContent = (content: any, idx: number) => {
+      const toolName = content.name?.toLowerCase();
+      const input = content.input;
+      const toolId = content.id;
+      const toolResult = toolResults.get(toolId);
+
+      // TodoWrite tool - special widget
+      if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
+        return (
+          <MemoizedTodoWriteWidget
+            key={idx}
+            todos={input.todos}
+            defaultExpanded={true}
+          />
+        );
+      }
+
+      // ExitPlanMode tool - special widget
+      if (toolName === 'exitplanmode' && input?.plan) {
+        // Find matching pending plan approval requestId for this agent
+        const pendingRequestId = pendingPlanApprovalIds
+          ? Array.from(pendingPlanApprovalIds)[0]
+          : undefined;
+
+        return (
+          <MemoizedExitPlanModeWidget
+            key={idx}
+            plan={input.plan}
+            workingDirectory={workingDirectory}
+            defaultExpanded={true}
+            pendingApprovalRequestId={pendingRequestId}
+            onApprovalResponse={onPlanApprovalResponse}
+          />
+        );
+      }
+
+      // EnterPlanMode tool - special widget
+      if (toolName === 'enterplanmode') {
+        const isFirstEnterPlanMode = msg.content.findIndex(
+          (c: any) => c.type === 'tool_use' && c.name?.toLowerCase() === 'enterplanmode'
+        ) === idx;
+
+        if (!isFirstEnterPlanMode) {
+          return null;
+        }
+
+        return (
+          <MemoizedEnterPlanModeWidget
+            key={idx}
+            objective={input?.objective}
+            defaultExpanded={false}
+          />
+        );
+      }
+
+      // AskUserQuestion tool - special widget
+      if (toolName === 'askuserquestion' && input?.questions) {
+        let questions = input.questions;
+
+        if (typeof questions === 'string') {
+          try {
+            questions = JSON.parse(questions);
+          } catch (e) {
+            console.error('Failed to parse questions string:', e);
+          }
+        }
+
+        if (Array.isArray(questions)) {
+          const existingAnswer = answeredQuestions?.get(toolId);
+          const isAnswered = !!existingAnswer || !!toolResult;
+
+          return (
+            <MemoizedAskUserQuestionWidget
+              key={idx}
+              questions={questions}
+              toolUseId={toolId}
+              onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers, sessionId)}
+              disabled={isAnswered}
+              existingAnswers={existingAnswer}
+            />
+          );
+        }
+      }
+
+      // Task tool (subagent) - special widget
+      // Check if task description mentions a team member → show TeammateWidget
+      if (toolName === 'task' && input?.subagent_type) {
+        if (activeTeam) {
+          const taskText = `${input.description || ''} ${input.prompt || ''}`.toLowerCase();
+          const matchedMember = activeTeam.members.find(m =>
+            taskText.includes(m.name.toLowerCase())
+          );
+          if (matchedMember) {
+            return (
+              <TeammateWidget
+                key={idx}
+                name={matchedMember.name}
+                role={input.description || matchedMember.role}
+                agentId={matchedMember.agentId}
+                action={toolResult ? 'stop' : 'start'}
+                avatar={matchedMember.avatar}
+                color={matchedMember.color}
+              />
+            );
+          }
+        }
+
+        return (
+          <MemoizedTaskWidget
+            key={idx}
+            subagentType={input.subagent_type}
+            description={input.description || 'Running task'}
+            isLoading={!toolResult}
+            workingDirectory={workingDirectory}
+          />
+        );
+      }
+
+      // TaskOutput tool - special widget
+      if (toolName === 'taskoutput' && input?.task_id) {
+        let status: 'pending' | 'running' | 'completed' | 'error' | 'unknown' = 'unknown';
+        let output: string | undefined;
+        let error: string | undefined;
+
+        if (toolResult) {
+          try {
+            const result = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
+            status = result.status || 'completed';
+            output = result.output || result.result || (typeof toolResult === 'string' ? toolResult : JSON.stringify(result, null, 2));
+            error = result.error;
+          } catch {
+            output = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
+            status = 'completed';
+          }
+        }
+
+        return (
+          <MemoizedTaskOutputWidget
+            key={idx}
+            taskId={input.task_id}
+            status={status}
+            output={output}
+            error={error}
+            block={input.block}
+            timeout={input.timeout}
+            isLoading={!toolResult}
+            defaultExpanded={true}
+          />
+        );
+      }
+
+      // Read tool - check for image files (special handling)
+      if (toolName === 'read' && input?.file_path) {
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
+        const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
+
+        if (isImageFile && toolResult) {
+          const imageContent = extractImageData(toolResult);
+          if (imageContent) {
+            return (
+              <MemoizedImagePreviewWidget
+                key={idx}
+                filePath={input.file_path}
+                imageData={imageContent.data}
+                mediaType={imageContent.mediaType}
+                onOpenInTab={onOpenImageTab}
+              />
+            );
+          }
+        }
+      }
+
+      // All other tools - use minimal display
+      return (
+        <MemoizedToolMinimalStream
+          key={idx}
+          toolName={content.name || 'unknown'}
+          input={input}
+          isLoading={!toolResult}
+          hasError={toolResult?.is_error}
+          result={toolResult}
+          onFilePathClick={onFilePathClick}
+          onOpenInIDE={onOpenInIDE}
+          onUndoEdit={onUndoEdit}
+        />
+      );
+    };
+
+    // Collect text content and rules
+    let combinedText = '';
+    let ruleNames: string[] = [];
+
+    msg.content.forEach((content: any) => {
+      if (content.type === 'text' && content.text) {
+        const rulesMatch = content.text.match(/^(?:Following rules?:\s*)(.+)$/m);
+        if (rulesMatch) {
+          ruleNames = rulesMatch[1].split(',').map((r: string) => r.trim().replace(/\.$/, '')).filter(Boolean);
+          combinedText += content.text.replace(/^Following rules?:\s*.+$/m, '').replace(/^\n+/, '');
+        } else {
+          combinedText += content.text;
+        }
+      }
     });
 
     return (
       <div className="stream-message assistant-message">
+        {/* Thinking blocks - rendered before the main content */}
         {msg.content.map((content: any, idx: number) => {
-          // Thinking block content (SDK 0.1.54+ extended thinking)
-          // Only render if showThinkingBlocks is true (controlled by footer icon)
           if (content.type === 'thinking' && content.thinking && showThinkingBlocks) {
             return (
               <ThinkingBlock
-                key={idx}
+                key={`thinking-${idx}`}
                 content={content.thinking}
                 defaultExpanded={false}
               />
             );
           }
-
-          // Text content
-          if (content.type === 'text' && content.text) {
-            // Extract "Following rules:" line into styled pills
-            const rulesMatch = content.text.match(/^(?:Following rules?:\s*)(.+)$/m);
-            const ruleNames = rulesMatch
-              ? rulesMatch[1].split(',').map((r: string) => r.trim().replace(/\.$/, '')).filter(Boolean)
-              : [];
-            const cleanedText = rulesMatch
-              ? content.text.replace(/^Following rules?:\s*.+$/m, '').replace(/^\n+/, '')
-              : content.text;
-
-            return (
-              <div key={idx} className="assistant-text">
-                <div className="assistant-avatar">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-                  )}
-                </div>
-                <div className="assistant-content">
-                  <div className="assistant-name">{agentName}</div>
-                  {ruleNames.length > 0 && (
-                    <div className="rules-pills">
-                      <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      {ruleNames.map((name: string) => (
-                        <span key={name} className="rule-pill">{name}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="assistant-message-text">
-                    <MarkdownText>{cleanedText}</MarkdownText>
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          // Tool use content
-          if (content.type === 'tool_use') {
-            const toolName = content.name?.toLowerCase();
-            const input = content.input;
-            const toolId = content.id;
-            const toolResult = toolResults.get(toolId);
-
-            // 🦆 DEBUG: Log every tool_use being processed
-            console.log(`🔧 [StreamMessage] TOOL_USE detected: name="${content.name}" id="${toolId}" toolName="${toolName}"`);
-
-            // Debug logging for Task tool
-            if (toolName === 'task') {
-              console.log('🎯 [StreamMessage] Task tool detected!', {
-                toolName,
-                hasSubagentType: !!input?.subagent_type,
-                subagentType: input?.subagent_type,
-                description: input?.description,
-                fullInput: input,
-              });
-            }
-
-            // Edit tool
-            if (toolName === 'edit' && input?.file_path) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'edit'} toolId={toolId} />
-                  <MemoizedEditWidget
-                    file_path={input.file_path}
-                    old_string={input.old_string}
-                    new_string={input.new_string}
-                    result={toolResult}
-                    onFilePathClick={onFilePathClick}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Write tool
-            if (toolName === 'write' && input?.file_path && input?.content) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'write'} toolId={toolId} />
-                  <MemoizedWriteWidget
-                    filePath={input.file_path}
-                    content={input.content}
-                    result={toolResult}
-                    onFilePathClick={onFilePathClick}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Bash tool
-            if (toolName === 'bash' && input?.command) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'bash'} toolId={toolId} />
-                  <MemoizedBashWidget
-                    command={input.command}
-                    description={input.description}
-                    result={toolResult}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Read tool - check if image file first
-            if (toolName === 'read' && input?.file_path) {
-              const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
-              const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
-
-              if (isImageFile && toolResult) {
-                // Extract image data from tool result
-                const imageContent = extractImageData(toolResult);
-                if (imageContent) {
-                  return (
-                    <React.Fragment key={idx}>
-                      <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
-                      <MemoizedImagePreviewWidget
-                        filePath={input.file_path}
-                        imageData={imageContent.data}
-                        mediaType={imageContent.mediaType}
-                        onOpenInTab={onOpenImageTab}
-                      />
-                    </React.Fragment>
-                  );
-                }
-              }
-
-              // Text files - existing ReadWidget
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'read'} toolId={toolId} />
-                  <MemoizedReadWidget
-                    filePath={input.file_path}
-                    result={toolResult}
-                    onFilePathClick={onFilePathClick}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Grep tool
-            if (toolName === 'grep' && input?.pattern) {
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'grep'} toolId={toolId} />
-                  <MemoizedGrepWidget
-                    pattern={input.pattern}
-                    path={input.path}
-                    result={toolResult}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // TodoWrite tool - no GIF (skipped in ToolGifInline)
-            if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
-              return (
-                <MemoizedTodoWriteWidget
-                  key={idx}
-                  todos={input.todos}
-                  defaultExpanded={true}
-                />
-              );
-            }
-
-            // ExitPlanMode tool - no GIF
-            if (toolName === 'exitplanmode' && input?.plan) {
-              return (
-                <MemoizedExitPlanModeWidget
-                  key={idx}
-                  plan={input.plan}
-                  workingDirectory={workingDirectory}
-                  defaultExpanded={true}
-                />
-              );
-            }
-
-            // EnterPlanMode tool - purple header widget, no GIF
-            // Only render ONCE even if called multiple times
-            if (toolName === 'enterplanmode') {
-              // Skip if this is a duplicate (same tool in same message already rendered)
-              const isFirstEnterPlanMode = msg.content.findIndex(
-                (c: any) => c.type === 'tool_use' && c.name?.toLowerCase() === 'enterplanmode'
-              ) === idx;
-
-              if (!isFirstEnterPlanMode) {
-                return null; // Skip duplicates
-              }
-
-              return (
-                <MemoizedEnterPlanModeWidget
-                  key={idx}
-                  objective={input?.objective}
-                  defaultExpanded={false}
-                />
-              );
-            }
-
-            // AskUserQuestion tool - no GIF (skipped in ToolGifInline)
-            // Handle both array and stringified JSON (SDK may serialize as string)
-            if (toolName === 'askuserquestion' && input?.questions) {
-              let questions = input.questions;
-
-              // Parse if questions came as stringified JSON
-              if (typeof questions === 'string') {
-                try {
-                  questions = JSON.parse(questions);
-                  console.log('🔧 [AskUserQuestion] Parsed stringified questions:', questions);
-                } catch (e) {
-                  console.error('🔧 [AskUserQuestion] Failed to parse questions string:', e);
-                }
-              }
-
-              // Now check if we have a valid array
-              if (Array.isArray(questions)) {
-                const isPending = pendingQuestionIds?.has(toolId);
-                const existingAnswer = answeredQuestions?.get(toolId);
-                const isAnswered = !!existingAnswer || !!toolResult;
-
-                return (
-                  <MemoizedAskUserQuestionWidget
-                    key={idx}
-                    questions={questions}
-                    toolUseId={toolId}
-                    onSubmit={(id, answers) => onUserQuestionAnswer?.(id, answers, sessionId)}
-                    disabled={isAnswered}
-                    existingAnswers={existingAnswer}
-                  />
-                );
-              }
-            }
-
-            // Task tool (subagent invocation) - launches droids
-            if (toolName === 'task' && input?.subagent_type) {
-              const subagentType = input.subagent_type;
-              const description = input.description || 'Running task';
-
-              console.log('🤖 [StreamMessage] RENDERING Task widget for droid:', subagentType);
-
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'task'} toolId={toolId} />
-                  <MemoizedTaskWidget
-                    subagentType={subagentType}
-                    description={description}
-                    isLoading={!toolResult}
-                    workingDirectory={workingDirectory}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // TaskOutput tool - retrieves output from background tasks
-            if (toolName === 'taskoutput' && input?.task_id) {
-              // Parse status from tool result if available
-              let status: 'pending' | 'running' | 'completed' | 'error' | 'unknown' = 'unknown';
-              let output: string | undefined;
-              let error: string | undefined;
-
-              if (toolResult) {
-                try {
-                  // toolResult might be a string or parsed object
-                  const result = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
-                  status = result.status || 'completed';
-                  output = result.output || result.result || (typeof toolResult === 'string' ? toolResult : JSON.stringify(result, null, 2));
-                  error = result.error;
-                } catch {
-                  // If parsing fails, use the raw result as output
-                  output = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
-                  status = 'completed';
-                }
-              }
-
-              return (
-                <React.Fragment key={idx}>
-                  <ToolGifInline toolName={content.name || 'taskoutput'} toolId={toolId} />
-                  <MemoizedTaskOutputWidget
-                    taskId={input.task_id}
-                    status={status}
-                    output={output}
-                    error={error}
-                    block={input.block}
-                    timeout={input.timeout}
-                    isLoading={!toolResult}
-                    defaultExpanded={true}
-                  />
-                </React.Fragment>
-              );
-            }
-
-            // Generic fallback for MCP and other tools
-            // GIF is OUTSIDE the widget with caption
-            const toolColor = getToolColor(content.name || '');
-            return (
-              <React.Fragment key={idx}>
-                {/* GIF outside with caption */}
-                <ToolGifInline toolName={content.name || 'unknown'} toolId={toolId} />
-                {/* Collapsible tool widget */}
-                <CollapsibleToolWidget
-                  toolName={content.name || 'unknown'}
-                  toolColor={toolColor}
-                  input={input}
-                  isLoading={!toolResult}
-                />
-              </React.Fragment>
-            );
-          }
-
           return null;
         })}
 
-        {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
-        {(() => {
-          // Check if this message has file-modifying tools (Edit, Write, MultiEdit)
-          const hasFileChanges = msg.content.some(
-            (c: any) => c.type === 'tool_use' && ['edit', 'write', 'multiedit'].includes(c.name?.toLowerCase())
-          );
-
-          // Get the UUID from the preceding user message (required for rewind)
-          // We need the user message UUID that preceded this assistant response
-          const messageIndex = streamMessages.findIndex((m) => m === message);
-          let precedingUserMessageUuid: string | undefined;
-
-          if (messageIndex > 0) {
-            // Look backwards for the user message
-            for (let i = messageIndex - 1; i >= 0; i--) {
-              const prevMsg = streamMessages[i];
-              if (prevMsg.type === 'user') {
-                // Get UUID from user event (SDK provides this in the uuid field)
-                precedingUserMessageUuid = (prevMsg as any).uuid;
-                break;
-              }
-            }
-          }
-
-          // DEBUG: Log why rewind button might not show
-          if (hasFileChanges) {
-            console.log('[RewindButton] hasFileChanges:', hasFileChanges);
-            console.log('[RewindButton] onRewindFiles:', !!onRewindFiles);
-            console.log('[RewindButton] sessionId:', sessionId);
-            console.log('[RewindButton] precedingUserMessageUuid:', precedingUserMessageUuid);
-            // Log full structure of user messages to find UUID location
-            const userMessages = streamMessages.filter((m: any) => m.type === 'user');
-            console.log('[RewindButton] User messages:', userMessages.length);
-            if (userMessages.length > 0) {
-              console.log('[RewindButton] First user message keys:', Object.keys(userMessages[0]));
-              console.log('[RewindButton] First user message:', JSON.stringify(userMessages[0]).substring(0, 500));
-            }
-          }
-
-          if (hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid) {
-            return (
-              <div className="rewind-files-action" style={{
-                marginTop: '12px',
-                paddingTop: '12px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                display: 'flex',
-                justifyContent: 'flex-end',
-              }}>
-                <button
-                  onClick={() => onRewindFiles(precedingUserMessageUuid!)}
-                  className="rewind-button"
-                  title="Undo all file changes from this response"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 16px',
-                    background: 'rgba(251, 146, 60, 0.12)',
-                    border: '1px solid rgba(251, 146, 60, 0.3)',
-                    borderRadius: '8px',
-                    color: 'rgb(251, 191, 136)',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.5)';
-                    e.currentTarget.style.color = 'rgb(251, 146, 60)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.12)';
-                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.3)';
-                    e.currentTarget.style.color = 'rgb(251, 191, 136)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  {/* Undo/Rewind arrow icon */}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                    <path d="M3 3v5h5"/>
-                  </svg>
-                  Undo Changes
-                </button>
+        {/* Avatar + Content block - ALWAYS shown for assistant messages */}
+        <div className="assistant-text">
+          <div className="assistant-avatar">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+            )}
+          </div>
+          <div className="assistant-content">
+            <div className="assistant-name">
+              {agentName}
+              {activeTeam && (() => {
+                const normalizedAgent = agentName.toLowerCase().replace('agent ', '');
+                const isMember = activeTeam.members.some(m =>
+                  m.name.toLowerCase().replace('agent ', '') === normalizedAgent
+                );
+                if (!isMember) return null;
+                return <TeamModeBadge team={activeTeam} />;
+              })()}
+            </div>
+            {ruleNames.length > 0 && (
+              <div className="rules-pills">
+                <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                {ruleNames.map((name: string) => (
+                  <span key={name} className="rule-pill">{name}</span>
+                ))}
               </div>
-            );
-          }
-          return null;
-        })()}
+            )}
+            {/* Text content */}
+            {combinedText.trim() && (
+              <div className="assistant-message-text">
+                <MarkdownText>{combinedText.trim()}</MarkdownText>
+              </div>
+            )}
+            {/* Tool uses - rendered inside the content block */}
+            {msg.content.map((content: any, idx: number) => {
+              if (content.type === 'tool_use') {
+                return renderToolContent(content, idx);
+              }
+              return null;
+            })}
+
+            {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
+            {(() => {
+              // Check if this message has file-modifying tools (Edit, Write, MultiEdit)
+              const hasFileChanges = msg.content.some(
+                (c: any) => c.type === 'tool_use' && ['edit', 'write', 'multiedit'].includes(c.name?.toLowerCase())
+              );
+
+              // Get the UUID from the preceding user message (required for rewind)
+              const messageIndex = streamMessages.findIndex((m) => m === message);
+              let precedingUserMessageUuid: string | undefined;
+
+              if (messageIndex > 0) {
+                for (let i = messageIndex - 1; i >= 0; i--) {
+                  const prevMsg = streamMessages[i];
+                  if (prevMsg.type === 'user') {
+                    precedingUserMessageUuid = (prevMsg as any).uuid;
+                    break;
+                  }
+                }
+              }
+
+              if (hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid) {
+                return (
+                  <div className="rewind-files-action" style={{
+                    marginTop: '12px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                  }}>
+                    <button
+                      onClick={() => onRewindFiles(precedingUserMessageUuid!)}
+                      className="rewind-button"
+                      title="Undo all file changes from this response"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        background: 'transparent',
+                        border: '1px solid rgba(251, 146, 60, 0.25)',
+                        borderRadius: '4px',
+                        color: 'rgba(251, 191, 136, 0.7)',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(251, 146, 60, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.4)';
+                        e.currentTarget.style.color = 'rgb(251, 191, 136)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.25)';
+                        e.currentTarget.style.color = 'rgba(251, 191, 136, 0.7)';
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                      </svg>
+                      Undo
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        </div>
       </div>
     );
   }
@@ -695,8 +781,33 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   if (message.type === 'agent') {
     const agentEvent = message as any;
     const agentType = agentEvent.agent_type || agentEvent.agent_name || 'subagent';
+    const eventAction = agentEvent.action as 'start' | 'stop';
 
-    if (agentEvent.action === 'start') {
+    // Check if this agent event matches a team member
+    if (activeTeam && agentEvent.agent_name) {
+      const eventName = (agentEvent.agent_name as string).toLowerCase();
+      const matchedMember = activeTeam.members.find(m =>
+        m.name.toLowerCase() === eventName ||
+        m.name.toLowerCase().includes(eventName) ||
+        eventName.includes(m.name.toLowerCase())
+      );
+
+      if (matchedMember) {
+        return (
+          <TeammateWidget
+            name={matchedMember.name}
+            role={matchedMember.role}
+            agentId={matchedMember.agentId}
+            action={eventAction || 'start'}
+            avatar={matchedMember.avatar}
+            color={matchedMember.color}
+          />
+        );
+      }
+    }
+
+    // Default: use TaskWidget for droids/subagents
+    if (eventAction === 'start') {
       return (
         <TaskWidget
           subagentType={agentType}
@@ -707,7 +818,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       );
     }
 
-    if (agentEvent.action === 'stop') {
+    if (eventAction === 'stop') {
       return (
         <TaskWidget
           subagentType={agentType}
@@ -794,11 +905,6 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
           {message.stop_reason && (
             <span className="result-stat-inline" style={{ color: message.stop_reason === 'end_turn' ? '#00D9FF' : '#F7931E' }}>
               Stop: {message.stop_reason}
-            </span>
-          )}
-          {message.session_id && (
-            <span className="result-stat-inline">
-              Session: {message.session_id.substring(0, 8)}...
             </span>
           )}
         </div>

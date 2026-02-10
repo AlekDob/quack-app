@@ -645,7 +645,56 @@ fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
 }
 
 fn detect_shell() -> String {
-  std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
+  // Try SHELL env var first (Unix)
+  if let Ok(shell) = std::env::var("SHELL") {
+    return shell;
+  }
+
+  // Windows-specific shell detection
+  #[cfg(target_os = "windows")]
+  {
+    // Try PowerShell Core (pwsh) first
+    let mut cmd = std::process::Command::new("where");
+    cmd.arg("pwsh");
+
+    // Windows: Hide console window
+    {
+      use std::os::windows::process::CommandExt;
+      const CREATE_NO_WINDOW: u32 = 0x08000000;
+      cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    if let Ok(output) = cmd.output() {
+      if output.status.success() {
+        if let Ok(path) = String::from_utf8(output.stdout) {
+          if let Some(first_line) = path.lines().next() {
+            return first_line.trim().to_string();
+          }
+        }
+      }
+    }
+
+    // Fall back to Windows PowerShell
+    if let Ok(system_root) = std::env::var("SystemRoot") {
+      let powershell = format!("{}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", system_root);
+      if std::path::Path::new(&powershell).exists() {
+        return powershell;
+      }
+    }
+
+    // Last resort: cmd.exe
+    if let Ok(comspec) = std::env::var("COMSPEC") {
+      return comspec;
+    }
+
+    return "cmd.exe".to_string();
+  }
+
+  // Unix fallback
+  #[cfg(not(target_os = "windows"))]
+  {
+    "/bin/bash".to_string()
+  }
 }
 
 fn default_cwd() -> Result<PathBuf> {
@@ -698,10 +747,18 @@ fn execute_command_impl(command: String, cwd: String) -> Result<CommandResult> {
   let args = &parts[1..];
 
   // Execute the command
-  let output = Command::new(program)
-    .args(args)
-    .current_dir(cwd_path)
-    .output()
+  let mut cmd = Command::new(program);
+  cmd.args(args).current_dir(cwd_path);
+
+  // Windows: Hide console window
+  #[cfg(target_os = "windows")]
+  {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+  }
+
+  let output = cmd.output()
     .context(format!("Failed to execute command: {}", command))?;
 
   let stdout = String::from_utf8_lossy(&output.stdout).to_string();

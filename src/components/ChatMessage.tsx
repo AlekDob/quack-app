@@ -1,18 +1,15 @@
-import { memo, useState, useEffect, useRef, useMemo } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
-import ToolCallCard from './ToolCallCard';
+import ToolCallMinimal from './ToolCallMinimal';
 import StreamMessage from './StreamMessage';
 import ThinkingBlock from './ThinkingBlock';
 import MessageSettingsBadges from './MessageSettingsBadges';
 import SessionIdDisplay from './SessionIdDisplay';
 import MarkdownText from './MarkdownText';
 import { AgentMentionChip } from './AgentMentionChip';
-import { getAvatarUrl } from '../utils/agentAvatars';
 import { parseAgentMentions } from '../utils/agentMentions';
-import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import cyberducksAvatar from '../../images/cyberducks.png';
+import humanoidAvatar from '../../images/humanoid.jpeg';
 import './ChatMessage.css';
 import './StreamMessage.css';
 
@@ -44,6 +41,7 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onOpenFile?: (path: string) => void;
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void;
   onSessionIdClick?: (sessionId: string) => void;
   agentName?: string;
   agentAvatar?: string;
@@ -65,9 +63,12 @@ interface ChatMessageProps {
   onRewindFiles?: (userMessageId: string) => void;
   // Image preview
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  // Plan approval
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -78,8 +79,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
   const isResumeMessage = message.metadata?.isResumeMessage === true;
   const sessionId = message.metadata?.sessionId as string | undefined;
 
-  // State for avatar URL (handles both default and custom avatars)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  // Use cached avatar hook - much faster than manual loading
+  const avatarUrl = useAgentAvatar(agentName, agentAvatar);
 
   // State for sticky message actions
   const [isExpanded, setIsExpanded] = useState(false);
@@ -88,61 +89,14 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
   const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load avatar URL (custom or default) - WITH FALLBACK for undefined avatars
+  // Cleanup timeout on unmount
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadAvatarUrl() {
-      // If no avatar specified, use duck30.jpeg fallback
-      if (!agentAvatar) {
-        console.log('[ChatMessage] No avatar specified, using duck30.jpeg fallback');
-        if (isMounted) {
-          // Use duck30.jpeg as fallback for agents with undefined avatar
-          if (window.__TAURI__) {
-            setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
-          } else {
-            setAvatarUrl('/duck30.jpeg');
-          }
-        }
-        return;
-      }
-
-      // Check if it's a custom avatar (UUID format)
-      if (isCustomAvatar(agentAvatar)) {
-        try {
-          const url = await getCustomAvatarUrl(agentAvatar);
-          if (isMounted) {
-            setAvatarUrl(url);
-          }
-        } catch (error) {
-          console.error('Failed to load custom avatar in chat:', error);
-          if (isMounted) {
-            // Fallback to duck30.jpeg if custom avatar fails
-            if (window.__TAURI__) {
-              setAvatarUrl(convertFileSrc('/images/ducks/new-avatars/duck30.jpeg', 'asset'));
-            } else {
-              setAvatarUrl('/duck30.jpeg');
-            }
-          }
-        }
-      } else {
-        // Default avatar - need to get full path with prefix
-        if (isMounted) {
-          setAvatarUrl(getAvatarUrl(agentAvatar));
-        }
-      }
-    }
-
-    loadAvatarUrl();
-
     return () => {
-      isMounted = false;
-      // Clean up timeout on unmount
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
       }
     };
-  }, [agentAvatar]);
+  }, []);
 
   // Auto-collapse with delay after hover is removed
   useEffect(() => {
@@ -404,38 +358,20 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
 
   return (
     <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''}`}>
-      <div className="chat-message-avatar">
-        {isUser ? (
-          <div className="avatar-icon user-avatar">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="8" cy="5" r="3"/>
-              <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
-            </svg>
-          </div>
-        ) : (projectName && gitBranch) ? (
-          <img
-            src={cyberducksAvatar}
-            alt="Project Context"
-            className="avatar-icon assistant-avatar-img"
-            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-          />
-        ) : avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={agentName}
-            className="avatar-icon assistant-avatar-img"
-            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-          />
-        ) : (
-          <div className="avatar-icon assistant-avatar">🦆</div>
-        )}
-      </div>
       <div
         className="chat-message-content"
         onMouseEnter={() => isLastUserMessage && isUser && setIsHovering(true)}
         onMouseLeave={() => isLastUserMessage && isUser && setIsHovering(false)}
       >
         <div className="chat-message-header">
+          {/* Agent avatar for assistant messages - always shows (cached) */}
+          {!isUser && (
+            <img
+              src={avatarUrl}
+              alt={agentName}
+              className="chat-message-avatar"
+            />
+          )}
           <span className="chat-message-role">
             {isUser
               ? 'You'
@@ -514,6 +450,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                 message={event}
                 streamMessages={message.events || []}
                 onFilePathClick={onFilePathClick}
+                onOpenInIDE={onOpenInIDE}
                 agentName={agentName}
                 agentAvatar={agentAvatar}
                 workingDirectory={workingDirectory}
@@ -524,20 +461,34 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
                 onOpenImageTab={onOpenImageTab}
                 sessionId={currentSessionId}
                 onRewindFiles={onRewindFiles}
+                pendingPlanApprovalIds={pendingPlanApprovalIds}
+                onPlanApprovalResponse={onPlanApprovalResponse}
               />
             ))}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
             {isUser ? (
-              // User messages: render with mentions support
-              isLastUserMessage && !isExpanded
-                ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 30))
-                : renderTextWithMentions(message.content)
+              // User messages: render with mentions support - always truncated unless expanded
+              <>
+                <span className="user-message-text">
+                  {!isExpanded
+                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 20, 150))
+                    : renderTextWithMentions(message.content)
+                  }
+                </span>
+                <img
+                  src={humanoidAvatar}
+                  alt="User"
+                  className="user-message-avatar"
+                />
+              </>
             ) : (
               // Assistant messages: render with markdown formatting
-              // This ensures proper formatting even when loaded from disk without events
-              <MarkdownText>{message.content}</MarkdownText>
+              // Use same wrapper structure as StreamMessage for consistent padding
+              <div className="assistant-message-text">
+                <MarkdownText>{message.content}</MarkdownText>
+              </div>
             )}
             {isStreaming && <span className="streaming-cursor">▊</span>}
           </div>
@@ -572,9 +523,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onSessionIdClick, a
           </div>
         )}
         {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="chat-message-tools">
+          <div className="chat-message-tools-minimal">
             {message.toolCalls.map((tool) => (
-              <ToolCallCard key={tool.id} tool={tool} onOpenFile={onOpenFile} />
+              <ToolCallMinimal key={tool.id} tool={tool} onOpenFile={onOpenFile} />
             ))}
           </div>
         )}

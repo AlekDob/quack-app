@@ -47,6 +47,7 @@ export default function ClaudeAssetsTabView({
     <div className="claude-assets-tab-view" style={{ height: '100%' }}>
       <ClaudeAssetsPanel
         projectPaths={projectPaths}
+        initialProjectPath={tab.initialProjectPath}
         onOpenFile={onOpenFile}
         onSelectCommand={onSelectCommand}
         onSelectRule={onSelectRule}

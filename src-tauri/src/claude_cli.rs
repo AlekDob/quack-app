@@ -7,6 +7,14 @@ use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::Mutex as TokioMutex;
 use once_cell::sync::Lazy;
 
+// Windows-specific helper to hide console windows
+#[cfg(target_os = "windows")]
+fn hide_console_window(cmd: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
 // =============================================================================
 // ACTIVE PROCESS MANAGEMENT (for bidirectional communication)
 // =============================================================================
@@ -132,6 +140,15 @@ pub enum ClaudeEvent {
         #[serde(flatten)]
         extra: serde_json::Value,
     },
+    // PlanApprovalRequest event - ExitPlanMode requires user approval
+    #[serde(rename = "plan_approval_request")]
+    PlanApprovalRequest {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        plan: serde_json::Value,
+        #[serde(flatten)]
+        extra: serde_json::Value,
+    },
 }
 
 /// Question structure for AskUserQuestion tool
@@ -200,6 +217,23 @@ pub struct AgentConfig {
     pub file_path: String,
 }
 
+/// Team context for Agent Teams mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamContext {
+    pub team_name: String,
+    pub members: Vec<TeamContextMember>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamContextMember {
+    pub name: String,
+    pub role: String,
+    pub communication_style: String,
+    pub is_lead: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCliRequest {
@@ -223,6 +257,8 @@ pub struct ClaudeCliRequest {
     // 🦆 SESSION-FIRST: Frontend session key for routing events to correct chat session
     // This allows parallel conversations - each stream knows where to write its events
     pub session_key: Option<String>,
+    // 🦆 Agent Teams context (team name + members for prompt augmentation)
+    pub team_context: Option<TeamContext>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -270,10 +306,17 @@ fn parse_node_major_version(version_str: &str) -> Option<u32> {
 
 /// Check if Node.js version is compatible (>= MIN_NODE_VERSION)
 fn is_node_version_compatible(node_path: &Path) -> bool {
-    if let Ok(output) = std::process::Command::new(node_path)
-        .arg("--version")
-        .output()
+    let mut cmd = std::process::Command::new(node_path);
+    cmd.arg("--version");
+
+    #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(version_str) = String::from_utf8(output.stdout) {
                 if let Some(major) = parse_node_major_version(&version_str) {
@@ -301,10 +344,12 @@ fn find_system_node_executable() -> Option<PathBuf> {
 
     // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
     // Volta respects the toolchain and version management even from Finder
-    if let Ok(output) = std::process::Command::new("volta")
-        .args(["which", "node"])
-        .output()
-    {
+    let mut cmd = std::process::Command::new("volta");
+    cmd.args(["which", "node"]);
+    #[cfg(target_os = "windows")]
+    hide_console_window(&mut cmd);
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
                 let path = PathBuf::from(path_str.trim());
@@ -316,9 +361,13 @@ fn find_system_node_executable() -> Option<PathBuf> {
         }
     }
 
-    // 🎯 PRIORITY 2: Check Volta directory directly (for Finder launch)
+    // 🎯 PRIORITY 2: Check Volta directory directly (for Finder/Explorer launch)
     if let Some(ref home) = home_dir {
+        #[cfg(target_os = "windows")]
+        let volta_node = home.join(".volta").join("bin").join("node.exe");
+        #[cfg(not(target_os = "windows"))]
         let volta_node = home.join(".volta/bin/node");
+
         if volta_node.exists() && is_node_version_compatible(&volta_node) {
             log::info!("[Node.js] ✅ Found Volta Node.js at: {:?}", volta_node);
             return Some(volta_node);
@@ -326,92 +375,222 @@ fn find_system_node_executable() -> Option<PathBuf> {
     }
 
     // 🎯 PRIORITY 3: Try standard PATH (works for dev mode and Terminal launch)
-    if let Ok(output) = std::process::Command::new("which").arg("node").output() {
-        if output.status.success() {
-            if let Ok(path_str) = String::from_utf8(output.stdout) {
-                let path = PathBuf::from(path_str.trim());
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, use 'where' command instead of 'which'
+        let mut cmd = std::process::Command::new("where");
+        cmd.arg("node");
+        hide_console_window(&mut cmd);
+
+        if let Ok(output) = cmd.output() {
+            if output.status.success() {
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    // 'where' can return multiple lines, take the first one
+                    if let Some(first_line) = path_str.lines().next() {
+                        let path = PathBuf::from(first_line.trim());
+                        if path.exists() && is_node_version_compatible(&path) {
+                            log::info!("[Node.js] ✅ Found via PATH (where): {:?}", path);
+                            return Some(path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(output) = std::process::Command::new("which").arg("node").output() {
+            if output.status.success() {
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    let path = PathBuf::from(path_str.trim());
+                    if path.exists() && is_node_version_compatible(&path) {
+                        log::info!("[Node.js] ✅ Found via PATH: {:?}", path);
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // 🎯 PRIORITY 4: Common installation paths
+    #[cfg(target_os = "windows")]
+    let common_paths: Vec<PathBuf> = vec![
+        PathBuf::from(r"C:\Program Files\nodejs\node.exe"),      // Standard Node.js installer
+        PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"), // 32-bit Node.js
+        PathBuf::from(r"C:\nodejs\node.exe"),                     // Custom install location
+    ];
+
+    #[cfg(not(target_os = "windows"))]
+    let common_paths: Vec<PathBuf> = vec![
+        PathBuf::from("/opt/homebrew/bin/node"),        // Homebrew ARM Mac (most common now)
+        PathBuf::from("/usr/local/bin/node"),           // Homebrew Intel Mac
+        PathBuf::from("/usr/bin/node"),                 // System package managers
+        PathBuf::from("/opt/local/bin/node"),           // MacPorts
+    ];
+
+    for path in &common_paths {
+        if path.exists() && is_node_version_compatible(path) {
+            log::info!("[Node.js] ✅ Found at common path: {:?}", path);
+            return Some(path.clone());
+        }
+    }
+
+    // 🎯 PRIORITY 5: Check NVM installations
+    if let Some(ref home) = home_dir {
+        // Windows: Check nvm-windows at %APPDATA%\nvm
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let nvm_dir = PathBuf::from(&appdata).join("nvm");
+                if nvm_dir.exists() {
+                    log::info!("[Node.js] Found nvm-windows directory, scanning versions...");
+                    if let Ok(entries) = fs::read_dir(&nvm_dir) {
+                        let mut versions: Vec<_> = entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().is_dir())
+                            .filter(|e| e.file_name().to_string_lossy().starts_with('v'))
+                            .collect();
+
+                        // Sort by version number descending
+                        versions.sort_by(|a, b| {
+                            let a_ver = a.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            let b_ver = b.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            b_ver.cmp(&a_ver)
+                        });
+
+                        for entry in versions {
+                            let node_path = entry.path().join("node.exe");
+                            if node_path.exists() && is_node_version_compatible(&node_path) {
+                                log::info!("[Node.js] ✅ Found nvm-windows version: {:?}", node_path);
+                                return Some(node_path);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also check Volta on Windows
+            let volta_node = home.join(".volta").join("bin").join("node.exe");
+            if volta_node.exists() && is_node_version_compatible(&volta_node) {
+                log::info!("[Node.js] ✅ Found Volta Node.js (Windows) at: {:?}", volta_node);
+                return Some(volta_node);
+            }
+        }
+
+        // macOS/Linux: Check NVM at ~/.nvm/versions/node
+        #[cfg(not(target_os = "windows"))]
+        {
+            let nvm_dir = home.join(".nvm/versions/node");
+
+            if nvm_dir.exists() {
+                log::info!("[Node.js] Found NVM directory, scanning versions...");
+                if let Ok(entries) = fs::read_dir(&nvm_dir) {
+                    let mut versions: Vec<_> = entries
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().is_dir())
+                        .collect();
+
+                    // Sort by version number (extract from dir name like "v20.18.0")
+                    versions.sort_by(|a, b| {
+                        let a_ver = a.file_name().to_string_lossy()
+                            .trim_start_matches('v')
+                            .split('.')
+                            .next()
+                            .and_then(|s| s.parse::<u32>().ok())
+                            .unwrap_or(0);
+                        let b_ver = b.file_name().to_string_lossy()
+                            .trim_start_matches('v')
+                            .split('.')
+                            .next()
+                            .and_then(|s| s.parse::<u32>().ok())
+                            .unwrap_or(0);
+                        b_ver.cmp(&a_ver) // Descending order (latest first)
+                    });
+
+                    // Try each version, latest first, but only compatible ones
+                    for entry in versions {
+                        let node_path = entry.path().join("bin/node");
+                        if node_path.exists() && is_node_version_compatible(&node_path) {
+                            log::info!("[Node.js] ✅ Found NVM version: {:?}", node_path);
+                            return Some(node_path);
+                        }
+                    }
+                }
+            }
+
+            // 🎯 PRIORITY 6: Check fnm installations (Unix only)
+            // fnm stores versions in ~/.local/share/fnm/node-versions/ or ~/.fnm/node-versions/
+            let fnm_dirs = vec![
+                home.join(".local/share/fnm/node-versions"),
+                home.join(".fnm/node-versions"),
+            ];
+
+            for fnm_dir in &fnm_dirs {
+                if fnm_dir.exists() {
+                    log::info!("[Node.js] Found fnm directory at: {:?}, scanning versions...", fnm_dir);
+                    if let Ok(entries) = fs::read_dir(fnm_dir) {
+                        let mut versions: Vec<_> = entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().is_dir())
+                            .collect();
+
+                        // Sort by version number descending
+                        versions.sort_by(|a, b| {
+                            let a_ver = a.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            let b_ver = b.file_name().to_string_lossy()
+                                .trim_start_matches('v')
+                                .split('.')
+                                .next()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .unwrap_or(0);
+                            b_ver.cmp(&a_ver)
+                        });
+
+                        for entry in versions {
+                            // fnm uses installation/bin/node inside each version dir
+                            let node_path = entry.path().join("installation/bin/node");
+                            if node_path.exists() && is_node_version_compatible(&node_path) {
+                                log::info!("[Node.js] ✅ Found fnm version: {:?}", node_path);
+                                return Some(node_path);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check user-specific paths (Unix only)
+            let user_paths = vec![
+                home.join(".local/bin/node"),
+                home.join("bin/node"),
+            ];
+
+            for path in user_paths {
                 if path.exists() && is_node_version_compatible(&path) {
-                    log::info!("[Node.js] ✅ Found via PATH: {:?}", path);
+                    log::info!("[Node.js] ✅ Found in user directory: {:?}", path);
                     return Some(path);
                 }
             }
         }
     }
 
-    // 🎯 PRIORITY 4: Common installation paths (macOS/Linux)
-    let common_paths = vec![
-        "/opt/homebrew/bin/node",        // Homebrew ARM Mac (most common now)
-        "/usr/local/bin/node",           // Homebrew Intel Mac
-        "/usr/bin/node",                 // System package managers
-        "/opt/local/bin/node",           // MacPorts
-    ];
-
-    for path_str in &common_paths {
-        let path = PathBuf::from(path_str);
-        if path.exists() && is_node_version_compatible(&path) {
-            log::info!("[Node.js] ✅ Found at common path: {:?}", path);
-            return Some(path);
-        }
-    }
-
-    // 🎯 PRIORITY 5: Check NVM installations (~/.nvm/versions/node/*/bin/node)
-    // Important: This works even when NVM is not initialized (Finder launch)
-    if let Some(ref home) = home_dir {
-        let nvm_dir = home.join(".nvm/versions/node");
-
-        if nvm_dir.exists() {
-            log::info!("[Node.js] Found NVM directory, scanning versions...");
-            if let Ok(entries) = fs::read_dir(&nvm_dir) {
-                // Get all version directories
-                let mut versions: Vec<_> = entries
-                    .filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_dir())
-                    .collect();
-
-                // Sort by version number (extract from dir name like "v20.18.0")
-                versions.sort_by(|a, b| {
-                    let a_ver = a.file_name().to_string_lossy()
-                        .trim_start_matches('v')
-                        .split('.')
-                        .next()
-                        .and_then(|s| s.parse::<u32>().ok())
-                        .unwrap_or(0);
-                    let b_ver = b.file_name().to_string_lossy()
-                        .trim_start_matches('v')
-                        .split('.')
-                        .next()
-                        .and_then(|s| s.parse::<u32>().ok())
-                        .unwrap_or(0);
-                    b_ver.cmp(&a_ver) // Descending order (latest first)
-                });
-
-                // Try each version, latest first, but only compatible ones
-                for entry in versions {
-                    let node_path = entry.path().join("bin/node");
-                    if node_path.exists() && is_node_version_compatible(&node_path) {
-                        log::info!("[Node.js] ✅ Found NVM version: {:?}", node_path);
-                        return Some(node_path);
-                    }
-                }
-            }
-        }
-
-        // Check user-specific paths
-        let user_paths = vec![
-            home.join(".local/bin/node"),
-            home.join("bin/node"),
-        ];
-
-        for path in user_paths {
-            if path.exists() && is_node_version_compatible(&path) {
-                log::info!("[Node.js] ✅ Found in user directory: {:?}", path);
-                return Some(path);
-            }
-        }
-    }
-
     log::warn!("[Node.js] ❌ System Node.js executable not found in any common location");
-    log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, user directories");
+    log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, fnm, user directories");
     log::warn!("[Node.js] Minimum required version: Node.js {}", MIN_NODE_VERSION);
     None
 }
@@ -455,20 +634,23 @@ pub struct ToolDiffEvent {
 pub fn find_claude_cli_path() -> Option<String> {
     // Strategy: Search in order of preference
     // 1. Try Volta's 'which claude' first (respects Volta toolchain)
-    // 2. Common system paths (Homebrew, MacPorts, system-wide)
-    // 3. User-specific paths (~/.local/bin, ~/bin)
-    // 4. NVM paths (~/.nvm/versions/node/*/bin/claude)
-    // 5. Volta paths (~/.volta/bin/claude)
-    // 6. Fallback to system 'which claude'
+    // 2. Try 'where claude' on Windows or 'which claude' on Unix (system PATH)
+    // 3. Common system paths (Homebrew, MacPorts, system-wide)
+    // 4. User-specific paths (~/.local/bin, ~/bin)
+    // 5. NVM paths (~/.nvm/versions/node/*/bin/claude)
+    // 6. Volta paths (~/.volta/bin/claude)
+    // 7. Windows npm global paths (%APPDATA%\npm, %ProgramFiles%\nodejs)
 
     log::info!("[Claude CLI] Starting search for Claude executable...");
 
     // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
     // This respects Volta's toolchain and version management
-    if let Ok(output) = std::process::Command::new("volta")
-        .args(["which", "claude"])
-        .output()
-    {
+    let mut cmd = std::process::Command::new("volta");
+    cmd.args(["which", "claude"]);
+    #[cfg(target_os = "windows")]
+    hide_console_window(&mut cmd);
+
+    if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
                 let path = path_str.trim();
@@ -480,45 +662,144 @@ pub fn find_claude_cli_path() -> Option<String> {
         }
     }
 
-    let mut search_paths: Vec<String> = vec![
-        // Standard package manager paths
-        "/opt/homebrew/bin/claude".to_string(),         // Homebrew on Apple Silicon
-        "/usr/local/bin/claude".to_string(),            // Homebrew on Intel Mac
-        "/opt/local/bin/claude".to_string(),            // MacPorts
-        "/usr/bin/claude".to_string(),                  // System-wide install
-    ];
+    // 🎯 PRIORITY 2: Try system PATH via 'where' (Windows) or 'which' (Unix)
+    #[cfg(target_os = "windows")]
+    {
+        log::info!("[Claude CLI] Trying 'where claude' (Windows)...");
+        let mut cmd = std::process::Command::new("where");
+        cmd.arg("claude");
+        hide_console_window(&mut cmd);
 
-    // Add user-specific paths
-    if let Ok(home) = std::env::var("HOME") {
-        // Volta-managed global binaries (high priority)
-        search_paths.push(format!("{}/.volta/bin/claude", home));
-
-        search_paths.push(format!("{}/.local/bin/claude", home));
-        search_paths.push(format!("{}/bin/claude", home));
-
-        // Search in NVM directories
-        let nvm_base = format!("{}/.nvm/versions/node", home);
-        if let Ok(entries) = fs::read_dir(&nvm_base) {
-            for entry in entries.filter_map(Result::ok) {
-                let node_version_path = entry.path();
-                if node_version_path.is_dir() {
-                    let claude_path = node_version_path.join("bin/claude");
-                    if let Some(path_str) = claude_path.to_str() {
-                        search_paths.push(path_str.to_string());
+        if let Ok(output) = cmd.output() {
+            if output.status.success() {
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    // 'where' can return multiple lines, take the first one
+                    if let Some(first_line) = path_str.lines().next() {
+                        let path = first_line.trim();
+                        if !path.is_empty() && Path::new(path).exists() {
+                            log::info!("[Claude CLI] ✅ Found via 'where' at: {}", path);
+                            return Some(path.to_string());
+                        }
                     }
                 }
             }
         }
+    }
 
-        // Search in Volta toolchain directories
-        let volta_base = format!("{}/.volta/tools/image/claude", home);
-        if let Ok(entries) = fs::read_dir(&volta_base) {
-            for entry in entries.filter_map(Result::ok) {
-                let version_path = entry.path();
-                if version_path.is_dir() {
-                    let claude_path = version_path.join("bin/claude");
-                    if let Some(path_str) = claude_path.to_str() {
-                        search_paths.push(path_str.to_string());
+    #[cfg(not(target_os = "windows"))]
+    {
+        log::info!("[Claude CLI] Trying 'which claude' (Unix)...");
+        let mut cmd = std::process::Command::new("which");
+        cmd.arg("claude");
+
+        if let Ok(output) = cmd.output() {
+            if output.status.success() {
+                if let Ok(path) = String::from_utf8(output.stdout) {
+                    let path = path.trim();
+                    if !path.is_empty() && Path::new(path).exists() {
+                        log::info!("[Claude CLI] ✅ Found via 'which' at: {}", path);
+                        return Some(path.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 🎯 PRIORITY 3: Build search paths based on platform
+    let mut search_paths: Vec<String> = vec![];
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Unix/macOS paths
+        search_paths.extend(vec![
+            "/opt/homebrew/bin/claude".to_string(),         // Homebrew on Apple Silicon
+            "/usr/local/bin/claude".to_string(),            // Homebrew on Intel Mac
+            "/opt/local/bin/claude".to_string(),            // MacPorts
+            "/usr/bin/claude".to_string(),                  // System-wide install
+        ]);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows npm global paths
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            search_paths.push(format!("{}\\npm\\claude.cmd", appdata));
+            search_paths.push(format!("{}\\npm\\claude", appdata));
+        }
+
+        if let Ok(programfiles) = std::env::var("ProgramFiles") {
+            search_paths.push(format!("{}\\nodejs\\claude.cmd", programfiles));
+            search_paths.push(format!("{}\\nodejs\\claude", programfiles));
+        }
+
+        // Add common Windows paths
+        search_paths.extend(vec![
+            r"C:\Program Files\nodejs\claude.cmd".to_string(),
+            r"C:\Program Files (x86)\nodejs\claude.cmd".to_string(),
+        ]);
+    }
+
+    // Add user-specific paths (cross-platform)
+    if let Ok(home) = std::env::var("HOME") {
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Volta-managed global binaries (high priority)
+            search_paths.push(format!("{}/.volta/bin/claude", home));
+
+            search_paths.push(format!("{}/.local/bin/claude", home));
+            search_paths.push(format!("{}/bin/claude", home));
+
+            // Search in NVM directories
+            let nvm_base = format!("{}/.nvm/versions/node", home);
+            if let Ok(entries) = fs::read_dir(&nvm_base) {
+                for entry in entries.filter_map(Result::ok) {
+                    let node_version_path = entry.path();
+                    if node_version_path.is_dir() {
+                        let claude_path = node_version_path.join("bin/claude");
+                        if let Some(path_str) = claude_path.to_str() {
+                            search_paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+
+            // Search in Volta toolchain directories
+            let volta_base = format!("{}/.volta/tools/image/claude", home);
+            if let Ok(entries) = fs::read_dir(&volta_base) {
+                for entry in entries.filter_map(Result::ok) {
+                    let version_path = entry.path();
+                    if version_path.is_dir() {
+                        let claude_path = version_path.join("bin/claude");
+                        if let Some(path_str) = claude_path.to_str() {
+                            search_paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows-specific: Add USERPROFILE paths
+        if let Ok(userprofile) = std::env::var("USERPROFILE") {
+            search_paths.push(format!("{}\\AppData\\Roaming\\npm\\claude.cmd", userprofile));
+            search_paths.push(format!("{}\\AppData\\Roaming\\npm\\claude", userprofile));
+        }
+
+        // Windows NVM paths
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let nvm_dir = PathBuf::from(&appdata).join("nvm");
+            if nvm_dir.exists() {
+                if let Ok(entries) = fs::read_dir(&nvm_dir) {
+                    for entry in entries.filter_map(Result::ok) {
+                        let version_path = entry.path();
+                        if version_path.is_dir() {
+                            let claude_cmd = version_path.join("claude.cmd");
+                            if let Some(path_str) = claude_cmd.to_str() {
+                                search_paths.push(path_str.to_string());
+                            }
+                        }
                     }
                 }
             }
@@ -531,9 +812,12 @@ pub fn find_claude_cli_path() -> Option<String> {
         if Path::new(path).exists() {
             // Verify it's executable by running --version
             log::debug!("[Claude CLI] Testing path: {}", path);
-            let output = std::process::Command::new(path)
-                .arg("--version")
-                .output();
+            let mut cmd = std::process::Command::new(path);
+            cmd.arg("--version");
+            #[cfg(target_os = "windows")]
+            hide_console_window(&mut cmd);
+
+            let output = cmd.output();
 
             if let Ok(output) = output {
                 if output.status.success() {
@@ -542,23 +826,6 @@ pub fn find_claude_cli_path() -> Option<String> {
                     } else {
                         log::info!("[Claude CLI] ✅ Found at: {}", path);
                     }
-                    return Some(path.to_string());
-                }
-            }
-        }
-    }
-
-    // Fallback: Try using 'which' to find claude in PATH
-    log::info!("[Claude CLI] Trying 'which claude' as fallback...");
-    if let Ok(output) = std::process::Command::new("which")
-        .arg("claude")
-        .output()
-    {
-        if output.status.success() {
-            if let Ok(path) = String::from_utf8(output.stdout) {
-                let path = path.trim();
-                if !path.is_empty() && Path::new(path).exists() {
-                    log::info!("[Claude CLI] ✅ Found via 'which' at: {}", path);
                     return Some(path.to_string());
                 }
             }
@@ -696,6 +963,14 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = command
         .spawn()
@@ -887,6 +1162,14 @@ pub async fn send_message_via_cli_streaming(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
     let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to spawn claude command: {}", e))?;
@@ -984,6 +1267,7 @@ pub async fn send_message_via_sdk_streaming(
         setting_sources, // ✅ Extract setting_sources to control prompt length
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
         session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
+        team_context, // 🦆 Agent Teams context
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
@@ -1063,6 +1347,12 @@ pub async fn send_message_via_sdk_streaming(
     // Add agents if provided
     if let Some(agent_list) = agents {
         config["agents"] = serde_json::json!(agent_list);
+    }
+
+    // Add teamContext if provided (Agent Teams mode)
+    if let Some(tc) = &team_context {
+        config["teamContext"] = serde_json::json!(tc);
+        log::info!("[SDK] Adding teamContext: team={}, {} members", tc.team_name, tc.members.len());
     }
 
     // Add attachments if provided (for image support)
@@ -1325,8 +1615,22 @@ pub async fn send_message_via_sdk_streaming(
         command.env("CLAUDE_CODE_TASK_LIST_ID", &task_list_id);
     }
 
+    // Always propagate Agent Teams env var so TeammateTool is available in SDK
+    // The user enables this via Settings toggle → stored in ~/.claude/settings.json
+    // Without this, F8() in the SDK returns false and TeammateTool is not registered
+    command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+    log::info!("[SDK] Agent Teams mode enabled via env var");
+
     log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);
     log::info!("[SDK DEBUG] Working directory: {:?}", node_sdk_dir);
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = command
         .spawn()
@@ -1348,13 +1652,24 @@ pub async fn send_message_via_sdk_streaming(
         .ok_or("Failed to capture stdout".to_string())?;
     let mut stdout_reader = BufReader::new(stdout).lines();
 
-    // Capture stderr for error reporting
+    // Capture stderr for logging (Node.js SDK uses stderr for debug/info messages
+    // since stdout is reserved for JSON data in stdio MCP transport)
     let stderr_handle = if let Some(stderr) = child.stderr.take() {
         Some(tokio::spawn(async move {
             let mut stderr_reader = BufReader::new(stderr).lines();
             let mut stderr_lines = Vec::new();
             while let Ok(Some(line)) = stderr_reader.next_line().await {
-                log::error!("[Node.js SDK stderr] {}", line);
+                // Classify log level based on content
+                let line_upper = line.to_uppercase();
+                if line_upper.contains("[DEBUG]") || line_upper.contains("[MCP]") || line_upper.contains("[AUTH]") || line_upper.contains("[IDE-MCP]") {
+                    log::debug!("[Node.js SDK] {}", line);
+                } else if line_upper.contains("[ERROR]") || line_upper.contains("ERROR:") || line_upper.contains("FATAL") {
+                    log::error!("[Node.js SDK] {}", line);
+                } else if line_upper.contains("⚠") || line_upper.contains("[WARN]") || line_upper.contains("WARNING") {
+                    log::warn!("[Node.js SDK] {}", line);
+                } else {
+                    log::info!("[Node.js SDK] {}", line);
+                }
                 stderr_lines.push(line);
             }
             stderr_lines
@@ -1442,6 +1757,26 @@ pub async fn send_message_via_sdk_streaming(
                             }
                             Err(e) => {
                                 log::error!("[SDK] ❌ Failed to emit ask-user-question event (global): {:?}", e);
+                            }
+                        }
+                    }
+                    ClaudeEvent::PlanApprovalRequest { request_id, plan, .. } => {
+                        log::info!("[SDK] 📋 PlanApprovalRequest event: requestId={}, sessionKey={}", request_id, event_session_key);
+
+                        let payload = serde_json::json!({
+                            "requestId": request_id,
+                            "plan": plan,
+                            "agentId": agent_id,
+                            "sessionKey": event_session_key
+                        });
+
+                        // Emit to global listener
+                        match app.emit("plan-approval-request", payload) {
+                            Ok(_) => {
+                                log::info!("[SDK] 📋 Emitted plan-approval-request event to frontend");
+                            }
+                            Err(e) => {
+                                log::error!("[SDK] ❌ Failed to emit plan-approval-request event: {:?}", e);
                             }
                         }
                     }
@@ -1593,6 +1928,14 @@ pub async fn send_tool_result_to_sdk(
         .current_dir(working_directory.as_deref().unwrap_or("."))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let child = command.spawn()
         .map_err(|e| format!("Failed to spawn Node.js for tool result: {}", e))?;
@@ -1766,12 +2109,21 @@ pub async fn rewind_files(
     log::info!("[SDK REWIND] Node path: {:?}", node_path);
 
     // Spawn the rewind process
-    let mut child = Command::new(&node_path)
-        .arg(&script_path)
+    let mut cmd = Command::new(&node_path);
+    cmd.arg(&script_path)
         .arg(&config_str)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to spawn rewind process: {}", e))?;
 
     let stdout = child.stdout.take()

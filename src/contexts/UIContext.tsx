@@ -210,10 +210,11 @@ export const UIProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Settings
   const [quackSoundEnabled, setQuackSoundEnabled] = useState(() => {
+    // Default to true (sound ON by default)
     const stored = localStorage.getItem('quackSoundEnabled');
-    return stored !== null ? stored === 'true' : true;
+    return stored !== 'false';
   });
-  const [currentBackground, setCurrentBackground] = useState('quack-agent.jpeg');
+  const [currentBackground, setCurrentBackground] = useState('transparent');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('collapsedGroups');

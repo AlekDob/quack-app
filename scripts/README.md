@@ -2,7 +2,65 @@
 
 Helper scripts for development and build processes.
 
-## 🚀 Development Scripts
+## 🪟 Windows Scripts
+
+### `setup-windows.ps1`
+
+**Purpose**: Complete Windows development environment setup
+
+**What it does**:
+1. Installs Git (via winget)
+2. Installs Node.js LTS (via winget)
+3. Verifies npx is in PATH (required for MCP servers)
+4. Installs Rust (via rustup)
+5. Installs Visual Studio Build Tools
+6. Installs Tauri CLI
+7. Installs npm dependencies
+
+**Usage**:
+```powershell
+# Run from project root
+powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1
+```
+
+**Requirements**:
+- Windows 10/11
+- winget (Windows Package Manager) - pre-installed on modern Windows
+
+### `verify-setup.ps1`
+
+**Purpose**: Verify all required tools are installed correctly
+
+**Usage**:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/verify-setup.ps1
+```
+
+### `dev.ps1`
+
+**Purpose**: Start development server on Windows
+
+**Usage**:
+```powershell
+.\scripts\dev.ps1
+# or
+npm run dev:win
+```
+
+### `build-windows.ps1`
+
+**Purpose**: Build production release for Windows
+
+**Usage**:
+```powershell
+.\scripts\build-windows.ps1
+# or
+npm run tauri:build:win
+```
+
+---
+
+## 🍎 macOS/Linux Scripts
 
 ### `dev.sh`
 
@@ -78,12 +136,38 @@ echo "✅ Done!"
 
 ## 🐛 Troubleshooting
 
-### "Permission denied" error
+### Windows: "npx not found" (MCP servers fail)
+
+This is usually a PATH issue. The Quack app now uses `cmd /c npx` internally to work around this, but you should still verify:
+
+```powershell
+# Check if npx is available
+npx --version
+
+# If not, restart your terminal after Node.js installation
+# Or manually add Node.js to PATH
+```
+
+### Windows: "Permission denied" running scripts
+
+```powershell
+# Allow script execution
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Windows: IDE not detected
+
+Make sure your IDE is installed in a standard location:
+- VS Code: `%LOCALAPPDATA%\Programs\Microsoft VS Code\`
+- Cursor: `%LOCALAPPDATA%\Programs\cursor\`
+- JetBrains IDEs: `%ProgramFiles%\JetBrains\`
+
+### macOS/Linux: "Permission denied" error
 ```bash
 chmod +x scripts/your-script.sh
 ```
 
-### "cargo: command not found"
+### macOS/Linux: "cargo: command not found"
 The `dev.sh` script should fix this. If it persists, check:
 ```bash
 # Verify Cargo is installed
@@ -93,7 +177,7 @@ ls ~/.cargo/bin/cargo
 export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
-### "Node version too old"
+### macOS/Linux: "Node version too old"
 The `dev.sh` script uses Node v22.21.0. Verify:
 ```bash
 # Check NVM installation

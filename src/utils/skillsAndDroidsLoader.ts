@@ -48,7 +48,8 @@ export async function loadAvailableSkills(projectPath: string): Promise<SkillMet
     // Convert SkillInfo to SkillMetadata format
     const skills: SkillMetadata[] = skillsList.map((skill) => ({
       id: `${skill.scope}-${skill.name}`,
-      name: skill.name.replace(/-/g, ' '), // Format name nicely
+      name: skill.name,                        // Keep original name with hyphens for matching
+      displayName: skill.name.replace(/-/g, ' '), // Format name nicely for display
       description: skill.description || 'No description available',
       path: skill.file_path, // SkillInfo uses file_path, not path
       isGlobal: skill.scope === 'global'
