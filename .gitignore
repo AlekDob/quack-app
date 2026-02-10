@@ -32,3 +32,8 @@ dist-ssr
 src-tauri/binaries/
 .quack/active-agents.json
 /.quack/agent-personalities
+CLAUDE.md
+.quack/active-agents.json
+.quack/active-agents.json
+/.claude
+.mcp.json
