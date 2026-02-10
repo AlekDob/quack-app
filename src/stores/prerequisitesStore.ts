@@ -39,10 +39,12 @@ export interface PrerequisitesState {
 }
 
 // =============================================================================
-// Test Mode: simulate all prerequisites as missing
+// Test Modes
 // =============================================================================
 
-const IS_TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
+// VITE_TEST_MODE: shows prerequisites dialog (real checks)
+// VITE_TEST_PREREQUISITES: simulates all prerequisites as missing
+const SIMULATE_MISSING = import.meta.env.VITE_TEST_PREREQUISITES === 'true';
 
 const MOCK_PREREQUISITES: PrerequisitesCheck = {
   git: { name: 'Git', installed: false, version: null, download_url: 'https://git-scm.com/downloads' },
@@ -71,8 +73,8 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
       checkPrerequisites: async () => {
         set({ isChecking: true });
 
-        // Test mode: simulate everything as not installed
-        if (IS_TEST_MODE) {
+        // Simulate missing prerequisites for install flow testing
+        if (SIMULATE_MISSING) {
           console.warn('[Prerequisites] TEST MODE: simulating all prerequisites as missing');
           set({
             prerequisites: MOCK_PREREQUISITES,
