@@ -953,6 +953,11 @@ function AppContent() {
   // This prevents the bug where events are emitted before the listener is set up
   const activeListenersRef = useRef<Map<string, () => void>>(new Map());
 
+  // 🦆 FIX: Track in-flight listener registrations to prevent duplicate listen() calls
+  // Without this, Multi-Listener and Pre-warm can both call listen() for the same agentId
+  // before either resolves, causing Tauri's "listeners[eventId].handlerId" crash
+  const pendingListenersRef = useRef<Set<string>>(new Set());
+
   // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
   // This fixes the intermittent bug where Task/droid widgets don't appear because
   // the event arrives before React's setState has created the streaming message
@@ -1775,10 +1780,11 @@ function AppContent() {
   // CRITICAL: Maintain persistent listeners for ALL active agents, not just the active one
   // This prevents stream interruption when switching between agents during streaming
 
-  // 🦆 RACE CONDITION FIX: Only track agent IDs, not full chatSessions
-  // This prevents rapid listener teardown/setup during streaming which causes
-  // "listeners[eventId].handlerId" errors from Tauri's event system
-  const activeAgentIdsKey = Array.from(chatSessions.keys()).sort().join(',');
+  // 🦆 FIX: Use terminal IDs (real agents) instead of chatSessions keys
+  // chatSessions keys include session IDs (session-xxx) which don't correspond to
+  // Tauri event channels (claude-event:{agentId}). The backend emits on agent IDs only.
+  // This was causing hundreds of useless listeners and "Listener already exists" warnings.
+  const activeAgentIdsKey = terminals.map(t => t.id).sort().join(',');
 
   useEffect(() => {
     if (!tauriAvailable) return;
@@ -1789,14 +1795,14 @@ function AppContent() {
     // Track which listeners we're setting up in THIS effect run
     const newlyCreatedListeners = new Set<string>();
 
-    // Setup listener for each active agent (only if not already active)
+    // Setup listener for each active agent (only if not already active or pending)
     const setupPromises = activeAgentIds.map(async (agentId) => {
-      // 🦆 RACE FIX: Skip if listener already exists (created by ensureListenerReady)
-      if (activeListenersRef.current.has(agentId)) {
-        console.log(`[Multi-Listener] Listener already exists for agent: ${agentId}`);
+      // Skip if listener already exists or is being registered
+      if (activeListenersRef.current.has(agentId) || pendingListenersRef.current.has(agentId)) {
         return;
       }
 
+      pendingListenersRef.current.add(agentId);
       const eventName = `claude-event:${agentId}`;
 
       try {
@@ -1929,11 +1935,11 @@ function AppContent() {
           }
         });
 
-        // 🦆 RACE FIX: Store in shared ref instead of local map
         activeListenersRef.current.set(agentId, unlisten);
+        pendingListenersRef.current.delete(agentId);
         newlyCreatedListeners.add(agentId);
-        console.log(`[Multi-Listener] Listener registered for agent: ${agentId}`);
       } catch (error) {
+        pendingListenersRef.current.delete(agentId);
         console.error(`[Multi-Listener] Failed to setup listener for ${agentId}:`, error);
       }
     });
@@ -1966,27 +1972,39 @@ function AppContent() {
   useEffect(() => {
     if (!tauriAvailable || !activeId) return;
 
-    // If listener already exists, nothing to do
-    if (activeListenersRef.current.has(activeId)) {
-      console.log(`[Pre-warm] Listener already exists for activeId: ${activeId}`);
+    // Skip if listener already exists or is being registered by another effect
+    if (activeListenersRef.current.has(activeId) || pendingListenersRef.current.has(activeId)) {
       return;
     }
 
-    // Setup listener for the active agent NOW (before any message is sent)
-    const eventName = `claude-event:${activeId}`;
-    console.log(`[Pre-warm] Setting up listener for activeId: ${activeId}`);
+    let cancelled = false;
+    const capturedId = activeId;
+    pendingListenersRef.current.add(capturedId);
+
+    const eventName = `claude-event:${capturedId}`;
 
     // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
     // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
     listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
       const { sessionKey, event: claudeEvent } = event.payload;
-      handleClaudeEvent(activeId, claudeEvent, 'Pre-warm', sessionKey);
+      handleClaudeEvent(capturedId, claudeEvent, 'Pre-warm', sessionKey);
     }).then((unlisten) => {
-      activeListenersRef.current.set(activeId, unlisten);
-      console.log(`[Pre-warm] Listener ready for activeId: ${activeId}`);
+      pendingListenersRef.current.delete(capturedId);
+      if (cancelled) {
+        void unlisten().catch(() => undefined);
+        return;
+      }
+      activeListenersRef.current.set(capturedId, unlisten);
     }).catch((error) => {
-      console.error(`[Pre-warm] Failed for ${activeId}:`, error);
+      pendingListenersRef.current.delete(capturedId);
+      if (!cancelled) {
+        console.error(`[Pre-warm] Failed for ${capturedId}:`, error);
+      }
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [tauriAvailable, activeId]);
 
   // 🦆 SESSION PERSISTENCE: REMOVED - Agents always start fresh
@@ -1996,15 +2014,13 @@ function AppContent() {
   // 🦆 RACE CONDITION FIX: Helper function to ensure listener is ready for an agent
   // This prevents events being emitted before the listener is set up
   const ensureListenerReady = useCallback(async (agentId: string) => {
-    // If listener already exists, we're good
-    if (activeListenersRef.current.has(agentId)) {
-      console.log(`[Listener] Already active for agent: ${agentId}`);
+    // Skip if listener already exists or is being registered
+    if (activeListenersRef.current.has(agentId) || pendingListenersRef.current.has(agentId)) {
       return;
     }
 
-    // Set up a new listener for this agent
+    pendingListenersRef.current.add(agentId);
     const eventName = `claude-event:${agentId}`;
-    console.log(`[Listener] Setting up listener for agent: ${agentId}`);
 
     try {
       // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
@@ -2052,10 +2068,10 @@ function AppContent() {
         }
       });
 
-      // Store the unlisten function
       activeListenersRef.current.set(agentId, unlisten);
-      console.log(`[Listener] Ready for agent: ${agentId}`);
+      pendingListenersRef.current.delete(agentId);
     } catch (error) {
+      pendingListenersRef.current.delete(agentId);
       console.error(`[Listener] Failed to setup for ${agentId}:`, error);
     }
   }, [handleClaudeEvent]);
@@ -4015,9 +4031,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log(`[ChatView] activeTaskId is set (${activeTaskId}), returning empty for currentAgentMessages`);
       return [];
     }
-    const messages = chatKey ? (chatSessions.get(chatKey) ?? []) : [];
-    console.log(`[ChatView] Loading messages for chatKey="${chatKey}" (sessionId: ${activeSessionId}): ${messages.length} messages`);
-    return messages;
+    return chatKey ? (chatSessions.get(chatKey) ?? []) : [];
   }, [chatKey, chatSessions, activeSessionId, activeTaskId]);
 
   const currentAgentLoading = useMemo(() => {
@@ -4159,6 +4173,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [chatSessions, chatLoadingMap, terminals, isPipOpen, updatePipAgents]);
 
   // Listen for click-to-focus events from PiP window
+  // Use ref to avoid teardown/setup on every terminals change (prevents Tauri listener race condition)
+  terminalsRef.current = terminals;
+
   useEffect(() => {
     if (!tauriAvailable) return;
 
@@ -4166,22 +4183,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const { agentId } = event.payload;
       console.log('🦆 PiP agent clicked, focusing on agent:', agentId);
 
-      // Find the terminal for this agent
-      const terminal = terminals.find((t) => t.id === agentId);
+      // Use ref to get current terminals without re-registering listener
+      const terminal = terminalsRef.current.find((t) => t.id === agentId);
       if (terminal) {
-        // Switch to this terminal
         setActiveId(terminal.id);
 
-        // Focus the main window
         const window = getCurrentWindow();
         await window.setFocus();
       }
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten.then((fn) => fn()).catch(() => undefined);
     };
-  }, [tauriAvailable, terminals]);
+  }, [tauriAvailable]);
 
   // Auto-show/hide PiP based on main window focus
   useEffect(() => {
@@ -4203,7 +4218,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      unlistenFocus.then((fn) => fn());
+      unlistenFocus.then((fn) => fn()).catch(() => undefined);
     };
   }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
@@ -4794,24 +4809,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     removedIds.forEach((terminalId) => {
       const unlisten = askUserListenersRef.current.get(terminalId);
       if (unlisten) {
-        try {
-          unlisten();
-        } catch (e) {
-          // Ignore errors during cleanup
-        }
+        void unlisten().catch(() => undefined);
         askUserListenersRef.current.delete(terminalId);
-        console.log(`[AskUser] Listener removed for terminal: ${terminalId}`);
       }
     });
 
     // Cleanup on unmount
     return () => {
-      askUserListenersRef.current.forEach((unlisten, id) => {
-        try {
-          unlisten();
-        } catch (e) {
-          // Ignore errors during cleanup
-        }
+      askUserListenersRef.current.forEach((unlisten) => {
+        void unlisten().catch(() => undefined);
       });
       askUserListenersRef.current.clear();
     };
@@ -5971,8 +5977,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      void unlistenInstalled.then((fn) => fn());
-      void unlistenUninstalled.then((fn) => fn());
+      void unlistenInstalled.then((fn) => fn()).catch(() => undefined);
+      void unlistenUninstalled.then((fn) => fn()).catch(() => undefined);
     };
   }, [loadAgents, tauriAvailable]);
 
@@ -6269,7 +6275,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      void unlistenPromise.then((fn) => fn());
+      void unlistenPromise.then((fn) => fn()).catch(() => undefined);
     };
   }, [tauriAvailable]);
 
@@ -6727,7 +6733,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     return () => {
       if (unlisten) {
-        unlisten();
+        void unlisten().catch(() => undefined);
       }
     };
   }, [markTerminalIdle, tauriAvailable]);
@@ -8133,7 +8139,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      unlistenPromise.then(unlisten => unlisten());
+      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
   }, [activeProjects, updateTerminalWindowProjects]);
 
@@ -9783,15 +9789,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Handler to open .mcp.json file in Monaco editor
   const handleOpenMcpConfig = useCallback(
-    (repoPath: string) => {
-      // Construct the full path to .mcp.json
-      const mcpFilePath = `${repoPath}/.mcp.json`;
-      const fileName = '.mcp.json';
+    (filePath: string) => {
+      // filePath is the full path to .mcp.json (project or global)
+      const fileName = filePath.split('/').pop() || '.mcp.json';
 
       // Create a fake DirectoryEntry to open the file
       const fakeEntry: DirectoryEntry = {
         name: fileName,
-        path: mcpFilePath,
+        path: filePath,
         is_dir: false,
         is_symlink: false,
       };
@@ -10504,9 +10509,8 @@ You have access to all Bash tools to execute git commands like:
             // 🦆 Clean up listener for this agent
             const unlisten = activeListenersRef.current.get(chatId);
             if (unlisten) {
-              unlisten();
+              void unlisten().catch(() => undefined);
               activeListenersRef.current.delete(chatId);
-              console.log(`[onDeleteAgentChat] Cleaned up listener for agent: ${chatId}`);
             }
             // Remove from chatSessions map
             setChatSessions(prev => {
@@ -11850,6 +11854,7 @@ You have access to all Bash tools to execute git commands like:
             <QuackStoreDrawer
               onClose={() => setShowStoreDrawer(false)}
               onRefresh={handleMarketplaceRefresh}
+              activeProjects={activeProjects}
             />
           </div>
         </div>
