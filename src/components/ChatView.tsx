@@ -137,6 +137,8 @@ interface ChatViewProps {
   // Plan approval
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  // Teammate stream drill-down
+  onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
 
 export default function ChatView({
@@ -220,6 +222,7 @@ export default function ChatView({
   onOpenPersonality,
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
+  onTeammateDrillDown,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -677,6 +680,7 @@ export default function ChatView({
         onOpenPersonality={onOpenPersonality}
         pendingPlanApprovalIds={pendingPlanApprovalIds}
         onPlanApprovalResponse={onPlanApprovalResponse}
+        onTeammateDrillDown={onTeammateDrillDown}
       />
       {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
         <EditSummaryBar

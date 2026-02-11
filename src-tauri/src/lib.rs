@@ -49,6 +49,7 @@ mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
 mod git_watcher; // 🔀 Git branch change watcher
+mod teammate_watcher; // 👥 Teammate session stream watcher
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -574,6 +575,7 @@ pub fn run() {
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
         .manage(git_watcher::GitBranchWatcherManager::new()) // Register git branch watcher manager
+        .manage(teammate_watcher::TeammateSessionWatcher::new()) // Register teammate session watcher
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -1142,6 +1144,10 @@ pub fn run() {
             git_watcher::start_git_branch_watcher,
             git_watcher::stop_git_branch_watcher,
             git_watcher::stop_all_git_branch_watchers,
+            // 👥 Teammate Session Watcher commands
+            teammate_watcher::start_teammate_watcher,
+            teammate_watcher::stop_teammate_watcher,
+            teammate_watcher::read_teammate_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -3,6 +3,7 @@
  *
  * Displays teammate activity in the chat stream with avatar, name, and role.
  * Used when Agent Teams mode is active and a teammate is spawned/stopped.
+ * Clickable when active to open teammate's stream in a dedicated tab.
  */
 
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
@@ -14,13 +15,18 @@ interface TeammateWidgetProps {
   action: 'start' | 'stop';
   avatar?: string;
   color?: string;
+  sessionId?: string;
+  onDrillDown?: (sessionId: string, name: string) => void;
 }
 
 const DEFAULT_COLOR = '#00D9FF';
 
-export function TeammateWidget({ name, role, action, avatar, color = DEFAULT_COLOR }: TeammateWidgetProps) {
+export function TeammateWidget({
+  name, role, action, avatar, color = DEFAULT_COLOR, sessionId, onDrillDown,
+}: TeammateWidgetProps) {
   const avatarUrl = useAgentAvatar(name, avatar);
   const isStarting = action === 'start';
+  const isClickable = isStarting && !!sessionId && !!onDrillDown;
 
   const hexToRgba = (hex: string, alpha: number): string => {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -29,17 +35,37 @@ export function TeammateWidget({ name, role, action, avatar, color = DEFAULT_COL
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
+  const handleClick = () => {
+    if (isClickable) {
+      onDrillDown(sessionId!, name);
+    }
+  };
+
   return (
-    <div className="teammate-widget" style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      padding: '8px 12px',
-      borderRadius: '8px',
-      background: `linear-gradient(135deg, ${hexToRgba(color, 0.12)} 0%, ${hexToRgba(color, 0.04)} 100%)`,
-      border: `1px solid ${hexToRgba(color, 0.25)}`,
-      margin: '4px 0',
-    }}>
+    <div
+      className="teammate-widget"
+      onClick={handleClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        padding: '8px 12px',
+        borderRadius: '8px',
+        background: `linear-gradient(135deg, ${hexToRgba(color, 0.12)} 0%, ${hexToRgba(color, 0.04)} 100%)`,
+        border: `1px solid ${hexToRgba(color, 0.25)}`,
+        margin: '4px 0',
+        cursor: isClickable ? 'pointer' : 'default',
+        transition: 'border-color 0.2s ease',
+      }}
+      onMouseEnter={(e) => {
+        if (isClickable) {
+          (e.currentTarget as HTMLDivElement).style.borderColor = hexToRgba(color, 0.5);
+        }
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.borderColor = hexToRgba(color, 0.25);
+      }}
+    >
       <img
         src={avatarUrl}
         alt={name}
@@ -92,6 +118,15 @@ export function TeammateWidget({ name, role, action, avatar, color = DEFAULT_COL
                 animation: 'teammate-pulse 1.5s ease-in-out infinite',
               }} />
               Working on task...
+              {isClickable && (
+                <span style={{
+                  marginLeft: '4px',
+                  opacity: 0.5,
+                  fontSize: '9px',
+                }}>
+                  (click to view)
+                </span>
+              )}
             </>
           ) : (
             <>
