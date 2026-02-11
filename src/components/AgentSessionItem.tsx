@@ -23,6 +23,8 @@ interface AgentSessionItemProps {
   onDelete?: (sessionId: string) => void;
   /** Callback to rename session */
   onRename?: (sessionId: string) => void;
+  /** Agent's default branch (fallback when session has no branch) */
+  agentBranch?: string;
 }
 
 /**
@@ -85,6 +87,7 @@ function AgentSessionItem({
   onMarkDone,
   onDelete,
   onRename,
+  agentBranch,
 }: AgentSessionItemProps) {
   const relativeTime = formatRelativeTime(session.updatedAt);
   const itemRef = useRef<HTMLDivElement>(null);
@@ -317,6 +320,32 @@ function AgentSessionItem({
           >
             {(session.title || 'Untitled').length > 25 ? (session.title || 'Untitled').substring(0, 25) + '...' : (session.title || 'Untitled')}
           </span>
+
+          {/* Branch badge — only when session has explicit branch different from agent's */}
+          {session.branch && session.branch !== agentBranch && (
+            <span
+              className="session-branch-badge"
+              title={session.branch}
+              style={{
+                fontSize: '8px',
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                padding: '1px 4px',
+                borderRadius: '3px',
+                background: 'rgba(255, 107, 53, 0.15)',
+                color: 'rgba(255, 107, 53, 0.85)',
+                border: '1px solid rgba(255, 107, 53, 0.2)',
+                maxWidth: '80px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              {session.branch.length > 12
+                ? session.branch.replace(/^(feature|hotfix|bugfix|release)\//, '').substring(0, 10) + '..'
+                : session.branch}
+            </span>
+          )}
         </div>
 
         {/* Progress Bar when loading */}

@@ -30,6 +30,7 @@ mod personality;
 mod plugins;
 mod prerequisites; // ✅ Prerequisites checker (Git, Node.js, Claude CLI)
 mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
+mod groups; // 📂 Project Grouping (multi-project awareness, cross-project CLAUDE.md)
 mod preferences;
 mod preview;
 mod proxy;
@@ -1084,6 +1085,14 @@ pub fn run() {
             teams::create_team,
             teams::disband_team,
             teams::get_active_team,
+            // 📂 Project Grouping commands
+            groups::create_group,
+            groups::list_groups,
+            groups::get_group,
+            groups::update_group,
+            groups::delete_group,
+            groups::get_group_for_project,
+            groups::sync_group_contexts,
             sessions::list_sessions,
             sessions::get_session_info,
             sessions::get_all_sessions_info,

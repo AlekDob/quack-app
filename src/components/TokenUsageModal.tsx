@@ -72,8 +72,12 @@ const AUTO_COMPACT_COST = 45000;
 /**
  * Calculate context breakdown
  *
- * Messages = inputTokens + outputTokens (accumulated from the session)
- * Overhead = dynamic (from project files) or default ~38k
+ * With the new tracking model, inputTokens from the SDK already represents the
+ * FULL context window input for the last turn (system + tools + all messages).
+ * So overhead is INCLUDED in inputTokens, not added on top.
+ *
+ * Messages = inputTokens - overhead (the actual conversation content)
+ * Overhead = dynamic (from project files) or default ~38k (system + tools + CLAUDE.md)
  * Auto-Compact = reserve for auto-compact operation (45k)
  */
 const calculateBreakdown = (
@@ -81,8 +85,9 @@ const calculateBreakdown = (
   outputTokens: number,
   overhead: number = DEFAULT_OVERHEAD
 ): ContextBreakdown => {
-  // Messages = actual user input/output tokens from the session
-  const messagesTokens = inputTokens + outputTokens;
+  // inputTokens already includes overhead (system + tools + messages)
+  // Messages = what's left after subtracting overhead
+  const messagesTokens = Math.max(0, inputTokens - overhead);
 
   return {
     messages: messagesTokens,
@@ -92,16 +97,17 @@ const calculateBreakdown = (
 };
 
 /**
- * Calculate total context usage including overhead and auto-compact reserve
- * This is what actually counts against the 200k limit
+ * Calculate total context usage including auto-compact reserve
+ * inputTokens already includes overhead, so total = inputTokens + auto-compact reserve
  */
 const calculateTotalContextUsage = (
   inputTokens: number,
-  outputTokens: number,
-  overhead: number = DEFAULT_OVERHEAD
+  _outputTokens: number,
+  _overhead: number = DEFAULT_OVERHEAD
 ): number => {
-  const breakdown = calculateBreakdown(inputTokens, outputTokens, overhead);
-  return breakdown.messages + breakdown.overhead + breakdown.autoCompact;
+  // inputTokens = full context window fill (system + tools + messages)
+  // We add auto-compact reserve on top as "reserved" space
+  return inputTokens + AUTO_COMPACT_COST;
 };
 
 export default function TokenUsageModal({

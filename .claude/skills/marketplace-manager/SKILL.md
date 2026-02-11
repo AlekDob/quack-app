@@ -62,6 +62,33 @@ For creating pre-configured agents users can spawn. Includes suggested name, rol
 }
 ```
 
+**CRITICAL: Two different `skills` fields with different purposes:**
+
+| Field | Location | Format | Purpose |
+|-------|----------|--------|---------|
+| `plugin.skills` | Top-level | `["skills/skill-name"]` (path with `skills/` prefix) | Declares which SKILL.md files this plugin **ships** (on-disk paths relative to plugin root) |
+| `agentTemplate.skills` | Inside `agentTemplate` | `["skill-name"]` (name only, NO `skills/` prefix) | Sets which skills appear as **Preferred Skills** in the Create Agent UI |
+
+**Rules:**
+1. `agentTemplate.skills` MUST include ALL skills the agent should use — both from this plugin AND from `bundledPlugins`
+2. `bundledPlugins` auto-installs the referenced plugin's skills, but does NOT auto-select them as preferred
+3. If `agentTemplate.skills` is empty or missing, the agent will have NO preferred skills in the UI
+
+**Example with bundled dependency:**
+```json
+{
+  "skills": ["skills/my-skill"],
+  "agentTemplate": {
+    "skills": [
+      "my-skill",
+      "quack-brain"
+    ],
+    "bundledPlugins": ["quack-brain"]
+  }
+}
+```
+Here `quack-brain` plugin is auto-installed via `bundledPlugins`, and its skills (`quack-brain`) are listed in `agentTemplate.skills` so they appear pre-selected in the UI.
+
 Available avatars: `duck1.jpeg` through `duck10.jpeg`.
 Communication styles: `professional`, `technical`, `friendly`, `casual`.
 
@@ -244,3 +271,5 @@ Before committing any marketplace changes, verify:
 - [ ] JSON files are valid (no trailing commas, proper quoting)
 - [ ] No duplicate plugin names in marketplace.json
 - [ ] Conventional commit message used
+- [ ] **For Agent Templates**: `agentTemplate.skills` includes ALL preferred skills (own + bundledPlugins skills)
+- [ ] **For Agent Templates**: `agentTemplate.skills` uses skill names only (NO `skills/` prefix)

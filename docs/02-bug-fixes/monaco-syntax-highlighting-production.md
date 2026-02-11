@@ -1,8 +1,26 @@
 # Monaco Editor Syntax Highlighting in Production
 
 **Date:** 2025-01-14
-**Status:** Resolved
+**Status:** ~~Resolved~~ **Obsolete (Monaco Removed)**
 **Severity:** High
+
+---
+
+## Note: This Fix is Obsolete
+
+**As of 2026-02-11**, Monaco Editor was completely removed from Quack. This bug fix is no longer relevant.
+
+**Replacement solution**:
+- CodeMirror for inline code viewing (no CORS issues)
+- IDE opener for file editing (VS Code, Cursor, Zed, etc.)
+
+**See**:
+- Architectural decision: `.quack/brain/decisions/remove-monaco-use-codemirror-and-ide.md`
+- Completion doc: `docs/08-optimizations/01-completed/remove-monaco-editor.md`
+
+---
+
+## Original Problem (Historical)
 
 ## Problem
 

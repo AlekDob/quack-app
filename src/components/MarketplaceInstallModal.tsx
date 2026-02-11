@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
 import type { MarketplaceResource } from '../types';
-import { useSessionStore } from '../stores/sessionStore';
+import type { ActiveProject } from './modal-steps/types';
 import { getCategoryGradient, getCategoryIcon, VerifiedIcon, formatInstallCount, hasDuckAvatar, getDuckAvatarUrl } from './store/StoreIcons';
 import MarkdownText from './MarkdownText';
 
@@ -11,6 +11,7 @@ interface MarketplaceInstallModalProps {
   onClose: () => void;
   onInstall: (resource: MarketplaceResource, scope: 'global' | 'project') => Promise<boolean>;
   onUninstall?: (resourceId: string) => Promise<boolean>;
+  activeProjects?: ActiveProject[];
 }
 
 export default function MarketplaceInstallModal({
@@ -19,17 +20,15 @@ export default function MarketplaceInstallModal({
   const [installing, setInstalling] = useState(false);
   const [scope, setScope] = useState<'global' | 'project'>('global');
 
-  const selectedSession = useSessionStore((s) => s.getSelectedSession());
-  const projectPath = selectedSession?.projectPath;
-  const projectName = selectedSession?.projectName || 'No project';
-
   if (!resource) return null;
+
+  const isAgentBundle = resource.category === 'agent-bundles';
 
   const handleInstall = async () => {
     setInstalling(true);
     try {
       const success = await onInstall(resource, scope);
-      if (success) setTimeout(() => onClose(), 800);
+      if (success) setTimeout(() => onClose(), 300);
     } finally {
       setInstalling(false);
     }
@@ -108,8 +107,8 @@ export default function MarketplaceInstallModal({
           </div>
         )}
 
-        {/* Scope selector (only for install) */}
-        {!installed && (
+        {/* Scope selector - hidden for agent-bundles (project picker handles it) */}
+        {!installed && !isAgentBundle && (
           <div className="store-detail-scope">
             <button
               type="button"
@@ -121,10 +120,10 @@ export default function MarketplaceInstallModal({
             <button
               type="button"
               className={`store-scope-btn ${scope === 'project' ? 'active' : ''}`}
-              onClick={() => projectPath && setScope('project')}
-              disabled={!projectPath}
+              onClick={() => setScope('project')}
+              disabled
             >
-              {projectPath ? projectName : 'No project'}
+              Project
             </button>
           </div>
         )}
@@ -152,7 +151,12 @@ export default function MarketplaceInstallModal({
               onClick={handleInstall}
               disabled={installing}
             >
-              {installing ? 'Installing...' : 'Install'}
+              {installing
+                ? 'Installing...'
+                : isAgentBundle
+                  ? 'Install Agent...'
+                  : 'Install'
+              }
             </button>
           )}
           {resource.repository && (

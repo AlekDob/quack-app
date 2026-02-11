@@ -1,30 +1,34 @@
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useMarketplace } from '../hooks/useMarketplace';
-import { useSessionStore } from '../stores/sessionStore';
 import type { MarketplaceResource } from '../types';
+import type { ActiveProject } from './modal-steps/types';
 import type { StoreTab } from './store/storeConstants';
 import { CATEGORY_MAP } from './store/storeConstants';
 import StoreSidebar from './store/StoreSidebar';
 import StoreMainContent from './store/StoreMainContent';
 import MarketplaceInstallModal from './MarketplaceInstallModal';
+import StoreProjectPickerModal from './store/StoreProjectPickerModal';
 import './QuackStoreDrawer.css';
 
 interface QuackStoreDrawerProps {
   onClose: () => void;
   onRefresh?: () => void;
+  activeProjects?: ActiveProject[];
 }
 
-export default function QuackStoreDrawer({ onClose, onRefresh }: QuackStoreDrawerProps) {
+export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = [] }: QuackStoreDrawerProps) {
   const {
     allResources, loading, error, loadResources,
     installResource, uninstallResource, installAgentBundle, isInstalled,
   } = useMarketplace();
 
-  const selectedSession = useSessionStore((s) => s.getSelectedSession());
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<StoreTab>('all');
   const [selectedResource, setSelectedResource] = useState<MarketplaceResource | null>(null);
+
+  // Project picker state for agent-bundle installs
+  const [pendingBundleResource, setPendingBundleResource] = useState<MarketplaceResource | null>(null);
 
   const filteredResources = useMemo(() => {
     let filtered = allResources;
@@ -60,21 +64,14 @@ export default function QuackStoreDrawer({ onClose, onRefresh }: QuackStoreDrawe
   }, [allResources, activeTab, searchQuery]);
 
   const handleInstall = async (resource: MarketplaceResource, scope: 'global' | 'project' = 'global') => {
-    const projectPath = selectedSession?.projectPath;
-    const projectName = selectedSession?.projectName || 'default';
+    // For agent-bundles, show project picker instead of installing directly
+    if (resource.category === 'agent-bundles') {
+      setPendingBundleResource(resource);
+      return true; // Signal that we handled it (picker will do the actual install)
+    }
     const toastId = toast.loading(`Installing ${resource.name}...`);
     try {
-      if (resource.category === 'agent-bundles') {
-        if (!projectPath) {
-          toast.error('Open a project first to install agent bundles', { id: toastId });
-          return false;
-        }
-        await installAgentBundle(resource, projectPath, projectName);
-        toast.success(`${resource.name} installed`, { id: toastId, duration: 4000 });
-        onRefresh?.();
-        return true;
-      }
-      const success = await installResource(resource, scope, projectPath);
+      const success = await installResource(resource, scope);
       if (success) {
         toast.success(`${resource.name} installed`, { id: toastId, duration: 4000 });
         onRefresh?.();
@@ -84,6 +81,21 @@ export default function QuackStoreDrawer({ onClose, onRefresh }: QuackStoreDrawe
     } catch {
       toast.error('Failed to install', { id: toastId });
       return false;
+    }
+  };
+
+  const handleProjectSelected = async (projectPath: string, projectName: string) => {
+    if (!pendingBundleResource) return;
+    const resource = pendingBundleResource;
+    setPendingBundleResource(null);
+
+    const toastId = toast.loading(`Installing ${resource.name}...`);
+    try {
+      await installAgentBundle(resource, projectPath, projectName);
+      toast.success(`${resource.name} installed in ${projectName}`, { id: toastId, duration: 4000 });
+      onRefresh?.();
+    } catch {
+      toast.error('Failed to install', { id: toastId });
     }
   };
 
@@ -139,6 +151,15 @@ export default function QuackStoreDrawer({ onClose, onRefresh }: QuackStoreDrawe
           onClose={() => setSelectedResource(null)}
           onInstall={handleInstall}
           onUninstall={handleUninstall}
+          activeProjects={activeProjects}
+        />
+      )}
+      {pendingBundleResource && (
+        <StoreProjectPickerModal
+          projects={activeProjects}
+          resourceName={pendingBundleResource.name}
+          onSelect={handleProjectSelected}
+          onCancel={() => setPendingBundleResource(null)}
         />
       )}
     </div>

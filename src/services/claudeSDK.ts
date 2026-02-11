@@ -620,8 +620,11 @@ function convertSDKEventToClaudeEvent(event: any): ClaudeEvent | null {
         ? {
             input_tokens: event.usage.input_tokens || event.usage.inputTokens || 0,
             output_tokens: event.usage.output_tokens || event.usage.outputTokens || 0,
+            cache_creation_input_tokens: event.usage.cache_creation_input_tokens || event.usage.cacheCreationInputTokens || 0,
+            cache_read_input_tokens: event.usage.cache_read_input_tokens || event.usage.cacheReadInputTokens || 0,
           }
         : undefined,
+      model_usage: event.model_usage || event.modelUsage || undefined,
     };
   }
 

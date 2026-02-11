@@ -445,6 +445,11 @@ export interface AgentSession {
   cacheReadTokens?: number;
   totalCost?: number;
 
+  // Git context — per-session branch (overrides agent-level branch)
+  branch?: string;                   // Git branch for this session
+  useWorktree?: boolean;             // Whether this session uses an isolated worktree
+  worktreePath?: string;             // Path to worktree directory
+
   // Initial prompt and attachments from Kanban task creation
   // These are pre-populated in ChatInput when opening the session for the first time
   initialPrompt?: string;
@@ -453,6 +458,23 @@ export interface AgentSession {
 }
 
 export type AgentSessionStatus = 'todo' | 'in_progress' | 'done';
+
+// ─── Project Grouping ───────────────────────────────────────────────
+
+export interface ProjectGroupMember {
+  path: string;                      // Absolute path to project root
+  role: string;                      // e.g., "main", "landing", "docs", "api"
+  label?: string;                    // Display name override
+}
+
+export interface ProjectGroup {
+  id: string;                        // Slugified group name
+  name: string;                      // Display name, e.g., "Quack Ecosystem"
+  projects: ProjectGroupMember[];    // 2+ projects in the group
+  color?: string;                    // Group color for sidebar
+  createdAt: number;
+  notes?: string;                    // Cross-project notes (integration points, etc.)
+}
 
 // Simplified ClaudeSession for Telegram integration
 export interface ClaudeSession {
@@ -565,6 +587,16 @@ export interface ClaudeUserEvent extends ClaudeEventBase {
   uuid?: string; // SDK User message UUID (for file checkpointing rewind)
 }
 
+export interface ModelUsageEntry {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  webSearchRequests: number;
+  costUSD: number;
+  contextWindow: number;
+}
+
 export interface ClaudeResultEvent extends ClaudeEventBase {
   type: 'result';
   result?: string;
@@ -575,6 +607,7 @@ export interface ClaudeResultEvent extends ClaudeEventBase {
   cost_usd?: number;
   duration_ms?: number;
   usage?: UsageStats;
+  model_usage?: Record<string, ModelUsageEntry>;
   stop_reason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
 }
 

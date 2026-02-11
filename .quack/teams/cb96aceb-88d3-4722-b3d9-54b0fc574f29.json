@@ -1,0 +1,40 @@
+{
+  "id": "cb96aceb-88d3-4722-b3d9-54b0fc574f29",
+  "name": "Team a",
+  "projectPath": "/Users/alekdob/Desktop/Dev/Personal/quack-app",
+  "leadAgentId": "37612718-10fd-4335-bdfb-ca7475d78670",
+  "members": [
+    {
+      "agentId": "37612718-10fd-4335-bdfb-ca7475d78670",
+      "name": "Agent Immacolatella",
+      "role": "Comunication and Brand manager",
+      "communicationStyle": "friendly",
+      "isLead": true
+    },
+    {
+      "agentId": "f29e177c-630b-48a1-bd63-142aa7e40bfc",
+      "name": "Agent Graydon",
+      "role": "Rust Systems Developer",
+      "communicationStyle": "technical",
+      "selectedSkills": [
+        "rust-async",
+        "rust-memory",
+        "rust-error-handling"
+      ],
+      "isLead": false
+    },
+    {
+      "agentId": "f64d42e0-bedc-4905-997c-646ee960ed83",
+      "name": "Agent Alex",
+      "role": "React/Next.js Developer",
+      "communicationStyle": "technical",
+      "selectedSkills": [
+        "react-best-practices",
+        "nextjs-patterns",
+        "react-testing"
+      ],
+      "isLead": false
+    }
+  ],
+  "createdAt": 1770799954342
+}

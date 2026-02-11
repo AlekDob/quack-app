@@ -131,12 +131,6 @@ export default defineConfig(({ mode }) => {
         output: {
           // Manual chunking strategy for optimal code splitting
           manualChunks: (id) => {
-            // Monaco Editor - Large library (~2MB), needs separate chunk to avoid React initialization issues
-            // CRITICAL: Must be checked BEFORE vendor chunk to ensure proper isolation
-            if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
-              return 'monaco-editor';
-            }
-
             // XTerm - Terminal library (~150KB)
             if (id.includes('@xterm/xterm') || id.includes('xterm')) {
               return 'xterm';

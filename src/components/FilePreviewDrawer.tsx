@@ -1,16 +1,16 @@
 import { memo, useState, useCallback, useEffect, useImperativeHandle, forwardRef, lazy, Suspense, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import type { DiffInfo, LineChange } from "./CodeEditorMonaco";
+import type { DiffInfo, LineChange } from "./CodeEditorCodeMirror";
 import MarkdownText from "./MarkdownText";
 import RevealInFinderButton from "./RevealInFinderButton";
 import CodeEditorSkeleton from "./skeletons/CodeEditorSkeleton";
 import SearchToolbar, { type SearchOptions } from "./SearchToolbar";
-import type { CodeEditorRef } from "./CodeEditorMonaco";
+import type { CodeEditorRef } from "./CodeEditorCodeMirror";
 import { formatShortcut } from "../utils/platform";
+import { useIDEStore, selectHasPreferredIDE } from "../stores/ideStore";
 
-// Lazy load Monaco editor (better diff support, minimap, VS Code-like experience)
-const CodeEditor = lazy(() => import("./CodeEditorMonaco"));
+// Lazy load CodeMirror editor
+const CodeEditor = lazy(() => import("./CodeEditorCodeMirror"));
 
 interface FilePreviewDrawerProps {
   open: boolean;
@@ -62,23 +62,25 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
   const [searchMatchCount, setSearchMatchCount] = useState(0);
   const [currentSearchMatch, setCurrentSearchMatch] = useState(0);
   const codeEditorRef = useRef<CodeEditorRef>(null);
+  const hasPreferredIDE = useIDEStore(selectHasPreferredIDE);
+  const openFileInIDE = useIDEStore((state) => state.openFileInIDE);
 
   // Notify parent when hasUnsavedChanges state changes
   useEffect(() => {
     onHasUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onHasUnsavedChanges]);
 
-  const handleOpenInEditor = useCallback(async () => {
+  const handleOpenInIDE = useCallback(async () => {
     if (!path) return;
 
     try {
-      await invoke("open_file_in_editor", { path });
-      toast.success("File opened in default editor");
+      await openFileInIDE(path);
+      toast.success("File opened in IDE");
     } catch (error) {
-      console.error("Failed to open file in editor:", error);
-      toast.error("Failed to open file in editor");
+      console.error("Failed to open file in IDE:", error);
+      toast.error("Failed to open file in IDE");
     }
-  }, [path]);
+  }, [path, openFileInIDE]);
 
   const handleContentChange = useCallback(
     (newContent: string) => {
@@ -260,15 +262,17 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                 )}
                 {path && (
                   <>
-                    <button
-                      type="button"
-                      className="preview-action"
-                      onClick={handleOpenInEditor}
-                      disabled={loading}
-                      title="Open in default IDE"
-                    >
-                      Open with IDE
-                    </button>
+                    {hasPreferredIDE && (
+                      <button
+                        type="button"
+                        className="preview-action"
+                        onClick={handleOpenInIDE}
+                        disabled={loading}
+                        title="Open in IDE"
+                      >
+                        Open in IDE
+                      </button>
+                    )}
                     <RevealInFinderButton path={path} className="preview-action" />
                   </>
                 )}
@@ -330,9 +334,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                 ref={codeEditorRef}
                 content={editedContent}
                 filename={filename}
-                readOnly={false}
-                onChange={handleContentChange}
-                onSave={handleSave}
+                readOnly={true}
                 diffInfo={diffInfo}
                 lineChanges={lineChanges}
               />

@@ -22,6 +22,13 @@ interface MarketplaceJson {
   }>;
 }
 
+interface McpServerConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  type?: string;
+}
+
 interface PluginJson {
   name: string;
   version: string;
@@ -35,6 +42,7 @@ interface PluginJson {
   commands?: string[];
   agents?: string[];
   rules?: string[];
+  mcpServers?: Record<string, McpServerConfig>;
   agentTemplate?: AgentTemplate;
 }
 
@@ -217,6 +225,33 @@ export function useMarketplace() {
             _pluginSource: pluginSource,
           } as MarketplaceResource & { _agentTemplate: AgentTemplate; _pluginSource: string });
         }
+
+        // Create resources for each MCP server
+        if (pluginData.mcpServers) {
+          discoveredCategories.add('mcp');
+          for (const [serverName, serverConfig] of Object.entries(pluginData.mcpServers)) {
+            allResources.push({
+              id: `${plugin.name}--mcp--${serverName}`,
+              name: formatName(serverName),
+              description: plugin.description,
+              longDescription: pluginData.longDescription,
+              category: 'mcp',
+              author,
+              installCount: 0,
+              tags: pluginData.keywords || plugin.tags || [],
+              version: pluginData.version,
+              installCommand: '',
+              repository: pluginData.repository,
+              verified: true,
+              featured: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              _pluginSource: pluginSource,
+              _mcpServerName: serverName,
+              _mcpServerConfig: serverConfig,
+            } as MarketplaceResource & { _pluginSource: string; _mcpServerName: string; _mcpServerConfig: McpServerConfig });
+          }
+        }
       }
 
       // Try to load skill descriptions from their skill.md files
@@ -234,11 +269,17 @@ export function useMarketplace() {
     }
   }, []);
 
-  // Enrich skill/command descriptions by fetching their .md files
+  // Enrich resource descriptions by fetching their .md files
   const enrichSkillDescriptions = async (resources: MarketplaceResource[]) => {
-    const enrichable = resources.filter(r => r.category === 'skills' || r.category === 'commands');
+    const enrichable = resources.filter(r =>
+      r.category === 'skills' || r.category === 'commands' ||
+      r.category === 'agents' || r.category === 'droids' || r.category === 'rules'
+    );
     const fetchPromises = enrichable.map(async (resource) => {
-      const ext = resource as MarketplaceResource & { _pluginSource?: string; _skillPath?: string; _commandPath?: string };
+      const ext = resource as MarketplaceResource & {
+        _pluginSource?: string; _skillPath?: string; _commandPath?: string;
+        _agentPath?: string; _rulePath?: string;
+      };
       if (!ext._pluginSource) return;
 
       let mdUrl: string;
@@ -246,6 +287,10 @@ export function useMarketplace() {
         mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
       } else if (ext._commandPath) {
         mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._commandPath}`;
+      } else if (ext._agentPath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._agentPath}`;
+      } else if (ext._rulePath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._rulePath}`;
       } else {
         return;
       }
@@ -366,6 +411,8 @@ export function useMarketplace() {
       _commandPath?: string;
       _agentPath?: string;
       _rulePath?: string;
+      _mcpServerName?: string;
+      _mcpServerConfig?: McpServerConfig;
     };
 
     try {
@@ -454,6 +501,52 @@ export function useMarketplace() {
           // Directory may already exist, continue
         }
         await invoke('write_file_content', { path: targetPath, content });
+      } else if (ext._mcpServerName && ext._mcpServerConfig) {
+        // Add MCP server to .mcp.json in the target scope
+        const mcpJsonPath = scope === 'project' && projectPath
+          ? await join(projectPath, '.mcp.json')
+          : await join(await homeDir(), '.mcp.json');
+
+        let mcpConfig: { mcpServers: Record<string, McpServerConfig> } = { mcpServers: {} };
+        try {
+          const existing = await invoke<string>('read_file_content', { path: mcpJsonPath });
+          mcpConfig = JSON.parse(existing);
+        } catch {
+          // File doesn't exist yet, use default
+        }
+
+        mcpConfig.mcpServers[ext._mcpServerName] = ext._mcpServerConfig;
+        await invoke('write_file_content', {
+          path: mcpJsonPath,
+          content: JSON.stringify(mcpConfig, null, 2) + '\n',
+        });
+
+        // Also install bundled rules from the same plugin
+        if (ext._pluginSource) {
+          const pluginJsonUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/.claude-plugin/plugin.json${cacheBust()}`;
+          try {
+            const pRes = await fetch(pluginJsonUrl);
+            if (pRes.ok) {
+              const pData: PluginJson = await pRes.json();
+              if (pData.rules) {
+                for (const rulePath of pData.rules) {
+                  const ruleFile = rulePath.split('/').pop() || '';
+                  const ruleUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${rulePath}`;
+                  const rRes = await fetch(ruleUrl);
+                  if (rRes.ok) {
+                    const ruleContent = await rRes.text();
+                    const ruleDir = await join(basePath, 'rules');
+                    try { await invoke('create_directory', { path: ruleDir }); } catch { /* exists */ }
+                    await invoke('write_file_content', {
+                      path: await join(ruleDir, ruleFile),
+                      content: ruleContent,
+                    });
+                  }
+                }
+              }
+            }
+          } catch { /* non-critical: rules are optional */ }
+        }
       } else {
         throw new Error('Unknown resource type');
       }
@@ -482,6 +575,7 @@ export function useMarketplace() {
       _commandPath?: string;
       _agentPath?: string;
       _rulePath?: string;
+      _mcpServerName?: string;
     };
 
     try {
@@ -503,6 +597,21 @@ export function useMarketplace() {
         const ruleFile = ext._rulePath.split('/').pop() || '';
         const targetPath = await join(home, '.claude', 'rules', ruleFile);
         await invoke('remove_file', { path: targetPath });
+      } else if (ext._mcpServerName) {
+        // Remove MCP server from .mcp.json (check both project and global)
+        for (const mcpPath of ['.mcp.json', await join(home, '.mcp.json')]) {
+          try {
+            const existing = await invoke<string>('read_file_content', { path: mcpPath });
+            const mcpConfig = JSON.parse(existing);
+            if (mcpConfig.mcpServers?.[ext._mcpServerName]) {
+              delete mcpConfig.mcpServers[ext._mcpServerName];
+              await invoke('write_file_content', {
+                path: mcpPath,
+                content: JSON.stringify(mcpConfig, null, 2) + '\n',
+              });
+            }
+          } catch { /* file doesn't exist or parse error, skip */ }
+        }
       }
 
       setLibrary(prev => ({
