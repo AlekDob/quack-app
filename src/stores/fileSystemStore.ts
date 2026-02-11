@@ -53,6 +53,20 @@ interface FileSystemState {
   setEditorSelection: (selection: FileSystemState['editorSelection']) => void;
   clearEditorSelection: () => void;
 
+  // External IDE context (from WebSocket connection to VS Code, Cursor, etc.)
+  externalIdeContext: {
+    activeFile: string | null;
+    selection: {
+      filePath: string;
+      language: string;
+      text: string;
+      startLine: number;
+      endLine: number;
+    } | null;
+    ideName: string;
+  } | null;
+  setExternalIdeContext: (ctx: FileSystemState['externalIdeContext']) => void;
+
   // IDE context injection toggle
   ideContextEnabled: boolean;
   toggleIdeContext: () => void;
@@ -77,6 +91,7 @@ export const useFileSystemStore = create<FileSystemState>()(
     previewContent: null,
     previewLoading: false,
     editorSelection: null,
+    externalIdeContext: null,
     ideContextEnabled: true,
 
     // Explorer actions
@@ -150,6 +165,9 @@ export const useFileSystemStore = create<FileSystemState>()(
     // Editor selection actions
     setEditorSelection: (selection) => set({ editorSelection: selection }),
     clearEditorSelection: () => set({ editorSelection: null }),
+
+    // External IDE context
+    setExternalIdeContext: (ctx) => set({ externalIdeContext: ctx }),
 
     // IDE context toggle
     toggleIdeContext: () => set((state) => ({ ideContextEnabled: !state.ideContextEnabled })),

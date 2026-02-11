@@ -102,6 +102,7 @@ import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
 import { buildContextPrefix } from "./utils/ideContextBuilder";
+import { useExternalIdeContext } from "./hooks/useExternalIdeContext";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
@@ -696,6 +697,9 @@ function AppContent() {
   useEffect(() => {
     useFileSystemStore.getState().setPreviewFile(previewFile?.path ?? null);
   }, [previewFile]);
+
+  // Poll external IDE (VS Code, Cursor) for context so the ChatInput chip can show it
+  useExternalIdeContext(explorerPath || null);
 
   const [previewImageData, setPreviewImageData] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
