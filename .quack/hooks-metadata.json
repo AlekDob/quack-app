@@ -1,13 +1,3 @@
 {
-  "hooks": [
-    {
-      "id": "codebase-map-auto-update",
-      "name": "Codebase Map Auto-Update",
-      "description": "Auto-updates codebase map on file write",
-      "enabled": true,
-      "command": "node \"/Users/alekdob/.quack/scripts/generate-codebase-map.mjs\" --update-file \"$TOOL_INPUT_FILE_PATH\" . .quack/codebase-map.md",
-      "hookType": "PostToolUse",
-      "matcher": "Write"
-    }
-  ]
+  "hooks": []
 }

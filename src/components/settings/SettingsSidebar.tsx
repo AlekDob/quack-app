@@ -6,7 +6,6 @@ export type SettingsCategory =
   | 'ai-assistant'
   | 'agent-modes'
   | 'second-brain'
-  | 'codebase-map'
   | 'ide'
   | 'license'
   | 'integrations'
@@ -33,7 +32,6 @@ const categories: CategoryItem[] = [
   { id: 'ai-assistant', label: 'AI Assistant' },
   { id: 'agent-modes', label: 'Agent Modes' },
   { id: 'second-brain', label: 'Second Brain' },
-  { id: 'codebase-map', label: 'Codebase Map' },
   { id: 'ide', label: 'External IDE' },
   { id: 'license', label: 'License' },
   { id: 'integrations', label: 'Integrations' },
