@@ -96,7 +96,7 @@ import GitConfigOnboarding from "./components/settings/GitConfigOnboarding";
 import IDEOnboarding from "./components/settings/IDEOnboarding";
 import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
-import type { DiffInfo } from "./components/CodeEditorMonaco";
+import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
@@ -1115,11 +1115,14 @@ function AppContent() {
         totalCost: 0,
       };
 
+      // IMPORTANT: input_tokens from SDK = full context window input for THIS turn
+      // (includes system + tools + all previous messages). We REPLACE (not accumulate)
+      // to reflect the actual context window state, matching what `claude /context` shows.
       const updatedTokens = {
-        inputTokens: currentTokens.inputTokens + usage.input_tokens,
-        outputTokens: currentTokens.outputTokens + usage.output_tokens,
-        cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
-        cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreationTokens: usage.cache_creation_input_tokens || 0,
+        cacheReadTokens: usage.cache_read_input_tokens || 0,
         // total_cost_usd is cumulative from SDK, so we just set it (not add)
         totalCost: totalCostUsd ?? currentTokens.totalCost,
       };
@@ -3342,31 +3345,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log(`[compactConversationForTargetAgent] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
 
-      // Get current tokens and estimate reduction
+      // Reset tokens to 0 after compact. The next SDK result event will report
+      // the real context window size post-compact, giving us accurate numbers.
       const currentTokens = chatTokensMap.get(targetAgentId);
-      const currentInputTokens = currentTokens?.inputTokens || 0;
-      const currentOutputTokens = currentTokens?.outputTokens || 0;
-
-      // Estimate 60% reduction (based on removed messages)
-      const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
-      const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
-      const savedTokens = (currentInputTokens + currentOutputTokens) - (reducedInputTokens + reducedOutputTokens);
-
-      // Update token counts
       setChatTokensMap((prev) => {
         const newMap = new Map(prev);
         newMap.set(targetAgentId, {
-          inputTokens: reducedInputTokens,
-          outputTokens: reducedOutputTokens,
-          cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
-          cacheReadTokens: currentTokens?.cacheReadTokens || 0,
-          totalCost: currentTokens?.totalCost || 0, // Preserve cost through compaction
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+          totalCost: currentTokens?.totalCost || 0, // Preserve cumulative cost
         });
         return newMap;
       });
 
       toast.dismiss('compacting');
-      toast.success(`Compacted! ${messagesToSummarize.length} messages → 1 summary. ~${savedTokens.toLocaleString()} tokens freed`, {
+      toast.success(`Compacted! ${messagesToSummarize.length} messages summarized. Token count will update on next message.`, {
         duration: 5000,
       });
 
@@ -3500,31 +3495,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log(`[compactConversation] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
 
-      // Get current tokens and estimate reduction
+      // Reset tokens to 0 after compact. The next SDK result event will report
+      // the real context window size post-compact, giving us accurate numbers.
       const currentTokens = chatTokensMap.get(chatKey);
-      const currentInputTokens = currentTokens?.inputTokens || 0;
-      const currentOutputTokens = currentTokens?.outputTokens || 0;
-
-      // Estimate 60% reduction (based on removed messages)
-      const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
-      const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
-      const savedTokens = (currentInputTokens + currentOutputTokens) - (reducedInputTokens + reducedOutputTokens);
-
-      // Update token counts
       setChatTokensMap((prev) => {
         const newMap = new Map(prev);
         newMap.set(chatKey, {
-          inputTokens: reducedInputTokens,
-          outputTokens: reducedOutputTokens,
-          cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
-          cacheReadTokens: currentTokens?.cacheReadTokens || 0,
-          totalCost: currentTokens?.totalCost || 0, // Preserve cost through compaction
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+          totalCost: currentTokens?.totalCost || 0, // Preserve cumulative cost
         });
         return newMap;
       });
 
       toast.dismiss('compacting');
-      toast.success(`Compacted! ${messagesToSummarize.length} messages → 1 summary. ~${savedTokens.toLocaleString()} tokens freed 🦆`, {
+      toast.success(`Compacted! ${messagesToSummarize.length} messages summarized. Token count will update on next message.`, {
         duration: 5000,
       });
 
@@ -11360,11 +11347,12 @@ You have access to all Bash tools to execute git commands like:
                     onOpenIDE={async () => {
                       if (!previewFile?.path) return;
                       try {
-                        await invoke("open_file_in_editor", { path: previewFile.path });
-                        toast.success("File opened in default editor");
+                        const { openFileInIDE } = useIDEStore.getState();
+                        await openFileInIDE(previewFile.path);
+                        toast.success("File opened in IDE");
                       } catch (error) {
-                        console.error("Failed to open file in editor:", error);
-                        toast.error("Failed to open file in editor");
+                        console.error("Failed to open file in IDE:", error);
+                        toast.error("Failed to open file in IDE");
                       }
                     }}
                     onRevealFinder={async () => {
@@ -11845,19 +11833,21 @@ You have access to all Bash tools to execute git commands like:
           />
         )}
 
-        <div className={`git-drawer ${showStoreDrawer ? "open" : ""}`}>
-          <div
-            className="git-drawer-backdrop"
-            onClick={() => setShowStoreDrawer(false)}
-          />
-          <div className="git-drawer-panel quack-store-drawer-panel">
-            <QuackStoreDrawer
-              onClose={() => setShowStoreDrawer(false)}
-              onRefresh={handleMarketplaceRefresh}
-              activeProjects={activeProjects}
+        {showStoreDrawer && (
+          <div className="git-drawer open">
+            <div
+              className="git-drawer-backdrop"
+              onClick={() => setShowStoreDrawer(false)}
             />
+            <div className="git-drawer-panel quack-store-drawer-panel">
+              <QuackStoreDrawer
+                onClose={() => setShowStoreDrawer(false)}
+                onRefresh={handleMarketplaceRefresh}
+                activeProjects={activeProjects}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <SavedCommandModal
           open={savedCommandModalOpen}
