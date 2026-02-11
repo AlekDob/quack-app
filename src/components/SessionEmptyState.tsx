@@ -12,7 +12,7 @@
  */
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
 import type { AgentSession, TerminalInfo } from '../types';
@@ -83,8 +83,74 @@ export default function SessionEmptyState({
   }, [allSessions, agent.id]);
 
   // Handle new session creation
-  const handleNewSession = useCallback(async (title: string) => {
+  const handleNewSession = useCallback(async (title: string, branch?: string, useWorktree?: boolean) => {
     try {
+      let worktreePath: string | undefined;
+
+      // 🦆 BRANCH-PER-SESSION: Handle branch operations
+      if (branch) {
+        // Check if branch already exists
+        let branchExists = false;
+        try {
+          const branches = await invoke<Array<{ name: string }>>('git_list_branches', {
+            rootPath: agent.cwd,
+          });
+          branchExists = branches.some((b) => b.name === branch);
+        } catch {
+          // If we can't list branches, assume it doesn't exist
+        }
+
+        if (useWorktree) {
+          // Check if a worktree already exists for this branch
+          let existingWorktree: string | undefined;
+          try {
+            const worktrees = await invoke<Array<{ path: string; branch: string }>>('git_list_worktrees', {
+              rootPath: agent.cwd,
+            });
+            const match = worktrees.find((w) => w.branch === branch);
+            if (match) existingWorktree = match.path;
+          } catch {
+            // If listing fails, proceed with creation
+          }
+
+          if (existingWorktree) {
+            // Reuse existing worktree
+            worktreePath = existingWorktree;
+            console.log(`[SessionEmptyState] Reusing existing worktree at ${worktreePath} for branch ${branch}`);
+          } else {
+            // Create new worktree (+ branch if new)
+            const shortId = Date.now().toString(36);
+            const safeBranch = branch.replace(/[^a-zA-Z0-9-_]/g, '-');
+            worktreePath = `${agent.cwd}/.worktrees/session-${safeBranch}-${shortId}`;
+
+            await invoke('git_add_worktree', {
+              path: worktreePath,
+              branchName: branch,
+              createBranch: !branchExists,
+              rootPath: agent.cwd,
+            });
+
+            console.log(`[SessionEmptyState] Worktree created at ${worktreePath} for branch ${branch}`);
+          }
+        } else if (!branchExists) {
+          // Create new branch without worktree (switch to it in main repo)
+          await invoke('git_create_branch', {
+            branchName: branch,
+            fromBranch: null,
+            switch: true,
+            rootPath: agent.cwd,
+          });
+          console.log(`[SessionEmptyState] Created and switched to new branch ${branch}`);
+        } else {
+          // Existing branch, no worktree — switch to it
+          await invoke('git_switch_branch', {
+            branchName: branch,
+            rootPath: agent.cwd,
+          });
+          console.log(`[SessionEmptyState] Switched to existing branch ${branch}`);
+        }
+      }
+
       const newSession = await createSession({
         title,
         agentId: agent.id,
@@ -92,6 +158,9 @@ export default function SessionEmptyState({
         projectName: agent.cwd.split('/').pop() || 'project',
         status: 'todo',
         messageCount: 0,
+        branch,
+        useWorktree,
+        worktreePath,
       });
 
       setIsModalOpen(false);
@@ -417,6 +486,8 @@ export default function SessionEmptyState({
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleNewSession}
         agentName={agent.label}
+        projectPath={agent.cwd}
+        defaultBranch={agent.branch}
       />
 
       {/* Pulse animation for loading status */}

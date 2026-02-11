@@ -1215,7 +1215,7 @@ export default function RepositoryGroup({
 
   // Handle new session creation from agent card button
   const handleNewSession = useCallback(
-    async (title: string) => {
+    async (title: string, branch?: string, useWorktree?: boolean) => {
       if (!newSessionModalAgentId) return;
 
       // Find agent to get project info
@@ -1225,6 +1225,72 @@ export default function RepositoryGroup({
       if (!agent) return;
 
       try {
+        let worktreePath: string | undefined;
+
+        // 🦆 BRANCH-PER-SESSION: Handle branch operations
+        if (branch) {
+          // Check if branch already exists
+          let branchExists = false;
+          try {
+            const branches = await invoke<Array<{ name: string }>>('git_list_branches', {
+              rootPath: agent.cwd,
+            });
+            branchExists = branches.some((b) => b.name === branch);
+          } catch {
+            // If we can't list branches, assume it doesn't exist
+          }
+
+          if (useWorktree) {
+            // Check if a worktree already exists for this branch
+            let existingWorktree: string | undefined;
+            try {
+              const worktrees = await invoke<Array<{ path: string; branch: string }>>('git_list_worktrees', {
+                rootPath: agent.cwd,
+              });
+              const match = worktrees.find((w) => w.branch === branch);
+              if (match) existingWorktree = match.path;
+            } catch {
+              // If listing fails, proceed with creation
+            }
+
+            if (existingWorktree) {
+              // Reuse existing worktree
+              worktreePath = existingWorktree;
+              console.log(`[RepositoryGroup] Reusing existing worktree at ${worktreePath} for branch ${branch}`);
+            } else {
+              // Create new worktree (+ branch if new)
+              const shortId = Date.now().toString(36);
+              const safeBranch = branch.replace(/[^a-zA-Z0-9-_]/g, '-');
+              worktreePath = `${agent.cwd}/.worktrees/session-${safeBranch}-${shortId}`;
+
+              await invoke('git_add_worktree', {
+                path: worktreePath,
+                branchName: branch,
+                createBranch: !branchExists,
+                rootPath: agent.cwd,
+              });
+
+              console.log(`[RepositoryGroup] Worktree created at ${worktreePath} for branch ${branch}`);
+            }
+          } else if (!branchExists) {
+            // Create new branch without worktree (switch to it in main repo)
+            await invoke('git_create_branch', {
+              branchName: branch,
+              fromBranch: null,
+              switch: true,
+              rootPath: agent.cwd,
+            });
+            console.log(`[RepositoryGroup] Created and switched to new branch ${branch}`);
+          } else {
+            // Existing branch, no worktree — switch to it
+            await invoke('git_switch_branch', {
+              branchName: branch,
+              rootPath: agent.cwd,
+            });
+            console.log(`[RepositoryGroup] Switched to existing branch ${branch}`);
+          }
+        }
+
         const newSession = await createSession({
           title,
           agentId: newSessionModalAgentId,
@@ -1232,6 +1298,9 @@ export default function RepositoryGroup({
           projectName: displayName,
           status: "todo",
           messageCount: 0,
+          branch,
+          useWorktree,
+          worktreePath,
         });
 
         // Close modal and open the new session
@@ -1650,7 +1719,7 @@ export default function RepositoryGroup({
           e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)";
         }}
       >
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full flex-col gap-1">
           <div className="flex items-center gap-2">
             {/* Chevron - click to toggle collapse */}
             <button
@@ -1704,9 +1773,19 @@ export default function RepositoryGroup({
             </span>
           </div>
 
-          {/* Action buttons - consistent style */}
+          {/* Action buttons - hidden by default, revealed on hover */}
           <div
-            style={{ display: "flex", alignItems: "center", gap: "2px" }}
+            className="repo-action-row"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "2px",
+              paddingLeft: "24px",
+              maxHeight: 0,
+              overflow: "hidden",
+              opacity: 0,
+              transition: "max-height 0.2s ease, opacity 0.15s ease",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Copy Path button */}
@@ -1948,59 +2027,7 @@ export default function RepositoryGroup({
                   className="branch-group relative"
                   style={{ marginBottom: "24px" }}
                 >
-                  {/* Branch Header */}
-                  <div
-                    className="branch-header mb-3"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginLeft: "32px",
-                    }}
-                  >
-                    <span
-                      className="text-white/60 font-mono"
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        fontFamily:
-                          "'SF Mono', 'Monaco', 'Consolas', monospace",
-                      }}
-                    >
-                      {branchName} ({agents.length} agent
-                      {agents.length !== 1 ? "s" : ""})
-                    </span>
-                    {/* Modified Files Badge - Clickable to open Git Panel */}
-                    {(branchModifiedFiles.get(branchName) || 0) > 0 && (
-                      <div
-                        className="modified-files-badge"
-                        title={`${branchModifiedFiles.get(branchName)} files to commit - Click to open Git Panel`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onOpenGitPanel) onOpenGitPanel();
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#d97706"; // Darker orange on hover
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#f59e0b"; // Back to amber
-                        }}
-                        style={{
-                          background: "#f59e0b",
-                          color: "#fff",
-                          borderRadius: "8px",
-                          padding: "1px 6px",
-                          fontSize: "9px",
-                          fontWeight: 600,
-                          cursor: "pointer", // Changed from 'default' to 'pointer'
-                          userSelect: "none",
-                          transition: "background 0.2s ease",
-                        }}
-                      >
-                        {branchModifiedFiles.get(branchName)}
-                      </div>
-                    )}
-                  </div>
+                  {/* Branch is now shown per-session, not per-agent group */}
 
                   {/* Agents in this branch with Sortable Context */}
                   <SortableContext
@@ -2065,6 +2092,7 @@ export default function RepositoryGroup({
                             <AgentSessionList
                               agentId={agent.id}
                               agentColor={agent.color}
+                              agentBranch={agent.branch}
                               onSessionClick={onSessionClick}
                               activeSessionId={activeSessionId}
                             />
@@ -2161,59 +2189,7 @@ export default function RepositoryGroup({
                       className="branch-group relative"
                       style={{ marginBottom: "24px" }}
                     >
-                      {/* Branch Header */}
-                      <div
-                        className="branch-header mb-3"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          marginLeft: "32px",
-                        }}
-                      >
-                        <span
-                          className="text-white/60 font-mono"
-                          style={{
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            fontFamily:
-                              "'SF Mono', 'Monaco', 'Consolas', monospace",
-                          }}
-                        >
-                          {branchName} ({agents.length} agent
-                          {agents.length !== 1 ? "s" : ""})
-                        </span>
-                        {/* Modified Files Badge - Clickable to open Git Panel */}
-                        {(branchModifiedFiles.get(branchName) || 0) > 0 && (
-                          <div
-                            className="modified-files-badge"
-                            title={`${branchModifiedFiles.get(branchName)} files to commit - Click to open Git Panel`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onOpenGitPanel) onOpenGitPanel();
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "#d97706"; // Darker orange on hover
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "#f59e0b"; // Back to amber
-                            }}
-                            style={{
-                              background: "#f59e0b",
-                              color: "#fff",
-                              borderRadius: "8px",
-                              padding: "1px 6px",
-                              fontSize: "9px",
-                              fontWeight: 600,
-                              cursor: "pointer", // Changed from 'default' to 'pointer'
-                              userSelect: "none",
-                              transition: "background 0.2s ease",
-                            }}
-                          >
-                            {branchModifiedFiles.get(branchName)}
-                          </div>
-                        )}
-                      </div>
+                      {/* Branch is now shown per-session, not per-agent group */}
 
                       {/* Worktree Agents */}
                       {agents.map((agent) => {
@@ -3112,6 +3088,14 @@ export default function RepositoryGroup({
             ? [...mainAgents, ...worktreeAgents].find(
                 (a) => a.id === newSessionModalAgentId,
               )?.label
+            : undefined
+        }
+        projectPath={repoPath}
+        defaultBranch={
+          newSessionModalAgentId
+            ? [...mainAgents, ...worktreeAgents].find(
+                (a) => a.id === newSessionModalAgentId,
+              )?.branch
             : undefined
         }
       />

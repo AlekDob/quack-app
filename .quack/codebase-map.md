@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-10T19:01:57Z
-files: 407
-exports: 1185
+generated: 2026-02-11T09:43:18Z
+files: 408
+exports: 1193
 ---
 
 # Codebase Map
@@ -1522,6 +1522,9 @@ exports: 1185
 ## src/stores/gitStore.ts
 - export const `useGitStore`
 
+## src/stores/groupStore.ts
+- export const `useGroupStore`
+
 ## src/stores/ideStore.ts
 - export type `IDEInfo { id, name, appPath, cli, cliAvailable, appExists, supportsDiff }`
 - export type `IDEConfig { preferredIDE, autoLaunch, syncFocus, installedIDEs, hasCompletedOnboarding }`
@@ -1621,7 +1624,7 @@ exports: 1185
 - export type `AIPromptEngineerResponse { type, questions, improvement }`
 - export type `AgentInfo { name, description, model, color, file_path, scope, workingOn, avatar }`
 - export type `AgentDetails { content }`
-- export type `AgentPersonality { id, name, role, technicalContext, rules, communicationStyle, customNotes, selectedRules, toolkit, personality, quirks, specialties, skills }`
+- export type `AgentPersonality { id, name, role, technicalContext, rules, communicationStyle, customNotes, selectedRules, selectedSkills, toolkit, personality }`
 - export type `AgentToolkit { skills, droids, commands }`
 - export type `SavedAgent { id, name, avatar, color, workingOn, personality, createdAt, lastUsed, usageCount }`
 - export type `SkillInfo { name, description, file_path, scope }`
@@ -1638,8 +1641,10 @@ exports: 1185
 - export type `MessageSettingsMetadata { model, effort, thinkingMode, hasThinkingBlocks }`
 - export type `ChatMessage { id, role, content, timestamp, status, toolCalls, toolResults, error, attachments, events, metadata, settings, thinkingContent }`
 - export type `ChatSession { id, title, messages, createdAt, updatedAt, systemPrompt, workingDirectory, claudeSessionId }`
-- export type `AgentSession { id, claudeSessionId, title, agentId, projectPath, projectName, status, createdAt, updatedAt, completedAt, messageCount, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, totalCost }`
+- export type `AgentSession { id, claudeSessionId, title, agentId, projectPath, projectName, status, createdAt, updatedAt, completedAt, messageCount, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, totalCost, branch }`
 - export type `AgentSessionStatus = 'todo' | 'in_progress' | 'done'`
+- export type `ProjectGroupMember { path, role, label }`
+- export type `ProjectGroup { id, name, projects, color, createdAt, notes }`
 - export type `ClaudeSession { id, name, isStreaming }`
 - export type `ClaudeSettings { apiKey, model, temperature, maxTokens, enableTools, enableStreaming }`
 - export type `StreamChunk { type, content, toolCall }`
@@ -1702,9 +1707,9 @@ exports: 1185
 - export type `SessionHistoryMessage { role, content, timestamp, tool_calls, name, input }`
 - export type `SessionInfo { id, title, createdAt, updatedAt, messageCount, totalTokens, totalCost, status, workingDirectory, model, agentName }`
 - export type `SessionDetails { messages, usage, events }`
-- export type `MarketplaceCategory = 'agents' | 'commands' | 'hooks' | 'settings' | 'mcp' | 's...`
-- export type `AgentTemplate { suggestedName, role, communicationStyle, customNotes, suggestedColor, suggestedAvatar, suggestedGender, bundledPlugins }`
-- export type `MarketplaceResource { id, name, description, category, author, authorAvatar, installCount, rating, tags, version, installCommand, repository, icon, featured, verified, createdAt, updatedAt, dependencies, screenshots }`
+- export type `MarketplaceCategory = 'agents' | 'droids' | 'commands' | 'hooks' | 'settings' |...`
+- export type `AgentTemplate { suggestedName, role, communicationStyle, customNotes, suggestedColor, suggestedAvatar, suggestedGender, skills, bundledPlugins }`
+- export type `MarketplaceResource { id, name, description, longDescription, category, author, authorAvatar, installCount, rating, tags, version, installCommand, repository, icon, featured, verified, createdAt, updatedAt, dependencies }`
 - export type `MarketplaceStack { id, name, description, resources, author, public, createdAt, updatedAt }`
 - export type `MarketplaceLibrary { installedResources, customStacks, favorites, lastSync }`
 - export type `MarketplaceFilters { category, searchQuery, tags, verified, featured, sortBy, showFavoritesOnly }`
@@ -1756,6 +1761,11 @@ exports: 1185
 - export type `AgentBundleManifest { id, version, name, displayName, description, author, license, repository, personality, equipment, compatibility, marketplace }`
 - export type `AgentBundle { manifest, skillsFiles, droidsFiles, rulesFiles, commandsFiles, assetsFiles }`
 - export type `PowerRatingBreakdown { total, base, skills, droids, rules, commands, skillCount, droidCount, ruleCount, commandCount }`
+- export type `TeamMember { agentId, name, role, communicationStyle, selectedSkills, isLead, avatar, color }`
+- export type `TeamConfig { id, name, projectPath, leadAgentId, members, createdAt, taskDescription }`
+- export type `TeamContext { teamName, members }`
+- export type `TeamContextMember { name, role, communicationStyle, isLead }`
+- export type `TeammateStatus = 'spawning' | 'active' | 'idle' | 'stopped'`
 
 ## src/types/claudeAssets.ts
 - export type `ClaudeAssetType`

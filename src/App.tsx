@@ -574,6 +574,15 @@ function AppContent() {
   const [gitBranch, setGitBranch] = useState<string>('');
 
   const [explorerPath, setExplorerPath] = useState("");
+
+  // 🦆 BRANCH-PER-SESSION: Effective git root path considers session's worktreePath
+  const effectiveGitRootPath = useMemo(() => {
+    if (activeSessionId) {
+      const session = agentSessions.find(s => s.id === activeSessionId);
+      if (session?.worktreePath) return session.worktreePath;
+    }
+    return explorerPath;
+  }, [activeSessionId, agentSessions, explorerPath]);
   const [explorerTree, setExplorerTree] = useState<
     Record<string, DirectoryEntry[]>
   >({});
@@ -1421,15 +1430,27 @@ function AppContent() {
     const project = extractProjectId(cwd) || '';
     setProjectName(project);
 
-    // Use the branch associated with this terminal (agent workspace)
-    // instead of the current repository branch on disk
-    if (activeTerminal.branch) {
+    // 🦆 BRANCH-PER-SESSION: If session has explicit branch, use that instead of agent's
+    const activeSession = activeSessionId
+      ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+      : null;
+
+    if (activeSession?.branch) {
+      setGitBranch(activeSession.branch);
+    } else if (activeTerminal.branch) {
+      // Use the branch associated with this terminal (agent workspace)
       setGitBranch(activeTerminal.branch);
     } else {
-      // Fallback: Get current git branch from disk if no branch is assigned to terminal
+      // Fallback: Get current git branch from disk if no branch is assigned
       invoke<string>('git_current_branch', { rootPath: cwd })
         .then((branch) => {
-          setGitBranch(branch.trim());
+          // Re-check session branch to avoid race condition with async resolution
+          const currentSession = activeSessionId
+            ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+            : null;
+          if (!currentSession?.branch) {
+            setGitBranch(branch.trim());
+          }
         })
         .catch(() => {
           setGitBranch(''); // Not a git repository or error
@@ -1442,7 +1463,16 @@ function AppContent() {
         // Not a git repo or watcher failed — silent
       });
     }
-  }, [activeTerminal, tauriAvailable]);
+  }, [activeTerminal, tauriAvailable, activeSessionId]);
+
+  // 🦆 BRANCH-PER-SESSION: Override gitBranch when active session has explicit branch
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const session = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
+    if (session?.branch) {
+      setGitBranch(session.branch);
+    }
+  }, [activeSessionId]);
 
   // Listen for real-time git branch changes from file watcher
   useEffect(() => {
@@ -1455,8 +1485,14 @@ function AppContent() {
         const activeCwd = activeTerminal?.cwd || '';
 
         // Update displayed branch if event matches the active terminal's project
+        // But NOT if the active session has an explicit branch (session branch takes priority)
         if (activeCwd && projectPath === activeCwd) {
-          setGitBranch(branch);
+          const currentSession = activeSessionId
+            ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+            : null;
+          if (!currentSession?.branch) {
+            setGitBranch(branch);
+          }
         }
 
         // Update branch on ALL terminals that share this project path (persistence)
@@ -2286,7 +2322,11 @@ function AppContent() {
 
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
-      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
+      // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available, then agent's cwd
+      const sessionWorktreePath = currentSession?.worktreePath;
+      const workingDir = sessionWorktreePath
+        ? sessionWorktreePath
+        : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -2855,9 +2895,8 @@ function AppContent() {
     const { sessions: updatedSessions } = useSessionStore.getState();
     const updatedSession = updatedSessions.find(s => s.id === targetAgentId);
 
-    // 🦆 SESSIONS-FIRST: Use session's projectPath as working directory
-    // (Worktree isolation not used in sessions-first architecture)
-    const effectiveWorkingDirectory = updatedSession?.projectPath || options?.workingDirectory || '/';
+    // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available, then projectPath
+    const effectiveWorkingDirectory = updatedSession?.worktreePath || updatedSession?.projectPath || options?.workingDirectory || '/';
     console.log(`[sendMessageForTargetAgent] Using working directory: ${effectiveWorkingDirectory}`)
 
     // Save the prompt for restoration on abort
@@ -9614,7 +9653,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setHistoryError(null);
 
     try {
-      const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available
+      const activeSession = activeSessionId
+        ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+        : null;
+      const rootPath = activeSession?.worktreePath || activeTerminal?.cwd || explorerPath || undefined;
       const [statusResult, historyResult] = await Promise.allSettled([
         invoke<GitStatusSummary>("git_status_summary", { rootPath }),
         invoke<GitCommitEntry[]>("git_commit_history", { limit: 50, branchName: null, rootPath }),
@@ -9658,13 +9701,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } finally {
       setLoadingGit(false);
     }
-  }, [activeTerminal, explorerPath, tauriAvailable]);
+  }, [activeTerminal, explorerPath, tauriAvailable, activeSessionId]);
 
   useEffect(() => {
     if (showGitDrawer) {
       void refreshGitSummary();
     }
   }, [refreshGitSummary, showGitDrawer]);
+
+  // 🦆 BRANCH-PER-SESSION: Refresh git panel when active session changes
+  useEffect(() => {
+    if (activeSessionId && showGitDrawer) {
+      void refreshGitSummary();
+    }
+  }, [activeSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load git status on startup only (not on every terminal switch!)
   useEffect(() => {
@@ -11724,7 +11774,7 @@ You have access to all Bash tools to execute git commands like:
                 onCommit={handleCommit}
                 committing={committing}
                 onGenerateCommitMessage={handleGenerateCommitMessage}
-                rootPath={explorerPath}
+                rootPath={effectiveGitRootPath}
                 terminals={terminals}
                 onBranchSwitch={async (branchName) => {
                   // Switch to the branch
