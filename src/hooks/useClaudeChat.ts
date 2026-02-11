@@ -532,15 +532,18 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             }
           }
 
-          // Track cumulative tokens from result events
+          // Track context window fill from result events
+          // IMPORTANT: input_tokens from SDK = full context window input for THIS turn
+          // (includes system + tools + all previous messages + current message)
+          // So we REPLACE (not accumulate) to reflect the actual context window state
           if (event.type === 'result' && event.usage) {
-            const usage = event.usage; // Destructure to help TypeScript narrow the type
-            setSessionTokens(prev => ({
-              inputTokens: prev.inputTokens + usage.input_tokens,
-              outputTokens: prev.outputTokens + usage.output_tokens,
-              cacheCreationTokens: prev.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
-              cacheReadTokens: prev.cacheReadTokens + (usage.cache_read_input_tokens || 0),
-            }));
+            const usage = event.usage;
+            setSessionTokens({
+              inputTokens: usage.input_tokens,
+              outputTokens: usage.output_tokens,
+              cacheCreationTokens: usage.cache_creation_input_tokens || 0,
+              cacheReadTokens: usage.cache_read_input_tokens || 0,
+            });
           }
 
           // Update message with streaming content (events array is already deduplicated)

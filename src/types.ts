@@ -587,6 +587,16 @@ export interface ClaudeUserEvent extends ClaudeEventBase {
   uuid?: string; // SDK User message UUID (for file checkpointing rewind)
 }
 
+export interface ModelUsageEntry {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  webSearchRequests: number;
+  costUSD: number;
+  contextWindow: number;
+}
+
 export interface ClaudeResultEvent extends ClaudeEventBase {
   type: 'result';
   result?: string;
@@ -597,6 +607,7 @@ export interface ClaudeResultEvent extends ClaudeEventBase {
   cost_usd?: number;
   duration_ms?: number;
   usage?: UsageStats;
+  model_usage?: Record<string, ModelUsageEntry>;
   stop_reason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
 }
 
