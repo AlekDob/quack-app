@@ -275,6 +275,12 @@
   padding: 0;
 }
 
+/* Project context panel adjustments */
+.accordion-content .project-context-panel .context-notes-editor {
+  font-size: 11px !important;
+  min-height: 100px;
+}
+
 /* Compact all cards and items */
 .accordion-content .saved-command-card,
 .accordion-content .skill-card,

@@ -3892,6 +3892,32 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId, pendingPlanApprovals]);
 
+  // Teammate stream drill-down: open a tab to view teammate's session stream
+  const handleTeammateDrillDown = useCallback((sessionId: string, name: string) => {
+    const tabId = `teammate-${sessionId}`;
+    const existingTab = tabs.find(t => t.id === tabId);
+    if (existingTab) {
+      setActiveTabId(tabId);
+      return;
+    }
+
+    const team = useTeamStore.getState().activeTeam;
+    const member = team?.members.find(m => m.name.toLowerCase() === name.toLowerCase());
+
+    const newTab: Tab = {
+      id: tabId,
+      label: name,
+      type: 'teammate-stream',
+      closable: true,
+      color: member?.color,
+      teammateSessionId: sessionId,
+      teammateName: name,
+    };
+
+    setTabs(prevTabs => [...prevTabs, newTab]);
+    setActiveTabId(tabId);
+  }, [tabs, setActiveTabId]);
+
   // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
     if (!activeId) return;
@@ -11164,6 +11190,7 @@ You have access to all Bash tools to execute git commands like:
                       return ids;
                     })()}
                     onPlanApprovalResponse={respondToPlanApproval}
+                    onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );
               })()}
@@ -11312,6 +11339,7 @@ You have access to all Bash tools to execute git commands like:
                       return ids;
                     })()}
                     onPlanApprovalResponse={respondToPlanApproval}
+                    onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );
               })()}
@@ -11535,6 +11563,22 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+
+              {/* Teammate Stream Tab - shown when teammate-stream tab is active */}
+              {activeTabId.startsWith('teammate-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'teammate-stream' && activeTab.teammateSessionId) {
+                  const { TeammateStreamTab } = require('./components/TeammateStreamTab');
+                  return (
+                    <TeammateStreamTab
+                      sessionId={activeTab.teammateSessionId}
+                      teammateName={activeTab.teammateName || 'Teammate'}
+                      teammateColor={activeTab.color}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility (hidden in Kanban mode) */}
               {tabs.some(t => t.type === 'agent-terminal') && !isKanbanTabActive && (
