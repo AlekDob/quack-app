@@ -25,6 +25,9 @@ import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
+import type { EditorSelection } from "./components/CodeEditorCodeMirror";
+import { useFileSystemStore } from "./stores/fileSystemStore";
+import { getLanguageFromFilename } from "./utils/languageDetection";
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
@@ -98,6 +101,7 @@ import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
+import { buildInternalContextPrefix } from "./utils/ideContextBuilder";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
@@ -687,6 +691,12 @@ function AppContent() {
     path: string;
   } | null>(null);
   const [previewContent, setPreviewContent] = useState("");
+
+  // Sync local previewFile to fileSystemStore so IDE context utilities can read it
+  useEffect(() => {
+    useFileSystemStore.getState().setPreviewFile(previewFile?.path ?? null);
+  }, [previewFile]);
+
   const [previewImageData, setPreviewImageData] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -695,6 +705,22 @@ function AppContent() {
   const [previewLineChanges, setPreviewLineChanges] = useState<LineChange[] | null>(null);
   const [previewHasUnsavedChanges, setPreviewHasUnsavedChanges] = useState(false);
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
+
+  // IDE context: track editor selection for agent chat context injection
+  const handleEditorSelectionChange = useCallback((sel: EditorSelection | null) => {
+    if (!sel || !previewFile) {
+      useFileSystemStore.getState().clearEditorSelection();
+      return;
+    }
+    useFileSystemStore.getState().setEditorSelection({
+      filePath: previewFile.path,
+      language: getLanguageFromFilename(previewFile.name),
+      selectedText: sel.selectedText,
+      startLine: sel.startLine,
+      endLine: sel.endLine,
+    });
+  }, [previewFile]);
+
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showStoreDrawer, setShowStoreDrawer] = useState(false);
@@ -753,6 +779,13 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return 'chat';
   });
+
+  // Clear editor selection when navigating away from file tab
+  useEffect(() => {
+    if (!activeTabId.startsWith('file-')) {
+      useFileSystemStore.getState().clearEditorSelection();
+    }
+  }, [activeTabId]);
 
   // Persist tab state to localStorage for wake-from-standby resilience
   useEffect(() => {
@@ -2339,6 +2372,12 @@ function AppContent() {
         prompt = `${history}\n\nUser: ${contentWithAttachments}`;
       }
 
+      // Inject IDE context (open file, selection, git status) into prompt
+      const ideContextPrefix = buildInternalContextPrefix(gitSummary);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
+      }
+
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
       // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available, then agent's cwd
@@ -3006,6 +3045,12 @@ function AppContent() {
           .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
           .join('\n\n');
         prompt = `${history}\n\nUser: ${content}`;
+      }
+
+      // Inject IDE context (open file, selection, git status) into prompt
+      const ideContextPrefix = buildInternalContextPrefix(gitSummary);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
       }
 
       // Create abort promise
@@ -11365,6 +11410,7 @@ You have access to all Bash tools to execute git commands like:
                     onHasUnsavedChanges={setPreviewHasUnsavedChanges}
                     imageData={previewImageData}
                     embedded={true}
+                    onEditorSelectionChange={handleEditorSelectionChange}
                   />
                   <FileActionButtons
                     onRefresh={handleRefreshPreview}

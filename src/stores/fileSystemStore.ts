@@ -17,6 +17,15 @@ interface FileSystemState {
   previewContent: string | null;
   previewLoading: boolean;
 
+  // Editor selection state (for IDE context injection into agent chats)
+  editorSelection: {
+    filePath: string;
+    language: string;
+    selectedText: string;
+    startLine: number;
+    endLine: number;
+  } | null;
+
   // Actions - Explorer
   setExplorerPath: (path: string) => void;
   setExplorerTree: (tree: Record<string, DirectoryEntry[]>) => void;
@@ -40,6 +49,10 @@ interface FileSystemState {
   setPreviewLoading: (loading: boolean) => void;
   clearPreview: () => void;
 
+  // Actions - Editor selection
+  setEditorSelection: (selection: FileSystemState['editorSelection']) => void;
+  clearEditorSelection: () => void;
+
   // Selectors
   getDirectoryEntries: (path: string) => DirectoryEntry[] | undefined;
   isDirExpanded: (path: string) => boolean;
@@ -59,6 +72,7 @@ export const useFileSystemStore = create<FileSystemState>()(
     previewFile: null,
     previewContent: null,
     previewLoading: false,
+    editorSelection: null,
 
     // Explorer actions
     setExplorerPath: (path) => set({ explorerPath: path }),
@@ -127,6 +141,10 @@ export const useFileSystemStore = create<FileSystemState>()(
       previewContent: null,
       previewLoading: false,
     }),
+
+    // Editor selection actions
+    setEditorSelection: (selection) => set({ editorSelection: selection }),
+    clearEditorSelection: () => set({ editorSelection: null }),
 
     // Selectors
     getDirectoryEntries: (path) => {
