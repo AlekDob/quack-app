@@ -6564,6 +6564,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           // SIMPLE: Just load terminals - no migration needed!
           setTerminals(recreated);
 
+          // 🔵 Initialize lastReadTimestamps to NOW for all agents at boot
+          // This prevents "Quack quack..." badge from showing on pre-existing sessions
+          // Badge should only appear for NEW messages received after app startup
+          const bootTimestamp = Date.now();
+          setLastReadTimestamps((prev) => {
+            const updated = new Map(prev);
+            for (const terminal of recreated) {
+              if (!updated.has(terminal.id)) {
+                updated.set(terminal.id, bootTimestamp);
+              }
+            }
+            return updated;
+          });
+
           // Load sessions from sessionStore (sessions-first architecture)
           await useSessionStore.getState().loadSessions();
 
