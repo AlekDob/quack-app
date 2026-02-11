@@ -72,6 +72,8 @@ interface RepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
 }
@@ -1117,6 +1119,7 @@ export default function RepositoryGroup({
   chatLoadingMap,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
   onOpenPersonality,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
@@ -2095,6 +2098,7 @@ export default function RepositoryGroup({
                               agentBranch={agent.branch}
                               onSessionClick={onSessionClick}
                               activeSessionId={activeSessionId}
+                              onActiveSessionDone={onActiveSessionDone}
                             />
                           </div>
                         )}

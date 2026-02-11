@@ -83,6 +83,8 @@ interface SortableRepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
 }
@@ -222,6 +224,8 @@ interface TerminalSidebarProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
 }
@@ -273,6 +277,7 @@ export default function TerminalSidebar({
   onCreateTask,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
   onOpenPersonality,
 }: TerminalSidebarProps) {
   void _onColorChange;
@@ -956,6 +961,7 @@ export default function TerminalSidebar({
                       chatLoadingMap={chatLoadingMap}
                       onSessionClick={onSessionClick}
                       activeSessionId={activeSessionId}
+                      onActiveSessionDone={onActiveSessionDone}
                       onOpenPersonality={onOpenPersonality}
                     />
                   );
@@ -1084,6 +1090,7 @@ export default function TerminalSidebar({
                           chatLoadingMap={chatLoadingMap}
                           onSessionClick={onSessionClick}
                           activeSessionId={activeSessionId}
+                          onActiveSessionDone={onActiveSessionDone}
                           onOpenPersonality={onOpenPersonality}
                         />
                       );

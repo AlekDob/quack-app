@@ -215,6 +215,8 @@ interface AgentSessionListProps {
   agentBranch?: string;
   onSessionClick: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
 }
 
 /**
@@ -229,6 +231,7 @@ function AgentSessionList({
   agentBranch,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
 }: AgentSessionListProps) {
   const [showAll, setShowAll] = useState(false);
   const [deleteDialogSession, setDeleteDialogSession] = useState<{ id: string; title: string } | null>(null);
@@ -254,7 +257,11 @@ function AgentSessionList({
   // Handle marking session as done
   const handleMarkDone = useCallback((sessionId: string) => {
     updateSession(sessionId, { status: 'done', completedAt: Date.now() });
-  }, [updateSession]);
+    // Navigate back to agent view if the completed session was active
+    if (sessionId === activeSessionId && onActiveSessionDone) {
+      onActiveSessionDone();
+    }
+  }, [updateSession, activeSessionId, onActiveSessionDone]);
 
   // Handle delete session (shows confirmation dialog)
   const handleDeleteRequest = useCallback((sessionId: string) => {

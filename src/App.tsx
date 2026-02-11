@@ -7667,6 +7667,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
+        // Show agent overview (not a stale session) for the new agent
+        setActiveSessionId(null);
+        setActiveTaskId(null);
+        setActiveTabId('chat');
         clearTerminalAttention(createdWithState.id);
 
         // Add to active-agents.json index (file-based persistence)
@@ -10545,6 +10549,11 @@ You have access to all Bash tools to execute git commands like:
           // Session props
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
+          onActiveSessionDone={() => {
+            // Navigate back to agent overview when active session is marked as done
+            setActiveSessionId(null);
+            setActiveTaskId(null);
+          }}
           // Open Agent Personality accordion
           onOpenPersonality={() => {
             console.log('[App] onOpenPersonality from sidebar clicked');
