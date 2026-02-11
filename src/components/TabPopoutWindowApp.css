@@ -327,16 +327,7 @@
   border-color: rgba(242, 140, 82, 0.6);
 }
 
-/* Monaco Editor container - ensure full height */
+/* Code editor container - ensure full height */
 .tab-popout-content > div {
   height: 100%;
-}
-
-/* CodeEditor Monaco styles override for popout */
-.tab-popout-content .monaco-editor {
-  height: 100% !important;
-}
-
-.tab-popout-content .monaco-editor .overflow-guard {
-  height: 100% !important;
 }

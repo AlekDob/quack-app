@@ -269,11 +269,17 @@ export function useMarketplace() {
     }
   }, []);
 
-  // Enrich skill/command descriptions by fetching their .md files
+  // Enrich resource descriptions by fetching their .md files
   const enrichSkillDescriptions = async (resources: MarketplaceResource[]) => {
-    const enrichable = resources.filter(r => r.category === 'skills' || r.category === 'commands');
+    const enrichable = resources.filter(r =>
+      r.category === 'skills' || r.category === 'commands' ||
+      r.category === 'agents' || r.category === 'droids' || r.category === 'rules'
+    );
     const fetchPromises = enrichable.map(async (resource) => {
-      const ext = resource as MarketplaceResource & { _pluginSource?: string; _skillPath?: string; _commandPath?: string };
+      const ext = resource as MarketplaceResource & {
+        _pluginSource?: string; _skillPath?: string; _commandPath?: string;
+        _agentPath?: string; _rulePath?: string;
+      };
       if (!ext._pluginSource) return;
 
       let mdUrl: string;
@@ -281,6 +287,10 @@ export function useMarketplace() {
         mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
       } else if (ext._commandPath) {
         mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._commandPath}`;
+      } else if (ext._agentPath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._agentPath}`;
+      } else if (ext._rulePath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._rulePath}`;
       } else {
         return;
       }

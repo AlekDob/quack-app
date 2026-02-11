@@ -594,9 +594,24 @@ function SortableAgent({
     return getTimestampOpacity(relativeTime.minutes);
   }, [relativeTime]);
 
+  // Merge our log with dnd-kit's onPointerDown listener
+  const mergedListeners = useMemo(() => {
+    if (!listeners) return {};
+    return {
+      ...listeners,
+      onPointerDown: (e: React.PointerEvent) => {
+        console.log("[DnD] pointerDown on agent wrapper:", agent.label, "target:", (e.target as HTMLElement).className);
+        // Call dnd-kit's original handler
+        listeners.onPointerDown?.(e);
+      },
+    };
+  }, [listeners, agent.label]);
+
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
+      {...mergedListeners}
       style={{
         ...style,
         marginBottom: "8px",
@@ -611,9 +626,6 @@ function SortableAgent({
           gap: "8px",
           position: "relative" as const,
         }}
-        draggable
-        onDragStart={handleNativeDragStart}
-        onDragEnd={handleNativeDragEnd}
       >
         {/* Agent Card - No left timing section */}
         <div
@@ -1140,6 +1152,7 @@ export default function RepositoryGroup({
   >(new Map());
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [agentOrder, setAgentOrder] = useState<Record<string, string[]>>({});
+  const renderedOrderRef = useRef<Map<string, string[]>>(new Map());
   // New session modal state
   const [newSessionModalAgentId, setNewSessionModalAgentId] = useState<
     string | null
@@ -1334,110 +1347,119 @@ export default function RepositoryGroup({
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
+    console.log("[DnD] dragStart - agent:", event.active.id);
     setActiveAgentId(String(event.active.id));
     // Add class to disable animations for performance
     document.body.classList.add("dragging-active");
   };
 
-  // Handle drag end
+  // Handle drag end - uses renderedOrderRef to avoid stale closure issues
   const handleDragEnd = (event: DragEndEvent) => {
-    // Remove dragging class to re-enable animations
     document.body.classList.remove("dragging-active");
 
     const { active, over } = event;
+    console.log("[DnD] dragEnd - active:", active.id, "over:", over?.id);
 
     if (!over || active.id === over.id) {
       setActiveAgentId(null);
       return;
     }
 
-    // Find which branch the agents belong to
-    const allAgents = [...mainAgents, ...worktreeAgents];
-    const activeAgent = allAgents.find((a) => a.id === active.id);
-    const overAgent = allAgents.find((a) => a.id === over.id);
+    // Find which branch contains both agents by checking rendered order
+    let targetBranch: string | null = null;
+    let currentIds: string[] = [];
 
-    if (!activeAgent || !overAgent) {
+    for (const [branch, ids] of renderedOrderRef.current.entries()) {
+      if (ids.includes(String(active.id)) && ids.includes(String(over.id))) {
+        targetBranch = branch;
+        currentIds = ids;
+        break;
+      }
+    }
+
+    if (!targetBranch || currentIds.length === 0) {
+      console.warn("[DnD] Could not find branch containing both agents");
       setActiveAgentId(null);
       return;
     }
 
-    const activeBranch = activeAgent.branch || getBranchName(activeAgent);
-    const overBranch = overAgent.branch || getBranchName(overAgent);
+    const oldIndex = currentIds.indexOf(String(active.id));
+    const newIndex = currentIds.indexOf(String(over.id));
 
-    // Only allow reordering within the same branch
-    if (activeBranch !== overBranch) {
-      setActiveAgentId(null);
-      document.body.classList.remove("dragging-active");
-      return;
-    }
-
-    // Get agents for this branch
-    const branchAgents = allAgents.filter((a) => {
-      const branch = a.branch || getBranchName(a);
-      return branch === activeBranch;
-    });
-
-    // Apply custom order or use default
-    const orderKey = `${activeBranch}-${activeAgent.worktreePath ? "worktree" : "main"}`;
-    const currentOrder = agentOrder[orderKey] || branchAgents.map((a) => a.id);
-
-    const oldIndex = currentOrder.indexOf(String(active.id));
-    const newIndex = currentOrder.indexOf(String(over.id));
+    console.log("[DnD] branch:", targetBranch, "oldIndex:", oldIndex, "newIndex:", newIndex);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      const newOrder = arrayMove(currentIds, oldIndex, newIndex);
+      const orderKey = `${targetBranch}-main`;
       const updatedOrder = { ...agentOrder, [orderKey]: newOrder };
       setAgentOrder(updatedOrder);
       saveOrder(updatedOrder);
+      console.log("[DnD] Order saved:", orderKey, newOrder);
     }
 
     setActiveAgentId(null);
   };
 
-  // Sort agents by last ASSISTANT message timestamp - most recent first (NO DRAG-AND-DROP)
-  const applyCustomOrder = useCallback(
-    (agents: TerminalInfo[], branchName: string) => {
-      // Get last ASSISTANT message timestamp (only when agent RESPONDS, not when user sends!)
-      const getLastAssistantMessageTimestamp = (
-        agent: TerminalInfo,
-      ): number => {
-        if (!chatSessions) return 0;
-        const messages = chatSessions.get(agent.id);
-        if (!messages || messages.length === 0) return 0;
+  // Get last ASSISTANT message timestamp for an agent
+  const getLastAssistantTimestamp = useCallback(
+    (agent: TerminalInfo): number => {
+      if (!chatSessions) return 0;
+      const messages = chatSessions.get(agent.id);
+      if (!messages || messages.length === 0) return 0;
 
-        // Find LAST assistant message (when the agent responds, not when user sends)
-        const lastAssistantMessage = [...messages]
-          .reverse()
-          .find((msg) => msg.role === "assistant");
+      const lastAssistantMsg = [...messages]
+        .reverse()
+        .find((msg) => msg.role === "assistant");
 
-        if (!lastAssistantMessage?.timestamp) return 0;
-
-        // console.log(`[SORT] ${agent.label} - last assistant msg timestamp: ${lastAssistantMessage.timestamp}`); // Performance: Disabled logging
-        return lastAssistantMessage.timestamp;
-      };
-
-      // Simple sort: most recent ASSISTANT message first (sorting happens when agent RESPONDS)
-      const sorted = [...agents].sort((a, b) => {
-        const timestampA = getLastAssistantMessageTimestamp(a);
-        const timestampB = getLastAssistantMessageTimestamp(b);
-
-        // If both have assistant messages, sort by timestamp (most recent first)
-        if (timestampA > 0 && timestampB > 0) {
-          return timestampB - timestampA;
-        }
-
-        // Agents with assistant messages come before agents without
-        if (timestampA > 0) return -1;
-        if (timestampB > 0) return 1;
-
-        // Both empty - maintain original order
-        return 0;
-      });
-
-      // console.log(`[SORT] Branch ${branchName} sorted order:`, sorted.map(a => `${a.label} (${getLastAssistantMessageTimestamp(a)})`)); // Performance: Disabled logging
-      return sorted;
+      return lastAssistantMsg?.timestamp ?? 0;
     },
     [chatSessions],
+  );
+
+  // Sort agents by timestamp - most recent assistant response first
+  const sortByTimestamp = useCallback(
+    (agents: TerminalInfo[]): TerminalInfo[] => {
+      return [...agents].sort((a, b) => {
+        const tsA = getLastAssistantTimestamp(a);
+        const tsB = getLastAssistantTimestamp(b);
+
+        if (tsA > 0 && tsB > 0) return tsB - tsA;
+        if (tsA > 0) return -1;
+        if (tsB > 0) return 1;
+        return 0;
+      });
+    },
+    [getLastAssistantTimestamp],
+  );
+
+  // Apply saved manual drag order if exists, otherwise fall back to timestamp sort
+  const applyCustomOrder = useCallback(
+    (agents: TerminalInfo[], branchName: string) => {
+      const orderKey = `${branchName}-main`;
+      const savedOrder = agentOrder[orderKey];
+
+      // No manual order saved — fall back to timestamp sorting
+      if (!savedOrder || savedOrder.length === 0) {
+        return sortByTimestamp(agents);
+      }
+
+      // Split agents into those in saved order vs new ones
+      const agentMap = new Map(agents.map((a) => [a.id, a]));
+      const ordered: TerminalInfo[] = [];
+
+      for (const id of savedOrder) {
+        const agent = agentMap.get(id);
+        if (agent) {
+          ordered.push(agent);
+          agentMap.delete(id);
+        }
+      }
+
+      // Append NEW agents (not in saved order), sorted by timestamp
+      const newAgents = sortByTimestamp([...agentMap.values()]);
+      return [...ordered, ...newAgents];
+    },
+    [agentOrder, sortByTimestamp],
   );
 
   // Helper to generate PR URL - Memoized for performance
@@ -2030,6 +2052,8 @@ export default function RepositoryGroup({
           >
             {sortedBranches.map(([branchName, agents]) => {
               const orderedAgents = applyCustomOrder(agents, branchName);
+              // Track rendered order for drag handler
+              renderedOrderRef.current.set(branchName, orderedAgents.map(a => a.id));
 
               return (
                 <div
