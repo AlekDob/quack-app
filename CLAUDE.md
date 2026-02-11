@@ -33,24 +33,26 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 **Role:** Project Manager | **Style:** professional
 **Preferred Skills:** quack-brain
 
-### Teammate: Agent Fredric
-**Role:** Marketing & Communication Manager | **Style:** friendly
-
 ### Teammate: Agent Scribe
 **Role:** Documentation Manager | **Style:** professional
 **Preferred Skills:** quack-brain, human-test-plan
 
+### Teammate: Agent Fredric
+**Role:** Marketing & Communication Manager | **Style:** friendly
+
 ### Teammate: Agent Leo
 **Role:** Quack Developer (Full-Stack Tauri+Rust+React) | **Style:** sarcastic
 **Preferred Skills:** tauri-build-expert, tauri-image-assets, quack-agents-architecture, claude-agent-sdk
+
+### Teammate: Agent Alex
+**Role:** React/Next.js Developer | **Style:** technical
+**Preferred Skills:** react-best-practices, nextjs-patterns, react-testing
 
 ### Teammate: Agent Graydon
 **Role:** Rust Systems Developer | **Style:** technical
 **Preferred Skills:** rust-async, rust-memory, rust-error-handling
 
 <!-- QUACK_TEAM_ROSTER_END -->
-
-
 <!-- QUACK_GROUP_CONTEXT_START -->
 ## Project Group: Quack
 
