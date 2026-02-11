@@ -9,55 +9,46 @@ tags: [notification, ui, sidebar, chat, sessions-first]
 
 ## Problem
 
-All'avvio dell'app, il badge "Quack quack..." (💬) appariva su tutti gli agenti che avevano sessioni con messaggi pre-esistenti, anche se l'utente non aveva ricevuto nuovi messaggi.
+All'avvio dell'app, il badge "Quack quack..." appariva su tutti gli agenti, anche quelli senza sessioni attive sotto di loro.
 
-**Root cause**: `lastReadTimestamps` era inizializzato come `Map` vuota. Quando le sessioni venivano caricate con messaggi dell'assistente, il confronto `lastAssistantTimestamp > lastReadTimestamp` diventava `qualsiasi_timestamp > 0` = `true`.
+**Root causes** (two issues):
+
+1. `lastReadTimestamps` era inizializzato come Map vuota - qualsiasi messaggio pre-esistente risultava "non letto" (`timestamp > 0 = true`)
+2. `agentSessions` includeva sessioni con status `done` (archiviate) - i loro messaggi venivano contati per il badge anche se le sessioni sono nascoste nella sidebar
 
 ## Symptoms
 
-- Badge 💬 visibile su tutti gli agenti all'avvio
-- Tooltip "Quack quack..." appare anche su sessioni vecchie
-- Non ha senso mostrare notifiche per messaggi già visti
+- Badge e tooltip "Quack quack..." visibili su agenti senza sessioni visibili nella sidebar
+- Appare sia in main che in worktree sections, su agenti di diversi progetti
 
-## Solution
+## Solution (Two-Part Fix)
 
-**File**: `src/App.tsx` (dentro l'initialization useEffect)
+### Part 1: Boot timestamp initialization (`src/App.tsx`)
 
-Dopo il caricamento dei terminali al boot (`setTerminals(recreated)`), inizializza `lastReadTimestamps` con `Date.now()` per tutti gli agenti:
+Inizializza `lastReadTimestamps` con `Date.now()` per tutti gli agenti al boot.
+
+### Part 2: Filter done sessions (`src/components/RepositoryGroup.tsx`)
+
+**This is the real fix.** Created `activeSessions` filtering out `status === "done"`:
 
 ```typescript
-// SIMPLE: Just load terminals - no migration needed!
-setTerminals(recreated);
-
-// 🔵 Initialize lastReadTimestamps to NOW for all agents at boot
-// This prevents "Quack quack..." badge from showing on pre-existing sessions
-// Badge should only appear for NEW messages received after app startup
-const bootTimestamp = Date.now();
-setLastReadTimestamps((prev) => {
-  const updated = new Map(prev);
-  for (const terminal of recreated) {
-    if (!updated.has(terminal.id)) {
-      updated.set(terminal.id, bootTimestamp);
-    }
-  }
-  return updated;
-});
+const activeSessions = useMemo(
+  () => agentSessions.filter((s) => s.status !== "done"),
+  [agentSessions],
+);
 ```
 
-## How it works
+All badge-related calculations (`isDormant`, `hasUnreadMessages`, `lastAssistantTimestamp`, `showNotificationBadge`) now use `activeSessions` instead of `agentSessions`.
 
-1. **At boot**: Tutti i terminali vengono marcati come "letti" al momento dell'avvio
-2. **Pre-existing messages**: Considerati "già letti" (timestamp < bootTimestamp)
-3. **New messages**: Solo messaggi ricevuti DOPO l'avvio fanno apparire il badge
+Same fix applied to the worktree section using `activeSessionsWorktree`.
+
+## Key Insight
+
+The sidebar shows only non-done sessions (max 5), but the badge logic was counting ALL sessions including archived ones. This mismatch caused "phantom" notifications - badge visible but no sessions shown underneath.
 
 ## Related Code
 
 - **Badge logic**: `src/components/RepositoryGroup.tsx` (SortableAgent + worktree section)
-- **Condition**: `showNotificationBadge = lastAssistantTimestamp > lastReadTimestamp`
-- **Mark as read**: `src/App.tsx` useEffect che monitora `activeId`
-
-## Tested
-
-- ✅ Badge non appare all'avvio per sessioni vecchie
-- ✅ Badge appare correttamente quando l'agente risponde dopo l'avvio
-- ✅ Badge scompare quando si clicca l'agente (mark as read)
+- **Active sessions filter**: `activeSessions = agentSessions.filter(s => s.status !== "done")`
+- **Condition**: `showNotificationBadge = !isActive && !isDormant && activeSessions.length > 0 && lastAssistantTimestamp > lastReadTimestamp`
+- **Boot init**: `src/App.tsx` initializes `lastReadTimestamps` with `Date.now()` for all agents

@@ -199,6 +199,13 @@ function SortableAgent({
     [allSessions, agent.id],
   );
 
+  // 🔵 FIX: Active sessions only (exclude "done") for notification badge calculations
+  // Done sessions are archived and should NOT trigger "Quack quack..." badge
+  const activeSessions = useMemo(
+    () => agentSessions.filter((s) => s.status !== "done"),
+    [agentSessions],
+  );
+
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((t) => t + 1);
@@ -287,13 +294,14 @@ function SortableAgent({
     [transform, isDragging, transition],
   );
 
-  // 🦆 SESSIONS-FIRST: Check if agent is dormant (no user interaction in ANY session)
-  // Agent is awake if ANY session has at least one assistant response
+  // 🦆 SESSIONS-FIRST: Check if agent is dormant (no user interaction in ANY active session)
+  // Agent is awake if ANY non-done session has at least one assistant response
+  // 🔵 FIX: Uses activeSessions (excludes "done") so archived sessions don't prevent dormant state
   const isDormant = useMemo(() => {
-    if (!chatSessions || agentSessions.length === 0) return true;
+    if (!chatSessions || activeSessions.length === 0) return true;
 
-    // Check ALL sessions for this agent
-    for (const session of agentSessions) {
+    // Check only ACTIVE (non-done) sessions for this agent
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (!sessionMessages || sessionMessages.length === 0) continue;
 
@@ -302,34 +310,32 @@ function SortableAgent({
         (msg) => msg.role === "assistant",
       );
       if (hasAssistantMessage) {
-        return false; // Agent is AWAKE - at least one session has assistant response
+        return false; // Agent is AWAKE - at least one active session has assistant response
       }
     }
 
-    return true; // No sessions with assistant responses = dormant
-  }, [chatSessions, agentSessions]);
+    return true; // No active sessions with assistant responses = dormant
+  }, [chatSessions, activeSessions]);
 
-  // 🦆 SESSIONS-FIRST: Check if ALL sessions are empty (no messages)
+  // 🦆 SESSIONS-FIRST: Check if ALL active sessions are empty (no messages)
   const isChatEmpty = useMemo(() => {
-    if (!chatSessions || agentSessions.length === 0) return true;
+    if (!chatSessions || activeSessions.length === 0) return true;
 
-    // Check if ALL sessions have no messages
-    for (const session of agentSessions) {
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (sessionMessages && sessionMessages.length > 0) {
-        return false; // At least one session has messages
+        return false;
       }
     }
 
-    return true; // All sessions are empty
-  }, [chatSessions, agentSessions]);
+    return true;
+  }, [chatSessions, activeSessions]);
 
-  // 🦆 SESSIONS-FIRST: Check if ANY session has unread messages (agent responded)
+  // 🦆 SESSIONS-FIRST: Check if ANY active session has unread messages (agent responded)
   const hasUnreadMessages = useMemo(() => {
     if (!chatSessions || isActive || isDormant) return false;
 
-    // Check ALL sessions for unread assistant messages
-    for (const session of agentSessions) {
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (!sessionMessages || sessionMessages.length === 0) continue;
 
@@ -337,21 +343,21 @@ function SortableAgent({
         .reverse()
         .find((msg) => msg.role === "assistant");
       if (lastAssistantMessage) {
-        return true; // At least one session has an assistant response
+        return true;
       }
     }
 
     return false;
-  }, [chatSessions, agentSessions, isActive, isDormant]);
+  }, [chatSessions, activeSessions, isActive, isDormant]);
 
-  // 🦆 SESSIONS-FIRST: Get LATEST assistant message timestamp across ALL sessions
+  // 🦆 SESSIONS-FIRST: Get LATEST assistant message timestamp across ACTIVE sessions only
+  // 🔵 FIX: Only considers non-done sessions to prevent badge from old archived responses
   const lastAssistantTimestamp = useMemo(() => {
-    if (!chatSessions || agentSessions.length === 0) return 0;
+    if (!chatSessions || activeSessions.length === 0) return 0;
 
     let latestTimestamp = 0;
 
-    // Check ALL sessions and find the most recent assistant message
-    for (const session of agentSessions) {
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (!sessionMessages || sessionMessages.length === 0) continue;
 
@@ -367,7 +373,7 @@ function SortableAgent({
     }
 
     return latestTimestamp;
-  }, [chatSessions, agentSessions]);
+  }, [chatSessions, activeSessions]);
 
   // 🔵 Get last read timestamp for this agent
   const lastReadTimestamp = useMemo(() => {
@@ -383,14 +389,15 @@ function SortableAgent({
   }, [isActive, isHovered, agent.color]);
 
   // 🔵 Show notification badge dot when agent has NEW unread messages (read-once system)
-  // Badge appears when: NOT active + agent responded AFTER last read
+  // Badge appears when: NOT active + has active sessions + agent responded AFTER last read
+  // 🔵 FIX: Also checks that active sessions exist with complete assistant messages
   const showNotificationBadge = useMemo(() => {
     if (isActive || isDormant) return false; // No badge when active or dormant
+    if (activeSessions.length === 0) return false; // No badge without active sessions
 
     // 🔵 TIMESTAMP COMPARISON: Badge shows ONLY if agent responded AFTER last read
-    // This creates "read-once" behavior: badge disappears when clicked, only reappears for NEW messages
     return lastAssistantTimestamp > lastReadTimestamp;
-  }, [isActive, isDormant, lastAssistantTimestamp, lastReadTimestamp]);
+  }, [isActive, isDormant, activeSessions.length, lastAssistantTimestamp, lastReadTimestamp]);
 
   // 🦆 SESSIONS-FIRST: Aggregate status from ALL sessions for TerminalActivityBar
   // Status is 'busy' if ANY session is loading, 'idle' otherwise
@@ -2217,17 +2224,18 @@ export default function RepositoryGroup({
                           return !messages || messages.length === 0;
                         })();
 
-                        // 🦆 FIX: Check if agent is dormant based on SESSIONS (not agent.id)
-                        // Agent is dormant if NO session has an assistant response
+                        // 🔵 FIX: Filter to active (non-done) sessions only for badge calculations
+                        const activeSessionsWorktree =
+                          allSessionsForRepo.filter(
+                            (s) => s.agentId === agent.id && s.status !== "done",
+                          );
+
+                        // 🦆 FIX: Check if agent is dormant based on ACTIVE SESSIONS only
                         const isDormantWorktree = (() => {
                           if (!chatSessions) return true;
-                          const agentSessionsForDormant =
-                            allSessionsForRepo.filter(
-                              (s) => s.agentId === agent.id,
-                            );
-                          if (agentSessionsForDormant.length === 0) return true;
+                          if (activeSessionsWorktree.length === 0) return true;
 
-                          for (const session of agentSessionsForDormant) {
+                          for (const session of activeSessionsWorktree) {
                             const sessionMessages = chatSessions.get(
                               session.id,
                             );
@@ -2237,26 +2245,20 @@ export default function RepositoryGroup({
                                 (msg) => msg.role === "assistant",
                               )
                             ) {
-                              return false; // At least one session has assistant response = not dormant
+                              return false;
                             }
                           }
                           return true;
                         })();
-                        // Keep backward compat variable name
                         const isDormant = isDormantWorktree;
 
-                        // 🦆 FIX: Check if agent has unread messages based on SESSIONS
+                        // 🦆 FIX: Check if agent has unread messages based on ACTIVE SESSIONS
                         const hasUnreadMessagesWorktree = (() => {
                           if (!chatSessions || isActive) return false;
-                          const agentSessionsForUnread =
-                            allSessionsForRepo.filter(
-                              (s) => s.agentId === agent.id,
-                            );
-                          if (agentSessionsForUnread.length === 0) return false;
+                          if (activeSessionsWorktree.length === 0) return false;
                           if (isDormantWorktree) return false;
 
-                          // Check if ANY session has unread (last message is assistant and complete)
-                          for (const session of agentSessionsForUnread) {
+                          for (const session of activeSessionsWorktree) {
                             const sessionMessages = chatSessions.get(
                               session.id,
                             );
@@ -2275,15 +2277,21 @@ export default function RepositoryGroup({
                           return false;
                         })();
 
-                        // Calculate last assistant timestamp for worktree agents (same as SortableAgent)
+                        // 🔵 FIX: Calculate last assistant timestamp from ACTIVE sessions only
                         const lastAssistantTimestamp = (() => {
-                          if (!chatSessions) return 0;
-                          const messages = chatSessions.get(agent.id);
-                          if (!messages || messages.length === 0) return 0;
-                          const lastAssistantMessage = [...messages]
-                            .reverse()
-                            .find((msg) => msg.role === "assistant");
-                          return lastAssistantMessage?.timestamp || 0;
+                          if (!chatSessions || activeSessionsWorktree.length === 0) return 0;
+                          let latest = 0;
+                          for (const session of activeSessionsWorktree) {
+                            const sessionMessages = chatSessions.get(session.id);
+                            if (!sessionMessages || sessionMessages.length === 0) continue;
+                            const lastAssistantMsg = [...sessionMessages]
+                              .reverse()
+                              .find((msg) => msg.role === "assistant");
+                            if (lastAssistantMsg?.timestamp) {
+                              latest = Math.max(latest, lastAssistantMsg.timestamp);
+                            }
+                          }
+                          return latest;
                         })();
 
                         // 🔵 Show notification badge dot for worktree agents (read-once system)
@@ -2292,6 +2300,7 @@ export default function RepositoryGroup({
                         const showNotificationBadge =
                           !isActive &&
                           !isDormant &&
+                          activeSessionsWorktree.length > 0 &&
                           lastAssistantTimestamp > lastReadTimestamp;
 
                         // Determine if conversation is active and if agent is busy (worktree)
