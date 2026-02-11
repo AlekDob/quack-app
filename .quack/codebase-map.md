@@ -1,7 +1,7 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-11T09:43:18Z
+generated: 2026-02-11T12:03:49Z
 files: 408
 exports: 1193
 ---
