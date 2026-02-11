@@ -16,14 +16,29 @@
 
 set -e
 
-# Configuration
-PROJECT_ROOT="/Users/alekdob/Desktop/Dev/Personal/quack-app"
-# Universal build path (arm64 + x86_64)
+# Resolve project root from script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Load .env file
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+else
+    echo -e "${RED}ERROR: .env file not found at $PROJECT_ROOT/.env${NC}"
+    echo "Copy .env.example to .env and fill in your certificate details."
+    exit 1
+fi
+
+# Validate required variables
+SIGNING_IDENTITY="${APPLE_SIGNING_IDENTITY:?ERROR: APPLE_SIGNING_IDENTITY not set in .env}"
+KEYCHAIN_PROFILE="${APPLE_KEYCHAIN_PROFILE:-QuackNotarization}"
+
+# Configuration (derived from project root)
 APP_PATH="$PROJECT_ROOT/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.app"
 DMG_PATH="$PROJECT_ROOT/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.dmg"
-SIGNING_IDENTITY="Developer ID Application: ALEKSANDAR DOBROHOTOV (FC38UVV3V3)"
 ENTITLEMENTS="$PROJECT_ROOT/src-tauri/Entitlements.plist"
-KEYCHAIN_PROFILE="QuackNotarization"
 
 # Parallel jobs (adjust based on CPU cores)
 PARALLEL_JOBS=8

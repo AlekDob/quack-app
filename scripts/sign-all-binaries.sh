@@ -5,9 +5,24 @@
 
 set -e
 
-APP_PATH="${1:-src-tauri/target/release/bundle/macos/Quack.app}"
-SIGNING_IDENTITY="Developer ID Application: ALEKSANDAR DOBROHOTOV (FC38UVV3V3)"
-ENTITLEMENTS="src-tauri/Entitlements.plist"
+# Resolve project root from script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Load .env file
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+else
+    echo "ERROR: .env file not found at $PROJECT_ROOT/.env"
+    echo "Copy .env.example to .env and fill in your certificate details."
+    exit 1
+fi
+
+APP_PATH="${1:-$PROJECT_ROOT/src-tauri/target/release/bundle/macos/Quack.app}"
+SIGNING_IDENTITY="${APPLE_SIGNING_IDENTITY:?ERROR: APPLE_SIGNING_IDENTITY not set in .env}"
+ENTITLEMENTS="$PROJECT_ROOT/src-tauri/Entitlements.plist"
 
 echo "=== Quack Deep Code Signing Script ==="
 echo "App Path: $APP_PATH"
