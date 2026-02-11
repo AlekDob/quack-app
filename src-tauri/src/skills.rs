@@ -45,8 +45,8 @@ fn list_skills_impl(working_dir: Option<String>) -> Result<Vec<SkillInfo>> {
     let mut skills = Vec::new();
 
     // 1. Read GLOBAL skills from ~/.claude/skills/
-    if let Ok(home_dir) = std::env::var("HOME") {
-        let global_skills_dir = PathBuf::from(home_dir).join(".claude").join("skills");
+    if let Some(home_dir) = dirs::home_dir() {
+        let global_skills_dir = home_dir.join(".claude").join("skills");
 
         if global_skills_dir.exists() {
             log::info!("Found global skills directory at: {:?}", global_skills_dir);
@@ -89,7 +89,7 @@ fn list_skills_impl(working_dir: Option<String>) -> Result<Vec<SkillInfo>> {
 
     // 2. Read PROJECT skills from .claude/skills/
     let current = if let Some(dir) = working_dir {
-        PathBuf::from(dir)
+        PathBuf::from(normalize_path(&dir))
     } else {
         std::env::current_dir()
             .context("Unable to get current working directory")?
@@ -160,14 +160,14 @@ fn get_skill_details_impl(
     let skills_dir = match scope.as_deref() {
         Some("global") => {
             // Global skills: ~/.claude/skills/
-            let home = std::env::var("HOME")
-                .context("Unable to get HOME directory")?;
-            PathBuf::from(home).join(".claude").join("skills")
+            let home = dirs::home_dir()
+                .ok_or_else(|| anyhow!("Unable to get home directory"))?;
+            home.join(".claude").join("skills")
         }
         _ => {
             // Project skills: .claude/skills/ in working directory
             let current = if let Some(dir) = working_dir {
-                PathBuf::from(dir)
+                PathBuf::from(normalize_path(&dir))
             } else {
                 std::env::current_dir()
                     .context("Unable to get current working directory")?
@@ -238,7 +238,7 @@ fn parse_skill_file_with_scope(path: &PathBuf, scope: &str) -> Result<SkillInfo>
     Ok(SkillInfo {
         name,
         description,
-        file_path: path.to_string_lossy().to_string(),
+        file_path: normalize_path(&path.to_string_lossy()),
         scope: scope.to_string(),
     })
 }
@@ -274,15 +274,24 @@ fn parse_skill_file_with_content(path: &PathBuf) -> Result<SkillDetails> {
     Ok(SkillDetails {
         name,
         description,
-        file_path: path.to_string_lossy().to_string(),
+        file_path: normalize_path(&path.to_string_lossy()),
         content,
     })
+}
+
+/// Normalize path by removing \\?\ prefix added by fs::canonicalize on Windows
+fn normalize_path(path: &str) -> String {
+    if path.starts_with(r"\\?\") {
+        path[4..].to_string()
+    } else {
+        path.to_string()
+    }
 }
 
 fn check_skills_directory_impl(working_dir: Option<String>) -> Result<bool> {
     // Use provided working directory or current directory
     let current = if let Some(dir) = working_dir {
-        PathBuf::from(dir)
+        PathBuf::from(normalize_path(&dir))
     } else {
         std::env::current_dir()
             .context("Unable to get current working directory")?

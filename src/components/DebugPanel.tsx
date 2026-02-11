@@ -8,6 +8,9 @@
 import { useState, useEffect } from 'react';
 import debugLogger, { type DebugLogEntry } from '../services/debugLogger';
 import { useSessionStore } from '../stores/sessionStore';
+import { usePrerequisitesStore } from '../stores/prerequisitesStore';
+import { useGitConfigStore } from '../stores/gitConfigStore';
+import { useIDEStore } from '../stores/ideStore';
 import './DebugPanel.css';
 
 export default function DebugPanel() {
@@ -17,6 +20,11 @@ export default function DebugPanel() {
   const [levelFilter, setLevelFilter] = useState<'all' | 'info' | 'warn' | 'error'>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const { sessions } = useSessionStore();
+
+  // Onboarding stores
+  const prerequisitesStore = usePrerequisitesStore();
+  const gitConfigStore = useGitConfigStore();
+  const ideStore = useIDEStore();
 
   // Load logs on mount and refresh
   useEffect(() => {
@@ -68,6 +76,52 @@ export default function DebugPanel() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleResetGitOnboarding = () => {
+    if (confirm('Reset Git onboarding? The dialog will appear on next app restart.')) {
+      // Use the store's reset action to ensure persistence works correctly
+      useGitConfigStore.getState().resetOnboarding();
+      alert('Git onboarding reset successfully. Restart the app to see it.');
+    }
+  };
+
+  const handleResetIDEOnboarding = () => {
+    if (confirm('Reset IDE onboarding? The dialog will appear on next app restart.')) {
+      // Use the store's reset action to ensure persistence works correctly
+      useIDEStore.getState().resetOnboarding();
+      alert('IDE onboarding reset successfully. Restart the app to see it.');
+    }
+  };
+
+  const handleShowGitOnboarding = () => {
+    // Temporarily force onboarding to show by setting hasCompletedOnboarding to false
+    const currentState = useGitConfigStore.getState();
+    useGitConfigStore.setState({ hasCompletedOnboarding: false });
+
+    // Note: The onboarding will appear immediately without restart
+    alert('Git onboarding will appear now. Complete it or refresh to restore previous state.');
+  };
+
+  const handleShowIDEOnboarding = () => {
+    // Temporarily force onboarding to show
+    const currentState = useIDEStore.getState();
+    useIDEStore.setState({ hasCompletedOnboarding: false, preferredIDE: null });
+
+    // Note: The onboarding will appear immediately without restart
+    alert('IDE onboarding will appear now. Complete it or refresh to restore previous state.');
+  };
+
+  const handleResetPrerequisites = () => {
+    if (confirm('Reset prerequisites check? The dialog will appear on next app restart.')) {
+      usePrerequisitesStore.getState().resetOnboarding();
+      alert('Prerequisites check reset successfully. Restart the app to see it.');
+    }
+  };
+
+  const handleShowPrerequisites = () => {
+    usePrerequisitesStore.setState({ hasCompletedOnboarding: false });
+    alert('Prerequisites check will appear now. Complete it or refresh to restore previous state.');
   };
 
   const stats = debugLogger.getStats();
@@ -267,6 +321,77 @@ export default function DebugPanel() {
         <p className="debug-panel-description" style={{ fontSize: '11px', opacity: 0.7 }}>
           Chat history is managed by Claude SDK. Sessions are stored in sessionStore.
         </p>
+      </div>
+
+      {/* Onboarding Testing Section */}
+      <div className="debug-panel-storage">
+        <h3>🔄 Onboarding Testing</h3>
+
+        {/* Show Onboarding (Instant) */}
+        <div style={{ marginBottom: '20px' }}>
+          <p className="debug-panel-description" style={{ marginBottom: '12px' }}>
+            Show onboarding dialogs immediately (without restart).
+          </p>
+          <div className="debug-control-row">
+            <button
+              className="debug-action-btn"
+              onClick={handleShowPrerequisites}
+              title="Show prerequisites check now"
+            >
+              Show Prerequisites
+            </button>
+            <button
+              className="debug-action-btn"
+              onClick={handleShowGitOnboarding}
+              title="Show Git configuration onboarding now"
+            >
+              Show Git Config
+            </button>
+            <button
+              className="debug-action-btn"
+              onClick={handleShowIDEOnboarding}
+              title="Show IDE selection onboarding now"
+            >
+              Show IDE Setup
+            </button>
+          </div>
+          <p className="debug-panel-description" style={{ fontSize: '11px', opacity: 0.7, marginTop: '8px' }}>
+            Appears instantly. Complete the flow or refresh to restore state.
+          </p>
+        </div>
+
+        {/* Reset Onboarding (Requires Restart) */}
+        <div>
+          <p className="debug-panel-description" style={{ marginBottom: '12px' }}>
+            Reset onboarding state permanently (requires restart).
+          </p>
+          <div className="debug-control-row">
+            <button
+              className="debug-action-btn"
+              onClick={handleResetPrerequisites}
+              title="Reset prerequisites check permanently"
+            >
+              Reset Prerequisites
+            </button>
+            <button
+              className="debug-action-btn"
+              onClick={handleResetGitOnboarding}
+              title="Reset Git configuration onboarding permanently"
+            >
+              Reset Git Config
+            </button>
+            <button
+              className="debug-action-btn"
+              onClick={handleResetIDEOnboarding}
+              title="Reset IDE selection onboarding permanently"
+            >
+              Reset IDE Setup
+            </button>
+          </div>
+          <p className="debug-panel-description" style={{ fontSize: '11px', opacity: 0.7, marginTop: '8px' }}>
+            Restart required to see the onboarding dialogs.
+          </p>
+        </div>
       </div>
 
       {/* Help */}

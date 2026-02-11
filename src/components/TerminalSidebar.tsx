@@ -27,6 +27,8 @@ import ContextMenu from "./ContextMenu";
 import CommitHistoryModal from "./CommitHistoryModal";
 import DragHandle from "./DragHandle";
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
+import { extractProjectId } from "../utils/projectUtils";
+import { formatShortcut } from "../utils/platform";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
 
 // Storage format for project order and colors
@@ -448,8 +450,7 @@ export default function TerminalSidebar({
 
       // Extract base repository name more intelligently
       let repoName: string;
-      const parts = cwd.split('/');
-      const lastPart = parts[parts.length - 1];
+      const lastPart = extractProjectId(cwd);
 
       if (isWorktree) {
         // For worktrees, extract the base repo name
@@ -503,7 +504,7 @@ export default function TerminalSidebar({
     // Add persisted projects that have no terminals (empty projects)
     if (persistedProjects) {
       for (const [projectPath, projectName] of persistedProjects) {
-        const dirName = projectPath.split('/').pop() || projectName;
+        const dirName = extractProjectId(projectPath) || projectName;
         if (!repoMap.has(dirName)) {
           repoMap.set(dirName, {
             mainAgents: [],
@@ -756,12 +757,12 @@ export default function TerminalSidebar({
     <aside className="sidebar sidebar-codex">
       {/* Top area next to traffic lights */}
       <div className="sidebar-header-top" data-tauri-drag-region>
-        <KeyboardShortcutTooltip label="New Project" shortcut="⌘N">
+        <KeyboardShortcutTooltip label="New Project" shortcut={formatShortcut("⌘N")}>
           <button
             type="button"
             className="new-project-btn-sidebar"
             onClick={() => onCreateAgent()}
-            aria-label="New Project (⌘N)"
+            aria-label={`New Project (${formatShortcut("⌘N")})`}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12h14" />

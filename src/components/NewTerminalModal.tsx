@@ -29,8 +29,6 @@ import { useMarketplace } from '../hooks/useMarketplace';
 // Step components
 import { StepProgress } from './modal-steps/StepProgress';
 import { StepProjectSelection } from './modal-steps/StepProjectSelection';
-import { StepStarterBundles } from './modal-steps/StepStarterBundles';
-import type { StarterBundle } from './modal-steps/StepStarterBundles';
 import type { ModalStep, ActiveProject } from './modal-steps/types';
 
 // Styles
@@ -66,10 +64,10 @@ interface NewTerminalModalProps {
   onBrowse: () => void
   onCancel: () => void
   onConfirm: (agentData?: SavedAgent) => void
-  /** When true, show starter agent bundles step after project selection */
+  /** @deprecated Starter bundles now handled via Quack Store */
   isOnboarding?: boolean
-  /** Callback when user selects starter bundles to install */
-  onInstallStarterBundles?: (bundles: StarterBundle[], projectPath: string, projectName: string) => Promise<void>
+  /** @deprecated Starter bundles now handled via Quack Store */
+  onInstallStarterBundles?: (bundles: Array<{ resource: import('../types').MarketplaceResource; template: import('../types').AgentTemplate }>, projectPath: string, projectName: string) => Promise<void>
 }
 
 function NewTerminalModal({
@@ -100,11 +98,9 @@ function NewTerminalModal({
   onBrowse,
   onCancel,
   onConfirm,
-  isOnboarding = false,
-  onInstallStarterBundles,
 }: NewTerminalModalProps) {
-  // Marketplace for starter bundles
-  const { getStarterBundles, loading: marketplaceLoading, allResources, installResource } = useMarketplace();
+  // Marketplace for agent templates
+  const { allResources, installResource } = useMarketplace();
 
   // Step management - PROJECT-FIRST FLOW (2 steps: project → agent)
   // Edit mode: agent step with inline editing form
@@ -117,9 +113,6 @@ function NewTerminalModal({
   // Inline editing mode within the agent step
   const [inlineEditingMode, setInlineEditingMode] = useState<'create' | 'edit' | null>(null);
   const [editingAgentData, setEditingAgentData] = useState<SavedAgent | null>(null);
-
-  // Starter bundles install state
-  const [installingBundles, setInstallingBundles] = useState(false);
 
   // Git branch state
   const [availableBranches, setAvailableBranches] = useState<GitBranch[]>([]);
@@ -619,12 +612,8 @@ function NewTerminalModal({
       return;
     }
     setCompletedSteps(prev => [...prev, 'project']);
-    // Show starter bundles during onboarding (first project creation)
-    if (isOnboarding) {
-      setCurrentStep('starters');
-    } else {
-      setCurrentStep('agent');
-    }
+    // Starter bundles step disabled - agents are now imported from the Quack Store
+    setCurrentStep('agent');
   }
 
   // Handle project selection from StepProjectSelection
@@ -714,38 +703,7 @@ function NewTerminalModal({
           />
         )}
 
-        {/* Step 1.5: Starter Bundles (onboarding only) */}
-        {currentStep === 'starters' && (
-          <StepStarterBundles
-            bundles={getStarterBundles().map(resource => {
-              const ext = resource as typeof resource & { _agentTemplate?: import('../types').AgentTemplate };
-              return {
-                resource,
-                template: ext._agentTemplate!,
-              };
-            }).filter(b => b.template)}
-            loading={marketplaceLoading}
-            installing={installingBundles}
-            onConfirm={async (selected) => {
-              setInstallingBundles(true);
-              try {
-                const projectName = path.split('/').pop() || path;
-                await onInstallStarterBundles?.(selected, path, projectName);
-              } finally {
-                setInstallingBundles(false);
-                onCancel();
-              }
-            }}
-            onSkip={() => {
-              setCompletedSteps(prev => [...prev, 'starters']);
-              setCurrentStep('agent');
-            }}
-            onBack={() => {
-              setCurrentStep('project');
-              setCompletedSteps(prev => prev.filter(s => s !== 'project'));
-            }}
-          />
-        )}
+        {/* Starter Bundles step removed - agents are now imported from the Quack Store */}
 
         {/* Step 2: Agent Selection (with inline editing) */}
         {currentStep === 'agent' && (

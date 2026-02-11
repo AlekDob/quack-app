@@ -40,6 +40,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useTeamStore } from "../stores/teamStore";
 import TeamCreationModal from "./TeamCreationModal";
 import TeamStatusBadge from "./TeamStatusBadge";
+import { extractProjectId } from "../utils/projectUtils";
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
 import type { TerminalInfo, ChatMessage, GitPullResult } from "../types";
 
@@ -88,19 +89,18 @@ function getAvatarUrl(avatarName: string): string {
 
 // Helper to extract repository name from path
 function getRepoDisplayName(path: string): string {
-  const parts = path.split("/");
-  const lastPart = parts[parts.length - 1];
-  if (lastPart.includes("-worktree-")) {
-    return lastPart.split("-worktree-")[0];
+  const projectName = extractProjectId(path);
+  // Handle worktree paths (e.g., "quack-app-worktree-feature-branch")
+  if (projectName.includes("-worktree-")) {
+    return projectName.split("-worktree-")[0];
   }
-  return lastPart;
+  return projectName;
 }
 
 // Helper to extract branch name from worktree path or terminal info
 function getBranchName(terminal: TerminalInfo): string {
   if (terminal.branch) return terminal.branch;
-  const pathParts = terminal.cwd.split("/");
-  const lastPart = pathParts[pathParts.length - 1];
+  const lastPart = extractProjectId(terminal.cwd);
   if (lastPart.includes("-worktree-")) {
     const branchPart = lastPart.split("-worktree-")[1];
     return branchPart.replace(/-/g, "/");

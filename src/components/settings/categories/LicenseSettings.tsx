@@ -185,13 +185,23 @@ export default function LicenseSettings() {
               <button
                 className="license-purchase-button"
                 onClick={() => {
-                  // Open Gumroad checkout in browser
-                  open('https://alekdob.gumroad.com/l/tsvgt?wanted=true');
+                  open('https://alekdob.gumroad.com/l/hmrki');
                 }}
               >
-                <span className="license-purchase-icon">👑</span>
-                Purchase Quack Pro
+                Subscribe - <s>&euro;15</s> &euro;9/mo or <s>&euro;159</s> &euro;89/yr
               </button>
+              <button
+                className="license-purchase-button license-purchase-lifetime"
+                onClick={() => {
+                  open('https://alekdob.gumroad.com/l/tsvgt');
+                }}
+              >
+                Lifetime License - <s>&euro;399</s> &euro;179
+              </button>
+              <p className="license-indie-message">
+                Built with love by two indie devs from Italy 🍕🇮🇹
+                Your support keeps Quack alive and quacking! 🦆
+              </p>
             </div>
           </div>
         </div>

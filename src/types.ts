@@ -998,6 +998,7 @@ export interface MarketplaceResource {
   id: string;
   name: string;
   description: string;
+  longDescription?: string;
   category: MarketplaceCategory;
   author: string;
   authorAvatar?: string;

@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import type { ChatToolCall, TodoItem } from '../types';
 import DiffViewer from './DiffViewer';
 import TodoWidget from './TodoWidget';
@@ -88,8 +88,33 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
     return '';
   };
 
+  // Full path/command for tooltip and copy (not truncated)
+  const getFullTarget = (): string => {
+    const toolName = tool.name.toLowerCase();
+    const input = tool.input as Record<string, unknown>;
+    if (!input) return '';
+
+    if (input.file_path) return input.file_path as string;
+    if (toolName === 'bash' && input.command) return input.command as string;
+    if (input.pattern) return input.pattern as string;
+    if (input.description) return input.description as string;
+    if (input.path) return input.path as string;
+    return '';
+  };
+
   const toolColor = getToolColor(tool.name);
   const toolTarget = getToolTarget();
+  const fullTarget = getFullTarget();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyTarget = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!fullTarget) return;
+    navigator.clipboard.writeText(fullTarget);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [fullTarget]);
+
   const hasResult = tool.result && tool.result.trim().length > 0;
   const hasDiff = tool.diff && tool.diff.lines.length > 0;
   const hasContent = hasResult || hasDiff;
@@ -139,7 +164,13 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
           {toolTarget && (
             <>
               <span className="tool-minimal-on">on</span>
-              <span className="tool-minimal-target">{toolTarget}</span>
+              <span
+                className={`tool-minimal-target ${fullTarget ? 'copyable' : ''} ${copied ? 'copied' : ''}`}
+                title={fullTarget || toolTarget}
+                onClick={fullTarget ? handleCopyTarget : undefined}
+              >
+                {copied ? 'Copied!' : toolTarget}
+              </span>
             </>
           )}
         </span>

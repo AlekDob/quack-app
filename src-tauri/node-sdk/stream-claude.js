@@ -576,6 +576,48 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
           }
         }
 
+        // Handle ExitPlanMode - requires user approval before proceeding
+        // Without this, plans get auto-approved without user interaction
+        if (toolName === 'ExitPlanMode') {
+          console.error(`[canUseTool] ExitPlanMode detected, requesting user approval`);
+          console.error(`[canUseTool] Plan:`, JSON.stringify(input, null, 2).substring(0, 1000));
+
+          try {
+            // Send plan approval request to frontend and wait for user's decision
+            const response = await requestFromFrontend('plan_approval_request', {
+              plan: input,
+            }, 0); // 0 = no timeout, wait indefinitely
+
+            console.error(`[canUseTool] Plan approval response:`, JSON.stringify(response, null, 2));
+
+            // Response comes as { requestId, answers: { approved: 'true'/'false', feedback: '...' } }
+            const answers = response.answers || response;
+            const isApproved = answers.approved === 'true' || answers.approved === true;
+
+            if (isApproved) {
+              // User approved the plan - allow ExitPlanMode to proceed
+              return {
+                behavior: 'allow',
+                updatedInput: input,
+              };
+            } else {
+              // User rejected the plan - deny ExitPlanMode
+              const feedback = answers.feedback || 'User rejected the plan';
+              return {
+                behavior: 'deny',
+                message: feedback,
+              };
+            }
+          } catch (error) {
+            console.error(`[canUseTool] Error getting plan approval:`, error.message);
+            // Deny if we couldn't get approval
+            return {
+              behavior: 'deny',
+              message: `Failed to get plan approval: ${error.message}`,
+            };
+          }
+        }
+
         // Default: allow all other tools
         return {
           behavior: 'allow',

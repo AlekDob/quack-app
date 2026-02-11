@@ -19,7 +19,7 @@ import "./SidePanelAccordion.css";
  * All sections visible, collapsible individually
  */
 
-// Category-specific colors matching AddonsDrawer
+// Category-specific colors matching Quack Store
 const CATEGORY_COLORS: Record<string, string> = {
   skills: '#f28c52',      // Orange - main accent
   agents: '#f28c52',      // Orange - personas
@@ -27,8 +27,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   rules: '#60a5fa',       // Blue - governance
   hooks: '#a78bfa',       // Purple - events
   mcp: '#34d399',         // Green - servers
-  commands: '#f472b6',    // Pink - snippets
-  snippets: '#f472b6',    // Pink - snippets
+  commands: '#f472b6',    // Pink - commands
   context: '#f28c52',     // Orange - file explorer
   'agent-context': '#f28c52', // Orange - personality
   default: '#f28c52',     // Orange fallback
@@ -228,7 +227,6 @@ interface SidePanelAccordionProps {
   activeAgentCwd?: string | null;
   activeAgentPersonality?: Partial<AgentPersonality> | null;
   activeAgentColor?: string | null;
-  onImportAgent?: (agent: import('../types').SavedAgent) => void;
   projectName?: string;
   gitBranch?: string;
   agentRefreshKey?: number;
@@ -311,7 +309,6 @@ export default function SidePanelAccordion({
   activeAgentCwd,
   activeAgentPersonality,
   activeAgentColor,
-  onImportAgent,
   projectName,
   gitBranch,
   agentRefreshKey,
@@ -491,7 +488,6 @@ export default function SidePanelAccordion({
             onOpenFile={onOpenFile}
             onOpenContextDrawer={onOpenContextDrawer}
             onOpenRulesTab={() => toggleSection("rules")}
-            onImportAgent={onImportAgent}
             projectName={projectName}
             gitBranch={gitBranch}
             refreshKey={agentRefreshKey}
@@ -577,7 +573,7 @@ export default function SidePanelAccordion({
           isExpanded={focusedSection === "commands"}
           isFocused={focusedSection === "commands"}
           order={getOrder("commands")}
-          category="snippets"
+          category="commands"
           onToggle={() => toggleSection("commands")}
         >
           <CommandsPanel

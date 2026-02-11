@@ -707,9 +707,9 @@ button.directory-chooser:disabled {
   min-height: 0;
 }
 
-/* Addons Drawer Panel - Narrower width */
-.git-drawer-panel.addons-drawer-panel {
-  width: clamp(380px, 30vw, 480px);
+/* Quack Store Drawer Panel */
+.git-drawer-panel.quack-store-drawer-panel {
+  width: clamp(900px, 85vw, 1600px);
 }
 
 /* Git Drawer Loading State */

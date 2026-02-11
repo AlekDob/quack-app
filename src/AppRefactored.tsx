@@ -759,7 +759,7 @@ function AppRefactored() {
         {/* Action Icons */}
         <ActionIcons
           onGitClick={() => setShowGitDrawer(true)}
-          onPluginsClick={() => setShowPluginsDrawer(true)}
+          onStoreClick={() => setShowPluginsDrawer(true)}
           onUsageClick={() => {}}
           onTelegramClick={() => setShowTelegramSetup(true)}
           onTerminalClick={() => setShowNewTerminalModal(true)}

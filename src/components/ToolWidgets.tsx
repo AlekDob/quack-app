@@ -692,8 +692,18 @@ export const ExitPlanModeWidget: React.FC<{
   plan: string;
   defaultExpanded?: boolean;
   workingDirectory?: string;
-}> = ({ plan, defaultExpanded = true, workingDirectory }) => {
-  return <PlanWidget plan={plan} defaultExpanded={defaultExpanded} workingDirectory={workingDirectory} />;
+  pendingApprovalRequestId?: string;
+  onApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+}> = ({ plan, defaultExpanded = true, workingDirectory, pendingApprovalRequestId, onApprovalResponse }) => {
+  return (
+    <PlanWidget
+      plan={plan}
+      defaultExpanded={defaultExpanded}
+      workingDirectory={workingDirectory}
+      pendingApprovalRequestId={pendingApprovalRequestId}
+      onApprovalResponse={onApprovalResponse}
+    />
+  );
 };
 
 // EnterPlanMode widget - shows when AI enters planning mode

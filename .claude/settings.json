@@ -2,11 +2,11 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/Users/alekdob/.quack/scripts/generate-codebase-map.mjs\" --update-file \"$TOOL_INPUT_FILE_PATH\" . .quack/codebase-map.md"
+            "command": "bash scripts/codebase-map-hook.sh"
           }
         ]
       }

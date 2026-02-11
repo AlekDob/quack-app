@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { homeDir } from '@tauri-apps/api/path';
+import { homeDir, join } from '@tauri-apps/api/path';
 import type { MarketplaceResource, MarketplaceCategory, MarketplaceFilters, MarketplaceLibrary, AgentTemplate } from '../types';
 import { createAgent, type UnifiedAgent } from '../services/unifiedAgentStorage';
 import { getRandomGenderedName, getRandomName } from '../utils/agentNames';
@@ -26,11 +26,13 @@ interface PluginJson {
   name: string;
   version: string;
   description: string;
+  longDescription?: string;
   author?: { name: string; url?: string };
   repository?: string;
   license?: string;
   keywords?: string[];
   skills?: string[];
+  commands?: string[];
   agents?: string[];
   rules?: string[];
   agentTemplate?: AgentTemplate;
@@ -165,6 +167,32 @@ export function useMarketplace() {
           }
         }
 
+        // Create resources for each command
+        if (pluginData.commands) {
+          discoveredCategories.add('commands');
+          for (const cmdPath of pluginData.commands) {
+            const cmdName = cmdPath.split('/').pop()?.replace('.md', '') || cmdPath;
+            allResources.push({
+              id: `${plugin.name}--command--${cmdName}`,
+              name: `/${cmdName}`,
+              description: `Command from ${plugin.name} plugin`,
+              category: 'commands',
+              author,
+              installCount: 0,
+              tags: pluginData.keywords || plugin.tags || [],
+              version: pluginData.version,
+              installCommand: '',
+              repository: pluginData.repository,
+              verified: true,
+              featured: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              _pluginSource: pluginSource,
+              _commandPath: cmdPath,
+            } as MarketplaceResource & { _pluginSource: string; _commandPath: string });
+          }
+        }
+
         // Create agent bundle resource if template exists
         if (pluginData.agentTemplate) {
           discoveredCategories.add('agent-bundles');
@@ -172,6 +200,7 @@ export function useMarketplace() {
             id: `${plugin.name}--bundle`,
             name: pluginData.agentTemplate.suggestedName,
             description: plugin.description,
+            longDescription: pluginData.longDescription,
             category: 'agent-bundles',
             author,
             installCount: 0,
@@ -179,6 +208,7 @@ export function useMarketplace() {
             version: pluginData.version,
             installCommand: '',
             repository: pluginData.repository,
+            icon: pluginData.agentTemplate.suggestedAvatar,
             verified: true,
             featured: (pluginData.keywords || plugin.tags || []).includes('starter'),
             createdAt: new Date().toISOString(),
@@ -204,22 +234,35 @@ export function useMarketplace() {
     }
   }, []);
 
-  // Enrich skill descriptions by fetching skill.md files
+  // Enrich skill/command descriptions by fetching their .md files
   const enrichSkillDescriptions = async (resources: MarketplaceResource[]) => {
-    const skills = resources.filter(r => r.category === 'skills');
-    const fetchPromises = skills.map(async (resource) => {
-      const ext = resource as MarketplaceResource & { _pluginSource?: string; _skillPath?: string };
-      if (!ext._pluginSource || !ext._skillPath) return;
+    const enrichable = resources.filter(r => r.category === 'skills' || r.category === 'commands');
+    const fetchPromises = enrichable.map(async (resource) => {
+      const ext = resource as MarketplaceResource & { _pluginSource?: string; _skillPath?: string; _commandPath?: string };
+      if (!ext._pluginSource) return;
 
-      const skillMdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
+      let mdUrl: string;
+      if (ext._skillPath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
+      } else if (ext._commandPath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._commandPath}`;
+      } else {
+        return;
+      }
+
       try {
-        const res = await fetch(skillMdUrl);
+        const res = await fetch(mdUrl);
         if (!res.ok) return;
         const content = await res.text();
-        // Extract description from first paragraph after frontmatter
-        const descMatch = content.match(/^---[\s\S]*?---\s*\n\s*#[^\n]*\n\s*\n([^\n]+)/);
-        if (descMatch) {
-          resource.description = descMatch[1].trim().slice(0, 120);
+        // Extract description from frontmatter
+        const fmDescMatch = content.match(/^---[\s\S]*?description:\s*(.+?)[\s\S]*?---/);
+        if (fmDescMatch) {
+          resource.description = fmDescMatch[1].trim().slice(0, 200);
+        }
+        // Extract long description: everything after the title line
+        const bodyMatch = content.match(/^---[\s\S]*?---\s*\n\s*#[^\n]*\n\s*\n([\s\S]+)/);
+        if (bodyMatch) {
+          resource.longDescription = bodyMatch[1].trim().slice(0, 2000);
         }
       } catch {
         // Silent fail - keep default description
@@ -231,8 +274,7 @@ export function useMarketplace() {
   // Check which resources are installed locally
   const checkInstalledResources = async (allResources: MarketplaceResource[]) => {
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      const home = await homeDir();
       const installed: MarketplaceResource[] = [];
 
       for (const resource of allResources) {
@@ -241,18 +283,22 @@ export function useMarketplace() {
           _skillPath?: string;
           _agentPath?: string;
           _rulePath?: string;
+          _commandPath?: string;
         };
 
         let checkPath = '';
         if (ext._skillPath) {
           const skillName = ext._skillPath.split('/').pop() || '';
-          checkPath = `${home}.claude/skills/${skillName}/SKILL.md`;
+          checkPath = await join(home, '.claude', 'skills', skillName, 'SKILL.md');
+        } else if (ext._commandPath) {
+          const cmdFile = ext._commandPath.split('/').pop() || '';
+          checkPath = await join(home, '.claude', 'commands', cmdFile);
         } else if (ext._agentPath) {
           const agentFile = ext._agentPath.split('/').pop() || '';
-          checkPath = `${home}.claude/agents/${agentFile}`;
+          checkPath = await join(home, '.claude', 'agents', agentFile);
         } else if (ext._rulePath) {
           const ruleFile = ext._rulePath.split('/').pop() || '';
-          checkPath = `${home}.claude/rules/${ruleFile}`;
+          checkPath = await join(home, '.claude', 'rules', ruleFile);
         }
 
         if (checkPath) {
@@ -317,6 +363,7 @@ export function useMarketplace() {
     const ext = resource as MarketplaceResource & {
       _pluginSource?: string;
       _skillPath?: string;
+      _commandPath?: string;
       _agentPath?: string;
       _rulePath?: string;
     };
@@ -325,11 +372,10 @@ export function useMarketplace() {
       // Determine base path based on scope
       let basePath: string;
       if (scope === 'project' && projectPath) {
-        basePath = projectPath.endsWith('/') ? `${projectPath}.claude` : `${projectPath}/.claude`;
+        basePath = await join(projectPath, '.claude');
       } else {
-        let home = await homeDir();
-        if (!home.endsWith('/')) home += '/';
-        basePath = `${home}.claude`;
+        const home = await homeDir();
+        basePath = await join(home, '.claude');
       }
 
       if (ext._skillPath && ext._pluginSource) {
@@ -342,8 +388,27 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/skills/{skillName}/SKILL.md
-        const targetDir = `${basePath}/skills/${skillName}`;
-        const targetPath = `${targetDir}/SKILL.md`;
+        const targetDir = await join(basePath, 'skills', skillName);
+        const targetPath = await join(targetDir, 'SKILL.md');
+
+        try {
+          await invoke('create_directory', { path: targetDir });
+        } catch {
+          // Directory may already exist, continue
+        }
+        await invoke('write_file_content', { path: targetPath, content });
+      } else if (ext._commandPath && ext._pluginSource) {
+        // Download the command .md file
+        const cmdFile = ext._commandPath.split('/').pop() || '';
+        const cmdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._commandPath}`;
+
+        const res = await fetch(cmdUrl);
+        if (!res.ok) throw new Error(`Failed to download command: ${res.status}`);
+        const content = await res.text();
+
+        // Write to {basePath}/commands/{cmdFile}
+        const targetDir = await join(basePath, 'commands');
+        const targetPath = await join(targetDir, cmdFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -361,8 +426,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/agents/{agentFile}
-        const targetDir = `${basePath}/agents`;
-        const targetPath = `${targetDir}/${agentFile}`;
+        const targetDir = await join(basePath, 'agents');
+        const targetPath = await join(targetDir, agentFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -380,8 +445,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/rules/{ruleFile}
-        const targetDir = `${basePath}/rules`;
-        const targetPath = `${targetDir}/${ruleFile}`;
+        const targetDir = await join(basePath, 'rules');
+        const targetPath = await join(targetDir, ruleFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -414,25 +479,29 @@ export function useMarketplace() {
     const ext = resource as MarketplaceResource & {
       _pluginSource?: string;
       _skillPath?: string;
+      _commandPath?: string;
       _agentPath?: string;
       _rulePath?: string;
     };
 
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      const home = await homeDir();
 
       if (ext._skillPath) {
         const skillName = ext._skillPath.split('/').pop() || '';
-        const targetDir = `${home}.claude/skills/${skillName}`;
+        const targetDir = await join(home, '.claude', 'skills', skillName);
         await invoke('remove_directory', { path: targetDir });
+      } else if (ext._commandPath) {
+        const cmdFile = ext._commandPath.split('/').pop() || '';
+        const targetPath = await join(home, '.claude', 'commands', cmdFile);
+        await invoke('remove_file', { path: targetPath });
       } else if (ext._agentPath) {
         const agentFile = ext._agentPath.split('/').pop() || '';
-        const targetPath = `${home}.claude/agents/${agentFile}`;
+        const targetPath = await join(home, '.claude', 'agents', agentFile);
         await invoke('remove_file', { path: targetPath });
       } else if (ext._rulePath) {
         const ruleFile = ext._rulePath.split('/').pop() || '';
-        const targetPath = `${home}.claude/rules/${ruleFile}`;
+        const targetPath = await join(home, '.claude', 'rules', ruleFile);
         await invoke('remove_file', { path: targetPath });
       }
 
@@ -506,10 +575,9 @@ export function useMarketplace() {
                 if (!res.ok) continue;
                 const content = await res.text();
 
-                let home = await homeDir();
-                if (!home.endsWith('/')) home += '/';
-                const targetDir = `${home}.claude/skills/${skillName}`;
-                const targetPath = `${targetDir}/SKILL.md`;
+                const home = await homeDir();
+                const targetDir = await join(home, '.claude', 'skills', skillName);
+                const targetPath = await join(targetDir, 'SKILL.md');
 
                 try {
                   await invoke('create_directory', { path: targetDir });
@@ -537,10 +605,9 @@ export function useMarketplace() {
                 if (!res.ok) continue;
                 const content = await res.text();
 
-                let home = await homeDir();
-                if (!home.endsWith('/')) home += '/';
-                const targetDir = `${home}.claude/rules`;
-                const targetPath = `${targetDir}/${ruleFile}`;
+                const home = await homeDir();
+                const targetDir = await join(home, '.claude', 'rules');
+                const targetPath = await join(targetDir, ruleFile);
 
                 try {
                   await invoke('create_directory', { path: targetDir });

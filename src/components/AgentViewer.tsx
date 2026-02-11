@@ -43,7 +43,7 @@ const getShortModelName = (model: string): string => {
 
 // Icon components
 const icons: Record<string, ReactNode> = {
-  // Robot icon for Droids - matching AddonsDrawer
+  // Robot icon for Droids - matching Quack Store
   droid: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="10" rx="2" />
@@ -235,26 +235,35 @@ export default function AgentViewer({
     setIsSaving(true);
 
     try {
-      const nameToUse = isNewAgent ? editName : agent!.name;
-      const scopeToUse = isNewAgent ? editScope : agentScope;
-
-      await invoke("save_agent_content", {
-        name: nameToUse,
-        content: editContent,
-        model: editModel,
-        color: editColor,
-        description: editDescription,
-        scope: scopeToUse,
-        workingDir,
-      });
-
       if (isNewAgent) {
-        // For new agents, just close and refresh the list
+        // Use create_agent which auto-creates the .claude/agents/ directory
+        await invoke("create_agent", {
+          name: editName,
+          description: editDescription,
+          model: editModel,
+          color: editColor,
+          content: editContent,
+          scope: editScope,
+          workingDir,
+        });
+
         setIsEditing(false);
         if (onRefresh) {
           onRefresh();
         }
       } else {
+        const nameToUse = agent!.name;
+
+        await invoke("save_agent_content", {
+          name: nameToUse,
+          content: editContent,
+          model: editModel,
+          color: editColor,
+          description: editDescription,
+          scope: agentScope,
+          workingDir,
+        });
+
         // Refresh agent details
         const updatedDetails = await invoke<AgentDetails>("get_agent_details", {
           name: agentName,

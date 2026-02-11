@@ -28,6 +28,7 @@ mod notifications;
 mod native_terminal;
 mod personality;
 mod plugins;
+mod prerequisites; // ✅ Prerequisites checker (Git, Node.js, Claude CLI)
 mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
 mod preferences;
 mod preview;
@@ -46,6 +47,7 @@ mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
+mod git_watcher; // 🔀 Git branch change watcher
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -570,6 +572,7 @@ pub fn run() {
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
+        .manage(git_watcher::GitBranchWatcherManager::new()) // Register git branch watcher manager
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -886,6 +889,8 @@ pub fn run() {
             fs::get_current_username,
             fs::read_file_content,
             fs::write_file_content,
+            fs::write_binary_file,
+            fs::read_binary_file,
             fs::create_directory,
             fs::remove_file,
             fs::remove_directory,
@@ -952,8 +957,14 @@ pub fn run() {
             git::git_has_uncommitted_changes,
             git::git_get_remote_url,
             git::git_uncommitted_files_count,
+            git::git_get_user_config,
+            git::git_set_user_config,
             git::is_git_repository,
             git::git_init,
+            prerequisites::check_prerequisites,
+            prerequisites::install_claude_cli,
+            prerequisites::check_claude_auth_status,
+            prerequisites::open_claude_login_terminal,
             preview::create_preview_webview,
             preview::update_preview_webview_position,
             preview::destroy_preview_webview,
@@ -1118,6 +1129,10 @@ pub fn run() {
             semantic_search::semantic_search_code,
             semantic_search::semantic_search_get_status,
             semantic_search::semantic_search_generate_embeddings,
+            // 🔀 Git Branch Watcher commands
+            git_watcher::start_git_branch_watcher,
+            git_watcher::stop_git_branch_watcher,
+            git_watcher::stop_all_git_branch_watchers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

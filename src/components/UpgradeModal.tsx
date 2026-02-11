@@ -1,8 +1,12 @@
-import React from 'react';
-import { X, Crown, Check, Sparkles, Zap, Shield } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Crown, Check, Sparkles, Zap, Shield, Infinity } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 import { FREE_LIMITS } from '../config/features';
-import { usePricingConfig, useCheckoutConfig, useFeaturesConfig } from '../hooks/useAppConfig';
+
+const GUMROAD_SUBSCRIPTION_URL = 'https://alekdob.gumroad.com/l/hmrki';
+const GUMROAD_LIFETIME_URL = 'https://alekdob.gumroad.com/l/tsvgt';
+
+type PlanTab = 'subscription' | 'lifetime';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -17,35 +21,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   onActivateLicense,
   limitType = 'terminals',
 }) => {
-  const { pricing } = usePricingConfig();
-  const { checkout } = useCheckoutConfig();
-  const { features } = useFeaturesConfig();
+  const [selectedPlan, setSelectedPlan] = useState<PlanTab>('subscription');
 
   if (!isOpen) return null;
-
-  // Map badge colors to Tailwind classes (for proper purging)
-  const badgeColorClasses = {
-    purple: 'bg-purple-500/20 border-purple-500/30 text-purple-400',
-    blue: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
-    green: 'bg-green-500/20 border-green-500/30 text-green-400',
-    yellow: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
-    orange: 'bg-orange-500/20 border-orange-500/30 text-orange-400',
-    red: 'bg-red-500/20 border-red-500/30 text-red-400',
-  };
-
-  const badgeClasses = badgeColorClasses[pricing.badge_color as keyof typeof badgeColorClasses] || badgeColorClasses.purple;
-
-  // Generate subscription type text
-  const getSubscriptionText = () => {
-    if (pricing.billing_period === 'lifetime') {
-      return 'Lifetime license';
-    } else if (pricing.billing_period === 'year') {
-      return 'Annual subscription';
-    } else if (pricing.billing_period === 'month') {
-      return 'Monthly subscription';
-    }
-    return 'License';
-  };
 
   const limitMessages = {
     terminals: `You've reached the free tier limit of ${FREE_LIMITS.maxTerminals} agents.`,
@@ -64,6 +42,13 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     { icon: Check, text: 'Auto-Updates' },
     { icon: Check, text: 'Priority Support' },
   ];
+
+  const handlePurchase = () => {
+    const url = selectedPlan === 'lifetime'
+      ? GUMROAD_LIFETIME_URL
+      : GUMROAD_SUBSCRIPTION_URL;
+    open(url);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -95,30 +80,71 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
         {/* Body - Scrollable */}
         <div className="p-6 overflow-y-auto flex-1">
-          {/* Pricing */}
+          {/* Plan Toggle */}
+          <div className="flex bg-gray-800 rounded-xl p-1 mb-6">
+            <button
+              onClick={() => setSelectedPlan('subscription')}
+              className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+                selectedPlan === 'subscription'
+                  ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Subscription
+            </button>
+            <button
+              onClick={() => setSelectedPlan('lifetime')}
+              className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+                selectedPlan === 'lifetime'
+                  ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Lifetime
+            </button>
+          </div>
+
+          {/* Pricing Card */}
           <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-5 mb-6">
-            <div className="flex items-baseline justify-center gap-2 mb-2">
-              {pricing.original_price > pricing.current_price && (
-                <span className="text-lg text-gray-400 line-through">
-                  {pricing.currency === 'EUR' ? '€' : '$'}{pricing.original_price}
-                </span>
-              )}
-              <span className="text-4xl font-bold text-white">
-                {pricing.currency === 'EUR' ? '€' : '$'}{pricing.current_price}
-              </span>
-              {pricing.billing_period !== 'lifetime' && (
-                <span className="text-sm text-gray-400">/{pricing.billing_period}</span>
-              )}
-            </div>
-            <p className="text-center text-xs text-gray-400">
-              {getSubscriptionText()} • Use on {features.max_devices === 1 ? '1 device' : `up to ${features.max_devices} devices`}
-            </p>
-            {pricing.badge_text && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs">
-                <span className={`px-2 py-1 border rounded ${badgeClasses}`}>
-                  {pricing.badge_text}
-                </span>
-              </div>
+            {selectedPlan === 'subscription' ? (
+              <>
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <span className="px-2 py-0.5 border rounded text-xs bg-yellow-500/20 border-yellow-500/30 text-yellow-400">
+                    Early Bird
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-center gap-2 mb-1">
+                  <span className="text-lg text-gray-500 line-through">&euro;15</span>
+                  <span className="text-4xl font-bold text-white">&euro;9</span>
+                  <span className="text-sm text-gray-400">/month</span>
+                </div>
+                <p className="text-center text-xs text-gray-400 mb-2">
+                  or <span className="text-gray-500 line-through">&euro;159</span> &euro;89/year (save 2 months)
+                </p>
+                <p className="text-center text-xs text-gray-500">
+                  Cancel anytime - up to 3 devices
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <span className="px-2 py-0.5 border rounded text-xs bg-yellow-500/20 border-yellow-500/30 text-yellow-400">
+                    Early Bird
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-center gap-2 mb-1">
+                  <span className="text-lg text-gray-500 line-through">&euro;399</span>
+                  <span className="text-4xl font-bold text-white">&euro;179</span>
+                </div>
+                <p className="text-center text-xs text-gray-400 mb-2">
+                  One-time payment - forever yours
+                </p>
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs">
+                  <span className="px-2 py-1 border rounded bg-purple-500/20 border-purple-500/30 text-purple-400">
+                    + 1h Onboarding with the founder
+                  </span>
+                </div>
+              </>
             )}
           </div>
 
@@ -153,19 +179,26 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 </span>
               </div>
             ))}
+            {selectedPlan === 'lifetime' && (
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-purple-600">
+                  <Infinity className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-sm font-medium text-purple-400">
+                  Lifetime updates + 1h onboarding
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
           <div className="space-y-3">
             <button
-              onClick={() => {
-                // Open Gumroad checkout in browser using Tauri shell
-                open(checkout.gumroad_url);
-              }}
+              onClick={handlePurchase}
               className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold transition-all shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 flex items-center justify-center gap-2"
             >
               <Crown className="w-5 h-5" />
-              Subscribe to Quack Pro
+              {selectedPlan === 'lifetime' ? 'Buy Lifetime License' : 'Subscribe to Quack Pro'}
             </button>
 
             <button
@@ -176,10 +209,20 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             </button>
           </div>
 
+          {/* Indie message */}
+          <div className="mt-5 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-center">
+            <p className="text-sm text-orange-300/90">
+              Built with love by two indie devs from Italy 🍕🇮🇹
+            </p>
+            <p className="text-xs text-orange-400/70 mt-0.5">
+              Your support keeps Quack alive and quacking! 🦆
+            </p>
+          </div>
+
           {/* Footer */}
-          <div className="mt-6 pt-4 border-t border-gray-700/50 text-center">
+          <div className="mt-4 text-center">
             <p className="text-xs text-gray-500">
-              Secure payment via Gumroad • Cancel anytime • 14-day money-back guarantee
+              Secure payment via Gumroad • 14-day money-back guarantee
             </p>
           </div>
         </div>

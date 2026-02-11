@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { formatShortcut } from "../utils/platform";
 
 interface FileActionButtonsProps {
   onRefresh: () => void;
@@ -108,7 +109,7 @@ function FileActionButtons({
           <polyline points="17 21 17 13 7 13 7 21" />
           <polyline points="7 3 7 8 15 8" />
         </svg>
-        <span className="file-action-tooltip">{hasUnsavedChanges ? "Save changes (⌘S)" : "No changes"}</span>
+        <span className="file-action-tooltip">{hasUnsavedChanges ? `Save changes (${formatShortcut("⌘S")})` : "No changes"}</span>
       </button>
 
       {/* Open with IDE */}
@@ -151,7 +152,7 @@ function FileActionButtons({
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-          <span className="file-action-tooltip">Close file (⌘W)</span>
+          <span className="file-action-tooltip">{`Close file (${formatShortcut("⌘W")})`}</span>
         </button>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Brain } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import { useIDEStore } from '../stores/ideStore';
+import { formatShortcut } from '../utils/platform';
 import './ActionIcons.css';
 
 // Installed app from Rust backend
@@ -17,7 +18,6 @@ interface InstalledApp {
 interface ActionIconsProps {
   projectPath?: string;
   onGitClick: () => void;
-  onPluginsClick: () => void;
   onUsageClick: () => void;
   onTelegramClick: () => void;
   onTerminalClick: () => void;
@@ -42,9 +42,9 @@ interface ActionIconsProps {
   onKanbanClick?: () => void;
   isKanbanActive?: boolean;
   inProgressTaskCount?: number;
-  // Addons
-  onAddonsClick?: () => void;
-  isAddonsOpen?: boolean;
+  // Quack Store
+  onStoreClick?: () => void;
+  isStoreOpen?: boolean;
 }
 
 function ActionIcons({
@@ -60,8 +60,8 @@ function ActionIcons({
   onKanbanClick,
   isKanbanActive = false,
   inProgressTaskCount = 0,
-  onAddonsClick,
-  isAddonsOpen = false,
+  onStoreClick,
+  isStoreOpen = false,
 }: ActionIconsProps) {
   const [openMenuOpen, setOpenMenuOpen] = useState(false);
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
@@ -148,13 +148,139 @@ function ActionIcons({
         />
       );
     }
-    // Fallback icon
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <path d="M8 21h8M12 17v4" />
-      </svg>
-    );
+
+    // Fallback icons by app ID
+    switch (app.id) {
+      // VS Code family
+      case 'vscode':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M17.5 2L9 10.5l-4-3.5L2 8.5v7l3 1.5 4-3.5 8.5 8.5 3.5-1.5V3.5L17.5 2zM6 14.5l-2-1v-3l2 1.5v2.5zm11-1l-5-4.5V5.5l5 2.5v5.5z" fill="#007ACC"/>
+          </svg>
+        );
+      case 'cursor':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="3" fill="#1a1a1a"/>
+            <path d="M8 8l8 4-8 4V8z" fill="#fff"/>
+          </svg>
+        );
+      case 'windsurf':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="3" fill="#0ea5e9"/>
+            <path d="M7 12h10M12 7v10" stroke="#fff" strokeWidth="2"/>
+          </svg>
+        );
+      // JetBrains family
+      case 'intellij':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#000"/>
+            <text x="5" y="16" fill="#fff" fontSize="10" fontWeight="bold">IJ</text>
+          </svg>
+        );
+      case 'webstorm':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#00CDD7"/>
+            <text x="4" y="16" fill="#000" fontSize="9" fontWeight="bold">WS</text>
+          </svg>
+        );
+      case 'phpstorm':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#B345F1"/>
+            <text x="4" y="16" fill="#fff" fontSize="9" fontWeight="bold">PS</text>
+          </svg>
+        );
+      case 'pycharm':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#21D789"/>
+            <text x="4" y="16" fill="#000" fontSize="9" fontWeight="bold">Py</text>
+          </svg>
+        );
+      case 'goland':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#087CFA"/>
+            <text x="4" y="16" fill="#fff" fontSize="9" fontWeight="bold">Go</text>
+          </svg>
+        );
+      case 'rubymine':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#FE2857"/>
+            <text x="3" y="16" fill="#fff" fontSize="9" fontWeight="bold">RM</text>
+          </svg>
+        );
+      // Terminals
+      case 'windows-terminal':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="4" width="20" height="16" rx="2" fill="#0C0C0C"/>
+            <path d="M6 9l4 3-4 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12 15h6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        );
+      case 'powershell':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="4" width="20" height="16" rx="2" fill="#012456"/>
+            <path d="M6 9l4 3-4 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12 15h6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        );
+      case 'git-bash':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="4" width="20" height="16" rx="2" fill="#2D2D2D"/>
+            <path d="M6 9l4 3-4 3" stroke="#F05033" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12 15h6" stroke="#F05033" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        );
+      // Explorer
+      case 'explorer':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" fill="#FFC107"/>
+            <path d="M3 7h18v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" fill="#FFE082"/>
+          </svg>
+        );
+      // Zed
+      case 'zed':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="3" fill="#084CCF"/>
+            <text x="6" y="16" fill="#fff" fontSize="11" fontWeight="bold">Z</text>
+          </svg>
+        );
+      // Sublime
+      case 'sublime':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#FF9800"/>
+            <text x="6" y="16" fill="#fff" fontSize="11" fontWeight="bold">S</text>
+          </svg>
+        );
+      // Notepad++
+      case 'notepadpp':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#90BE6D"/>
+            <text x="3" y="16" fill="#fff" fontSize="8" fontWeight="bold">N++</text>
+          </svg>
+        );
+      default:
+        // Generic fallback
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+        );
+    }
   };
 
   return (
@@ -165,12 +291,12 @@ function ActionIcons({
       {/* Right side - Action icons */}
       {/* Kanban Icon */}
       {onKanbanClick && (
-        <KeyboardShortcutTooltip label="Kanban" shortcut="⌘K">
+        <KeyboardShortcutTooltip label="Kanban" shortcut={formatShortcut("⌘K")}>
           <button
             type="button"
             className={`action-icon ${isKanbanActive ? 'active' : ''}`}
             onClick={onKanbanClick}
-            aria-label="Open Kanban (⌘K)"
+            aria-label={`Open Kanban (${formatShortcut("⌘K")})`}
             style={{ position: 'relative' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -220,12 +346,12 @@ function ActionIcons({
       </button>
 
       {/* Terminal Icon */}
-      <KeyboardShortcutTooltip label="Terminal" shortcut="⌘T">
+      <KeyboardShortcutTooltip label="Terminal" shortcut={formatShortcut("⌘T")}>
         <button
           type="button"
           className={`action-icon ${terminalWindowOpen ? 'active' : ''}`}
           onClick={onTerminalClick}
-          aria-label="Open Terminals (⌘T)"
+          aria-label={`Open Terminals (${formatShortcut("⌘T")})`}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect
@@ -268,20 +394,20 @@ function ActionIcons({
         </button>
       )}
 
-      {/* Addons Icon */}
-      {onAddonsClick && (
+      {/* Quack Store Icon */}
+      {onStoreClick && (
         <button
           type="button"
-          className={`action-icon ${isAddonsOpen ? 'active' : ''}`}
-          onClick={onAddonsClick}
-          aria-label="Open Addons"
+          className={`action-icon ${isStoreOpen ? 'active' : ''}`}
+          onClick={onStoreClick}
+          aria-label="Open Quack Store"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M2 17l10 5 10-5" />
             <path d="M2 12l10 5 10-5" />
           </svg>
-          <span className="action-icon-tooltip">Addons</span>
+          <span className="action-icon-tooltip">Quack Store</span>
         </button>
       )}
 
@@ -413,12 +539,12 @@ function ActionIcons({
       )}
 
       {/* Side Panel Toggle Icon - LAST */}
-      <KeyboardShortcutTooltip label="Side Panel" shortcut="⌘B">
+      <KeyboardShortcutTooltip label="Side Panel" shortcut={formatShortcut("⌘B")}>
         <button
           type="button"
           className={`action-icon ${!sidePanelCollapsed ? 'active' : ''}`}
           onClick={onToggleSidePanel}
-          aria-label={sidePanelCollapsed ? "Open side panel (⌘B)" : "Close side panel (⌘B)"}
+          aria-label={sidePanelCollapsed ? `Open side panel (${formatShortcut("⌘B")})` : `Close side panel (${formatShortcut("⌘B")})`}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect

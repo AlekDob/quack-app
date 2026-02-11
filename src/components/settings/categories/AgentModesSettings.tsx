@@ -1,7 +1,4 @@
-import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '../../../stores/settingsStore';
-import { useSessionStore } from '../../../stores/sessionStore';
 import type { EffortLevel, ThinkingMode } from '../../../types';
 import { getModelOptions } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
@@ -21,11 +18,6 @@ const effortOptions = [
   { value: 'medium' as EffortLevel, label: 'Balanced', desc: 'Default quality', icon: '>>' },
   { value: 'high' as EffortLevel, label: 'Quality', desc: 'Thorough responses', icon: '>>>' },
 ];
-
-interface RuleInfo {
-  name: string;
-  exists: boolean;
-}
 
 interface ModePresetCardProps {
   mode: 'bypass' | 'plan';
@@ -101,38 +93,9 @@ function ModePresetCard({ mode, title, description, color, icon }: ModePresetCar
 
 export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
-  const selectedSession = useSessionStore((s) => s.getSelectedSession());
-  const [rules, setRules] = useState<RuleInfo[]>([]);
-
-  const projectPath = selectedSession?.projectPath;
-  const projectName = selectedSession?.projectName || 'No project';
-
-  useEffect(() => {
-    if (!projectPath) return;
-    checkRules(projectPath);
-  }, [projectPath]);
-
-  const checkRules = async (projPath: string) => {
-    const ruleFiles = [
-      { name: 'use-codebase-map', file: 'use-codebase-map.md' },
-      { name: 'use-quack-brain', file: 'use-quack-brain.md' },
-      { name: 'apatr-d', file: 'Analyze-Plan-act-test-review-document.md' },
-    ];
-
-    const results: RuleInfo[] = [];
-    for (const r of ruleFiles) {
-      try {
-        await invoke<string>('read_file_content', { path: `${projPath}/.claude/rules/${r.file}` });
-        results.push({ name: r.name, exists: true });
-      } catch {
-        results.push({ name: r.name, exists: false });
-      }
-    }
-    setRules(results);
-  };
 
   const handleReset = () => {
-    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.5')) {
+    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.6')) {
       resetModePresets();
     }
   };
@@ -170,40 +133,108 @@ export default function AgentModesSettings() {
         </div>
       </div>
 
-      {/* Active Rules */}
-      <SectionHeader
-        title="Active Rules"
-        description={`Rules detected in ${projectName}`}
-      />
+      <style>{`
+        .mode-presets-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
 
-      <div className="settings-group">
-        {rules.length === 0 ? (
-          <div className="settings-row">
-            <div className="settings-row-left">
-              <div className="settings-row-description">
-                {projectPath ? 'Checking rules...' : 'Select a session to view project rules'}
-              </div>
-            </div>
-          </div>
-        ) : (
-          rules.map((rule) => (
-            <div key={rule.name} className="settings-row">
-              <div className="settings-row-left">
-                <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span className={`rule-dot ${rule.exists ? 'active' : ''}`} />
-                  {rule.name}
-                </div>
-              </div>
-              <div className="settings-row-control">
-                <span className={`rule-badge ${rule.exists ? 'rule-badge-active' : ''}`}>
-                  {rule.exists ? 'Active' : 'Not installed'}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+        .mode-preset-card {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-left: 3px solid;
+          border-radius: 12px;
+          padding: 20px;
+          transition: border-color 0.15s ease;
+        }
 
+        .mode-preset-card:hover {
+          border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .mode-preset-header {
+          margin-bottom: 16px;
+        }
+
+        .mode-preset-title {
+          font-size: 15px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 4px;
+        }
+
+        .mode-icon {
+          font-size: 12px;
+        }
+
+        .mode-preset-desc {
+          font-size: 12px;
+          color: rgba(255, 255, 255, 0.5);
+          line-height: 1.4;
+        }
+
+        .mode-preset-options {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .mode-preset-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .mode-preset-label {
+          font-size: 13px;
+          color: rgba(255, 255, 255, 0.6);
+          min-width: 64px;
+          flex-shrink: 0;
+        }
+
+        .mode-preset-select {
+          flex: 1;
+          background: rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+          padding: 8px 12px;
+          font-size: 13px;
+          color: #f3f4f6;
+          cursor: pointer;
+          outline: none;
+          transition: border-color 0.15s ease;
+          font-family: inherit;
+        }
+
+        .mode-preset-select:hover {
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .mode-preset-select:focus {
+          border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .mode-preset-select option {
+          background: #1a1a1a;
+          color: #f3f4f6;
+        }
+
+        .mode-presets-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 8px;
+        }
+
+        .mode-presets-hint {
+          font-size: 11px;
+          color: rgba(255, 255, 255, 0.4);
+        }
+
+      `}</style>
     </div>
   );
 }

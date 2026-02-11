@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import { getFileManagerName } from '../utils/platform';
 
 interface RevealInFinderButtonProps {
   path: string;
@@ -12,15 +13,18 @@ export default function RevealInFinderButton({
   path,
   className = '',
   iconOnly = false,
-  label = 'Reveal in Finder',
+  label,
 }: RevealInFinderButtonProps) {
+  const fileManagerName = getFileManagerName();
+  const displayLabel = label ?? `Reveal in ${fileManagerName}`;
+
   const handleReveal = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening file when clicking reveal button
     try {
       await invoke('reveal_in_finder', { path });
     } catch (err) {
-      console.error('Failed to reveal in Finder:', err);
-      toast.error(`Failed to reveal in Finder: ${err}`);
+      console.error(`Failed to reveal in ${fileManagerName}:`, err);
+      toast.error(`Failed to reveal in ${fileManagerName}: ${err}`);
     }
   };
 
@@ -28,7 +32,7 @@ export default function RevealInFinderButton({
     <button
       onClick={handleReveal}
       className={`reveal-in-finder-btn ${className}`}
-      title={label}
+      title={displayLabel}
       type="button"
     >
       {/* Folder icon SVG - compact size to match @ button */}
@@ -44,7 +48,7 @@ export default function RevealInFinderButton({
       >
         <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
       </svg>
-      {!iconOnly && <span>{label}</span>}
+      {!iconOnly && <span>{displayLabel}</span>}
     </button>
   );
 }

@@ -427,7 +427,7 @@ fn parse_numstat_value(value: &str) -> Option<i32> {
     }
 }
 
-fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
+pub(crate) fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
     let mut dir = if let Some(path) = starting_path {
         path
     } else {
@@ -471,10 +471,18 @@ pub fn git_init(path: String) -> Result<String, String> {
     }
 
     // Initialize git repository
-    let output = Command::new("git")
-        .current_dir(&dir)
-        .args(&["init"])
-        .output()
+    let mut cmd = Command::new("git");
+    cmd.current_dir(&dir).args(&["init"]);
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd.output()
         .map_err(|e| format!("Failed to run git init: {}", e))?;
 
     if !output.status.success() {
@@ -484,17 +492,31 @@ pub fn git_init(path: String) -> Result<String, String> {
 
     // Create an initial commit to establish the main branch
     // First, check if there's a .gitignore or any files to commit
-    let add_output = Command::new("git")
-        .current_dir(&dir)
-        .args(&["add", "-A"])
-        .output()
+    let mut add_cmd = Command::new("git");
+    add_cmd.current_dir(&dir).args(&["add", "-A"]);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        add_cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let add_output = add_cmd.output()
         .map_err(|e| format!("Failed to stage files: {}", e))?;
 
     // Create initial commit (allow empty if no files exist)
-    let commit_output = Command::new("git")
-        .current_dir(&dir)
-        .args(&["commit", "--allow-empty", "-m", "Initial commit"])
-        .output()
+    let mut commit_cmd = Command::new("git");
+    commit_cmd.current_dir(&dir).args(&["commit", "--allow-empty", "-m", "Initial commit"]);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        commit_cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let commit_output = commit_cmd.output()
         .map_err(|e| format!("Failed to create initial commit: {}", e))?;
 
     if !commit_output.status.success() {
@@ -507,10 +529,18 @@ pub fn git_init(path: String) -> Result<String, String> {
 }
 
 fn run_git(root: &PathBuf, args: &[&str], allow_non_zero: bool) -> Result<String> {
-    let output = Command::new("git")
-        .current_dir(root)
-        .args(args)
-        .output()
+    let mut cmd = Command::new("git");
+    cmd.current_dir(root).args(args);
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd.output()
         .with_context(|| format!("Impossibile eseguire git {:?}", args))?;
 
     if !output.status.success()
@@ -1292,4 +1322,82 @@ fn git_uncommitted_files_count_impl(root_path: Option<String>) -> Result<usize> 
         .count();
 
     Ok(count)
+}
+
+#[derive(Serialize, Clone)]
+pub struct GitUserConfig {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+
+#[tauri::command]
+pub fn git_get_user_config() -> Result<GitUserConfig, String> {
+    git_get_user_config_impl().map_err(|err| err.to_string())
+}
+
+fn git_get_user_config_impl() -> Result<GitUserConfig> {
+    // Get user.name from global git config
+    let name = Command::new("git")
+        .args(["config", "--global", "--get", "user.name"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            }
+        });
+
+    // Get user.email from global git config
+    let email = Command::new("git")
+        .args(["config", "--global", "--get", "user.email"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            }
+        });
+
+    Ok(GitUserConfig { name, email })
+}
+
+#[tauri::command]
+pub fn git_set_user_config(name: String, email: String) -> Result<(), String> {
+    git_set_user_config_impl(name, email).map_err(|err| err.to_string())
+}
+
+fn git_set_user_config_impl(name: String, email: String) -> Result<()> {
+    // Set user.name in global git config
+    let name_output = Command::new("git")
+        .args(["config", "--global", "user.name", &name])
+        .output()
+        .context("Failed to execute git config command for user.name")?;
+
+    if !name_output.status.success() {
+        let stderr = String::from_utf8_lossy(&name_output.stderr);
+        return Err(anyhow!("Failed to set user.name: {}", stderr));
+    }
+
+    // Set user.email in global git config
+    let email_output = Command::new("git")
+        .args(["config", "--global", "user.email", &email])
+        .output()
+        .context("Failed to execute git config command for user.email")?;
+
+    if !email_output.status.success() {
+        let stderr = String::from_utf8_lossy(&email_output.stderr);
+        return Err(anyhow!("Failed to set user.email: {}", stderr));
+    }
+
+    Ok(())
 }

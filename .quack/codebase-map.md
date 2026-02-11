@@ -1,9 +1,9 @@
 ---
 type: codebase-map
 project: .
-generated: 2026-02-02T08:27:55Z
-files: 401
-exports: 1174
+generated: 2026-02-10T19:01:57Z
+files: 407
+exports: 1185
 ---
 
 # Codebase Map
@@ -66,7 +66,7 @@ exports: 1174
 - export default fn `AgentRulesBanner()`
 
 ## src/components/AgentSelector.tsx
-- export default fn `AgentSelector({ onUseAgent, onEditAgent, onCreateNew }: AgentSelectorProps)`
+- export default fn `AgentSelector()`
 
 ## src/components/AgentSessionItem.tsx
 - export default `memo(AgentSessionItem)`
@@ -538,6 +538,9 @@ exports: 1174
 ## src/components/QuackAgencySetupWizard.tsx
 - export default fn `QuackAgencySetupWizard()`
 
+## src/components/QuackStoreDrawer.tsx
+- export default fn `QuackStoreDrawer({ onClose, onRefresh }: QuackStoreDrawerProps)`
+
 ## src/components/RepositoryGroup.tsx
 - export default fn `RepositoryGroup()`
 
@@ -644,6 +647,9 @@ exports: 1174
 ## src/components/settings/IDEOnboarding.tsx
 - export default fn `IDEOnboarding()`
 
+## src/components/settings/PrerequisitesCheck.tsx
+- export default fn `PrerequisitesCheck()`
+
 ## src/components/settings/SettingsContent.tsx
 - export default fn `SettingsContent({ children }: SettingsContentProps)`
 
@@ -674,6 +680,9 @@ exports: 1174
 
 ## src/components/SidePanel.tsx
 - export default fn `SidePanel()`
+
+## src/components/SidePanelAccordion.tsx
+- export default fn `SidePanelAccordion()`
 
 ## src/components/SkeletonMessage.tsx
 - export default fn `SkeletonMessage()`
@@ -715,6 +724,9 @@ exports: 1174
 
 ## src/components/StorageMetrics.tsx
 - export default fn `StorageMetrics({ className }: StorageMetricsProps)`
+
+## src/components/store/StoreItemCard.tsx
+- export default fn `StoreItemCard()`
 
 ## src/components/StreamMessage.tsx
 - export default `memo(StreamMessage)`
@@ -1539,6 +1551,14 @@ exports: 1174
 - export fn `generateWindowLabel(tab: Tab): string`
 - export fn `canPopoutTab(tab: Tab): boolean`
 
+## src/stores/prerequisitesStore.ts
+- export type `PrerequisiteStatus { name, installed, version, download_url }`
+- export type `PrerequisitesCheck { git, nodejs, claude_cli, all_installed }`
+- export type `PrerequisitesState { hasCompletedOnboarding, prerequisites, isChecking, isInstalling, isLoggedIn, isCheckingAuth, isLoggingIn, checkPrerequisites, installClaudeCLI, checkAuthStatus, openLoginTerminal, completeOnboarding, resetOnboarding }`
+- export const `usePrerequisitesStore`
+- export fn `selectShouldShowPrerequisites(state: PrerequisitesState): boolean`
+- export fn `selectAllPrerequisitesInstalled(state: PrerequisitesState): boolean`
+
 ## src/stores/sessionStore.ts
 - export fn `shouldArchiveSession(session: AgentSession): boolean`
 - export const `sessionWriteLock`
@@ -1977,6 +1997,9 @@ exports: 1174
 
 ## src/views/ProjectDashboardTabView.tsx
 - export default fn `ProjectDashboardTabView()`
+
+## src\App.tsx
+- export default `App`
 
 ## vite.config.ts
 - export default `defineConfig(({ mode }) => {`

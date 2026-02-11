@@ -35,6 +35,7 @@ interface IDEState extends IDEConfig {
   setAutoLaunch: (enabled: boolean) => void;
   setSyncFocus: (enabled: boolean) => void;
   completeOnboarding: () => void;
+  resetOnboarding: () => void;
 
   // IDE Operations (calls MCP server via Tauri)
   openFileInIDE: (path: string, line?: number, column?: number) => Promise<string>;
@@ -180,6 +181,10 @@ export const useIDEStore = create<IDEState>()(
       setAutoLaunch: (enabled: boolean) => set({ autoLaunch: enabled }),
       setSyncFocus: (enabled: boolean) => set({ syncFocus: enabled }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      resetOnboarding: () => set({
+        hasCompletedOnboarding: false,
+        preferredIDE: null,
+      }),
 
       // IDE Operations
       openFileInIDE: async (path: string, line?: number, column?: number) => {

@@ -282,7 +282,7 @@
   font-weight: 500;
 }
 
-/* Bundle Actions - Compact on hover */
+/* Bundle Export - Show on hover */
 .bundle-actions-compact {
   display: flex;
   gap: 4px;
@@ -334,6 +334,23 @@
   background: rgba(255, 107, 107, 0.1);
   border-radius: 3px;
   cursor: pointer;
+}
+
+.bundle-success-compact {
+  margin-top: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: #00D9FF;
+  background: rgba(0, 217, 255, 0.1);
+  border-radius: 3px;
+  animation: bundleFadeInOut 3s ease-in-out forwards;
+}
+
+@keyframes bundleFadeInOut {
+  0% { opacity: 0; transform: translateY(-2px); }
+  15% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* Legacy styles for backward compatibility */
@@ -416,11 +433,6 @@
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
-}
-
-/* Legacy bundle actions */
-.bundle-actions {
-  display: none;
 }
 
 /* Legacy workspace/context (hidden - using new compact styles) */

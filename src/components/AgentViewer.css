@@ -31,7 +31,7 @@
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  /* Teal gradient for Droids - matching AddonsDrawer */
+  /* Teal gradient for Droids - matching Quack Store */
   background: linear-gradient(135deg, rgba(78, 205, 196, 0.06) 0%, rgba(38, 166, 154, 0.04) 100%);
 }
 
@@ -44,7 +44,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Teal gradient for Droids - matching AddonsDrawer */
+  /* Teal gradient for Droids - matching Quack Store */
   background: linear-gradient(135deg, #4ecdc4, #26a69a);
 }
 
@@ -215,7 +215,7 @@
 }
 
 .agent-viewer-icon-button.agent-viewer-edit:hover:not(:disabled) {
-  /* Teal for Droids - matching AddonsDrawer */
+  /* Teal for Droids - matching Quack Store */
   background: rgba(78, 205, 196, 0.12);
   border-color: rgba(78, 205, 196, 0.3);
   color: #4ecdc4;
@@ -234,7 +234,7 @@
 }
 
 .agent-viewer-save {
-  /* Teal gradient for Droids - matching AddonsDrawer */
+  /* Teal gradient for Droids - matching Quack Store */
   background: linear-gradient(135deg, #4ecdc4, #26a69a);
   border: none;
   color: white;
@@ -354,7 +354,7 @@
 
 .agent-viewer-input:focus {
   outline: none;
-  /* Teal for Droids - matching AddonsDrawer */
+  /* Teal for Droids - matching Quack Store */
   border-color: rgba(78, 205, 196, 0.5);
   background: rgba(0, 0, 0, 0.4);
 }
@@ -389,7 +389,7 @@
 
 .agent-viewer-radio-label input[type="radio"] {
   cursor: pointer;
-  /* Teal for Droids - matching AddonsDrawer */
+  /* Teal for Droids - matching Quack Store */
   accent-color: #4ecdc4;
 }
 
@@ -399,13 +399,13 @@
 }
 
 .agent-viewer-radio-label:has(input:checked) {
-  /* Teal for Droids - matching AddonsDrawer */
+  /* Teal for Droids - matching Quack Store */
   background: rgba(78, 205, 196, 0.15);
   border-color: rgba(78, 205, 196, 0.4);
 }
 
 .agent-viewer-radio-label:has(input:checked) span {
-  /* Teal for Droids - matching AddonsDrawer */
+  /* Teal for Droids - matching Quack Store */
   color: #4ecdc4;
   font-weight: 500;
 }
@@ -431,7 +431,7 @@
 .agent-viewer-textarea:focus,
 .agent-viewer-select:focus {
   outline: none;
-  /* Teal for Droids - matching AddonsDrawer */
+  /* Teal for Droids - matching Quack Store */
   border-color: rgba(78, 205, 196, 0.5);
   background: rgba(0, 0, 0, 0.4);
 }
