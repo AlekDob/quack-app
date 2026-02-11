@@ -68,7 +68,7 @@
       "exceptionDomain": "",
       "frameworks": [],
       "minimumSystemVersion": "10.15",
-      "signingIdentity": "Developer ID Application: ALEKSANDAR DOBROHOTOV (FC38UVV3V3)",
+      "signingIdentity": null,
       "hardenedRuntime": true,
       "dmg": {
         "appPosition": {

@@ -14,9 +14,19 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Resolve project root from script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+QUACK_APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Load .env file
+if [ -f "$QUACK_APP_DIR/.env" ]; then
+    set -a
+    source "$QUACK_APP_DIR/.env"
+    set +a
+fi
+
 # Configuration
-QUACK_APP_DIR="/Users/alekdob/Desktop/Dev/Personal/quack-app"
-RELEASES_REPO="AlekDob/quack-releases"
+RELEASES_REPO="${GITHUB_RELEASES_REPO:-AlekDob/quack-releases}"
 DMG_PATH="$QUACK_APP_DIR/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.dmg"
 ZIP_PATH="$QUACK_APP_DIR/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack_universal.zip"
 
