@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
+import { getLanguageFromFilename } from "../utils/languageDetection";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, Decoration } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
@@ -264,39 +265,6 @@ interface CodeEditorProps {
   diffInfo?: DiffInfo | null;
   lineChanges?: LineChange[]; // New prop for detailed line-by-line diff
 }
-
-const getLanguageFromFilename = (filename: string | null): string => {
-  if (!filename) return "plaintext";
-
-  const extension = filename.split(".").pop()?.toLowerCase() || "";
-
-  const languageMap: Record<string, string> = {
-    js: "javascript",
-    jsx: "javascript",
-    ts: "typescript",
-    tsx: "typescript",
-    mjs: "javascript",
-    cjs: "javascript",
-    html: "html",
-    htm: "html",
-    css: "css",
-    scss: "css",
-    sass: "css",
-    less: "css",
-    json: "json",
-    yaml: "yaml",
-    yml: "yaml",
-    md: "markdown",
-    mdx: "markdown",
-    markdown: "markdown",
-    py: "python",
-    rs: "rust",
-    sh: "shell",
-    bash: "shell",
-  };
-
-  return languageMap[extension] || "plaintext";
-};
 
 const getLanguageExtension = (language: string) => {
   switch (language) {

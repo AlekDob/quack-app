@@ -25,6 +25,9 @@ import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
+import type { EditorSelection } from "./components/CodeEditorCodeMirror";
+import { useFileSystemStore } from "./stores/fileSystemStore";
+import { getLanguageFromFilename } from "./utils/languageDetection";
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
@@ -98,6 +101,8 @@ import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
+import { buildContextPrefix } from "./utils/ideContextBuilder";
+import { useExternalIdeContext } from "./hooks/useExternalIdeContext";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
@@ -687,6 +692,15 @@ function AppContent() {
     path: string;
   } | null>(null);
   const [previewContent, setPreviewContent] = useState("");
+
+  // Sync local previewFile to fileSystemStore so IDE context utilities can read it
+  useEffect(() => {
+    useFileSystemStore.getState().setPreviewFile(previewFile?.path ?? null);
+  }, [previewFile]);
+
+  // Poll external IDE (VS Code, Cursor) for context so the ChatInput chip can show it
+  useExternalIdeContext(explorerPath || null);
+
   const [previewImageData, setPreviewImageData] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -695,6 +709,22 @@ function AppContent() {
   const [previewLineChanges, setPreviewLineChanges] = useState<LineChange[] | null>(null);
   const [previewHasUnsavedChanges, setPreviewHasUnsavedChanges] = useState(false);
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
+
+  // IDE context: track editor selection for agent chat context injection
+  const handleEditorSelectionChange = useCallback((sel: EditorSelection | null) => {
+    if (!sel || !previewFile) {
+      useFileSystemStore.getState().clearEditorSelection();
+      return;
+    }
+    useFileSystemStore.getState().setEditorSelection({
+      filePath: previewFile.path,
+      language: getLanguageFromFilename(previewFile.name),
+      selectedText: sel.selectedText,
+      startLine: sel.startLine,
+      endLine: sel.endLine,
+    });
+  }, [previewFile]);
+
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showStoreDrawer, setShowStoreDrawer] = useState(false);
@@ -753,6 +783,13 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return 'chat';
   });
+
+  // Clear editor selection when navigating away from file tab
+  useEffect(() => {
+    if (!activeTabId.startsWith('file-')) {
+      useFileSystemStore.getState().clearEditorSelection();
+    }
+  }, [activeTabId]);
 
   // Persist tab state to localStorage for wake-from-standby resilience
   useEffect(() => {
@@ -2347,6 +2384,13 @@ function AppContent() {
         ? sessionWorktreePath
         : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
+      // Inject IDE context (open file, selection, git status) into prompt
+      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
+      const ideContextPrefix = await buildContextPrefix(gitSummary, workingDir ?? null);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
+      }
+
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
         if (abortController.signal.aborted) {
@@ -3006,6 +3050,13 @@ function AppContent() {
           .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
           .join('\n\n');
         prompt = `${history}\n\nUser: ${content}`;
+      }
+
+      // Inject IDE context (open file, selection, git status) into prompt
+      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
+      const ideContextPrefix = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
       }
 
       // Create abort promise
@@ -11365,6 +11416,7 @@ You have access to all Bash tools to execute git commands like:
                     onHasUnsavedChanges={setPreviewHasUnsavedChanges}
                     imageData={previewImageData}
                     embedded={true}
+                    onEditorSelectionChange={handleEditorSelectionChange}
                   />
                   <FileActionButtons
                     onRefresh={handleRefreshPreview}

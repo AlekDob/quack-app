@@ -17,6 +17,15 @@ interface FileSystemState {
   previewContent: string | null;
   previewLoading: boolean;
 
+  // Editor selection state (for IDE context injection into agent chats)
+  editorSelection: {
+    filePath: string;
+    language: string;
+    selectedText: string;
+    startLine: number;
+    endLine: number;
+  } | null;
+
   // Actions - Explorer
   setExplorerPath: (path: string) => void;
   setExplorerTree: (tree: Record<string, DirectoryEntry[]>) => void;
@@ -40,6 +49,28 @@ interface FileSystemState {
   setPreviewLoading: (loading: boolean) => void;
   clearPreview: () => void;
 
+  // Actions - Editor selection
+  setEditorSelection: (selection: FileSystemState['editorSelection']) => void;
+  clearEditorSelection: () => void;
+
+  // External IDE context (from WebSocket connection to VS Code, Cursor, etc.)
+  externalIdeContext: {
+    activeFile: string | null;
+    selection: {
+      filePath: string;
+      language: string;
+      text: string;
+      startLine: number;
+      endLine: number;
+    } | null;
+    ideName: string;
+  } | null;
+  setExternalIdeContext: (ctx: FileSystemState['externalIdeContext']) => void;
+
+  // IDE context injection toggle
+  ideContextEnabled: boolean;
+  toggleIdeContext: () => void;
+
   // Selectors
   getDirectoryEntries: (path: string) => DirectoryEntry[] | undefined;
   isDirExpanded: (path: string) => boolean;
@@ -59,6 +90,9 @@ export const useFileSystemStore = create<FileSystemState>()(
     previewFile: null,
     previewContent: null,
     previewLoading: false,
+    editorSelection: null,
+    externalIdeContext: null,
+    ideContextEnabled: true,
 
     // Explorer actions
     setExplorerPath: (path) => set({ explorerPath: path }),
@@ -127,6 +161,16 @@ export const useFileSystemStore = create<FileSystemState>()(
       previewContent: null,
       previewLoading: false,
     }),
+
+    // Editor selection actions
+    setEditorSelection: (selection) => set({ editorSelection: selection }),
+    clearEditorSelection: () => set({ editorSelection: null }),
+
+    // External IDE context
+    setExternalIdeContext: (ctx) => set({ externalIdeContext: ctx }),
+
+    // IDE context toggle
+    toggleIdeContext: () => set((state) => ({ ideContextEnabled: !state.ideContextEnabled })),
 
     // Selectors
     getDirectoryEntries: (path) => {

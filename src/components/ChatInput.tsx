@@ -22,6 +22,7 @@ import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
+import { useFileSystemStore } from '../stores/fileSystemStore';
 import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import {
   compressImage,
@@ -126,6 +127,9 @@ export default function ChatInput({
   onToggleFullscreen,
   agentToolkit,
 }: ChatInputProps) {
+  // IDE context state for indicator chip
+  const { previewFile, editorSelection, externalIdeContext, ideContextEnabled, toggleIdeContext } = useFileSystemStore();
+
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
   const [localAttachments, setLocalAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
@@ -2327,6 +2331,47 @@ export default function ChatInput({
               </button>
             </div>
           )}
+          {/* IDE context indicator chip */}
+          {(previewFile || editorSelection || externalIdeContext) && (() => {
+            let contextLabel = '';
+            if (editorSelection) {
+              const fileName = editorSelection.filePath.split('/').pop() || editorSelection.filePath;
+              contextLabel = `${fileName}:${editorSelection.startLine}-${editorSelection.endLine}`;
+            } else if (externalIdeContext?.selection) {
+              const fileName = externalIdeContext.selection.filePath.split('/').pop() || externalIdeContext.selection.filePath;
+              contextLabel = `${fileName}:${externalIdeContext.selection.startLine}-${externalIdeContext.selection.endLine}`;
+            } else if (externalIdeContext?.activeFile) {
+              contextLabel = externalIdeContext.activeFile.split('/').pop() || externalIdeContext.activeFile;
+            } else if (previewFile) {
+              contextLabel = previewFile.split('/').pop() || previewFile;
+            }
+
+            const isExternal = !editorSelection && !previewFile && !!externalIdeContext;
+            const sourceLabel = isExternal ? externalIdeContext.ideName : 'Quack';
+            const enabledTitle = `${sourceLabel} context will be attached. Click to disable.`;
+            const disabledTitle = 'IDE context disabled. Click to enable.';
+
+            return (
+              <button
+                type="button"
+                className={`chat-input-context-chip ${!ideContextEnabled ? 'chat-input-context-chip--disabled' : ''}`}
+                onClick={toggleIdeContext}
+                title={ideContextEnabled ? enabledTitle : disabledTitle}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+                <span>{contextLabel}</span>
+                {!ideContextEnabled && (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                )}
+              </button>
+            );
+          })()}
           </div>
           {/* Send button - aligned to right */}
           <div className="chat-input-actions-right">
