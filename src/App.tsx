@@ -101,7 +101,7 @@ import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
-import { buildInternalContextPrefix } from "./utils/ideContextBuilder";
+import { buildContextPrefix } from "./utils/ideContextBuilder";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
@@ -2372,12 +2372,6 @@ function AppContent() {
         prompt = `${history}\n\nUser: ${contentWithAttachments}`;
       }
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      const ideContextPrefix = buildInternalContextPrefix(gitSummary);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
-
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
       // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available, then agent's cwd
@@ -2385,6 +2379,13 @@ function AppContent() {
       const workingDir = sessionWorktreePath
         ? sessionWorktreePath
         : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
+
+      // Inject IDE context (open file, selection, git status) into prompt
+      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
+      const ideContextPrefix = await buildContextPrefix(gitSummary, workingDir ?? null);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
+      }
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -3048,7 +3049,8 @@ function AppContent() {
       }
 
       // Inject IDE context (open file, selection, git status) into prompt
-      const ideContextPrefix = buildInternalContextPrefix(gitSummary);
+      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
+      const ideContextPrefix = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
       if (ideContextPrefix) {
         prompt = ideContextPrefix + prompt;
       }

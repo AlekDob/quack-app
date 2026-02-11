@@ -22,6 +22,7 @@ import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
+import { useFileSystemStore } from '../stores/fileSystemStore';
 import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import {
   compressImage,
@@ -126,6 +127,9 @@ export default function ChatInput({
   onToggleFullscreen,
   agentToolkit,
 }: ChatInputProps) {
+  // IDE context state for indicator chip
+  const { previewFile, editorSelection, ideContextEnabled, toggleIdeContext } = useFileSystemStore();
+
   // Use local state as fallback if not controlled
   const [localInput, setLocalInput] = useState('');
   const [localAttachments, setLocalAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
@@ -2117,6 +2121,39 @@ export default function ChatInput({
                   <span>{skillName.replace(/-/g, ' ')}</span>
                 </div>
               ))}
+            </div>
+          );
+        })()}
+        {/* IDE context indicator chip */}
+        {(previewFile || editorSelection) && (() => {
+          let contextLabel = '';
+          if (editorSelection) {
+            const fileName = editorSelection.filePath.split('/').pop() || editorSelection.filePath;
+            contextLabel = `${fileName}:${editorSelection.startLine}-${editorSelection.endLine}`;
+          } else if (previewFile) {
+            contextLabel = previewFile.split('/').pop() || previewFile;
+          }
+
+          return (
+            <div className="chat-input-mentions">
+              <button
+                type="button"
+                className={`chat-input-context-chip ${!ideContextEnabled ? 'chat-input-context-chip--disabled' : ''}`}
+                onClick={toggleIdeContext}
+                title={ideContextEnabled ? 'IDE context will be attached. Click to disable.' : 'IDE context disabled. Click to enable.'}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+                <span>{contextLabel}</span>
+                {!ideContextEnabled && (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                )}
+              </button>
             </div>
           );
         })()}

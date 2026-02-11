@@ -31,9 +31,9 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { execSync, spawn } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { execSync, spawn, spawnSync } from 'child_process';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
+import { join, basename } from 'path';
 import { homedir, platform } from 'os';
 
 // =============================================================================
@@ -623,6 +623,21 @@ const TOOLS = [
       properties: {},
     },
   },
+
+  // === IDE CONTEXT ===
+  {
+    name: 'ide_get_context',
+    description: 'Get current IDE context: which IDE extensions are running, which workspaces they have open. NOTE: The active file, selection, and diagnostics are automatically injected into your prompt at message send time. Use this tool to check IDE connectivity or refresh context mid-conversation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspacePath: {
+          type: 'string',
+          description: 'Optional workspace path to filter results. If omitted, returns all connected IDEs.',
+        },
+      },
+    },
+  },
 ];
 
 // =============================================================================
@@ -758,6 +773,108 @@ async function handleSyncFocus() {
 }
 
 // =============================================================================
+// IDE CONTEXT DISCOVERY (Claude Code extension lock files)
+// =============================================================================
+
+/**
+ * Check if a PID is alive.
+ */
+function isPidAlive(pid) {
+  try {
+    if (platform() === 'win32') {
+      const result = spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8' });
+      return result.stdout && result.stdout.includes(String(pid));
+    }
+    // Unix: kill -0 checks existence without sending a signal
+    const result = spawnSync('kill', ['-0', String(pid)], { encoding: 'utf8' });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Discover Claude Code IDE extension instances from lock files.
+ * Lock files are at ~/.claude/ide/[port].lock
+ */
+function discoverIdeInstances(workspacePath) {
+  const ideDir = join(homedir(), '.claude', 'ide');
+
+  if (!existsSync(ideDir)) {
+    return { instances: [], message: 'No ~/.claude/ide/ directory found. Is the Claude Code IDE extension installed?' };
+  }
+
+  let files;
+  try {
+    files = readdirSync(ideDir).filter(f => f.endsWith('.lock'));
+  } catch {
+    return { instances: [], message: 'Could not read ~/.claude/ide/ directory.' };
+  }
+
+  if (files.length === 0) {
+    return { instances: [], message: 'No IDE extension instances found. Make sure VSCode/Cursor has the Claude Code extension active.' };
+  }
+
+  const instances = [];
+
+  for (const file of files) {
+    const port = parseInt(basename(file, '.lock'), 10);
+    if (isNaN(port)) continue;
+
+    try {
+      const content = readFileSync(join(ideDir, file), 'utf8');
+      const lock = JSON.parse(content);
+
+      // Validate PID
+      if (!isPidAlive(lock.pid)) {
+        console.error(`[IDE-MCP] Stale lock file ${file} (pid ${lock.pid} not alive)`);
+        continue;
+      }
+
+      const instance = {
+        port,
+        pid: lock.pid,
+        ideName: lock.ideName || 'Unknown IDE',
+        workspaceFolders: lock.workspaceFolders || [],
+        transport: lock.transport || 'ws',
+      };
+
+      // Filter by workspace if provided
+      if (workspacePath) {
+        const normalized = workspacePath.replace(/\/$/, '');
+        const matches = instance.workspaceFolders.some(folder => {
+          const folderNorm = folder.replace(/\/$/, '');
+          return normalized === folderNorm || normalized.startsWith(folderNorm + '/');
+        });
+        if (!matches) continue;
+      }
+
+      instances.push(instance);
+    } catch (e) {
+      console.error(`[IDE-MCP] Failed to parse lock file ${file}: ${e.message}`);
+    }
+  }
+
+  return {
+    instances,
+    message: instances.length > 0
+      ? `Found ${instances.length} connected IDE instance(s).`
+      : workspacePath
+        ? `No IDE extension found for workspace: ${workspacePath}`
+        : 'No active IDE extension instances found.',
+  };
+}
+
+async function handleGetContext(args) {
+  const result = discoverIdeInstances(args?.workspacePath);
+
+  return JSON.stringify({
+    ...result,
+    note: 'Active file, selection, and diagnostics are automatically injected into your prompt. This tool shows IDE connectivity status.',
+  }, null, 2);
+}
+
+// =============================================================================
 // MAIN SERVER
 // =============================================================================
 
@@ -815,6 +932,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'ide_sync_focus':
         result = await handleSyncFocus();
+        break;
+      case 'ide_get_context':
+        result = await handleGetContext(args);
         break;
       default:
         return {

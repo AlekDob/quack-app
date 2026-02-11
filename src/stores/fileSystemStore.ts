@@ -53,6 +53,10 @@ interface FileSystemState {
   setEditorSelection: (selection: FileSystemState['editorSelection']) => void;
   clearEditorSelection: () => void;
 
+  // IDE context injection toggle
+  ideContextEnabled: boolean;
+  toggleIdeContext: () => void;
+
   // Selectors
   getDirectoryEntries: (path: string) => DirectoryEntry[] | undefined;
   isDirExpanded: (path: string) => boolean;
@@ -73,6 +77,7 @@ export const useFileSystemStore = create<FileSystemState>()(
     previewContent: null,
     previewLoading: false,
     editorSelection: null,
+    ideContextEnabled: true,
 
     // Explorer actions
     setExplorerPath: (path) => set({ explorerPath: path }),
@@ -145,6 +150,9 @@ export const useFileSystemStore = create<FileSystemState>()(
     // Editor selection actions
     setEditorSelection: (selection) => set({ editorSelection: selection }),
     clearEditorSelection: () => set({ editorSelection: null }),
+
+    // IDE context toggle
+    toggleIdeContext: () => set((state) => ({ ideContextEnabled: !state.ideContextEnabled })),
 
     // Selectors
     getDirectoryEntries: (path) => {

@@ -933,6 +933,8 @@ pub fn run() {
             ide_integration::open_folder_in_ide,
             ide_integration::get_installed_apps,
             ide_integration::open_in_app,
+            ide_integration::discover_ide_instances,
+            ide_integration::get_ide_context,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,
