@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { usePrerequisitesStore, selectShouldShowPrerequisites } from '../../stores/prerequisitesStore';
+import { isMacOS } from '../../utils/platform';
 import './PrerequisitesCheck.css';
+
+const CLAUDE_INSTALL_CMD = 'sudo npm install -g @anthropic-ai/claude-code';
 
 export default function PrerequisitesCheck() {
   const {
     checkPrerequisites,
-    installClaudeCLI,
+    installXcodeCliTools,
+    openNodeDownload,
+    openClaudeInstallTerminal,
     openLoginTerminal,
     completeOnboarding,
     prerequisites,
     isChecking,
-    isInstalling,
+    isInstallingGit,
     isLoggedIn,
     isLoggingIn,
   } = usePrerequisitesStore();
@@ -18,8 +23,8 @@ export default function PrerequisitesCheck() {
   const shouldShow = usePrerequisitesStore(selectShouldShowPrerequisites);
   const [isClosing, setIsClosing] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
+  const [gitInstallError, setGitInstallError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
-
   // Check prerequisites on mount
   useEffect(() => {
     if (shouldShow) {
@@ -31,14 +36,47 @@ export default function PrerequisitesCheck() {
     return null;
   }
 
+  const handleRecheck = () => {
+    setInstallError(null);
+    setGitInstallError(null);
+    setLoginError(null);
+    checkPrerequisites();
+  };
+
+  const handleInstallGit = async () => {
+    setGitInstallError(null);
+
+    try {
+      await installXcodeCliTools();
+    } catch (error) {
+      console.error('[Prerequisites Check] Failed to install Xcode CLI Tools:', error);
+      setGitInstallError('Failed to launch Xcode CLI Tools installer. Please run "xcode-select --install" manually in your terminal.');
+    }
+  };
+
+  const handleNodeDownload = async () => {
+    try {
+      await openNodeDownload();
+    } catch (error) {
+      console.error('[Prerequisites Check] Failed to open Node.js download page:', error);
+    }
+  };
+
   const handleInstallClaudeCLI = async () => {
     setInstallError(null);
 
     try {
-      await installClaudeCLI();
+      // Copy command to clipboard as backup
+      try {
+        await navigator.clipboard.writeText(CLAUDE_INSTALL_CMD);
+      } catch {
+        // ignore clipboard error
+      }
+      // Open terminal with sudo install command
+      await openClaudeInstallTerminal();
     } catch (error) {
       console.error('[Prerequisites Check] Failed to install Claude CLI:', error);
-      setInstallError('Failed to install Claude CLI. Please try installing manually.');
+      setInstallError('Failed to open terminal. Run manually: ' + CLAUDE_INSTALL_CMD);
     }
   };
 
@@ -71,6 +109,15 @@ export default function PrerequisitesCheck() {
   };
 
   const allReady = (prerequisites?.all_installed ?? false) && isLoggedIn;
+
+  // Determine Node.js item state
+  const nodeInstalled = prerequisites?.nodejs.installed ?? false;
+  const nodeVersionOk = prerequisites?.nodejs.version_satisfied ?? false;
+  const nodeOutdated = nodeInstalled && !nodeVersionOk;
+  const nodeReady = nodeInstalled && nodeVersionOk;
+
+  // Claude CLI should only be installable when Node.js is installed and version is OK
+  const canInstallClaude = nodeReady;
 
   return (
     <div className={`prerequisites-overlay ${isClosing ? 'closing' : ''}`}>
@@ -120,17 +167,50 @@ export default function PrerequisitesCheck() {
                   )}
                 </div>
                 {!prerequisites.git.installed && (
-                  <span className="prerequisite-hint">xcode-select --install</span>
+                  isMacOS() ? (
+                    <button
+                      className="prerequisite-action"
+                      onClick={handleInstallGit}
+                      disabled={isInstallingGit}
+                      title="Install via Xcode Command Line Tools"
+                    >
+                      {isInstallingGit ? (
+                        <>
+                          <div className="prerequisite-button-spinner" />
+                          <span>Installing...</span>
+                        </>
+                      ) : (
+                        'Install'
+                      )}
+                    </button>
+                  ) : (
+                    <span className="prerequisite-hint">xcode-select --install</span>
+                  )
                 )}
               </div>
 
+              {gitInstallError && (
+                <div className="prerequisites-error">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M8 4v5M8 11h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  <span>{gitInstallError}</span>
+                </div>
+              )}
+
               {/* Node.js */}
-              <div className={`prerequisite-item ${prerequisites.nodejs.installed ? 'installed' : 'missing'}`}>
+              <div className={`prerequisite-item ${nodeReady ? 'installed' : nodeOutdated ? 'outdated' : 'missing'}`}>
                 <div className="prerequisite-status">
-                  {prerequisites.nodejs.installed ? (
+                  {nodeReady ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : nodeOutdated ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 8v4M12 16h.01" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   ) : (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
@@ -140,13 +220,33 @@ export default function PrerequisitesCheck() {
                   )}
                 </div>
                 <div className="prerequisite-info">
-                  <div className="prerequisite-name">{prerequisites.nodejs.name}</div>
+                  <div className="prerequisite-name">
+                    {prerequisites.nodejs.name}
+                    {prerequisites.nodejs.min_version && !nodeReady && (
+                      <span className="prerequisite-min-version">{prerequisites.nodejs.min_version}</span>
+                    )}
+                  </div>
                   {prerequisites.nodejs.version && (
-                    <div className="prerequisite-version">{prerequisites.nodejs.version}</div>
+                    <div className="prerequisite-version">
+                      {prerequisites.nodejs.version}
+                      {nodeOutdated && <span className="prerequisite-outdated-label"> (update required)</span>}
+                    </div>
                   )}
                 </div>
-                {!prerequisites.nodejs.installed && (
-                  <span className="prerequisite-hint">brew install node</span>
+                {!nodeReady && (
+                  isMacOS() ? (
+                    <button
+                      className="prerequisite-action"
+                      onClick={handleNodeDownload}
+                      title="Open Node.js download page"
+                    >
+                      Download
+                    </button>
+                  ) : (
+                    <span className="prerequisite-hint">
+                      {prerequisites.nodejs.download_url ? 'nodejs.org/download' : 'brew install node'}
+                    </span>
+                  )
                 )}
               </div>
 
@@ -175,17 +275,10 @@ export default function PrerequisitesCheck() {
                   <button
                     className="prerequisite-action"
                     onClick={handleInstallClaudeCLI}
-                    disabled={isInstalling || !prerequisites.nodejs.installed}
-                    title={!prerequisites.nodejs.installed ? 'Node.js required' : 'Install via npm'}
+                    disabled={!canInstallClaude}
+                    title={!canInstallClaude ? 'Node.js >= 18 required' : 'Opens Terminal with install command'}
                   >
-                    {isInstalling ? (
-                      <>
-                        <div className="prerequisite-button-spinner" />
-                        <span>Installing...</span>
-                      </>
-                    ) : (
-                      'Install'
-                    )}
+                    Install
                   </button>
                 )}
               </div>
@@ -273,7 +366,7 @@ export default function PrerequisitesCheck() {
         <div className="prerequisites-actions">
           <button
             className="prerequisites-refresh"
-            onClick={checkPrerequisites}
+            onClick={handleRecheck}
             disabled={isChecking}
             title="Re-check system requirements"
           >

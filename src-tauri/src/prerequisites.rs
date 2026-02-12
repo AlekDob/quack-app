@@ -4,12 +4,17 @@ use std::env;
 use anyhow::{Result, Context};
 use serde::Serialize;
 
+/// Minimum supported Node.js version (major)
+const MIN_NODE_VERSION: u32 = 18;
+
 #[derive(Serialize, Clone)]
 pub struct PrerequisiteStatus {
     pub name: String,
     pub installed: bool,
     pub version: Option<String>,
     pub download_url: Option<String>,
+    pub min_version: Option<String>,
+    pub version_satisfied: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -83,7 +88,7 @@ fn check_prerequisites_impl() -> Result<PrerequisitesCheck> {
     let nodejs = check_nodejs()?;
     let claude_cli = check_claude_cli()?;
 
-    let all_installed = git.installed && nodejs.installed && claude_cli.installed;
+    let all_installed = git.installed && nodejs.installed && nodejs.version_satisfied && claude_cli.installed;
 
     Ok(PrerequisitesCheck {
         git,
@@ -111,6 +116,8 @@ fn check_git() -> Result<PrerequisiteStatus> {
                 installed: true,
                 version,
                 download_url: None,
+                min_version: None,
+                version_satisfied: true,
             })
         }
         _ => Ok(PrerequisiteStatus {
@@ -118,6 +125,8 @@ fn check_git() -> Result<PrerequisiteStatus> {
             installed: false,
             version: None,
             download_url: Some("https://git-scm.com/downloads".to_string()),
+            min_version: None,
+            version_satisfied: false,
         }),
     }
 }
@@ -216,27 +225,39 @@ fn find_node_executable() -> Option<(PathBuf, String)> {
     None
 }
 
+/// Parse Node.js version string (e.g., "v22.8.0" -> 22)
+fn parse_node_major_version(version_str: &str) -> Option<u32> {
+    let trimmed = version_str.trim().trim_start_matches('v');
+    trimmed.split('.').next()?.parse().ok()
+}
+
 fn check_nodejs() -> Result<PrerequisiteStatus> {
+    let min_version_str = format!(">= {}", MIN_NODE_VERSION);
+    let download_url = "https://nodejs.org/en/download".to_string();
+
     match find_node_executable() {
-        Some((_path, version)) => Ok(PrerequisiteStatus {
-            name: "Node.js".to_string(),
-            installed: true,
-            version: Some(version),
-            download_url: None,
-        }),
+        Some((_path, version)) => {
+            let version_satisfied = parse_node_major_version(&version)
+                .map(|major| major >= MIN_NODE_VERSION)
+                .unwrap_or(false); // If we can't parse, assume incompatible (safe default)
+
+            Ok(PrerequisiteStatus {
+                name: "Node.js".to_string(),
+                installed: true,
+                version: Some(version),
+                download_url: if version_satisfied { None } else { Some(download_url) },
+                min_version: Some(min_version_str),
+                version_satisfied,
+            })
+        }
         None => {
-            let download_url = if cfg!(target_os = "macos") {
-                "https://nodejs.org/en/download"
-            } else if cfg!(target_os = "windows") {
-                "https://nodejs.org/en/download"
-            } else {
-                "https://nodejs.org/en/download"
-            };
             Ok(PrerequisiteStatus {
                 name: "Node.js".to_string(),
                 installed: false,
                 version: None,
-                download_url: Some(download_url.to_string()),
+                download_url: Some(download_url),
+                min_version: Some(min_version_str),
+                version_satisfied: false,
             })
         }
     }
@@ -334,6 +355,8 @@ fn check_claude_cli() -> Result<PrerequisiteStatus> {
                     installed: true,
                     version,
                     download_url: None,
+                    min_version: None,
+                    version_satisfied: true,
                 });
             }
         }
@@ -357,6 +380,8 @@ fn check_claude_cli() -> Result<PrerequisiteStatus> {
                     installed: true,
                     version,
                     download_url: None,
+                    min_version: None,
+                    version_satisfied: true,
                 });
             }
         }
@@ -367,6 +392,8 @@ fn check_claude_cli() -> Result<PrerequisiteStatus> {
         installed: false,
         version: None,
         download_url: None,
+        min_version: None,
+        version_satisfied: false,
     })
 }
 
@@ -388,6 +415,114 @@ fn install_claude_cli_impl() -> Result<String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     Ok(stdout.to_string())
+}
+
+/// Install Xcode Command Line Tools on macOS (triggers native dialog)
+#[tauri::command]
+pub fn install_xcode_cli_tools() -> Result<String, String> {
+    install_xcode_cli_tools_impl().map_err(|err| err.to_string())
+}
+
+fn install_xcode_cli_tools_impl() -> Result<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = Command::new("xcode-select")
+            .arg("--install")
+            .output()
+            .context("Failed to execute xcode-select --install")?;
+
+        // xcode-select --install returns exit code 1 if already installed,
+        // but still shows the dialog if tools are missing
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if stderr.contains("already installed") {
+            return Ok("Xcode Command Line Tools are already installed".to_string());
+        }
+
+        Ok(format!("Xcode CLI Tools installation dialog opened. {}{}", stdout, stderr))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(anyhow::anyhow!("install_xcode_cli_tools is only supported on macOS"))
+    }
+}
+
+/// Open the system terminal and run `sudo npm install -g @anthropic-ai/claude-code`
+#[tauri::command]
+pub fn open_claude_install_terminal() -> Result<String, String> {
+    open_claude_install_terminal_impl().map_err(|err| err.to_string())
+}
+
+fn open_claude_install_terminal_impl() -> Result<String> {
+    let install_cmd = "sudo npm install -g @anthropic-ai/claude-code";
+
+    #[cfg(target_os = "macos")]
+    {
+        let applescript = format!(
+            r#"tell application "Terminal"
+                activate
+                do script "{}"
+            end tell"#,
+            install_cmd
+        );
+
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(&applescript)
+            .output()
+            .context("Failed to open Terminal.app on macOS")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Failed to open terminal: {}", stderr));
+        }
+
+        return Ok("Opened macOS Terminal with Claude CLI install command".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/c", "start", "cmd", "/k", "npm install -g @anthropic-ai/claude-code"]);
+        hide_console_window(&mut cmd);
+        let output = cmd
+            .output()
+            .context("Failed to open terminal on Windows")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Failed to open terminal: {}", stderr));
+        }
+
+        return Ok("Opened Windows terminal with Claude CLI install command".to_string());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let terminals = vec![
+            ("x-terminal-emulator", vec!["-e", "sh", "-c", install_cmd]),
+            ("gnome-terminal", vec!["--", "sh", "-c", install_cmd]),
+            ("konsole", vec!["-e", "sh", "-c", install_cmd]),
+            ("xterm", vec!["-e", "sh", "-c", install_cmd]),
+        ];
+
+        for (term, args) in &terminals {
+            if let Ok(output) = Command::new(term).args(args).output() {
+                if output.status.success() {
+                    return Ok(format!("Opened {} with Claude CLI install command", term));
+                }
+            }
+        }
+
+        return Err(anyhow::anyhow!("No supported terminal emulator found on Linux"));
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Err(anyhow::anyhow!("Unsupported operating system"))
+    }
 }
 
 /// Check if Claude CLI is authenticated (logged in)

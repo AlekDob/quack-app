@@ -968,6 +968,8 @@ pub fn run() {
             git::git_init,
             prerequisites::check_prerequisites,
             prerequisites::install_claude_cli,
+            prerequisites::install_xcode_cli_tools,
+            prerequisites::open_claude_install_terminal,
             prerequisites::check_claude_auth_status,
             prerequisites::open_claude_login_terminal,
             preview::create_preview_webview,

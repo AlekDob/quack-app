@@ -29,6 +29,7 @@ interface FilePreviewDrawerProps {
   onHasUnsavedChanges?: (hasChanges: boolean) => void;
   imageData?: string | null;
   embedded?: boolean; // When true, renders without drawer backdrop (for tab system)
+  onEditorSelectionChange?: (selection: { selectedText: string; startLine: number; endLine: number } | null) => void;
 }
 
 export interface FilePreviewDrawerRef {
