@@ -1,0 +1,61 @@
+{
+  "id": "8b1ad6bf-9c91-486f-ab21-f4e912b41734",
+  "name": "Team a",
+  "projectPath": "/Users/alekdob/Desktop/Dev/Personal/quack-app",
+  "leadAgentId": "1880f75a-c665-4cf0-b224-df70c22e1fb8",
+  "members": [
+    {
+      "agentId": "f29e177c-630b-48a1-bd63-142aa7e40bfc",
+      "name": "Agent Graydon",
+      "role": "Rust Systems Developer",
+      "communicationStyle": "technical",
+      "selectedSkills": [
+        "rust-async",
+        "rust-memory",
+        "rust-error-handling"
+      ],
+      "isLead": false
+    },
+    {
+      "agentId": "f64d42e0-bedc-4905-997c-646ee960ed83",
+      "name": "Agent Alex",
+      "role": "React/Next.js Developer",
+      "communicationStyle": "technical",
+      "selectedSkills": [
+        "react-best-practices",
+        "nextjs-patterns",
+        "react-testing"
+      ],
+      "isLead": false
+    },
+    {
+      "agentId": "41fb86fd-f7ae-4afa-95c5-d5a9ffae2b54",
+      "name": "Agent Scribe",
+      "role": "Documentation Manager",
+      "communicationStyle": "professional",
+      "selectedSkills": [
+        "quack-brain",
+        "human-test-plan"
+      ],
+      "isLead": false
+    },
+    {
+      "agentId": "9d2408a4-8514-42a0-b737-7172404a5fe4",
+      "name": "Agent Fredric",
+      "role": "Marketing & Communication Manager",
+      "communicationStyle": "friendly",
+      "isLead": false
+    },
+    {
+      "agentId": "1880f75a-c665-4cf0-b224-df70c22e1fb8",
+      "name": "Agent Jack",
+      "role": "Project Manager",
+      "communicationStyle": "professional",
+      "selectedSkills": [
+        "quack-brain"
+      ],
+      "isLead": true
+    }
+  ],
+  "createdAt": 1770894564275
+}

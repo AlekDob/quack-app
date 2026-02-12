@@ -16,6 +16,15 @@ export interface IDEInfo {
   supportsDiff: boolean;
 }
 
+// Installed app from Rust backend (same as ActionIcons)
+export interface InstalledApp {
+  id: string;
+  name: string;
+  app_path: string;
+  category: 'ide' | 'terminal' | 'finder';
+  icon_base64: string | null;
+}
+
 export interface IDEConfig {
   preferredIDE: string | null;
   autoLaunch: boolean;
@@ -29,8 +38,13 @@ interface IDEState extends IDEConfig {
   detectedIDEs: IDEInfo[];
   isDetecting: boolean;
 
+  // Installed apps (from get_installed_apps - includes real icons)
+  installedApps: InstalledApp[];
+  isLoadingApps: boolean;
+
   // Actions
   detectInstalledIDEs: () => Promise<void>;
+  loadInstalledApps: () => Promise<void>;
   setPreferredIDE: (ideId: string) => Promise<void>;
   setAutoLaunch: (enabled: boolean) => void;
   setSyncFocus: (enabled: boolean) => void;
@@ -142,6 +156,8 @@ export const useIDEStore = create<IDEState>()(
       hasCompletedOnboarding: false,
       detectedIDEs: [],
       isDetecting: false,
+      installedApps: [],
+      isLoadingApps: false,
 
       // Detect installed IDEs
       detectInstalledIDEs: async () => {
@@ -162,6 +178,18 @@ export const useIDEStore = create<IDEState>()(
           // Fallback: try to detect via checking common paths
           // This runs in the frontend but is less reliable
           set({ isDetecting: false });
+        }
+      },
+
+      // Load installed apps (same source as ActionIcons dropdown)
+      loadInstalledApps: async () => {
+        set({ isLoadingApps: true });
+        try {
+          const apps = await invoke<InstalledApp[]>('get_installed_apps');
+          set({ installedApps: apps, isLoadingApps: false });
+        } catch (error) {
+          console.error('[IDE Store] Failed to load installed apps:', error);
+          set({ isLoadingApps: false });
         }
       },
 
@@ -283,6 +311,9 @@ export const useIDEStore = create<IDEState>()(
 
 export const selectPreferredIDEName = (state: IDEState): string | null => {
   if (!state.preferredIDE) return null;
+  // Try installed apps first (has real names), then fallback to registry
+  const app = state.installedApps.find(a => a.id === state.preferredIDE);
+  if (app) return app.name;
   return IDE_REGISTRY[state.preferredIDE]?.name || state.preferredIDE;
 };
 
@@ -292,4 +323,8 @@ export const selectHasPreferredIDE = (state: IDEState): boolean => {
 
 export const selectShouldShowOnboarding = (state: IDEState): boolean => {
   return !state.hasCompletedOnboarding && state.preferredIDE === null;
+};
+
+export const selectInstalledIDEApps = (state: IDEState): InstalledApp[] => {
+  return state.installedApps.filter(a => a.category === 'ide');
 };

@@ -26,7 +26,7 @@ interface AgentsPanelProps {
     workingOn?: string,
     avatar?: string
   ) => Promise<void>;
-  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 }
 
 // Drag handler for droid/agent items
@@ -75,10 +75,10 @@ export default function AgentsPanel({
     }
   };
 
-  // Handle editing an existing droid via tab
+  // Handle editing an existing droid via tab (pass file_path for IDE opening)
   const handleEditDroid = (agent: AgentInfo) => {
     if (onSelectDroid) {
-      onSelectDroid(agent.name, agent.scope as 'global' | 'project', false);
+      onSelectDroid(agent.name, agent.scope as 'global' | 'project', false, agent.file_path);
     } else {
       // Fallback to onSelectAgent
       onSelectAgent(agent);

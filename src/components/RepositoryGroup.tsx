@@ -1174,13 +1174,26 @@ export default function RepositoryGroup({
     return map;
   }, [mainAgents, worktreeAgents]);
 
-  // Load active team ONLY on mount / repoPath change (not on agent list changes)
+  // Load active team on mount / repoPath change, and re-enrich when agents become available
   const buildAgentAvatarMapRef = useRef(buildAgentAvatarMap);
   buildAgentAvatarMapRef.current = buildAgentAvatarMap;
+  const agentCount = mainAgents.length + worktreeAgents.length;
+  const hasEnrichedRef = useRef(false);
+
   useEffect(() => {
+    hasEnrichedRef.current = false;
     loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]);
+
+  // Re-enrich team avatars once agents are loaded (fixes race condition on startup)
+  useEffect(() => {
+    if (agentCount > 0 && !hasEnrichedRef.current) {
+      hasEnrichedRef.current = true;
+      loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentCount]);
 
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
   const { sessions: allSessionsForRepo, createSession } = useSessionStore();

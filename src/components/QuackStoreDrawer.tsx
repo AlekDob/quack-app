@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useMarketplace } from '../hooks/useMarketplace';
-import type { MarketplaceResource } from '../types';
+import type { MarketplaceResource, AgentTemplate } from '../types';
 import type { ActiveProject } from './modal-steps/types';
 import type { StoreTab } from './store/storeConstants';
 import { CATEGORY_MAP } from './store/storeConstants';
@@ -11,16 +11,25 @@ import MarketplaceInstallModal from './MarketplaceInstallModal';
 import StoreProjectPickerModal from './store/StoreProjectPickerModal';
 import './QuackStoreDrawer.css';
 
+export interface AgentBundleInstallData {
+  template: AgentTemplate;
+  projectPath: string;
+  projectName: string;
+  installedSkills: string[];
+  installedRules: string[];
+}
+
 interface QuackStoreDrawerProps {
   onClose: () => void;
   onRefresh?: () => void;
   activeProjects?: ActiveProject[];
+  onAgentBundleInstalled?: (data: AgentBundleInstallData) => void;
 }
 
-export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = [] }: QuackStoreDrawerProps) {
+export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = [], onAgentBundleInstalled }: QuackStoreDrawerProps) {
   const {
     allResources, loading, error, loadResources,
-    installResource, uninstallResource, installAgentBundle, isInstalled,
+    installResource, uninstallResource, installBundleSkills, isInstalled,
   } = useMarketplace();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,10 +98,29 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
     const resource = pendingBundleResource;
     setPendingBundleResource(null);
 
+    const ext = resource as MarketplaceResource & { _agentTemplate?: AgentTemplate };
+    if (!ext._agentTemplate) {
+      toast.error('Invalid agent bundle');
+      return;
+    }
+
     const toastId = toast.loading(`Installing ${resource.name}...`);
     try {
-      await installAgentBundle(resource, projectPath, projectName);
-      toast.success(`${resource.name} installed in ${projectName}`, { id: toastId, duration: 4000 });
+      const { skillCount, ruleCount, installedSkills, installedRules } = await installBundleSkills(resource);
+      const parts: string[] = [];
+      if (skillCount > 0) parts.push(`${skillCount} skill${skillCount !== 1 ? 's' : ''}`);
+      if (ruleCount > 0) parts.push(`${ruleCount} rule${ruleCount !== 1 ? 's' : ''}`);
+      const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+      toast.success(`${resource.name} installed in ${projectName}${detail}`, { id: toastId, duration: 4000 });
+
+      // Notify App.tsx to create the agent terminal in the sidebar
+      onAgentBundleInstalled?.({
+        template: ext._agentTemplate,
+        projectPath,
+        projectName,
+        installedSkills,
+        installedRules,
+      });
       onRefresh?.();
     } catch {
       toast.error('Failed to install', { id: toastId });
