@@ -2031,7 +2031,7 @@ function AppContent() {
     }).then((unlisten) => {
       pendingListenersRef.current.delete(capturedId);
       if (cancelled) {
-        void unlisten().catch(() => undefined);
+        unlisten();
         return;
       }
       activeListenersRef.current.set(capturedId, unlisten);
@@ -4873,7 +4873,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     removedIds.forEach((terminalId) => {
       const unlisten = askUserListenersRef.current.get(terminalId);
       if (unlisten) {
-        void unlisten().catch(() => undefined);
+        unlisten();
         askUserListenersRef.current.delete(terminalId);
       }
     });
@@ -4881,7 +4881,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // Cleanup on unmount
     return () => {
       askUserListenersRef.current.forEach((unlisten) => {
-        void unlisten().catch(() => undefined);
+        unlisten();
       });
       askUserListenersRef.current.clear();
     };
@@ -6797,7 +6797,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     return () => {
       if (unlisten) {
-        void unlisten().catch(() => undefined);
+        unlisten();
       }
     };
   }, [markTerminalIdle, tauriAvailable]);
@@ -10573,7 +10573,7 @@ You have access to all Bash tools to execute git commands like:
             // 🦆 Clean up listener for this agent
             const unlisten = activeListenersRef.current.get(chatId);
             if (unlisten) {
-              void unlisten().catch(() => undefined);
+              unlisten();
               activeListenersRef.current.delete(chatId);
             }
             // Remove from chatSessions map
