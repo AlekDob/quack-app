@@ -26,7 +26,7 @@ export function TeammateWidget({
 }: TeammateWidgetProps) {
   const avatarUrl = useAgentAvatar(name, avatar);
   const isStarting = action === 'start';
-  const isClickable = isStarting && !!sessionId && !!onDrillDown;
+  const isClickable = !!sessionId && !!onDrillDown;
 
   const hexToRgba = (hex: string, alpha: number): string => {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -138,6 +138,15 @@ export function TeammateWidget({
                 display: 'inline-block',
               }} />
               Task completed
+              {isClickable && (
+                <span style={{
+                  marginLeft: '4px',
+                  opacity: 0.5,
+                  fontSize: '9px',
+                }}>
+                  (click to view)
+                </span>
+              )}
             </>
           )}
         </div>

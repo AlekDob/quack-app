@@ -1,90 +1,58 @@
-import { useEffect, useState } from 'react';
-import { useIDEStore, IDE_REGISTRY, selectShouldShowOnboarding } from '../../stores/ideStore';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useIDEStore, selectShouldShowOnboarding } from '../../stores/ideStore';
+import type { InstalledApp } from '../../stores/ideStore';
 import './IDEOnboarding.css';
 
-// IDE Icons as SVG components (same as IDESettings)
-const IDEIcon = ({ ideId, size = 32 }: { ideId: string; size?: number }) => {
-  const iconStyle = { width: size, height: size };
-
-  switch (ideId) {
-    case 'vscode':
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none">
-          <path d="M17.5 2L9 10.5L4 6.5L2 8L6.5 12L2 16L4 17.5L9 13.5L17.5 22L22 20V4L17.5 2Z" fill="#007ACC" />
-          <path d="M17.5 2V22L22 20V4L17.5 2Z" fill="#1F9CF0" />
-        </svg>
-      );
-    case 'cursor':
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="18" height="18" rx="4" fill="#1a1a1a" stroke="#fff" strokeWidth="1.5" />
-          <path d="M8 8L16 12L8 16V8Z" fill="#fff" />
-        </svg>
-      );
-    case 'windsurf':
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L22 12L12 22L2 12L12 2Z" fill="#00b4d8" />
-          <path d="M12 6L18 12L12 18L6 12L12 6Z" fill="#0077b6" />
-        </svg>
-      );
-    case 'zed':
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="18" height="18" rx="3" fill="#084" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="10" fontWeight="bold">Z</text>
-        </svg>
-      );
-    case 'intellij':
-    case 'webstorm':
-    case 'pycharm':
-    case 'goland':
-    case 'rubymine':
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none">
-          <rect x="2" y="2" width="20" height="20" rx="3" fill="#000" />
-          <rect x="4" y="16" width="10" height="3" fill="#fff" />
-          <rect x="4" y="5" width="4" height="4" fill="#fc801d" />
-          <rect x="10" y="5" width="4" height="4" fill="#087cfa" />
-          <rect x="16" y="5" width="4" height="4" fill="#fe2857" />
-        </svg>
-      );
-    case 'sublime':
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none">
-          <path d="M4 4L20 8L20 12L4 8L4 4Z" fill="#ff9800" />
-          <path d="M4 12L20 16L20 20L4 16L4 12Z" fill="#ff9800" />
-        </svg>
-      );
-    default:
-      return (
-        <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M9 9l6 6M15 9l-6 6" />
-        </svg>
-      );
+// App icon - uses real icon from Rust backend, with SVG fallback
+const AppIcon = ({ app, size = 40 }: { app: InstalledApp; size?: number }) => {
+  if (app.icon_base64) {
+    return (
+      <img
+        src={`data:image/png;base64,${app.icon_base64}`}
+        alt={app.name}
+        width={size}
+        height={size}
+        style={{ borderRadius: '8px' }}
+      />
+    );
   }
+
+  // Fallback: generic icon
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M7 8l3 3-3 3" />
+      <path d="M13 11h4" />
+    </svg>
+  );
 };
 
 export default function IDEOnboarding() {
-  const {
-    detectedIDEs,
-    isDetecting,
-    detectInstalledIDEs,
-    setPreferredIDE,
-    completeOnboarding,
-  } = useIDEStore();
+  const isLoadingApps = useIDEStore((s) => s.isLoadingApps);
+  const loadInstalledApps = useIDEStore((s) => s.loadInstalledApps);
+  const setPreferredIDE = useIDEStore((s) => s.setPreferredIDE);
+  const completeOnboarding = useIDEStore((s) => s.completeOnboarding);
 
   const shouldShow = useIDEStore(selectShouldShowOnboarding);
+  const installedApps = useIDEStore(s => s.installedApps);
   const [isClosing, setIsClosing] = useState(false);
   const [selectedIDE, setSelectedIDE] = useState<string | null>(null);
 
-  // Detect IDEs on mount
+  // Memoize filtered IDE apps to avoid new array reference each render
+  const ideApps = useMemo(
+    () => installedApps.filter(a => a.category === 'ide'),
+    [installedApps]
+  );
+
+  // Load installed apps once when onboarding is shown
+  const hasLoadedRef = useRef(false);
   useEffect(() => {
-    if (shouldShow) {
-      detectInstalledIDEs();
+    if (shouldShow && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      loadInstalledApps();
     }
-  }, [shouldShow, detectInstalledIDEs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldShow]);
 
   if (!shouldShow) {
     return null;
@@ -110,6 +78,9 @@ export default function IDEOnboarding() {
     }, 250);
   };
 
+  // Find the selected app for the button label
+  const selectedApp = ideApps.find(a => a.id === selectedIDE);
+
   return (
     <div className={`ide-onboarding-overlay ${isClosing ? 'closing' : ''}`}>
       <div className="ide-onboarding-dialog">
@@ -133,28 +104,25 @@ export default function IDEOnboarding() {
 
         {/* IDE Grid */}
         <div className="ide-onboarding-grid">
-          {isDetecting ? (
+          {isLoadingApps ? (
             <div className="ide-onboarding-loading">
               <div className="ide-onboarding-spinner" />
               <span>Detecting installed IDEs...</span>
             </div>
           ) : (
-            Object.entries(IDE_REGISTRY).map(([ideId, info]) => {
-              const detected = detectedIDEs.find(d => d.id === ideId);
-              const isInstalled = !!detected;
-              const isSelected = selectedIDE === ideId;
+            ideApps.map((app) => {
+              const isSelected = selectedIDE === app.id;
 
               return (
                 <button
-                  key={ideId}
-                  className={`ide-onboarding-card ${isSelected ? 'selected' : ''} ${!isInstalled ? 'not-installed' : ''}`}
-                  onClick={() => isInstalled && setSelectedIDE(ideId)}
-                  disabled={!isInstalled}
+                  key={app.id}
+                  className={`ide-onboarding-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => setSelectedIDE(app.id)}
                 >
                   <div className="ide-onboarding-card-icon">
-                    <IDEIcon ideId={ideId} size={40} />
+                    <AppIcon app={app} size={40} />
                   </div>
-                  <div className="ide-onboarding-card-name">{info.name}</div>
+                  <div className="ide-onboarding-card-name">{app.name}</div>
                   {isSelected && (
                     <div className="ide-onboarding-card-check">
                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -163,14 +131,17 @@ export default function IDEOnboarding() {
                       </svg>
                     </div>
                   )}
-                  {!isInstalled && (
-                    <div className="ide-onboarding-card-unavailable">Not installed</div>
-                  )}
                 </button>
               );
             })
           )}
         </div>
+
+        {!isLoadingApps && ideApps.length === 0 && (
+          <div className="ide-onboarding-loading">
+            <span>No IDEs detected on your system.</span>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="ide-onboarding-actions">
@@ -185,7 +156,7 @@ export default function IDEOnboarding() {
             onClick={handleSelectIDE}
             disabled={!selectedIDE}
           >
-            Continue with {selectedIDE ? IDE_REGISTRY[selectedIDE]?.name : 'selected IDE'}
+            Continue with {selectedApp?.name || 'selected IDE'}
           </button>
         </div>
 

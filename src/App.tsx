@@ -36,7 +36,7 @@ import { getLanguageFromFilename } from "./utils/languageDetection";
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
-import QuackStoreDrawer from "./components/QuackStoreDrawer";
+import QuackStoreDrawer, { type AgentBundleInstallData } from "./components/QuackStoreDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
@@ -1230,7 +1230,7 @@ function AppContent() {
         if (agentEvt.action === 'start') {
           teamState.updateTeammateStatus(agentEvt.agent_name, 'active', agentEvt.session_id);
         } else if (agentEvt.action === 'stop') {
-          teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped');
+          teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped', agentEvt.session_id);
         }
       }
     }
@@ -2540,6 +2540,15 @@ function AppContent() {
         response.total_cost_usd,
         response.usage  // ✅ Now passing full usage stats from Rust backend!
       );
+
+      // 🦆 STAMINA FIX: Also update chatTokensMap from invoke response
+      // The streamed result event may fail to update chatTokensMap if the Rust
+      // deserialization fails (e.g., null values in usage) or if the event is
+      // dropped. This ensures stamina always gets updated from the authoritative
+      // invoke response.
+      if (response.usage) {
+        handleTokenUpdate(messageKey, response.usage, response.total_cost_usd);
+      }
 
       // Notify that agent response is complete
       // 🦆 RACE CONDITION FIX: Use CAPTURED values
@@ -5667,16 +5676,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setActiveTabId(agentTabId);
   }, []);
 
-  // Handler for selecting or creating a droid via Claude Assets panel
-  const handleSelectDroid = useCallback((agentName: string, agentScope: 'global' | 'project', isNew = false) => {
+  // Handler for selecting or creating a droid - opens in external IDE if available
+  const handleSelectDroid = useCallback((agentName: string, agentScope: 'global' | 'project', isNew = false, filePath?: string) => {
     if (isNew) {
       handleCreateNewAgent(agentScope);
       return;
     }
 
-    const agentTabId = `agent-${agentName}-${agentScope}`;
+    // Try opening in external IDE if preferred IDE is set
+    if (filePath) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
+    }
 
-    // Check if tab already exists
+    // Fallback: open internal tab
+    const agentTabId = `agent-${agentName}-${agentScope}`;
     const existingTab = tabs.find(t => t.id === agentTabId);
 
     if (existingTab) {
@@ -5709,11 +5726,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
-  // Command tab handler
-  const handleSelectCommand = useCallback((commandName: string, commandScope: 'global' | 'project', isNew = false) => {
-    const commandTabId = isNew ? `command-new-${Date.now()}` : `command-${commandName}-${commandScope}`;
+  // Command tab handler - opens in external IDE if available, falls back to internal tab
+  const handleSelectCommand = useCallback((commandName: string, commandScope: 'global' | 'project', isNew = false, filePath?: string) => {
+    // For existing commands with a file path, try opening in external IDE
+    if (!isNew && filePath) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
+    }
 
-    // Check if tab already exists
+    // Fallback: open internal tab
+    const commandTabId = isNew ? `command-new-${Date.now()}` : `command-${commandName}-${commandScope}`;
     const existingTab = tabs.find(t => t.id === commandTabId);
 
     if (existingTab) {
@@ -5733,11 +5758,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tabs]);
 
-  // Rule tab handler
-  const handleSelectRule = useCallback((ruleName: string, ruleScope: 'global' | 'project', isNew = false) => {
-    const ruleTabId = isNew ? `rule-new-${Date.now()}` : `rule-${ruleName}-${ruleScope}`;
+  // Rule tab handler - opens in external IDE if available, falls back to internal tab
+  const handleSelectRule = useCallback((ruleName: string, ruleScope: 'global' | 'project', isNew = false, filePath?: string) => {
+    // For existing rules with a file path, try opening in external IDE
+    if (!isNew && filePath) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
+    }
 
-    // Check if tab already exists
+    // Fallback: open internal tab
+    const ruleTabId = isNew ? `rule-new-${Date.now()}` : `rule-${ruleName}-${ruleScope}`;
     const existingTab = tabs.find(t => t.id === ruleTabId);
 
     if (existingTab) {
@@ -5789,23 +5822,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
+  // Skills handler - opens in external IDE if available, falls back to internal tab
   const handleSelectSkill = useCallback(async (skillInfo: SkillInfo) => {
     if (!tauriAvailable) {
       return;
     }
 
-    try {
-      // Create a new tab for the skill instead of opening drawer
-      const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
+    // Try opening in external IDE if preferred IDE is set
+    if (skillInfo.file_path) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        const opened = await tryOpenInIDE(skillInfo.file_path);
+        if (opened) return;
+      }
+    }
 
-      // Check if tab already exists
+    // Fallback: open internal tab
+    try {
+      const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
       const existingTab = tabs.find(t => t.id === skillTabId);
 
       if (existingTab) {
-        // Tab already exists, just switch to it
         setActiveTabId(skillTabId);
       } else {
-        // Create new skill tab
         const newTab: Tab = {
           id: skillTabId,
           label: skillInfo.name.replace(/-/g, ' '),
@@ -5813,7 +5852,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           closable: true,
           skillName: skillInfo.name,
           skillScope: skillInfo.scope as 'global' | 'project',
-          // icon removed - rendered directly in TabBar to avoid React serialization issues
         };
 
         setTabs(prevTabs => [...prevTabs, newTab]);
@@ -5898,6 +5936,90 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       loadSkills(),
     ]);
   }, [loadAgents, loadSkills]);
+
+  // Handle agent bundle installed from Quack Store - creates terminal in sidebar
+  const handleAgentBundleInstalled = useCallback(async (data: AgentBundleInstallData) => {
+    if (!tauriAvailable) return;
+
+    const { template, projectPath, projectName, installedSkills, installedRules } = data;
+    try {
+      const created = await invoke<TerminalInfo>("create_terminal", {
+        label: template.suggestedName,
+        color: template.suggestedColor,
+        cwd: projectPath,
+        workingOn: null,
+        avatar: template.suggestedAvatar || null,
+        branch: null,
+      });
+
+      const personality: Partial<AgentPersonality> = {
+        role: template.role,
+        communicationStyle: template.communicationStyle,
+        customNotes: template.customNotes,
+        selectedSkills: installedSkills.length > 0 ? installedSkills : undefined,
+        selectedRules: installedRules.length > 0 ? installedRules : undefined,
+      };
+
+      const createdWithState: TerminalInfo = {
+        ...created,
+        status: "idle",
+        needsAttention: false,
+        hasResponded: false,
+        responseStartTime: null,
+        avatar: template.suggestedAvatar,
+        personality,
+      };
+
+      setTerminals((prev) => [...prev, createdWithState]);
+      setActiveId(createdWithState.id);
+      setActiveSessionId(null);
+      setActiveTaskId(null);
+      setActiveTabId('chat');
+      clearTerminalAttention(createdWithState.id);
+      void addActiveAgent(projectPath, createdWithState.id);
+
+      // Persist project in sidebar
+      setPersistedProjects(prev => {
+        if (prev.has(projectPath)) return prev;
+        const next = new Map(prev);
+        next.set(projectPath, projectName);
+        return next;
+      });
+
+      // Save personality in background
+      if (Object.keys(personality).length > 0) {
+        const fullPersonality: AgentPersonality = {
+          id: createdWithState.id,
+          name: template.suggestedName,
+          role: personality.role || '',
+          communicationStyle: personality.communicationStyle || 'friendly',
+          customNotes: personality.customNotes || undefined,
+          selectedRules: personality.selectedRules || undefined,
+          selectedSkills: personality.selectedSkills || undefined,
+        };
+
+        fireAndForget('save_agent_personality', {
+          projectPath,
+          personality: fullPersonality,
+        }, (error) => {
+          console.error('Failed to save personality:', error);
+        });
+
+        fireAndForget('inject_personality_to_claude_md', {
+          projectPath,
+          personality: fullPersonality,
+        }, (error) => {
+          console.error('Failed to inject personality to CLAUDE.md:', error);
+        });
+      }
+
+      // Close the store drawer after successful install
+      setShowStoreDrawer(false);
+    } catch (err) {
+      console.error('Failed to create agent from bundle:', err);
+      toast.error('Agent installed but failed to add to sidebar');
+    }
+  }, [tauriAvailable, clearTerminalAttention, addActiveAgent]);
 
   const handleMentionFile = useCallback((filePath: string, fileName: string) => {
     // Calculate relative path from explorerRoot
@@ -6391,6 +6513,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         }
       }
 
+      // Try opening in external IDE if available
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        toast('Opening in your IDE...', { duration: 2000 });
+        try {
+          const { openFileInIDE } = useIDEStore.getState();
+          await openFileInIDE(absolutePath);
+          return;
+        } catch (err) {
+          console.error('[App] Failed to open Second Brain doc in IDE:', err);
+          toast.error('Failed to open in IDE');
+        }
+      }
+
+      // Fallback: open internal tab
       const fileName = absolutePath.split('/').pop() || 'Document';
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
 
@@ -8234,10 +8371,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [tauriAvailable]
   );
 
+  // Centralized helper: try to open file in preferred IDE with toast notification
+  // Returns true if opened in IDE, false if no IDE set (caller should fallback)
+  const tryOpenInIDE = useCallback(async (filePath: string, line?: number): Promise<boolean> => {
+    const { preferredIDE, openFileInIDE } = useIDEStore.getState();
+    if (!preferredIDE) return false;
+
+    try {
+      toast('Opening in your IDE...', { duration: 2000 });
+      await openFileInIDE(filePath, line);
+      return true;
+    } catch (err) {
+      console.error('[App] Failed to open file in IDE:', err);
+      toast.error('Failed to open in IDE');
+      return false;
+    }
+  }, []);
+
   const handleOpenFilePreview = useCallback(
     async (entry: DirectoryEntry, lineChanges?: LineChange[]) => {
       if (!tauriAvailable || entry.is_dir) {
         return;
+      }
+
+      // Try opening in external IDE if available (skip for files with lineChanges - need internal diff view)
+      if (!lineChanges) {
+        const opened = await tryOpenInIDE(entry.path);
+        if (opened) return;
       }
 
       // Check if file is modified by AI and has lineChanges
@@ -8387,32 +8547,37 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [tauriAvailable, gitSummary, explorerRoot, activeId, fileEditsMap]
   );
 
-  const handleFilePathClick = useCallback((path: string, lineChanges?: LineChange[]) => {
-    const name = path.split('/').pop() || path;
-    // Create a fake DirectoryEntry to open the file
+  const handleFilePathClick = useCallback(async (path: string, lineChanges?: LineChange[]) => {
+    // Parse optional :line suffix (e.g. "src/App.tsx:42")
+    let filePath = path;
+    let line: number | undefined;
+    const lineMatch = path.match(/^(.+):(\d+)$/);
+    if (lineMatch) {
+      filePath = lineMatch[1];
+      line = parseInt(lineMatch[2], 10);
+    }
+
+    // Try opening in external IDE (skip for files with lineChanges - need internal diff view)
+    if (!lineChanges) {
+      const opened = await tryOpenInIDE(filePath, line);
+      if (opened) return;
+    }
+
+    // Fallback: open in internal tab
+    const name = filePath.split('/').pop() || filePath;
     const fakeEntry: DirectoryEntry = {
       name,
-      path,
+      path: filePath,
       is_dir: false,
       is_symlink: false,
     };
-    // Use handleOpenFilePreview to actually load file content
     handleOpenFilePreview(fakeEntry, lineChanges);
-  }, [handleOpenFilePreview]);
+  }, [tryOpenInIDE, handleOpenFilePreview]);
 
-  // Handler to open file in preferred IDE
+  // Handler to open file in preferred IDE (legacy, used by other components)
   const handleOpenInIDE = useCallback(async (path: string) => {
-    const { preferredIDE } = useIDEStore.getState();
-    if (!preferredIDE) {
-      console.warn('[App] No preferred IDE set, cannot open file');
-      return;
-    }
-    try {
-      await invoke('open_in_app', { appId: preferredIDE, path });
-    } catch (err) {
-      console.error('[App] Failed to open file in IDE:', err);
-    }
-  }, []);
+    await tryOpenInIDE(path);
+  }, [tryOpenInIDE]);
 
   // Handler to open diff drawer from EditSummaryBar
   const handleDiffClick = useCallback(async (filePath: string, status: 'created' | 'modified' | 'deleted') => {
@@ -9856,21 +10021,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [explorerRoot, handleOpenFilePreview]
   );
 
-  // Handler to open .mcp.json file in Monaco editor
+  // Handler to open .mcp.json file - opens in external IDE if available
   const handleOpenMcpConfig = useCallback(
     (filePath: string) => {
-      // filePath is the full path to .mcp.json (project or global)
-      const fileName = filePath.split('/').pop() || '.mcp.json';
+      // Try opening in external IDE first
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
 
-      // Create a fake DirectoryEntry to open the file
+      // Fallback: open in internal editor
+      const fileName = filePath.split('/').pop() || '.mcp.json';
       const fakeEntry: DirectoryEntry = {
         name: fileName,
         path: filePath,
         is_dir: false,
         is_symlink: false,
       };
-
-      // Use handleOpenFilePreview to open the file
       void handleOpenFilePreview(fakeEntry);
     },
     [handleOpenFilePreview]
@@ -11421,7 +11589,6 @@ You have access to all Bash tools to execute git commands like:
                     onHasUnsavedChanges={setPreviewHasUnsavedChanges}
                     imageData={previewImageData}
                     embedded={true}
-                    onEditorSelectionChange={handleEditorSelectionChange}
                   />
                   <FileActionButtons
                     onRefresh={handleRefreshPreview}
@@ -11945,6 +12112,7 @@ You have access to all Bash tools to execute git commands like:
                 onClose={() => setShowStoreDrawer(false)}
                 onRefresh={handleMarketplaceRefresh}
                 activeProjects={activeProjects}
+                onAgentBundleInstalled={handleAgentBundleInstalled}
               />
             </div>
           </div>

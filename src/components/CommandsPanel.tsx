@@ -5,7 +5,7 @@ import { CommandsList } from './CommandsList';
 
 interface CommandsPanelProps {
   basePath: string;
-  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 }
 
 export function CommandsPanel({ basePath, onSelectCommand }: CommandsPanelProps) {
@@ -32,9 +32,9 @@ export function CommandsPanel({ basePath, onSelectCommand }: CommandsPanelProps)
   };
 
   const handleEditCommand = (command: SlashCommand) => {
-    // Open command in tab for editing
+    // Open command in tab for editing (pass filePath for IDE opening)
     if (onSelectCommand) {
-      onSelectCommand(command.name, command.scope as 'global' | 'project');
+      onSelectCommand(command.name, command.scope as 'global' | 'project', false, (command as SlashCommand & { filePath?: string }).filePath);
     }
   };
 

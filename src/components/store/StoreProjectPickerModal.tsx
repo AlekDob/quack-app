@@ -52,7 +52,7 @@ export default function StoreProjectPickerModal({
     <div className="store-detail-overlay" onClick={onCancel}>
       <div
         className="store-detail-panel"
-        style={{ maxWidth: '480px' }}
+        style={{ maxWidth: '480px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -71,7 +71,7 @@ export default function StoreProjectPickerModal({
         </div>
 
         {/* Project List */}
-        <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '50vh', overflowY: 'auto' }}>
           {/* Browse for new */}
           <button
             type="button"

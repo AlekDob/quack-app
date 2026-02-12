@@ -5,7 +5,7 @@ import { RulesList } from './RulesList';
 
 interface RulesPanelProps {
   basePath: string;
-  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 }
 
 export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
@@ -40,9 +40,9 @@ export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
   };
 
   const handleEditRule = (rule: Rule) => {
-    // Open rule in tab for editing
+    // Open rule in tab for editing (pass filePath for IDE opening)
     if (onSelectRule) {
-      onSelectRule(rule.name, rule.scope as 'global' | 'project');
+      onSelectRule(rule.name, rule.scope as 'global' | 'project', false, rule.filePath);
     }
   };
 

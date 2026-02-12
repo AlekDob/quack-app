@@ -222,13 +222,13 @@ interface SidePanelAccordionProps {
   onRefreshSkills: () => void;
 
   // Commands props
-  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 
   // Rules props
-  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 
   // Droids props
-  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 
   // Context props
   tauriAvailable: boolean;

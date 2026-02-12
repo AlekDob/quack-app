@@ -12,9 +12,9 @@ interface ClaudeAssetsTabViewProps {
   isActive: boolean;
   terminals: TerminalInfo[];
   onOpenFile?: (path: string) => void;
-  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
-  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
-  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 }
 
 export default function ClaudeAssetsTabView({

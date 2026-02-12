@@ -506,9 +506,7 @@ export default function AgentSelector({
         <div className="agent-selector-title-section">
           <h3 className="agent-selector-title">Choose an agent</h3>
           <p className="agent-selector-subtitle">
-            {agents.length === 0
-              ? 'No saved agents yet'
-              : `${agents.length} saved ${agents.length === 1 ? 'agent' : 'agents'}`}
+            {`${agents.length} saved ${agents.length === 1 ? 'agent' : 'agents'}`}
           </p>
         </div>
 
@@ -712,29 +710,6 @@ export default function AgentSelector({
             ))}
           </div>
         </>
-      )}
-
-      {/* No saved agents empty state */}
-      {agents.length === 0 && !searchQuery && (
-        <div className="agent-selector-empty">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <line x1="19" y1="8" x2="19" y2="14"></line>
-            <line x1="22" y1="11" x2="16" y2="11"></line>
-          </svg>
-          <p className="agent-selector-empty-title">No saved agents yet</p>
-          <p className="agent-selector-empty-subtitle">
-            Create your first agent or try one from the marketplace
-          </p>
-          <button
-            type="button"
-            className="agent-selector-empty-create"
-            onClick={onCreateNew}
-          >
-            Create New Agent
-          </button>
-        </div>
       )}
 
       {/* No search results */}

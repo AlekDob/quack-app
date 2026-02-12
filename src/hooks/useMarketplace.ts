@@ -764,6 +764,95 @@ export function useMarketplace() {
     }
   }, []);
 
+  // Install only the skills and rules from an agent bundle globally (no project required)
+  const installBundleSkills = useCallback(async (
+    resource: MarketplaceResource
+  ): Promise<{ skillCount: number; ruleCount: number; installedSkills: string[]; installedRules: string[] }> => {
+    const ext = resource as MarketplaceResource & { _agentTemplate?: AgentTemplate };
+    if (!ext._agentTemplate) {
+      throw new Error('Resource is not an agent bundle');
+    }
+
+    const template = ext._agentTemplate;
+    const installedSkills: string[] = [];
+    const installedRules: string[] = [];
+
+    const bundledSkills = template.skills || template.bundledPlugins;
+    if (!bundledSkills || bundledSkills.length === 0) {
+      throw new Error('Agent bundle has no skills to install');
+    }
+
+    const fetchOpts: RequestInit = { cache: 'no-store' };
+    const marketplaceRes = await fetch(MARKETPLACE_JSON_URL + cacheBust(), fetchOpts);
+    if (!marketplaceRes.ok) {
+      throw new Error(`Failed to fetch marketplace: ${marketplaceRes.status}`);
+    }
+    const marketplace: MarketplaceJson = await marketplaceRes.json();
+    const home = await homeDir();
+    const basePath = await join(home, '.claude');
+
+    for (const pluginName of bundledSkills) {
+      const pluginEntry = marketplace.plugins.find(p => p.name === pluginName);
+      if (!pluginEntry) continue;
+
+      const pluginSource = pluginEntry.source.replace('./', '');
+      const pluginJsonUrl = `${GITHUB_RAW_BASE}/${pluginSource}/.claude-plugin/plugin.json${cacheBust()}`;
+      const pluginRes = await fetch(pluginJsonUrl, fetchOpts);
+      if (!pluginRes.ok) continue;
+
+      const pluginData: PluginJson = await pluginRes.json();
+
+      if (pluginData.skills) {
+        for (const skillPath of pluginData.skills) {
+          const skillName = skillPath.split('/').pop() || '';
+          const skillMdUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${skillPath}/SKILL.md`;
+          try {
+            const res = await fetch(skillMdUrl);
+            if (!res.ok) continue;
+            const content = await res.text();
+            const targetDir = await join(basePath, 'skills', skillName);
+            try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+            await invoke('write_file_content', { path: await join(targetDir, 'SKILL.md'), content });
+            installedSkills.push(skillName);
+          } catch (err) {
+            console.warn(`Failed to install skill ${skillName}:`, err);
+          }
+        }
+      }
+
+      if (pluginData.rules) {
+        for (const rulePath of pluginData.rules) {
+          const ruleFile = rulePath.split('/').pop() || '';
+          const ruleUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${rulePath}`;
+          try {
+            const res = await fetch(ruleUrl);
+            if (!res.ok) continue;
+            const content = await res.text();
+            const targetDir = await join(basePath, 'rules');
+            try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+            await invoke('write_file_content', { path: await join(targetDir, ruleFile), content });
+            installedRules.push(ruleFile);
+          } catch (err) {
+            console.warn(`Failed to install rule ${ruleFile}:`, err);
+          }
+        }
+      }
+    }
+
+    // Mark as installed
+    setLibrary(prev => ({
+      ...prev,
+      installedResources: [...prev.installedResources, resource],
+    }));
+
+    return {
+      skillCount: installedSkills.length,
+      ruleCount: installedRules.length,
+      installedSkills,
+      installedRules,
+    };
+  }, []);
+
   // Get all starter bundles (agent templates tagged as "starter")
   const getStarterBundles = useCallback((): MarketplaceResource[] => {
     return resources.filter(r =>
@@ -808,6 +897,7 @@ export function useMarketplace() {
     installResource,
     uninstallResource,
     installAgentBundle,
+    installBundleSkills,
     getStarterBundles,
     toggleFavorite,
     isInstalled,

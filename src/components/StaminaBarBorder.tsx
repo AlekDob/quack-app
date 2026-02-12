@@ -41,10 +41,13 @@ function StaminaBarBorder({
   const [showModal, setShowModal] = useState(false);
 
   // Calculate stamina
-  const messageTokens = inputTokens + outputTokens;
-  const totalContextUsage = messageTokens + overhead;
+  // inputTokens from SDK = full context window input (system + tools + CLAUDE.md + messages)
+  // Overhead is already INCLUDED in inputTokens, not added on top
+  const messageTokens = Math.max(0, inputTokens - overhead);
+  const totalContextUsage = inputTokens + AUTO_COMPACT_COST;
   const usagePercentage = (totalContextUsage / maxTokens) * 100;
 
+  // Stamina = how much usable space remains
   const maxUsableTokens = maxTokens - overhead - AUTO_COMPACT_COST;
   const remainingUsableTokens = Math.max(0, maxUsableTokens - messageTokens);
   const staminaPercentage = Math.max(0, Math.min(100, (remainingUsableTokens / maxUsableTokens) * 100));
