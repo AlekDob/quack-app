@@ -16,9 +16,9 @@ const DragHandle: React.FC<DragHandleProps> = ({ isDragging = false, className =
       }}
     >
       <svg
-        width="12"
-        height="20"
-        viewBox="0 0 12 20"
+        width="8"
+        height="14"
+        viewBox="0 0 8 14"
         fill="currentColor"
         className={`
           transition-opacity duration-200
@@ -27,12 +27,12 @@ const DragHandle: React.FC<DragHandleProps> = ({ isDragging = false, className =
         style={{ pointerEvents: 'none' }}
       >
         {/* Two columns of dots for the drag handle */}
-        <circle cx="3" cy="4" r="1.5" />
-        <circle cx="9" cy="4" r="1.5" />
-        <circle cx="3" cy="10" r="1.5" />
-        <circle cx="9" cy="10" r="1.5" />
-        <circle cx="3" cy="16" r="1.5" />
-        <circle cx="9" cy="16" r="1.5" />
+        <circle cx="2" cy="3" r="1.2" />
+        <circle cx="6" cy="3" r="1.2" />
+        <circle cx="2" cy="7" r="1.2" />
+        <circle cx="6" cy="7" r="1.2" />
+        <circle cx="2" cy="11" r="1.2" />
+        <circle cx="6" cy="11" r="1.2" />
       </svg>
     </div>
   );

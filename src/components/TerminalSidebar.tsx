@@ -155,6 +155,42 @@ function SortableRepositoryGroup({
   );
 }
 
+// Sortable wrapper for group sections (makes entire groups draggable)
+interface SortableGroupRenderProps {
+  dragHandleProps: Record<string, unknown>;
+  isDragging: boolean;
+}
+
+function SortableGroupSection({
+  sectionId,
+  children,
+}: {
+  sectionId: string;
+  children: (props: SortableGroupRenderProps) => React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sectionId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.5 : 1,
+    willChange: isDragging ? 'transform' : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ dragHandleProps: { ...attributes, ...listeners }, isDragging })}
+    </div>
+  );
+}
+
 const normalize = (value: string) => value.toLowerCase();
 const fuzzyMatch = (query: string, target: string) => {
   if (!query) {
@@ -449,7 +485,7 @@ export default function TerminalSidebar({
     document.body.classList.add('dragging-active');
   };
 
-  // Handle repository drag end
+  // Handle repository drag end — works on section-level IDs
   const handleRepoDragEnd = (event: DragEndEvent) => {
     // Remove dragging class to re-enable animations
     document.body.classList.remove('dragging-active');
@@ -461,34 +497,42 @@ export default function TerminalSidebar({
       return;
     }
 
-    const activeIndex = repositoryOrder.indexOf(String(active.id));
-    const overIndex = repositoryOrder.indexOf(String(over.id));
+    // Build current section IDs from sidebarSections
+    const currentSectionIds = sidebarSections.map((s) =>
+      s.type === 'group' ? `group-${s.group.id}` : `repo-${s.project[0]}`
+    );
 
-    if (activeIndex !== -1 && overIndex !== -1) {
-      const newOrder = arrayMove(repositoryOrder, activeIndex, overIndex);
-      setRepositoryOrder(newOrder);
-      saveRepositoryOrder(newOrder, projectColors);
-    } else {
-      // If not in saved order, create new order from current groups
-      const currentOrder = repositoryGroups.map(([name]) => `repo-${name}`);
-      const activeIdx = currentOrder.indexOf(String(active.id));
-      const overIdx = currentOrder.indexOf(String(over.id));
+    const activeIdx = currentSectionIds.indexOf(String(active.id));
+    const overIdx = currentSectionIds.indexOf(String(over.id));
 
-      if (activeIdx !== -1 && overIdx !== -1) {
-        const newOrder = arrayMove(currentOrder, activeIdx, overIdx);
-        setRepositoryOrder(newOrder);
+    if (activeIdx !== -1 && overIdx !== -1) {
+      // Reorder sections
+      const newSectionOrder = arrayMove(sidebarSections, activeIdx, overIdx);
 
-        // Auto-assign colors to new projects not in the map
-        const updatedColors = { ...projectColors };
-        newOrder.forEach((repoKey, index) => {
-          if (!updatedColors[repoKey]) {
-            updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+      // Flatten sections back to repo-* order for persistence
+      const newRepoOrder: string[] = [];
+      for (const section of newSectionOrder) {
+        if (section.type === 'standalone') {
+          newRepoOrder.push(`repo-${section.project[0]}`);
+        } else {
+          for (const [name] of section.projects) {
+            newRepoOrder.push(`repo-${name}`);
           }
-        });
-        setProjectColors(updatedColors);
-
-        saveRepositoryOrder(newOrder, updatedColors);
+        }
       }
+
+      setRepositoryOrder(newRepoOrder);
+
+      // Auto-assign colors to any new projects
+      const updatedColors = { ...projectColors };
+      newRepoOrder.forEach((repoKey, index) => {
+        if (!updatedColors[repoKey]) {
+          updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+        }
+      });
+      setProjectColors(updatedColors);
+
+      saveRepositoryOrder(newRepoOrder, updatedColors);
     }
 
     setActiveRepoId(null);
@@ -663,9 +707,10 @@ export default function TerminalSidebar({
       }
     }
 
-    // Collect by group id
+    // Collect by group id, preserving the order of first appearance
     const groupBuckets = new Map<string, { group: ProjectGroup; projects: RepoEntry[] }>();
-    const standalone: StandaloneSection[] = [];
+    const sections: SidebarSection[] = [];
+    const emittedGroups = new Set<string>();
 
     for (const entry of orderedRepositoryGroups) {
       const [, data] = entry;
@@ -675,19 +720,26 @@ export default function TerminalSidebar({
           groupBuckets.set(group.id, { group, projects: [] });
         }
         groupBuckets.get(group.id)!.projects.push(entry);
+        // Emit the group section at the position of its first member
+        if (!emittedGroups.has(group.id)) {
+          emittedGroups.add(group.id);
+          // Push a placeholder; we'll fill projects at the end
+          sections.push({ type: 'group', group, projects: groupBuckets.get(group.id)!.projects });
+        }
       } else {
-        standalone.push({ type: 'standalone', project: entry });
+        sections.push({ type: 'standalone', project: entry });
       }
     }
 
-    // Groups first, then standalone
-    const sections: SidebarSection[] = [];
-    for (const bucket of groupBuckets.values()) {
-      sections.push({ type: 'group', group: bucket.group, projects: bucket.projects });
-    }
-    sections.push(...standalone);
     return sections;
   }, [orderedRepositoryGroups, groups]);
+
+  // Compute section-level IDs for the top-level SortableContext
+  const sectionIds = useMemo(() => {
+    return sidebarSections.map((s) =>
+      s.type === 'group' ? `group-${s.group.id}` : `repo-${s.project[0]}`
+    );
+  }, [sidebarSections]);
 
   // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
@@ -924,7 +976,7 @@ export default function TerminalSidebar({
             onDragEnd={handleRepoDragEnd}
           >
             <SortableContext
-              items={orderedRepositoryGroups.map(([name]) => `repo-${name}`)}
+              items={sectionIds}
               strategy={verticalListSortingStrategy}
             >
               {sidebarSections.map((section) => {
@@ -973,7 +1025,9 @@ export default function TerminalSidebar({
                 const groupColor = grp.color || '#FF6B35';
 
                 return (
-                  <div key={`grp-${grp.id}`} className="sidebar-group-section" style={{ marginBottom: '4px' }}>
+                  <SortableGroupSection key={`grp-${grp.id}`} sectionId={`group-${grp.id}`}>
+                  {({ dragHandleProps, isDragging: isGroupDragging }) => (
+                  <div className="sidebar-group-section group" style={{ marginBottom: '4px' }}>
                     {/* Group Header */}
                     <div
                       className="sidebar-group-header"
@@ -981,9 +1035,9 @@ export default function TerminalSidebar({
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '4px',
                         width: '100%',
-                        padding: '5px 8px',
+                        padding: '5px 6px',
                         background: `${groupColor}12`,
                         border: 'none',
                         borderRadius: isGroupCollapsed ? '6px' : '6px 6px 0 0',
@@ -998,6 +1052,30 @@ export default function TerminalSidebar({
                       }}
                       onClick={() => toggleGroupSection(grp.id)}
                     >
+                      {/* Mini drag handle — inline in group header */}
+                      <div
+                        {...dragHandleProps}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          cursor: isGroupDragging ? 'grabbing' : 'grab',
+                          opacity: 0,
+                          transition: 'opacity 0.15s ease',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0 1px',
+                        }}
+                        className="group-hover:!opacity-50"
+                      >
+                        <svg width="8" height="14" viewBox="0 0 8 14" fill="rgba(255,255,255,0.6)" style={{ pointerEvents: 'none' }}>
+                          <circle cx="2" cy="3" r="1.2" />
+                          <circle cx="6" cy="3" r="1.2" />
+                          <circle cx="2" cy="7" r="1.2" />
+                          <circle cx="6" cy="7" r="1.2" />
+                          <circle cx="2" cy="11" r="1.2" />
+                          <circle cx="6" cy="11" r="1.2" />
+                        </svg>
+                      </div>
                       {/* Chevron */}
                       <svg
                         width="10" height="10" viewBox="0 0 24 24" fill="none"
@@ -1098,13 +1176,44 @@ export default function TerminalSidebar({
                     </div>
                     )}
                   </div>
+                  )}
+                  </SortableGroupSection>
                 );
               })}
             </SortableContext>
 
-            {/* Drag Overlay - Ghost Preview for repositories */}
+            {/* Drag Overlay - Ghost Preview for repositories and groups */}
             <DragOverlay dropAnimation={null}>
               {activeRepoId ? (() => {
+                // Check if dragging a group section
+                if (activeRepoId.startsWith('group-')) {
+                  const groupId = activeRepoId.replace('group-', '');
+                  const groupSection = sidebarSections.find(
+                    (s) => s.type === 'group' && s.group.id === groupId
+                  );
+                  if (!groupSection || groupSection.type !== 'group') return null;
+                  const groupColor = groupSection.group.color || '#FF6B35';
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        background: `${groupColor}25`,
+                        border: `2px dashed ${groupColor}`,
+                        borderRadius: '6px',
+                        boxShadow: `0 8px 24px ${groupColor}40, 0 0 40px ${groupColor}30`,
+                        pointerEvents: 'none',
+                        opacity: 0.8,
+                      }}
+                    >
+                      <span className="font-semibold text-sm text-white/90">{groupSection.group.name}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '8px' }}>
+                        {groupSection.projects.length} projects
+                      </span>
+                    </div>
+                  );
+                }
+
+                // Standalone project
                 const activeRepo = orderedRepositoryGroups.find(([name]) => `repo-${name}` === activeRepoId);
                 if (!activeRepo) return null;
 
