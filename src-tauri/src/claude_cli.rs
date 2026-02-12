@@ -110,10 +110,15 @@ pub enum ClaudeEvent {
         extra: serde_json::Value,
     },
     Result {
+        #[serde(default)]
         result: String,
         session_id: String,
+        #[serde(default)]
         total_cost_usd: f64,
         usage: Usage,
+        /// Per-model usage breakdown (SDK 0.2.x) with contextWindow, costUSD, etc.
+        #[serde(default, rename = "modelUsage")]
+        model_usage: Option<serde_json::Value>,
         #[serde(flatten)]
         extra: serde_json::Value,
     },
@@ -198,14 +203,29 @@ pub enum ContentBlock {
     Other(serde_json::Value),
 }
 
+/// Deserialize null or missing values as 0 for token counts.
+/// The Claude Agent SDK sends `null` for cache token fields when no caching occurred,
+/// but `#[serde(default)]` only handles missing fields, not explicit `null`.
+fn deserialize_null_as_zero<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<u32>::deserialize(deserializer).map(|opt| opt.unwrap_or(0))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub input_tokens: u32,
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub output_tokens: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub cache_read_input_tokens: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub cache_creation_input_tokens: u32,
+    /// Capture any extra fields the SDK sends (e.g., cache_creation, service_tier)
+    #[serde(flatten)]
+    pub extra: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

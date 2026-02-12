@@ -2540,6 +2540,15 @@ function AppContent() {
         response.usage  // ✅ Now passing full usage stats from Rust backend!
       );
 
+      // 🦆 STAMINA FIX: Also update chatTokensMap from invoke response
+      // The streamed result event may fail to update chatTokensMap if the Rust
+      // deserialization fails (e.g., null values in usage) or if the event is
+      // dropped. This ensures stamina always gets updated from the authoritative
+      // invoke response.
+      if (response.usage) {
+        handleTokenUpdate(messageKey, response.usage, response.total_cost_usd);
+      }
+
       // Notify that agent response is complete
       // 🦆 RACE CONDITION FIX: Use CAPTURED values
       notifyAgentReadyRef.current({ id: capturedAgentId, label: capturedAgentLabel, cwd: capturedAgentCwd });
