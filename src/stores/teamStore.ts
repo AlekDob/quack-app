@@ -35,9 +35,11 @@ export const useTeamStore = create<TeamStore>()((set) => ({
   loading: false,
 
   loadActiveTeam: async (projectPath: string, agentAvatars?: Map<string, { avatar?: string; color?: string }>) => {
+    console.warn('[TEAM-DEBUG] loadActiveTeam called. path:', projectPath, 'avatars:', agentAvatars?.size ?? 0);
     set({ loading: true });
     try {
       const team = await invoke<TeamConfig | null>('get_active_team', { projectPath });
+      console.warn('[TEAM-DEBUG] Rust returned:', team ? `"${team.name}" projectPath="${team.projectPath}"` : 'NULL');
       if (team && agentAvatars) {
         for (const member of team.members) {
           const data = agentAvatars.get(member.agentId);

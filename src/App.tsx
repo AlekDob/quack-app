@@ -25,7 +25,11 @@ import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
-import type { EditorSelection } from "./components/CodeEditorCodeMirror";
+type EditorSelection = {
+  selectedText: string;
+  startLine: number;
+  endLine: number;
+};
 import { useFileSystemStore } from "./stores/fileSystemStore";
 import { getLanguageFromFilename } from "./utils/languageDetection";
 import FileActionButtons from "./components/FileActionButtons";
@@ -11575,7 +11579,6 @@ You have access to all Bash tools to execute git commands like:
                     onHasUnsavedChanges={setPreviewHasUnsavedChanges}
                     imageData={previewImageData}
                     embedded={true}
-                    onEditorSelectionChange={handleEditorSelectionChange}
                   />
                   <FileActionButtons
                     onRefresh={handleRefreshPreview}

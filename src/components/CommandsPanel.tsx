@@ -34,7 +34,7 @@ export function CommandsPanel({ basePath, onSelectCommand }: CommandsPanelProps)
   const handleEditCommand = (command: SlashCommand) => {
     // Open command in tab for editing (pass filePath for IDE opening)
     if (onSelectCommand) {
-      onSelectCommand(command.name, command.scope as 'global' | 'project', false, command.filePath);
+      onSelectCommand(command.name, command.scope as 'global' | 'project', false, (command as SlashCommand & { filePath?: string }).filePath);
     }
   };
 
