@@ -366,8 +366,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     };
   }, [agentAvatar]);
 
-  // Reactive subscription to active team (avoids getState() in render)
+  // Reactive subscriptions to team state (avoids getState() in render)
   const activeTeam = useTeamStore((s) => s.activeTeam);
+  const teammateStatus = useTeamStore((s) => s.teammateStatus);
 
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
@@ -525,7 +526,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             taskText.includes(m.name.toLowerCase())
           );
           if (matchedMember) {
-            const teammateState = useTeamStore.getState().teammateStatus.get(matchedMember.name);
+            const teammateState = teammateStatus.get(matchedMember.name);
             return (
               <TeammateWidget
                 key={idx}

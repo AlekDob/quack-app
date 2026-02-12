@@ -1182,7 +1182,6 @@ export default function RepositoryGroup({
   const hasEnrichedRef = useRef(false);
 
   useEffect(() => {
-    console.warn('[TEAM-DEBUG] useEffect[repoPath] fired. repoPath:', repoPath);
     hasEnrichedRef.current = false;
     loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1190,7 +1189,6 @@ export default function RepositoryGroup({
 
   // Re-enrich team avatars once agents are loaded (fixes race condition on startup)
   useEffect(() => {
-    console.warn('[TEAM-DEBUG] useEffect[agentCount] fired. count:', agentCount, 'enriched:', hasEnrichedRef.current);
     if (agentCount > 0 && !hasEnrichedRef.current) {
       hasEnrichedRef.current = true;
       loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());

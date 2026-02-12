@@ -35,4 +35,5 @@ CLAUDE.md
 /.claude
 .mcp.json
 .quack/active-agents.json
+.quack/teams/
 /CLAUDE.md
