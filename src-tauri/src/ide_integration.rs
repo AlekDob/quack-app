@@ -427,12 +427,28 @@ fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process
     cmd.spawn()
 }
 
-/// Spawn a CLI command - on non-Windows just run directly
+/// Spawn a CLI command - on non-Windows use sh -c with proper quoting.
+/// Many IDE CLIs (Cursor, VS Code, Windsurf) use bash wrapper scripts with `eval`
+/// which breaks word splitting for paths containing spaces.
+/// Using sh -c with shell-escaped arguments ensures correct quoting.
 #[cfg(not(target_os = "windows"))]
 fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process::Child> {
-    Command::new(cli)
-        .args(args)
+    let mut cmd_parts = vec![shell_escape(cli)];
+    for arg in args {
+        cmd_parts.push(shell_escape(arg));
+    }
+    let full_cmd = cmd_parts.join(" ");
+    log::info!("[IDE] spawn_cli_command via sh -c: {}", full_cmd);
+    Command::new("sh")
+        .arg("-c")
+        .arg(&full_cmd)
         .spawn()
+}
+
+/// Shell-escape a string by wrapping it in single quotes.
+/// Any single quotes within the string are escaped as '\'' (end quote, escaped quote, start quote).
+fn shell_escape(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
 }
 
 /// Detect all installed IDEs on the system
@@ -1195,19 +1211,20 @@ pub fn open_multiple_files_in_ide(ide_id: String, file_paths: Vec<String>) -> Re
     // Find project root from first file
     let project_root = file_paths.first().and_then(|p| find_project_root(p));
 
-    // Build shell command with properly quoted paths
-    let mut cmd = String::new();
-    cmd.push_str(entry.cli);
+    // Build shell command with properly quoted paths (single-quote escaping)
+    let mut cmd_parts = vec![shell_escape(entry.cli)];
 
     // Add project folder first
     if let Some(ref root) = project_root {
-        cmd.push_str(&format!(" \"{}\"", root));
+        cmd_parts.push(shell_escape(root));
     }
 
     // Add all file paths quoted
     for path in &file_paths {
-        cmd.push_str(&format!(" \"{}\"", path));
+        cmd_parts.push(shell_escape(path));
     }
+
+    let cmd = cmd_parts.join(" ");
 
     log::info!("[IDE] Running shell command: {}", cmd);
 
