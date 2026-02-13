@@ -132,6 +132,7 @@ export default function ClaudeAssetsPanel({ projectPaths, initialProjectPath, on
   const [previewContent, setPreviewContent] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
+  const [confirmDeleteAsset, setConfirmDeleteAsset] = useState<ClaudeAsset | null>(null);
 
   // Load repository order from store (same store used by TerminalSidebar)
   // NOTE: The store now uses new format { order: string[], colors: Record<string, string> }
@@ -336,12 +337,15 @@ export default function ClaudeAssetsPanel({ projectPaths, initialProjectPath, on
     }
   };
 
-  // Handle asset delete
-  const handleDelete = async (asset: ClaudeAsset) => {
-    if (!confirm(`Delete "${asset.name}"? This action cannot be undone.`)) {
-      return;
-    }
+  // Handle asset delete - show confirmation modal first
+  const handleDelete = (asset: ClaudeAsset) => {
+    setConfirmDeleteAsset(asset);
+  };
 
+  const confirmDeleteAction = async () => {
+    if (!confirmDeleteAsset) return;
+    const asset = confirmDeleteAsset;
+    setConfirmDeleteAsset(null);
     const result = await deleteAsset(asset);
     if (result.success) {
       toast.success(`"${asset.name}" deleted`);
@@ -500,6 +504,34 @@ export default function ClaudeAssetsPanel({ projectPaths, initialProjectPath, on
             setPreviewAsset(null);
           }}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteAsset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="rounded-xl p-5 max-w-sm w-full mx-4 shadow-2xl" style={{ background: '#1e1e1e', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+            <h4 className="text-sm font-semibold text-white mb-2">Delete Asset</h4>
+            <p className="text-xs text-white/60 mb-5">
+              Are you sure you want to delete <span className="text-white/90 font-medium">{confirmDeleteAsset.name}</span>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAsset(null)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAction}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white bg-red-500/90 hover:bg-red-500 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

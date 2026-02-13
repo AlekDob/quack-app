@@ -319,7 +319,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
           prompt: content,
           cwd: options?.workingDirectory || task?.projectPath || '/',
           sessionId: existingSessionId,
-          model: options?.model || 'sonnet',
+          model: options?.model || 'opus',
           thinkingMode: options?.thinkingMode || 'auto',
           permissionMode: options?.permissionMode || 'bypass',
           effort: options?.effort || 'medium',

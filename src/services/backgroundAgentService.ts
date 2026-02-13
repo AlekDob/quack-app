@@ -381,7 +381,7 @@ async function executeAgentTask(task: BackgroundTask): Promise<void> {
 
   store.addTaskLog(task.id, {
     level: 'info',
-    message: `Executing agent task with model: ${task.config.model || 'sonnet'}`,
+    message: `Executing agent task with model: ${task.config.model || 'opus'}`,
     source: 'agent',
   });
 
@@ -390,7 +390,7 @@ async function executeAgentTask(task: BackgroundTask): Promise<void> {
     const result = await invoke<BackgroundTaskResult>('execute_background_agent', {
       taskId: task.id,
       prompt: task.config.prompt,
-      model: task.config.model || 'sonnet',
+      model: task.config.model || 'opus',
       workingDirectory: task.config.workingDirectory,
       agentId: task.config.agentId,
       timeout: task.config.timeout_ms,

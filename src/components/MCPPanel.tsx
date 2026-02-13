@@ -27,6 +27,7 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
   } = useMCPServers(workingDir);
 
   const [deletingServer, setDeletingServer] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showEditDropdown, setShowEditDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -78,27 +79,25 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
     }
   };
 
-  const handleDeleteServer = async (serverId: string) => {
-    // Prevent double deletion (in case of double-click or race condition)
-    if (deletingServer === serverId) {
-      return;
-    }
+  const handleDeleteServer = (serverId: string) => {
+    setConfirmDeleteId(serverId);
+  };
 
-    const confirmed = window.confirm("Are you sure you want to delete this MCP server?");
-
-    if (!confirmed) {
-      return; // User cancelled
-    }
-
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
     try {
-      setDeletingServer(serverId);
-      await deleteServer(serverId);
+      setDeletingServer(confirmDeleteId);
+      setConfirmDeleteId(null);
+      await deleteServer(confirmDeleteId);
     } catch (err) {
       console.error("Failed to delete server:", err);
-      alert(`Failed to delete server: ${err}`);
     } finally {
       setDeletingServer(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDeleteId(null);
   };
 
   const handleEditServer = (server: MCPServer) => {
@@ -320,6 +319,35 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
         >
           {servers.length} {servers.length === 1 ? "server" : "servers"}{" "}
           configured
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="rounded-xl p-5 max-w-sm w-full mx-4 shadow-2xl" style={{ background: '#1e1e1e', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+            <h4 className="text-sm font-semibold text-white mb-2">Delete MCP Server</h4>
+            <p className="text-xs text-white/60 mb-5">
+              Are you sure you want to delete <span className="text-white/90 font-medium">{servers.find(s => s.id === confirmDeleteId)?.name ?? confirmDeleteId}</span>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deletingServer !== null}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white bg-red-500/90 hover:bg-red-500 transition-colors disabled:opacity-50"
+              >
+                {deletingServer ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

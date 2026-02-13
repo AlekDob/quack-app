@@ -1157,14 +1157,19 @@ function AppContent() {
         totalCost: 0,
       };
 
-      // IMPORTANT: input_tokens from SDK = full context window input for THIS turn
-      // (includes system + tools + all previous messages). We REPLACE (not accumulate)
-      // to reflect the actual context window state, matching what `claude /context` shows.
+      // IMPORTANT: With prompt caching, usage.input_tokens only contains NON-CACHED tokens.
+      // The real context window fill = input_tokens + cache_read + cache_creation.
+      // See: https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+      // "input_tokens: Number of input tokens which were not read from or used to create a cache"
+      const cacheRead = usage.cache_read_input_tokens || 0;
+      const cacheCreation = usage.cache_creation_input_tokens || 0;
+      const contextWindowFill = usage.input_tokens + cacheRead + cacheCreation;
+
       const updatedTokens = {
-        inputTokens: usage.input_tokens,
+        inputTokens: contextWindowFill,
         outputTokens: usage.output_tokens,
-        cacheCreationTokens: usage.cache_creation_input_tokens || 0,
-        cacheReadTokens: usage.cache_read_input_tokens || 0,
+        cacheCreationTokens: cacheCreation,
+        cacheReadTokens: cacheRead,
         // total_cost_usd is cumulative from SDK, so we just set it (not add)
         totalCost: totalCostUsd ?? currentTokens.totalCost,
       };
@@ -1175,7 +1180,7 @@ function AppContent() {
                    updatedTokens.cacheCreationTokens + updatedTokens.cacheReadTokens;
       console.log(`[Token Tracking] 🦆 Accumulated tokens for agent ${agentId}: ${total} total, cost: $${updatedTokens.totalCost.toFixed(4)}`, updatedTokens);
 
-      // 🦆 STAMINA PRESERVATION: Update agentChats with new token counts for persistence
+      // 🦆 STAMINA PRESERVATION: Update agentChats with new token counts
       setAgentChats((prevChats) => {
         return prevChats.map((agent) => {
           if (agent.id === agentId) {
@@ -1296,10 +1301,51 @@ function AppContent() {
       return newSessions;
     });
 
-    // Handle token updates from result events - use messageKey for token tracking
-    if (claudeEvent.type === 'result' && claudeEvent.usage) {
-      console.log(`[${source}] 🦆 Token update for messageKey=${messageKey}:`, claudeEvent.usage, `cost: $${claudeEvent.total_cost_usd || 0}`);
-      handleTokenUpdate(messageKey, claudeEvent.usage, claudeEvent.total_cost_usd);
+    // 🦆 CONTEXT FILL FIX: Track usage from ASSISTANT events (per-step, real context fill)
+    // Assistant message usage is per-API-call, so input_tokens + cache_read + cache_creation
+    // = actual context window fill for that call. This is what `/context` shows.
+    // Result event usage is CUMULATIVE across all steps — not suitable for context fill display.
+    if (claudeEvent.type === 'assistant') {
+      const assistantEvt = claudeEvent as any;
+      const msgUsage = assistantEvt.message?.usage;
+      if (msgUsage && (msgUsage.input_tokens > 0 || msgUsage.cache_read_input_tokens > 0)) {
+        console.log(`[${source}] 🦆 Assistant message usage (per-step) for messageKey=${messageKey}:`, msgUsage);
+        handleTokenUpdate(messageKey, {
+          input_tokens: msgUsage.input_tokens || 0,
+          output_tokens: msgUsage.output_tokens || 0,
+          cache_creation_input_tokens: msgUsage.cache_creation_input_tokens || 0,
+          cache_read_input_tokens: msgUsage.cache_read_input_tokens || 0,
+        });
+      }
+    }
+
+    // Handle result events: update total_cost_usd and PERSIST tokens to disk
+    // DO NOT overwrite inputTokens from result event — result usage is CUMULATIVE across all
+    // agentic steps, while assistant message usage (above) is per-step and accurate for context fill.
+    if (claudeEvent.type === 'result') {
+      const resultEvt = claudeEvent as any;
+      if (resultEvt.total_cost_usd != null) {
+        console.log(`[${source}] 🦆 Result event cost update for messageKey=${messageKey}: $${resultEvt.total_cost_usd}`);
+        setChatTokensMap((prev) => {
+          const newMap = new Map(prev);
+          const current = newMap.get(messageKey);
+          if (current) {
+            const updated = { ...current, totalCost: resultEvt.total_cost_usd };
+            newMap.set(messageKey, updated);
+
+            // 🦆 STAMINA PERSISTENCE: Save tokens to sessionStore for survival across app restarts
+            // We persist here (result event = end of turn) to avoid excessive disk writes
+            useSessionStore.getState().updateSession(messageKey, {
+              inputTokens: updated.inputTokens,
+              outputTokens: updated.outputTokens,
+              cacheCreationTokens: updated.cacheCreationTokens,
+              cacheReadTokens: updated.cacheReadTokens,
+              totalCost: updated.totalCost,
+            });
+          }
+          return newMap;
+        });
+      }
     }
   }, [handleTokenUpdate]);
 
@@ -2313,7 +2359,7 @@ function AppContent() {
       agent_name: capturedAgentLabel,
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
-      model: options?.model || 'sonnet45',
+      model: options?.model || 'opus46',
       thinking_mode: options?.thinkingMode || 'auto',
       message_length: content.length,
     });
@@ -2330,7 +2376,7 @@ function AppContent() {
       status: 'streaming',
       // Store settings used for this message (for UI display)
       settings: {
-        model: options?.model || 'sonnet45',
+        model: options?.model || 'opus46',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2422,7 +2468,7 @@ function AppContent() {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
             model: (() => {
-              const friendlyName = options?.model || 'sonnet45';
+              const friendlyName = options?.model || 'opus46';
               const resolvedId = getModelId(friendlyName, remoteModels);
               console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, remoteModels=${remoteModels?.length ?? 0}, resolvedId=${resolvedId}`);
               console.log(`🦆 [MODEL DEBUG] remoteModels:`, remoteModels?.map(m => `${m.id}→${m.modelId}`).join(', ') || 'EMPTY');
@@ -2436,7 +2482,7 @@ function AppContent() {
             agents: availableDroids.length > 0 ? availableDroids.map(droid => ({
               name: droid.id.replace('global-', ''), // Use ID as name for @mention matching
               description: droid.description,
-              model: getModelId('sonnet', remoteModels), // Default model for droids
+              model: getModelId('opus', remoteModels), // Default model for droids
               filePath: droid.path,
             })) : undefined,
             cwd: workingDir,
@@ -2541,13 +2587,35 @@ function AppContent() {
         response.usage  // ✅ Now passing full usage stats from Rust backend!
       );
 
-      // 🦆 STAMINA FIX: Also update chatTokensMap from invoke response
-      // The streamed result event may fail to update chatTokensMap if the Rust
-      // deserialization fails (e.g., null values in usage) or if the event is
-      // dropped. This ensures stamina always gets updated from the authoritative
-      // invoke response.
-      if (response.usage) {
-        handleTokenUpdate(messageKey, response.usage, response.total_cost_usd);
+      // 🦆 STAMINA FIX: Update cost from invoke response (authoritative)
+      // NOTE: Don't overwrite inputTokens here — response.usage is CUMULATIVE (from result event)
+      // while assistant event usage (already applied via streaming) is per-step and correct
+      // for context window fill. Only update cost as a safety net.
+      if (response.total_cost_usd != null) {
+        setChatTokensMap((prev) => {
+          const newMap = new Map(prev);
+          const current = newMap.get(messageKey);
+          if (current) {
+            const updated = { ...current, totalCost: response.total_cost_usd };
+            newMap.set(messageKey, updated);
+
+            // 🦆 STAMINA PERSISTENCE: Persist to disk (backup, in case result event didn't fire)
+            useSessionStore.getState().updateSession(messageKey, {
+              inputTokens: updated.inputTokens,
+              outputTokens: updated.outputTokens,
+              cacheCreationTokens: updated.cacheCreationTokens,
+              cacheReadTokens: updated.cacheReadTokens,
+              totalCost: updated.totalCost,
+            });
+          } else {
+            // Fallback: if no assistant event set tokens yet, use invoke response
+            // (cumulative, but better than showing 0)
+            if (response.usage) {
+              handleTokenUpdate(messageKey, response.usage, response.total_cost_usd);
+            }
+          }
+          return newMap;
+        });
       }
 
       // Notify that agent response is complete
@@ -2562,7 +2630,7 @@ function AppContent() {
         agent_name: capturedAgentLabel,
         response_time_ms: responseTime,
         response_length: response.result?.length || 0,
-        model: options?.model || 'sonnet45',
+        model: options?.model || 'opus46',
         session_id: response.session_id,
         total_cost_usd: response.total_cost_usd,
       });
@@ -2580,7 +2648,7 @@ function AppContent() {
         agent_id: capturedAgentId,
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMsg.substring(0, 200),
-        model: options?.model || 'sonnet45',
+        model: options?.model || 'opus46',
       });
 
       // Check if this was an abort
@@ -3024,7 +3092,7 @@ function AppContent() {
       timestamp: 0,
       status: 'streaming',
       settings: {
-        model: options?.model || 'sonnet45',
+        model: options?.model || 'opus46',
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -3095,7 +3163,7 @@ function AppContent() {
           request: {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
-            model: getModelId(options?.model || 'sonnet45', remoteModels),
+            model: getModelId(options?.model || 'opus46', remoteModels),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
@@ -3210,7 +3278,7 @@ function AppContent() {
         timestamp: Date.now(),
         status: 'complete' as const,
         settings: {
-          model: options?.model || 'sonnet45',
+          model: options?.model || 'opus46',
           effort: options?.effort || 'medium',
           thinkingMode: options?.thinkingMode || 'auto',
         },
@@ -4333,7 +4401,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       return {
         inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
+        model: normalizeModelName(bypassPreset?.model || 'opus46'),
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
         effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -4356,7 +4424,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     const defaultSettings: AgentChatSettings = {
       inputDraft: '',
-      model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
+      model: normalizeModelName(bypassPreset?.model || 'opus46'),
       thinkingMode: bypassPreset?.thinkingMode || 'auto',
       permissionMode: 'bypass',
       effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -4385,7 +4453,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       const current = newMap.get(key) ?? {
         inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'sonnet45'),
+        model: normalizeModelName(bypassPreset?.model || 'opus46'),
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
         effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
@@ -6812,6 +6880,28 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
           const allSessions = useSessionStore.getState().sessions;
           console.log(`[Session Bootstrap] Loaded ${allSessions.length} sessions`);
+
+          // 🦆 STAMINA PERSISTENCE: Restore chatTokensMap from persisted session tokens
+          // This ensures stamina bar shows correct values after app restart
+          const restoredTokens = new Map<string, {
+            inputTokens: number; outputTokens: number;
+            cacheCreationTokens: number; cacheReadTokens: number; totalCost: number;
+          }>();
+          for (const session of allSessions) {
+            if (session.inputTokens && session.inputTokens > 0) {
+              restoredTokens.set(session.id, {
+                inputTokens: session.inputTokens,
+                outputTokens: session.outputTokens || 0,
+                cacheCreationTokens: session.cacheCreationTokens || 0,
+                cacheReadTokens: session.cacheReadTokens || 0,
+                totalCost: session.totalCost || 0,
+              });
+            }
+          }
+          if (restoredTokens.size > 0) {
+            setChatTokensMap(restoredTokens);
+            console.log(`[Session Bootstrap] 🦆 Restored stamina tokens for ${restoredTokens.size} sessions`);
+          }
 
           // 🚀 LAZY HYDRATION: Chat messages are now loaded on-demand when session is selected
           // This significantly improves startup time by avoiding N resume_session calls at boot

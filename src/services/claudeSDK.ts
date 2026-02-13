@@ -222,7 +222,7 @@ export async function* streamClaudeMessage(
 
   try {
     const {
-      model = 'sonnet',
+      model = 'opus',
       thinkingMode,
       permissionMode = 'act',
       sessionId,

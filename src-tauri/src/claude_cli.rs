@@ -1243,6 +1243,8 @@ pub async fn send_message_via_cli_streaming(
     let result_event = events.iter()
         .find_map(|e| match e {
             ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } => {
+                // Pass usage as-is. Frontend calculates context fill as:
+                // contextWindowFill = input_tokens + cache_read + cache_creation
                 Some(ClaudeCliResponse {
                     result: result.clone(),
                     session_id: session_id.clone(),
@@ -1832,7 +1834,13 @@ pub async fn send_message_via_sdk_streaming(
                 }
 
                 // Check if this is the final result
-                if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = &event {
+                if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, model_usage, .. } = &event {
+                    log::info!("[SDK] 🦆 RESULT EVENT - input_tokens: {}, output_tokens: {}, cache_read: {}, cache_creation: {}, total_cost: {}, modelUsage: {:?}",
+                        usage.input_tokens, usage.output_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens, total_cost_usd, model_usage);
+
+                    // Pass usage as-is to frontend. The frontend calculates context fill as:
+                    // contextWindowFill = input_tokens + cache_read + cache_creation
+                    // This accounts for prompt caching where input_tokens is only non-cached portion.
                     final_result = Some(ClaudeCliResponse {
                         result: result.clone(),
                         session_id: session_id.clone(),
