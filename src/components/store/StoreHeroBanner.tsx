@@ -35,7 +35,6 @@ export default function StoreHeroBanner({
       <div className="store-hero-info">
         <div className="store-hero-label">FEATURED</div>
         <div className="store-hero-name">{resource.name}</div>
-        <div className="store-hero-desc">{resource.description}</div>
         <div className="store-hero-meta">
           {resource.author} · v{resource.version}
         </div>

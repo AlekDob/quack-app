@@ -29,7 +29,9 @@ import DragHandle from "./DragHandle";
 import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
 import { extractProjectId } from "../utils/projectUtils";
 import { formatShortcut } from "../utils/platform";
-import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo } from "../types";
+import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo, ProjectGroup } from "../types";
+import { useGroupStore } from "../stores/groupStore";
+import GroupCreationModal from "./GroupCreationModal";
 
 // Storage format for project order and colors
 interface ProjectStorageData {
@@ -81,6 +83,8 @@ interface SortableRepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
 }
@@ -147,6 +151,42 @@ function SortableRepositoryGroup({
       >
         <RepositoryGroup {...props} />
       </div>
+    </div>
+  );
+}
+
+// Sortable wrapper for group sections (makes entire groups draggable)
+interface SortableGroupRenderProps {
+  dragHandleProps: Record<string, unknown>;
+  isDragging: boolean;
+}
+
+function SortableGroupSection({
+  sectionId,
+  children,
+}: {
+  sectionId: string;
+  children: (props: SortableGroupRenderProps) => React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sectionId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.5 : 1,
+    willChange: isDragging ? 'transform' : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ dragHandleProps: { ...attributes, ...listeners }, isDragging })}
     </div>
   );
 }
@@ -220,6 +260,8 @@ interface TerminalSidebarProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
 }
@@ -271,6 +313,7 @@ export default function TerminalSidebar({
   onCreateTask,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
   onOpenPersonality,
 }: TerminalSidebarProps) {
   void _onColorChange;
@@ -288,6 +331,66 @@ export default function TerminalSidebar({
 
   // Check for updates
   const { updateAvailable, latestRelease } = useUpdateChecker();
+
+  // Project groups (cross-project linking)
+  const groups = useGroupStore((s) => s.groups);
+  const loadGroups = useGroupStore((s) => s.loadGroups);
+  const deleteGroup = useGroupStore((s) => s.deleteGroup);
+  const updateGroup = useGroupStore((s) => s.updateGroup);
+  const [collapsedGroupSections, setCollapsedGroupSections] = useState<Set<string>>(new Set());
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupContextMenu, setGroupContextMenu] = useState<{
+    position: { x: number; y: number };
+    groupId: string;
+    groupName: string;
+  } | null>(null);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  const toggleGroupSection = useCallback((groupId: string) => {
+    setCollapsedGroupSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
+
+  const handleGroupContextMenu = useCallback((e: MouseEvent, groupId: string, groupName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGroupContextMenu({ position: { x: e.clientX, y: e.clientY }, groupId, groupName });
+  }, []);
+
+  const handleDisbandGroup = useCallback(async (groupId: string) => {
+    try {
+      await deleteGroup(groupId);
+      setGroupContextMenu(null);
+      console.log(`[TerminalSidebar] Disbanded group: ${groupId}`);
+    } catch (error) {
+      console.error('[TerminalSidebar] Failed to disband group:', error);
+    }
+  }, [deleteGroup]);
+
+  const handleRemoveFromGroup = useCallback(async (groupId: string, projectPath: string) => {
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return;
+
+    const remaining = group.projects.filter((p) => p.path !== projectPath);
+    if (remaining.length < 2) {
+      // Less than 2 projects — disband the group entirely
+      await handleDisbandGroup(groupId);
+    } else {
+      try {
+        await updateGroup(groupId, { projects: remaining });
+        setGroupContextMenu(null);
+        console.log(`[TerminalSidebar] Removed project from group: ${projectPath}`);
+      } catch (error) {
+        console.error('[TerminalSidebar] Failed to remove project from group:', error);
+      }
+    }
+  }, [groups, handleDisbandGroup, updateGroup]);
+
   // Metro style is now the only option (removed useMetroStyle state)
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
   const [projectColors, setProjectColors] = useState<Record<string, string>>({});
@@ -382,7 +485,7 @@ export default function TerminalSidebar({
     document.body.classList.add('dragging-active');
   };
 
-  // Handle repository drag end
+  // Handle repository drag end — works on section-level IDs
   const handleRepoDragEnd = (event: DragEndEvent) => {
     // Remove dragging class to re-enable animations
     document.body.classList.remove('dragging-active');
@@ -394,34 +497,42 @@ export default function TerminalSidebar({
       return;
     }
 
-    const activeIndex = repositoryOrder.indexOf(String(active.id));
-    const overIndex = repositoryOrder.indexOf(String(over.id));
+    // Build current section IDs from sidebarSections
+    const currentSectionIds = sidebarSections.map((s) =>
+      s.type === 'group' ? `group-${s.group.id}` : `repo-${s.project[0]}`
+    );
 
-    if (activeIndex !== -1 && overIndex !== -1) {
-      const newOrder = arrayMove(repositoryOrder, activeIndex, overIndex);
-      setRepositoryOrder(newOrder);
-      saveRepositoryOrder(newOrder, projectColors);
-    } else {
-      // If not in saved order, create new order from current groups
-      const currentOrder = repositoryGroups.map(([name]) => `repo-${name}`);
-      const activeIdx = currentOrder.indexOf(String(active.id));
-      const overIdx = currentOrder.indexOf(String(over.id));
+    const activeIdx = currentSectionIds.indexOf(String(active.id));
+    const overIdx = currentSectionIds.indexOf(String(over.id));
 
-      if (activeIdx !== -1 && overIdx !== -1) {
-        const newOrder = arrayMove(currentOrder, activeIdx, overIdx);
-        setRepositoryOrder(newOrder);
+    if (activeIdx !== -1 && overIdx !== -1) {
+      // Reorder sections
+      const newSectionOrder = arrayMove(sidebarSections, activeIdx, overIdx);
 
-        // Auto-assign colors to new projects not in the map
-        const updatedColors = { ...projectColors };
-        newOrder.forEach((repoKey, index) => {
-          if (!updatedColors[repoKey]) {
-            updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+      // Flatten sections back to repo-* order for persistence
+      const newRepoOrder: string[] = [];
+      for (const section of newSectionOrder) {
+        if (section.type === 'standalone') {
+          newRepoOrder.push(`repo-${section.project[0]}`);
+        } else {
+          for (const [name] of section.projects) {
+            newRepoOrder.push(`repo-${name}`);
           }
-        });
-        setProjectColors(updatedColors);
-
-        saveRepositoryOrder(newOrder, updatedColors);
+        }
       }
+
+      setRepositoryOrder(newRepoOrder);
+
+      // Auto-assign colors to any new projects
+      const updatedColors = { ...projectColors };
+      newRepoOrder.forEach((repoKey, index) => {
+        if (!updatedColors[repoKey]) {
+          updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+        }
+      });
+      setProjectColors(updatedColors);
+
+      saveRepositoryOrder(newRepoOrder, updatedColors);
     }
 
     setActiveRepoId(null);
@@ -575,6 +686,60 @@ export default function TerminalSidebar({
 
     return ordered;
   }, [repositoryGroups, repositoryOrder, projectColors, saveRepositoryOrder, query]);
+
+  // Organize projects into group sections vs standalone
+  type RepoEntry = typeof orderedRepositoryGroups[number];
+  interface GroupedSection { type: 'group'; group: ProjectGroup; projects: RepoEntry[] }
+  interface StandaloneSection { type: 'standalone'; project: RepoEntry }
+  type SidebarSection = GroupedSection | StandaloneSection;
+
+  const sidebarSections = useMemo((): SidebarSection[] => {
+    if (groups.length === 0) {
+      // No groups — all standalone
+      return orderedRepositoryGroups.map((p) => ({ type: 'standalone', project: p }));
+    }
+
+    // Map repoPath → group
+    const pathToGroup = new Map<string, ProjectGroup>();
+    for (const g of groups) {
+      for (const member of g.projects) {
+        pathToGroup.set(member.path, g);
+      }
+    }
+
+    // Collect by group id, preserving the order of first appearance
+    const groupBuckets = new Map<string, { group: ProjectGroup; projects: RepoEntry[] }>();
+    const sections: SidebarSection[] = [];
+    const emittedGroups = new Set<string>();
+
+    for (const entry of orderedRepositoryGroups) {
+      const [, data] = entry;
+      const group = pathToGroup.get(data.repoPath);
+      if (group) {
+        if (!groupBuckets.has(group.id)) {
+          groupBuckets.set(group.id, { group, projects: [] });
+        }
+        groupBuckets.get(group.id)!.projects.push(entry);
+        // Emit the group section at the position of its first member
+        if (!emittedGroups.has(group.id)) {
+          emittedGroups.add(group.id);
+          // Push a placeholder; we'll fill projects at the end
+          sections.push({ type: 'group', group, projects: groupBuckets.get(group.id)!.projects });
+        }
+      } else {
+        sections.push({ type: 'standalone', project: entry });
+      }
+    }
+
+    return sections;
+  }, [orderedRepositoryGroups, groups]);
+
+  // Compute section-level IDs for the top-level SortableContext
+  const sectionIds = useMemo(() => {
+    return sidebarSections.map((s) =>
+      s.type === 'group' ? `group-${s.group.id}` : `repo-${s.project[0]}`
+    );
+  }, [sidebarSections]);
 
   // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
@@ -770,6 +935,23 @@ export default function TerminalSidebar({
             <span>New project</span>
           </button>
         </KeyboardShortcutTooltip>
+
+        {/* Create Group button — only show when 2+ projects exist */}
+        {orderedRepositoryGroups.length >= 2 && (
+          <button
+            type="button"
+            className="new-project-btn-sidebar"
+            onClick={() => setShowGroupModal(true)}
+            aria-label="Create Group"
+            style={{ marginLeft: '4px' }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="18" rx="2" />
+              <line x1="12" y1="3" x2="12" y2="21" />
+            </svg>
+            <span>Group</span>
+          </button>
+        )}
       </div>
 
       <div className="sidebar-header sidebar-header-codex" data-tauri-drag-region>
@@ -794,53 +976,244 @@ export default function TerminalSidebar({
             onDragEnd={handleRepoDragEnd}
           >
             <SortableContext
-              items={orderedRepositoryGroups.map(([name]) => `repo-${name}`)}
+              items={sectionIds}
               strategy={verticalListSortingStrategy}
             >
-              {orderedRepositoryGroups.map(([repoName, group]) => {
-                const repoKey = `repo-${repoName}`;
-                const isCollapsed = collapsedGroups.has(repoKey);
-                const projectColor = projectColors[repoKey];
+              {sidebarSections.map((section) => {
+                if (section.type === 'standalone') {
+                  const [repoName, repoData] = section.project;
+                  const repoKey = `repo-${repoName}`;
+                  return (
+                    <SortableRepositoryGroup
+                      key={repoKey}
+                      repoKey={repoKey}
+                      repoPath={repoData.repoPath}
+                      repoName={repoName}
+                      mainAgents={repoData.mainAgents}
+                      worktreeAgents={repoData.worktreeAgents}
+                      isCollapsed={collapsedGroups.has(repoKey)}
+                      activeId={activeId}
+                      projectColor={projectColors[repoKey]}
+                      chatSessions={chatSessions}
+                      lastReadTimestamps={lastReadTimestamps}
+                      onToggle={() => onToggleGroup(repoKey)}
+                      onSelect={handleSelectTerminal}
+                      onClose={onClose}
+                      onContextMenu={handleContextMenu}
+                      onGitOperation={handleGitOperation}
+                      onOpenGitPanel={onOpenGitPanel}
+                      onOpenTerminalWindow={onOpenTerminalWindow}
+                      gitRefreshTrigger={gitRefreshTrigger}
+                      onCreateAgent={onCreateAgent}
+                      onRemoveProject={onRemoveProject}
+                      onOpenDashboard={onOpenDashboard}
+                      onOpenClaudeAssets={onOpenClaudeAssets}
+                      isKanbanTabActive={isKanbanTabActive}
+                      onOpenKanbanTab={onOpenKanbanTab}
+                      chatLoadingMap={chatLoadingMap}
+                      onSessionClick={onSessionClick}
+                      activeSessionId={activeSessionId}
+                      onActiveSessionDone={onActiveSessionDone}
+                      onOpenPersonality={onOpenPersonality}
+                    />
+                  );
+                }
+
+                // Group section — collapsible wrapper around multiple projects
+                const { group: grp, projects } = section;
+                const isGroupCollapsed = collapsedGroupSections.has(grp.id);
+                const groupColor = grp.color || '#FF6B35';
 
                 return (
-                  <SortableRepositoryGroup
-                    key={repoKey}
-                    repoKey={repoKey}
-                    repoPath={group.repoPath}
-                    repoName={repoName}
-                    mainAgents={group.mainAgents}
-                    worktreeAgents={group.worktreeAgents}
-                    isCollapsed={isCollapsed}
-                    activeId={activeId}
-                    projectColor={projectColor}
-                    chatSessions={chatSessions}
-                    lastReadTimestamps={lastReadTimestamps}
-                    onToggle={() => onToggleGroup(repoKey)}
-                    onSelect={handleSelectTerminal}
-                    onClose={onClose}
-                    onContextMenu={handleContextMenu}
-                    onGitOperation={handleGitOperation}
-                    onOpenGitPanel={onOpenGitPanel}
-                    onOpenTerminalWindow={onOpenTerminalWindow}
-                    gitRefreshTrigger={gitRefreshTrigger}
-                    onCreateAgent={onCreateAgent}
-                    onRemoveProject={onRemoveProject}
-                    onOpenDashboard={onOpenDashboard}
-                    onOpenClaudeAssets={onOpenClaudeAssets}
-                    isKanbanTabActive={isKanbanTabActive}
-                    onOpenKanbanTab={onOpenKanbanTab}
-                    chatLoadingMap={chatLoadingMap}
-                    onSessionClick={onSessionClick}
-                    activeSessionId={activeSessionId}
-                    onOpenPersonality={onOpenPersonality}
-                  />
+                  <SortableGroupSection key={`grp-${grp.id}`} sectionId={`group-${grp.id}`}>
+                  {({ dragHandleProps, isDragging: isGroupDragging }) => (
+                  <div className="sidebar-group-section group" style={{ marginBottom: '4px' }}>
+                    {/* Group Header */}
+                    <div
+                      className="sidebar-group-header"
+                      onContextMenu={(e) => handleGroupContextMenu(e, grp.id, grp.name)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        width: '100%',
+                        padding: '5px 6px',
+                        background: `${groupColor}12`,
+                        border: 'none',
+                        borderRadius: isGroupCollapsed ? '6px' : '6px 6px 0 0',
+                        cursor: 'pointer',
+                        color: 'rgba(255, 255, 255, 0.75)',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                        position: 'relative',
+                      }}
+                      onClick={() => toggleGroupSection(grp.id)}
+                    >
+                      {/* Mini drag handle — inline in group header */}
+                      <div
+                        {...dragHandleProps}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          cursor: isGroupDragging ? 'grabbing' : 'grab',
+                          opacity: 0,
+                          transition: 'opacity 0.15s ease',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0 1px',
+                        }}
+                        className="group-hover:!opacity-50"
+                      >
+                        <svg width="8" height="14" viewBox="0 0 8 14" fill="rgba(255,255,255,0.6)" style={{ pointerEvents: 'none' }}>
+                          <circle cx="2" cy="3" r="1.2" />
+                          <circle cx="6" cy="3" r="1.2" />
+                          <circle cx="2" cy="7" r="1.2" />
+                          <circle cx="6" cy="7" r="1.2" />
+                          <circle cx="2" cy="11" r="1.2" />
+                          <circle cx="6" cy="11" r="1.2" />
+                        </svg>
+                      </div>
+                      {/* Chevron */}
+                      <svg
+                        width="10" height="10" viewBox="0 0 24 24" fill="none"
+                        stroke={groupColor} strokeWidth="2.5"
+                        style={{
+                          transform: isGroupCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.15s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                      {/* Group color dot */}
+                      <span style={{
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: groupColor, flexShrink: 0,
+                      }} />
+                      <span style={{ flex: 1, textAlign: 'left' }}>{grp.name}</span>
+                      <span style={{ fontSize: '9px', opacity: 0.5 }}>
+                        {projects.length} projects
+                      </span>
+                      {/* Hover action icons */}
+                      <span
+                        className="group-header-actions"
+                        style={{
+                          display: 'flex',
+                          gap: '2px',
+                          opacity: 0,
+                          transition: 'opacity 0.15s ease',
+                        }}
+                      >
+                        {/* Disband group */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDisbandGroup(grp.id); }}
+                          title="Disband group"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '2px', borderRadius: '3px', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="rgba(255,255,255,0.5)" strokeWidth="2">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    </div>
+
+                    {/* Group Projects (collapsible) — dashed border shows belonging */}
+                    {!isGroupCollapsed && (
+                    <div style={{
+                      borderLeft: `2px dashed ${groupColor}70`,
+                      borderRight: `2px dashed ${groupColor}70`,
+                      borderBottom: `2px dashed ${groupColor}70`,
+                      borderTop: 'none',
+                      borderRadius: '0 0 6px 6px',
+                      padding: '4px 2px 2px 2px',
+                      marginBottom: '2px',
+                    }}>
+                    {projects.map(([repoName, repoData]) => {
+                      const repoKey = `repo-${repoName}`;
+                      return (
+                        <SortableRepositoryGroup
+                          key={repoKey}
+                          repoKey={repoKey}
+                          repoPath={repoData.repoPath}
+                          repoName={repoName}
+                          mainAgents={repoData.mainAgents}
+                          worktreeAgents={repoData.worktreeAgents}
+                          isCollapsed={collapsedGroups.has(repoKey)}
+                          activeId={activeId}
+                          projectColor={projectColors[repoKey]}
+                          chatSessions={chatSessions}
+                          lastReadTimestamps={lastReadTimestamps}
+                          onToggle={() => onToggleGroup(repoKey)}
+                          onSelect={handleSelectTerminal}
+                          onClose={onClose}
+                          onContextMenu={handleContextMenu}
+                          onGitOperation={handleGitOperation}
+                          onOpenGitPanel={onOpenGitPanel}
+                          onOpenTerminalWindow={onOpenTerminalWindow}
+                          gitRefreshTrigger={gitRefreshTrigger}
+                          onCreateAgent={onCreateAgent}
+                          onRemoveProject={onRemoveProject}
+                          onOpenDashboard={onOpenDashboard}
+                          onOpenClaudeAssets={onOpenClaudeAssets}
+                          isKanbanTabActive={isKanbanTabActive}
+                          onOpenKanbanTab={onOpenKanbanTab}
+                          chatLoadingMap={chatLoadingMap}
+                          onSessionClick={onSessionClick}
+                          activeSessionId={activeSessionId}
+                          onActiveSessionDone={onActiveSessionDone}
+                          onOpenPersonality={onOpenPersonality}
+                        />
+                      );
+                    })}
+                    </div>
+                    )}
+                  </div>
+                  )}
+                  </SortableGroupSection>
                 );
               })}
             </SortableContext>
 
-            {/* Drag Overlay - Ghost Preview for repositories */}
+            {/* Drag Overlay - Ghost Preview for repositories and groups */}
             <DragOverlay dropAnimation={null}>
               {activeRepoId ? (() => {
+                // Check if dragging a group section
+                if (activeRepoId.startsWith('group-')) {
+                  const groupId = activeRepoId.replace('group-', '');
+                  const groupSection = sidebarSections.find(
+                    (s) => s.type === 'group' && s.group.id === groupId
+                  );
+                  if (!groupSection || groupSection.type !== 'group') return null;
+                  const groupColor = groupSection.group.color || '#FF6B35';
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        background: `${groupColor}25`,
+                        border: `2px dashed ${groupColor}`,
+                        borderRadius: '6px',
+                        boxShadow: `0 8px 24px ${groupColor}40, 0 0 40px ${groupColor}30`,
+                        pointerEvents: 'none',
+                        opacity: 0.8,
+                      }}
+                    >
+                      <span className="font-semibold text-sm text-white/90">{groupSection.group.name}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '8px' }}>
+                        {groupSection.projects.length} projects
+                      </span>
+                    </div>
+                  );
+                }
+
+                // Standalone project
                 const activeRepo = orderedRepositoryGroups.find(([name]) => `repo-${name}` === activeRepoId);
                 if (!activeRepo) return null;
 
@@ -951,6 +1324,103 @@ export default function TerminalSidebar({
         />
       )}
 
+      {/* Group context menu */}
+      {groupContextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 9999,
+          }}
+          onClick={() => setGroupContextMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setGroupContextMenu(null); }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: groupContextMenu.position.y,
+              left: groupContextMenu.position.x,
+              background: 'rgba(30, 30, 30, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '8px',
+              padding: '4px',
+              minWidth: '180px',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Group name label */}
+            <div style={{
+              padding: '6px 10px',
+              fontSize: '10px',
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontFamily: "'JetBrains Mono', monospace",
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              marginBottom: '2px',
+            }}>
+              {groupContextMenu.groupName}
+            </div>
+
+            {/* Remove individual projects */}
+            {(() => {
+              const grp = groups.find((g) => g.id === groupContextMenu.groupId);
+              if (!grp) return null;
+              return grp.projects.map((p) => {
+                const projectName = p.path.split('/').pop() || p.path;
+                return (
+                  <button
+                    key={p.path}
+                    onClick={() => handleRemoveFromGroup(groupContextMenu.groupId, p.path)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      width: '100%', padding: '7px 10px', background: 'none',
+                      border: 'none', cursor: 'pointer', borderRadius: '4px',
+                      color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                      stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    Remove {projectName}
+                  </button>
+                );
+              });
+            })()}
+
+            {/* Separator */}
+            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
+
+            {/* Disband group */}
+            <button
+              onClick={() => handleDisbandGroup(groupContextMenu.groupId)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                width: '100%', padding: '7px 10px', background: 'none',
+                border: 'none', cursor: 'pointer', borderRadius: '4px',
+                color: '#E74C3C', fontSize: '12px', textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(231, 76, 60, 0.12)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="#E74C3C" strokeWidth="2">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg>
+              Disband group
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Footer Bar - Minimal with text labels */}
       <div className="sidebar-footer-bar">
         {/* Left side: Settings + Docs with labels */}
@@ -1009,6 +1479,17 @@ export default function TerminalSidebar({
           onClose={() => setCommitHistoryModal(null)}
         />
       )}
+
+      {/* Group Creation Modal */}
+      <GroupCreationModal
+        isOpen={showGroupModal}
+        onClose={() => { setShowGroupModal(false); loadGroups(); }}
+        activeProjects={orderedRepositoryGroups.map(([name, data]) => ({
+          path: data.repoPath,
+          name,
+          color: projectColors[`repo-${name}`],
+        }))}
+      />
     </aside>
   );
 }

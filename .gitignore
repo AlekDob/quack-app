@@ -30,5 +30,9 @@ dist-ssr
 
 # Tauri binaries (auto-generated, too large for GitHub)
 src-tauri/binaries/
-.quack/active-agents.json
 /.quack/agent-personalities
+/.claude
+.mcp.json
+.quack/active-agents.json
+.quack/teams/
+/CLAUDE.md

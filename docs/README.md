@@ -439,6 +439,9 @@ find docs/ -mtime -7 -name "*.md"
 - Second Brain (Tana-style outliner, @mentions, #supertags)
 - MCP Memory (knowledge graph, entity types, project scoping)
 - Task Completion Hooks (auto-documentation on task done)
+- Project Grouping (cross-project context, visual grouping, CLAUDE.md injection)
+- Branch per Session (session-scoped branches, dirty tree protection)
+- Git Worktree Isolation (parallel branches, session-scoped worktrees)
 
 **Optimization Tasks**: 21 identified (1 completed, 20 pending)
 **Deprecated Docs**: 8 (in archive)

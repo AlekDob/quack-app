@@ -25,10 +25,18 @@ import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
+// Editor selection type for IDE context injection
+interface EditorSelection {
+  selectedText: string;
+  startLine: number;
+  endLine: number;
+}
+import { useFileSystemStore } from "./stores/fileSystemStore";
+import { getLanguageFromFilename } from "./utils/languageDetection";
 import FileActionButtons from "./components/FileActionButtons";
 import GitPanel from "./components/GitPanel";
 import DiffDrawer from "./components/DiffDrawer";
-import QuackStoreDrawer from "./components/QuackStoreDrawer";
+import QuackStoreDrawer, { type AgentBundleInstallData } from "./components/QuackStoreDrawer";
 import SavedCommandsDrawer from "./components/SavedCommandsDrawer";
 import SavedCommandModal from "./components/SavedCommandModal";
 import SessionDetailsDrawer from "./components/SessionDetailsDrawer";
@@ -96,8 +104,10 @@ import GitConfigOnboarding from "./components/settings/GitConfigOnboarding";
 import IDEOnboarding from "./components/settings/IDEOnboarding";
 import UpdateToast from "./components/UpdateToast";
 import { isPro, canCreateTerminal } from "./config/features";
-import type { DiffInfo } from "./components/CodeEditorMonaco";
+import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
+import { buildContextPrefix } from "./utils/ideContextBuilder";
+import { useExternalIdeContext } from "./hooks/useExternalIdeContext";
 import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
@@ -574,6 +584,15 @@ function AppContent() {
   const [gitBranch, setGitBranch] = useState<string>('');
 
   const [explorerPath, setExplorerPath] = useState("");
+
+  // 🦆 BRANCH-PER-SESSION: Effective git root path considers session's worktreePath
+  const effectiveGitRootPath = useMemo(() => {
+    if (activeSessionId) {
+      const session = agentSessions.find(s => s.id === activeSessionId);
+      if (session?.worktreePath) return session.worktreePath;
+    }
+    return explorerPath;
+  }, [activeSessionId, agentSessions, explorerPath]);
   const [explorerTree, setExplorerTree] = useState<
     Record<string, DirectoryEntry[]>
   >({});
@@ -678,6 +697,15 @@ function AppContent() {
     path: string;
   } | null>(null);
   const [previewContent, setPreviewContent] = useState("");
+
+  // Sync local previewFile to fileSystemStore so IDE context utilities can read it
+  useEffect(() => {
+    useFileSystemStore.getState().setPreviewFile(previewFile?.path ?? null);
+  }, [previewFile]);
+
+  // Poll external IDE (VS Code, Cursor) for context so the ChatInput chip can show it
+  useExternalIdeContext(explorerPath || null);
+
   const [previewImageData, setPreviewImageData] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -686,6 +714,22 @@ function AppContent() {
   const [previewLineChanges, setPreviewLineChanges] = useState<LineChange[] | null>(null);
   const [previewHasUnsavedChanges, setPreviewHasUnsavedChanges] = useState(false);
   const previewDrawerRef = useRef<FilePreviewDrawerRef>(null);
+
+  // IDE context: track editor selection for agent chat context injection
+  const handleEditorSelectionChange = useCallback((sel: EditorSelection | null) => {
+    if (!sel || !previewFile) {
+      useFileSystemStore.getState().clearEditorSelection();
+      return;
+    }
+    useFileSystemStore.getState().setEditorSelection({
+      filePath: previewFile.path,
+      language: getLanguageFromFilename(previewFile.name),
+      selectedText: sel.selectedText,
+      startLine: sel.startLine,
+      endLine: sel.endLine,
+    });
+  }, [previewFile]);
+
   const [showGitDrawer, setShowGitDrawer] = useState(false);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showStoreDrawer, setShowStoreDrawer] = useState(false);
@@ -744,6 +788,13 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return 'chat';
   });
+
+  // Clear editor selection when navigating away from file tab
+  useEffect(() => {
+    if (!activeTabId.startsWith('file-')) {
+      useFileSystemStore.getState().clearEditorSelection();
+    }
+  }, [activeTabId]);
 
   // Persist tab state to localStorage for wake-from-standby resilience
   useEffect(() => {
@@ -944,6 +995,11 @@ function AppContent() {
   // This prevents the bug where events are emitted before the listener is set up
   const activeListenersRef = useRef<Map<string, () => void>>(new Map());
 
+  // 🦆 FIX: Track in-flight listener registrations to prevent duplicate listen() calls
+  // Without this, Multi-Listener and Pre-warm can both call listen() for the same agentId
+  // before either resolves, causing Tauri's "listeners[eventId].handlerId" crash
+  const pendingListenersRef = useRef<Set<string>>(new Set());
+
   // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
   // This fixes the intermittent bug where Task/droid widgets don't appear because
   // the event arrives before React's setState has created the streaming message
@@ -1101,11 +1157,14 @@ function AppContent() {
         totalCost: 0,
       };
 
+      // IMPORTANT: input_tokens from SDK = full context window input for THIS turn
+      // (includes system + tools + all previous messages). We REPLACE (not accumulate)
+      // to reflect the actual context window state, matching what `claude /context` shows.
       const updatedTokens = {
-        inputTokens: currentTokens.inputTokens + usage.input_tokens,
-        outputTokens: currentTokens.outputTokens + usage.output_tokens,
-        cacheCreationTokens: currentTokens.cacheCreationTokens + (usage.cache_creation_input_tokens || 0),
-        cacheReadTokens: currentTokens.cacheReadTokens + (usage.cache_read_input_tokens || 0),
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreationTokens: usage.cache_creation_input_tokens || 0,
+        cacheReadTokens: usage.cache_read_input_tokens || 0,
         // total_cost_usd is cumulative from SDK, so we just set it (not add)
         totalCost: totalCostUsd ?? currentTokens.totalCost,
       };
@@ -1171,7 +1230,7 @@ function AppContent() {
         if (agentEvt.action === 'start') {
           teamState.updateTeammateStatus(agentEvt.agent_name, 'active', agentEvt.session_id);
         } else if (agentEvt.action === 'stop') {
-          teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped');
+          teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped', agentEvt.session_id);
         }
       }
     }
@@ -1421,15 +1480,27 @@ function AppContent() {
     const project = extractProjectId(cwd) || '';
     setProjectName(project);
 
-    // Use the branch associated with this terminal (agent workspace)
-    // instead of the current repository branch on disk
-    if (activeTerminal.branch) {
+    // 🦆 BRANCH-PER-SESSION: If session has explicit branch, use that instead of agent's
+    const activeSession = activeSessionId
+      ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+      : null;
+
+    if (activeSession?.branch) {
+      setGitBranch(activeSession.branch);
+    } else if (activeTerminal.branch) {
+      // Use the branch associated with this terminal (agent workspace)
       setGitBranch(activeTerminal.branch);
     } else {
-      // Fallback: Get current git branch from disk if no branch is assigned to terminal
+      // Fallback: Get current git branch from disk if no branch is assigned
       invoke<string>('git_current_branch', { rootPath: cwd })
         .then((branch) => {
-          setGitBranch(branch.trim());
+          // Re-check session branch to avoid race condition with async resolution
+          const currentSession = activeSessionId
+            ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+            : null;
+          if (!currentSession?.branch) {
+            setGitBranch(branch.trim());
+          }
         })
         .catch(() => {
           setGitBranch(''); // Not a git repository or error
@@ -1442,7 +1513,16 @@ function AppContent() {
         // Not a git repo or watcher failed — silent
       });
     }
-  }, [activeTerminal, tauriAvailable]);
+  }, [activeTerminal, tauriAvailable, activeSessionId]);
+
+  // 🦆 BRANCH-PER-SESSION: Override gitBranch when active session has explicit branch
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const session = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
+    if (session?.branch) {
+      setGitBranch(session.branch);
+    }
+  }, [activeSessionId]);
 
   // Listen for real-time git branch changes from file watcher
   useEffect(() => {
@@ -1455,8 +1535,14 @@ function AppContent() {
         const activeCwd = activeTerminal?.cwd || '';
 
         // Update displayed branch if event matches the active terminal's project
+        // But NOT if the active session has an explicit branch (session branch takes priority)
         if (activeCwd && projectPath === activeCwd) {
-          setGitBranch(branch);
+          const currentSession = activeSessionId
+            ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+            : null;
+          if (!currentSession?.branch) {
+            setGitBranch(branch);
+          }
         }
 
         // Update branch on ALL terminals that share this project path (persistence)
@@ -1739,10 +1825,11 @@ function AppContent() {
   // CRITICAL: Maintain persistent listeners for ALL active agents, not just the active one
   // This prevents stream interruption when switching between agents during streaming
 
-  // 🦆 RACE CONDITION FIX: Only track agent IDs, not full chatSessions
-  // This prevents rapid listener teardown/setup during streaming which causes
-  // "listeners[eventId].handlerId" errors from Tauri's event system
-  const activeAgentIdsKey = Array.from(chatSessions.keys()).sort().join(',');
+  // 🦆 FIX: Use terminal IDs (real agents) instead of chatSessions keys
+  // chatSessions keys include session IDs (session-xxx) which don't correspond to
+  // Tauri event channels (claude-event:{agentId}). The backend emits on agent IDs only.
+  // This was causing hundreds of useless listeners and "Listener already exists" warnings.
+  const activeAgentIdsKey = terminals.map(t => t.id).sort().join(',');
 
   useEffect(() => {
     if (!tauriAvailable) return;
@@ -1753,14 +1840,14 @@ function AppContent() {
     // Track which listeners we're setting up in THIS effect run
     const newlyCreatedListeners = new Set<string>();
 
-    // Setup listener for each active agent (only if not already active)
+    // Setup listener for each active agent (only if not already active or pending)
     const setupPromises = activeAgentIds.map(async (agentId) => {
-      // 🦆 RACE FIX: Skip if listener already exists (created by ensureListenerReady)
-      if (activeListenersRef.current.has(agentId)) {
-        console.log(`[Multi-Listener] Listener already exists for agent: ${agentId}`);
+      // Skip if listener already exists or is being registered
+      if (activeListenersRef.current.has(agentId) || pendingListenersRef.current.has(agentId)) {
         return;
       }
 
+      pendingListenersRef.current.add(agentId);
       const eventName = `claude-event:${agentId}`;
 
       try {
@@ -1893,11 +1980,11 @@ function AppContent() {
           }
         });
 
-        // 🦆 RACE FIX: Store in shared ref instead of local map
         activeListenersRef.current.set(agentId, unlisten);
+        pendingListenersRef.current.delete(agentId);
         newlyCreatedListeners.add(agentId);
-        console.log(`[Multi-Listener] Listener registered for agent: ${agentId}`);
       } catch (error) {
+        pendingListenersRef.current.delete(agentId);
         console.error(`[Multi-Listener] Failed to setup listener for ${agentId}:`, error);
       }
     });
@@ -1930,27 +2017,39 @@ function AppContent() {
   useEffect(() => {
     if (!tauriAvailable || !activeId) return;
 
-    // If listener already exists, nothing to do
-    if (activeListenersRef.current.has(activeId)) {
-      console.log(`[Pre-warm] Listener already exists for activeId: ${activeId}`);
+    // Skip if listener already exists or is being registered by another effect
+    if (activeListenersRef.current.has(activeId) || pendingListenersRef.current.has(activeId)) {
       return;
     }
 
-    // Setup listener for the active agent NOW (before any message is sent)
-    const eventName = `claude-event:${activeId}`;
-    console.log(`[Pre-warm] Setting up listener for activeId: ${activeId}`);
+    let cancelled = false;
+    const capturedId = activeId;
+    pendingListenersRef.current.add(capturedId);
+
+    const eventName = `claude-event:${capturedId}`;
 
     // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
     // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
     listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
       const { sessionKey, event: claudeEvent } = event.payload;
-      handleClaudeEvent(activeId, claudeEvent, 'Pre-warm', sessionKey);
+      handleClaudeEvent(capturedId, claudeEvent, 'Pre-warm', sessionKey);
     }).then((unlisten) => {
-      activeListenersRef.current.set(activeId, unlisten);
-      console.log(`[Pre-warm] Listener ready for activeId: ${activeId}`);
+      pendingListenersRef.current.delete(capturedId);
+      if (cancelled) {
+        unlisten();
+        return;
+      }
+      activeListenersRef.current.set(capturedId, unlisten);
     }).catch((error) => {
-      console.error(`[Pre-warm] Failed for ${activeId}:`, error);
+      pendingListenersRef.current.delete(capturedId);
+      if (!cancelled) {
+        console.error(`[Pre-warm] Failed for ${capturedId}:`, error);
+      }
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [tauriAvailable, activeId]);
 
   // 🦆 SESSION PERSISTENCE: REMOVED - Agents always start fresh
@@ -1960,15 +2059,13 @@ function AppContent() {
   // 🦆 RACE CONDITION FIX: Helper function to ensure listener is ready for an agent
   // This prevents events being emitted before the listener is set up
   const ensureListenerReady = useCallback(async (agentId: string) => {
-    // If listener already exists, we're good
-    if (activeListenersRef.current.has(agentId)) {
-      console.log(`[Listener] Already active for agent: ${agentId}`);
+    // Skip if listener already exists or is being registered
+    if (activeListenersRef.current.has(agentId) || pendingListenersRef.current.has(agentId)) {
       return;
     }
 
-    // Set up a new listener for this agent
+    pendingListenersRef.current.add(agentId);
     const eventName = `claude-event:${agentId}`;
-    console.log(`[Listener] Setting up listener for agent: ${agentId}`);
 
     try {
       // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
@@ -2016,10 +2113,10 @@ function AppContent() {
         }
       });
 
-      // Store the unlisten function
       activeListenersRef.current.set(agentId, unlisten);
-      console.log(`[Listener] Ready for agent: ${agentId}`);
+      pendingListenersRef.current.delete(agentId);
     } catch (error) {
+      pendingListenersRef.current.delete(agentId);
       console.error(`[Listener] Failed to setup for ${agentId}:`, error);
     }
   }, [handleClaudeEvent]);
@@ -2286,7 +2383,18 @@ function AppContent() {
 
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
-      const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
+      // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available, then agent's cwd
+      const sessionWorktreePath = currentSession?.worktreePath;
+      const workingDir = sessionWorktreePath
+        ? sessionWorktreePath
+        : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
+
+      // Inject IDE context (open file, selection, git status) into prompt
+      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
+      const ideContextPrefix = await buildContextPrefix(gitSummary, workingDir ?? null);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
+      }
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -2432,6 +2540,15 @@ function AppContent() {
         response.total_cost_usd,
         response.usage  // ✅ Now passing full usage stats from Rust backend!
       );
+
+      // 🦆 STAMINA FIX: Also update chatTokensMap from invoke response
+      // The streamed result event may fail to update chatTokensMap if the Rust
+      // deserialization fails (e.g., null values in usage) or if the event is
+      // dropped. This ensures stamina always gets updated from the authoritative
+      // invoke response.
+      if (response.usage) {
+        handleTokenUpdate(messageKey, response.usage, response.total_cost_usd);
+      }
 
       // Notify that agent response is complete
       // 🦆 RACE CONDITION FIX: Use CAPTURED values
@@ -2855,9 +2972,8 @@ function AppContent() {
     const { sessions: updatedSessions } = useSessionStore.getState();
     const updatedSession = updatedSessions.find(s => s.id === targetAgentId);
 
-    // 🦆 SESSIONS-FIRST: Use session's projectPath as working directory
-    // (Worktree isolation not used in sessions-first architecture)
-    const effectiveWorkingDirectory = updatedSession?.projectPath || options?.workingDirectory || '/';
+    // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available, then projectPath
+    const effectiveWorkingDirectory = updatedSession?.worktreePath || updatedSession?.projectPath || options?.workingDirectory || '/';
     console.log(`[sendMessageForTargetAgent] Using working directory: ${effectiveWorkingDirectory}`)
 
     // Save the prompt for restoration on abort
@@ -2948,6 +3064,13 @@ function AppContent() {
           .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
           .join('\n\n');
         prompt = `${history}\n\nUser: ${content}`;
+      }
+
+      // Inject IDE context (open file, selection, git status) into prompt
+      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
+      const ideContextPrefix = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
+      if (ideContextPrefix) {
+        prompt = ideContextPrefix + prompt;
       }
 
       // Create abort promise
@@ -3287,31 +3410,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log(`[compactConversationForTargetAgent] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
 
-      // Get current tokens and estimate reduction
+      // Reset tokens to 0 after compact. The next SDK result event will report
+      // the real context window size post-compact, giving us accurate numbers.
       const currentTokens = chatTokensMap.get(targetAgentId);
-      const currentInputTokens = currentTokens?.inputTokens || 0;
-      const currentOutputTokens = currentTokens?.outputTokens || 0;
-
-      // Estimate 60% reduction (based on removed messages)
-      const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
-      const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
-      const savedTokens = (currentInputTokens + currentOutputTokens) - (reducedInputTokens + reducedOutputTokens);
-
-      // Update token counts
       setChatTokensMap((prev) => {
         const newMap = new Map(prev);
         newMap.set(targetAgentId, {
-          inputTokens: reducedInputTokens,
-          outputTokens: reducedOutputTokens,
-          cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
-          cacheReadTokens: currentTokens?.cacheReadTokens || 0,
-          totalCost: currentTokens?.totalCost || 0, // Preserve cost through compaction
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+          totalCost: currentTokens?.totalCost || 0, // Preserve cumulative cost
         });
         return newMap;
       });
 
       toast.dismiss('compacting');
-      toast.success(`Compacted! ${messagesToSummarize.length} messages → 1 summary. ~${savedTokens.toLocaleString()} tokens freed`, {
+      toast.success(`Compacted! ${messagesToSummarize.length} messages summarized. Token count will update on next message.`, {
         duration: 5000,
       });
 
@@ -3445,31 +3560,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log(`[compactConversation] Compaction complete: ${messagesToSummarize.length} messages → 1 summary`);
 
-      // Get current tokens and estimate reduction
+      // Reset tokens to 0 after compact. The next SDK result event will report
+      // the real context window size post-compact, giving us accurate numbers.
       const currentTokens = chatTokensMap.get(chatKey);
-      const currentInputTokens = currentTokens?.inputTokens || 0;
-      const currentOutputTokens = currentTokens?.outputTokens || 0;
-
-      // Estimate 60% reduction (based on removed messages)
-      const reducedInputTokens = Math.floor(currentInputTokens * 0.4);
-      const reducedOutputTokens = Math.floor(currentOutputTokens * 0.4);
-      const savedTokens = (currentInputTokens + currentOutputTokens) - (reducedInputTokens + reducedOutputTokens);
-
-      // Update token counts
       setChatTokensMap((prev) => {
         const newMap = new Map(prev);
         newMap.set(chatKey, {
-          inputTokens: reducedInputTokens,
-          outputTokens: reducedOutputTokens,
-          cacheCreationTokens: currentTokens?.cacheCreationTokens || 0,
-          cacheReadTokens: currentTokens?.cacheReadTokens || 0,
-          totalCost: currentTokens?.totalCost || 0, // Preserve cost through compaction
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 0,
+          totalCost: currentTokens?.totalCost || 0, // Preserve cumulative cost
         });
         return newMap;
       });
 
       toast.dismiss('compacting');
-      toast.success(`Compacted! ${messagesToSummarize.length} messages → 1 summary. ~${savedTokens.toLocaleString()} tokens freed 🦆`, {
+      toast.success(`Compacted! ${messagesToSummarize.length} messages summarized. Token count will update on next message.`, {
         duration: 5000,
       });
 
@@ -3850,6 +3957,32 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId, pendingPlanApprovals]);
 
+  // Teammate stream drill-down: open a tab to view teammate's session stream
+  const handleTeammateDrillDown = useCallback((sessionId: string, name: string) => {
+    const tabId = `teammate-${sessionId}`;
+    const existingTab = tabs.find(t => t.id === tabId);
+    if (existingTab) {
+      setActiveTabId(tabId);
+      return;
+    }
+
+    const team = useTeamStore.getState().activeTeam;
+    const member = team?.members.find(m => m.name.toLowerCase() === name.toLowerCase());
+
+    const newTab: Tab = {
+      id: tabId,
+      label: name,
+      type: 'teammate-stream',
+      closable: true,
+      color: member?.color,
+      teammateSessionId: sessionId,
+      teammateName: name,
+    };
+
+    setTabs(prevTabs => [...prevTabs, newTab]);
+    setActiveTabId(tabId);
+  }, [tabs, setActiveTabId]);
+
   // Open current session in terminal window with claude --resume command
   const openSessionInTerminal = useCallback(async () => {
     if (!activeId) return;
@@ -3976,9 +4109,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log(`[ChatView] activeTaskId is set (${activeTaskId}), returning empty for currentAgentMessages`);
       return [];
     }
-    const messages = chatKey ? (chatSessions.get(chatKey) ?? []) : [];
-    console.log(`[ChatView] Loading messages for chatKey="${chatKey}" (sessionId: ${activeSessionId}): ${messages.length} messages`);
-    return messages;
+    return chatKey ? (chatSessions.get(chatKey) ?? []) : [];
   }, [chatKey, chatSessions, activeSessionId, activeTaskId]);
 
   const currentAgentLoading = useMemo(() => {
@@ -4120,6 +4251,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [chatSessions, chatLoadingMap, terminals, isPipOpen, updatePipAgents]);
 
   // Listen for click-to-focus events from PiP window
+  // Use ref to avoid teardown/setup on every terminals change (prevents Tauri listener race condition)
+  terminalsRef.current = terminals;
+
   useEffect(() => {
     if (!tauriAvailable) return;
 
@@ -4127,22 +4261,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const { agentId } = event.payload;
       console.log('🦆 PiP agent clicked, focusing on agent:', agentId);
 
-      // Find the terminal for this agent
-      const terminal = terminals.find((t) => t.id === agentId);
+      // Use ref to get current terminals without re-registering listener
+      const terminal = terminalsRef.current.find((t) => t.id === agentId);
       if (terminal) {
-        // Switch to this terminal
         setActiveId(terminal.id);
 
-        // Focus the main window
         const window = getCurrentWindow();
         await window.setFocus();
       }
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten.then((fn) => fn()).catch(() => undefined);
     };
-  }, [tauriAvailable, terminals]);
+  }, [tauriAvailable]);
 
   // Auto-show/hide PiP based on main window focus
   useEffect(() => {
@@ -4164,7 +4296,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      unlistenFocus.then((fn) => fn());
+      unlistenFocus.then((fn) => fn()).catch(() => undefined);
     };
   }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
 
@@ -4755,24 +4887,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     removedIds.forEach((terminalId) => {
       const unlisten = askUserListenersRef.current.get(terminalId);
       if (unlisten) {
-        try {
-          unlisten();
-        } catch (e) {
-          // Ignore errors during cleanup
-        }
+        unlisten();
         askUserListenersRef.current.delete(terminalId);
-        console.log(`[AskUser] Listener removed for terminal: ${terminalId}`);
       }
     });
 
     // Cleanup on unmount
     return () => {
-      askUserListenersRef.current.forEach((unlisten, id) => {
-        try {
-          unlisten();
-        } catch (e) {
-          // Ignore errors during cleanup
-        }
+      askUserListenersRef.current.forEach((unlisten) => {
+        unlisten();
       });
       askUserListenersRef.current.clear();
     };
@@ -5553,16 +5676,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setActiveTabId(agentTabId);
   }, []);
 
-  // Handler for selecting or creating a droid via Claude Assets panel
-  const handleSelectDroid = useCallback((agentName: string, agentScope: 'global' | 'project', isNew = false) => {
+  // Handler for selecting or creating a droid - opens in external IDE if available
+  const handleSelectDroid = useCallback((agentName: string, agentScope: 'global' | 'project', isNew = false, filePath?: string) => {
     if (isNew) {
       handleCreateNewAgent(agentScope);
       return;
     }
 
-    const agentTabId = `agent-${agentName}-${agentScope}`;
+    // Try opening in external IDE if preferred IDE is set
+    if (filePath) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
+    }
 
-    // Check if tab already exists
+    // Fallback: open internal tab
+    const agentTabId = `agent-${agentName}-${agentScope}`;
     const existingTab = tabs.find(t => t.id === agentTabId);
 
     if (existingTab) {
@@ -5595,11 +5726,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, []);
 
-  // Command tab handler
-  const handleSelectCommand = useCallback((commandName: string, commandScope: 'global' | 'project', isNew = false) => {
-    const commandTabId = isNew ? `command-new-${Date.now()}` : `command-${commandName}-${commandScope}`;
+  // Command tab handler - opens in external IDE if available, falls back to internal tab
+  const handleSelectCommand = useCallback((commandName: string, commandScope: 'global' | 'project', isNew = false, filePath?: string) => {
+    // For existing commands with a file path, try opening in external IDE
+    if (!isNew && filePath) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
+    }
 
-    // Check if tab already exists
+    // Fallback: open internal tab
+    const commandTabId = isNew ? `command-new-${Date.now()}` : `command-${commandName}-${commandScope}`;
     const existingTab = tabs.find(t => t.id === commandTabId);
 
     if (existingTab) {
@@ -5619,11 +5758,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tabs]);
 
-  // Rule tab handler
-  const handleSelectRule = useCallback((ruleName: string, ruleScope: 'global' | 'project', isNew = false) => {
-    const ruleTabId = isNew ? `rule-new-${Date.now()}` : `rule-${ruleName}-${ruleScope}`;
+  // Rule tab handler - opens in external IDE if available, falls back to internal tab
+  const handleSelectRule = useCallback((ruleName: string, ruleScope: 'global' | 'project', isNew = false, filePath?: string) => {
+    // For existing rules with a file path, try opening in external IDE
+    if (!isNew && filePath) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
+    }
 
-    // Check if tab already exists
+    // Fallback: open internal tab
+    const ruleTabId = isNew ? `rule-new-${Date.now()}` : `rule-${ruleName}-${ruleScope}`;
     const existingTab = tabs.find(t => t.id === ruleTabId);
 
     if (existingTab) {
@@ -5675,23 +5822,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable, activeTerminal?.cwd, explorerPath]);
 
+  // Skills handler - opens in external IDE if available, falls back to internal tab
   const handleSelectSkill = useCallback(async (skillInfo: SkillInfo) => {
     if (!tauriAvailable) {
       return;
     }
 
-    try {
-      // Create a new tab for the skill instead of opening drawer
-      const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
+    // Try opening in external IDE if preferred IDE is set
+    if (skillInfo.file_path) {
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        const opened = await tryOpenInIDE(skillInfo.file_path);
+        if (opened) return;
+      }
+    }
 
-      // Check if tab already exists
+    // Fallback: open internal tab
+    try {
+      const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
       const existingTab = tabs.find(t => t.id === skillTabId);
 
       if (existingTab) {
-        // Tab already exists, just switch to it
         setActiveTabId(skillTabId);
       } else {
-        // Create new skill tab
         const newTab: Tab = {
           id: skillTabId,
           label: skillInfo.name.replace(/-/g, ' '),
@@ -5699,7 +5852,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           closable: true,
           skillName: skillInfo.name,
           skillScope: skillInfo.scope as 'global' | 'project',
-          // icon removed - rendered directly in TabBar to avoid React serialization issues
         };
 
         setTabs(prevTabs => [...prevTabs, newTab]);
@@ -5784,6 +5936,90 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       loadSkills(),
     ]);
   }, [loadAgents, loadSkills]);
+
+  // Handle agent bundle installed from Quack Store - creates terminal in sidebar
+  const handleAgentBundleInstalled = useCallback(async (data: AgentBundleInstallData) => {
+    if (!tauriAvailable) return;
+
+    const { template, projectPath, projectName, installedSkills, installedRules } = data;
+    try {
+      const created = await invoke<TerminalInfo>("create_terminal", {
+        label: template.suggestedName,
+        color: template.suggestedColor,
+        cwd: projectPath,
+        workingOn: null,
+        avatar: template.suggestedAvatar || null,
+        branch: null,
+      });
+
+      const personality: Partial<AgentPersonality> = {
+        role: template.role,
+        communicationStyle: template.communicationStyle,
+        customNotes: template.customNotes,
+        selectedSkills: installedSkills.length > 0 ? installedSkills : undefined,
+        selectedRules: installedRules.length > 0 ? installedRules : undefined,
+      };
+
+      const createdWithState: TerminalInfo = {
+        ...created,
+        status: "idle",
+        needsAttention: false,
+        hasResponded: false,
+        responseStartTime: null,
+        avatar: template.suggestedAvatar,
+        personality,
+      };
+
+      setTerminals((prev) => [...prev, createdWithState]);
+      setActiveId(createdWithState.id);
+      setActiveSessionId(null);
+      setActiveTaskId(null);
+      setActiveTabId('chat');
+      clearTerminalAttention(createdWithState.id);
+      void addActiveAgent(projectPath, createdWithState.id);
+
+      // Persist project in sidebar
+      setPersistedProjects(prev => {
+        if (prev.has(projectPath)) return prev;
+        const next = new Map(prev);
+        next.set(projectPath, projectName);
+        return next;
+      });
+
+      // Save personality in background
+      if (Object.keys(personality).length > 0) {
+        const fullPersonality: AgentPersonality = {
+          id: createdWithState.id,
+          name: template.suggestedName,
+          role: personality.role || '',
+          communicationStyle: personality.communicationStyle || 'friendly',
+          customNotes: personality.customNotes || undefined,
+          selectedRules: personality.selectedRules || undefined,
+          selectedSkills: personality.selectedSkills || undefined,
+        };
+
+        fireAndForget('save_agent_personality', {
+          projectPath,
+          personality: fullPersonality,
+        }, (error) => {
+          console.error('Failed to save personality:', error);
+        });
+
+        fireAndForget('inject_personality_to_claude_md', {
+          projectPath,
+          personality: fullPersonality,
+        }, (error) => {
+          console.error('Failed to inject personality to CLAUDE.md:', error);
+        });
+      }
+
+      // Close the store drawer after successful install
+      setShowStoreDrawer(false);
+    } catch (err) {
+      console.error('Failed to create agent from bundle:', err);
+      toast.error('Agent installed but failed to add to sidebar');
+    }
+  }, [tauriAvailable, clearTerminalAttention, addActiveAgent]);
 
   const handleMentionFile = useCallback((filePath: string, fileName: string) => {
     // Calculate relative path from explorerRoot
@@ -5932,8 +6168,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      void unlistenInstalled.then((fn) => fn());
-      void unlistenUninstalled.then((fn) => fn());
+      void unlistenInstalled.then((fn) => fn()).catch(() => undefined);
+      void unlistenUninstalled.then((fn) => fn()).catch(() => undefined);
     };
   }, [loadAgents, tauriAvailable]);
 
@@ -6230,7 +6466,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      void unlistenPromise.then((fn) => fn());
+      void unlistenPromise.then((fn) => fn()).catch(() => undefined);
     };
   }, [tauriAvailable]);
 
@@ -6277,6 +6513,21 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         }
       }
 
+      // Try opening in external IDE if available
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        toast('Opening in your IDE...', { duration: 2000 });
+        try {
+          const { openFileInIDE } = useIDEStore.getState();
+          await openFileInIDE(absolutePath);
+          return;
+        } catch (err) {
+          console.error('[App] Failed to open Second Brain doc in IDE:', err);
+          toast.error('Failed to open in IDE');
+        }
+      }
+
+      // Fallback: open internal tab
       const fileName = absolutePath.split('/').pop() || 'Document';
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
 
@@ -6524,6 +6775,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
           // SIMPLE: Just load terminals - no migration needed!
           setTerminals(recreated);
+
+          // 🔵 Initialize lastReadTimestamps to NOW for all agents at boot
+          // This prevents "Quack quack..." badge from showing on pre-existing sessions
+          // Badge should only appear for NEW messages received after app startup
+          const bootTimestamp = Date.now();
+          setLastReadTimestamps((prev) => {
+            const updated = new Map(prev);
+            for (const terminal of recreated) {
+              if (!updated.has(terminal.id)) {
+                updated.set(terminal.id, bootTimestamp);
+              }
+            }
+            return updated;
+          });
 
           // Load sessions from sessionStore (sessions-first architecture)
           await useSessionStore.getState().loadSessions();
@@ -7628,6 +7893,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
         setTerminals((prev) => [...prev, createdWithState]);
         setActiveId(createdWithState.id);
+        // Show agent overview (not a stale session) for the new agent
+        setActiveSessionId(null);
+        setActiveTaskId(null);
+        setActiveTabId('chat');
         clearTerminalAttention(createdWithState.id);
 
         // Add to active-agents.json index (file-based persistence)
@@ -8076,7 +8345,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
 
     return () => {
-      unlistenPromise.then(unlisten => unlisten());
+      unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
     };
   }, [activeProjects, updateTerminalWindowProjects]);
 
@@ -8102,10 +8371,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [tauriAvailable]
   );
 
+  // Centralized helper: try to open file in preferred IDE with toast notification
+  // Returns true if opened in IDE, false if no IDE set (caller should fallback)
+  const tryOpenInIDE = useCallback(async (filePath: string, line?: number): Promise<boolean> => {
+    const { preferredIDE, openFileInIDE } = useIDEStore.getState();
+    if (!preferredIDE) return false;
+
+    try {
+      toast('Opening in your IDE...', { duration: 2000 });
+      await openFileInIDE(filePath, line);
+      return true;
+    } catch (err) {
+      console.error('[App] Failed to open file in IDE:', err);
+      toast.error('Failed to open in IDE');
+      return false;
+    }
+  }, []);
+
   const handleOpenFilePreview = useCallback(
     async (entry: DirectoryEntry, lineChanges?: LineChange[]) => {
       if (!tauriAvailable || entry.is_dir) {
         return;
+      }
+
+      // Try opening in external IDE if available (skip for files with lineChanges - need internal diff view)
+      if (!lineChanges) {
+        const opened = await tryOpenInIDE(entry.path);
+        if (opened) return;
       }
 
       // Check if file is modified by AI and has lineChanges
@@ -8255,32 +8547,37 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [tauriAvailable, gitSummary, explorerRoot, activeId, fileEditsMap]
   );
 
-  const handleFilePathClick = useCallback((path: string, lineChanges?: LineChange[]) => {
-    const name = path.split('/').pop() || path;
-    // Create a fake DirectoryEntry to open the file
+  const handleFilePathClick = useCallback(async (path: string, lineChanges?: LineChange[]) => {
+    // Parse optional :line suffix (e.g. "src/App.tsx:42")
+    let filePath = path;
+    let line: number | undefined;
+    const lineMatch = path.match(/^(.+):(\d+)$/);
+    if (lineMatch) {
+      filePath = lineMatch[1];
+      line = parseInt(lineMatch[2], 10);
+    }
+
+    // Try opening in external IDE (skip for files with lineChanges - need internal diff view)
+    if (!lineChanges) {
+      const opened = await tryOpenInIDE(filePath, line);
+      if (opened) return;
+    }
+
+    // Fallback: open in internal tab
+    const name = filePath.split('/').pop() || filePath;
     const fakeEntry: DirectoryEntry = {
       name,
-      path,
+      path: filePath,
       is_dir: false,
       is_symlink: false,
     };
-    // Use handleOpenFilePreview to actually load file content
     handleOpenFilePreview(fakeEntry, lineChanges);
-  }, [handleOpenFilePreview]);
+  }, [tryOpenInIDE, handleOpenFilePreview]);
 
-  // Handler to open file in preferred IDE
+  // Handler to open file in preferred IDE (legacy, used by other components)
   const handleOpenInIDE = useCallback(async (path: string) => {
-    const { preferredIDE } = useIDEStore.getState();
-    if (!preferredIDE) {
-      console.warn('[App] No preferred IDE set, cannot open file');
-      return;
-    }
-    try {
-      await invoke('open_in_app', { appId: preferredIDE, path });
-    } catch (err) {
-      console.error('[App] Failed to open file in IDE:', err);
-    }
-  }, []);
+    await tryOpenInIDE(path);
+  }, [tryOpenInIDE]);
 
   // Handler to open diff drawer from EditSummaryBar
   const handleDiffClick = useCallback(async (filePath: string, status: 'created' | 'modified' | 'deleted') => {
@@ -9614,7 +9911,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setHistoryError(null);
 
     try {
-      const rootPath = activeTerminal?.cwd ?? explorerPath ?? undefined;
+      // 🦆 BRANCH-PER-SESSION: Use session's worktreePath if available
+      const activeSession = activeSessionId
+        ? useSessionStore.getState().sessions.find(s => s.id === activeSessionId)
+        : null;
+      const rootPath = activeSession?.worktreePath || activeTerminal?.cwd || explorerPath || undefined;
       const [statusResult, historyResult] = await Promise.allSettled([
         invoke<GitStatusSummary>("git_status_summary", { rootPath }),
         invoke<GitCommitEntry[]>("git_commit_history", { limit: 50, branchName: null, rootPath }),
@@ -9658,13 +9959,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } finally {
       setLoadingGit(false);
     }
-  }, [activeTerminal, explorerPath, tauriAvailable]);
+  }, [activeTerminal, explorerPath, tauriAvailable, activeSessionId]);
 
   useEffect(() => {
     if (showGitDrawer) {
       void refreshGitSummary();
     }
   }, [refreshGitSummary, showGitDrawer]);
+
+  // 🦆 BRANCH-PER-SESSION: Refresh git panel when active session changes
+  useEffect(() => {
+    if (activeSessionId && showGitDrawer) {
+      void refreshGitSummary();
+    }
+  }, [activeSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load git status on startup only (not on every terminal switch!)
   useEffect(() => {
@@ -9713,22 +10021,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     [explorerRoot, handleOpenFilePreview]
   );
 
-  // Handler to open .mcp.json file in Monaco editor
+  // Handler to open .mcp.json file - opens in external IDE if available
   const handleOpenMcpConfig = useCallback(
-    (repoPath: string) => {
-      // Construct the full path to .mcp.json
-      const mcpFilePath = `${repoPath}/.mcp.json`;
-      const fileName = '.mcp.json';
+    (filePath: string) => {
+      // Try opening in external IDE first
+      const { preferredIDE } = useIDEStore.getState();
+      if (preferredIDE) {
+        void tryOpenInIDE(filePath);
+        return;
+      }
 
-      // Create a fake DirectoryEntry to open the file
+      // Fallback: open in internal editor
+      const fileName = filePath.split('/').pop() || '.mcp.json';
       const fakeEntry: DirectoryEntry = {
         name: fileName,
-        path: mcpFilePath,
+        path: filePath,
         is_dir: false,
         is_symlink: false,
       };
-
-      // Use handleOpenFilePreview to open the file
       void handleOpenFilePreview(fakeEntry);
     },
     [handleOpenFilePreview]
@@ -10438,7 +10748,6 @@ You have access to all Bash tools to execute git commands like:
             if (unlisten) {
               unlisten();
               activeListenersRef.current.delete(chatId);
-              console.log(`[onDeleteAgentChat] Cleaned up listener for agent: ${chatId}`);
             }
             // Remove from chatSessions map
             setChatSessions(prev => {
@@ -10495,6 +10804,11 @@ You have access to all Bash tools to execute git commands like:
           // Session props
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
+          onActiveSessionDone={() => {
+            // Navigate back to agent overview when active session is marked as done
+            setActiveSessionId(null);
+            setActiveTaskId(null);
+          }}
           // Open Agent Personality accordion
           onOpenPersonality={() => {
             console.log('[App] onOpenPersonality from sidebar clicked');
@@ -11100,6 +11414,7 @@ You have access to all Bash tools to execute git commands like:
                       return ids;
                     })()}
                     onPlanApprovalResponse={respondToPlanApproval}
+                    onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );
               })()}
@@ -11248,6 +11563,7 @@ You have access to all Bash tools to execute git commands like:
                       return ids;
                     })()}
                     onPlanApprovalResponse={respondToPlanApproval}
+                    onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );
               })()}
@@ -11283,11 +11599,12 @@ You have access to all Bash tools to execute git commands like:
                     onOpenIDE={async () => {
                       if (!previewFile?.path) return;
                       try {
-                        await invoke("open_file_in_editor", { path: previewFile.path });
-                        toast.success("File opened in default editor");
+                        const { openFileInIDE } = useIDEStore.getState();
+                        await openFileInIDE(previewFile.path);
+                        toast.success("File opened in IDE");
                       } catch (error) {
-                        console.error("Failed to open file in editor:", error);
-                        toast.error("Failed to open file in editor");
+                        console.error("Failed to open file in IDE:", error);
+                        toast.error("Failed to open file in IDE");
                       }
                     }}
                     onRevealFinder={async () => {
@@ -11470,6 +11787,22 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
+
+              {/* Teammate Stream Tab - shown when teammate-stream tab is active */}
+              {activeTabId.startsWith('teammate-') && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'teammate-stream' && activeTab.teammateSessionId) {
+                  const { TeammateStreamTab } = require('./components/TeammateStreamTab');
+                  return (
+                    <TeammateStreamTab
+                      sessionId={activeTab.teammateSessionId}
+                      teammateName={activeTab.teammateName || 'Teammate'}
+                      teammateColor={activeTab.color}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Agent Terminal Tabs - render ALL terminals, show/hide with visibility (hidden in Kanban mode) */}
               {tabs.some(t => t.type === 'agent-terminal') && !isKanbanTabActive && (
@@ -11724,7 +12057,7 @@ You have access to all Bash tools to execute git commands like:
                 onCommit={handleCommit}
                 committing={committing}
                 onGenerateCommitMessage={handleGenerateCommitMessage}
-                rootPath={explorerPath}
+                rootPath={effectiveGitRootPath}
                 terminals={terminals}
                 onBranchSwitch={async (branchName) => {
                   // Switch to the branch
@@ -11768,18 +12101,22 @@ You have access to all Bash tools to execute git commands like:
           />
         )}
 
-        <div className={`git-drawer ${showStoreDrawer ? "open" : ""}`}>
-          <div
-            className="git-drawer-backdrop"
-            onClick={() => setShowStoreDrawer(false)}
-          />
-          <div className="git-drawer-panel quack-store-drawer-panel">
-            <QuackStoreDrawer
-              onClose={() => setShowStoreDrawer(false)}
-              onRefresh={handleMarketplaceRefresh}
+        {showStoreDrawer && (
+          <div className="git-drawer open">
+            <div
+              className="git-drawer-backdrop"
+              onClick={() => setShowStoreDrawer(false)}
             />
+            <div className="git-drawer-panel quack-store-drawer-panel">
+              <QuackStoreDrawer
+                onClose={() => setShowStoreDrawer(false)}
+                onRefresh={handleMarketplaceRefresh}
+                activeProjects={activeProjects}
+                onAgentBundleInstalled={handleAgentBundleInstalled}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <SavedCommandModal
           open={savedCommandModalOpen}

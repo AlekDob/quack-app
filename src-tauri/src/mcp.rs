@@ -171,6 +171,14 @@ fn get_global_mcp_config_path() -> Result<PathBuf, String> {
     Ok(PathBuf::from(home_dir).join(".claude.json"))
 }
 
+/// Get the path to global ~/.mcp.json (user-level MCP servers)
+fn get_global_mcp_json_path() -> Result<PathBuf, String> {
+    let home_dir = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map_err(|_| "Failed to get home directory (neither USERPROFILE nor HOME set)".to_string())?;
+    Ok(PathBuf::from(home_dir).join(".mcp.json"))
+}
+
 /// Structure for reading ~/.claude.json which has a different format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ClaudeConfig {
@@ -608,13 +616,33 @@ pub async fn list_mcp_servers(
         log::warn!("⚠️ [MCP DEBUG] Failed to read ~/.claude.json");
     }
 
+    // 3. Also read from ~/.mcp.json (user-level global MCP servers)
+    log::info!("📖 [MCP DEBUG] Step 3: Reading from ~/.mcp.json (user-level global)");
+    if let Ok(global_mcp_json_path) = get_global_mcp_json_path() {
+        if let Ok(user_config) = read_mcp_config(&global_mcp_json_path) {
+            let user_servers = config_to_servers(user_config, "global");
+            log::info!("✅ [MCP DEBUG] Loaded {} servers from ~/.mcp.json", user_servers.len());
+
+            // Only add servers that aren't already loaded
+            for server in user_servers {
+                if !all_servers.iter().any(|s| s.id == server.id) {
+                    all_servers.push(server);
+                } else {
+                    log::info!("ℹ️ [MCP DEBUG] Skipping '{}' from ~/.mcp.json (already loaded)", server.id);
+                }
+            }
+        } else {
+            log::warn!("⚠️ [MCP DEBUG] Failed to read ~/.mcp.json");
+        }
+    }
+
     log::info!("📊 [MCP DEBUG] Total servers: {}", all_servers.len());
     for server in &all_servers {
         log::info!("  - {} (scope: {}, transport: {}, enabled: {})", server.id, server.scope, server.transport, server.enabled);
     }
 
     // Auto-start enabled stdio servers
-    log::info!("🚀 [MCP DEBUG] Step 3: Auto-starting enabled stdio servers");
+    log::info!("🚀 [MCP DEBUG] Step 4: Auto-starting enabled stdio servers");
     let process_manager: tauri::State<MCPProcessManager> = app.state();
     for server in &mut all_servers {
         if server.enabled && server.transport == "stdio" {
@@ -775,39 +803,26 @@ pub async fn save_mcp_server(
 
         log::info!("✅ [MCP SAVE] Successfully saved MCP server '{}' to .mcp.json", server.id);
     } else {
-        // Save to ~/.claude.json (global scope)
-        let work_dir = if let Some(dir) = working_dir {
-            if !dir.is_empty() {
-                dir
-            } else {
-                std::env::current_dir()
-                    .map_err(|e| format!("Failed to get current directory: {}", e))?
-                    .to_str()
-                    .ok_or("Failed to convert path to string")?
-                    .to_string()
-            }
-        } else {
-            std::env::current_dir()
-                .map_err(|e| format!("Failed to get current directory: {}", e))?
-                .to_str()
-                .ok_or("Failed to convert path to string")?
-                .to_string()
-        };
+        // Save to ~/.mcp.json (global scope)
+        let global_mcp_json_path = get_global_mcp_json_path()?;
+        log::info!("💾 [MCP SAVE] Writing to ~/.mcp.json at: {}", global_mcp_json_path.display());
 
-        // Read existing MCP servers from ~/.claude.json
-        let mut existing_servers = if let Ok(global_config) = read_global_mcp_config(Some(&work_dir)) {
-            global_config.mcp_servers
+        // Read existing config or create new one
+        let mut existing_config = if global_mcp_json_path.exists() {
+            read_mcp_config(&global_mcp_json_path)?
         } else {
-            HashMap::new()
+            MCPConfigFile {
+                mcp_servers: HashMap::new(),
+            }
         };
 
         // Insert or update the server
-        existing_servers.insert(server.id.clone(), server_config);
+        existing_config.mcp_servers.insert(server.id.clone(), server_config);
 
-        // Write back to ~/.claude.json
-        write_global_mcp_config(&work_dir, existing_servers)?;
+        // Write back to ~/.mcp.json
+        write_mcp_config(&global_mcp_json_path, &existing_config)?;
 
-        log::info!("✅ [MCP SAVE] Successfully saved MCP server '{}' to ~/.claude.json", server.id);
+        log::info!("✅ [MCP SAVE] Successfully saved MCP server '{}' to ~/.mcp.json", server.id);
     }
 
     Ok(())
@@ -867,16 +882,28 @@ pub async fn delete_mcp_server(
         return Err(format!("MCP server '{}' not found in .mcp.json or ~/.claude.json", server_id));
     };
 
-    // Remove the server
-    if existing_servers.remove(&server_id).is_none() {
-        return Err(format!("MCP server '{}' not found in .mcp.json or ~/.claude.json", server_id));
+    // Remove the server from ~/.claude.json
+    if existing_servers.remove(&server_id).is_some() {
+        // Write back to ~/.claude.json
+        write_global_mcp_config(&work_dir, existing_servers)?;
+        log::info!("✅ [MCP DELETE] Successfully deleted MCP server '{}' from ~/.claude.json", server_id);
+        return Ok(());
     }
 
-    // Write back to ~/.claude.json
-    write_global_mcp_config(&work_dir, existing_servers)?;
+    // Not found in ~/.claude.json either, try ~/.mcp.json
+    log::info!("🔍 [MCP DELETE] Server not in ~/.claude.json, checking ~/.mcp.json");
+    if let Ok(global_mcp_json_path) = get_global_mcp_json_path() {
+        if global_mcp_json_path.exists() {
+            let mut user_config = read_mcp_config(&global_mcp_json_path)?;
+            if user_config.mcp_servers.remove(&server_id).is_some() {
+                write_mcp_config(&global_mcp_json_path, &user_config)?;
+                log::info!("✅ [MCP DELETE] Successfully deleted MCP server '{}' from ~/.mcp.json", server_id);
+                return Ok(());
+            }
+        }
+    }
 
-    log::info!("✅ [MCP DELETE] Successfully deleted MCP server '{}' from ~/.claude.json", server_id);
-    Ok(())
+    Err(format!("MCP server '{}' not found in .mcp.json, ~/.claude.json, or ~/.mcp.json", server_id))
 }
 
 /// Get predefined MCP server templates

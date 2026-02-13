@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import MarkdownText from './MarkdownText';
+import { useIDEStore } from '../stores/ideStore';
 import './PlanWidget.css';
 
 interface PlanWidgetProps {
@@ -70,7 +71,8 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({
   const handleOpenFile = async () => {
     if (!savedFilePath) return;
     try {
-      await invoke('open_file_in_editor', { path: savedFilePath });
+      const { openFileInIDE } = useIDEStore.getState();
+      await openFileInIDE(savedFilePath);
     } catch (err) {
       console.error('[PlanWidget] Failed to open file:', err);
     }

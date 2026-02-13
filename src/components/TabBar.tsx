@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image' | 'teammate-stream';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -32,6 +32,8 @@ export interface Tab {
   imageData?: string; // Base64 image data for image tabs
   mediaType?: string; // MIME type (image/png, image/jpeg, etc.) for image tabs
   initialProjectPath?: string; // Initial project to select for claude-assets tabs
+  teammateSessionId?: string; // Session ID for teammate stream tabs
+  teammateName?: string; // Teammate name for teammate stream tabs
 }
 
 interface ContextMenuState {
@@ -369,6 +371,15 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </span>
+          )}
+          {tab.type === 'teammate-stream' && (
+            <span className="tab-icon" aria-hidden="true">
+              {/* Teammate stream icon - eye/monitor */}
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
             </span>
           )}

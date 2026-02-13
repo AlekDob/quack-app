@@ -72,6 +72,8 @@ interface RepositoryGroupProps {
   // Session props
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
 }
@@ -197,6 +199,13 @@ function SortableAgent({
     [allSessions, agent.id],
   );
 
+  // 🔵 FIX: Active sessions only (exclude "done") for notification badge calculations
+  // Done sessions are archived and should NOT trigger "Quack quack..." badge
+  const activeSessions = useMemo(
+    () => agentSessions.filter((s) => s.status !== "done"),
+    [agentSessions],
+  );
+
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((t) => t + 1);
@@ -285,13 +294,14 @@ function SortableAgent({
     [transform, isDragging, transition],
   );
 
-  // 🦆 SESSIONS-FIRST: Check if agent is dormant (no user interaction in ANY session)
-  // Agent is awake if ANY session has at least one assistant response
+  // 🦆 SESSIONS-FIRST: Check if agent is dormant (no user interaction in ANY active session)
+  // Agent is awake if ANY non-done session has at least one assistant response
+  // 🔵 FIX: Uses activeSessions (excludes "done") so archived sessions don't prevent dormant state
   const isDormant = useMemo(() => {
-    if (!chatSessions || agentSessions.length === 0) return true;
+    if (!chatSessions || activeSessions.length === 0) return true;
 
-    // Check ALL sessions for this agent
-    for (const session of agentSessions) {
+    // Check only ACTIVE (non-done) sessions for this agent
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (!sessionMessages || sessionMessages.length === 0) continue;
 
@@ -300,34 +310,32 @@ function SortableAgent({
         (msg) => msg.role === "assistant",
       );
       if (hasAssistantMessage) {
-        return false; // Agent is AWAKE - at least one session has assistant response
+        return false; // Agent is AWAKE - at least one active session has assistant response
       }
     }
 
-    return true; // No sessions with assistant responses = dormant
-  }, [chatSessions, agentSessions]);
+    return true; // No active sessions with assistant responses = dormant
+  }, [chatSessions, activeSessions]);
 
-  // 🦆 SESSIONS-FIRST: Check if ALL sessions are empty (no messages)
+  // 🦆 SESSIONS-FIRST: Check if ALL active sessions are empty (no messages)
   const isChatEmpty = useMemo(() => {
-    if (!chatSessions || agentSessions.length === 0) return true;
+    if (!chatSessions || activeSessions.length === 0) return true;
 
-    // Check if ALL sessions have no messages
-    for (const session of agentSessions) {
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (sessionMessages && sessionMessages.length > 0) {
-        return false; // At least one session has messages
+        return false;
       }
     }
 
-    return true; // All sessions are empty
-  }, [chatSessions, agentSessions]);
+    return true;
+  }, [chatSessions, activeSessions]);
 
-  // 🦆 SESSIONS-FIRST: Check if ANY session has unread messages (agent responded)
+  // 🦆 SESSIONS-FIRST: Check if ANY active session has unread messages (agent responded)
   const hasUnreadMessages = useMemo(() => {
     if (!chatSessions || isActive || isDormant) return false;
 
-    // Check ALL sessions for unread assistant messages
-    for (const session of agentSessions) {
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (!sessionMessages || sessionMessages.length === 0) continue;
 
@@ -335,21 +343,21 @@ function SortableAgent({
         .reverse()
         .find((msg) => msg.role === "assistant");
       if (lastAssistantMessage) {
-        return true; // At least one session has an assistant response
+        return true;
       }
     }
 
     return false;
-  }, [chatSessions, agentSessions, isActive, isDormant]);
+  }, [chatSessions, activeSessions, isActive, isDormant]);
 
-  // 🦆 SESSIONS-FIRST: Get LATEST assistant message timestamp across ALL sessions
+  // 🦆 SESSIONS-FIRST: Get LATEST assistant message timestamp across ACTIVE sessions only
+  // 🔵 FIX: Only considers non-done sessions to prevent badge from old archived responses
   const lastAssistantTimestamp = useMemo(() => {
-    if (!chatSessions || agentSessions.length === 0) return 0;
+    if (!chatSessions || activeSessions.length === 0) return 0;
 
     let latestTimestamp = 0;
 
-    // Check ALL sessions and find the most recent assistant message
-    for (const session of agentSessions) {
+    for (const session of activeSessions) {
       const sessionMessages = chatSessions.get(session.id);
       if (!sessionMessages || sessionMessages.length === 0) continue;
 
@@ -365,7 +373,7 @@ function SortableAgent({
     }
 
     return latestTimestamp;
-  }, [chatSessions, agentSessions]);
+  }, [chatSessions, activeSessions]);
 
   // 🔵 Get last read timestamp for this agent
   const lastReadTimestamp = useMemo(() => {
@@ -381,14 +389,15 @@ function SortableAgent({
   }, [isActive, isHovered, agent.color]);
 
   // 🔵 Show notification badge dot when agent has NEW unread messages (read-once system)
-  // Badge appears when: NOT active + agent responded AFTER last read
+  // Badge appears when: NOT active + has active sessions + agent responded AFTER last read
+  // 🔵 FIX: Also checks that active sessions exist with complete assistant messages
   const showNotificationBadge = useMemo(() => {
     if (isActive || isDormant) return false; // No badge when active or dormant
+    if (activeSessions.length === 0) return false; // No badge without active sessions
 
     // 🔵 TIMESTAMP COMPARISON: Badge shows ONLY if agent responded AFTER last read
-    // This creates "read-once" behavior: badge disappears when clicked, only reappears for NEW messages
     return lastAssistantTimestamp > lastReadTimestamp;
-  }, [isActive, isDormant, lastAssistantTimestamp, lastReadTimestamp]);
+  }, [isActive, isDormant, activeSessions.length, lastAssistantTimestamp, lastReadTimestamp]);
 
   // 🦆 SESSIONS-FIRST: Aggregate status from ALL sessions for TerminalActivityBar
   // Status is 'busy' if ANY session is loading, 'idle' otherwise
@@ -585,9 +594,25 @@ function SortableAgent({
     return getTimestampOpacity(relativeTime.minutes);
   }, [relativeTime]);
 
+  // Merge dnd-kit listeners but exclude icons-wrapper from drag initiation
+  const mergedListeners = useMemo(() => {
+    if (!listeners) return {};
+    return {
+      ...listeners,
+      onPointerDown: (e: React.PointerEvent) => {
+        // Don't start drag when clicking action buttons in icons-wrapper
+        const target = e.target as HTMLElement;
+        if (target.closest('.icons-wrapper')) return;
+        listeners.onPointerDown?.(e);
+      },
+    };
+  }, [listeners]);
+
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
+      {...mergedListeners}
       style={{
         ...style,
         marginBottom: "8px",
@@ -602,9 +627,6 @@ function SortableAgent({
           gap: "8px",
           position: "relative" as const,
         }}
-        draggable
-        onDragStart={handleNativeDragStart}
-        onDragEnd={handleNativeDragEnd}
       >
         {/* Agent Card - No left timing section */}
         <div
@@ -1117,6 +1139,7 @@ export default function RepositoryGroup({
   chatLoadingMap,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
   onOpenPersonality,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
@@ -1130,6 +1153,7 @@ export default function RepositoryGroup({
   >(new Map());
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [agentOrder, setAgentOrder] = useState<Record<string, string[]>>({});
+  const renderedOrderRef = useRef<Map<string, string[]>>(new Map());
   // New session modal state
   const [newSessionModalAgentId, setNewSessionModalAgentId] = useState<
     string | null
@@ -1151,13 +1175,26 @@ export default function RepositoryGroup({
     return map;
   }, [mainAgents, worktreeAgents]);
 
-  // Load active team ONLY on mount / repoPath change (not on agent list changes)
+  // Load active team on mount / repoPath change, and re-enrich when agents become available
   const buildAgentAvatarMapRef = useRef(buildAgentAvatarMap);
   buildAgentAvatarMapRef.current = buildAgentAvatarMap;
+  const agentCount = mainAgents.length + worktreeAgents.length;
+  const hasEnrichedRef = useRef(false);
+
   useEffect(() => {
+    hasEnrichedRef.current = false;
     loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]);
+
+  // Re-enrich team avatars once agents are loaded (fixes race condition on startup)
+  useEffect(() => {
+    if (agentCount > 0 && !hasEnrichedRef.current) {
+      hasEnrichedRef.current = true;
+      loadActiveTeam(repoPath, buildAgentAvatarMapRef.current());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentCount]);
 
   // 🦆 SESSIONS-FIRST: Get all sessions for aggregated status calculation
   const { sessions: allSessionsForRepo, createSession } = useSessionStore();
@@ -1215,7 +1252,7 @@ export default function RepositoryGroup({
 
   // Handle new session creation from agent card button
   const handleNewSession = useCallback(
-    async (title: string) => {
+    async (title: string, branch?: string, useWorktree?: boolean) => {
       if (!newSessionModalAgentId) return;
 
       // Find agent to get project info
@@ -1225,6 +1262,72 @@ export default function RepositoryGroup({
       if (!agent) return;
 
       try {
+        let worktreePath: string | undefined;
+
+        // 🦆 BRANCH-PER-SESSION: Handle branch operations
+        if (branch) {
+          // Check if branch already exists
+          let branchExists = false;
+          try {
+            const branches = await invoke<Array<{ name: string }>>('git_list_branches', {
+              rootPath: agent.cwd,
+            });
+            branchExists = branches.some((b) => b.name === branch);
+          } catch {
+            // If we can't list branches, assume it doesn't exist
+          }
+
+          if (useWorktree) {
+            // Check if a worktree already exists for this branch
+            let existingWorktree: string | undefined;
+            try {
+              const worktrees = await invoke<Array<{ path: string; branch: string }>>('git_list_worktrees', {
+                rootPath: agent.cwd,
+              });
+              const match = worktrees.find((w) => w.branch === branch);
+              if (match) existingWorktree = match.path;
+            } catch {
+              // If listing fails, proceed with creation
+            }
+
+            if (existingWorktree) {
+              // Reuse existing worktree
+              worktreePath = existingWorktree;
+              console.log(`[RepositoryGroup] Reusing existing worktree at ${worktreePath} for branch ${branch}`);
+            } else {
+              // Create new worktree (+ branch if new)
+              const shortId = Date.now().toString(36);
+              const safeBranch = branch.replace(/[^a-zA-Z0-9-_]/g, '-');
+              worktreePath = `${agent.cwd}/.worktrees/session-${safeBranch}-${shortId}`;
+
+              await invoke('git_add_worktree', {
+                path: worktreePath,
+                branchName: branch,
+                createBranch: !branchExists,
+                rootPath: agent.cwd,
+              });
+
+              console.log(`[RepositoryGroup] Worktree created at ${worktreePath} for branch ${branch}`);
+            }
+          } else if (!branchExists) {
+            // Create new branch without worktree (switch to it in main repo)
+            await invoke('git_create_branch', {
+              branchName: branch,
+              fromBranch: null,
+              switch: true,
+              rootPath: agent.cwd,
+            });
+            console.log(`[RepositoryGroup] Created and switched to new branch ${branch}`);
+          } else {
+            // Existing branch, no worktree — switch to it
+            await invoke('git_switch_branch', {
+              branchName: branch,
+              rootPath: agent.cwd,
+            });
+            console.log(`[RepositoryGroup] Switched to existing branch ${branch}`);
+          }
+        }
+
         const newSession = await createSession({
           title,
           agentId: newSessionModalAgentId,
@@ -1232,6 +1335,9 @@ export default function RepositoryGroup({
           projectName: displayName,
           status: "todo",
           messageCount: 0,
+          branch,
+          useWorktree,
+          worktreePath,
         });
 
         // Close modal and open the new session
@@ -1255,110 +1361,119 @@ export default function RepositoryGroup({
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
+    console.log("[DnD] dragStart - agent:", event.active.id);
     setActiveAgentId(String(event.active.id));
     // Add class to disable animations for performance
     document.body.classList.add("dragging-active");
   };
 
-  // Handle drag end
+  // Handle drag end - uses renderedOrderRef to avoid stale closure issues
   const handleDragEnd = (event: DragEndEvent) => {
-    // Remove dragging class to re-enable animations
     document.body.classList.remove("dragging-active");
 
     const { active, over } = event;
+    console.log("[DnD] dragEnd - active:", active.id, "over:", over?.id);
 
     if (!over || active.id === over.id) {
       setActiveAgentId(null);
       return;
     }
 
-    // Find which branch the agents belong to
-    const allAgents = [...mainAgents, ...worktreeAgents];
-    const activeAgent = allAgents.find((a) => a.id === active.id);
-    const overAgent = allAgents.find((a) => a.id === over.id);
+    // Find which branch contains both agents by checking rendered order
+    let targetBranch: string | null = null;
+    let currentIds: string[] = [];
 
-    if (!activeAgent || !overAgent) {
+    for (const [branch, ids] of renderedOrderRef.current.entries()) {
+      if (ids.includes(String(active.id)) && ids.includes(String(over.id))) {
+        targetBranch = branch;
+        currentIds = ids;
+        break;
+      }
+    }
+
+    if (!targetBranch || currentIds.length === 0) {
+      console.warn("[DnD] Could not find branch containing both agents");
       setActiveAgentId(null);
       return;
     }
 
-    const activeBranch = activeAgent.branch || getBranchName(activeAgent);
-    const overBranch = overAgent.branch || getBranchName(overAgent);
+    const oldIndex = currentIds.indexOf(String(active.id));
+    const newIndex = currentIds.indexOf(String(over.id));
 
-    // Only allow reordering within the same branch
-    if (activeBranch !== overBranch) {
-      setActiveAgentId(null);
-      document.body.classList.remove("dragging-active");
-      return;
-    }
-
-    // Get agents for this branch
-    const branchAgents = allAgents.filter((a) => {
-      const branch = a.branch || getBranchName(a);
-      return branch === activeBranch;
-    });
-
-    // Apply custom order or use default
-    const orderKey = `${activeBranch}-${activeAgent.worktreePath ? "worktree" : "main"}`;
-    const currentOrder = agentOrder[orderKey] || branchAgents.map((a) => a.id);
-
-    const oldIndex = currentOrder.indexOf(String(active.id));
-    const newIndex = currentOrder.indexOf(String(over.id));
+    console.log("[DnD] branch:", targetBranch, "oldIndex:", oldIndex, "newIndex:", newIndex);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      const newOrder = arrayMove(currentIds, oldIndex, newIndex);
+      const orderKey = `${targetBranch}-main`;
       const updatedOrder = { ...agentOrder, [orderKey]: newOrder };
       setAgentOrder(updatedOrder);
       saveOrder(updatedOrder);
+      console.log("[DnD] Order saved:", orderKey, newOrder);
     }
 
     setActiveAgentId(null);
   };
 
-  // Sort agents by last ASSISTANT message timestamp - most recent first (NO DRAG-AND-DROP)
-  const applyCustomOrder = useCallback(
-    (agents: TerminalInfo[], branchName: string) => {
-      // Get last ASSISTANT message timestamp (only when agent RESPONDS, not when user sends!)
-      const getLastAssistantMessageTimestamp = (
-        agent: TerminalInfo,
-      ): number => {
-        if (!chatSessions) return 0;
-        const messages = chatSessions.get(agent.id);
-        if (!messages || messages.length === 0) return 0;
+  // Get last ASSISTANT message timestamp for an agent
+  const getLastAssistantTimestamp = useCallback(
+    (agent: TerminalInfo): number => {
+      if (!chatSessions) return 0;
+      const messages = chatSessions.get(agent.id);
+      if (!messages || messages.length === 0) return 0;
 
-        // Find LAST assistant message (when the agent responds, not when user sends)
-        const lastAssistantMessage = [...messages]
-          .reverse()
-          .find((msg) => msg.role === "assistant");
+      const lastAssistantMsg = [...messages]
+        .reverse()
+        .find((msg) => msg.role === "assistant");
 
-        if (!lastAssistantMessage?.timestamp) return 0;
-
-        // console.log(`[SORT] ${agent.label} - last assistant msg timestamp: ${lastAssistantMessage.timestamp}`); // Performance: Disabled logging
-        return lastAssistantMessage.timestamp;
-      };
-
-      // Simple sort: most recent ASSISTANT message first (sorting happens when agent RESPONDS)
-      const sorted = [...agents].sort((a, b) => {
-        const timestampA = getLastAssistantMessageTimestamp(a);
-        const timestampB = getLastAssistantMessageTimestamp(b);
-
-        // If both have assistant messages, sort by timestamp (most recent first)
-        if (timestampA > 0 && timestampB > 0) {
-          return timestampB - timestampA;
-        }
-
-        // Agents with assistant messages come before agents without
-        if (timestampA > 0) return -1;
-        if (timestampB > 0) return 1;
-
-        // Both empty - maintain original order
-        return 0;
-      });
-
-      // console.log(`[SORT] Branch ${branchName} sorted order:`, sorted.map(a => `${a.label} (${getLastAssistantMessageTimestamp(a)})`)); // Performance: Disabled logging
-      return sorted;
+      return lastAssistantMsg?.timestamp ?? 0;
     },
     [chatSessions],
+  );
+
+  // Sort agents by timestamp - most recent assistant response first
+  const sortByTimestamp = useCallback(
+    (agents: TerminalInfo[]): TerminalInfo[] => {
+      return [...agents].sort((a, b) => {
+        const tsA = getLastAssistantTimestamp(a);
+        const tsB = getLastAssistantTimestamp(b);
+
+        if (tsA > 0 && tsB > 0) return tsB - tsA;
+        if (tsA > 0) return -1;
+        if (tsB > 0) return 1;
+        return 0;
+      });
+    },
+    [getLastAssistantTimestamp],
+  );
+
+  // Apply saved manual drag order if exists, otherwise fall back to timestamp sort
+  const applyCustomOrder = useCallback(
+    (agents: TerminalInfo[], branchName: string) => {
+      const orderKey = `${branchName}-main`;
+      const savedOrder = agentOrder[orderKey];
+
+      // No manual order saved — fall back to timestamp sorting
+      if (!savedOrder || savedOrder.length === 0) {
+        return sortByTimestamp(agents);
+      }
+
+      // Split agents into those in saved order vs new ones
+      const agentMap = new Map(agents.map((a) => [a.id, a]));
+      const ordered: TerminalInfo[] = [];
+
+      for (const id of savedOrder) {
+        const agent = agentMap.get(id);
+        if (agent) {
+          ordered.push(agent);
+          agentMap.delete(id);
+        }
+      }
+
+      // Append NEW agents (not in saved order), sorted by timestamp
+      const newAgents = sortByTimestamp([...agentMap.values()]);
+      return [...ordered, ...newAgents];
+    },
+    [agentOrder, sortByTimestamp],
   );
 
   // Helper to generate PR URL - Memoized for performance
@@ -1650,7 +1765,7 @@ export default function RepositoryGroup({
           e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)";
         }}
       >
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full flex-col gap-1">
           <div className="flex items-center gap-2">
             {/* Chevron - click to toggle collapse */}
             <button
@@ -1704,9 +1819,19 @@ export default function RepositoryGroup({
             </span>
           </div>
 
-          {/* Action buttons - consistent style */}
+          {/* Action buttons - hidden by default, revealed on hover */}
           <div
-            style={{ display: "flex", alignItems: "center", gap: "2px" }}
+            className="repo-action-row"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "2px",
+              paddingLeft: "24px",
+              maxHeight: 0,
+              overflow: "hidden",
+              opacity: 0,
+              transition: "max-height 0.2s ease, opacity 0.15s ease",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Copy Path button */}
@@ -1941,6 +2066,8 @@ export default function RepositoryGroup({
           >
             {sortedBranches.map(([branchName, agents]) => {
               const orderedAgents = applyCustomOrder(agents, branchName);
+              // Track rendered order for drag handler
+              renderedOrderRef.current.set(branchName, orderedAgents.map(a => a.id));
 
               return (
                 <div
@@ -1948,59 +2075,7 @@ export default function RepositoryGroup({
                   className="branch-group relative"
                   style={{ marginBottom: "24px" }}
                 >
-                  {/* Branch Header */}
-                  <div
-                    className="branch-header mb-3"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginLeft: "32px",
-                    }}
-                  >
-                    <span
-                      className="text-white/60 font-mono"
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        fontFamily:
-                          "'SF Mono', 'Monaco', 'Consolas', monospace",
-                      }}
-                    >
-                      {branchName} ({agents.length} agent
-                      {agents.length !== 1 ? "s" : ""})
-                    </span>
-                    {/* Modified Files Badge - Clickable to open Git Panel */}
-                    {(branchModifiedFiles.get(branchName) || 0) > 0 && (
-                      <div
-                        className="modified-files-badge"
-                        title={`${branchModifiedFiles.get(branchName)} files to commit - Click to open Git Panel`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onOpenGitPanel) onOpenGitPanel();
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#d97706"; // Darker orange on hover
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#f59e0b"; // Back to amber
-                        }}
-                        style={{
-                          background: "#f59e0b",
-                          color: "#fff",
-                          borderRadius: "8px",
-                          padding: "1px 6px",
-                          fontSize: "9px",
-                          fontWeight: 600,
-                          cursor: "pointer", // Changed from 'default' to 'pointer'
-                          userSelect: "none",
-                          transition: "background 0.2s ease",
-                        }}
-                      >
-                        {branchModifiedFiles.get(branchName)}
-                      </div>
-                    )}
-                  </div>
+                  {/* Branch is now shown per-session, not per-agent group */}
 
                   {/* Agents in this branch with Sortable Context */}
                   <SortableContext
@@ -2065,8 +2140,10 @@ export default function RepositoryGroup({
                             <AgentSessionList
                               agentId={agent.id}
                               agentColor={agent.color}
+                              agentBranch={agent.branch}
                               onSessionClick={onSessionClick}
                               activeSessionId={activeSessionId}
+                              onActiveSessionDone={onActiveSessionDone}
                             />
                           </div>
                         )}
@@ -2161,59 +2238,7 @@ export default function RepositoryGroup({
                       className="branch-group relative"
                       style={{ marginBottom: "24px" }}
                     >
-                      {/* Branch Header */}
-                      <div
-                        className="branch-header mb-3"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          marginLeft: "32px",
-                        }}
-                      >
-                        <span
-                          className="text-white/60 font-mono"
-                          style={{
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            fontFamily:
-                              "'SF Mono', 'Monaco', 'Consolas', monospace",
-                          }}
-                        >
-                          {branchName} ({agents.length} agent
-                          {agents.length !== 1 ? "s" : ""})
-                        </span>
-                        {/* Modified Files Badge - Clickable to open Git Panel */}
-                        {(branchModifiedFiles.get(branchName) || 0) > 0 && (
-                          <div
-                            className="modified-files-badge"
-                            title={`${branchModifiedFiles.get(branchName)} files to commit - Click to open Git Panel`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onOpenGitPanel) onOpenGitPanel();
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "#d97706"; // Darker orange on hover
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "#f59e0b"; // Back to amber
-                            }}
-                            style={{
-                              background: "#f59e0b",
-                              color: "#fff",
-                              borderRadius: "8px",
-                              padding: "1px 6px",
-                              fontSize: "9px",
-                              fontWeight: 600,
-                              cursor: "pointer", // Changed from 'default' to 'pointer'
-                              userSelect: "none",
-                              transition: "background 0.2s ease",
-                            }}
-                          >
-                            {branchModifiedFiles.get(branchName)}
-                          </div>
-                        )}
-                      </div>
+                      {/* Branch is now shown per-session, not per-agent group */}
 
                       {/* Worktree Agents */}
                       {agents.map((agent) => {
@@ -2237,17 +2262,18 @@ export default function RepositoryGroup({
                           return !messages || messages.length === 0;
                         })();
 
-                        // 🦆 FIX: Check if agent is dormant based on SESSIONS (not agent.id)
-                        // Agent is dormant if NO session has an assistant response
+                        // 🔵 FIX: Filter to active (non-done) sessions only for badge calculations
+                        const activeSessionsWorktree =
+                          allSessionsForRepo.filter(
+                            (s) => s.agentId === agent.id && s.status !== "done",
+                          );
+
+                        // 🦆 FIX: Check if agent is dormant based on ACTIVE SESSIONS only
                         const isDormantWorktree = (() => {
                           if (!chatSessions) return true;
-                          const agentSessionsForDormant =
-                            allSessionsForRepo.filter(
-                              (s) => s.agentId === agent.id,
-                            );
-                          if (agentSessionsForDormant.length === 0) return true;
+                          if (activeSessionsWorktree.length === 0) return true;
 
-                          for (const session of agentSessionsForDormant) {
+                          for (const session of activeSessionsWorktree) {
                             const sessionMessages = chatSessions.get(
                               session.id,
                             );
@@ -2257,26 +2283,20 @@ export default function RepositoryGroup({
                                 (msg) => msg.role === "assistant",
                               )
                             ) {
-                              return false; // At least one session has assistant response = not dormant
+                              return false;
                             }
                           }
                           return true;
                         })();
-                        // Keep backward compat variable name
                         const isDormant = isDormantWorktree;
 
-                        // 🦆 FIX: Check if agent has unread messages based on SESSIONS
+                        // 🦆 FIX: Check if agent has unread messages based on ACTIVE SESSIONS
                         const hasUnreadMessagesWorktree = (() => {
                           if (!chatSessions || isActive) return false;
-                          const agentSessionsForUnread =
-                            allSessionsForRepo.filter(
-                              (s) => s.agentId === agent.id,
-                            );
-                          if (agentSessionsForUnread.length === 0) return false;
+                          if (activeSessionsWorktree.length === 0) return false;
                           if (isDormantWorktree) return false;
 
-                          // Check if ANY session has unread (last message is assistant and complete)
-                          for (const session of agentSessionsForUnread) {
+                          for (const session of activeSessionsWorktree) {
                             const sessionMessages = chatSessions.get(
                               session.id,
                             );
@@ -2295,15 +2315,21 @@ export default function RepositoryGroup({
                           return false;
                         })();
 
-                        // Calculate last assistant timestamp for worktree agents (same as SortableAgent)
+                        // 🔵 FIX: Calculate last assistant timestamp from ACTIVE sessions only
                         const lastAssistantTimestamp = (() => {
-                          if (!chatSessions) return 0;
-                          const messages = chatSessions.get(agent.id);
-                          if (!messages || messages.length === 0) return 0;
-                          const lastAssistantMessage = [...messages]
-                            .reverse()
-                            .find((msg) => msg.role === "assistant");
-                          return lastAssistantMessage?.timestamp || 0;
+                          if (!chatSessions || activeSessionsWorktree.length === 0) return 0;
+                          let latest = 0;
+                          for (const session of activeSessionsWorktree) {
+                            const sessionMessages = chatSessions.get(session.id);
+                            if (!sessionMessages || sessionMessages.length === 0) continue;
+                            const lastAssistantMsg = [...sessionMessages]
+                              .reverse()
+                              .find((msg) => msg.role === "assistant");
+                            if (lastAssistantMsg?.timestamp) {
+                              latest = Math.max(latest, lastAssistantMsg.timestamp);
+                            }
+                          }
+                          return latest;
                         })();
 
                         // 🔵 Show notification badge dot for worktree agents (read-once system)
@@ -2312,6 +2338,7 @@ export default function RepositoryGroup({
                         const showNotificationBadge =
                           !isActive &&
                           !isDormant &&
+                          activeSessionsWorktree.length > 0 &&
                           lastAssistantTimestamp > lastReadTimestamp;
 
                         // Determine if conversation is active and if agent is busy (worktree)
@@ -3112,6 +3139,14 @@ export default function RepositoryGroup({
             ? [...mainAgents, ...worktreeAgents].find(
                 (a) => a.id === newSessionModalAgentId,
               )?.label
+            : undefined
+        }
+        projectPath={repoPath}
+        defaultBranch={
+          newSessionModalAgentId
+            ? [...mainAgents, ...worktreeAgents].find(
+                (a) => a.id === newSessionModalAgentId,
+              )?.branch
             : undefined
         }
       />

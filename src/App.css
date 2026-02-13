@@ -949,7 +949,7 @@ button.directory-chooser:disabled {
   overflow: auto;
 }
 
-/* Fix embedded preview - ensure full height for Monaco Editor */
+/* Fix embedded preview - ensure full height for code editor */
 .file-preview-container {
   display: flex;
   flex-direction: column;
@@ -977,14 +977,14 @@ button.directory-chooser:disabled {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0; /* Remove padding in embedded mode for full Monaco Editor height */
+  padding: 0; /* Remove padding in embedded mode for full editor height */
   overflow: hidden; /* CRITICAL: Prevent double scrollbar - editor has its own scrollbar */
 }
 
 .preview-embedded .editor-container {
   flex: 1;
   min-height: 0;
-  height: 100%; /* CRITICAL: Monaco Editor needs explicit height to render */
+  height: 100%; /* CRITICAL: Code editor needs explicit height to render */
   overflow: hidden; /* Ensure editor container doesn't create extra scrollbar */
 }
 
@@ -4234,42 +4234,7 @@ button.directory-chooser:disabled {
   flex-direction: column;
 }
 
-/* Decorazioni Monaco Editor per diff */
-.diff-line-added {
-  background: rgba(74, 222, 128, 0.12);
-  border-left: 3px solid #4ade80;
-}
-
-.diff-line-deleted {
-  background: rgba(248, 113, 113, 0.12);
-  border-left: 3px solid #f87171;
-}
-
-.diff-line-modified {
-  background: rgba(251, 191, 36, 0.12);
-  border-left: 3px solid #fbbf24;
-}
-
-.diff-glyph-added::before {
-  content: "+";
-  color: #4ade80;
-  font-weight: bold;
-  margin-left: 4px;
-}
-
-.diff-glyph-deleted::before {
-  content: "−";
-  color: #f87171;
-  font-weight: bold;
-  margin-left: 4px;
-}
-
-.diff-glyph-modified::before {
-  content: "~";
-  color: #fbbf24;
-  font-weight: bold;
-  margin-left: 4px;
-}
+/* Diff decorations are now handled by CodeMirror (cm-line-added, cm-line-modified, cm-line-removed) */
 
 .preview-action.active {
   background: rgba(var(--accent-rgb), 0.2);

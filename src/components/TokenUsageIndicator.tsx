@@ -63,22 +63,22 @@ function TokenUsageIndicator({
   const clearHistory = () => {};
   const exportHistory = () => '';
 
-  // Total context = messages + overhead (dynamic or default)
-  // The overhead is calculated per-project based on CLAUDE.md files and MCP servers
-  const messageTokens = inputTokens + outputTokens;
-  const totalContextUsage = messageTokens + overhead;
+  // With the new tracking model, inputTokens from SDK = full context window input
+  // (already includes system + tools + all messages). Overhead is included in inputTokens.
+  // Total context usage = inputTokens + auto-compact reserve
+  const totalContextUsage = inputTokens + AUTO_COMPACT_COST;
 
-  // Calculate usage percentage based on total context (not just messages)
+  // Calculate usage percentage based on total context
   const usagePercentage = (totalContextUsage / maxTokens) * 100;
 
-  // NEW STAMINA LOGIC: Based on FREE tokens (usable space)
-  // maxUsableTokens = space available for messages (excluding overhead + auto-compact)
-  const maxUsableTokens = maxTokens - overhead - AUTO_COMPACT_COST;
-  const remainingUsableTokens = Math.max(0, maxUsableTokens - messageTokens);
+  // STAMINA LOGIC: Based on FREE tokens (usable space)
+  // maxUsableTokens = total context minus auto-compact reserve
+  const maxUsableTokens = maxTokens - AUTO_COMPACT_COST;
+  const remainingUsableTokens = Math.max(0, maxUsableTokens - inputTokens);
 
   // Stamina = percentage of usable space remaining
-  // Fresh agent (0 messages): 100%
-  // Fully used (maxUsableTokens messages): 0%
+  // Fresh agent (0 input tokens): 100%
+  // Context window full: 0%
   const staminaPercentage = Math.max(0, Math.min(100, (remainingUsableTokens / maxUsableTokens) * 100));
 
   // Debug logging (disabled for performance)

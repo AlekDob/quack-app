@@ -7,7 +7,7 @@ import type { Tab } from './TabBar';
 import './TabPopoutWindowApp.css';
 
 // Lazy load components to match main app tab views
-const CodeEditor = lazy(() => import('./CodeEditorMonaco'));
+const CodeEditor = lazy(() => import('./CodeEditorCodeMirror'));
 const DocsViewer = lazy(() => import('./docs/DocsViewer'));
 const SkillViewer = lazy(() => import('./SkillViewer'));
 const AgentViewer = lazy(() => import('./AgentViewer'));
@@ -269,7 +269,6 @@ const TabPopoutWindowApp: React.FC = () => {
               readOnly={false}
               onChange={handleContentChange}
               onSave={handleSaveFile}
-              showMinimap={true}
             />
           </Suspense>
         );

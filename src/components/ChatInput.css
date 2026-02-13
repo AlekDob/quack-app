@@ -286,6 +286,43 @@
   flex-shrink: 0;
 }
 
+/* IDE context chip */
+.chat-input-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: rgba(74, 158, 255, 0.12);
+  border: 1px solid rgba(74, 158, 255, 0.25);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
+  color: rgba(74, 158, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.chat-input-context-chip:hover {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: rgba(74, 158, 255, 0.4);
+}
+
+.chat-input-context-chip--disabled {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.chat-input-context-chip--disabled:hover {
+  opacity: 0.7;
+}
+
+.chat-input-context-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
 
 /* Loading state */
 .mention-loading {

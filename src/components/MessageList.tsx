@@ -35,12 +35,15 @@ interface MessageListProps {
   // Plan approval
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  // Teammate stream drill-down
+  onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality, pendingPlanApprovalIds, onPlanApprovalResponse }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
+  const userHasScrolledUpRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showScrollToTopButton, setShowScrollToTopButton] = useState(false);
 
@@ -60,12 +63,21 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     const isAtBottom = checkIfAtBottom();
     setShowScrollButton(!isAtBottom);
 
+    // Track if user scrolled away from bottom during streaming
+    if (loading) {
+      if (!isAtBottom) {
+        userHasScrolledUpRef.current = true;
+      } else {
+        userHasScrolledUpRef.current = false;
+      }
+    }
+
     // Show "scroll to top" (previous user message) button when:
     // 1. Not at bottom (scrolled up in conversation)
     // 2. There are user messages to navigate to
     const hasUserMessages = messages.some(m => m.role === 'user');
     setShowScrollToTopButton(!isAtBottom && hasUserMessages);
-  }, [checkIfAtBottom, messages]);
+  }, [checkIfAtBottom, messages, loading]);
 
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -177,12 +189,15 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
       // Always scroll to bottom when session is hydrated (loaded from disk)
       shouldAutoScroll = true;
     } else if (hasNewMessage) {
+      // Reset scroll lock when user sends a new message
+      if (lastMessage?.role === 'user') {
+        userHasScrolledUpRef.current = false;
+      }
       // Always auto-scroll for user messages or if already at bottom
       shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
     } else if (loading) {
-      // During streaming, ALWAYS scroll to keep up with new content
-      // This ensures we see Claude's response as it types
-      shouldAutoScroll = true;
+      // During streaming, only auto-scroll if user hasn't scrolled up
+      shouldAutoScroll = !userHasScrolledUpRef.current && isAtBottom;
     }
 
     if (shouldAutoScroll) {
@@ -200,6 +215,13 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
 
     prevMessagesLengthRef.current = messages.length;
   }, [messages, loading, checkIfAtBottom]);
+
+  // Reset scroll lock when streaming ends
+  useEffect(() => {
+    if (!loading) {
+      userHasScrolledUpRef.current = false;
+    }
+  }, [loading]);
 
   // Find the last user message
   const lastUserMessageIndex = messages.reduce((lastIndex, msg, index) => {
@@ -243,6 +265,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
                 onOpenImageTab={onOpenImageTab}
                 pendingPlanApprovalIds={pendingPlanApprovalIds}
                 onPlanApprovalResponse={onPlanApprovalResponse}
+                onTeammateDrillDown={onTeammateDrillDown}
               />
             </div>
         ))}

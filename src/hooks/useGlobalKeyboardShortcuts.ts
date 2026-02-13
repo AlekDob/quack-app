@@ -30,9 +30,8 @@ const isEditableElement = (target: EventTarget | null): boolean => {
   // Check for contenteditable
   if (target.isContentEditable) return true;
 
-  // Check for Monaco editor or CodeMirror
+  // Check for CodeMirror or xterm
   if (
-    target.closest(".monaco-editor") ||
     target.closest(".cm-editor") ||
     target.closest(".xterm")
   ) {

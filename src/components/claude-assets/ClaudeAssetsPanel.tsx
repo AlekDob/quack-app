@@ -29,9 +29,9 @@ interface ClaudeAssetsPanelProps {
   projectPaths: string[];
   initialProjectPath?: string; // Pre-select this project when opening
   onOpenFile?: (path: string) => void;
-  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean) => void;
-  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean) => void;
-  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean) => void;
+  onSelectCommand?: (commandName: string, commandScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
+  onSelectRule?: (ruleName: string, ruleScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
+  onSelectDroid?: (agentName: string, agentScope: 'global' | 'project', isNew?: boolean, filePath?: string) => void;
 }
 
 // Asset type labels - icons rendered as SVG
@@ -292,21 +292,21 @@ export default function ClaudeAssetsPanel({ projectPaths, initialProjectPath, on
     const isGlobal = asset.projectName === 'global' || asset.path.match(/\/Users\/[^/]+\/\./);
     const scope: 'global' | 'project' = isGlobal ? 'global' : 'project';
 
-    // For droids/agents, open in dedicated tab
+    // For droids/agents, open in IDE or dedicated tab
     if (asset.type === 'droid' && onSelectDroid) {
-      onSelectDroid(asset.name, scope);
+      onSelectDroid(asset.name, scope, false, asset.path);
       return;
     }
 
-    // For commands, open in dedicated tab
+    // For commands, open in IDE or dedicated tab
     if (asset.type === 'command' && onSelectCommand) {
-      onSelectCommand(asset.name, scope);
+      onSelectCommand(asset.name, scope, false, asset.path);
       return;
     }
 
-    // For rules, open in dedicated tab
+    // For rules, open in IDE or dedicated tab
     if (asset.type === 'rule' && onSelectRule) {
-      onSelectRule(asset.name, scope);
+      onSelectRule(asset.name, scope, false, asset.path);
       return;
     }
 

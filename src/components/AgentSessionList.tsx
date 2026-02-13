@@ -212,8 +212,11 @@ function RenameSessionDialog({
 interface AgentSessionListProps {
   agentId: string;
   agentColor?: string;
+  agentBranch?: string;
   onSessionClick: (sessionId: string) => void;
   activeSessionId?: string;
+  /** Called when the active session is marked as done (to navigate back to agent view) */
+  onActiveSessionDone?: () => void;
 }
 
 /**
@@ -225,8 +228,10 @@ interface AgentSessionListProps {
 function AgentSessionList({
   agentId,
   agentColor = '#00D4FF',
+  agentBranch,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
 }: AgentSessionListProps) {
   const [showAll, setShowAll] = useState(false);
   const [deleteDialogSession, setDeleteDialogSession] = useState<{ id: string; title: string } | null>(null);
@@ -252,7 +257,11 @@ function AgentSessionList({
   // Handle marking session as done
   const handleMarkDone = useCallback((sessionId: string) => {
     updateSession(sessionId, { status: 'done', completedAt: Date.now() });
-  }, [updateSession]);
+    // Navigate back to agent view if the completed session was active
+    if (sessionId === activeSessionId && onActiveSessionDone) {
+      onActiveSessionDone();
+    }
+  }, [updateSession, activeSessionId, onActiveSessionDone]);
 
   // Handle delete session (shows confirmation dialog)
   const handleDeleteRequest = useCallback((sessionId: string) => {
@@ -307,33 +316,87 @@ function AgentSessionList({
     );
   }
 
+  // Group sessions by branch (session.branch > agentBranch > 'main')
+  const sessionsByBranch = visibleSessions.reduce<Record<string, typeof visibleSessions>>((acc, session) => {
+    const branch = session.branch || agentBranch || 'main';
+    if (!acc[branch]) acc[branch] = [];
+    acc[branch].push(session);
+    return acc;
+  }, {});
+
+  const branchNames = Object.keys(sessionsByBranch);
+
   return (
     <div style={{ marginTop: '4px' }}>
-      {/* Session list */}
-      {visibleSessions.map((session, index) => {
-        const isLoadingForSession = chatLoadingMap.get(session.id) ?? false;
-        // 🦆 FIX: Check pending questions using session.id (the sessionKey from the event)
-        // pendingQuestionsMap is now keyed by sessionId (not agentId) to show "?" only on the correct session
-        const pendingQuestionsSet = pendingQuestionsMap.get(session.id);
-        const hasPendingQuestion = pendingQuestionsSet ? pendingQuestionsSet.size > 0 : false;
-        const isLast = index === visibleSessions.length - 1;
+      {/* Sessions grouped by branch */}
+      {branchNames.map((branchName) => {
+        const branchSessions = sessionsByBranch[branchName];
         return (
-          <AgentSessionItem
-            key={session.id}
-            session={session}
-            onClick={onSessionClick}
-            isActive={session.id === activeSessionId}
-            agentColor={agentColor}
-            isLast={isLast}
-            // 🦆 SESSIONS-FIRST: Pass chat data for activity indicators
-            chatMessages={chatSessions.get(session.id) || []}
-            isLoading={isLoadingForSession}
-            hasPendingQuestion={hasPendingQuestion}
-            // Context menu callbacks
-            onMarkDone={handleMarkDone}
-            onDelete={handleDeleteRequest}
-            onRename={handleRenameRequest}
-          />
+          <div key={branchName} style={{ marginBottom: '2px' }}>
+            {/* Branch sub-header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '2px 8px 2px 20px',
+                marginBottom: '1px',
+              }}
+            >
+              {/* Git branch icon */}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                stroke="rgba(255, 255, 255, 0.35)" strokeWidth="2" strokeLinecap="round">
+                <line x1="6" y1="3" x2="6" y2="15" />
+                <circle cx="18" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <path d="M18 9a9 9 0 0 1-9 9" />
+              </svg>
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  fontWeight: 500,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {branchName}
+              </span>
+              <span
+                style={{
+                  fontSize: '8px',
+                  color: 'rgba(255, 255, 255, 0.2)',
+                }}
+              >
+                ({branchSessions.length})
+              </span>
+            </div>
+            {/* Sessions in this branch */}
+            {branchSessions.map((session, index) => {
+              const isLoadingForSession = chatLoadingMap.get(session.id) ?? false;
+              const pendingQuestionsSet = pendingQuestionsMap.get(session.id);
+              const hasPendingQuestion = pendingQuestionsSet ? pendingQuestionsSet.size > 0 : false;
+              const isLast = index === branchSessions.length - 1
+                && branchName === branchNames[branchNames.length - 1];
+              return (
+                <AgentSessionItem
+                  key={session.id}
+                  session={session}
+                  onClick={onSessionClick}
+                  isActive={session.id === activeSessionId}
+                  agentColor={agentColor}
+                  isLast={isLast}
+                  chatMessages={chatSessions.get(session.id) || []}
+                  isLoading={isLoadingForSession}
+                  hasPendingQuestion={hasPendingQuestion}
+                  onMarkDone={handleMarkDone}
+                  onDelete={handleDeleteRequest}
+                  onRename={handleRenameRequest}
+                  agentBranch={agentBranch}
+                />
+              );
+            })}
+          </div>
         );
       })}
 

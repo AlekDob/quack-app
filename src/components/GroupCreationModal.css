@@ -1,0 +1,370 @@
+/**
+ * GroupCreationModal Styles
+ *
+ * Modal for creating project groups.
+ * Follows Quack's glassmorphism design patterns - matches NewSessionModal.css exactly.
+ */
+
+/* Backdrop */
+.group-creation-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal */
+.group-creation-modal {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(26, 26, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Header */
+.group-creation-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.group-creation-modal-header h2 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.group-creation-modal-close {
+  margin-left: auto;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.group-creation-modal-close:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Content */
+.group-creation-modal-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.group-creation-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.group-creation-form-field label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.group-creation-optional {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.group-creation-form-field input[type="text"] {
+  padding: 0.625rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  transition: all 0.15s ease;
+}
+
+.group-creation-form-field input[type="text"]::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.group-creation-form-field input[type="text"]:focus {
+  outline: none;
+  border-color: rgba(0, 212, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.group-creation-form-field textarea {
+  padding: 0.625rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  transition: all 0.15s ease;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.group-creation-form-field textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.group-creation-form-field textarea:focus {
+  outline: none;
+  border-color: rgba(0, 212, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Project List */
+.group-creation-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.group-creation-project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.15s ease;
+}
+
+.group-creation-project-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.group-creation-project-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.group-creation-project-checkbox.selected {
+  border-width: 2px;
+}
+
+.group-creation-project-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.group-creation-project-color {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.group-creation-project-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.group-creation-project-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-creation-project-path {
+  font-size: 0.65rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-creation-role-input {
+  width: 90px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.group-creation-role-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.group-creation-role-input:focus {
+  outline: none;
+  border-color: rgba(255, 107, 53, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.group-creation-error {
+  font-size: 0.7rem;
+  color: rgba(231, 76, 60, 0.9);
+  background: rgba(231, 76, 60, 0.1);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+/* Color Picker */
+.group-creation-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.group-creation-color-option {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  position: relative;
+}
+
+.group-creation-color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.group-creation-color-option.selected {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+/* Footer */
+.group-creation-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Buttons */
+.group-creation-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.group-creation-button.secondary {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.group-creation-button.secondary:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.group-creation-button.primary {
+  background: rgba(255, 107, 53, 0.2);
+  color: rgba(255, 107, 53, 0.95);
+  border: 1px solid rgba(255, 107, 53, 0.3);
+}
+
+.group-creation-button.primary:hover {
+  background: rgba(255, 107, 53, 0.3);
+  border-color: rgba(255, 107, 53, 0.5);
+}
+
+.group-creation-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Spinner */
+.group-creation-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 107, 53, 0.3);
+  border-top-color: rgba(255, 107, 53, 0.9);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

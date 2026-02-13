@@ -30,6 +30,7 @@ mod personality;
 mod plugins;
 mod prerequisites; // ✅ Prerequisites checker (Git, Node.js, Claude CLI)
 mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
+mod groups; // 📂 Project Grouping (multi-project awareness, cross-project CLAUDE.md)
 mod preferences;
 mod preview;
 mod proxy;
@@ -48,6 +49,7 @@ mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
 mod git_watcher; // 🔀 Git branch change watcher
+mod teammate_watcher; // 👥 Teammate session stream watcher
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -573,6 +575,7 @@ pub fn run() {
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
         .manage(git_watcher::GitBranchWatcherManager::new()) // Register git branch watcher manager
+        .manage(teammate_watcher::TeammateSessionWatcher::new()) // Register teammate session watcher
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -930,6 +933,8 @@ pub fn run() {
             ide_integration::open_folder_in_ide,
             ide_integration::get_installed_apps,
             ide_integration::open_in_app,
+            ide_integration::discover_ide_instances,
+            ide_integration::get_ide_context,
             git::git_status_summary,
             git::git_diff,
             git::git_stage,
@@ -963,6 +968,8 @@ pub fn run() {
             git::git_init,
             prerequisites::check_prerequisites,
             prerequisites::install_claude_cli,
+            prerequisites::install_xcode_cli_tools,
+            prerequisites::open_claude_install_terminal,
             prerequisites::check_claude_auth_status,
             prerequisites::open_claude_login_terminal,
             preview::create_preview_webview,
@@ -1084,6 +1091,14 @@ pub fn run() {
             teams::create_team,
             teams::disband_team,
             teams::get_active_team,
+            // 📂 Project Grouping commands
+            groups::create_group,
+            groups::list_groups,
+            groups::get_group,
+            groups::update_group,
+            groups::delete_group,
+            groups::get_group_for_project,
+            groups::sync_group_contexts,
             sessions::list_sessions,
             sessions::get_session_info,
             sessions::get_all_sessions_info,
@@ -1133,6 +1148,10 @@ pub fn run() {
             git_watcher::start_git_branch_watcher,
             git_watcher::stop_git_branch_watcher,
             git_watcher::stop_all_git_branch_watchers,
+            // 👥 Teammate Session Watcher commands
+            teammate_watcher::start_teammate_watcher,
+            teammate_watcher::stop_teammate_watcher,
+            teammate_watcher::read_teammate_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

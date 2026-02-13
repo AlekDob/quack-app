@@ -301,6 +301,8 @@ interface StreamMessageProps {
   // Plan approval
   pendingPlanApprovalIds?: Set<string>; // Request IDs with pending plan approvals
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  // Teammate stream drill-down
+  onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -321,6 +323,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   onOpenImageTab,
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
+  onTeammateDrillDown,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -363,8 +366,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     };
   }, [agentAvatar]);
 
-  // Reactive subscription to active team (avoids getState() in render)
+  // Reactive subscriptions to team state (avoids getState() in render)
   const activeTeam = useTeamStore((s) => s.activeTeam);
+  const teammateStatus = useTeamStore((s) => s.teammateStatus);
 
   // Build a map of tool results for quick lookup
   const toolResults = useMemo(() => {
@@ -522,6 +526,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             taskText.includes(m.name.toLowerCase())
           );
           if (matchedMember) {
+            const teammateState = teammateStatus.get(matchedMember.name);
             return (
               <TeammateWidget
                 key={idx}
@@ -531,6 +536,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
                 action={toolResult ? 'stop' : 'start'}
                 avatar={matchedMember.avatar}
                 color={matchedMember.color}
+                sessionId={teammateState?.sessionId}
+                onDrillDown={onTeammateDrillDown}
               />
             );
           }
@@ -801,6 +808,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             action={eventAction || 'start'}
             avatar={matchedMember.avatar}
             color={matchedMember.color}
+            sessionId={agentEvent.session_id}
+            onDrillDown={onTeammateDrillDown}
           />
         );
       }

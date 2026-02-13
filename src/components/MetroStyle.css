@@ -1,6 +1,23 @@
 /* Metro-Style Visual System - Ultra Minimal Design */
 /* Inspired by Moscow Metro Map - Clean, Simple, Effective */
 
+/* Group Header Hover Actions */
+.sidebar-group-header:hover .group-header-actions {
+  opacity: 1 !important;
+}
+
+.sidebar-group-header:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.group-header-actions button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.group-header-actions button:hover svg {
+  stroke: rgba(255, 107, 53, 0.9) !important;
+}
+
 /* Repository Group Base Styling */
 .repository-group {
   margin-bottom: 16px;
@@ -13,7 +30,19 @@
   position: relative;
 }
 
-/* Hide action buttons by default, show on hover */
+/* Hide action row by default, expand on hover */
+.repository-header .repo-action-row {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.15s ease;
+}
+
+.repository-header:hover .repo-action-row {
+  max-height: 40px !important;
+  opacity: 1 !important;
+}
+
 .repository-header .repo-action-btn {
   opacity: 0;
   transition: opacity 0.15s ease;

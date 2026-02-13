@@ -66,9 +66,11 @@ interface ChatMessageProps {
   // Plan approval
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  // Teammate stream drill-down
+  onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -463,6 +465,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 onRewindFiles={onRewindFiles}
                 pendingPlanApprovalIds={pendingPlanApprovalIds}
                 onPlanApprovalResponse={onPlanApprovalResponse}
+                onTeammateDrillDown={onTeammateDrillDown}
               />
             ))}
           </div>

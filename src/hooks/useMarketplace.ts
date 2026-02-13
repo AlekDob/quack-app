@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { homeDir } from '@tauri-apps/api/path';
+import { homeDir, join } from '@tauri-apps/api/path';
 import type { MarketplaceResource, MarketplaceCategory, MarketplaceFilters, MarketplaceLibrary, AgentTemplate } from '../types';
 import { createAgent, type UnifiedAgent } from '../services/unifiedAgentStorage';
 import { getRandomGenderedName, getRandomName } from '../utils/agentNames';
@@ -22,6 +22,13 @@ interface MarketplaceJson {
   }>;
 }
 
+interface McpServerConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  type?: string;
+}
+
 interface PluginJson {
   name: string;
   version: string;
@@ -35,6 +42,7 @@ interface PluginJson {
   commands?: string[];
   agents?: string[];
   rules?: string[];
+  mcpServers?: Record<string, McpServerConfig>;
   agentTemplate?: AgentTemplate;
 }
 
@@ -217,6 +225,33 @@ export function useMarketplace() {
             _pluginSource: pluginSource,
           } as MarketplaceResource & { _agentTemplate: AgentTemplate; _pluginSource: string });
         }
+
+        // Create resources for each MCP server
+        if (pluginData.mcpServers) {
+          discoveredCategories.add('mcp');
+          for (const [serverName, serverConfig] of Object.entries(pluginData.mcpServers)) {
+            allResources.push({
+              id: `${plugin.name}--mcp--${serverName}`,
+              name: formatName(serverName),
+              description: plugin.description,
+              longDescription: pluginData.longDescription,
+              category: 'mcp',
+              author,
+              installCount: 0,
+              tags: pluginData.keywords || plugin.tags || [],
+              version: pluginData.version,
+              installCommand: '',
+              repository: pluginData.repository,
+              verified: true,
+              featured: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              _pluginSource: pluginSource,
+              _mcpServerName: serverName,
+              _mcpServerConfig: serverConfig,
+            } as MarketplaceResource & { _pluginSource: string; _mcpServerName: string; _mcpServerConfig: McpServerConfig });
+          }
+        }
       }
 
       // Try to load skill descriptions from their skill.md files
@@ -234,11 +269,17 @@ export function useMarketplace() {
     }
   }, []);
 
-  // Enrich skill/command descriptions by fetching their .md files
+  // Enrich resource descriptions by fetching their .md files
   const enrichSkillDescriptions = async (resources: MarketplaceResource[]) => {
-    const enrichable = resources.filter(r => r.category === 'skills' || r.category === 'commands');
+    const enrichable = resources.filter(r =>
+      r.category === 'skills' || r.category === 'commands' ||
+      r.category === 'agents' || r.category === 'droids' || r.category === 'rules'
+    );
     const fetchPromises = enrichable.map(async (resource) => {
-      const ext = resource as MarketplaceResource & { _pluginSource?: string; _skillPath?: string; _commandPath?: string };
+      const ext = resource as MarketplaceResource & {
+        _pluginSource?: string; _skillPath?: string; _commandPath?: string;
+        _agentPath?: string; _rulePath?: string;
+      };
       if (!ext._pluginSource) return;
 
       let mdUrl: string;
@@ -246,6 +287,10 @@ export function useMarketplace() {
         mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
       } else if (ext._commandPath) {
         mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._commandPath}`;
+      } else if (ext._agentPath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._agentPath}`;
+      } else if (ext._rulePath) {
+        mdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._rulePath}`;
       } else {
         return;
       }
@@ -274,8 +319,7 @@ export function useMarketplace() {
   // Check which resources are installed locally
   const checkInstalledResources = async (allResources: MarketplaceResource[]) => {
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      const home = await homeDir();
       const installed: MarketplaceResource[] = [];
 
       for (const resource of allResources) {
@@ -290,16 +334,16 @@ export function useMarketplace() {
         let checkPath = '';
         if (ext._skillPath) {
           const skillName = ext._skillPath.split('/').pop() || '';
-          checkPath = `${home}.claude/skills/${skillName}/SKILL.md`;
+          checkPath = await join(home, '.claude', 'skills', skillName, 'SKILL.md');
         } else if (ext._commandPath) {
           const cmdFile = ext._commandPath.split('/').pop() || '';
-          checkPath = `${home}.claude/commands/${cmdFile}`;
+          checkPath = await join(home, '.claude', 'commands', cmdFile);
         } else if (ext._agentPath) {
           const agentFile = ext._agentPath.split('/').pop() || '';
-          checkPath = `${home}.claude/agents/${agentFile}`;
+          checkPath = await join(home, '.claude', 'agents', agentFile);
         } else if (ext._rulePath) {
           const ruleFile = ext._rulePath.split('/').pop() || '';
-          checkPath = `${home}.claude/rules/${ruleFile}`;
+          checkPath = await join(home, '.claude', 'rules', ruleFile);
         }
 
         if (checkPath) {
@@ -367,17 +411,18 @@ export function useMarketplace() {
       _commandPath?: string;
       _agentPath?: string;
       _rulePath?: string;
+      _mcpServerName?: string;
+      _mcpServerConfig?: McpServerConfig;
     };
 
     try {
       // Determine base path based on scope
       let basePath: string;
       if (scope === 'project' && projectPath) {
-        basePath = projectPath.endsWith('/') ? `${projectPath}.claude` : `${projectPath}/.claude`;
+        basePath = await join(projectPath, '.claude');
       } else {
-        let home = await homeDir();
-        if (!home.endsWith('/')) home += '/';
-        basePath = `${home}.claude`;
+        const home = await homeDir();
+        basePath = await join(home, '.claude');
       }
 
       if (ext._skillPath && ext._pluginSource) {
@@ -390,8 +435,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/skills/{skillName}/SKILL.md
-        const targetDir = `${basePath}/skills/${skillName}`;
-        const targetPath = `${targetDir}/SKILL.md`;
+        const targetDir = await join(basePath, 'skills', skillName);
+        const targetPath = await join(targetDir, 'SKILL.md');
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -409,8 +454,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/commands/{cmdFile}
-        const targetDir = `${basePath}/commands`;
-        const targetPath = `${targetDir}/${cmdFile}`;
+        const targetDir = await join(basePath, 'commands');
+        const targetPath = await join(targetDir, cmdFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -428,8 +473,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/agents/{agentFile}
-        const targetDir = `${basePath}/agents`;
-        const targetPath = `${targetDir}/${agentFile}`;
+        const targetDir = await join(basePath, 'agents');
+        const targetPath = await join(targetDir, agentFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -447,8 +492,8 @@ export function useMarketplace() {
         const content = await res.text();
 
         // Write to {basePath}/rules/{ruleFile}
-        const targetDir = `${basePath}/rules`;
-        const targetPath = `${targetDir}/${ruleFile}`;
+        const targetDir = await join(basePath, 'rules');
+        const targetPath = await join(targetDir, ruleFile);
 
         try {
           await invoke('create_directory', { path: targetDir });
@@ -456,6 +501,52 @@ export function useMarketplace() {
           // Directory may already exist, continue
         }
         await invoke('write_file_content', { path: targetPath, content });
+      } else if (ext._mcpServerName && ext._mcpServerConfig) {
+        // Add MCP server to .mcp.json in the target scope
+        const mcpJsonPath = scope === 'project' && projectPath
+          ? await join(projectPath, '.mcp.json')
+          : await join(await homeDir(), '.mcp.json');
+
+        let mcpConfig: { mcpServers: Record<string, McpServerConfig> } = { mcpServers: {} };
+        try {
+          const existing = await invoke<string>('read_file_content', { path: mcpJsonPath });
+          mcpConfig = JSON.parse(existing);
+        } catch {
+          // File doesn't exist yet, use default
+        }
+
+        mcpConfig.mcpServers[ext._mcpServerName] = ext._mcpServerConfig;
+        await invoke('write_file_content', {
+          path: mcpJsonPath,
+          content: JSON.stringify(mcpConfig, null, 2) + '\n',
+        });
+
+        // Also install bundled rules from the same plugin
+        if (ext._pluginSource) {
+          const pluginJsonUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/.claude-plugin/plugin.json${cacheBust()}`;
+          try {
+            const pRes = await fetch(pluginJsonUrl);
+            if (pRes.ok) {
+              const pData: PluginJson = await pRes.json();
+              if (pData.rules) {
+                for (const rulePath of pData.rules) {
+                  const ruleFile = rulePath.split('/').pop() || '';
+                  const ruleUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${rulePath}`;
+                  const rRes = await fetch(ruleUrl);
+                  if (rRes.ok) {
+                    const ruleContent = await rRes.text();
+                    const ruleDir = await join(basePath, 'rules');
+                    try { await invoke('create_directory', { path: ruleDir }); } catch { /* exists */ }
+                    await invoke('write_file_content', {
+                      path: await join(ruleDir, ruleFile),
+                      content: ruleContent,
+                    });
+                  }
+                }
+              }
+            }
+          } catch { /* non-critical: rules are optional */ }
+        }
       } else {
         throw new Error('Unknown resource type');
       }
@@ -484,28 +575,43 @@ export function useMarketplace() {
       _commandPath?: string;
       _agentPath?: string;
       _rulePath?: string;
+      _mcpServerName?: string;
     };
 
     try {
-      let home = await homeDir();
-      if (!home.endsWith('/')) home += '/';
+      const home = await homeDir();
 
       if (ext._skillPath) {
         const skillName = ext._skillPath.split('/').pop() || '';
-        const targetDir = `${home}.claude/skills/${skillName}`;
+        const targetDir = await join(home, '.claude', 'skills', skillName);
         await invoke('remove_directory', { path: targetDir });
       } else if (ext._commandPath) {
         const cmdFile = ext._commandPath.split('/').pop() || '';
-        const targetPath = `${home}.claude/commands/${cmdFile}`;
+        const targetPath = await join(home, '.claude', 'commands', cmdFile);
         await invoke('remove_file', { path: targetPath });
       } else if (ext._agentPath) {
         const agentFile = ext._agentPath.split('/').pop() || '';
-        const targetPath = `${home}.claude/agents/${agentFile}`;
+        const targetPath = await join(home, '.claude', 'agents', agentFile);
         await invoke('remove_file', { path: targetPath });
       } else if (ext._rulePath) {
         const ruleFile = ext._rulePath.split('/').pop() || '';
-        const targetPath = `${home}.claude/rules/${ruleFile}`;
+        const targetPath = await join(home, '.claude', 'rules', ruleFile);
         await invoke('remove_file', { path: targetPath });
+      } else if (ext._mcpServerName) {
+        // Remove MCP server from .mcp.json (check both project and global)
+        for (const mcpPath of ['.mcp.json', await join(home, '.mcp.json')]) {
+          try {
+            const existing = await invoke<string>('read_file_content', { path: mcpPath });
+            const mcpConfig = JSON.parse(existing);
+            if (mcpConfig.mcpServers?.[ext._mcpServerName]) {
+              delete mcpConfig.mcpServers[ext._mcpServerName];
+              await invoke('write_file_content', {
+                path: mcpPath,
+                content: JSON.stringify(mcpConfig, null, 2) + '\n',
+              });
+            }
+          } catch { /* file doesn't exist or parse error, skip */ }
+        }
       }
 
       setLibrary(prev => ({
@@ -578,10 +684,9 @@ export function useMarketplace() {
                 if (!res.ok) continue;
                 const content = await res.text();
 
-                let home = await homeDir();
-                if (!home.endsWith('/')) home += '/';
-                const targetDir = `${home}.claude/skills/${skillName}`;
-                const targetPath = `${targetDir}/SKILL.md`;
+                const home = await homeDir();
+                const targetDir = await join(home, '.claude', 'skills', skillName);
+                const targetPath = await join(targetDir, 'SKILL.md');
 
                 try {
                   await invoke('create_directory', { path: targetDir });
@@ -609,10 +714,9 @@ export function useMarketplace() {
                 if (!res.ok) continue;
                 const content = await res.text();
 
-                let home = await homeDir();
-                if (!home.endsWith('/')) home += '/';
-                const targetDir = `${home}.claude/rules`;
-                const targetPath = `${targetDir}/${ruleFile}`;
+                const home = await homeDir();
+                const targetDir = await join(home, '.claude', 'rules');
+                const targetPath = await join(targetDir, ruleFile);
 
                 try {
                   await invoke('create_directory', { path: targetDir });
@@ -660,6 +764,95 @@ export function useMarketplace() {
     }
   }, []);
 
+  // Install only the skills and rules from an agent bundle globally (no project required)
+  const installBundleSkills = useCallback(async (
+    resource: MarketplaceResource
+  ): Promise<{ skillCount: number; ruleCount: number; installedSkills: string[]; installedRules: string[] }> => {
+    const ext = resource as MarketplaceResource & { _agentTemplate?: AgentTemplate };
+    if (!ext._agentTemplate) {
+      throw new Error('Resource is not an agent bundle');
+    }
+
+    const template = ext._agentTemplate;
+    const installedSkills: string[] = [];
+    const installedRules: string[] = [];
+
+    const bundledSkills = template.skills || template.bundledPlugins;
+    if (!bundledSkills || bundledSkills.length === 0) {
+      throw new Error('Agent bundle has no skills to install');
+    }
+
+    const fetchOpts: RequestInit = { cache: 'no-store' };
+    const marketplaceRes = await fetch(MARKETPLACE_JSON_URL + cacheBust(), fetchOpts);
+    if (!marketplaceRes.ok) {
+      throw new Error(`Failed to fetch marketplace: ${marketplaceRes.status}`);
+    }
+    const marketplace: MarketplaceJson = await marketplaceRes.json();
+    const home = await homeDir();
+    const basePath = await join(home, '.claude');
+
+    for (const pluginName of bundledSkills) {
+      const pluginEntry = marketplace.plugins.find(p => p.name === pluginName);
+      if (!pluginEntry) continue;
+
+      const pluginSource = pluginEntry.source.replace('./', '');
+      const pluginJsonUrl = `${GITHUB_RAW_BASE}/${pluginSource}/.claude-plugin/plugin.json${cacheBust()}`;
+      const pluginRes = await fetch(pluginJsonUrl, fetchOpts);
+      if (!pluginRes.ok) continue;
+
+      const pluginData: PluginJson = await pluginRes.json();
+
+      if (pluginData.skills) {
+        for (const skillPath of pluginData.skills) {
+          const skillName = skillPath.split('/').pop() || '';
+          const skillMdUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${skillPath}/SKILL.md`;
+          try {
+            const res = await fetch(skillMdUrl);
+            if (!res.ok) continue;
+            const content = await res.text();
+            const targetDir = await join(basePath, 'skills', skillName);
+            try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+            await invoke('write_file_content', { path: await join(targetDir, 'SKILL.md'), content });
+            installedSkills.push(skillName);
+          } catch (err) {
+            console.warn(`Failed to install skill ${skillName}:`, err);
+          }
+        }
+      }
+
+      if (pluginData.rules) {
+        for (const rulePath of pluginData.rules) {
+          const ruleFile = rulePath.split('/').pop() || '';
+          const ruleUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${rulePath}`;
+          try {
+            const res = await fetch(ruleUrl);
+            if (!res.ok) continue;
+            const content = await res.text();
+            const targetDir = await join(basePath, 'rules');
+            try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+            await invoke('write_file_content', { path: await join(targetDir, ruleFile), content });
+            installedRules.push(ruleFile);
+          } catch (err) {
+            console.warn(`Failed to install rule ${ruleFile}:`, err);
+          }
+        }
+      }
+    }
+
+    // Mark as installed
+    setLibrary(prev => ({
+      ...prev,
+      installedResources: [...prev.installedResources, resource],
+    }));
+
+    return {
+      skillCount: installedSkills.length,
+      ruleCount: installedRules.length,
+      installedSkills,
+      installedRules,
+    };
+  }, []);
+
   // Get all starter bundles (agent templates tagged as "starter")
   const getStarterBundles = useCallback((): MarketplaceResource[] => {
     return resources.filter(r =>
@@ -704,6 +897,7 @@ export function useMarketplace() {
     installResource,
     uninstallResource,
     installAgentBundle,
+    installBundleSkills,
     getStarterBundles,
     toggleFavorite,
     isInstalled,

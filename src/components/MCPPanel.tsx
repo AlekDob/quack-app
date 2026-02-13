@@ -1,9 +1,9 @@
-import { useState } from "react";
-import type { MCPServer, MCPTemplate } from "../types";
+import { useState, useRef, useEffect } from "react";
+import type { MCPServer } from "../types";
 import { useMCPServers } from "../hooks/useMCPServers";
 import MCPServerCard from "./MCPServerCard";
-import MCPServerModal from "./MCPServerModal";
-import MCPTemplateCard from "./MCPTemplateCard";
+import { invoke } from "@tauri-apps/api/core";
+import { homeDir, join } from "@tauri-apps/api/path";
 
 /**
  * MCP Panel - Management interface for MCP (Model Context Protocol) servers
@@ -19,61 +19,62 @@ interface MCPPanelProps {
 export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCPPanelProps) {
   const {
     servers,
-    templates,
     loading,
     error,
     refreshServers,
-    addServer,
-    updateServer,
     deleteServer,
     testConnection,
-    stopServer,
-    restartServer,
   } = useMCPServers(workingDir);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<MCPTemplate | null>(
-    null
-  );
   const [deletingServer, setDeletingServer] = useState<string | null>(null);
+  const [showEditDropdown, setShowEditDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowEditDropdown(false);
+      }
+    }
+    if (showEditDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showEditDropdown]);
 
   const handleRefresh = async () => {
     await refreshServers();
     onRefresh?.();
   };
 
-  const handleAddServer = () => {
-    setEditingServer(null);
-    setSelectedTemplate(null);
-    setModalOpen(true);
-  };
-
-  const handleEditServer = (server: MCPServer) => {
-    setEditingServer(server);
-    setSelectedTemplate(null);
-    setModalOpen(true);
-  };
-
-  const handleUseTemplate = (template: MCPTemplate) => {
-    setEditingServer(null);
-    setSelectedTemplate(template);
-    setModalOpen(true);
-  };
-
-  const handleSaveServer = async (server: MCPServer) => {
+  const handleOpenMcpJson = async (scope: "project" | "global") => {
+    setShowEditDropdown(false);
     try {
-      if (editingServer) {
-        await updateServer(server);
+      let filePath: string;
+      if (scope === "project" && workingDir) {
+        filePath = await join(workingDir, ".mcp.json");
       } else {
-        await addServer(server);
+        const home = await homeDir();
+        filePath = await join(home, ".mcp.json");
       }
-      setModalOpen(false);
-      setEditingServer(null);
-      setSelectedTemplate(null);
+
+      // Check if file exists, if not ask to create it
+      try {
+        await invoke<string>("read_file_content", { path: filePath });
+      } catch {
+        const shouldCreate = window.confirm(
+          `${scope === "project" ? "Project" : "Global"} .mcp.json doesn't exist yet.\n\nCreate it now?`
+        );
+        if (!shouldCreate) return;
+        await invoke("write_file_content", {
+          path: filePath,
+          content: JSON.stringify({ mcpServers: {} }, null, 2) + "\n",
+        });
+      }
+
+      onOpenMcpConfig?.(filePath);
     } catch (err) {
-      console.error("Failed to save server:", err);
-      throw err;
+      console.error("Failed to open .mcp.json:", err);
     }
   };
 
@@ -100,15 +101,8 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
     }
   };
 
-  const handleToggleEnabled = async (server: MCPServer) => {
-    try {
-      await updateServer({
-        ...server,
-        enabled: !server.enabled,
-      });
-    } catch (err) {
-      console.error("Failed to toggle server:", err);
-    }
+  const handleEditServer = (server: MCPServer) => {
+    handleOpenMcpJson(server.scope === "project" ? "project" : "global");
   };
 
   const handleTestConnection = async (server: MCPServer) => {
@@ -117,24 +111,6 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
       alert("Connection test successful!");
     } else {
       alert("Connection test failed. Please check your configuration.");
-    }
-  };
-
-  const handleStopServer = async (serverId: string) => {
-    try {
-      await stopServer(serverId);
-    } catch (err) {
-      console.error("Failed to stop server:", err);
-      alert(`Failed to stop server: ${err}`);
-    }
-  };
-
-  const handleRestartServer = async (serverId: string) => {
-    try {
-      await restartServer(serverId);
-    } catch (err) {
-      console.error("Failed to restart server:", err);
-      alert(`Failed to restart server: ${err}`);
     }
   };
 
@@ -156,13 +132,50 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
-            <button
-              type="button"
-              onClick={handleAddServer}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200"
-            >
-              + Add Server
-            </button>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowEditDropdown(!showEditDropdown)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white/70 hover:text-white hover:bg-white/10 border border-white/15 transition-colors duration-200 flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit JSON
+                <svg className={`w-3 h-3 transition-transform ${showEditDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showEditDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-48 rounded-lg overflow-hidden shadow-xl z-50" style={{ background: 'rgba(30, 30, 30, 0.95)', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                  {workingDir && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenMcpJson("project")}
+                      className="w-full px-3 py-2.5 text-left text-xs hover:bg-white/10 transition-colors flex items-center gap-2"
+                      style={{ color: 'rgba(255, 255, 255, 0.8)' }}
+                    >
+                      <svg className="w-3.5 h-3.5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      Project .mcp.json
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMcpJson("global")}
+                    className="w-full px-3 py-2.5 text-left text-xs hover:bg-white/10 transition-colors flex items-center gap-2"
+                    style={{ color: 'rgba(255, 255, 255, 0.8)', borderTop: workingDir ? '1px solid rgba(255, 255, 255, 0.08)' : 'none' }}
+                  >
+                    <svg className="w-3.5 h-3.5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    Global .mcp.json
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -219,54 +232,19 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
               No MCP Servers
             </h4>
             <p
-              className="text-sm mb-8 max-w-md leading-relaxed"
+              className="text-sm mb-4 max-w-md leading-relaxed"
               style={{ color: "rgba(255, 255, 255, 0.6)" }}
             >
               MCP (Model Context Protocol) servers extend Claude's capabilities
-              with external tools, APIs, and data sources. Get started by adding
-              a server from templates or create a custom one.
+              with external tools, APIs, and data sources.
             </p>
-
-            {/* Template cards grid */}
-            {templates.length > 0 && (
-              <div className="w-full max-w-2xl">
-                <p
-                  className="text-sm font-semibold mb-4 text-left"
-                  style={{ color: "rgba(255, 255, 255, 0.7)" }}
-                >
-                  Quick start with templates:
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {templates.map((template) => (
-                    <MCPTemplateCard
-                      key={template.id}
-                      template={template}
-                      onClick={handleUseTemplate}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddServer}
-                  className="mt-6 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    color: "rgba(255, 255, 255, 0.8)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.05)";
-                  }}
-                >
-                  Or create a custom server
-                </button>
-              </div>
-            )}
+            <p
+              className="text-xs mb-6 max-w-md leading-relaxed"
+              style={{ color: "rgba(255, 255, 255, 0.4)" }}
+            >
+              Use the "Edit JSON" button above to open your .mcp.json file and
+              add server configurations.
+            </p>
           </div>
         )}
 
@@ -283,17 +261,6 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
                     <span>Project Servers</span>
                     <span className="text-xs text-white/40">{servers.filter((s) => s.scope === "project").length}</span>
                   </div>
-                  {/* Edit JSON button */}
-                  {onOpenMcpConfig && workingDir && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenMcpConfig(workingDir)}
-                      className="px-2 py-1 text-[10px] font-medium rounded hover:bg-white/10 text-white/50 hover:text-white/70 transition-colors duration-200"
-                      title="Edit .mcp.json"
-                    >
-                      Edit JSON
-                    </button>
-                  )}
                 </div>
                 <div className="space-y-1">
                   {servers
@@ -356,20 +323,6 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
         </div>
       )}
 
-      {/* Modal */}
-      {modalOpen && (
-        <MCPServerModal
-          server={editingServer}
-          template={selectedTemplate}
-          templates={templates}
-          onSave={handleSaveServer}
-          onClose={() => {
-            setModalOpen(false);
-            setEditingServer(null);
-            setSelectedTemplate(null);
-          }}
-        />
-      )}
     </div>
   );
 }

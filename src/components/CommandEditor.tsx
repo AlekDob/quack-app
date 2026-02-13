@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SlashCommand } from '../hooks/useSlashCommands';
-import CodeEditorMonaco from './CodeEditorMonaco';
+import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 
 interface CommandEditorProps {
   isOpen: boolean;
@@ -200,13 +200,12 @@ export function CommandEditor({ isOpen, command, onClose, onSave }: CommandEdito
               Command Content
             </label>
             <div className="border border-white/10 rounded-lg overflow-hidden" style={{ height: '300px' }}>
-              <CodeEditorMonaco
+              <CodeEditorCodeMirror
                 content={content}
                 filename="command.md"
                 language="markdown"
                 readOnly={false}
                 onChange={setContent}
-                showMinimap={false}
               />
             </div>
             <p className="text-xs text-white/30 mt-1">

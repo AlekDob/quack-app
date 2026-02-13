@@ -1,10 +1,13 @@
 {
   "mcpServers": {
-    "puppeteer": {
+    "mixpanel": {
       "type": "stdio",
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/server-puppeteer"
+        "-y",
+        "mcp-remote",
+        "https://mcp-eu.mixpanel.com/mcp",
+        "--allow-http"
       ]
     },
     "context7": {

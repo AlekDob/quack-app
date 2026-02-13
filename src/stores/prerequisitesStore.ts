@@ -11,6 +11,8 @@ export interface PrerequisiteStatus {
   installed: boolean;
   version: string | null;
   download_url: string | null;
+  min_version: string | null;
+  version_satisfied: boolean;
 }
 
 export interface PrerequisitesCheck {
@@ -29,14 +31,34 @@ export interface PrerequisitesState {
   isCheckingAuth: boolean;
   isLoggingIn: boolean;
 
+  isInstallingGit: boolean;
+
   // Actions
   checkPrerequisites: () => Promise<void>;
   installClaudeCLI: () => Promise<void>;
+  installXcodeCliTools: () => Promise<void>;
+  openNodeDownload: () => Promise<void>;
+  openClaudeInstallTerminal: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   openLoginTerminal: () => Promise<void>;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
 }
+
+// =============================================================================
+// Test Modes
+// =============================================================================
+
+// VITE_TEST_MODE: shows prerequisites dialog (real checks)
+// VITE_TEST_PREREQUISITES: simulates all prerequisites as missing
+const SIMULATE_MISSING = import.meta.env.VITE_TEST_PREREQUISITES === 'true';
+
+const MOCK_PREREQUISITES: PrerequisitesCheck = {
+  git: { name: 'Git', installed: false, version: null, download_url: 'https://git-scm.com/downloads', min_version: null, version_satisfied: false },
+  nodejs: { name: 'Node.js', installed: false, version: null, download_url: 'https://nodejs.org/en/download', min_version: '>= 18', version_satisfied: false },
+  claude_cli: { name: 'Claude Code CLI', installed: false, version: null, download_url: null, min_version: null, version_satisfied: false },
+  all_installed: false,
+};
 
 // =============================================================================
 // Store
@@ -50,6 +72,7 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
       prerequisites: null,
       isChecking: false,
       isInstalling: false,
+      isInstallingGit: false,
       isLoggedIn: false,
       isCheckingAuth: false,
       isLoggingIn: false,
@@ -57,6 +80,18 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
       // Check prerequisites
       checkPrerequisites: async () => {
         set({ isChecking: true });
+
+        // Simulate missing prerequisites for install flow testing
+        if (SIMULATE_MISSING) {
+          console.warn('[Prerequisites] TEST MODE: simulating all prerequisites as missing');
+          set({
+            prerequisites: MOCK_PREREQUISITES,
+            isChecking: false,
+            isLoggedIn: false,
+            isLoggingIn: false,
+          });
+          return;
+        }
 
         try {
           const result = await invoke<PrerequisitesCheck>('check_prerequisites');
@@ -76,7 +111,6 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
             isChecking: false,
             isLoggedIn,
             isLoggingIn: false,
-            // Never auto-complete: always show the screen so the user can review and click Continue
           });
         } catch (error) {
           console.error('[Prerequisites Store] Failed to check prerequisites:', error);
@@ -101,6 +135,41 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
         } catch (error) {
           console.error('[Prerequisites Store] Failed to install Claude CLI:', error);
           set({ isInstalling: false });
+          throw error;
+        }
+      },
+
+      // Install Xcode CLI Tools (macOS only - triggers native dialog)
+      installXcodeCliTools: async () => {
+        set({ isInstallingGit: true });
+
+        try {
+          await invoke('install_xcode_cli_tools');
+          // Don't re-check immediately - user needs to complete the Xcode dialog first
+          set({ isInstallingGit: false });
+        } catch (error) {
+          console.error('[Prerequisites Store] Failed to install Xcode CLI Tools:', error);
+          set({ isInstallingGit: false });
+          throw error;
+        }
+      },
+
+      // Open Node.js download page in browser
+      openNodeDownload: async () => {
+        try {
+          await invoke('open_external_url', { url: 'https://nodejs.org/en/download' });
+        } catch (error) {
+          console.error('[Prerequisites Store] Failed to open Node.js download page:', error);
+          throw error;
+        }
+      },
+
+      // Open terminal with sudo npm install for Claude CLI
+      openClaudeInstallTerminal: async () => {
+        try {
+          await invoke('open_claude_install_terminal');
+        } catch (error) {
+          console.error('[Prerequisites Store] Failed to open Claude install terminal:', error);
           throw error;
         }
       },
@@ -157,7 +226,16 @@ export const usePrerequisitesStore = create<PrerequisitesState>()(
 // Selectors
 // =============================================================================
 
+// Session-level flag: reset onboarding at startup in test mode
+let testModeInitialized = false;
+
 export const selectShouldShowPrerequisites = (state: PrerequisitesState): boolean => {
+  // In test mode, reset onboarding once per session so the dialog shows
+  if (import.meta.env.VITE_TEST_MODE === 'true' && !testModeInitialized) {
+    testModeInitialized = true;
+    usePrerequisitesStore.getState().resetOnboarding();
+    return true;
+  }
   return !state.hasCompletedOnboarding;
 };
 
