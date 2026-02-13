@@ -8,10 +8,8 @@ export type SettingsCategory =
   | 'second-brain'
   | 'ide'
   | 'license'
-  | 'integrations'
   | 'notifications'
   | 'appearance'
-  | 'terminal'
   | 'keyboard-shortcuts'
   | 'debug'
   | 'about';
@@ -34,10 +32,8 @@ const categories: CategoryItem[] = [
   { id: 'second-brain', label: 'Second Brain' },
   { id: 'ide', label: 'External IDE' },
   { id: 'license', label: 'License' },
-  { id: 'integrations', label: 'Integrations' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'terminal', label: 'Terminal' },
   { id: 'keyboard-shortcuts', label: 'Keyboard' },
   { id: 'debug', label: 'Debug' },
   { id: 'about', label: 'About' },
