@@ -205,6 +205,18 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         cli_style: "zed",
         supports_diff: false,
     },
+    // Athas Dev
+    IDEEntry {
+        id: "athas",
+        name: "Athas",
+        bundle_id: "com.code.athas",
+        cli: "athas-code",
+        app_path: "/Applications/Athas.app",
+        app_path_local: Some("Programs\\Athas\\Athas.exe"),
+        app_path_program: None,
+        cli_style: "vscode",
+        supports_diff: true,
+    },
     // JetBrains Family
     IDEEntry {
         id: "intellij",
@@ -544,10 +556,11 @@ fn save_ide_config(config: &IDEConfig) -> Result<(), String> {
 /// Set the preferred IDE (saves to config file for MCP server sync)
 #[tauri::command]
 pub fn set_preferred_ide(ide_id: String) -> Result<(), String> {
-    // Validate the IDE exists
-    let valid = IDE_REGISTRY.iter().any(|e| e.id == ide_id);
+    // Validate: check registry OR custom IDEs
+    let in_registry = IDE_REGISTRY.iter().any(|e| e.id == ide_id);
+    let in_custom = load_custom_ides_from_disk().iter().any(|e| e.id == ide_id);
 
-    if !valid {
+    if !in_registry && !in_custom {
         return Err(format!("Unknown IDE: {}", ide_id));
     }
 
@@ -585,7 +598,45 @@ pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String,
     let folder_path = normalize_path(&folder_path);
     log::info!("[IDE] Opening folder {} in IDE {}", folder_path, ide_id);
 
-    // Find IDE entry
+    // Handle custom IDEs
+    if ide_id.starts_with("custom-") {
+        let custom_ides = load_custom_ides_from_disk();
+        let custom = custom_ides.iter().find(|c| c.id == ide_id)
+            .ok_or_else(|| format!("Custom IDE not found: {}", ide_id))?;
+
+        if !Path::new(&folder_path).exists() {
+            return Err(format!("Folder not found: {}", folder_path));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let result = Command::new("open")
+                .arg("-a")
+                .arg(&custom.app_path)
+                .arg(&folder_path)
+                .spawn();
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", folder_path, custom.name)),
+                Err(e) => Err(format!("Failed to open in {}: {}", custom.name, e)),
+            };
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let result = Command::new(&custom.app_path)
+                .arg(&folder_path)
+                .spawn();
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", folder_path, custom.name)),
+                Err(e) => Err(format!("Failed to open in {}: {}", custom.name, e)),
+            };
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        return Err("Custom IDEs not supported on this platform".to_string());
+    }
+
+    // Find IDE entry from registry
     let ide = IDE_REGISTRY.iter().find(|e| e.id == ide_id);
 
     let ide = match ide {
@@ -832,6 +883,42 @@ pub fn open_file_in_ide(
         "[IDE] open_file_in_ide called: ide_id={}, file_path={}, line={:?}, column={:?}",
         ide_id, file_path, line, column
     );
+
+    // Handle custom IDEs: use `open -a` (macOS) or direct exe (Windows)
+    if ide_id.starts_with("custom-") {
+        let custom_ides = load_custom_ides_from_disk();
+        let custom = custom_ides.iter().find(|c| c.id == ide_id)
+            .ok_or_else(|| format!("Custom IDE not found: {}", ide_id))?;
+
+        log::info!("[IDE] Opening file in custom IDE: {} ({})", custom.name, custom.app_path);
+
+        #[cfg(target_os = "macos")]
+        {
+            let result = Command::new("open")
+                .arg("-a")
+                .arg(&custom.app_path)
+                .arg(&file_path)
+                .spawn();
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", file_path, custom.name)),
+                Err(e) => Err(format!("Failed to open file in {}: {}", custom.name, e)),
+            };
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let result = Command::new(&custom.app_path)
+                .arg(&file_path)
+                .spawn();
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", file_path, custom.name)),
+                Err(e) => Err(format!("Failed to open file in {}: {}", custom.name, e)),
+            };
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        return Err("Custom IDEs not supported on this platform".to_string());
+    }
 
     let entry = IDE_REGISTRY
         .iter()
@@ -1311,7 +1398,18 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
         }
     }
 
-    log::info!("[IDE] Found {} installed apps", apps.len());
+    // Append custom IDEs
+    for custom in load_custom_ides_from_disk() {
+        apps.push(InstalledApp {
+            id: custom.id,
+            name: custom.name,
+            app_path: custom.app_path,
+            category: "ide".to_string(),
+            icon_base64: custom.icon_base64,
+        });
+    }
+
+    log::info!("[IDE] Found {} installed apps (including custom)", apps.len());
     apps
 }
 
@@ -1331,8 +1429,8 @@ pub fn open_in_app(app_id: String, path: String) -> Result<String, String> {
     let path = normalize_path(&path);
     log::info!("[IDE] Opening {} in {}", path, app_id);
 
-    // Check if it's an IDE
-    if IDE_REGISTRY.iter().any(|e| e.id == app_id) {
+    // Check if it's an IDE (registry or custom)
+    if IDE_REGISTRY.iter().any(|e| e.id == app_id) || app_id.starts_with("custom-") {
         return open_folder_in_ide(app_id, path);
     }
 
@@ -2022,4 +2120,234 @@ fn parse_active_file_result(result: &serde_json::Value, ctx: &mut ExternalIdeCon
             }
         }
     }
+}
+
+// =============================================================================
+// Custom IDE Support
+// =============================================================================
+
+/// A user-added custom IDE not in the hardcoded registry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomIDE {
+    pub id: String,
+    pub name: String,
+    pub app_path: String,
+    pub icon_base64: Option<String>,
+}
+
+/// Storage wrapper for custom-ides.json
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CustomIDEStorage {
+    ides: Vec<CustomIDE>,
+}
+
+/// Get the path to custom-ides.json
+fn get_custom_ides_path() -> Result<std::path::PathBuf, String> {
+    let config_path = get_ide_config_path()?;
+    let parent = config_path.parent()
+        .ok_or("Failed to get config directory")?;
+    Ok(parent.join("custom-ides.json"))
+}
+
+/// Load custom IDEs from disk, removing stale entries
+fn load_custom_ides_from_disk() -> Vec<CustomIDE> {
+    let path = match get_custom_ides_path() {
+        Ok(p) => p,
+        Err(_) => return vec![],
+    };
+
+    if !path.exists() {
+        return vec![];
+    }
+
+    let content = match fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+
+    let storage: CustomIDEStorage = match serde_json::from_str(&content) {
+        Ok(s) => s,
+        Err(_) => return vec![],
+    };
+
+    // Filter out stale entries (app no longer exists)
+    let total = storage.ides.len();
+    let valid: Vec<CustomIDE> = storage.ides.into_iter()
+        .filter(|ide| Path::new(&ide.app_path).exists())
+        .collect();
+
+    // If we filtered some out, save the cleaned list
+    if valid.len() != total {
+        let _ = save_custom_ides_to_disk(&valid);
+    }
+
+    valid
+}
+
+/// Save custom IDEs to disk
+fn save_custom_ides_to_disk(ides: &[CustomIDE]) -> Result<(), String> {
+    let path = get_custom_ides_path()?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create dir: {}", e))?;
+    }
+
+    let storage = CustomIDEStorage { ides: ides.to_vec() };
+    let json = serde_json::to_string_pretty(&storage)
+        .map_err(|e| format!("Failed to serialize: {}", e))?;
+
+    fs::write(&path, json)
+        .map_err(|e| format!("Failed to write: {}", e))?;
+
+    Ok(())
+}
+
+/// Extract app name from a macOS .app bundle
+#[cfg(target_os = "macos")]
+fn extract_app_name(app_path: &str) -> String {
+    let info_plist = format!("{}/Contents/Info.plist", app_path);
+
+    // Try CFBundleDisplayName first, then CFBundleName
+    for key in &["CFBundleDisplayName", "CFBundleName"] {
+        if let Ok(output) = Command::new("defaults")
+            .args(["read", &info_plist, key])
+            .output()
+        {
+            if output.status.success() {
+                let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !name.is_empty() {
+                    return name;
+                }
+            }
+        }
+    }
+
+    // Fallback: parse from path (e.g., "/Applications/Nova.app" -> "Nova")
+    Path::new(app_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Unknown IDE")
+        .to_string()
+}
+
+/// Extract app name from a Windows .exe path
+#[cfg(target_os = "windows")]
+fn extract_app_name(app_path: &str) -> String {
+    Path::new(app_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Unknown IDE")
+        .to_string()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn extract_app_name(app_path: &str) -> String {
+    Path::new(app_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Unknown IDE")
+        .to_string()
+}
+
+/// Generate a sanitized ID from the app name
+fn generate_custom_ide_id(name: &str) -> String {
+    let sanitized: String = name.to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect();
+    format!("custom-{}", sanitized.trim_matches('-'))
+}
+
+/// Register a custom IDE from an app path
+#[tauri::command]
+pub fn register_custom_ide(app_path: String) -> Result<InstalledApp, String> {
+    let app_path = normalize_path(&app_path);
+    log::info!("[IDE] Registering custom IDE: {}", app_path);
+
+    if !Path::new(&app_path).exists() {
+        return Err(format!("App not found: {}", app_path));
+    }
+
+    // Check for duplicates
+    let mut existing = load_custom_ides_from_disk();
+    if existing.iter().any(|ide| ide.app_path == app_path) {
+        return Err("This IDE is already added".to_string());
+    }
+
+    // Also check against the hardcoded registry
+    #[cfg(target_os = "macos")]
+    {
+        if IDE_REGISTRY.iter().any(|e| e.app_path == app_path) {
+            return Err("This IDE is already in the built-in list".to_string());
+        }
+    }
+
+    let name = extract_app_name(&app_path);
+    let id = generate_custom_ide_id(&name);
+
+    // Ensure unique ID
+    let final_id = if existing.iter().any(|ide| ide.id == id) {
+        format!("{}-{}", id, existing.len())
+    } else {
+        id
+    };
+
+    // Extract icon (macOS only)
+    #[cfg(target_os = "macos")]
+    let icon = get_app_icon_base64(&app_path);
+    #[cfg(not(target_os = "macos"))]
+    let icon: Option<String> = None;
+
+    let custom_ide = CustomIDE {
+        id: final_id.clone(),
+        name: name.clone(),
+        app_path: app_path.clone(),
+        icon_base64: icon.clone(),
+    };
+
+    existing.push(custom_ide);
+    save_custom_ides_to_disk(&existing)?;
+
+    log::info!("[IDE] Registered custom IDE: {} ({})", name, final_id);
+
+    Ok(InstalledApp {
+        id: final_id,
+        name,
+        app_path,
+        category: "ide".to_string(),
+        icon_base64: icon,
+    })
+}
+
+/// Remove a custom IDE
+#[tauri::command]
+pub fn remove_custom_ide(ide_id: String) -> Result<(), String> {
+    log::info!("[IDE] Removing custom IDE: {}", ide_id);
+
+    let mut ides = load_custom_ides_from_disk();
+    let before_len = ides.len();
+    ides.retain(|ide| ide.id != ide_id);
+
+    if ides.len() == before_len {
+        return Err(format!("Custom IDE not found: {}", ide_id));
+    }
+
+    save_custom_ides_to_disk(&ides)?;
+
+    // Clear preference if this was the preferred IDE
+    let config = load_ide_config();
+    if config.preferred_ide == ide_id {
+        let mut new_config = config;
+        new_config.preferred_ide = String::new();
+        save_ide_config(&new_config)?;
+    }
+
+    Ok(())
+}
+
+/// Get all custom IDEs
+#[tauri::command]
+pub fn get_custom_ides() -> Vec<CustomIDE> {
+    load_custom_ides_from_disk()
 }

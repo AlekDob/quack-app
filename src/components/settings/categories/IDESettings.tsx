@@ -33,6 +33,7 @@ export default function IDESettings() {
   const syncFocus = useIDEStore(s => s.syncFocus);
   const isLoadingApps = useIDEStore(s => s.isLoadingApps);
   const installedApps = useIDEStore(s => s.installedApps);
+  const isAddingCustomIDE = useIDEStore(s => s.isAddingCustomIDE);
 
   const preferredIDEName = useIDEStore(selectPreferredIDEName);
 
@@ -53,6 +54,26 @@ export default function IDESettings() {
 
   const handleSelectIDE = async (ideId: string) => {
     await useIDEStore.getState().setPreferredIDE(ideId);
+  };
+
+  const handleAddCustomIDE = async () => {
+    try {
+      const app = await useIDEStore.getState().addCustomIDE();
+      if (app) {
+        await useIDEStore.getState().setPreferredIDE(app.id);
+      }
+    } catch (error) {
+      console.error('[IDESettings] Failed to add custom IDE:', error);
+    }
+  };
+
+  const handleRemoveCustomIDE = async (e: React.MouseEvent, ideId: string) => {
+    e.stopPropagation();
+    try {
+      await useIDEStore.getState().removeCustomIDE(ideId);
+    } catch (error) {
+      console.error('[IDESettings] Failed to remove custom IDE:', error);
+    }
   };
 
   const handleArrangeWindows = async () => {
@@ -127,6 +148,17 @@ export default function IDESettings() {
                     </svg>
                   </div>
                 )}
+                {app.id.startsWith('custom-') && (
+                  <button
+                    className="ide-settings-card-remove"
+                    onClick={(e) => handleRemoveCustomIDE(e, app.id)}
+                    title="Remove custom IDE"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M2 2l6 6M8 2l-6 6" />
+                    </svg>
+                  </button>
+                )}
               </button>
             );
           })}
@@ -137,6 +169,17 @@ export default function IDESettings() {
             No IDEs detected on your system.
           </div>
         )}
+
+        <button
+          className="ide-settings-add-custom-btn"
+          onClick={handleAddCustomIDE}
+          disabled={isAddingCustomIDE}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M9 3v12M3 9h12" />
+          </svg>
+          <span>{isAddingCustomIDE ? 'Adding...' : 'Add Custom IDE'}</span>
+        </button>
       </div>
 
       {/* Settings Toggles */}
