@@ -75,6 +75,12 @@ interface KanbanState {
   isNewTaskModalRequested: boolean;
   // Initial values for new task modal (from context menu "Create Task")
   pendingTaskInitialValues: KanbanTaskInitialValues | null;
+  // Agent drop request from sidebar drag (cross-boundary dnd-kit drag)
+  agentDropRequest: { agentId: string; timestamp: number } | null;
+  // Which column the sidebar drag is hovering over (null = not dragging or not over any column)
+  sidebarDragHoverColumn: KanbanStatus | null;
+  // Agent info for the card being dragged from sidebar
+  sidebarDragAgentInfo: { name: string; color: string } | null;
   // Task IDs currently being documented (session IDs)
   processingDocumentation: Set<string>;
 
@@ -107,6 +113,11 @@ interface KanbanState {
   // Task completion documentation tracking
   markDocumentationProcessing: (taskId: string) => void;
   markDocumentationComplete: (taskId: string, result: TaskCompletionResult) => void;
+  // Agent drop from sidebar boundary crossing
+  requestAgentDrop: (agentId: string) => void;
+  clearAgentDropRequest: () => void;
+  setSidebarDragHoverColumn: (column: KanbanStatus | null) => void;
+  setSidebarDragAgentInfo: (info: { name: string; color: string } | null) => void;
   // Agent filter actions
   setAgentFilter: (agentId: string | null) => void;
   // Agent info management
@@ -146,6 +157,9 @@ export const useKanbanStore = create<KanbanState>()(
         pendingNotification: null,
         isNewTaskModalRequested: false,
         pendingTaskInitialValues: null,
+        agentDropRequest: null,
+        sidebarDragHoverColumn: null,
+        sidebarDragAgentInfo: null,
         processingDocumentation: new Set(),
 
         // Pagination for Done column - show 20 tasks initially, load 20 more each time
@@ -355,6 +369,26 @@ export const useKanbanStore = create<KanbanState>()(
         // Clear pending initial values after they've been consumed
         clearPendingTaskInitialValues: () => {
           set({ pendingTaskInitialValues: null });
+        },
+
+        // Request agent drop from sidebar boundary crossing
+        requestAgentDrop: (agentId: string) => {
+          set({ agentDropRequest: { agentId, timestamp: Date.now() } });
+        },
+
+        // Clear agent drop request after it's been consumed
+        clearAgentDropRequest: () => {
+          set({ agentDropRequest: null });
+        },
+
+        // Set which Kanban column the sidebar drag is hovering over
+        setSidebarDragHoverColumn: (column: KanbanStatus | null) => {
+          set({ sidebarDragHoverColumn: column });
+        },
+
+        // Set agent info for the card being dragged from sidebar
+        setSidebarDragAgentInfo: (info: { name: string; color: string } | null) => {
+          set({ sidebarDragAgentInfo: info });
         },
 
         // Set agent filter for Kanban view

@@ -76,7 +76,7 @@ interface SortableRepositoryGroupProps {
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
   // Kanban tab props
-  isKanbanTabActive?: boolean;
+  isKanbanViewActive?: boolean;
   onOpenKanbanTab?: () => void;
   // Chat loading state for task status indicators
   chatLoadingMap?: Map<string, boolean>;
@@ -1008,7 +1008,7 @@ export default function TerminalSidebar({
                       onRemoveProject={onRemoveProject}
                       onOpenDashboard={onOpenDashboard}
                       onOpenClaudeAssets={onOpenClaudeAssets}
-                      isKanbanTabActive={isKanbanTabActive}
+                      isKanbanViewActive={isKanbanTabActive}
                       onOpenKanbanTab={onOpenKanbanTab}
                       chatLoadingMap={chatLoadingMap}
                       onSessionClick={onSessionClick}
@@ -1163,7 +1163,7 @@ export default function TerminalSidebar({
                           onRemoveProject={onRemoveProject}
                           onOpenDashboard={onOpenDashboard}
                           onOpenClaudeAssets={onOpenClaudeAssets}
-                          isKanbanTabActive={isKanbanTabActive}
+                          isKanbanViewActive={isKanbanTabActive}
                           onOpenKanbanTab={onOpenKanbanTab}
                           chatLoadingMap={chatLoadingMap}
                           onSessionClick={onSessionClick}

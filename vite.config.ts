@@ -115,6 +115,7 @@ export default defineConfig(({ mode }) => {
           pip: resolve(rootDir, 'pip.html'),
           browser: resolve(rootDir, 'browser.html'),
           'tab-popout': resolve(rootDir, 'tab-popout.html'),
+          brain: resolve(rootDir, 'brain.html'),
         },
 
         // External dependencies - only Claude Agent SDK runs in Node.js subprocess

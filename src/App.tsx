@@ -8904,15 +8904,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     console.log('[Quack] Memory Graph tab deprecated - use Obsidian vault directly');
   }, []);
 
-  // Handler for opening Brain folder in Finder/Obsidian
+  // Handler for opening Brain window (separate Tauri webview)
   const handleOpenSecondBrainTab = useCallback(async () => {
     try {
-      const { openBrainFolder } = await import('./services/brainFileService');
-      openBrainFolder();
+      const projectPath = activeTerminal?.cwd || undefined;
+      await invoke('open_brain_window', { projectPath });
     } catch (error) {
-      console.error('[Quack] Failed to open Brain folder:', error);
+      console.error('[Quack] Failed to open Brain window:', error);
     }
-  }, []);
+  }, [activeTerminal?.cwd]);
 
   // Handler for opening Second Brain tab with a specific node (deprecated)
   const handleOpenSecondBrainWithNode = useCallback((_nodeId: string, _nodeLabel: string) => {

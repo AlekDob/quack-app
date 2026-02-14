@@ -16,6 +16,7 @@ import {
 import KanbanCard from './KanbanCard';
 import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
 import { groupTasksByCompletionDate, type DateGroup } from '../../utils/kanbanDateGrouping';
+import { useKanbanStore } from '../../stores/kanbanStore';
 
 // Types for In Progress column grouping by status
 type InProgressBucket = 'ready' | 'working' | 'cold';
@@ -114,6 +115,11 @@ export default function KanbanColumn({
   // Track native HTML5 drag-over state for sidebar agents
   const [isNativeDragOver, setIsNativeDragOver] = useState(false);
 
+  // Track if THIS column is being hovered during sidebar drag
+  const sidebarDragHoverColumn = useKanbanStore((s) => s.sidebarDragHoverColumn);
+  const sidebarDragAgentInfo = useKanbanStore((s) => s.sidebarDragAgentInfo);
+  const isSidebarDragHovered = sidebarDragHoverColumn === id;
+
   // Intersection Observer for infinite scroll (Done column only)
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -147,8 +153,8 @@ export default function KanbanColumn({
     };
   }, [id, hasMore, onLoadMore]);
 
-  // Use parent-provided isDropTarget OR internal isOver OR native drag for highlighting
-  const showDropHighlight = isDropTarget || isOver || isNativeDragOver;
+  // Use parent-provided isDropTarget OR internal isOver OR native drag OR sidebar hover on this column
+  const showDropHighlight = isDropTarget || isOver || isNativeDragOver || isSidebarDragHovered;
 
   // Group tasks by completion date for Done column
   const dateGroups: DateGroup[] = useMemo(() => {
@@ -255,6 +261,7 @@ export default function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
+      data-column-id={id}
       className={`kanban-column ${showDropHighlight ? 'drop-target' : ''}`}
       onDragOver={handleNativeDragOver}
       onDragLeave={handleNativeDragLeave}
@@ -389,6 +396,21 @@ export default function KanbanColumn({
             })
           )}
         </SortableContext>
+
+        {/* Ghost card placeholder when dragging agent from sidebar */}
+        {isSidebarDragHovered && sidebarDragAgentInfo && (
+          <div
+            className="kanban-ghost-card"
+            style={{
+              borderColor: sidebarDragAgentInfo.color,
+              '--ghost-color': sidebarDragAgentInfo.color,
+            } as React.CSSProperties}
+          >
+            <div className="kanban-ghost-card-dot" style={{ background: sidebarDragAgentInfo.color }} />
+            <span className="kanban-ghost-card-name">{sidebarDragAgentInfo.name}</span>
+            <span className="kanban-ghost-card-label">+ New Task</span>
+          </div>
+        )}
 
         {/* Infinite scroll sentinel for Done column */}
         {id === 'done' && hasMore && (

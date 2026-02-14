@@ -9,6 +9,7 @@ use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Manage
 mod agency;
 mod agency_setup;
 mod ai;
+mod brain_window;
 mod browser;
 mod claude_auth;
 mod claude_cli;
@@ -857,6 +858,7 @@ pub fn run() {
             skills::list_skills,
             skills::get_skill_details,
             skills::check_skills_directory,
+            brain_window::open_brain_window,
             browser::open_browser_window,
             browser::close_browser_window,
             browser::emit_to_main,

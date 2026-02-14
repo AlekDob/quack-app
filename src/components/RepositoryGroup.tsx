@@ -7,6 +7,7 @@ import {
   memo,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ import {
   DragOverlay,
   type DragEndEvent,
   type DragStartEvent,
+  type DragMoveEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -42,7 +44,7 @@ import TeamCreationModal from "./TeamCreationModal";
 import TeamStatusBadge from "./TeamStatusBadge";
 import { extractProjectId } from "../utils/projectUtils";
 // import DragHandle from './DragHandle'; // 🦆 DISABLED - replaced with timestamp display
-import type { TerminalInfo, ChatMessage, GitPullResult } from "../types";
+import type { TerminalInfo, ChatMessage, GitPullResult, KanbanStatus } from "../types";
 
 interface RepositoryGroupProps {
   repoPath: string;
@@ -557,30 +559,6 @@ function SortableAgent({
     },
     [onGitMenuToggle, showGitMenu, agent.id],
   );
-
-  // Native HTML5 drag handler for dragging agent to Kanban board
-  const handleNativeDragStart = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      // Mark that we started dragging - will prevent click on drag end
-      wasDraggedRef.current = true;
-      // Set custom data type for Kanban to identify this as an agent drag
-      e.dataTransfer.setData("application/x-quack-agent", agent.id);
-      e.dataTransfer.effectAllowed = "copy";
-      // Set a nice drag image (optional - browser default works too)
-      if (e.currentTarget) {
-        e.dataTransfer.setDragImage(e.currentTarget, 20, 20);
-      }
-    },
-    [agent.id],
-  );
-
-  // Reset drag flag after drag ends (success or cancel)
-  const handleNativeDragEnd = useCallback(() => {
-    // Reset after a short delay to prevent click from firing
-    setTimeout(() => {
-      wasDraggedRef.current = false;
-    }, 100);
-  }, []);
 
   // Get relative time string with opacity - re-calculate on tick change
   const relativeTime = useMemo(
@@ -1154,6 +1132,11 @@ export default function RepositoryGroup({
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [agentOrder, setAgentOrder] = useState<Record<string, string[]>>({});
   const renderedOrderRef = useRef<Map<string, string[]>>(new Map());
+  // Cross-boundary drag state (drag agent to Kanban)
+  const [crossBoundaryIntent, setCrossBoundaryIntent] = useState(false);
+  const crossBoundaryRef = useRef(false);
+  // Pointer position for custom drag overlay (portal-based, escapes sidebar overflow)
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   // New session modal state
   const [newSessionModalAgentId, setNewSessionModalAgentId] = useState<
     string | null
@@ -1367,12 +1350,107 @@ export default function RepositoryGroup({
     document.body.classList.add("dragging-active");
   };
 
+  // Handle drag move - track pointer + detect cross-boundary drag toward Kanban
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const activatorEvent = event.activatorEvent as PointerEvent;
+    const currentX = activatorEvent.clientX + event.delta.x;
+    const currentY = activatorEvent.clientY + event.delta.y;
+
+    // Always track pointer for the portal-based overlay
+    setDragPointer({ x: currentX, y: currentY });
+
+    if (!isKanbanViewActive) return;
+
+    // Find the sidebar element for boundary detection
+    const sidebarEl = document.querySelector('.sidebar');
+    if (!sidebarEl) return;
+
+    const sidebarRect = sidebarEl.getBoundingClientRect();
+
+    // 20px buffer to avoid accidental triggers
+    const isBeyond = currentX > sidebarRect.right + 20;
+    crossBoundaryRef.current = isBeyond;
+    setCrossBoundaryIntent(isBeyond);
+
+    // Detect which Kanban column the pointer is over
+    import("../stores/kanbanStore").then(({ useKanbanStore }) => {
+      const store = useKanbanStore.getState();
+      if (!isBeyond) {
+        if (store.sidebarDragHoverColumn !== null) {
+          store.setSidebarDragHoverColumn(null);
+          store.setSidebarDragAgentInfo(null);
+        }
+        return;
+      }
+
+      // Find which column element the pointer is over
+      const columns = document.querySelectorAll('.kanban-column');
+      let hoveredColumn: string | null = null;
+      columns.forEach((col) => {
+        const rect = col.getBoundingClientRect();
+        if (currentX >= rect.left && currentX <= rect.right &&
+            currentY >= rect.top && currentY <= rect.bottom) {
+          // Extract column id from the droppable data
+          const colId = col.getAttribute('data-column-id');
+          if (colId) hoveredColumn = colId;
+        }
+      });
+
+      if (store.sidebarDragHoverColumn !== hoveredColumn) {
+        store.setSidebarDragHoverColumn(hoveredColumn as KanbanStatus | null);
+      }
+
+      // Set agent info if not already set
+      if (!store.sidebarDragAgentInfo) {
+        const agentId = String(event.active.id);
+        const agent = [...mainAgents, ...worktreeAgents].find(
+          (a) => a.id === agentId,
+        );
+        if (agent) {
+          store.setSidebarDragAgentInfo({
+            name: agent.label,
+            color: agent.color,
+          });
+        }
+      }
+    });
+  }, [isKanbanViewActive, mainAgents, worktreeAgents]);
+
   // Handle drag end - uses renderedOrderRef to avoid stale closure issues
   const handleDragEnd = (event: DragEndEvent) => {
     document.body.classList.remove("dragging-active");
+    setDragPointer(null);
 
     const { active, over } = event;
     console.log("[DnD] dragEnd - active:", active.id, "over:", over?.id);
+
+    // Always reset sidebar drag state in store
+    import("../stores/kanbanStore").then(({ useKanbanStore }) => {
+      const store = useKanbanStore.getState();
+      if (store.sidebarDragHoverColumn !== null) {
+        store.setSidebarDragHoverColumn(null);
+      }
+      if (store.sidebarDragAgentInfo !== null) {
+        store.setSidebarDragAgentInfo(null);
+      }
+    });
+
+    // Check if this was a cross-boundary drag (intent to create Kanban task)
+    if (crossBoundaryRef.current && isKanbanViewActive) {
+      const agentId = String(active.id);
+      import("../stores/kanbanStore").then(({ useKanbanStore }) => {
+        useKanbanStore.getState().requestAgentDrop(agentId);
+      });
+      console.log("[DnD] Cross-boundary drag → Kanban task for:", agentId);
+      setActiveAgentId(null);
+      crossBoundaryRef.current = false;
+      setCrossBoundaryIntent(false);
+      return;
+    }
+
+    // Reset cross-boundary state
+    crossBoundaryRef.current = false;
+    setCrossBoundaryIntent(false);
 
     if (!over || active.id === over.id) {
       setActiveAgentId(null);
@@ -2060,8 +2138,9 @@ export default function RepositoryGroup({
           {/* Branch Groups with DnD Context */}
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={isKanbanViewActive ? () => [] : closestCenter}
             onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
           >
             {sortedBranches.map(([branchName, agents]) => {
@@ -2154,49 +2233,71 @@ export default function RepositoryGroup({
               );
             })}
 
-            {/* Drag Overlay - Ghost Preview */}
+            {/* DragOverlay kept for dnd-kit measuring (hidden) */}
             <DragOverlay dropAnimation={null}>
-              {activeAgentId
-                ? (() => {
-                    const agent = [...mainAgents, ...worktreeAgents].find(
-                      (a) => a.id === activeAgentId,
-                    );
-                    if (!agent) return null;
-
-                    return (
-                      <div
-                        style={{
-                          marginLeft: "36px",
-                          padding: "8px 12px",
-                          background: `${agent.color}25`,
-                          border: `2px dashed ${agent.color}`,
-                          borderRadius: "6px",
-                          boxShadow: `0 8px 24px ${agent.color}40, 0 0 40px ${agent.color}30`,
-                          pointerEvents: "none",
-                          opacity: 0.8,
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          {/* Ghost metro dot */}
-                          <div
-                            style={{
-                              width: "10px",
-                              height: "10px",
-                              borderRadius: "50%",
-                              background: agent.color,
-                              opacity: 0.6,
-                            }}
-                          />
-                          <span className="font-semibold text-sm text-white/90">
-                            {agent.label}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })()
-                : null}
+              {activeAgentId ? <div style={{ opacity: 0 }} /> : null}
             </DragOverlay>
           </DndContext>
+
+          {/* Portal-based drag overlay - escapes sidebar overflow:hidden */}
+          {activeAgentId && dragPointer && createPortal(
+            (() => {
+              const agent = [...mainAgents, ...worktreeAgents].find(
+                (a) => a.id === activeAgentId,
+              );
+              if (!agent) return null;
+              return (
+                <div
+                  style={{
+                    position: "fixed",
+                    left: dragPointer.x + 12,
+                    top: dragPointer.y - 16,
+                    padding: "8px 12px",
+                    background: crossBoundaryIntent
+                      ? `${agent.color}40`
+                      : `${agent.color}25`,
+                    border: crossBoundaryIntent
+                      ? `2px solid ${agent.color}`
+                      : `2px dashed ${agent.color}`,
+                    borderRadius: "6px",
+                    boxShadow: crossBoundaryIntent
+                      ? `0 8px 32px ${agent.color}60, 0 0 60px ${agent.color}40`
+                      : `0 8px 24px ${agent.color}40, 0 0 40px ${agent.color}30`,
+                    pointerEvents: "none",
+                    opacity: crossBoundaryIntent ? 0.95 : 0.8,
+                    transition: "background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease",
+                    zIndex: 99999,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      style={{
+                        width: "10px",
+                        height: "10px",
+                        borderRadius: "50%",
+                        background: agent.color,
+                        opacity: 0.6,
+                      }}
+                    />
+                    <span className="font-semibold text-sm text-white/90">
+                      {agent.label}
+                    </span>
+                    {crossBoundaryIntent && (
+                      <span style={{
+                        fontSize: "11px",
+                        color: "rgba(255,255,255,0.7)",
+                        marginLeft: "4px",
+                      }}>
+                        + New Task
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })(),
+            document.body,
+          )}
 
           {/* Worktree Section - Separate section for worktrees */}
           {worktreeAgents.length > 0 && (

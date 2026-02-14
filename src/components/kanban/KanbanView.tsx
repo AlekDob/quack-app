@@ -113,6 +113,8 @@ export default function KanbanView({
     clearNewTaskModalRequest,
     pendingTaskInitialValues,
     clearPendingTaskInitialValues,
+    agentDropRequest,
+    clearAgentDropRequest,
     updateAgentInfo, // NEW: to update agent rendering info
     // Pagination for Done column
     getVisibleDoneTasks,
@@ -472,6 +474,13 @@ export default function KanbanView({
     setIsModalOpen(true);
   }, [terminals]);
 
+  // Handle agent drop from sidebar cross-boundary drag (dnd-kit boundary detection)
+  useEffect(() => {
+    if (agentDropRequest) {
+      handleSidebarAgentDrop(agentDropRequest.agentId, 'todo');
+      clearAgentDropRequest();
+    }
+  }, [agentDropRequest, clearAgentDropRequest, handleSidebarAgentDrop]);
 
   if (isLoading) {
     return (

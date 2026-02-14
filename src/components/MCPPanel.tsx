@@ -48,12 +48,15 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
     onRefresh?.();
   };
 
-  const handleOpenMcpJson = async (scope: "project" | "global") => {
+  const handleOpenMcpJson = async (scope: "project" | "global" | "claude-global") => {
     setShowEditDropdown(false);
     try {
       let filePath: string;
       if (scope === "project" && workingDir) {
         filePath = await join(workingDir, ".mcp.json");
+      } else if (scope === "claude-global") {
+        const home = await homeDir();
+        filePath = await join(home, ".claude", ".mcp.json");
       } else {
         const home = await homeDir();
         filePath = await join(home, ".mcp.json");
@@ -63,8 +66,9 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
       try {
         await invoke<string>("read_file_content", { path: filePath });
       } catch {
+        const label = scope === "project" ? "Project" : scope === "claude-global" ? "Claude Code global" : "Global";
         const shouldCreate = window.confirm(
-          `${scope === "project" ? "Project" : "Global"} .mcp.json doesn't exist yet.\n\nCreate it now?`
+          `${label} .mcp.json doesn't exist yet.\n\nCreate it now?`
         );
         if (!shouldCreate) return;
         await invoke("write_file_content", {
@@ -171,6 +175,17 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                     </svg>
                     Global .mcp.json
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMcpJson("claude-global")}
+                    className="w-full px-3 py-2.5 text-left text-xs hover:bg-white/10 transition-colors flex items-center gap-2"
+                    style={{ color: 'rgba(255, 255, 255, 0.8)', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+                  >
+                    <svg className="w-3.5 h-3.5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Claude Code .mcp.json
                   </button>
                 </div>
               )}

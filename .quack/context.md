@@ -8,6 +8,8 @@
 - fix agente da quack store
 - stamina fixed
 - Setting migliori 
+- drag and drop agent order
+- new quack brain siystem and ui inteface
 
 ## cose da fare
 - stamina issue 
