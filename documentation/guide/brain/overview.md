@@ -15,6 +15,17 @@ Quando un agente trova un bug subdolo, scopre un pattern utile, o prende una dec
 
 Il livello **Progetto** vive nel repo Git — si committa, si condivide con il team. Il livello **Globale** e' personale, sul tuo Mac.
 
+## Due audience: umani e AI
+
+Dentro `documentation/` convivono due tipi di contenuto:
+
+| Audience | Cartella | Formato | Scopo |
+|----------|----------|---------|-------|
+| **Umani** | `guide/{feature}/` | Markdown narrativo, italiano, senza frontmatter | Guide tutorial per capire come funzionano le feature |
+| **AI** | `gotchas/`, `patterns/`, `decisions/`, `bugs/` | YAML frontmatter + markdown tecnico | Entry strutturati per la ricerca rapida dell'agente |
+
+Non sono duplicati — le guide spiegano il *come e perche'* in modo narrativo, gli entry AI contengono dettagli tecnici puntuali. La Brain UI li mostra in sezioni separate con indicatori di audience (badge verde per umani, viola per AI).
+
 ## Come si collega all'agente
 
 Ogni progetto ha un `CLAUDE.md` che l'agente legge automaticamente. Dentro c'e' una sezione **Knowledge Base** con i link agli entry piu' critici del Brain. L'agente vede subito le cose importanti senza doverle cercare.
@@ -27,5 +38,5 @@ Il flusso completo e' spiegato in [Access Chain](./access-chain.md).
 |--------|-----------|
 | [Access Chain](./access-chain.md) | Come l'AI accede alla conoscenza (i 3 livelli) |
 | [Tipi di Entry](./entry-types.md) | Gotcha, Pattern, Decision, Diary — quando usare cosa |
-| [Brain UI](./brain-ui.md) | La finestra visuale: Timeline, Knowledge, Graph |
+| [Brain UI](./brain-ui.md) | La finestra visuale: sidebar, filtri AI/Human, Graph, Guide |
 | [Scrivere Entry](./writing-entries.md) | Formato, regole, esempi pratici |

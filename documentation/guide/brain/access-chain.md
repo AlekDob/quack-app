@@ -50,3 +50,7 @@ L'Access Chain e' definito in 3 posti:
 | `~/.claude/skills/quack-brain/SKILL.md` | **Come** leggere/scrivere entry (formato, criteri) | Solo quando l'agente invoca la skill |
 
 La sezione Knowledge Base nel CLAUDE.md e' posizionata **fuori** dall'header auto-generato dell'agente, quindi persiste anche quando cambi personalita' o agente.
+
+## Migrare documentazione esistente
+
+Se un progetto ha gia' documentazione sparsa in posti diversi (`.quack/brain/`, `.claude/docs/`, file markdown nella root, cartelle `docs/`), puoi usare la skill `brain-migrate` per convertirla nella struttura v2 (`documentation/` + `guide/`). La skill scansiona, classifica, e migra con approvazione a ogni step.
