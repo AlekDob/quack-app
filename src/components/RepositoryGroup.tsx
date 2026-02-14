@@ -476,16 +476,22 @@ function SortableAgent({
     }
 
     // Show tooltip every 5 seconds for 2 seconds
+    // Memory fix: track inner timeouts to cancel on cleanup
+    let hideTimeout: ReturnType<typeof setTimeout>;
     const showInterval = setInterval(() => {
       setShowQuackTooltip(true);
-      setTimeout(() => setShowQuackTooltip(false), 2000);
+      hideTimeout = setTimeout(() => setShowQuackTooltip(false), 2000);
     }, 5000);
 
     // Show immediately on first unread
     setShowQuackTooltip(true);
-    setTimeout(() => setShowQuackTooltip(false), 2000);
+    const initialHideTimeout = setTimeout(() => setShowQuackTooltip(false), 2000);
 
-    return () => clearInterval(showInterval);
+    return () => {
+      clearInterval(showInterval);
+      clearTimeout(hideTimeout);
+      clearTimeout(initialHideTimeout);
+    };
   }, [showNotificationBadge, isBusy]);
 
   // Memoize metro station style - DYNAMIC based on notification state (MUST be after showNotificationBadge)
@@ -2517,9 +2523,11 @@ export default function RepositoryGroup({
                           }
 
                           // Show tooltip every 5 seconds for 2 seconds
+                          // Memory fix: track inner timeouts to cancel on cleanup
+                          let hideTimeout: ReturnType<typeof setTimeout>;
                           const showInterval = setInterval(() => {
                             setShowQuackTooltipWorktree(true);
-                            setTimeout(
+                            hideTimeout = setTimeout(
                               () => setShowQuackTooltipWorktree(false),
                               2000,
                             );
@@ -2527,12 +2535,16 @@ export default function RepositoryGroup({
 
                           // Show immediately on first unread
                           setShowQuackTooltipWorktree(true);
-                          setTimeout(
+                          const initialHideTimeout = setTimeout(
                             () => setShowQuackTooltipWorktree(false),
                             2000,
                           );
 
-                          return () => clearInterval(showInterval);
+                          return () => {
+                            clearInterval(showInterval);
+                            clearTimeout(hideTimeout);
+                            clearTimeout(initialHideTimeout);
+                          };
                         }, [showNotificationBadge, isBusyWorktree]);
 
                         const relativeTime = getRelativeTimeString(

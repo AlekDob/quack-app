@@ -566,6 +566,7 @@ async fn start_mcp_server(
                 // Emit to frontend for debugging
                 let _ = app_handle.emit("mcp-server-log", (server_id.clone(), line));
             }
+            log::info!("MCP[{}] stderr reader task ended", server_id);
         });
     }
 

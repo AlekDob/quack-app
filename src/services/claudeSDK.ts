@@ -464,12 +464,9 @@ export async function* streamClaudeMessage(
     // Clean up active stream for this session
     activeStreams.delete(sessionKey);
 
-    // Clean up event tracking for this session to prevent memory leaks
-    // Note: We keep event IDs for a short time to prevent duplicates from late events
-    setTimeout(() => {
-      seenEventIds.delete(sessionKey);
-      console.log(`[claudeSDK:${streamId}] Cleaned up event tracking for session: ${sessionKey}`);
-    }, 5000); // Keep for 5 seconds after stream ends
+    // Clean up event tracking immediately when stream ends
+    seenEventIds.delete(sessionKey);
+    console.log(`[claudeSDK:${streamId}] Cleaned up event tracking for session: ${sessionKey}`);
   }
 }
 

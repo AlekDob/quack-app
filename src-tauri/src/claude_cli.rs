@@ -1679,7 +1679,7 @@ pub async fn send_message_via_sdk_streaming(
     let stderr_handle = if let Some(stderr) = child.stderr.take() {
         Some(tokio::spawn(async move {
             let mut stderr_reader = BufReader::new(stderr).lines();
-            let mut stderr_lines = Vec::new();
+            let mut stderr_lines: Vec<String> = Vec::with_capacity(200);
             while let Ok(Some(line)) = stderr_reader.next_line().await {
                 // Classify log level based on content
                 let line_upper = line.to_uppercase();
@@ -1693,6 +1693,9 @@ pub async fn send_message_via_sdk_streaming(
                     log::info!("[Node.js SDK] {}", line);
                 }
                 stderr_lines.push(line);
+                if stderr_lines.len() > 200 {
+                    stderr_lines.remove(0);
+                }
             }
             stderr_lines
         }))

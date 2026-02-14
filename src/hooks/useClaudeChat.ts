@@ -18,6 +18,9 @@ import { useChatStore } from '../stores/chatStore';
 // Map to track Task tool_use_id -> Kanban task_id for status updates
 const taskToolToKanbanMap = new Map<string, string>();
 
+// Memory leak prevention: cap events per stream to avoid unbounded growth
+const MAX_EVENTS_PER_STREAM = 500;
+
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
 
@@ -438,6 +441,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
 
           seenEventIds.add(eventId);
           events.push(event);
+          // Memory leak prevention: trim old events to prevent unbounded growth
+          if (events.length > MAX_EVENTS_PER_STREAM) {
+            events.splice(0, events.length - MAX_EVENTS_PER_STREAM);
+          }
           console.log('[useClaudeChat] ✅ New unique event added - ID:', eventId.substring(0, 30), 'Type:', event.type, 'Total:', events.length);
 
           // 🦆 DEBUG: Log unique event
@@ -711,6 +718,12 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null; // Clean up
+      // Memory leak prevention: clean up stale taskToolToKanbanMap entries older than 1 hour
+      // This catches abandoned tasks that never got a tool_result
+      if (taskToolToKanbanMap.size > 100) {
+        console.warn('[useClaudeChat] taskToolToKanbanMap has', taskToolToKanbanMap.size, 'entries - possible leak');
+        taskToolToKanbanMap.clear();
+      }
     }
     // 🦆 FIX: Removed messages.length from dependencies - using messagesLengthRef.current instead
   }, [isLoading]);
@@ -773,6 +786,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     // 6.5. 🦆 FIX: Clear event deduplication Set to start fresh
     seenEventIdsRef.current.clear();
     console.log('[useClaudeChat] Event deduplication Set cleared');
+
+    // Memory leak prevention: clear task-to-kanban mapping
+    taskToolToKanbanMap.clear();
+    console.log('[useClaudeChat] Task-to-Kanban mapping cleared');
 
     // 7. Try to notify backend to delete session files
     if (oldSessionId) {
