@@ -47,6 +47,7 @@ interface ToolGifCategories {
 }
 
 interface GeneralSettings {
+  userName: string; // Display name — auto-injected into CLAUDE.md global for diary entries
   autoSave: boolean;
   autoSaveInterval: number;
   confirmOnExit: boolean;
@@ -115,6 +116,7 @@ const defaultToolGifCategories: ToolGifCategories = {
 };
 
 const defaultGeneralSettings: GeneralSettings = {
+  userName: '',
   autoSave: true,
   autoSaveInterval: 30,
   confirmOnExit: true,

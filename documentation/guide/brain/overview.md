@@ -32,10 +32,15 @@ Ogni progetto ha un `CLAUDE.md` che l'agente legge automaticamente. Dentro c'e' 
 
 Il flusso completo e' spiegato in [Access Chain](./access-chain.md).
 
+## Vedi come funziona — il diagramma
+
+Se preferisci una vista d'insieme visuale, apri il diagramma [Architecture Flow](./architecture-flow.mmd) — mostra l'intero flusso del Brain in un colpo d'occhio: come l'agente AI accede alla conoscenza, come tu umano navighi nella UI, e dove vivono i dati.
+
 ## Cosa trovi in questa guida
 
 | Pagina | Contenuto |
 |--------|-----------|
+| [Architecture Flow](./architecture-flow.mmd) | Diagramma visuale dell'intero sistema Brain |
 | [Access Chain](./access-chain.md) | Come l'AI accede alla conoscenza (i 3 livelli) |
 | [Tipi di Entry](./entry-types.md) | Gotcha, Pattern, Decision, Diary — quando usare cosa |
 | [Brain UI](./brain-ui.md) | La finestra visuale: sidebar, filtri AI/Human, Graph, Guide |

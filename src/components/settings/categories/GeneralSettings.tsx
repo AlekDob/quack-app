@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Store } from '@tauri-apps/plugin-store';
+import { invoke } from '@tauri-apps/api/core';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
@@ -9,6 +10,9 @@ export default function GeneralSettings() {
   // PiP and Quack Sound settings
   const [pipEnabled, setPipEnabled] = useState(false);
   const [quackSoundEnabled, setQuackSoundEnabled] = useState(true);
+
+  // Profile
+  const userName = useSettingsStore((s) => s.general?.userName ?? '');
 
   // GIF reactions settings
   const enableToolGifs = useSettingsStore((s) => s.general?.enableToolGifs ?? false);
@@ -37,6 +41,17 @@ export default function GeneralSettings() {
       },
     });
   };
+
+  // Auto-inject userName into ~/.claude/CLAUDE.md (debounced)
+  const injectTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (injectTimer.current) clearTimeout(injectTimer.current);
+    if (!userName) return;
+    injectTimer.current = setTimeout(() => {
+      syncUserNameToClaudeMd(userName);
+    }, 800);
+    return () => { if (injectTimer.current) clearTimeout(injectTimer.current); };
+  }, [userName]);
 
   useEffect(() => {
     loadUiPreferences();
@@ -81,8 +96,69 @@ export default function GeneralSettings() {
     }
   };
 
+  const syncUserNameToClaudeMd = async (name: string) => {
+    try {
+      const home = await invoke<string>('get_home_directory');
+      const claudeMdPath = `${home}/.claude/CLAUDE.md`;
+      let content = '';
+      try {
+        content = await invoke<string>('read_file_content', { path: claudeMdPath });
+      } catch {
+        // File doesn't exist — create with minimal template
+        content = `# CLAUDE.md - Global\n\n**Name**: ${name}\n`;
+        await invoke('write_file_content', { path: claudeMdPath, content });
+        return;
+      }
+      // Update or insert the **Name** line
+      if (content.match(/^\*\*Name\*\*:\s*.*/m)) {
+        content = content.replace(/^\*\*Name\*\*:\s*.*/m, `**Name**: ${name}`);
+      } else {
+        // Insert after first heading or at top
+        const headingEnd = content.match(/^#[^\n]*\n/m);
+        if (headingEnd) {
+          const idx = (headingEnd.index ?? 0) + headingEnd[0].length;
+          content = content.slice(0, idx) + `\n**Name**: ${name}\n` + content.slice(idx);
+        } else {
+          content = `**Name**: ${name}\n\n` + content;
+        }
+      }
+      await invoke('write_file_content', { path: claudeMdPath, content });
+    } catch (err) {
+      console.error('Failed to sync userName to CLAUDE.md:', err);
+    }
+  };
+
   return (
     <div className="settings-category">
+      <SectionHeader
+        title="Profile"
+        description="Your identity for diary entries and team collaboration"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="Display Name"
+          description="Used in diary entries and auto-injected into CLAUDE.md global"
+          control={
+            <input
+              type="text"
+              value={userName}
+              onChange={(e) => updateGeneralSettings({ userName: e.target.value })}
+              placeholder="e.g. Alek"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                color: '#e0e0e0',
+                fontSize: '12px',
+                width: '180px',
+                outline: 'none',
+              }}
+            />
+          }
+        />
+      </div>
+
       <SectionHeader
         title="Chat Experience"
         description="Customize your AI chat experience"

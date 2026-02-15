@@ -1,21 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import { X, Edit3, Eye, Save } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Edit3, Eye, Save, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import mermaid from 'mermaid';
 import { readBrainEntry } from '../../services/brainFileService';
 import type { BrainEntry } from '../../services/brainFileService';
+
+mermaid.initialize({
+  startOnLoad: false,
+  securityLevel: 'loose',
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#FF6B35',
+    primaryTextColor: '#e4e4e7',
+    primaryBorderColor: '#3a3a40',
+    lineColor: '#71717a',
+    secondaryColor: '#2a2a30',
+    tertiaryColor: '#1a1a1e',
+    background: '#1a1a1e',
+    mainBkg: '#2a2a30',
+    nodeBorder: '#3a3a40',
+    clusterBkg: '#25252a',
+    titleColor: '#e4e4e7',
+    edgeLabelBackground: '#2a2a30',
+  },
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+});
 
 interface BrainEditorProps {
   filePath: string;
   onClose: () => void;
 }
 
+const isMermaidFile = (path: string) => path.endsWith('.mmd');
+
 export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
   const [entry, setEntry] = useState<BrainEntry | null>(null);
   const [mode, setMode] = useState<'view' | 'edit'>('view');
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const mermaidRef = useRef<HTMLDivElement>(null);
+  const mermaidContainerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const minZoom = useRef(0.5);
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
     loadEntry();
   }, [filePath]);
 
@@ -43,6 +76,67 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
       }
     }
   };
+
+  const renderMermaid = useCallback(async () => {
+    if (!mermaidRef.current || !entry || !isMermaidFile(filePath)) return;
+    try {
+      const id = `mermaid-${Date.now()}`;
+      const { svg } = await mermaid.render(id, entry.content);
+      if (mermaidRef.current) mermaidRef.current.innerHTML = svg;
+      // Clean up mermaid's hidden render container from the DOM
+      document.querySelectorAll('[id^="dmermaid-"]').forEach(el => el.remove());
+      // Calculate fit-to-container zoom as minimum
+      requestAnimationFrame(() => {
+        const svgEl = mermaidRef.current?.querySelector('svg');
+        const container = mermaidContainerRef.current;
+        if (svgEl && container) {
+          const svgW = svgEl.getBoundingClientRect().width;
+          const svgH = svgEl.getBoundingClientRect().height;
+          const cW = container.clientWidth;
+          const cH = container.clientHeight;
+          if (svgW > 0 && svgH > 0) {
+            minZoom.current = Math.min(cW / svgW, cH / svgH, 1);
+          }
+        }
+      });
+    } catch (err) {
+      if (mermaidRef.current) {
+        mermaidRef.current.innerHTML = `<pre class="brain-mermaid-error">Mermaid render error: ${String(err)}</pre>`;
+      }
+    }
+  }, [entry, filePath]);
+
+  useEffect(() => {
+    if (mode === 'view' && isMermaidFile(filePath)) renderMermaid();
+  }, [mode, filePath, renderMermaid]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom(prev => {
+      const factor = Math.pow(1.002, -e.deltaY);
+      return Math.min(10, Math.max(minZoom.current, prev * factor));
+    });
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isPanning.current = true;
+    panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+  }, [pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning.current) return;
+    setPan({ x: e.clientX - panStart.current.x, y: e.clientY - panStart.current.y });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isPanning.current = false;
+  }, []);
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
   const handleSave = async () => {
     if (!entry) return;
@@ -161,7 +255,9 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
     <div className="brain-editor">
       <div className="brain-editor-header">
         <div className="brain-editor-meta">
-          <span className="brain-editor-type">{entry.type}</span>
+          <span className={`brain-editor-type ${isMermaidFile(filePath) ? 'brain-editor-type-mermaid' : ''}`}>
+            {isMermaidFile(filePath) ? 'diagram' : entry.type}
+          </span>
           <span className="brain-editor-date">{entry.created}</span>
           {entry.project && <span className="brain-editor-project">{entry.project}</span>}
         </div>
@@ -183,10 +279,45 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
       </div>
 
       {mode === 'view' ? (
-        <div
-          className="brain-editor-view"
-          dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(entry.content) }}
-        />
+        isMermaidFile(filePath) ? (
+          <div className="brain-mermaid-container">
+            <div className="brain-mermaid-controls">
+              <button onClick={() => setZoom(prev => Math.min(10, prev * 1.3))} title="Zoom in">
+                <ZoomIn size={14} />
+              </button>
+              <span className="brain-mermaid-zoom-label">{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom(prev => Math.max(minZoom.current, prev * 0.7))} title="Zoom out">
+                <ZoomOut size={14} />
+              </button>
+              <button onClick={resetView} title="Reset view">
+                <Maximize2 size={14} />
+              </button>
+            </div>
+            <div
+              className="brain-mermaid-view"
+              ref={mermaidContainerRef}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <div
+                ref={mermaidRef}
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: 'center center',
+                  cursor: isPanning.current ? 'grabbing' : 'grab',
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <div
+            className="brain-editor-view"
+            dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(entry.content) }}
+          />
+        )
       ) : (
         <textarea
           className="brain-editor-textarea"

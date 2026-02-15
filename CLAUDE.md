@@ -51,4 +51,6 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)
 - Memory leaks: `documentation/guide/memory-leak-prevention.md` (5 rules, bounded collections, how to spot leaks)
 
+**Brain breadcrumbs in code**: When writing code related to a Brain entry (bug fix, pattern, gotcha), add `// Brain: {slug}` above the relevant block. This links code back to its documentation. Example: `// Brain: fix-stamina-bar-prompt-caching`. See quack-brain skill for full rules.
+
 Full knowledge store: `documentation/` (project) + `~/.quack/brain/` (global). Use the `quack-brain` skill for read/write operations.

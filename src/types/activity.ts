@@ -5,6 +5,9 @@ export type ActivityEventType =
   | 'deploy'
   | 'refactor'
   | 'feature'
+  | 'pattern'
+  | 'gotcha'
+  | 'diary'
   | 'note';
 
 export interface ActivityEvent {

@@ -303,6 +303,41 @@
   margin: 0;
 }
 
+.brain-timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brain-timeline-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1a1a1e;
+  border: 1px solid #2a2a30;
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: #a1a1aa;
+}
+
+.brain-timeline-search:focus-within {
+  border-color: #FF6B35;
+}
+
+.brain-timeline-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e4e4e7;
+  font-size: 12px;
+  width: 140px;
+  font-family: inherit;
+}
+
+.brain-timeline-search input::placeholder {
+  color: #52525b;
+}
+
 .brain-timeline-filters {
   display: flex;
   gap: 8px;
@@ -315,7 +350,7 @@
   color: #a1a1aa;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: none;
   font-size: 11px;
 }
 
@@ -378,6 +413,9 @@
 .brain-event-icon-deploy { background: #a855f720; color: #a855f7; }
 .brain-event-icon-refactor { background: #eab30820; color: #eab308; }
 .brain-event-icon-feature { background: #FF6B3520; color: #FF6B35; }
+.brain-event-icon-pattern { background: #06b6d420; color: #06b6d4; }
+.brain-event-icon-gotcha { background: #f59e0b20; color: #f59e0b; }
+.brain-event-icon-diary { background: #22c55e20; color: #22c55e; }
 .brain-event-icon-note { background: #64748b20; color: #64748b; }
 
 .brain-event-details {
@@ -618,6 +656,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .brain-editor-header {
@@ -690,7 +729,7 @@
 }
 
 .brain-editor-view h1 { font-size: 16px; margin: 10px 0 6px; }
-.brain-editor-view h2 { font-size: 14px; margin: 8px 0 4px; }
+.brain-editor-view h2 { font-size: 14px; margin: 60px 0 4px; }
 .brain-editor-view h3 { font-size: 13px; margin: 6px 0 3px; }
 .brain-editor-view code { background: #2a2a30; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-family: 'Fira Code', 'JetBrains Mono', monospace; }
 .brain-editor-view ul { padding-left: 20px; margin: 4px 0; }
@@ -895,6 +934,85 @@
 .brain-guide-page-arrow {
   color: #71717a;
   flex-shrink: 0;
+}
+
+/* Mermaid Diagrams */
+.brain-mermaid-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.brain-mermaid-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.brain-mermaid-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #2a2a30;
+  border: 1px solid #3a3a40;
+  color: #a1a1aa;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.brain-mermaid-controls button:hover {
+  background: #3a3a40;
+  color: #e4e4e7;
+}
+
+.brain-mermaid-zoom-label {
+  font-size: 10px;
+  color: #71717a;
+  min-width: 36px;
+  text-align: center;
+}
+
+.brain-mermaid-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 8px;
+  background: #1e1e22;
+  border: 1px solid #2a2a30;
+}
+
+.brain-mermaid-view:active {
+  cursor: grabbing;
+}
+
+.brain-mermaid-view svg {
+  max-width: none;
+  height: auto;
+}
+
+.brain-mermaid-error {
+  color: #FF6B6B;
+  background: #2a2a30;
+  border: 1px solid #3a3a40;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  white-space: pre-wrap;
+}
+
+.brain-editor-type-mermaid {
+  background: #06b6d4 !important;
 }
 
 /* Scrollbar */

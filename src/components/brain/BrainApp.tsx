@@ -110,21 +110,26 @@ export default function BrainApp({ projectPath }: BrainAppProps) {
               entries: Array<{ name: string; path: string; is_dir: boolean }>;
             }>('list_directory', { path: entry.path });
             const mdFiles = sub.entries.filter(
-              e => !e.is_dir && e.name.endsWith('.md')
+              e => !e.is_dir && (e.name.endsWith('.md') || e.name.endsWith('.mmd'))
             );
             if (mdFiles.length === 0) continue;
 
             const pageList: Array<{ name: string; path: string; title: string }> = [];
             for (const f of mdFiles) {
-              let title = f.name.replace('.md', '').split('-')
+              const ext = f.name.endsWith('.mmd') ? '.mmd' : '.md';
+              let title = f.name.replace(ext, '').split('-')
                 .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-              try {
-                const content = await invoke<string>(
-                  'read_file_content', { path: f.path }
-                );
-                const heading = content.match(/^#\s+(.+)$/m);
-                if (heading) title = heading[1];
-              } catch { /* use filename title */ }
+              if (ext === '.mmd') {
+                title = `[Diagram] ${title}`;
+              } else {
+                try {
+                  const content = await invoke<string>(
+                    'read_file_content', { path: f.path }
+                  );
+                  const heading = content.match(/^#\s+(.+)$/m);
+                  if (heading) title = heading[1];
+                } catch { /* use filename title */ }
+              }
               pageList.push({ name: f.name, path: f.path, title });
             }
             pageList.sort((a, b) => {
@@ -200,7 +205,7 @@ export default function BrainApp({ projectPath }: BrainAppProps) {
           ) : (
             <>
               {activeView === 'timeline' && (
-                <BrainTimeline {...scopeProps} />
+                <BrainTimeline {...scopeProps} onSelectEntry={handleSelectEntry} />
               )}
               {activeView === 'knowledge' && (
                 <BrainKnowledge

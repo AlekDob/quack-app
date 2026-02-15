@@ -217,7 +217,7 @@ async function listMdFilesRecursive(dirPath: string): Promise<string[]> {
       path: dirPath,
     });
     for (const entry of listing.entries) {
-      if (!entry.is_dir && entry.name.endsWith('.md')) {
+      if (!entry.is_dir && (entry.name.endsWith('.md') || entry.name.endsWith('.mmd'))) {
         allFiles.push(entry.path);
       }
       if (entry.is_dir) {
@@ -326,6 +326,20 @@ function inferTypeFromPath(filePath: string): string {
 }
 
 function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
+  // Handle .mmd files (Mermaid diagrams — no frontmatter)
+  if (filePath.endsWith('.mmd')) {
+    const fileName = filePath.split('/').pop()?.replace('.mmd', '') || 'Diagram';
+    const title = fileName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return {
+      type: 'diagram',
+      created: '',
+      tags: ['mermaid', 'diagram'],
+      title,
+      content: raw,
+      filePath,
+    };
+  }
+
   const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!fmMatch) return null;
 

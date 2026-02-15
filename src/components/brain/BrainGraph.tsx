@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import ForceGraph2D from 'react-force-graph-2d';
+import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d';
 import { User, Bot } from 'lucide-react';
 import { listBrainEntries, readBrainEntry } from '../../services/brainFileService';
 import type { BrainEntry } from '../../services/brainFileService';
@@ -44,9 +44,11 @@ const typeColors: Record<string, string> = {
   tool: '#6EE7B7',
   guide: '#22c55e',
   guide_hub: '#16a34a',
+  diagram: '#06b6d4',
 };
 
 const isGuideType = (t: string) => t === 'guide' || t === 'guide_hub';
+const isDiagramType = (t: string) => t === 'diagram';
 
 function buildAiGraph(entries: BrainEntry[]): { nodes: GNode[]; links: GLink[] } {
   const nodes: GNode[] = [];
@@ -114,8 +116,7 @@ export default function BrainGraph({ projectPath, isGlobal, onSelectEntry, guide
   const [allLinks, setAllLinks] = useState<GLink[]>([]);
   const [filter, setFilter] = useState<GraphFilter>('all');
   const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fgRef = useRef<{ d3Force: (name: string, force?: unknown) => unknown }>(null);
+  const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -165,8 +166,8 @@ export default function BrainGraph({ projectPath, isGlobal, onSelectEntry, guide
   const filteredData = useMemo(() => {
     let nodes: GNode[];
     if (filter === 'all') nodes = allNodes;
-    else if (filter === 'ai') nodes = allNodes.filter(n => !isGuideType(n.type));
-    else nodes = allNodes.filter(n => isGuideType(n.type));
+    else if (filter === 'ai') nodes = allNodes.filter(n => !isGuideType(n.type) || isDiagramType(n.type));
+    else nodes = allNodes.filter(n => isGuideType(n.type) || isDiagramType(n.type));
 
     const ids = new Set(nodes.map(n => n.id));
     const links = allLinks.filter(l => {

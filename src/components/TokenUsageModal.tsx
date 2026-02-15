@@ -143,6 +143,10 @@ export default function TokenUsageModal({
   // INVERTED: Stamina percentage (100% = fresh, 0% = exhausted)
   const staminaPercentage = Math.max(0, 100 - percentage);
 
+  // Auto-compact zone: percentage of the total bar reserved for auto-compact
+  const autoCompactPercent = (AUTO_COMPACT_COST / maxTokens) * 100;
+  const autoCompactStartPercent = 100 - autoCompactPercent;
+
   const formatTokens = (tokens: number) => {
     return tokens.toLocaleString();
   };
@@ -228,6 +232,16 @@ export default function TokenUsageModal({
               <div className="context-usage-section">
                 <div className="fallout-progress-bar-container">
                   <div className="fallout-progress-bar">
+                    {/* Auto-compact reserve zone (rightmost portion, always visible) */}
+                    <div
+                      className={`fallout-progress-autocompact${percentage >= autoCompactStartPercent ? ' fallout-autocompact-pulse' : ''}`}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        width: `${autoCompactPercent}%`,
+                        height: '100%',
+                      }}
+                    />
                     <div
                       className="fallout-progress-fill"
                       style={{
