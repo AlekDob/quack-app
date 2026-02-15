@@ -72,7 +72,7 @@ npm run test:reset
 
 - **Normal mode** and **Test mode** are completely independent
 - Switch between them anytime:
-  - Normal: `npm run tauri:dev`
+  - Normal: `npm run dev:mac` (or `dev:win`, `dev:linux`)
   - Test: `npm run test:dev`
 - Test data location: `~/Library/Application Support/com.quack.terminal/*-TEST.json`
 

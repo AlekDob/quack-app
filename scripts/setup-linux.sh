@@ -293,8 +293,8 @@ verify_installation() {
         echo "Next steps:"
         echo "  1. cd /path/to/quack-app"
         echo "  2. npm install"
-        echo "  3. npm run tauri:dev    # For development"
-        echo "  4. ./build-linux.sh     # For production build"
+        echo "  3. npm run dev:linux    # For development"
+        echo "  4. npm run build:linux  # For production build"
     else
         echo -e "${RED}=========================================${NC}"
         echo -e "${RED}✗ Some dependencies are missing${NC}"

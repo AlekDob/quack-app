@@ -1,6 +1,6 @@
-# Quack - Linux Setup Guide
+# Quack - Linux Guide
 
-This guide covers setting up the development environment and building Quack on Linux.
+Complete guide for developing, building, and distributing Quack on Linux.
 
 ## Supported Distributions
 
@@ -11,27 +11,27 @@ This guide covers setting up the development environment and building Quack on L
 ## Quick Start
 
 ```bash
-# 1. Run the setup script to install all dependencies
-./scripts/setup-linux.sh
+# 1. Install system dependencies
+npm run setup:linux
 
 # 2. Install npm dependencies
 npm install
+cd src-tauri/node-sdk && npm install --production && cd ../..
 
 # 3. Run in development mode
-npm run tauri:dev
+npm run dev:linux
 
 # 4. Build for production
-./build-linux.sh
+npm run build:linux
 ```
 
 ## Manual Setup
 
-If you prefer to install dependencies manually or the setup script doesn't work for your distribution:
+If you prefer to install dependencies manually:
 
 ### Ubuntu / Debian
 
 ```bash
-# Update package list
 sudo apt update
 
 # Core Tauri dependencies
@@ -50,7 +50,7 @@ sudo apt install -y \
   file \
   pkg-config
 
-# SSL and crypto (for keychain/secure storage)
+# SSL and secure storage
 sudo apt install -y \
   libssl-dev \
   libsecret-1-dev
@@ -68,31 +68,20 @@ sudo apt install -y \
 ### Fedora / RHEL
 
 ```bash
-# Update system
 sudo dnf update -y
 
-# Core Tauri dependencies
 sudo dnf install -y \
   webkit2gtk4.1-devel \
   gtk3-devel \
   libappindicator-gtk3-devel \
   librsvg2-devel
 
-# Build tools
 sudo dnf groupinstall -y "Development Tools"
-sudo dnf install -y \
-  curl \
-  wget \
-  file \
-  pkg-config
+sudo dnf install -y curl wget file pkg-config
 
-# SSL and crypto
 sudo dnf install -y \
   openssl-devel \
-  libsecret-devel
-
-# Additional libraries
-sudo dnf install -y \
+  libsecret-devel \
   glib2-devel \
   cairo-devel \
   pango-devel \
@@ -104,36 +93,12 @@ sudo dnf install -y \
 ### Arch Linux
 
 ```bash
-# Update system
 sudo pacman -Syu --noconfirm
 
-# Core Tauri dependencies
 sudo pacman -S --noconfirm --needed \
-  webkit2gtk-4.1 \
-  gtk3 \
-  libayatana-appindicator \
-  librsvg
-
-# Build tools
-sudo pacman -S --noconfirm --needed \
-  base-devel \
-  curl \
-  wget \
-  file \
-  pkgconf
-
-# SSL and crypto
-sudo pacman -S --noconfirm --needed \
-  openssl \
-  libsecret
-
-# Additional libraries
-sudo pacman -S --noconfirm --needed \
-  glib2 \
-  cairo \
-  pango \
-  gdk-pixbuf2 \
-  libsoup3
+  webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg \
+  base-devel curl wget file pkgconf \
+  openssl libsecret glib2 cairo pango gdk-pixbuf2 libsoup3
 ```
 
 ### Install Rust
@@ -142,24 +107,19 @@ sudo pacman -S --noconfirm --needed \
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
 
-# Verify installation (minimum required: 1.77.2)
+# Verify (minimum required: 1.77.2)
 rustc --version
 ```
 
 ### Install Node.js
 
-Using nvm (recommended):
-
 ```bash
+# Using nvm (recommended)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source ~/.bashrc  # or ~/.zshrc
+source ~/.bashrc
 
 nvm install --lts
 nvm use --lts
-
-# Verify installation
-node --version
-npm --version
 ```
 
 ### Install Tauri CLI
@@ -170,35 +130,47 @@ cargo install tauri-cli
 
 ## Development
 
-### Running in Development Mode
-
 ```bash
-# Start the development server with hot reload
-npm run tauri:dev
+npm run dev:linux
 ```
 
-### Building for Production
+Starts the Tauri dev server with hot reload on `http://localhost:5174`.
+
+## Build Commands
+
+### Build All Formats (deb + AppImage)
 
 ```bash
-# Build all formats (deb, AppImage)
-./build-linux.sh
-
-# Build only .deb package
-./build-linux.sh --deb
-
-# Build only AppImage
-./build-linux.sh --appimage
-
-# Build only .rpm package (requires rpmbuild)
-./build-linux.sh --rpm
-
-# Skip frontend build (use existing dist/)
-./build-linux.sh --skip-frontend
+npm run build:linux
 ```
 
-Output files will be in:
-- `dist-linux/` - Distribution-ready packages
-- `src-tauri/target/release/bundle/` - Raw build output
+### Build Specific Format
+
+```bash
+npm run build:linux:deb        # .deb only (Debian/Ubuntu)
+npm run build:linux:appimage   # AppImage only (Universal)
+```
+
+Output files are placed in `dist-linux/`.
+
+### Bundle Optimization
+
+```bash
+npm run optimize-bundle:linux
+```
+
+Removes unused platform binaries, source maps, and test files from the node-sdk to reduce bundle size.
+
+## Release
+
+```bash
+# Full release (build + optimize + package + checksums)
+npm run release:linux
+
+# Release specific format
+npm run release:linux:deb
+npm run release:linux:appimage
+```
 
 ## Package Formats
 
@@ -208,7 +180,7 @@ Output files will be in:
 # Install
 sudo dpkg -i dist-linux/quack_*.deb
 
-# If dependencies are missing
+# Fix missing dependencies
 sudo apt-get install -f
 
 # Uninstall
@@ -218,37 +190,48 @@ sudo apt remove quack
 ### AppImage (Universal)
 
 ```bash
-# Make executable
+# Make executable and run
 chmod +x dist-linux/Quack_*.AppImage
-
-# Run directly
 ./dist-linux/Quack_*.AppImage
-
-# Or integrate with AppImageLauncher
 ```
 
 ### .rpm (Fedora/RHEL)
 
 ```bash
 # Install
-sudo rpm -i dist-linux/quack_*.rpm
-
-# Or using dnf
 sudo dnf install ./dist-linux/quack_*.rpm
 
 # Uninstall
 sudo dnf remove quack
 ```
 
+## Feature Support
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Core UI | Full | |
+| Terminal emulator | Full | PTY-based |
+| Native terminal integration | Full | gnome-terminal, konsole, etc. |
+| System tray | Full | Requires libayatana-appindicator |
+| Transparent windows | Partial | Requires compositor |
+| Keychain / Secrets | Full | Via libsecret |
+| File explorer | Full | |
+| Git integration | Full | |
+| AI integration | Full | |
+
+## Known Limitations
+
+1. **Window title bar:** Uses standard GTK decorations instead of macOS overlay style.
+2. **Dock badge:** The "DEV" badge is macOS-only. Linux shows "[DEV MODE]" in the title.
+3. **Window focus/close:** Requires `wmctrl` or `xdotool` for native terminal focus operations.
+
 ## Troubleshooting
 
-### WebKitGTK Not Found
+### WebKitGTK not found
 
 ```
 error: could not find system library 'webkit2gtk-4.1'
 ```
-
-**Solution:** Install the WebKitGTK development package:
 
 ```bash
 # Ubuntu/Debian
@@ -261,9 +244,9 @@ sudo dnf install webkit2gtk4.1-devel
 sudo pacman -S webkit2gtk-4.1
 ```
 
-### AppIndicator/Tray Icon Not Showing
+### Tray icon not showing
 
-The system tray requires `libayatana-appindicator3`. If the tray icon doesn't appear:
+Some desktop environments (e.g. vanilla GNOME) don't show tray icons by default. Install the "AppIndicator and KStatusNotifierItem Support" extension.
 
 ```bash
 # Ubuntu/Debian
@@ -276,11 +259,7 @@ sudo dnf install libappindicator-gtk3
 sudo pacman -S libayatana-appindicator
 ```
 
-**Note:** Some desktop environments (like vanilla GNOME) don't show tray icons by default. You may need to install an extension like "AppIndicator and KStatusNotifierItem Support".
-
-### Keychain/Secret Storage Issues
-
-Quack uses the system keychain for secure API key storage. If you have issues:
+### Keychain / secret storage issues
 
 ```bash
 # Ubuntu/Debian
@@ -292,33 +271,32 @@ sudo dnf install libsecret gnome-keyring
 # Arch
 sudo pacman -S libsecret gnome-keyring
 
-# Start the keyring daemon if not running
+# Start keyring daemon if not running
 eval $(gnome-keyring-daemon --start)
 export SSH_AUTH_SOCK
 ```
 
-### Transparent Window Issues
+### Transparent window shows black background
 
-Transparent windows require a compositor. If you see a black background instead of transparency:
+Requires a compositor:
+- **X11:** Enable `picom`, `compton`, or your desktop's built-in compositor
+- **Wayland:** Compositor is always enabled, but transparency may behave differently
 
-- **X11:** Enable a compositor like `picom`, `compton`, or your desktop's built-in compositor
-- **Wayland:** Compositor is always enabled, but transparency might behave differently
-
-### AppImage Won't Run
+### AppImage won't run
 
 ```bash
 # Install FUSE
 sudo apt install fuse libfuse2
 
-# Make sure it's executable
+# Make executable
 chmod +x Quack_*.AppImage
 
-# Try extracting and running directly
+# Alternative: extract and run
 ./Quack_*.AppImage --appimage-extract
 ./squashfs-root/AppRun
 ```
 
-### Build Fails with "pkg-config not found"
+### pkg-config not found
 
 ```bash
 # Ubuntu/Debian
@@ -331,9 +309,9 @@ sudo dnf install pkg-config
 sudo pacman -S pkgconf
 ```
 
-## Window Management Tools (Optional)
+### Window management tools (optional)
 
-For better native terminal integration, install window management tools:
+For native terminal integration:
 
 ```bash
 # Ubuntu/Debian
@@ -346,56 +324,25 @@ sudo dnf install wmctrl xdotool
 sudo pacman -S wmctrl xdotool
 ```
 
-These tools enable:
-- Focusing terminal windows by name
-- Closing terminal windows programmatically
-- Better integration with external terminal emulators
-
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `TERMINAL` | Preferred terminal emulator | Auto-detected |
-| `DISPLAY` | X11 display (for X11 sessions) | `:0` |
+| `DISPLAY` | X11 display | `:0` |
 | `WAYLAND_DISPLAY` | Wayland display | Auto-detected |
+| `APPIMAGE_EXTRACT_AND_RUN` | Run AppImage tools without FUSE (VMs) | Not set |
 
-## Feature Support Matrix
+## npm Scripts Reference
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Core UI | ✅ Full | |
-| Terminal emulator | ✅ Full | PTY-based |
-| Native terminal integration | ✅ Full | gnome-terminal, konsole, etc. |
-| System tray | ✅ Full | Requires libayatana-appindicator |
-| Menu bar | ✅ Full | |
-| Transparent windows | ⚠️ Partial | Requires compositor |
-| Keychain/Secrets | ✅ Full | Via libsecret |
-| File explorer | ✅ Full | |
-| Git integration | ✅ Full | |
-| AI integration | ✅ Full | |
-| Window decorations | ✅ Full | Standard GTK decorations |
-
-## Known Limitations
-
-1. **Window title bar style:** Linux uses standard GTK decorations instead of the custom overlay style on macOS.
-
-2. **Dock badge:** The "DEV" badge on the dock icon is macOS-only. On Linux, the app title shows "[DEV MODE]" instead.
-
-3. **Native terminal focus:** Window focus/close operations require `wmctrl` or `xdotool` to be installed.
-
-## Contributing
-
-When contributing Linux-specific changes:
-
-1. Test on at least Ubuntu and one other distribution
-2. Use `#[cfg(target_os = "linux")]` for Linux-specific code
-3. Document any new system dependencies
-4. Update this README if needed
-
-## Support
-
-If you encounter issues:
-
-1. Check the troubleshooting section above
-2. Run with `RUST_LOG=debug npm run tauri:dev` for detailed logs
-3. Open an issue on GitHub with your distribution and error logs
+| Script | Description |
+|--------|-------------|
+| `dev:linux` | Start dev server with hot reload |
+| `build:linux` | Build all formats (deb + AppImage) |
+| `build:linux:deb` | Build .deb package only |
+| `build:linux:appimage` | Build AppImage only |
+| `optimize-bundle:linux` | Optimize node-sdk bundle size |
+| `release:linux` | Full release pipeline |
+| `release:linux:deb` | Release .deb only |
+| `release:linux:appimage` | Release AppImage only |
+| `setup:linux` | Install system dependencies |

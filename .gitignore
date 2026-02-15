@@ -36,3 +36,4 @@ src-tauri/binaries/
 .quack/active-agents.json
 .quack/teams/
 /CLAUDE.md
+dist-linux
