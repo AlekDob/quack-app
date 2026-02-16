@@ -23,6 +23,7 @@ interface ActionIconsProps {
   onBrowserClick: () => void;
   onDroidFactoryClick: () => void;
   onMemoryGraphClick?: () => void;
+  onSecondBrainClick?: () => void;
   onGuideClick: () => void;
   onClaudeAssetsClick?: () => void;
   onToggleSidePanel: () => void;
