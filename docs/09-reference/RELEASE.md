@@ -115,7 +115,7 @@ Add these secrets on GitHub:
 4. **Multi-platform build**:
    - macOS: `.dmg` and `.app`
    - Windows: `.msi`
-   - Linux: `.AppImage` and `.deb`
+   - Linux: `.deb`
 5. **Create GitHub Release**: Tag `v0.1.1` with automatic changelog
 6. **Upload artifacts**: Upload all build files
 7. **Commit version bump**: Update version files in the repo
@@ -129,7 +129,7 @@ https://github.com/alekdob/quack-app/releases
 │  ├─ Quack_0.1.1_aarch64.dmg (macOS Apple Silicon)
 │  ├─ Quack_0.1.1_x64.dmg (macOS Intel)
 │  ├─ Quack_0.1.1_x64.msi (Windows)
-│  ├─ Quack_0.1.1_amd64.AppImage (Linux)
+│  ├─ Quack_0.1.1_amd64.deb (Linux)
 │  └─ latest.json (update manifest)
 ```
 

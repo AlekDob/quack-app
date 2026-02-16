@@ -70,14 +70,6 @@ install_debian() {
         libsoup-3.0-dev \
         libjavascriptcoregtk-4.1-dev
     
-    # Optional: AppImage tools
-    if ! command -v appimagetool &> /dev/null; then
-        echo -e "${YELLOW}Installing AppImage tools...${NC}"
-        wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool
-        chmod +x /tmp/appimagetool
-        sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-    fi
-    
     echo -e "${GREEN}✓ Debian/Ubuntu dependencies installed${NC}"
 }
 

@@ -51,12 +51,8 @@
     "optimize-bundle:win": "powershell -ExecutionPolicy Bypass -File scripts/optimize-bundle-windows.ps1",
     "dev:linux": "./scripts/dev-linux.sh",
     "build:linux": "./scripts/build-linux.sh",
-    "build:linux:deb": "./scripts/build-linux.sh --deb",
-    "build:linux:appimage": "./scripts/build-linux.sh --appimage",
     "optimize-bundle:linux": "./scripts/optimize-bundle-linux.sh",
     "release:linux": "./scripts/release-linux.sh",
-    "release:linux:deb": "./scripts/release-linux.sh --deb",
-    "release:linux:appimage": "./scripts/release-linux.sh --appimage",
     "setup:linux": "./scripts/setup-linux.sh"
   },
   "dependencies": {

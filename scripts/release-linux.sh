@@ -1,19 +1,16 @@
 #!/bin/bash
 
 # =============================================================================
-# Quack - Complete Linux Release Script
+# Quack - Linux Release Script
 # =============================================================================
-# This script automates the entire release process for Linux:
+# Automates the release process for Linux (.deb):
 # 1. Build the frontend
-# 2. Optimize node-sdk (remove unused platform binaries)
-# 3. Build Tauri packages (deb, AppImage)
+# 2. Optimize node-sdk
+# 3. Build Tauri .deb package
 # 4. Generate SHA256 checksums
-# 5. Create distribution directory with all artifacts
+# 5. Create distribution directory
 #
 # Usage: ./scripts/release-linux.sh [OPTIONS]
-#   --deb         Build only .deb package
-#   --appimage    Build only AppImage
-#   --rpm         Build only .rpm package
 #   --skip-build  Skip frontend build (use existing dist/)
 # =============================================================================
 
@@ -39,43 +36,26 @@ fi
 # Increase Node.js memory limit for large builds
 export NODE_OPTIONS="--max-old-space-size=8192"
 
-# Allow AppImage tools (linuxdeploy) to run without FUSE (needed in VMs)
-export APPIMAGE_EXTRACT_AND_RUN=1
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}"
 echo "=================================================================="
-echo "           Quack Linux Release Script"
+echo "           Quack Linux Release Script (.deb)"
 echo "=================================================================="
 echo -e "${NC}"
 
 cd "$PROJECT_ROOT"
 
 # Parse command line arguments
-BUILD_TARGET="all"
 SKIP_BUILD=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --deb)
-            BUILD_TARGET="deb"
-            shift
-            ;;
-        --rpm)
-            BUILD_TARGET="rpm"
-            shift
-            ;;
-        --appimage)
-            BUILD_TARGET="appimage"
-            shift
-            ;;
         --skip-build)
             SKIP_BUILD=true
             shift
@@ -84,9 +64,6 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --deb           Build only .deb package (Debian/Ubuntu)"
-            echo "  --rpm           Build only .rpm package (Fedora/RHEL)"
-            echo "  --appimage      Build only AppImage (Universal)"
             echo "  --skip-build    Skip frontend build (use existing dist/)"
             echo "  --help, -h      Show this help message"
             exit 0
@@ -172,31 +149,10 @@ optimize_bundle() {
 
 # ==== Build Tauri ====
 build_tauri() {
-    echo -e "${YELLOW}[4/6] Building Tauri packages...${NC}"
-
-    local tauri_args=""
-
-    case $BUILD_TARGET in
-        deb)
-            tauri_args="--bundles deb"
-            echo "  Building .deb package..."
-            ;;
-        rpm)
-            tauri_args="--bundles rpm"
-            echo "  Building .rpm package..."
-            ;;
-        appimage)
-            tauri_args="--bundles appimage"
-            echo "  Building AppImage..."
-            ;;
-        all)
-            tauri_args="--bundles deb,appimage"
-            echo "  Building all packages (deb, AppImage)..."
-            ;;
-    esac
+    echo -e "${YELLOW}[4/6] Building Tauri .deb package...${NC}"
 
     # Skip beforeBuildCommand since we already built the frontend and optimized the bundle
-    cargo tauri build $tauri_args --config '{"build":{"beforeBuildCommand":""}}'
+    cargo tauri build --bundles deb --config '{"build":{"beforeBuildCommand":""}}'
 
     echo -e "${GREEN}Tauri build complete${NC}"
     echo ""
@@ -210,31 +166,12 @@ create_distribution() {
     rm -rf "$DIST_DIR"
     mkdir -p "$DIST_DIR"
 
-    # Copy .deb if exists
+    # Copy .deb
     if [ -d "$BUNDLE_DIR/deb" ]; then
         DEB_FILE=$(find "$BUNDLE_DIR/deb" -name "*.deb" | head -1)
         if [ -n "$DEB_FILE" ] && [ -f "$DEB_FILE" ]; then
             cp "$DEB_FILE" "$DIST_DIR/"
             echo -e "${GREEN}  + .deb: $(basename $DEB_FILE)${NC}"
-        fi
-    fi
-
-    # Copy AppImage if exists
-    if [ -d "$BUNDLE_DIR/appimage" ]; then
-        APPIMAGE_FILE=$(find "$BUNDLE_DIR/appimage" -name "*.AppImage" | head -1)
-        if [ -n "$APPIMAGE_FILE" ] && [ -f "$APPIMAGE_FILE" ]; then
-            cp "$APPIMAGE_FILE" "$DIST_DIR/"
-            chmod +x "$DIST_DIR/$(basename $APPIMAGE_FILE)"
-            echo -e "${GREEN}  + AppImage: $(basename $APPIMAGE_FILE)${NC}"
-        fi
-    fi
-
-    # Copy .rpm if exists
-    if [ -d "$BUNDLE_DIR/rpm" ]; then
-        RPM_FILE=$(find "$BUNDLE_DIR/rpm" -name "*.rpm" | head -1)
-        if [ -n "$RPM_FILE" ] && [ -f "$RPM_FILE" ]; then
-            cp "$RPM_FILE" "$DIST_DIR/"
-            echo -e "${GREEN}  + .rpm: $(basename $RPM_FILE)${NC}"
         fi
     fi
 
@@ -247,11 +184,10 @@ generate_checksums() {
 
     cd "$DIST_DIR"
 
-    # Generate checksum for each file
     CHECKSUM_FILE="SHA256SUMS.txt"
     rm -f "$CHECKSUM_FILE"
 
-    for file in *.deb *.AppImage *.rpm; do
+    for file in *.deb; do
         if [ -f "$file" ] 2>/dev/null; then
             sha256sum "$file" >> "$CHECKSUM_FILE"
             echo -e "${GREEN}  + $(sha256sum "$file" | cut -c1-16)... $file${NC}"
@@ -270,43 +206,18 @@ generate_checksums() {
 # ==== Create README ====
 create_readme() {
     cat > "$DIST_DIR/README.md" << 'EOF'
-# Quack Installation Instructions for Linux
+# Quack - Linux Installation
 
-## Installation Methods
-
-### Option 1: .deb Package (Debian/Ubuntu)
+## Install (.deb - Debian/Ubuntu)
 
 ```bash
-sudo dpkg -i quack_*.deb
+sudo dpkg -i Quack_*.deb
 
-# If there are dependency errors, run:
+# If there are dependency errors:
 sudo apt-get install -f
 ```
 
-### Option 2: AppImage (Universal)
-
-```bash
-# Make executable
-chmod +x Quack_*.AppImage
-
-# Run directly
-./Quack_*.AppImage
-
-# Or install with AppImageLauncher for better integration
-```
-
-### Option 3: .rpm Package (Fedora/RHEL)
-
-```bash
-sudo rpm -i quack_*.rpm
-
-# Or using dnf:
-sudo dnf install ./quack_*.rpm
-```
-
 ## Verifying Downloads
-
-Verify the integrity of downloaded files using SHA256 checksums:
 
 ```bash
 sha256sum -c SHA256SUMS.txt
@@ -314,7 +225,7 @@ sha256sum -c SHA256SUMS.txt
 
 ## First Run
 
-After installation, you can launch Quack from:
+After installation, launch Quack from:
 - Application menu (search for "Quack")
 - Terminal: `quack` or `/opt/quack/quack`
 
@@ -322,35 +233,18 @@ After installation, you can launch Quack from:
 
 ### Missing Libraries
 
-If you get library errors, install dependencies:
-
-**Ubuntu/Debian:**
 ```bash
 sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1
 ```
 
-**Fedora:**
-```bash
-sudo dnf install webkit2gtk4.1 gtk3 libappindicator-gtk3
-```
-
-### AppImage Won't Run
-
-1. Make sure it's executable: `chmod +x Quack_*.AppImage`
-2. Install FUSE if needed: `sudo apt install fuse libfuse2`
-
 ### Keychain Issues
 
-For secure API key storage, install libsecret:
+For secure API key storage:
 ```bash
-# Ubuntu/Debian
 sudo apt install libsecret-1-0 gnome-keyring
-
-# Fedora
-sudo dnf install libsecret gnome-keyring
 ```
 
-Enjoy using Quack!
+Enjoy using Quack! 🦆
 EOF
 
     echo "README.md created"
@@ -364,19 +258,16 @@ print_summary() {
     echo "=================================================================="
     echo -e "${NC}"
     echo ""
-    echo "Distribution files created in: $DIST_DIR/"
+    echo "Distribution files in: $DIST_DIR/"
     echo ""
 
     if [ -d "$DIST_DIR" ]; then
         echo "Files:"
-        ls -lh "$DIST_DIR"/*.deb "$DIST_DIR"/*.AppImage "$DIST_DIR"/*.rpm 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+        ls -lh "$DIST_DIR"/*.deb 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
         echo ""
     fi
 
-    echo "Installation commands:"
-    echo "  Debian/Ubuntu: sudo dpkg -i $DIST_DIR/quack_*.deb"
-    echo "  AppImage:      chmod +x $DIST_DIR/Quack_*.AppImage && ./Quack_*.AppImage"
-    echo "  Fedora/RHEL:   sudo rpm -i $DIST_DIR/quack_*.rpm"
+    echo "Installation: sudo dpkg -i $DIST_DIR/Quack_*.deb"
     echo ""
     echo "Verify checksums:"
     echo "  cd $DIST_DIR && sha256sum -c SHA256SUMS.txt"

@@ -307,4 +307,37 @@ npm run tauri:build:universal
 
 ---
 
+---
+
+## 🐧 Linux Build
+
+### Setup (una tantum)
+
+```bash
+./scripts/setup-linux.sh
+```
+
+Installa tutte le dipendenze necessarie (WebKitGTK, GTK3, libsecret, ecc.) su Ubuntu/Debian, Fedora o Arch.
+
+### Build .deb (Debian/Ubuntu)
+
+```bash
+npm run build:linux
+```
+
+**Output:** `dist-linux/Quack_*.deb`
+
+**Installazione:**
+```bash
+sudo dpkg -i dist-linux/Quack_*.deb
+sudo apt-get install -f  # se ci sono errori di dipendenze
+```
+
+**Opzioni:**
+- `--skip-frontend` — Salta la build del frontend (usa il `dist/` esistente)
+
+> **Nota:** Il build Linux produce solo pacchetti `.deb`. AppImage e RPM non sono supportati.
+
+---
+
 **Documentazione generata da Quack Agency 🦆**

@@ -138,20 +138,11 @@ Starts the Tauri dev server with hot reload on `http://localhost:5174`.
 
 ## Build Commands
 
-### Build All Formats (deb + AppImage)
-
 ```bash
 npm run build:linux
 ```
 
-### Build Specific Format
-
-```bash
-npm run build:linux:deb        # .deb only (Debian/Ubuntu)
-npm run build:linux:appimage   # AppImage only (Universal)
-```
-
-Output files are placed in `dist-linux/`.
+Produces a `.deb` package in `dist-linux/`.
 
 ### Bundle Optimization
 
@@ -166,43 +157,21 @@ Removes unused platform binaries, source maps, and test files from the node-sdk 
 ```bash
 # Full release (build + optimize + package + checksums)
 npm run release:linux
-
-# Release specific format
-npm run release:linux:deb
-npm run release:linux:appimage
 ```
 
-## Package Formats
+## Installation
 
 ### .deb (Debian/Ubuntu)
 
 ```bash
 # Install
-sudo dpkg -i dist-linux/quack_*.deb
+sudo dpkg -i dist-linux/Quack_*.deb
 
 # Fix missing dependencies
 sudo apt-get install -f
 
 # Uninstall
 sudo apt remove quack
-```
-
-### AppImage (Universal)
-
-```bash
-# Make executable and run
-chmod +x dist-linux/Quack_*.AppImage
-./dist-linux/Quack_*.AppImage
-```
-
-### .rpm (Fedora/RHEL)
-
-```bash
-# Install
-sudo dnf install ./dist-linux/quack_*.rpm
-
-# Uninstall
-sudo dnf remove quack
 ```
 
 ## Feature Support
@@ -282,20 +251,6 @@ Requires a compositor:
 - **X11:** Enable `picom`, `compton`, or your desktop's built-in compositor
 - **Wayland:** Compositor is always enabled, but transparency may behave differently
 
-### AppImage won't run
-
-```bash
-# Install FUSE
-sudo apt install fuse libfuse2
-
-# Make executable
-chmod +x Quack_*.AppImage
-
-# Alternative: extract and run
-./Quack_*.AppImage --appimage-extract
-./squashfs-root/AppRun
-```
-
 ### pkg-config not found
 
 ```bash
@@ -331,18 +286,13 @@ sudo pacman -S wmctrl xdotool
 | `TERMINAL` | Preferred terminal emulator | Auto-detected |
 | `DISPLAY` | X11 display | `:0` |
 | `WAYLAND_DISPLAY` | Wayland display | Auto-detected |
-| `APPIMAGE_EXTRACT_AND_RUN` | Run AppImage tools without FUSE (VMs) | Not set |
 
 ## npm Scripts Reference
 
 | Script | Description |
 |--------|-------------|
 | `dev:linux` | Start dev server with hot reload |
-| `build:linux` | Build all formats (deb + AppImage) |
-| `build:linux:deb` | Build .deb package only |
-| `build:linux:appimage` | Build AppImage only |
+| `build:linux` | Build .deb package |
 | `optimize-bundle:linux` | Optimize node-sdk bundle size |
 | `release:linux` | Full release pipeline |
-| `release:linux:deb` | Release .deb only |
-| `release:linux:appimage` | Release AppImage only |
 | `setup:linux` | Install system dependencies |
