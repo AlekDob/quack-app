@@ -35,6 +35,7 @@ interface KanbanCardProps {
   hasMessages?: boolean;      // Whether there are messages in the chat
   messageCount?: number;      // Number of messages in the chat
   isDormant?: boolean;        // No user interaction yet (chat empty)
+  hasPendingQuestion?: boolean; // Whether the agent is awaiting user input (AskUserQuestion/PlanApproval)
   processingDocumentation?: Set<string>; // Set of task IDs currently processing documentation
   onClick?: () => void;
   onDelete?: () => void | Promise<void>;
@@ -89,6 +90,7 @@ export default function KanbanCard({
   hasMessages = false,
   messageCount = 0,
   isDormant = true,
+  hasPendingQuestion = false,
   processingDocumentation,
   onClick,
   onDelete,
@@ -380,8 +382,18 @@ export default function KanbanCard({
           </div>
         )}
 
+        {/* Awaiting Input indicator - shows when agent needs user response */}
+        {isAgentTask && hasPendingQuestion && (
+          <div className="kanban-card-ready-row">
+            <span className="kanban-awaiting-badge">
+              <span className="kanban-awaiting-dot" />
+              Awaiting Input
+            </span>
+          </div>
+        )}
+
         {/* Ready indicator - shows when agent finished and awaiting review */}
-        {isAgentTask && isReady && (
+        {isAgentTask && isReady && !hasPendingQuestion && (
           <div className="kanban-card-ready-row">
             <span className="kanban-ready-badge">
               <span className="kanban-ready-dot" />

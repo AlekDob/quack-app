@@ -71,6 +71,8 @@ interface KanbanColumnProps {
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
   chatSessions?: Map<string, ChatMessage[]>;
+  // Pending questions state (for "Awaiting Input" badge)
+  pendingQuestionsChecker?: (sessionId: string) => boolean;
   // Drop target from parent (more reliable than internal isOver)
   isDropTarget?: boolean;
   // Handler for agent drop from sidebar (native HTML5 drag-and-drop)
@@ -96,6 +98,7 @@ export default function KanbanColumn({
   onOpenTerminal,
   chatLoadingMap,
   chatSessions,
+  pendingQuestionsChecker,
   isDropTarget = false,
   onSidebarAgentDrop,
   onClearAll,
@@ -246,11 +249,13 @@ export default function KanbanColumn({
 
   // Get column color based on status
   const getColumnColor = () => {
-    switch (id) {
+    switch (id as string) {
       case 'todo':
         return 'var(--kanban-todo-color, #6b7280)';
       case 'in_progress':
         return 'var(--kanban-progress-color, #f59e0b)';
+      case 'human_review':
+        return 'var(--kanban-review-color, #a855f7)';
       case 'done':
         return 'var(--kanban-done-color, #22c55e)';
       default:
@@ -304,6 +309,7 @@ export default function KanbanColumn({
             <div className="kanban-column-empty">
               {id === 'todo' && 'Drag an agent here or click Add Task'}
               {id === 'in_progress' && 'Drag tasks or agents here to start'}
+              {(id as string) === 'human_review' && 'Tasks waiting for your input will appear here'}
               {id === 'done' && 'Completed tasks will appear here'}
             </div>
           ) : id === 'done' && dateGroups.length > 0 ? (
@@ -360,6 +366,7 @@ export default function KanbanColumn({
                       hasMessages={hasMessages}
                       messageCount={messages.length}
                       isDormant={isDormant}
+                      hasPendingQuestion={pendingQuestionsChecker?.(task.id) ?? false}
                       onClick={() => onTaskClick(task)}
                       onDelete={() => onTaskDelete(task.id)}
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
@@ -370,7 +377,7 @@ export default function KanbanColumn({
               </div>
             ))
           ) : (
-            // Render flat list for TODO column
+            // Render flat list for TODO and Human Review columns
             tasks.map((task) => {
               const isLoading = chatLoadingMap?.get(task.id) || false;
               const messages = chatSessions?.get(task.id) || [];
@@ -386,6 +393,7 @@ export default function KanbanColumn({
                   hasMessages={hasMessages}
                   messageCount={messages.length}
                   isDormant={isDormant}
+                  hasPendingQuestion={pendingQuestionsChecker?.(task.id) ?? false}
                   onClick={() => onTaskClick(task)}
                   onDelete={() => onTaskDelete(task.id)}
                   onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}

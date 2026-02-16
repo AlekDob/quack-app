@@ -19,6 +19,7 @@
   --kanban-text-muted: rgba(255, 255, 255, 0.4);
   --kanban-todo-color: #6b7280;
   --kanban-progress-color: #f59e0b;
+  --kanban-review-color: #a855f7;
   --kanban-done-color: #22c55e;
   --kanban-accent: #f28c52;
 }
@@ -135,7 +136,7 @@
 /* Columns container */
 .kanban-columns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   flex: 1;
   overflow: hidden;
@@ -1627,6 +1628,39 @@
 }
 
 @keyframes ready-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Awaiting Input badge - shows in Human Review column */
+.kanban-awaiting-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--kanban-review-color, #a855f7);
+  background: rgba(168, 85, 247, 0.15);
+  flex-shrink: 0;
+  animation: awaiting-pulse 2s ease-in-out infinite;
+}
+
+.kanban-awaiting-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--kanban-review-color, #a855f7);
+  box-shadow: 0 0 4px rgba(168, 85, 247, 0.6);
+}
+
+@keyframes awaiting-pulse {
   0%, 100% {
     opacity: 1;
   }

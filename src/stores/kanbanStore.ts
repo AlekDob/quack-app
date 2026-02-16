@@ -83,6 +83,8 @@ interface KanbanState {
   sidebarDragAgentInfo: { name: string; color: string } | null;
   // Task IDs currently being documented (session IDs)
   processingDocumentation: Set<string>;
+  // Task IDs manually placed in Human Review column (ephemeral UI state)
+  manualHumanReviewIds: Set<string>;
 
   // Pagination state for Done column (infinite scroll)
   doneVisibleCount: number;
@@ -118,6 +120,10 @@ interface KanbanState {
   clearAgentDropRequest: () => void;
   setSidebarDragHoverColumn: (column: KanbanStatus | null) => void;
   setSidebarDragAgentInfo: (info: { name: string; color: string } | null) => void;
+  // Manual Human Review column management
+  addToHumanReview: (taskId: string) => void;
+  removeFromHumanReview: (taskId: string) => void;
+  isManualHumanReview: (taskId: string) => boolean;
   // Agent filter actions
   setAgentFilter: (agentId: string | null) => void;
   // Agent info management
@@ -161,6 +167,7 @@ export const useKanbanStore = create<KanbanState>()(
         sidebarDragHoverColumn: null,
         sidebarDragAgentInfo: null,
         processingDocumentation: new Set(),
+        manualHumanReviewIds: new Set(),
 
         // Pagination for Done column - show 20 tasks initially, load 20 more each time
         doneVisibleCount: 20,
@@ -282,6 +289,15 @@ export const useKanbanStore = create<KanbanState>()(
           }
 
           await sessionStore.updateSession(id, updates);
+
+          // Clear manual human review flag on any status change
+          const manualIds = get().manualHumanReviewIds;
+          if (manualIds.has(id)) {
+            const updated = new Set(manualIds);
+            updated.delete(id);
+            set({ manualHumanReviewIds: updated });
+          }
+
           console.log('[kanbanStore] Moved task (session):', id, 'to', newStatus);
 
           // Call completion callback if moving to done
@@ -389,6 +405,25 @@ export const useKanbanStore = create<KanbanState>()(
         // Set agent info for the card being dragged from sidebar
         setSidebarDragAgentInfo: (info: { name: string; color: string } | null) => {
           set({ sidebarDragAgentInfo: info });
+        },
+
+        // Manual Human Review: add a task to the column
+        addToHumanReview: (taskId) => {
+          const ids = new Set(get().manualHumanReviewIds);
+          ids.add(taskId);
+          set({ manualHumanReviewIds: ids });
+        },
+
+        // Manual Human Review: remove a task from the column
+        removeFromHumanReview: (taskId) => {
+          const ids = new Set(get().manualHumanReviewIds);
+          ids.delete(taskId);
+          set({ manualHumanReviewIds: ids });
+        },
+
+        // Manual Human Review: check if task was manually placed
+        isManualHumanReview: (taskId) => {
+          return get().manualHumanReviewIds.has(taskId);
         },
 
         // Set agent filter for Kanban view

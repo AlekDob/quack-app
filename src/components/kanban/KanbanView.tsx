@@ -28,6 +28,7 @@ import KanbanColumn from './KanbanColumn';
 import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal, { type KanbanTaskInitialValues, type KanbanTaskDraft } from './AddKanbanTaskModal';
 import { useKanbanStore } from '../../stores/kanbanStore';
+import { useChatStore } from '../../stores/chatStore';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
@@ -121,6 +122,10 @@ export default function KanbanView({
     hasMoreDoneTasks,
     loadMoreDone,
     isLoadingMoreDone,
+    // Manual Human Review tracking
+    addToHumanReview,
+    removeFromHumanReview,
+    isManualHumanReview,
   } = useKanbanStore();
 
   // 🦆 SESSIONS-FIRST: Sync agentInfoMap with terminals for proper avatar/color display
@@ -154,8 +159,9 @@ export default function KanbanView({
     const pointerCollisions = pointerWithin(args);
 
     // Find column collisions (prioritize these)
+    const columnIds = ['todo', 'in_progress', 'human_review', 'done'];
     const columnCollisions = pointerCollisions.filter(
-      collision => ['todo', 'in_progress', 'done'].includes(collision.id as string)
+      collision => columnIds.includes(collision.id as string)
     );
 
     // If we're over a column, return that
@@ -166,7 +172,7 @@ export default function KanbanView({
     // Fallback to rectIntersection for better detection
     const rectCollisions = rectIntersection(args);
     const columnRectCollisions = rectCollisions.filter(
-      collision => ['todo', 'in_progress', 'done'].includes(collision.id as string)
+      collision => columnIds.includes(collision.id as string)
     );
 
     if (columnRectCollisions.length > 0) {
@@ -179,11 +185,20 @@ export default function KanbanView({
 
   // 🦆 SESSIONS-FIRST: Get tasks from sessionStore via getters
   const todoTasks = getTasksByStatus('todo');
-  const inProgressTasks = getTasksByStatus('in_progress');
-  
+  const allInProgressTasks = getTasksByStatus('in_progress');
+
+  // 🦆 Split in_progress: tasks with pending questions OR manually placed → Human Review column
+  const hasPendingQuestion = useChatStore((s) => s.hasPendingQuestion);
+  const humanReviewTasks = allInProgressTasks.filter(task =>
+    hasPendingQuestion(task.id) || isManualHumanReview(task.id)
+  );
+  const inProgressTasks = allInProgressTasks.filter(task =>
+    !hasPendingQuestion(task.id) && !isManualHumanReview(task.id)
+  );
+
   // Create a combined array for find operations (used in drag handlers and drawer)
   const visibleDoneTasks = getVisibleDoneTasks();
-  const allTasks = [...todoTasks, ...inProgressTasks, ...visibleDoneTasks];
+  const allTasks = [...todoTasks, ...inProgressTasks, ...humanReviewTasks, ...visibleDoneTasks];
   // 🦆 SESSIONS-FIRST: Get total done count from getter
   const allDoneTasks = getTasksByStatus('done');
   const totalDoneTasks = allDoneTasks.length;
@@ -238,7 +253,7 @@ export default function KanbanView({
   // Handle drag over - track which column we're hovering
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
-    if (over && ['todo', 'in_progress', 'done'].includes(over.id as string)) {
+    if (over && ['todo', 'in_progress', 'human_review', 'done'].includes(over.id as string)) {
       setOverColumnId(over.id as string);
     } else {
       setOverColumnId(null);
@@ -257,11 +272,13 @@ export default function KanbanView({
     const overId = over.id as string;
 
     // Check if dropped on a column
-    if (['todo', 'in_progress', 'done'].includes(overId)) {
-      const newStatus = overId as KanbanStatus;
+    const validColumns = ['todo', 'in_progress', 'human_review', 'done'];
+    if (validColumns.includes(overId)) {
+      // human_review is a virtual column — underlying status is 'in_progress'
+      const newStatus: KanbanStatus = overId === 'human_review' ? 'in_progress' : overId as KanbanStatus;
       const task = allTasks.find((t) => t.id === taskId);
 
-      if (task && task.status !== newStatus) {
+      if (task) {
         // 🦆 Block moving to TODO if task has chat messages (conversation started)
         if (newStatus === 'todo') {
           const taskMessages = chatSessions.get(taskId) || [];
@@ -271,11 +288,22 @@ export default function KanbanView({
           }
         }
 
-        moveTask(taskId, newStatus);
+        // Track manual Human Review placement
+        if (overId === 'human_review') {
+          addToHumanReview(taskId);
+        } else {
+          // Moving OUT of human_review → clear manual flag
+          removeFromHumanReview(taskId);
+        }
 
-        // If moved to in_progress, open task in new tab
-        if (newStatus === 'in_progress' && onOpenTaskTab) {
-          onOpenTaskTab(task);
+        // Only call moveTask if actual status changes
+        if (task.status !== newStatus) {
+          moveTask(taskId, newStatus);
+
+          // If moved to in_progress, open task in new tab
+          if (newStatus === 'in_progress' && onOpenTaskTab) {
+            onOpenTaskTab(task);
+          }
         }
       }
     }
@@ -527,6 +555,7 @@ export default function KanbanView({
                         onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            pendingQuestionsChecker={hasPendingQuestion}
 
             isDropTarget={overColumnId === 'todo'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
@@ -549,8 +578,32 @@ export default function KanbanView({
                         onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            pendingQuestionsChecker={hasPendingQuestion}
 
             isDropTarget={overColumnId === 'in_progress'}
+            onSidebarAgentDrop={handleSidebarAgentDrop}
+          />
+
+          <KanbanColumn
+            id={'human_review' as KanbanStatus}
+            title="Human Review"
+            icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            }
+            tasks={humanReviewTasks}
+            onTaskClick={handleTaskClick}
+            onTaskDelete={handleTaskDelete}
+            onTaskEdit={handleTaskEdit}
+
+                        onOpenTerminal={onOpenTerminal}
+            chatLoadingMap={chatLoadingMap}
+            chatSessions={chatSessions}
+            pendingQuestionsChecker={hasPendingQuestion}
+
+            isDropTarget={overColumnId === 'human_review'}
             onSidebarAgentDrop={handleSidebarAgentDrop}
           />
 
@@ -571,6 +624,7 @@ export default function KanbanView({
                         onOpenTerminal={onOpenTerminal}
             chatLoadingMap={chatLoadingMap}
             chatSessions={chatSessions}
+            pendingQuestionsChecker={hasPendingQuestion}
 
             isDropTarget={overColumnId === 'done'}
             onSidebarAgentDrop={handleSidebarAgentDrop}

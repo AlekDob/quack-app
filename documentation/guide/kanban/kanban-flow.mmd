@@ -1,0 +1,77 @@
+graph LR
+    subgraph KANBAN["🦆 Kanban Board — 4 Columns"]
+        direction LR
+
+        subgraph TODO["📋 TODO"]
+            T1["New Task"]
+        end
+
+        subgraph INPROGRESS["⏳ In Progress"]
+            direction TB
+            READY["🟢 READY<br/>Agent finished"]
+            WORKING["🟠 WORKING<br/>Agent streaming"]
+            COLD["🔵 COLD<br/>Never started"]
+        end
+
+        subgraph REVIEW["👤 Human Review"]
+            direction TB
+            QUESTION["❓ AskUserQuestion"]
+            PLAN["📋 Plan Approval"]
+            MANUAL["🖐 Manual Placement"]
+        end
+
+        subgraph DONE["✅ Done"]
+            D1["Completed"]
+        end
+    end
+
+    %% Normal flow
+    T1 -->|"Start task"| WORKING
+    WORKING -->|"Agent finishes"| READY
+    READY -->|"User moves"| D1
+
+    %% Human Review auto-flow
+    WORKING -->|"Agent asks question<br/>(auto)"| QUESTION
+    WORKING -->|"Agent requests plan<br/>(auto)"| PLAN
+    QUESTION -->|"User answers<br/>(auto)"| WORKING
+    PLAN -->|"User approves<br/>(auto)"| WORKING
+
+    %% Manual drag to Human Review
+    READY -->|"User drags<br/>(manual)"| MANUAL
+    WORKING -->|"User drags<br/>(manual)"| MANUAL
+    COLD -->|"User drags<br/>(manual)"| MANUAL
+    MANUAL -->|"User drags out"| INPROGRESS
+
+    %% From Human Review to Done
+    QUESTION -->|"Drag to Done"| D1
+    PLAN -->|"Drag to Done"| D1
+    MANUAL -->|"Drag to Done"| D1
+
+    %% Detection mechanism
+    subgraph DETECTION["🔍 Detection (OR logic)"]
+        CS["chatStore<br/>pendingQuestionsMap"]
+        HPQ["hasPendingQuestion()"]
+        MR["kanbanStore<br/>manualHumanReviewIds"]
+        IMR["isManualHumanReview()"]
+    end
+
+    CS --> HPQ
+    MR --> IMR
+    HPQ -->|"true → Human Review"| REVIEW
+    IMR -->|"true → Human Review"| REVIEW
+    HPQ -->|"false"| CHECK
+    IMR -->|"false"| CHECK
+    CHECK{{"Both false?"} -->|"yes → In Progress"| INPROGRESS
+
+    %% Styling
+    classDef todo fill:#374151,stroke:#6b7280,color:#e4e4e7
+    classDef progress fill:#78350f,stroke:#f59e0b,color:#fbbf24
+    classDef review fill:#581c87,stroke:#a855f7,color:#d8b4fe
+    classDef done fill:#14532d,stroke:#22c55e,color:#86efac
+    classDef detect fill:#1e293b,stroke:#64748b,color:#94a3b8
+
+    class T1 todo
+    class READY,WORKING,COLD progress
+    class QUESTION,PLAN,MANUAL review
+    class D1 done
+    class CS,HPQ,MR,IMR detect

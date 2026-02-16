@@ -11482,8 +11482,6 @@ You have access to all Bash tools to execute git commands like:
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
                     onOpenImageTab={handleOpenImageTab}
-                    // Open markdown files in Quack tab
-                    onOpenInQuack={handleFilePathClick}
                     // Open Agent Personality in sidebar
                     onOpenPersonality={() => {
                       // Ensure side panel is not collapsed, then expand Agent Personality section
@@ -11632,8 +11630,6 @@ You have access to all Bash tools to execute git commands like:
                     // File Checkpointing (SDK 0.2.7+)
                     onRewindFiles={handleRewindFiles}
                     onOpenImageTab={handleOpenImageTab}
-                    // Open markdown files in Quack tab
-                    onOpenInQuack={handleFilePathClick}
                     // Open Agent Personality in sidebar
                     onOpenPersonality={() => {
                       // Ensure side panel is not collapsed, then expand Agent Personality section
