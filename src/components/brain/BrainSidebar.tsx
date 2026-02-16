@@ -44,7 +44,9 @@ interface BrainSidebarProps {
 }
 
 function shortenPath(path: string): string {
-  return path.replace(/^\/Users\/[^/]+/, '~');
+  return path
+    .replace(/^\/Users\/[^/]+/, '~')
+    .replace(/^[A-Z]:\\Users\\[^\\]+/, '~');
 }
 
 const categories = [

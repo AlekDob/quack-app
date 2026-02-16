@@ -172,6 +172,8 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
   };
 
   const simpleMarkdownToHtml = (md: string) => {
+    // Normalize CRLF (Windows) to LF so regex patterns match consistently
+    md = md.replace(/\r\n/g, '\n');
     // Extract fenced code blocks first to protect them
     const codeBlocks: string[] = [];
     let processed = md.replace(/```[\s\S]*?```/g, (match) => {

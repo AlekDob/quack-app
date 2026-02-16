@@ -32,7 +32,7 @@ export default function BrainApp({ projectPath }: BrainAppProps) {
   const [activeGuideFeature, setActiveGuideFeature] = useState<string>('');
 
   const isGlobal = scope === 'global';
-  const projectName = projectPath?.split('/').pop() || '';
+  const projectName = projectPath?.split(/[\\/]/).pop() || '';
   const [brainPath, setBrainPath] = useState<string>('');
   const [mapPath, setMapPath] = useState<string | null>(null);
   const [claudeMdPath, setClaudeMdPath] = useState<string | null>(null);

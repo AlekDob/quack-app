@@ -326,6 +326,9 @@ function inferTypeFromPath(filePath: string): string {
 }
 
 function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
+  // Normalize CRLF (Windows) to LF so regex patterns match consistently
+  raw = raw.replace(/\r\n/g, '\n');
+
   // Handle .mmd files (Mermaid diagrams — no frontmatter)
   if (filePath.endsWith('.mmd')) {
     const fileName = filePath.split('/').pop()?.replace('.mmd', '') || 'Diagram';
