@@ -43,7 +43,7 @@ export default function GeneralSettings() {
   };
 
   // Auto-inject userName into ~/.claude/CLAUDE.md (debounced)
-  const injectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const injectTimer = useRef<ReturnType<typeof setTimeout>>(null);
   useEffect(() => {
     if (injectTimer.current) clearTimeout(injectTimer.current);
     if (!userName) return;
