@@ -7,7 +7,7 @@
  */
 
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
+use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
@@ -19,7 +19,7 @@ use tokio::sync::Mutex;
 
 /// Manager for teammate session watchers (one per session)
 pub struct TeammateSessionWatcher {
-    watchers: Arc<Mutex<HashMap<String, Debouncer<RecommendedWatcher, FileIdMap>>>>,
+    watchers: Arc<Mutex<HashMap<String, Debouncer<RecommendedWatcher, RecommendedCache>>>>,
     file_positions: Arc<Mutex<HashMap<String, u64>>>,
 }
 

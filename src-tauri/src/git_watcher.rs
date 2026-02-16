@@ -6,7 +6,7 @@
  */
 
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
+use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -28,7 +28,7 @@ pub struct GitBranchChangedEvent {
 
 /// Manager for git branch watchers (one per project)
 pub struct GitBranchWatcherManager {
-    watchers: Arc<Mutex<HashMap<String, Debouncer<RecommendedWatcher, FileIdMap>>>>,
+    watchers: Arc<Mutex<HashMap<String, Debouncer<RecommendedWatcher, RecommendedCache>>>>,
 }
 
 impl GitBranchWatcherManager {
