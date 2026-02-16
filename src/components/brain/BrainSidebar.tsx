@@ -97,9 +97,26 @@ export default function BrainSidebar({
     onViewChange('guide');
   };
 
+  const displayTitle = scope === 'project' && projectName ? projectName : 'Quack Brain';
+
   return (
     <aside className="brain-sidebar" data-tauri-drag-region>
-      <div className="brain-sidebar-title" data-tauri-drag-region>Quack Brain</div>
+      <div className="brain-sidebar-title" data-tauri-drag-region>{displayTitle}</div>
+
+      {brainPath && (
+        <div className="brain-path-row">
+          <span className="brain-path-text" title={brainPath}>
+            {shortenPath(brainPath)}
+          </span>
+          <button
+            className="brain-path-finder"
+            onClick={() => invoke('reveal_in_finder', { path: brainPath })}
+            title="Open in Finder"
+          >
+            <ExternalLink size={12} />
+          </button>
+        </div>
+      )}
 
       <div className="brain-scope-toggle">
         <button
@@ -120,25 +137,7 @@ export default function BrainSidebar({
         </button>
       </div>
 
-      {brainPath && (
-        <div className="brain-path-row">
-          <div className="brain-path-info">
-            {scope === 'project' && projectName && (
-              <span className="brain-path-project">{projectName}</span>
-            )}
-            <span className="brain-path-text" title={brainPath}>
-              {shortenPath(brainPath)}
-            </span>
-          </div>
-          <button
-            className="brain-path-finder"
-            onClick={() => invoke('reveal_in_finder', { path: brainPath })}
-            title="Open in Finder"
-          >
-            <ExternalLink size={12} />
-          </button>
-        </div>
-      )}
+      <div className="brain-sidebar-divider" />
 
       <div className="brain-sidebar-section">
         {(hasMap || hasClaudeMd) && (

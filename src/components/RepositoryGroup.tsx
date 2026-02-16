@@ -61,6 +61,7 @@ interface RepositoryGroupProps {
   onContextMenu: (event: MouseEvent, terminal: TerminalInfo) => void;
   onOpenGitPanel?: () => void; // Function to open Git Panel drawer
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
+  onOpenBrain?: (projectPath: string) => void; // Open Brain window for this project
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onCreateAgent?: (projectPath: string) => void; // Create new agent associated with this project (passes project path)
   onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
@@ -1113,6 +1114,7 @@ export default function RepositoryGroup({
   onContextMenu,
   onOpenGitPanel,
   onOpenTerminalWindow,
+  onOpenBrain,
   gitRefreshTrigger,
   onCreateAgent,
   onRemoveProject,
@@ -1967,6 +1969,32 @@ export default function RepositoryGroup({
                 >
                   <polyline points="4 17 10 11 4 5" />
                   <line x1="12" y1="19" x2="20" y2="19" />
+                </svg>
+              </button>
+            )}
+            {/* Open Brain button */}
+            {onOpenBrain && (
+              <button
+                type="button"
+                onClick={() => onOpenBrain(repoPath)}
+                title="Open Brain"
+                className="repo-action-btn"
+                style={{ color: 'rgba(167, 139, 250, 0.8)' }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+                  <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+                  <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
+                  <path d="M12 18v4" />
                 </svg>
               </button>
             )}
