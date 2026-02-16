@@ -123,7 +123,7 @@ const config = JSON.parse(args[0] || '{}');
 
 const {
   prompt,
-  model = 'sonnet',
+  model = 'opus',
   permissionMode, // No default - let SDK use its default (auto-approve) when undefined
   thinkingMode,
   cwd,
@@ -807,6 +807,25 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
           if (taskTools.length > 0) {
             console.error(`[DEBUG] 🎯 Task tool invocation detected:`, JSON.stringify(taskTools, null, 2));
           }
+        }
+
+        // 🦆 DEBUG: Log assistant event usage to diagnose Messages: 0 bug
+        if (event.type === 'assistant' && event.message?.usage) {
+          console.error(`[DEBUG] 🦆 ASSISTANT MESSAGE USAGE:`, JSON.stringify({
+            messageId: event.message.id,
+            usage: event.message.usage,
+          }, null, 2));
+        }
+
+        // 🦆 DEBUG: Log result event details to diagnose Messages: 0 bug
+        if (event.type === 'result') {
+          console.error(`[DEBUG] 🦆 RESULT EVENT:`, JSON.stringify({
+            type: event.type,
+            subtype: event.subtype,
+            usage: event.usage,
+            modelUsage: event.modelUsage,
+            total_cost_usd: event.total_cost_usd,
+          }, null, 2));
         }
 
         emitEvent(event);

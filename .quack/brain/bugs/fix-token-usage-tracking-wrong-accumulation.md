@@ -73,12 +73,17 @@ setSessionTokens({
 
 ## Key Insight
 
-The Claude SDK reports `input_tokens` as the **full context fill**, not the marginal cost. This is correct and allows tracking total context usage, but breaks if you assume additive behavior. The fix mirrors how token usage is actually reported by the API - context window grows, but we track the full amount, not the increment.
+**CORRECTION (2026-02-13):** With prompt caching, `input_tokens` is NOT the full context fill. It's only the non-cached portion. The full context fill is:
+```
+context_fill = input_tokens + cache_read_input_tokens + cache_creation_input_tokens
+```
+
+Also, result event `usage` is CUMULATIVE across all agentic steps. For per-turn context fill, use assistant message `usage` instead.
 
 For conversation tracking:
-- Show `input_tokens` as context window usage (grows until turn N, then resets at compact)
+- Show `context_fill` (input + cache_read + cache_creation) from ASSISTANT events as context window usage
 - Show `output_tokens` as cumulative (always growing)
-- Show conversation size as approximate message count derived from token overhead
+- Use result event only for `total_cost_usd` (authoritative for billing)
 
 ## Testing
 

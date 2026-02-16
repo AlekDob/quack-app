@@ -19,6 +19,7 @@
   --kanban-text-muted: rgba(255, 255, 255, 0.4);
   --kanban-todo-color: #6b7280;
   --kanban-progress-color: #f59e0b;
+  --kanban-review-color: #a855f7;
   --kanban-done-color: #22c55e;
   --kanban-accent: #f28c52;
 }
@@ -135,7 +136,7 @@
 /* Columns container */
 .kanban-columns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   flex: 1;
   overflow: hidden;
@@ -158,6 +159,49 @@
   background: rgba(242, 140, 82, 0.08);
   border-color: var(--kanban-accent);
   box-shadow: 0 0 0 2px rgba(242, 140, 82, 0.2), inset 0 0 20px rgba(242, 140, 82, 0.05);
+}
+
+/* Ghost card placeholder when dragging agent from sidebar */
+.kanban-ghost-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  animation: ghost-card-fade-in 0.2s ease-out;
+}
+
+.kanban-ghost-card-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.kanban-ghost-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.kanban-ghost-card-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: auto;
+}
+
+@keyframes ghost-card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Column header */
@@ -1584,6 +1628,39 @@
 }
 
 @keyframes ready-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Awaiting Input badge - shows in Human Review column */
+.kanban-awaiting-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--kanban-review-color, #a855f7);
+  background: rgba(168, 85, 247, 0.15);
+  flex-shrink: 0;
+  animation: awaiting-pulse 2s ease-in-out infinite;
+}
+
+.kanban-awaiting-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--kanban-review-color, #a855f7);
+  box-shadow: 0 0 4px rgba(168, 85, 247, 0.6);
+}
+
+@keyframes awaiting-pulse {
   0%, 100% {
     opacity: 1;
   }

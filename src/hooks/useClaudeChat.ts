@@ -18,6 +18,9 @@ import { useChatStore } from '../stores/chatStore';
 // Map to track Task tool_use_id -> Kanban task_id for status updates
 const taskToolToKanbanMap = new Map<string, string>();
 
+// Memory leak prevention: cap events per stream to avoid unbounded growth
+const MAX_EVENTS_PER_STREAM = 500;
+
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 export type PermissionMode = 'plan' | 'bypass';
 
@@ -215,7 +218,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   const sendMessage = useCallback(async (content: string, options?: ChatSendOptions) => {
     if (!content.trim() || isLoading) return;
 
-    const model = options?.model || 'sonnet';
+    const model = options?.model || 'opus';
 
     // 🛡️ TOKEN OVERFLOW PREVENTION
     // Check token budget BEFORE sending the message
@@ -281,7 +284,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     posthog.capture('ai_message_sent', {
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
-      model: options?.model || 'sonnet',
+      model: options?.model || 'opus',
       thinking_mode: options?.thinkingMode || 'auto',
       message_length: content.length,
     });
@@ -315,7 +318,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
 
       // Stream message using Claude Agent SDK with unique streamId
       const stream = streamClaudeMessage(content, {
-        model: options?.model || 'sonnet',
+        model: options?.model || 'opus',
         thinkingMode: effectiveThinkingMode,
         permissionMode: options?.permissionMode || 'bypass',
         sessionId: claudeSessionId.current, // Resume previous session if exists
@@ -333,6 +336,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       // 🦆 FIX: Use persistent ref instead of local Set to survive re-renders
       const seenEventIds = seenEventIdsRef.current;
       let assistantContent = '';
+      let gotPerStepUsage = false; // Track if assistant events provided per-step usage
 
       // 🦆 FIX: Enhanced helper function to generate STABLE unique event IDs for deduplication
       const getEventId = (event: ClaudeEvent): string => {
@@ -437,6 +441,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
 
           seenEventIds.add(eventId);
           events.push(event);
+          // Memory leak prevention: trim old events to prevent unbounded growth
+          if (events.length > MAX_EVENTS_PER_STREAM) {
+            events.splice(0, events.length - MAX_EVENTS_PER_STREAM);
+          }
           console.log('[useClaudeChat] ✅ New unique event added - ID:', eventId.substring(0, 30), 'Type:', event.type, 'Total:', events.length);
 
           // 🦆 DEBUG: Log unique event
@@ -532,18 +540,43 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             }
           }
 
-          // Track context window fill from result events
-          // IMPORTANT: input_tokens from SDK = full context window input for THIS turn
-          // (includes system + tools + all previous messages + current message)
-          // So we REPLACE (not accumulate) to reflect the actual context window state
-          if (event.type === 'result' && event.usage) {
-            const usage = event.usage;
-            setSessionTokens({
-              inputTokens: usage.input_tokens,
-              outputTokens: usage.output_tokens,
-              cacheCreationTokens: usage.cache_creation_input_tokens || 0,
-              cacheReadTokens: usage.cache_read_input_tokens || 0,
-            });
+          // 🦆 CONTEXT FILL FIX: Track usage from ASSISTANT events (per-step)
+          // With prompt caching, input_tokens only contains non-cached tokens.
+          // Real context fill = input_tokens + cache_read + cache_creation (per API call).
+          // Assistant message usage is per-step; result usage is cumulative.
+          if (event.type === 'assistant') {
+            const assistantEvt = event as any;
+            const msgUsage = assistantEvt.message?.usage;
+            if (msgUsage && (msgUsage.input_tokens > 0 || msgUsage.cache_read_input_tokens > 0)) {
+              const cacheRead = msgUsage.cache_read_input_tokens || 0;
+              const cacheCreation = msgUsage.cache_creation_input_tokens || 0;
+              const contextFill = (msgUsage.input_tokens || 0) + cacheRead + cacheCreation;
+              gotPerStepUsage = true;
+              setSessionTokens({
+                inputTokens: contextFill,
+                outputTokens: msgUsage.output_tokens || 0,
+                cacheCreationTokens: cacheCreation,
+                cacheReadTokens: cacheRead,
+              });
+            }
+          }
+
+          // Fallback: track from result event only if assistant events didn't provide usage
+          // Result usage is CUMULATIVE across all agentic steps — only use as last resort
+          if (event.type === 'result' && !gotPerStepUsage) {
+            const resultEvt = event as any;
+            const usage = resultEvt.usage;
+            if (usage) {
+              const cacheRead = usage.cache_read_input_tokens || 0;
+              const cacheCreation = usage.cache_creation_input_tokens || 0;
+              const contextFill = (usage.input_tokens || 0) + cacheRead + cacheCreation;
+              setSessionTokens({
+                inputTokens: contextFill,
+                outputTokens: usage.output_tokens || 0,
+                cacheCreationTokens: cacheCreation,
+                cacheReadTokens: cacheRead,
+              });
+            }
           }
 
           // Update message with streaming content (events array is already deduplicated)
@@ -580,7 +613,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             response_time_ms: responseTime,
             response_length: assistantContent.length,
             events_count: events.length,
-            model: options?.model || 'sonnet',
+            model: options?.model || 'opus',
           });
 
           // 🆕 Trigger mobile notification
@@ -611,7 +644,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       posthog.capture('ai_error', {
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMessage.substring(0, 200),
-        model: options?.model || 'sonnet',
+        model: options?.model || 'opus',
       });
 
       // Check if this was an abort
@@ -685,6 +718,12 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null; // Clean up
+      // Memory leak prevention: clean up stale taskToolToKanbanMap entries older than 1 hour
+      // This catches abandoned tasks that never got a tool_result
+      if (taskToolToKanbanMap.size > 100) {
+        console.warn('[useClaudeChat] taskToolToKanbanMap has', taskToolToKanbanMap.size, 'entries - possible leak');
+        taskToolToKanbanMap.clear();
+      }
     }
     // 🦆 FIX: Removed messages.length from dependencies - using messagesLengthRef.current instead
   }, [isLoading]);
@@ -747,6 +786,10 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     // 6.5. 🦆 FIX: Clear event deduplication Set to start fresh
     seenEventIdsRef.current.clear();
     console.log('[useClaudeChat] Event deduplication Set cleared');
+
+    // Memory leak prevention: clear task-to-kanban mapping
+    taskToolToKanbanMap.clear();
+    console.log('[useClaudeChat] Task-to-Kanban mapping cleared');
 
     // 7. Try to notify backend to delete session files
     if (oldSessionId) {

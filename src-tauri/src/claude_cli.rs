@@ -1243,6 +1243,8 @@ pub async fn send_message_via_cli_streaming(
     let result_event = events.iter()
         .find_map(|e| match e {
             ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } => {
+                // Pass usage as-is. Frontend calculates context fill as:
+                // contextWindowFill = input_tokens + cache_read + cache_creation
                 Some(ClaudeCliResponse {
                     result: result.clone(),
                     session_id: session_id.clone(),
@@ -1677,7 +1679,7 @@ pub async fn send_message_via_sdk_streaming(
     let stderr_handle = if let Some(stderr) = child.stderr.take() {
         Some(tokio::spawn(async move {
             let mut stderr_reader = BufReader::new(stderr).lines();
-            let mut stderr_lines = Vec::new();
+            let mut stderr_lines: Vec<String> = Vec::with_capacity(200);
             while let Ok(Some(line)) = stderr_reader.next_line().await {
                 // Classify log level based on content
                 let line_upper = line.to_uppercase();
@@ -1691,6 +1693,9 @@ pub async fn send_message_via_sdk_streaming(
                     log::info!("[Node.js SDK] {}", line);
                 }
                 stderr_lines.push(line);
+                if stderr_lines.len() > 200 {
+                    stderr_lines.remove(0);
+                }
             }
             stderr_lines
         }))
@@ -1832,7 +1837,13 @@ pub async fn send_message_via_sdk_streaming(
                 }
 
                 // Check if this is the final result
-                if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = &event {
+                if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, model_usage, .. } = &event {
+                    log::info!("[SDK] 🦆 RESULT EVENT - input_tokens: {}, output_tokens: {}, cache_read: {}, cache_creation: {}, total_cost: {}, modelUsage: {:?}",
+                        usage.input_tokens, usage.output_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens, total_cost_usd, model_usage);
+
+                    // Pass usage as-is to frontend. The frontend calculates context fill as:
+                    // contextWindowFill = input_tokens + cache_read + cache_creation
+                    // This accounts for prompt caching where input_tokens is only non-cached portion.
                     final_result = Some(ClaudeCliResponse {
                         result: result.clone(),
                         session_id: session_id.clone(),

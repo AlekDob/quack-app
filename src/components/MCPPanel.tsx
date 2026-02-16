@@ -27,6 +27,7 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
   } = useMCPServers(workingDir);
 
   const [deletingServer, setDeletingServer] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showEditDropdown, setShowEditDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -47,12 +48,15 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
     onRefresh?.();
   };
 
-  const handleOpenMcpJson = async (scope: "project" | "global") => {
+  const handleOpenMcpJson = async (scope: "project" | "global" | "claude-global") => {
     setShowEditDropdown(false);
     try {
       let filePath: string;
       if (scope === "project" && workingDir) {
         filePath = await join(workingDir, ".mcp.json");
+      } else if (scope === "claude-global") {
+        const home = await homeDir();
+        filePath = await join(home, ".claude", ".mcp.json");
       } else {
         const home = await homeDir();
         filePath = await join(home, ".mcp.json");
@@ -62,8 +66,9 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
       try {
         await invoke<string>("read_file_content", { path: filePath });
       } catch {
+        const label = scope === "project" ? "Project" : scope === "claude-global" ? "Claude Code global" : "Global";
         const shouldCreate = window.confirm(
-          `${scope === "project" ? "Project" : "Global"} .mcp.json doesn't exist yet.\n\nCreate it now?`
+          `${label} .mcp.json doesn't exist yet.\n\nCreate it now?`
         );
         if (!shouldCreate) return;
         await invoke("write_file_content", {
@@ -78,27 +83,25 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
     }
   };
 
-  const handleDeleteServer = async (serverId: string) => {
-    // Prevent double deletion (in case of double-click or race condition)
-    if (deletingServer === serverId) {
-      return;
-    }
+  const handleDeleteServer = (serverId: string) => {
+    setConfirmDeleteId(serverId);
+  };
 
-    const confirmed = window.confirm("Are you sure you want to delete this MCP server?");
-
-    if (!confirmed) {
-      return; // User cancelled
-    }
-
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
     try {
-      setDeletingServer(serverId);
-      await deleteServer(serverId);
+      setDeletingServer(confirmDeleteId);
+      setConfirmDeleteId(null);
+      await deleteServer(confirmDeleteId);
     } catch (err) {
       console.error("Failed to delete server:", err);
-      alert(`Failed to delete server: ${err}`);
     } finally {
       setDeletingServer(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDeleteId(null);
   };
 
   const handleEditServer = (server: MCPServer) => {
@@ -172,6 +175,17 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                     </svg>
                     Global .mcp.json
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMcpJson("claude-global")}
+                    className="w-full px-3 py-2.5 text-left text-xs hover:bg-white/10 transition-colors flex items-center gap-2"
+                    style={{ color: 'rgba(255, 255, 255, 0.8)', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+                  >
+                    <svg className="w-3.5 h-3.5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Claude Code .mcp.json
                   </button>
                 </div>
               )}
@@ -320,6 +334,35 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
         >
           {servers.length} {servers.length === 1 ? "server" : "servers"}{" "}
           configured
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="rounded-xl p-5 max-w-sm w-full mx-4 shadow-2xl" style={{ background: '#1e1e1e', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+            <h4 className="text-sm font-semibold text-white mb-2">Delete MCP Server</h4>
+            <p className="text-xs text-white/60 mb-5">
+              Are you sure you want to delete <span className="text-white/90 font-medium">{servers.find(s => s.id === confirmDeleteId)?.name ?? confirmDeleteId}</span>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deletingServer !== null}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-white bg-red-500/90 hover:bg-red-500 transition-colors disabled:opacity-50"
+              >
+                {deletingServer ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

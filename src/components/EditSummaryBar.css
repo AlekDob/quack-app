@@ -218,50 +218,12 @@
   align-items: center;
 }
 
-/* File actions container (Diff + Open buttons) */
+/* File actions container (Diff button + edit count) */
 .edit-summary-bar-file-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-}
-
-/* Open button - aligned with edit count tag */
-.edit-summary-bar-open-btn {
-  padding: 1px 5px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(156, 163, 175, 0.1);
-  border: 1px solid rgba(156, 163, 175, 0.2);
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 500;
-  line-height: 1;
-  color: rgba(156, 163, 175, 0.9);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.edit-summary-bar-open-btn:hover {
-  background: rgba(156, 163, 175, 0.2);
-  border-color: rgba(156, 163, 175, 0.4);
-  color: #fff;
-  transform: translateY(-1px);
-}
-
-/* IDE-enabled Open button - orange theme */
-.edit-summary-bar-open-btn.ide-enabled {
-  background: rgba(242, 140, 82, 0.15);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: #f28c52;
-}
-
-.edit-summary-bar-open-btn.ide-enabled:hover {
-  background: rgba(242, 140, 82, 0.25);
-  border-color: rgba(242, 140, 82, 0.5);
-  color: #f28c52;
 }
 
 /* Deleted file items - red theme */
@@ -402,36 +364,6 @@
   background: rgba(139, 92, 246, 0.1);
 }
 
-/* Markdown Open button - purple theme */
-.edit-summary-bar-open-btn-markdown {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.3);
-  color: #a78bfa;
-}
-
-.edit-summary-bar-open-btn-markdown:hover {
-  background: rgba(139, 92, 246, 0.25);
-  border-color: rgba(139, 92, 246, 0.5);
-  color: #c4b5fd;
-}
-
-/* Quack button - cyan/teal theme */
-.edit-summary-bar-quack-btn {
-  background: rgba(6, 182, 212, 0.15) !important;
-  border-color: rgba(6, 182, 212, 0.3) !important;
-  color: #22d3ee !important;
-  gap: 4px;
-}
-
-.edit-summary-bar-quack-btn:hover {
-  background: rgba(6, 182, 212, 0.25) !important;
-  border-color: rgba(6, 182, 212, 0.5) !important;
-  color: #67e8f9 !important;
-}
-
-.edit-summary-bar-quack-btn svg {
-  flex-shrink: 0;
-}
 
 /* Responsive: hide text labels on small screens */
 @media (max-width: 600px) {
@@ -445,10 +377,6 @@
 
   .edit-summary-bar-file-actions {
     gap: 4px;
-  }
-
-  .edit-summary-bar-open-btn {
-    padding: 2px 4px;
   }
 }
 

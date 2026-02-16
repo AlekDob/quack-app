@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/core';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
 // =============================================================================
 // Types
@@ -22,6 +23,13 @@ export interface InstalledApp {
   name: string;
   app_path: string;
   category: 'ide' | 'terminal' | 'finder';
+  icon_base64: string | null;
+}
+
+export interface CustomIDE {
+  id: string;
+  name: string;
+  app_path: string;
   icon_base64: string | null;
 }
 
@@ -51,6 +59,11 @@ interface IDEState extends IDEConfig {
   completeOnboarding: () => void;
   resetOnboarding: () => void;
 
+  // Custom IDE management
+  isAddingCustomIDE: boolean;
+  addCustomIDE: () => Promise<InstalledApp | null>;
+  removeCustomIDE: (ideId: string) => Promise<void>;
+
   // IDE Operations (calls MCP server via Tauri)
   openFileInIDE: (path: string, line?: number, column?: number) => Promise<string>;
   openMultipleFilesInIDE: (paths: string[]) => Promise<string>;
@@ -69,6 +82,7 @@ export const IDE_REGISTRY: Record<string, { name: string; icon: string }> = {
   cursor: { name: 'Cursor', icon: 'cursor' },
   windsurf: { name: 'Windsurf', icon: 'windsurf' },
   zed: { name: 'Zed', icon: 'zed' },
+  athas: { name: 'Athas', icon: 'athas' },
   intellij: { name: 'IntelliJ IDEA', icon: 'jetbrains' },
   webstorm: { name: 'WebStorm', icon: 'jetbrains' },
   pycharm: { name: 'PyCharm', icon: 'jetbrains' },
@@ -99,6 +113,7 @@ function getIDECli(ideId: string): string {
     cursor: 'cursor',
     windsurf: 'windsurf',
     zed: 'zed',
+    athas: 'athas-code',
     intellij: 'idea',
     webstorm: 'webstorm',
     pycharm: 'pycharm',
@@ -111,7 +126,7 @@ function getIDECli(ideId: string): string {
 
 // Helper to build open file arguments based on IDE style
 function buildOpenArgs(ideId: string, path: string, line?: number, column?: number): string[] {
-  const vscodeLike = ['vscode', 'cursor', 'windsurf'];
+  const vscodeLike = ['vscode', 'cursor', 'windsurf', 'athas'];
   const jetbrains = ['intellij', 'webstorm', 'pycharm', 'goland', 'rubymine'];
 
   if (vscodeLike.includes(ideId)) {
@@ -158,6 +173,7 @@ export const useIDEStore = create<IDEState>()(
       isDetecting: false,
       installedApps: [],
       isLoadingApps: false,
+      isAddingCustomIDE: false,
 
       // Detect installed IDEs
       detectInstalledIDEs: async () => {
@@ -202,6 +218,58 @@ export const useIDEStore = create<IDEState>()(
           await invoke('set_preferred_ide', { ideId });
         } catch (error) {
           console.error('[IDE Store] Failed to save preference:', error);
+        }
+      },
+
+      // Custom IDE management
+      addCustomIDE: async () => {
+        const isMac = navigator.userAgent.includes('Mac');
+
+        const selected = await openDialog({
+          directory: isMac, // macOS: select .app directory; Windows: select .exe file
+          multiple: false,
+          title: isMac ? 'Select IDE Application' : 'Select IDE Executable',
+          defaultPath: isMac ? '/Applications' : undefined,
+          filters: isMac ? undefined : [{ name: 'Executables', extensions: ['exe'] }],
+        });
+
+        if (!selected || typeof selected !== 'string') {
+          return null;
+        }
+
+        // On macOS, only accept .app bundles
+        if (isMac && !selected.endsWith('.app')) {
+          console.error('[IDE Store] Selected path is not a .app bundle:', selected);
+          return null;
+        }
+
+        set({ isAddingCustomIDE: true });
+        try {
+          const app = await invoke<InstalledApp>('register_custom_ide', { appPath: selected });
+          await get().loadInstalledApps();
+          return app;
+        } catch (error) {
+          console.error('[IDE Store] Failed to add custom IDE:', error);
+          throw error;
+        } finally {
+          set({ isAddingCustomIDE: false });
+        }
+      },
+
+      removeCustomIDE: async (ideId: string) => {
+        try {
+          await invoke('remove_custom_ide', { ideId });
+
+          // If this was the preferred IDE, clear it
+          if (get().preferredIDE === ideId) {
+            set({ preferredIDE: null });
+          }
+
+          // Refresh the apps list
+          await get().loadInstalledApps();
+        } catch (error) {
+          console.error('[IDE Store] Failed to remove custom IDE:', error);
+          throw error;
         }
       },
 
@@ -264,32 +332,35 @@ export const useIDEStore = create<IDEState>()(
       },
 
       focusIDE: async () => {
-        const { preferredIDE } = get();
+        const { preferredIDE, installedApps } = get();
         if (!preferredIDE) {
           throw new Error('No preferred IDE set');
         }
 
-        const ideName = IDE_REGISTRY[preferredIDE]?.name || preferredIDE;
+        const app = installedApps.find(a => a.id === preferredIDE);
+        const ideName = app?.name || IDE_REGISTRY[preferredIDE]?.name || preferredIDE;
         return invoke<string>('focus_ide', { ideName });
       },
 
       arrangeWindowsSideBySide: async () => {
-        const { preferredIDE } = get();
+        const { preferredIDE, installedApps } = get();
         if (!preferredIDE) {
           throw new Error('No preferred IDE set');
         }
 
-        const ideName = IDE_REGISTRY[preferredIDE]?.name || preferredIDE;
+        const app = installedApps.find(a => a.id === preferredIDE);
+        const ideName = app?.name || IDE_REGISTRY[preferredIDE]?.name || preferredIDE;
         return invoke<string>('arrange_windows_side_by_side', { ideName });
       },
 
       syncFocusBothApps: async () => {
-        const { preferredIDE } = get();
+        const { preferredIDE, installedApps } = get();
         if (!preferredIDE) {
           throw new Error('No preferred IDE set');
         }
 
-        const ideName = IDE_REGISTRY[preferredIDE]?.name || preferredIDE;
+        const app = installedApps.find(a => a.id === preferredIDE);
+        const ideName = app?.name || IDE_REGISTRY[preferredIDE]?.name || preferredIDE;
         return invoke<string>('sync_focus_both_apps', { ideName });
       },
     }),

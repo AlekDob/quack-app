@@ -3,5 +3,10 @@
     "id": "710dddf7-90e7-4f46-8d6f-d18e8c70bf8e",
     "title": "Nostro sito",
     "url": "https://quack.build"
+  },
+  {
+    "id": "43afe326-dcf2-4dfb-9284-d4d6050beac5",
+    "title": "Claude Agent SDK overview",
+    "url": "https://platform.claude.com/docs/en/agent-sdk/overview"
   }
 ]

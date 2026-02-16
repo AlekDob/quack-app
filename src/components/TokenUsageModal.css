@@ -422,6 +422,7 @@
   transition: width 0.5s ease, background-color 0.3s ease;
   box-shadow: 0 0 20px currentColor, inset 0 0 10px rgba(255, 255, 255, 0.3);
   position: relative;
+  z-index: 1;
   background: linear-gradient(to bottom,
     rgba(255, 255, 255, 0.2) 0%,
     transparent 50%,
@@ -429,6 +430,28 @@
   );
   background-color: currentColor;
   background-blend-mode: overlay;
+}
+
+/* Auto-compact reserve zone (purple, rightmost portion of bar) */
+.fallout-progress-autocompact {
+  background: rgba(139, 92, 246, 0.35);
+  border-left: 1px solid rgba(139, 92, 246, 0.6);
+  z-index: 0;
+  transition: background 0.3s ease;
+}
+
+/* Pulse when usage reaches the auto-compact zone */
+.fallout-autocompact-pulse {
+  animation: autocompactPulse 2s ease-in-out infinite;
+}
+
+@keyframes autocompactPulse {
+  0%, 100% {
+    background: rgba(139, 92, 246, 0.35);
+  }
+  50% {
+    background: rgba(139, 92, 246, 0.55);
+  }
 }
 
 .fallout-progress-segments {

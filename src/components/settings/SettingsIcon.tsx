@@ -89,16 +89,6 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
-    case 'integrations':
-      return (
-        <svg {...iconProps}>
-          <path d="M12 2H8.5C7.12 2 6 3.12 6 4.5S7.12 7 8.5 7H11v3H8.5C7.12 10 6 11.12 6 12.5S7.12 15 8.5 15H12"/>
-          <path d="M12 2h3.5C16.88 2 18 3.12 18 4.5S16.88 7 15.5 7H13v3h2.5c1.38 0 2.5 1.12 2.5 2.5S16.88 15 15.5 15H12"/>
-          <path d="M12 15v4.5a2.5 2.5 0 0 0 5 0"/>
-          <path d="M12 15v4.5a2.5 2.5 0 0 1-5 0"/>
-        </svg>
-      );
-
     case 'notifications':
       return (
         <svg {...iconProps}>
@@ -112,14 +102,6 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         <svg {...iconProps}>
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 2a7 7 0 0 0 0 20"/>
-        </svg>
-      );
-
-    case 'terminal':
-      return (
-        <svg {...iconProps}>
-          <polyline points="4 17 10 11 4 5"/>
-          <line x1="12" y1="19" x2="20" y2="19"/>
         </svg>
       );
 

@@ -56,7 +56,7 @@ export function useAgentInfo(agentId: string, workingDir?: string): AgentInfoRes
         avatarUrl: cached.avatar ? `/avatars/${cached.avatar}` : getDuckdroidUrl(),
         color: cached.color || DEFAULT_COLOR,
         description: cached.description || '',
-        model: cached.model || 'sonnet',
+        model: cached.model || 'opus',
       });
       return;
     }
@@ -83,7 +83,7 @@ export function useAgentInfo(agentId: string, workingDir?: string): AgentInfoRes
             avatarUrl: agent.avatar ? `/avatars/${agent.avatar}` : getDuckdroidUrl(),
             color: agent.color || DEFAULT_COLOR,
             description: agent.description || '',
-            model: agent.model || 'sonnet',
+            model: agent.model || 'opus',
           });
         }
       } catch (error) {

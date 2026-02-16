@@ -5,9 +5,14 @@ import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
 import IOSInput from '../controls/IOSInput';
 
-export default function NotificationSettings() {
+interface NotificationSettingsProps {
+  onOpenTelegramSetup?: () => void;
+}
+
+export default function NotificationSettings({ onOpenTelegramSetup }: NotificationSettingsProps) {
   const [enabled, setEnabled] = useState(false);
-  const [ntfyTopic, setNtfyTopic] = useState('');
+  const [telegramToken, setTelegramToken] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [loading, setLoading] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -20,8 +25,9 @@ export default function NotificationSettings() {
       const enabledValue = await invoke<boolean>('get_mobile_notifications_enabled');
       setEnabled(enabledValue);
 
-      const topic = await invoke<string | null>('get_ntfy_topic');
-      setNtfyTopic(topic || '');
+      const [token, chatId] = await invoke<[string | null, string | null]>('get_telegram_config');
+      setTelegramToken(token || '');
+      setTelegramChatId(chatId || '');
     } catch (err) {
       console.error('Failed to load notification preferences:', err);
     }
@@ -40,29 +46,32 @@ export default function NotificationSettings() {
     }
   };
 
-  const handleSaveNtfy = async () => {
-    if (!ntfyTopic.trim()) {
-      setTestStatus({ type: 'error', message: 'Please enter a topic name' });
+  const handleSaveTelegram = async () => {
+    if (!telegramToken.trim() || !telegramChatId.trim()) {
+      setTestStatus({ type: 'error', message: 'Please fill in both Token and Chat ID' });
       return;
     }
 
     try {
       setLoading(true);
-      await invoke('set_ntfy_topic', { topic: ntfyTopic.trim() });
-      setTestStatus({ type: 'success', message: 'ntfy.sh topic saved!' });
+      await invoke('set_telegram_config', {
+        token: telegramToken.trim(),
+        chatId: telegramChatId.trim(),
+      });
+      setTestStatus({ type: 'success', message: 'Telegram settings saved!' });
     } catch (err) {
-      console.error('Failed to save ntfy topic:', err);
-      setTestStatus({ type: 'error', message: 'Failed to save ntfy.sh topic' });
+      console.error('Failed to save Telegram config:', err);
+      setTestStatus({ type: 'error', message: 'Failed to save Telegram settings' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTestNtfy = async () => {
+  const handleTestTelegram = async () => {
     try {
       setLoading(true);
       setTestStatus(null);
-      const result = await invoke<string>('send_ntfy_test');
+      const result = await invoke<string>('send_telegram_test');
       setTestStatus({ type: 'success', message: result });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -93,36 +102,70 @@ export default function NotificationSettings() {
       </div>
 
       <SectionHeader
-        title="ntfy.sh"
-        description="Simplest setup, just choose a topic name"
+        title="Telegram"
+        description="Connect Telegram for agent notifications and message history"
+      />
+
+      {onOpenTelegramSetup && (
+        <div className="settings-group">
+          <SettingsRow
+            label="Quick Setup"
+            description="Link your Telegram account with the guided setup wizard"
+            control={
+              <button
+                onClick={onOpenTelegramSetup}
+                className="ios-button ios-button-primary"
+              >
+                Link Telegram
+              </button>
+            }
+          />
+        </div>
+      )}
+
+      <SectionHeader
+        title="Manual Configuration"
+        description="Or configure manually with Bot Token and Chat ID"
       />
       <div className="settings-group">
         <SettingsRow
-          label="Topic Name"
-          description="Choose a unique topic, then subscribe in ntfy iOS app"
+          label="Bot Token"
+          description="Get from @BotFather on Telegram"
+          control={
+            <IOSInput
+              type="password"
+              value={telegramToken}
+              onChange={setTelegramToken}
+              placeholder="123456789:ABC..."
+            />
+          }
+        />
+        <SettingsRow
+          label="Chat ID"
+          description="Your Telegram chat identifier"
           control={
             <IOSInput
               type="text"
-              value={ntfyTopic}
-              onChange={setNtfyTopic}
-              placeholder="quack-alek-ai-2025"
+              value={telegramChatId}
+              onChange={setTelegramChatId}
+              placeholder="123456789"
             />
           }
         />
         <div className="notification-actions">
           <button
-            onClick={handleSaveNtfy}
+            onClick={handleSaveTelegram}
             disabled={loading}
             className="ios-button ios-button-primary"
           >
-            Save Topic
+            Save Config
           </button>
           <button
-            onClick={handleTestNtfy}
-            disabled={loading || !ntfyTopic}
+            onClick={handleTestTelegram}
+            disabled={loading || !telegramToken || !telegramChatId}
             className="ios-button ios-button-secondary"
           >
-            Test ntfy.sh
+            Test Telegram
           </button>
         </div>
       </div>

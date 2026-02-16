@@ -9,10 +9,8 @@ import AgentModesSettings from './categories/AgentModesSettings';
 import SecondBrainSettings from './categories/SecondBrainSettings';
 import IDESettings from './categories/IDESettings';
 import LicenseSettings from './categories/LicenseSettings';
-import IntegrationsSettings from './categories/IntegrationsSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
-import TerminalSettings from './categories/TerminalSettings';
 import KeyboardShortcutsSettings from './categories/KeyboardShortcutsSettings';
 import DebugSettings from './categories/DebugSettings';
 import AboutSettings from './categories/AboutSettings';
@@ -59,14 +57,10 @@ export default function UnifiedSettings({
         return <IDESettings />;
       case 'license':
         return <LicenseSettings />;
-      case 'integrations':
-        return <IntegrationsSettings onOpenTelegramSetup={onOpenTelegramSetup} />;
       case 'notifications':
-        return <NotificationSettings />;
+        return <NotificationSettings onOpenTelegramSetup={onOpenTelegramSetup} />;
       case 'appearance':
         return <AppearanceSettings />;
-      case 'terminal':
-        return <TerminalSettings />;
       case 'keyboard-shortcuts':
         return <KeyboardShortcutsSettings />;
       case 'debug':

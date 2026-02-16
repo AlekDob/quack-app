@@ -16,6 +16,7 @@ import {
 import KanbanCard from './KanbanCard';
 import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
 import { groupTasksByCompletionDate, type DateGroup } from '../../utils/kanbanDateGrouping';
+import { useKanbanStore } from '../../stores/kanbanStore';
 
 // Types for In Progress column grouping by status
 type InProgressBucket = 'ready' | 'working' | 'cold';
@@ -70,6 +71,8 @@ interface KanbanColumnProps {
   // Chat state for activity indicators
   chatLoadingMap?: Map<string, boolean>;
   chatSessions?: Map<string, ChatMessage[]>;
+  // Pending questions state (for "Awaiting Input" badge)
+  pendingQuestionsChecker?: (sessionId: string) => boolean;
   // Drop target from parent (more reliable than internal isOver)
   isDropTarget?: boolean;
   // Handler for agent drop from sidebar (native HTML5 drag-and-drop)
@@ -95,6 +98,7 @@ export default function KanbanColumn({
   onOpenTerminal,
   chatLoadingMap,
   chatSessions,
+  pendingQuestionsChecker,
   isDropTarget = false,
   onSidebarAgentDrop,
   onClearAll,
@@ -113,6 +117,11 @@ export default function KanbanColumn({
 
   // Track native HTML5 drag-over state for sidebar agents
   const [isNativeDragOver, setIsNativeDragOver] = useState(false);
+
+  // Track if THIS column is being hovered during sidebar drag
+  const sidebarDragHoverColumn = useKanbanStore((s) => s.sidebarDragHoverColumn);
+  const sidebarDragAgentInfo = useKanbanStore((s) => s.sidebarDragAgentInfo);
+  const isSidebarDragHovered = sidebarDragHoverColumn === id;
 
   // Intersection Observer for infinite scroll (Done column only)
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -147,8 +156,8 @@ export default function KanbanColumn({
     };
   }, [id, hasMore, onLoadMore]);
 
-  // Use parent-provided isDropTarget OR internal isOver OR native drag for highlighting
-  const showDropHighlight = isDropTarget || isOver || isNativeDragOver;
+  // Use parent-provided isDropTarget OR internal isOver OR native drag OR sidebar hover on this column
+  const showDropHighlight = isDropTarget || isOver || isNativeDragOver || isSidebarDragHovered;
 
   // Group tasks by completion date for Done column
   const dateGroups: DateGroup[] = useMemo(() => {
@@ -240,11 +249,13 @@ export default function KanbanColumn({
 
   // Get column color based on status
   const getColumnColor = () => {
-    switch (id) {
+    switch (id as string) {
       case 'todo':
         return 'var(--kanban-todo-color, #6b7280)';
       case 'in_progress':
         return 'var(--kanban-progress-color, #f59e0b)';
+      case 'human_review':
+        return 'var(--kanban-review-color, #a855f7)';
       case 'done':
         return 'var(--kanban-done-color, #22c55e)';
       default:
@@ -255,6 +266,7 @@ export default function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
+      data-column-id={id}
       className={`kanban-column ${showDropHighlight ? 'drop-target' : ''}`}
       onDragOver={handleNativeDragOver}
       onDragLeave={handleNativeDragLeave}
@@ -297,6 +309,7 @@ export default function KanbanColumn({
             <div className="kanban-column-empty">
               {id === 'todo' && 'Drag an agent here or click Add Task'}
               {id === 'in_progress' && 'Drag tasks or agents here to start'}
+              {(id as string) === 'human_review' && 'Tasks waiting for your input will appear here'}
               {id === 'done' && 'Completed tasks will appear here'}
             </div>
           ) : id === 'done' && dateGroups.length > 0 ? (
@@ -353,6 +366,7 @@ export default function KanbanColumn({
                       hasMessages={hasMessages}
                       messageCount={messages.length}
                       isDormant={isDormant}
+                      hasPendingQuestion={pendingQuestionsChecker?.(task.id) ?? false}
                       onClick={() => onTaskClick(task)}
                       onDelete={() => onTaskDelete(task.id)}
                       onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
@@ -363,7 +377,7 @@ export default function KanbanColumn({
               </div>
             ))
           ) : (
-            // Render flat list for TODO column
+            // Render flat list for TODO and Human Review columns
             tasks.map((task) => {
               const isLoading = chatLoadingMap?.get(task.id) || false;
               const messages = chatSessions?.get(task.id) || [];
@@ -379,6 +393,7 @@ export default function KanbanColumn({
                   hasMessages={hasMessages}
                   messageCount={messages.length}
                   isDormant={isDormant}
+                  hasPendingQuestion={pendingQuestionsChecker?.(task.id) ?? false}
                   onClick={() => onTaskClick(task)}
                   onDelete={() => onTaskDelete(task.id)}
                   onEdit={onTaskEdit ? () => onTaskEdit(task) : undefined}
@@ -389,6 +404,21 @@ export default function KanbanColumn({
             })
           )}
         </SortableContext>
+
+        {/* Ghost card placeholder when dragging agent from sidebar */}
+        {isSidebarDragHovered && sidebarDragAgentInfo && (
+          <div
+            className="kanban-ghost-card"
+            style={{
+              borderColor: sidebarDragAgentInfo.color,
+              '--ghost-color': sidebarDragAgentInfo.color,
+            } as React.CSSProperties}
+          >
+            <div className="kanban-ghost-card-dot" style={{ background: sidebarDragAgentInfo.color }} />
+            <span className="kanban-ghost-card-name">{sidebarDragAgentInfo.name}</span>
+            <span className="kanban-ghost-card-label">+ New Task</span>
+          </div>
+        )}
 
         {/* Infinite scroll sentinel for Done column */}
         {id === 'done' && hasMore && (

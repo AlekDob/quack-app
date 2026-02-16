@@ -32,7 +32,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   context: '#f28c52',     // Orange - file explorer
   'agent-context': '#f28c52', // Orange - personality
   'project-context': '#60a5fa', // Blue - project notes
-  brain: '#a78bfa',       // Purple - brain/knowledge
   default: '#f28c52',     // Orange fallback
 };
 
@@ -171,12 +170,6 @@ const icons = {
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
       <path d="M5 3h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
       <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  brain: (
-    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-      <path d="M10 3C7 3 5 5.5 5 8c0 1.5.5 2.5 1.5 3.5S8 13 8 15h4c0-2 .5-2.5 1.5-3.5S15 9.5 15 8c0-2.5-2-5-5-5Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M8 15v1a2 2 0 0 0 4 0v-1M8.5 8.5c.5-.5 1.5-.5 1.5.5s1 1 1.5.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
 };
@@ -386,14 +379,6 @@ export default function SidePanelAccordion({
     }
   }, [focusedSection, onRefreshHooks]);
 
-  // Pre-load brain directory when Brain section is focused
-  useEffect(() => {
-    if (focusedSection === "brain" && rootPath) {
-      const brainPath = `${rootPath}/.quack/brain`;
-      onLoadChildren(brainPath).catch(() => {});
-    }
-  }, [focusedSection, rootPath, onLoadChildren]);
-
   // Scroll to top when a section is focused
   useEffect(() => {
     if (focusedSection && containerRef.current) {
@@ -402,7 +387,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['context', 'agent-context', 'project-context', 'brain', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
+  const sectionIds = ['context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -532,29 +517,6 @@ export default function SidePanelAccordion({
           onToggle={() => toggleSection("project-context")}
         >
           <ProjectContextPanel rootPath={rootPath || ''} />
-        </AccordionSection>
-
-        {/* Brain Explorer */}
-        <AccordionSection
-          id="brain"
-          title="Brain"
-          icon={icons.brain}
-          isExpanded={focusedSection === "brain"}
-          isFocused={focusedSection === "brain"}
-          order={getOrder("brain")}
-          category="brain"
-          onToggle={() => toggleSection("brain")}
-        >
-          <FileExplorer
-            rootPath={rootPath ? `${rootPath}/.quack/brain` : null}
-            tree={tree}
-            loading={false}
-            error={null}
-            activePath={rootPath ? `${rootPath}/.quack/brain` : ''}
-            activeFilePath={null}
-            onOpenFile={onOpenFile}
-            onLoadChildren={onLoadChildren}
-          />
         </AccordionSection>
 
         {/* Agent Rules */}

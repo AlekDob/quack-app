@@ -47,6 +47,7 @@ interface ToolGifCategories {
 }
 
 interface GeneralSettings {
+  userName: string; // Display name — auto-injected into CLAUDE.md global for diary entries
   autoSave: boolean;
   autoSaveInterval: number;
   confirmOnExit: boolean;
@@ -115,6 +116,7 @@ const defaultToolGifCategories: ToolGifCategories = {
 };
 
 const defaultGeneralSettings: GeneralSettings = {
+  userName: '',
   autoSave: true,
   autoSaveInterval: 30,
   confirmOnExit: true,
@@ -129,7 +131,7 @@ const defaultGeneralSettings: GeneralSettings = {
 
 const defaultClaudeSettings: ClaudeSettings = {
   apiKey: null,
-  model: 'sonnet45', // Use Supabase IDs: 'sonnet45' | 'opus46' | 'haiku45' (mapped in modelService.ts)
+  model: 'opus46', // Use Supabase IDs: 'sonnet45' | 'opus46' | 'haiku45' (mapped in modelService.ts)
   permissionMode: 'act',
   maxTokens: 4096,
   temperature: 0.7,
@@ -141,7 +143,7 @@ const defaultClaudeSettings: ClaudeSettings = {
 // Legacy short names don't match <select> option values, causing a visual mismatch bug
 const defaultAgentModePresets: AgentModePresets = {
   bypass: {
-    model: 'sonnet45',
+    model: 'opus46',
     thinkingMode: 'auto',
     effort: 'medium',
   },
