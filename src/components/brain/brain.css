@@ -141,6 +141,12 @@
   -webkit-app-region: no-drag;
 }
 
+.brain-sidebar-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 12px;
+}
+
 .brain-sidebar-section {
   display: flex;
   flex-direction: column;
@@ -496,7 +502,7 @@
 
 .brain-knowledge-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 

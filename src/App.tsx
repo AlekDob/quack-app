@@ -432,6 +432,9 @@ function AppContent() {
   // Terminal Window manager - opens separate Tauri window for terminals
   const { openTerminalWindow, updateProjects: updateTerminalWindowProjects, isOpen: terminalWindowOpen } = useTerminalWindowManager();
 
+  // Brain window open state - tracks whether the Brain window is open
+  const [brainWindowOpen, setBrainWindowOpen] = useState(false);
+
   // Tab Popout Window manager - drag tabs out to separate windows
   const handleTabReturn = useCallback((tab: Tab) => {
     console.log('[App] Tab returned from popout:', tab.id);
@@ -8905,14 +8908,58 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, []);
 
   // Handler for opening Brain window (separate Tauri webview)
-  const handleOpenSecondBrainTab = useCallback(async () => {
+  // Accepts explicit projectPath (from repo-action-row) or falls back to active cwd
+  const handleOpenBrainWindow = useCallback(async (explicitProjectPath?: string) => {
     try {
-      const projectPath = activeTerminal?.cwd || undefined;
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const { emitTo } = await import('@tauri-apps/api/event');
+      const projectPath = explicitProjectPath || activeTerminal?.cwd || undefined;
+
+      // Check if brain window already exists
+      const existing = (await WebviewWindow.getAll()).find(w => w.label === 'brain');
+
+      if (existing) {
+        // Update project if a specific path was requested
+        if (projectPath) {
+          await emitTo('brain', 'brain-project-update', { projectPath });
+        }
+        await existing.setFocus();
+        setBrainWindowOpen(true);
+        return;
+      }
+
+      // Create via Rust command (uses fixed label "brain", reuses if exists)
       await invoke('open_brain_window', { projectPath });
+      setBrainWindowOpen(true);
+
+      // Listen for window close to update active state
+      const brainWindow = (await WebviewWindow.getAll()).find(w => w.label === 'brain');
+      if (brainWindow) {
+        brainWindow.once('tauri://destroyed', () => {
+          setBrainWindowOpen(false);
+        });
+      }
     } catch (error) {
       console.error('[Quack] Failed to open Brain window:', error);
     }
   }, [activeTerminal?.cwd]);
+
+  // Sync brain window project when active project changes
+  useEffect(() => {
+    if (!brainWindowOpen) return;
+    const projectPath = activeTerminal?.cwd || undefined;
+    if (!projectPath) return;
+
+    const syncBrainProject = async () => {
+      try {
+        const { emitTo } = await import('@tauri-apps/api/event');
+        await emitTo('brain', 'brain-project-update', { projectPath });
+      } catch (err) {
+        console.warn('[Quack] Failed to sync brain project:', err);
+      }
+    };
+    syncBrainProject();
+  }, [brainWindowOpen, activeTerminal?.cwd]);
 
   // Handler for opening Second Brain tab with a specific node (deprecated)
   const handleOpenSecondBrainWithNode = useCallback((_nodeId: string, _nodeLabel: string) => {
@@ -10886,6 +10933,7 @@ You have access to all Bash tools to execute git commands like:
           onOpenSettings={() => setShowSettings(true)}
           onOpenGitPanel={handleOpenGitDrawer}
           onOpenTerminalWindow={handleOpenTerminalWindowForRepo}
+          onOpenBrain={handleOpenBrainWindow}
           onOpenDashboard={handleOpenProjectDashboard}
           onOpenClaudeAssets={openClaudeAssetsTab}
           onRemoveProject={handleRemoveProject}
@@ -11178,13 +11226,11 @@ You have access to all Bash tools to execute git commands like:
               onBrowserClick={handleOpenBrowserTab}
               onDroidFactoryClick={() => setDroidFactoryOpen(true)}
               onMemoryGraphClick={handleOpenMemoryGraphTab}
-              onSecondBrainClick={handleOpenSecondBrainTab}
               onClaudeAssetsClick={openClaudeAssetsTab}
               onGuideClick={handleOpenDocsTab}
               onToggleSidePanel={() => setSidePanelCollapsed(!sidePanelCollapsed)}
               sidePanelCollapsed={sidePanelCollapsed}
               terminalWindowOpen={terminalWindowOpen}
-              secondBrainOpen={tabs.some(t => t.type === 'second-brain' && t.id === activeTabId)}
               claudeAssetsOpen={tabs.some(t => t.type === 'claude-assets' && t.id === activeTabId)}
               isAuthenticated={claudeCliAvailable !== false}
               onLoginClick={async () => {
