@@ -1021,6 +1021,20 @@
   background: #06b6d4 !important;
 }
 
+/* Inline Mermaid diagrams in markdown entries */
+.brain-editor-view .mermaid-diagram-container {
+  margin: 1rem 0;
+  padding: 1.5rem;
+  background: #1e1e22;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+}
+
+.brain-editor-view .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Scrollbar */
 .brain-sidebar::-webkit-scrollbar,
 .brain-content::-webkit-scrollbar,
