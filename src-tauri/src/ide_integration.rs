@@ -54,6 +54,8 @@ struct IDEEntry {
     app_path_local: Option<&'static str>,
     /// Windows-specific: path in Program Files
     app_path_program: Option<&'static str>,
+    /// Linux: known .desktop file basenames to search for
+    desktop_names: &'static [&'static str],
     cli_style: &'static str,
     supports_diff: bool,
 }
@@ -151,10 +153,134 @@ impl IDEEntry {
         None
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(target_os = "linux")]
+    fn get_app_path(&self) -> Option<String> {
+        // Search .desktop files in XDG application directories
+        let xdg_dirs = get_linux_desktop_dirs();
+        for dir in &xdg_dirs {
+            for name in self.desktop_names {
+                let desktop_path = Path::new(dir).join(name);
+                if desktop_path.exists() {
+                    if let Some(exec) = parse_desktop_exec(&desktop_path) {
+                        return Some(exec);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     fn get_app_path(&self) -> Option<String> {
         None
     }
+}
+
+// =============================================================================
+// Linux .desktop file helpers
+// =============================================================================
+
+/// Get XDG application directories where .desktop files may be found
+#[cfg(target_os = "linux")]
+fn get_linux_desktop_dirs() -> Vec<String> {
+    let mut dirs = Vec::new();
+
+    // XDG_DATA_HOME (default: ~/.local/share)
+    if let Ok(xdg_data_home) = std::env::var("XDG_DATA_HOME") {
+        dirs.push(format!("{}/applications", xdg_data_home));
+    } else if let Ok(home) = std::env::var("HOME") {
+        dirs.push(format!("{}/.local/share/applications", home));
+    }
+
+    // XDG_DATA_DIRS (default: /usr/local/share:/usr/share)
+    let xdg_data_dirs = std::env::var("XDG_DATA_DIRS")
+        .unwrap_or_else(|_| "/usr/local/share:/usr/share".to_string());
+    for dir in xdg_data_dirs.split(':') {
+        if !dir.is_empty() {
+            dirs.push(format!("{}/applications", dir));
+        }
+    }
+
+    // Snap and Flatpak additional locations
+    dirs.push("/var/lib/snapd/desktop/applications".to_string());
+    dirs.push("/var/lib/flatpak/exports/share/applications".to_string());
+    if let Ok(home) = std::env::var("HOME") {
+        dirs.push(format!("{}/.local/share/flatpak/exports/share/applications", home));
+    }
+
+    dirs
+}
+
+/// Parse a .desktop file and extract the executable path from the Exec= line.
+/// Only reads Exec= from the [Desktop Entry] section (ignores Desktop Action sections).
+/// Strips field codes (%f, %F, %u, %U, etc.) and returns just the binary path.
+#[cfg(target_os = "linux")]
+fn parse_desktop_exec(desktop_path: &std::path::Path) -> Option<String> {
+    let content = fs::read_to_string(desktop_path).ok()?;
+
+    let mut in_desktop_entry = false;
+    for line in content.lines() {
+        let line = line.trim();
+
+        // Track which section we're in
+        if line.starts_with('[') {
+            in_desktop_entry = line == "[Desktop Entry]";
+            continue;
+        }
+
+        // Only parse Exec= from the main [Desktop Entry] section
+        if in_desktop_entry && line.starts_with("Exec=") {
+            let exec_value = &line[5..]; // Skip "Exec="
+
+            // Split into tokens and take the first one (the binary)
+            // Handle common patterns: "env VAR=val binary args", "/usr/bin/binary args"
+            let mut tokens = exec_value.split_whitespace();
+            let mut binary = tokens.next()?.to_string();
+
+            // Skip env prefix: "env VAR=val binary"
+            if binary == "env" {
+                for token in tokens.by_ref() {
+                    if token.contains('=') {
+                        continue; // Skip environment variable assignments
+                    }
+                    binary = token.to_string();
+                    break;
+                }
+            }
+
+            // Verify the binary exists (could be absolute path or in PATH)
+            if Path::new(&binary).is_absolute() && Path::new(&binary).exists() {
+                return Some(binary);
+            }
+            // If not absolute, resolve by walking PATH directories
+            if !binary.contains('/') {
+                if let Some(resolved) = find_in_path(&binary) {
+                    return Some(resolved);
+                }
+            }
+
+            // Return the binary as-is if we can't resolve it
+            return Some(binary);
+        }
+    }
+    None
+}
+
+/// Find a binary in PATH directories without spawning a subprocess.
+/// More portable than calling `which` (which may not exist on minimal installs).
+#[cfg(target_os = "linux")]
+fn find_in_path(binary: &str) -> Option<String> {
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    for dir in path_var.split(':') {
+        if dir.is_empty() {
+            continue;
+        }
+        let candidate = Path::new(dir).join(binary);
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().into_owned());
+        }
+    }
+    None
 }
 
 /// All supported IDEs
@@ -168,6 +294,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Visual Studio Code.app",
         app_path_local: Some("Programs\\Microsoft VS Code\\Code.exe"),
         app_path_program: Some("Microsoft VS Code\\Code.exe"),
+        desktop_names: &["code.desktop", "code-oss.desktop", "visual-studio-code.desktop"],
         cli_style: "vscode",
         supports_diff: true,
     },
@@ -179,6 +306,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Cursor.app",
         app_path_local: Some("Programs\\cursor\\Cursor.exe"),
         app_path_program: None,
+        desktop_names: &["cursor.desktop", "cursor-url-handler.desktop"],
         cli_style: "vscode",
         supports_diff: true,
     },
@@ -190,6 +318,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Windsurf.app",
         app_path_local: Some("Programs\\Windsurf\\Windsurf.exe"),
         app_path_program: None,
+        desktop_names: &["windsurf.desktop"],
         cli_style: "vscode",
         supports_diff: false,
     },
@@ -202,6 +331,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Zed.app",
         app_path_local: Some("Programs\\Zed\\Zed.exe"),
         app_path_program: None,
+        desktop_names: &["zed.desktop", "dev.zed.Zed.desktop"],
         cli_style: "zed",
         supports_diff: false,
     },
@@ -214,6 +344,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Athas.app",
         app_path_local: Some("Programs\\Athas\\Athas.exe"),
         app_path_program: None,
+        desktop_names: &["athas-code.desktop"],
         cli_style: "vscode",
         supports_diff: true,
     },
@@ -226,6 +357,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/IntelliJ IDEA.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\IntelliJ IDEA*\\bin\\idea64.exe"),
+        desktop_names: &["intellij-idea.desktop", "jetbrains-idea.desktop", "jetbrains-idea-ce.desktop"],
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -237,6 +369,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/WebStorm.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\WebStorm*\\bin\\webstorm64.exe"),
+        desktop_names: &["webstorm.desktop", "jetbrains-webstorm.desktop"],
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -248,6 +381,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/PyCharm.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\PyCharm*\\bin\\pycharm64.exe"),
+        desktop_names: &["pycharm.desktop", "jetbrains-pycharm.desktop", "jetbrains-pycharm-ce.desktop"],
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -259,6 +393,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/GoLand.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\GoLand*\\bin\\goland64.exe"),
+        desktop_names: &["goland.desktop", "jetbrains-goland.desktop"],
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -270,6 +405,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/RubyMine.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\RubyMine*\\bin\\rubymine64.exe"),
+        desktop_names: &["rubymine.desktop", "jetbrains-rubymine.desktop"],
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -281,6 +417,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/PhpStorm.app",
         app_path_local: None,
         app_path_program: Some("JetBrains\\PhpStorm*\\bin\\phpstorm64.exe"),
+        desktop_names: &["phpstorm.desktop", "jetbrains-phpstorm.desktop"],
         cli_style: "jetbrains",
         supports_diff: true,
     },
@@ -293,6 +430,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Sublime Text.app",
         app_path_local: None,
         app_path_program: Some("Sublime Text\\sublime_text.exe"),
+        desktop_names: &["sublime_text.desktop", "sublime-text.desktop"],
         cli_style: "sublime",
         supports_diff: false,
     },
@@ -304,7 +442,8 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         cli: "xed",
         app_path: "/Applications/Xcode.app",
         app_path_local: None,
-        app_path_program: None, // Not available on Windows
+        app_path_program: None,
+        desktop_names: &[],
         cli_style: "xcode",
         supports_diff: false,
     },
@@ -317,6 +456,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Android Studio.app",
         app_path_local: None,
         app_path_program: Some("Android\\Android Studio\\bin\\studio64.exe"),
+        desktop_names: &["android-studio.desktop", "jetbrains-studio.desktop"],
         cli_style: "jetbrains",
         supports_diff: false,
     },
@@ -329,6 +469,7 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         app_path: "/Applications/Antigravity.app",
         app_path_local: Some("Programs\\Antigravity\\Antigravity.exe"),
         app_path_program: None,
+        desktop_names: &["antigravity.desktop"],
         cli_style: "vscode",
         supports_diff: false,
     },
@@ -338,9 +479,10 @@ const IDE_REGISTRY: &[IDEEntry] = &[
         name: "Notepad++",
         bundle_id: "",
         cli: "notepad++",
-        app_path: "", // Not available on macOS
+        app_path: "",
         app_path_local: None,
         app_path_program: Some("Notepad++\\notepad++.exe"),
+        desktop_names: &[],
         cli_style: "notepadpp",
         supports_diff: false,
     },
@@ -472,7 +614,16 @@ pub fn detect_installed_ides() -> Vec<IDEInfo> {
             }
         };
 
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(target_os = "linux")]
+        let (app_exists, resolved_path) = {
+            if let Some(path) = entry.get_app_path() {
+                (true, path)
+            } else {
+                (false, String::new())
+            }
+        };
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         let (app_exists, resolved_path) = (false, String::new());
 
         let cli_available = is_cli_available(entry.cli);
@@ -648,7 +799,18 @@ pub fn open_folder_in_ide(ide_id: String, folder_path: String) -> Result<String,
             };
         }
 
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(target_os = "linux")]
+        {
+            let result = Command::new(&custom.app_path)
+                .arg(&folder_path)
+                .spawn();
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", folder_path, custom.name)),
+                Err(e) => Err(format!("Failed to open in {}: {}", custom.name, e)),
+            };
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         return Err("Custom IDEs not supported on this platform".to_string());
     }
 
@@ -932,7 +1094,18 @@ pub fn open_file_in_ide(
             };
         }
 
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(target_os = "linux")]
+        {
+            let result = Command::new(&custom.app_path)
+                .arg(&file_path)
+                .spawn();
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", file_path, custom.name)),
+                Err(e) => Err(format!("Failed to open file in {}: {}", custom.name, e)),
+            };
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         return Err("Custom IDEs not supported on this platform".to_string());
     }
 
@@ -1015,7 +1188,31 @@ pub fn open_file_in_ide(
                     }
                 }
 
-                #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+                #[cfg(target_os = "linux")]
+                {
+                    // On Linux, try the resolved binary from .desktop file
+                    if let Some(app_path) = entry.get_app_path() {
+                        log::info!("[IDE] CLI not available, using resolved binary: {}", app_path);
+
+                        if let Some(ref root) = project_root {
+                            let _ = Command::new(&app_path).arg(root).spawn();
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                        }
+
+                        let result = Command::new(&app_path)
+                            .arg(&file_path)
+                            .spawn();
+
+                        return match result {
+                            Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                            Err(e) => Err(format!("Failed to open file: {}", e)),
+                        };
+                    } else {
+                        return Err(format!("{} not found on this system", entry.name));
+                    }
+                }
+
+                #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
                 {
                     return Err(format!("{} CLI not available and no fallback for this platform", entry.name));
                 }
@@ -1134,7 +1331,30 @@ pub fn open_file_in_ide(
                     }
                 }
 
-                #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+                #[cfg(target_os = "linux")]
+                {
+                    if let Some(app_path) = entry.get_app_path() {
+                        log::info!("[IDE] Zed CLI not available, using resolved binary: {}", app_path);
+
+                        if let Some(ref root) = project_root {
+                            let _ = Command::new(&app_path).arg(root).spawn();
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                        }
+
+                        let result = Command::new(&app_path)
+                            .arg(&file_path)
+                            .spawn();
+
+                        return match result {
+                            Ok(_) => Ok(format!("Opened {} in {}", file_path, entry.name)),
+                            Err(e) => Err(format!("Failed to open file: {}", e)),
+                        };
+                    } else {
+                        return Err(format!("Zed not found on this system"));
+                    }
+                }
+
+                #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
                 {
                     return Err(format!("Zed CLI not available and no fallback for this platform"));
                 }
@@ -1329,7 +1549,22 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
                     name: entry.name.to_string(),
                     app_path,
                     category: "ide".to_string(),
-                    icon_base64: None, // TODO: Windows icon extraction
+                    icon_base64: None,
+                });
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            let app_found = entry.get_app_path();
+            let cli_available = is_cli_available(entry.cli);
+            if app_found.is_some() || cli_available {
+                apps.push(InstalledApp {
+                    id: entry.id.to_string(),
+                    name: entry.name.to_string(),
+                    app_path: app_found.unwrap_or_default(),
+                    category: "ide".to_string(),
+                    icon_base64: None,
                 });
             }
         }
@@ -1411,6 +1646,42 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
                     icon_base64: None,
                 });
                 break; // Only add once
+            }
+        }
+    }
+
+    // On Linux, add common terminals and file managers
+    #[cfg(target_os = "linux")]
+    {
+        // Linux terminal/file manager entries: (id, name, cli, category)
+        let linux_apps: &[(&str, &str, &str, &str)] = &[
+            // Terminals
+            ("gnome-terminal", "GNOME Terminal", "gnome-terminal", "terminal"),
+            ("konsole", "Konsole", "konsole", "terminal"),
+            ("xfce4-terminal", "Xfce Terminal", "xfce4-terminal", "terminal"),
+            ("alacritty", "Alacritty", "alacritty", "terminal"),
+            ("kitty", "Kitty", "kitty", "terminal"),
+            ("wezterm", "WezTerm", "wezterm", "terminal"),
+            ("ghostty", "Ghostty", "ghostty", "terminal"),
+            ("foot", "Foot", "foot", "terminal"),
+            ("tilix", "Tilix", "tilix", "terminal"),
+            // File managers
+            ("nautilus", "Files (Nautilus)", "nautilus", "finder"),
+            ("dolphin", "Dolphin", "dolphin", "finder"),
+            ("thunar", "Thunar", "thunar", "finder"),
+            ("nemo", "Nemo", "nemo", "finder"),
+            ("pcmanfm", "PCManFM", "pcmanfm", "finder"),
+        ];
+
+        for &(id, name, cli, category) in linux_apps {
+            if is_cli_available(cli) {
+                apps.push(InstalledApp {
+                    id: id.to_string(),
+                    name: name.to_string(),
+                    app_path: cli.to_string(),
+                    category: category.to_string(),
+                    icon_base64: None,
+                });
             }
         }
     }
@@ -1559,6 +1830,40 @@ pub fn open_in_app(app_id: String, path: String) -> Result<String, String> {
             }
             _ => {}
         }
+    }
+
+    // Handle Linux-specific apps (terminals and file managers)
+    #[cfg(target_os = "linux")]
+    {
+        // Terminal apps with working-directory support
+        let terminal_args: Option<Vec<String>> = match app_id.as_str() {
+            "gnome-terminal" => Some(vec!["--working-directory".to_string(), path.clone()]),
+            "konsole" => Some(vec!["--workdir".to_string(), path.clone()]),
+            "xfce4-terminal" => Some(vec!["--working-directory".to_string(), path.clone()]),
+            "alacritty" => Some(vec!["--working-directory".to_string(), path.clone()]),
+            "kitty" => Some(vec!["--directory".to_string(), path.clone()]),
+            "wezterm" => Some(vec!["start".to_string(), "--cwd".to_string(), path.clone()]),
+            "ghostty" => Some(vec!["--working-directory".to_string(), path.clone()]),
+            "foot" => Some(vec![format!("--working-directory={}", path)]),
+            "tilix" => Some(vec!["--working-directory".to_string(), path.clone()]),
+            // File managers: just pass the path as argument
+            "nautilus" | "dolphin" | "thunar" | "nemo" | "pcmanfm" => {
+                Some(vec![path.clone()])
+            }
+            _ => None,
+        };
+
+        if let Some(args) = terminal_args {
+            let result = Command::new(&app_id)
+                .args(&args)
+                .spawn();
+
+            return match result {
+                Ok(_) => Ok(format!("Opened {} in {}", path, app_id)),
+                Err(e) => Err(format!("Failed to open {}: {}", app_id, e)),
+            };
+        }
+
     }
 
     Err(format!("Unknown app: {}", app_id))
