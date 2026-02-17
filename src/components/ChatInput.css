@@ -496,8 +496,8 @@
 
 .chat-input-field {
   width: 100%;
-  min-height: 32px;
-  max-height: 50px;
+  min-height: 50px;
+  max-height: 300px;
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -507,13 +507,9 @@
   font-size: 13px;
   line-height: 1.4;
   resize: none;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   outline: none;
-}
-
-/* Increase height when focused */
-.chat-input-container.focused .chat-input-field {
-  max-height: 300px;
+  overflow-y: hidden;
 }
 
 .chat-input-field::placeholder {

@@ -156,6 +156,15 @@ export default function ChatInput({
     attachmentsRef.current = attachments;
   }, [attachments]);
 
+  // Auto-resize textarea to fit content (2-line minimum, expands up to max-height)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+    el.style.overflowY = el.scrollHeight > 300 ? 'auto' : 'hidden';
+  }, [input]);
+
   // Wrapper to support both direct value and callback setter pattern
   const setAttachments = useCallback((valueOrUpdater: ChatAttachment[] | ((prev: ChatAttachment[]) => ChatAttachment[])) => {
     if (typeof valueOrUpdater === 'function') {
@@ -1112,12 +1121,11 @@ export default function ChatInput({
     const trimmed = (input || '').trim();
     if ((!trimmed && attachments.length === 0) || isStreaming) return;
 
-    // Clear input and blur before awaiting send (which blocks until stream ends)
+    // Clear input before awaiting send (which blocks until stream ends)
     const currentAttachments = [...attachments];
     setInput('');
     setAttachments([]);
     setError(null);
-    textareaRef.current?.blur();
 
     await onSend(trimmed, { attachments: currentAttachments });
   };
