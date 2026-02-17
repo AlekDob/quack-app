@@ -792,7 +792,6 @@ export default function ChatView({
         </div>
         <ChatInput
           onSend={handleSend}
-          disabled={isLoading}
           placeholder="Ask Claude about your code, commands, or project..."
           agents={agents}
           onSelectAgent={onSelectAgent}

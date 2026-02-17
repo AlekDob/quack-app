@@ -926,10 +926,6 @@ export default function ChatInput({
   );
 
   const handleAttach = useCallback(async () => {
-    if (disabled) {
-      return;
-    }
-
     try {
       const selection = await openDialog({
         multiple: true,
@@ -962,7 +958,7 @@ export default function ChatInput({
       console.error('Attachment selection failed', err);
       setError('Unable to select attachments.');
     }
-  }, [attachments.length, createAttachmentFromPath, disabled]);
+  }, [attachments.length, createAttachmentFromPath]);
 
   const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((item) => item.id !== id));
@@ -1012,10 +1008,6 @@ export default function ChatInput({
 
   const handlePaste = useCallback(
     async (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
-      if (disabled) {
-        return;
-      }
-
       const clipboardData = event.clipboardData;
       if (!clipboardData) {
         return;
@@ -1105,7 +1097,7 @@ export default function ChatInput({
         // who try to read it as a file path. The image is visible in the attachment preview.
       }
     },
-    [attachments.length, createAttachmentFromPath, disabled, mimeToExtension]
+    [attachments.length, createAttachmentFromPath, mimeToExtension]
   );
 
   const formatSize = useCallback((size: number) => {
@@ -1118,12 +1110,16 @@ export default function ChatInput({
 
   const handleSend = async () => {
     const trimmed = (input || '').trim();
-    if ((!trimmed && attachments.length === 0) || disabled) return;
+    if ((!trimmed && attachments.length === 0) || isStreaming) return;
 
-    await onSend(trimmed, { attachments });
+    // Clear input and blur before awaiting send (which blocks until stream ends)
+    const currentAttachments = [...attachments];
     setInput('');
     setAttachments([]);
     setError(null);
+    textareaRef.current?.blur();
+
+    await onSend(trimmed, { attachments: currentAttachments });
   };
 
   const handleStop = () => {
@@ -1227,9 +1223,13 @@ export default function ChatInput({
       } else if (keyCombo === shortcuts.chatVoiceRecord?.currentKeys) {
         e.preventDefault();
         handleVoiceClick();
-      } else if (keyCombo === shortcuts.chatSendMessage?.currentKeys && !disabled) {
+      } else if (keyCombo === shortcuts.chatSendMessage?.currentKeys) {
         e.preventDefault();
-        void handleSend();
+        if (isStreaming) {
+          handleStop();
+        } else {
+          void handleSend();
+        }
       } else if (keyCombo === shortcuts.chatOpenSnippets?.currentKeys) {
         e.preventDefault();
         setShowSnippetPopover(true);
@@ -1284,7 +1284,7 @@ export default function ChatInput({
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [shortcuts, input, disabled, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput]);
+  }, [shortcuts, input, isStreaming, isFullscreen, onToggleFullscreen, handleAttach, handleVoiceClick, handleSend, setInput]);
 
   // Snippet insertion handler
   const handleInsertSnippet = useCallback((content: string, cursorOffset?: number) => {
@@ -1829,12 +1829,24 @@ export default function ChatInput({
     // Send on Cmd+Enter or Ctrl+Enter
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      void handleSend();
+      if (isStreaming) {
+        handleStop();
+      } else {
+        void handleSend();
+      }
     }
     // Send on Enter (without Shift)
     else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      void handleSend();
+      if (isStreaming) {
+        // Empty input + Enter = stop streaming
+        if (!input.trim()) {
+          handleStop();
+        }
+        // If input has content, do nothing (user is composing next message)
+      } else {
+        void handleSend();
+      }
     }
   };
 
@@ -2095,7 +2107,6 @@ export default function ChatInput({
             type="button"
             className="chat-input-action-btn"
             onClick={handleAttach}
-            disabled={disabled}
             data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
             aria-label="Attach files"
           >
@@ -2107,7 +2118,6 @@ export default function ChatInput({
             type="button"
             className="chat-input-action-btn"
             onClick={onOpenPromptEngineer}
-            disabled={disabled}
             data-tooltip="Prompt Engineer"
             aria-label="Prompt Engineer"
           >
@@ -2122,7 +2132,6 @@ export default function ChatInput({
               type="button"
               className={`chat-input-action-btn ${isFullscreen ? 'active' : ''}`}
               onClick={onToggleFullscreen}
-              disabled={disabled}
               data-tooltip={isFullscreen ? `Exit fullscreen (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})` : `Fullscreen mode (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})`}
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
             >
@@ -2141,7 +2150,7 @@ export default function ChatInput({
             type="button"
             className="chat-input-action-btn"
             onClick={handleVoiceClick}
-            disabled={disabled || !isSpeechSupported}
+            disabled={!isSpeechSupported}
             data-tooltip={isSpeechSupported ? `Voice input (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice input not supported"}
             aria-label="Voice input"
           >
@@ -2162,7 +2171,6 @@ export default function ChatInput({
                   e.preventDefault();
                   setShowSnippetPopover(!showSnippetPopover);
                 }}
-                disabled={disabled}
                 data-tooltip={`Prompt Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
                 aria-label="Prompt Snippets"
               >
@@ -2191,7 +2199,6 @@ export default function ChatInput({
                     }
                   }, 0);
                 }}
-                disabled={disabled}
                 data-tooltip={`New line with _ (${formatShortcut(shortcuts.chatNewLine?.currentKeys || '')})`}
                 aria-label="New line with underscore"
               >
@@ -2239,7 +2246,6 @@ export default function ChatInput({
                     }, 0);
                   }
                 }}
-                disabled={disabled}
                 data-tooltip={`XML tag (${formatShortcut(shortcuts.chatInsertXml?.currentKeys || '')})`}
                 aria-label="XML tag"
               >
@@ -2291,33 +2297,47 @@ export default function ChatInput({
             );
           })()}
           </div>
-          {/* Send button - aligned to right */}
+          {/* Send/Stop button - aligned to right */}
           <div className="chat-input-actions-right">
-            <button
-              type="button"
-              className="chat-input-send"
-              onClick={() => void handleSend()}
-              disabled={disabled || (!input.trim() && attachments.length === 0)}
-              data-tooltip={`Send (${formatShortcut(shortcuts.chatSendMessage?.currentKeys || '')})`}
-              aria-label="Send message"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
+            {isStreaming ? (
+              <button
+                type="button"
+                className="chat-input-send streaming"
+                onClick={handleStop}
+                data-tooltip="Stop (ESC)"
+                aria-label="Stop streaming"
               >
-                <path
-                  d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
-                  fill="currentColor"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="chat-input-send"
+                onClick={() => void handleSend()}
+                disabled={!input.trim() && attachments.length === 0}
+                data-tooltip={`Send (${formatShortcut(shortcuts.chatSendMessage?.currentKeys || '')})`}
+                aria-label="Send message"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
           </div>
           <textarea
@@ -2345,7 +2365,6 @@ export default function ChatInput({
                 ? `⇧ + ↵ new line | ↵ send | @ to mention droids or files | / to invoke commands`
                 : placeholder
             }
-            disabled={disabled}
             rows={1}
           />
 
@@ -2461,7 +2480,7 @@ export default function ChatInput({
                   content={input}
                   filename="message.md"
                   language="markdown"
-                  readOnly={disabled}
+                  readOnly={false}
                   onChange={(value) => setInput(value)}
                 />
               </div>
@@ -2525,7 +2544,6 @@ export default function ChatInput({
                       type="button"
                       className="chat-input-action-btn"
                       onClick={handleAttach}
-                      disabled={disabled}
                       data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2537,7 +2555,6 @@ export default function ChatInput({
                       type="button"
                       className="chat-input-action-btn"
                       onClick={() => setShowSnippetPopover(!showSnippetPopover)}
-                      disabled={disabled}
                       data-tooltip={`Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2550,7 +2567,7 @@ export default function ChatInput({
                       type="button"
                       className="chat-input-action-btn"
                       onClick={handleVoiceClick}
-                      disabled={disabled || !isSpeechSupported}
+                      disabled={!isSpeechSupported}
                       data-tooltip={isSpeechSupported ? `Voice (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice not supported"}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2569,17 +2586,31 @@ export default function ChatInput({
                         <kbd>Cmd</kbd>+<kbd>Enter</kbd> send
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      className="chat-focus-send-btn"
-                      onClick={() => void handleSend()}
-                      disabled={disabled || (!input.trim() && attachments.length === 0)}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2 8L14 2L8 14L6.5 9.5L2 8Z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      <span>Send</span>
-                    </button>
+                    {isStreaming ? (
+                      <button
+                        type="button"
+                        className="chat-focus-send-btn streaming"
+                        onClick={handleStop}
+                        aria-label="Stop streaming"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                        <span>Stop</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="chat-focus-send-btn"
+                        onClick={() => void handleSend()}
+                        disabled={!input.trim() && attachments.length === 0}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M2 8L14 2L8 14L6.5 9.5L2 8Z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>Send</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

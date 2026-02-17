@@ -1101,6 +1101,16 @@
   box-shadow: none;
 }
 
+.chat-focus-send-btn.streaming {
+  background: #ef4444;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.chat-focus-send-btn.streaming:hover {
+  background: #dc2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+}
+
 .chat-focus-send-btn svg {
   flex-shrink: 0;
 }
