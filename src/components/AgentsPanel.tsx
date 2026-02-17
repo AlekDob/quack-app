@@ -1,5 +1,9 @@
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { AgentInfo, AgentDetails } from "../types";
+import { ScopePickerModal } from './ScopePickerModal';
+import { ConfirmModal } from './ConfirmModal';
+import { getRandomAgentName } from '../utils/agentNames';
 
 /**
  * Agents Panel - Inline list view of agents
@@ -48,6 +52,7 @@ export default function AgentsPanel({
   loading,
   error,
   directoryExists,
+  workingDir,
   onSelectAgent,
   onUseAgent,
   onRefresh,
@@ -56,6 +61,8 @@ export default function AgentsPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
+  const [showScopeModal, setShowScopeModal] = useState(false);
+  const [droidToDelete, setDroidToDelete] = useState<AgentInfo | null>(null);
 
   // Filter agents based on search query
   const filteredAgents = agents.filter(agent =>
@@ -68,11 +75,61 @@ export default function AgentsPanel({
     return [...agentsToSort].sort((a, b) => a.name.localeCompare(b.name));
   };
 
-  // Handle new droid creation via tab (like Commands/Rules)
+  // Handle new droid creation: show scope picker modal
   const handleNewDroid = () => {
+    setShowScopeModal(true);
+  };
+
+  // Create draft droid file and open in IDE or internal tab
+  const handleCreateDraft = async (name: string, scope: 'global' | 'project') => {
+    const displayName = name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const template = [
+      `You are **${displayName}**, a specialized AI agent.`,
+      '',
+      '<!-- Delete the examples below and write your own instructions. -->',
+      '',
+      '## Your Mission',
+      '',
+      'Describe what this agent does, its domain expertise, and when to use it.',
+      'Example: "You specialize in React component architecture and performance optimization."',
+      '',
+      '## How You Work',
+      '',
+      '1. **Analyze** — Read relevant files and gather context before acting',
+      '2. **Plan** — Explain your approach and surface uncertainties',
+      '3. **Execute** — Make changes with precision, one step at a time',
+      '4. **Verify** — Run tests or checks to confirm the result',
+      '',
+      '## Best Practices',
+      '',
+      '- Always read files before modifying them',
+      '- Explain your reasoning before acting',
+      '- Report failures immediately instead of retrying silently',
+      '- Respect the project architecture — surface decisions before introducing new patterns',
+      '',
+      '## Example Specializations',
+      '',
+      '<!-- Pick one or write your own: -->',
+      '<!-- - Code reviewer: find bugs, security issues, and suggest improvements -->',
+      '<!-- - Test writer: generate unit tests, integration tests, edge cases -->',
+      '<!-- - Documentation writer: update docs, README, changelogs -->',
+      '<!-- - Refactoring expert: improve code quality without changing behavior -->',
+      '<!-- - DevOps specialist: CI/CD, Docker, deployment pipelines -->',
+    ].join('\n');
+
+    const filePath = await invoke<string>('create_agent', {
+      name,
+      description: '',
+      model: 'sonnet',
+      color: 'blue',
+      content: template,
+      scope,
+      workingDir: scope === 'project' ? workingDir : undefined,
+    });
     if (onSelectDroid) {
-      onSelectDroid('', 'project', true);
+      onSelectDroid(name, scope, false, filePath);
     }
+    onRefresh();
   };
 
   // Handle editing an existing droid via tab (pass file_path for IDE opening)
@@ -80,9 +137,24 @@ export default function AgentsPanel({
     if (onSelectDroid) {
       onSelectDroid(agent.name, agent.scope as 'global' | 'project', false, agent.file_path);
     } else {
-      // Fallback to onSelectAgent
       onSelectAgent(agent);
     }
+  };
+
+  // Delete droid after user confirms via modal
+  const handleConfirmDelete = async () => {
+    if (!droidToDelete) return;
+    try {
+      await invoke('delete_agent', {
+        name: droidToDelete.name,
+        scope: droidToDelete.scope,
+        workingDir: droidToDelete.scope === 'project' ? workingDir : undefined,
+      });
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to delete droid:', err);
+    }
+    setDroidToDelete(null);
   };
 
   return (
@@ -267,7 +339,6 @@ export default function AgentsPanel({
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
-                        {/* Robot Icon - Teal gradient background with white icon (matches Quack Store) */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ecdc4, #26a69a)' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <rect x="4" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -278,8 +349,6 @@ export default function AgentsPanel({
                             <circle cx="10" cy="2" r="1" fill="currentColor"/>
                           </svg>
                         </div>
-
-                        {/* Agent Info */}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-white/90 truncate">
                             {agent.name.replace(/-/g, " ")}
@@ -290,7 +359,22 @@ export default function AgentsPanel({
                             </div>
                           )}
                         </div>
-
+                        <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEditDroid(agent); }}
+                            className="px-2 py-1 text-xs font-medium rounded-md bg-white/5 hover:bg-white/10 text-white/70 transition-colors duration-200"
+                            title="Edit droid"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDroidToDelete(agent); }}
+                            className="px-2 py-1 text-xs font-medium rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors duration-200"
+                            title="Delete droid"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     ))}
                 </div>
@@ -326,7 +410,6 @@ export default function AgentsPanel({
                         draggable
                         onDragStart={(e) => handleDroidDragStart(e, agent)}
                       >
-                        {/* Robot Icon - Teal gradient background with white icon (matches Quack Store) */}
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ecdc4, #26a69a)' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <rect x="4" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -337,8 +420,6 @@ export default function AgentsPanel({
                             <circle cx="10" cy="2" r="1" fill="currentColor"/>
                           </svg>
                         </div>
-
-                        {/* Agent Info */}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-white/90 truncate">
                             {agent.name.replace(/-/g, " ")}
@@ -349,7 +430,22 @@ export default function AgentsPanel({
                             </div>
                           )}
                         </div>
-
+                        <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEditDroid(agent); }}
+                            className="px-2 py-1 text-xs font-medium rounded-md bg-white/5 hover:bg-white/10 text-white/70 transition-colors duration-200"
+                            title="Edit droid"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDroidToDelete(agent); }}
+                            className="px-2 py-1 text-xs font-medium rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors duration-200"
+                            title="Delete droid"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     ))}
                 </div>
@@ -381,6 +477,23 @@ export default function AgentsPanel({
         </div>
       )}
 
+      {/* Confirm delete modal */}
+      <ConfirmModal
+        isOpen={droidToDelete !== null}
+        title="Delete Droid"
+        message={`Are you sure you want to delete "${droidToDelete?.name.replace(/-/g, ' ')}"? This cannot be undone.`}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDroidToDelete(null)}
+      />
+
+      {/* Scope picker modal for new droid */}
+      <ScopePickerModal
+        isOpen={showScopeModal}
+        onClose={() => setShowScopeModal(false)}
+        title="New Droid"
+        onConfirm={handleCreateDraft}
+        defaultName={getRandomAgentName(agents, 'project')}
+      />
     </div>
   );
 }

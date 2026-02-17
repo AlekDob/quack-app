@@ -344,7 +344,24 @@ function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
   }
 
   const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!fmMatch) return null;
+
+  // Resilient fallback: infer metadata from path/content when frontmatter is missing
+  // Brain: parseBrainFile-resilient-fallback
+  if (!fmMatch) {
+    const titleMatch = raw.match(/^#\s+(.+)$/m);
+    const dateMatch = filePath.match(/(\d{4}-\d{2}-\d{2})/);
+    const inferredType = inferTypeFromPath(filePath);
+    if (!inferredType && !titleMatch) return null;
+    return {
+      type: inferredType || 'note',
+      project: undefined,
+      created: dateMatch ? dateMatch[1] : '',
+      tags: [],
+      title: titleMatch ? titleMatch[1] : filePath.split('/').pop()?.replace('.md', '') || '',
+      content: raw.trim(),
+      filePath,
+    };
+  }
 
   const frontmatter = fmMatch[1];
   const body = fmMatch[2].trim();

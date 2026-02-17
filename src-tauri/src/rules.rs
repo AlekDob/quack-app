@@ -3,6 +3,13 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
+/// Get home directory cross-platform (HOME on Unix, USERPROFILE on Windows)
+fn get_home_dir() -> Result<String, String> {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not determine home directory".to_string())
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rule {
@@ -93,7 +100,7 @@ pub fn list_rules(_app: AppHandle, base_path: String) -> Result<RulesResponse, S
     let mut global_rules = Vec::new();
 
     // Read GLOBAL rules from ~/.claude/rules/
-    if let Ok(home_dir) = std::env::var("HOME") {
+    if let Ok(home_dir) = get_home_dir() {
         let global_rules_dir = PathBuf::from(home_dir).join(".claude/rules");
         log::info!("Reading global rules from: {:?}", global_rules_dir);
         global_rules = read_rules_from_dir(&global_rules_dir, "global");
@@ -120,9 +127,9 @@ pub fn create_rule(
     name: String,
     content: String,
     scope: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let rules_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
+        let home_dir = get_home_dir()
             .map_err(|_| "Could not determine home directory")?;
         PathBuf::from(home_dir).join(".claude/rules")
     } else {
@@ -142,11 +149,11 @@ pub fn create_rule(
         return Err(format!("Rule '{}' already exists", name));
     }
 
-    fs::write(&file_path, content)
+    fs::write(&file_path, &content)
         .map_err(|e| format!("Failed to write rule file: {}", e))?;
 
     log::info!("Created rule '{}' in {:?}", name, file_path);
-    Ok(())
+    Ok(file_path.to_string_lossy().to_string())
 }
 
 /// Update an existing rule
@@ -159,7 +166,7 @@ pub fn update_rule(
     scope: String,
 ) -> Result<(), String> {
     let rules_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
+        let home_dir = get_home_dir()
             .map_err(|_| "Could not determine home directory")?;
         PathBuf::from(home_dir).join(".claude/rules")
     } else {
@@ -188,7 +195,7 @@ pub fn delete_rule(
     scope: String,
 ) -> Result<(), String> {
     let rules_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
+        let home_dir = get_home_dir()
             .map_err(|_| "Could not determine home directory")?;
         PathBuf::from(home_dir).join(".claude/rules")
     } else {
@@ -303,7 +310,7 @@ pub fn get_rule_details(
     scope: String,
 ) -> Result<RuleDetails, String> {
     let rules_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
+        let home_dir = get_home_dir()
             .map_err(|_| "Could not determine home directory")?;
         PathBuf::from(home_dir).join(".claude/rules")
     } else {
@@ -344,7 +351,7 @@ pub fn save_rule_content(
     working_dir: Option<String>,
 ) -> Result<(), String> {
     let rules_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
+        let home_dir = get_home_dir()
             .map_err(|_| "Could not determine home directory")?;
         PathBuf::from(home_dir).join(".claude/rules")
     } else {
@@ -405,7 +412,7 @@ const BUNDLED_RULES: &[BundledRule] = &[];
 /// Rules are only installed if they don't already exist, preserving
 /// any user customizations.
 pub fn install_bundled_rules() -> Result<(), String> {
-    let home_dir = std::env::var("HOME")
+    let home_dir = get_home_dir()
         .map_err(|_| "Could not determine home directory")?;
 
     let global_rules_dir = PathBuf::from(home_dir).join(".claude/rules");

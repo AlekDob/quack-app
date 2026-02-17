@@ -335,6 +335,18 @@ fn load_skills_from_dir(skills_dir: &Path) -> Vec<(String, String)> {
     skills
 }
 
+/// Read the Display Name from the global ~/.claude/CLAUDE.md
+/// Looks for the pattern `**Name**: <value>` in the file.
+fn read_display_name_from_global_claude_md() -> Option<String> {
+    let home = dirs::home_dir()?;
+    let claude_md = home.join(".claude").join("CLAUDE.md");
+    let content = fs::read_to_string(&claude_md).ok()?;
+    let re = regex::Regex::new(r"(?m)^\*\*Name\*\*:\s*(.+)$").ok()?;
+    let caps = re.captures(&content)?;
+    let name = caps.get(1)?.as_str().trim().to_string();
+    if name.is_empty() { None } else { Some(name) }
+}
+
 /// Process CLAUDE.md template with personality variables
 #[tauri::command]
 pub fn inject_personality_to_claude_md(
@@ -473,6 +485,17 @@ fn inject_personality_to_claude_md_impl(
     agent_header.push_str("2. **Surface uncertainties** - Highlight doubts and ask for clarification instead of assuming\n");
     agent_header.push_str("3. **Report failures immediately** - Never silently retry or work around errors\n");
     agent_header.push_str("4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review\n\n");
+
+    // Brain: inject-display-name-agent-header
+    // Inject Display Name from global ~/.claude/CLAUDE.md so agents use the human's
+    // name (not the agent's name) as diary entry author.
+    if let Some(display_name) = read_display_name_from_global_claude_md() {
+        agent_header.push_str(&format!(
+            "**Diary Author**: `{}`\n\
+             *When writing diary entries, ALWAYS use `({})` as the author — never use your agent name.*\n\n",
+            display_name, display_name
+        ));
+    }
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 

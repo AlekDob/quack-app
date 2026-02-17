@@ -49,6 +49,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - MCP timeouts: `documentation/gotchas/gotcha-mcp-server-timeout-slow-startup.md`
 - LocalStorage: `documentation/gotchas/gotcha-localstorage-cache-stale-config.md`
 - Memory leaks: `documentation/bugs/bug-webkit-memory-leaks-high-cpu.md`
+- window.confirm: `documentation/gotchas/gotcha-window-confirm-tauri-webview.md`
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 
