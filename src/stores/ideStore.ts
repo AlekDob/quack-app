@@ -224,13 +224,15 @@ export const useIDEStore = create<IDEState>()(
       // Custom IDE management
       addCustomIDE: async () => {
         const isMac = navigator.userAgent.includes('Mac');
+        const isLinux = navigator.userAgent.includes('Linux');
 
         const selected = await openDialog({
-          directory: isMac, // macOS: select .app directory; Windows: select .exe file
+          directory: isMac, // macOS: select .app directory; Windows/Linux: select executable file
           multiple: false,
           title: isMac ? 'Select IDE Application' : 'Select IDE Executable',
-          defaultPath: isMac ? '/Applications' : undefined,
-          filters: isMac ? undefined : [{ name: 'Executables', extensions: ['exe'] }],
+          defaultPath: isMac ? '/Applications' : isLinux ? '/usr/bin' : undefined,
+          // macOS and Linux: no file filters; Windows: only .exe
+          filters: (isMac || isLinux) ? undefined : [{ name: 'Executables', extensions: ['exe'] }],
         });
 
         if (!selected || typeof selected !== 'string') {

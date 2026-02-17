@@ -6,7 +6,7 @@
  */
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
+use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -77,7 +77,7 @@ impl Default for WatcherConfig {
 /// Manager for multiple semantic file watchers (one per project)
 pub struct SemanticWatcherManager {
     /// Map of project_path -> active debouncer
-    watchers: Arc<Mutex<HashMap<String, Debouncer<RecommendedWatcher, FileIdMap>>>>,
+    watchers: Arc<Mutex<HashMap<String, Debouncer<RecommendedWatcher, RecommendedCache>>>>,
 }
 
 impl SemanticWatcherManager {

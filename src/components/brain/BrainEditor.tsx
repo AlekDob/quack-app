@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Edit3, Eye, Save, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import mermaid from 'mermaid';
+import MermaidDiagram from '../MermaidDiagram';
 import { readBrainEntry } from '../../services/brainFileService';
 import type { BrainEntry } from '../../services/brainFileService';
 
@@ -171,82 +172,117 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
     }
   };
 
-  const simpleMarkdownToHtml = (md: string) => {
+  const renderMarkdownWithMermaid = (md: string): React.ReactNode[] => {
     // Normalize CRLF (Windows) to LF so regex patterns match consistently
     md = md.replace(/\r\n/g, '\n');
-    // Extract fenced code blocks first to protect them
-    const codeBlocks: string[] = [];
-    let processed = md.replace(/```[\s\S]*?```/g, (match) => {
-      const content = match.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
-      const idx = codeBlocks.length;
-      codeBlocks.push(content);
-      return `%%CODEBLOCK_${idx}%%`;
-    });
 
-    // Extract tables before line-level processing
-    const tables: string[] = [];
-    processed = processed.replace(
-      /(?:^|\n)(\|.+\|)\n(\|[\s:|-]+\|)\n((?:\|.+\|\n?)+)/g,
-      (match) => {
-        const idx = tables.length;
-        tables.push(match.trim());
-        return `\n%%TABLE_${idx}%%\n`;
+    // Split content by fenced code blocks, preserving language info
+    const parts: Array<{ type: 'text' | 'code' | 'mermaid'; content: string }> = [];
+    const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(md)) !== null) {
+      // Text before the code block
+      if (match.index > lastIndex) {
+        parts.push({ type: 'text', content: md.slice(lastIndex, match.index) });
       }
-    );
+      const lang = match[1].toLowerCase();
+      const code = match[2].replace(/\n$/, '');
+      parts.push({ type: lang === 'mermaid' ? 'mermaid' : 'code', content: code });
+      lastIndex = match.index + match[0].length;
+    }
+    // Remaining text after last code block
+    if (lastIndex < md.length) {
+      parts.push({ type: 'text', content: md.slice(lastIndex) });
+    }
 
-    let html = processed
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-      .replace(/^[-*] (.*$)/gim, '<li>$1</li>')
-      .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-      .replace(/\n{2,}/g, '<br/>')
-      .replace(/\n/g, ' ');
+    const processInlineMarkdown = (text: string): string => {
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    };
 
-    // Restore tables as HTML tables
-    tables.forEach((table, i) => {
-      const rows = table.split('\n').filter(r => r.trim());
-      if (rows.length < 2) return;
-      const parseRow = (row: string) =>
-        row.split('|').slice(1, -1).map(c => c.trim());
-      const headers = parseRow(rows[0]);
-      const dataRows = rows.slice(2);
-      let tableHtml = '<table class="brain-table"><thead><tr>';
-      headers.forEach(h => {
-        tableHtml += `<th>${h.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</th>`;
-      });
-      tableHtml += '</tr></thead><tbody>';
-      dataRows.forEach(row => {
-        tableHtml += '<tr>';
-        parseRow(row).forEach(cell => {
-          const formatted = cell
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-          tableHtml += `<td>${formatted}</td>`;
-        });
-        tableHtml += '</tr>';
-      });
-      tableHtml += '</tbody></table>';
-      html = html.replace(`%%TABLE_${i}%%`, tableHtml);
-    });
+    const renderTextBlock = (text: string, key: number): React.ReactNode[] => {
+      const elements: React.ReactNode[] = [];
 
-    // Restore code blocks as styled pre elements
-    codeBlocks.forEach((block, i) => {
-      const escaped = block
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      html = html.replace(
-        `%%CODEBLOCK_${i}%%`,
-        `<pre class="brain-code-block"><code>${escaped}</code></pre>`
+      // Extract tables
+      const tables: string[] = [];
+      let processed = text.replace(
+        /(?:^|\n)(\|.+\|)\n(\|[\s:|-]+\|)\n((?:\|.+\|\n?)+)/g,
+        (m) => {
+          const idx = tables.length;
+          tables.push(m.trim());
+          return `\n%%TABLE_${idx}%%\n`;
+        }
       );
+
+      let html = processed
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+        .replace(/^[-*] (.*$)/gim, '<li>$1</li>')
+        .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
+        .replace(/\n{2,}/g, '<br/>')
+        .replace(/\n/g, ' ');
+
+      // Restore tables as HTML tables
+      tables.forEach((table, i) => {
+        const rows = table.split('\n').filter(r => r.trim());
+        if (rows.length < 2) return;
+        const parseRow = (row: string) =>
+          row.split('|').slice(1, -1).map(c => c.trim());
+        const headers = parseRow(rows[0]);
+        const dataRows = rows.slice(2);
+        let tableHtml = '<table class="brain-table"><thead><tr>';
+        headers.forEach(h => {
+          tableHtml += `<th>${processInlineMarkdown(h)}</th>`;
+        });
+        tableHtml += '</tr></thead><tbody>';
+        dataRows.forEach(row => {
+          tableHtml += '<tr>';
+          parseRow(row).forEach(cell => {
+            tableHtml += `<td>${processInlineMarkdown(cell)}</td>`;
+          });
+          tableHtml += '</tr>';
+        });
+        tableHtml += '</tbody></table>';
+        html = html.replace(`%%TABLE_${i}%%`, tableHtml);
+      });
+
+      if (html.trim()) {
+        elements.push(
+          <div key={`text-${key}`} dangerouslySetInnerHTML={{ __html: html }} />
+        );
+      }
+      return elements;
+    };
+
+    const result: React.ReactNode[] = [];
+    parts.forEach((part, i) => {
+      if (part.type === 'mermaid') {
+        result.push(<MermaidDiagram key={`mermaid-${i}`}>{part.content}</MermaidDiagram>);
+      } else if (part.type === 'code') {
+        const escaped = part.content
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        result.push(
+          <pre key={`code-${i}`} className="brain-code-block">
+            <code dangerouslySetInnerHTML={{ __html: escaped }} />
+          </pre>
+        );
+      } else {
+        result.push(...renderTextBlock(part.content, i));
+      }
     });
 
-    return html;
+    return result;
   };
 
   if (!entry) {
@@ -315,10 +351,9 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
             </div>
           </div>
         ) : (
-          <div
-            className="brain-editor-view"
-            dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(entry.content) }}
-          />
+          <div className="brain-editor-view">
+            {renderMarkdownWithMermaid(entry.content)}
+          </div>
         )
       ) : (
         <textarea
