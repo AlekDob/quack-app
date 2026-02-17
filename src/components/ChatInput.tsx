@@ -83,9 +83,6 @@ interface ChatInputProps {
   openaiApiKey?: string;
   // Open Prompt Engineer
   onOpenPromptEngineer?: () => void;
-  // Working on field
-  workingOn?: string;
-  onWorkingOnChange?: (value: string) => void;
   // Initial attachments (from Kanban task) - DEPRECATED, use attachments prop instead
   initialAttachments?: ChatAttachment[];
   // Fullscreen mode
@@ -120,8 +117,6 @@ export default function ChatInput({
   lastPrompt,
   openaiApiKey,
   onOpenPromptEngineer,
-  workingOn = '',
-  onWorkingOnChange,
   initialAttachments,
   isFullscreen = false,
   onToggleFullscreen,
@@ -207,37 +202,6 @@ export default function ChatInput({
   // Drag & drop state
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Working on popover state
-  const [showWorkingOnPopover, setShowWorkingOnPopover] = useState(false);
-  const [workingOnValue, setWorkingOnValue] = useState(workingOn);
-  const workingOnRef = useRef<HTMLDivElement>(null);
-
-  // Sync workingOn prop with local state
-  useEffect(() => {
-    setWorkingOnValue(workingOn);
-  }, [workingOn]);
-
-  // Update workingOn when popover closes (only if value changed)
-  useEffect(() => {
-    // When popover closes, update the value if it changed
-    if (!showWorkingOnPopover && workingOnValue !== workingOn && onWorkingOnChange) {
-      onWorkingOnChange(workingOnValue);
-    }
-  }, [showWorkingOnPopover, workingOnValue, workingOn, onWorkingOnChange]);
-
-  // Close popover when clicking outside
-  useEffect(() => {
-    if (!showWorkingOnPopover) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (workingOnRef.current && !workingOnRef.current.contains(event.target as Node)) {
-        setShowWorkingOnPopover(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showWorkingOnPopover]);
 
   // Slash command autocomplete state
   const [showCommandAutocomplete, setShowCommandAutocomplete] = useState(false);
@@ -2152,52 +2116,6 @@ export default function ChatInput({
               <path d="M12 2l0.5 1.5L14 4l-1.5 0.5L12 6l-0.5-1.5L10 4l1.5-0.5L12 2Z" opacity="0.6"/>
             </svg>
           </button>
-          {onWorkingOnChange && (
-            <div
-              ref={workingOnRef}
-              className="working-on-button-wrapper"
-            >
-              <button
-                type="button"
-                className={`chat-input-action-btn ${workingOn ? 'has-value' : ''}`}
-                data-tooltip="What are you working on?"
-                aria-label="Working on"
-                onClick={() => setShowWorkingOnPopover(!showWorkingOnPopover)}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 1a3 3 0 0 1 3 3v1h1.5A1.5 1.5 0 0 1 14 6.5v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-7A1.5 1.5 0 0 1 3.5 5H5V4a3 3 0 0 1 3-3Zm0 1a2 2 0 0 0-2 2v1h4V4a2 2 0 0 0-2-2Zm0 5.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/>
-                </svg>
-                {workingOn && (
-                  <span className="working-on-indicator"></span>
-                )}
-              </button>
-              {showWorkingOnPopover && (
-                <div className="working-on-popover">
-                  <div className="working-on-popover-header">
-                    <span>Working on</span>
-                  </div>
-                  <input
-                    type="text"
-                    className="working-on-popover-input"
-                    value={workingOnValue}
-                    onChange={(e) => setWorkingOnValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        setShowWorkingOnPopover(false);
-                      }
-                    }}
-                    placeholder="e.g., AI implementation"
-                    maxLength={150}
-                    autoFocus
-                  />
-                  <div className="working-on-popover-hint">
-                    Brief context about current focus
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
           {/* Fullscreen toggle button */}
           {onToggleFullscreen && (
             <button

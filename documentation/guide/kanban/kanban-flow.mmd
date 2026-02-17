@@ -61,7 +61,7 @@ graph LR
     IMR -->|"true → Human Review"| REVIEW
     HPQ -->|"false"| CHECK
     IMR -->|"false"| CHECK
-    CHECK{{"Both false?"} -->|"yes → In Progress"| INPROGRESS
+    CHECK{{"Both false?"}} -->|"yes → In Progress"| INPROGRESS
 
     %% Styling
     classDef todo fill:#374151,stroke:#6b7280,color:#e4e4e7

@@ -17,6 +17,10 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Auth credentials (cookies, tokens)
+medium-auth
+medium-auth.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
