@@ -74,6 +74,15 @@
   background: transparent;
 }
 
+/* Grouped consecutive messages - hide repeated header */
+.chat-message.assistant.no-header {
+  padding-top: 2px;
+}
+
+.chat-message.assistant.no-header .chat-message-header {
+  display: none;
+}
+
 /* Sticky last user message - iMessage style */
 .chat-message.sticky-user-message {
   position: sticky;

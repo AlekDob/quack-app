@@ -303,6 +303,8 @@ interface StreamMessageProps {
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   // Teammate stream drill-down
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
+  // Whether to show the agent header (avatar, name) — used for grouping consecutive messages
+  showHeader?: boolean;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -324,6 +326,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
   onTeammateDrillDown,
+  showHeader = true,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -641,7 +644,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     });
 
     return (
-      <div className="stream-message assistant-message">
+      <div className={`stream-message assistant-message${!showHeader ? ' no-header' : ''}`}>
         {/* Thinking blocks - rendered before the main content */}
         {msg.content.map((content: any, idx: number) => {
           if (content.type === 'thinking' && content.thinking && showThinkingBlocks) {
@@ -656,27 +659,31 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
           return null;
         })}
 
-        {/* Avatar + Content block - ALWAYS shown for assistant messages */}
+        {/* Avatar + Content block */}
         <div className="assistant-text">
-          <div className="assistant-avatar">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-            ) : (
-              <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-            )}
-          </div>
-          <div className="assistant-content">
-            <div className="assistant-name">
-              {agentName}
-              {activeTeam && (() => {
-                const normalizedAgent = agentName.toLowerCase().replace('agent ', '');
-                const isMember = activeTeam.members.some(m =>
-                  m.name.toLowerCase().replace('agent ', '') === normalizedAgent
-                );
-                if (!isMember) return null;
-                return <TeamModeBadge team={activeTeam} />;
-              })()}
+          {showHeader && (
+            <div className="assistant-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+              )}
             </div>
+          )}
+          <div className="assistant-content">
+            {showHeader && (
+              <div className="assistant-name">
+                {agentName}
+                {activeTeam && (() => {
+                  const normalizedAgent = agentName.toLowerCase().replace('agent ', '');
+                  const isMember = activeTeam.members.some(m =>
+                    m.name.toLowerCase().replace('agent ', '') === normalizedAgent
+                  );
+                  if (!isMember) return null;
+                  return <TeamModeBadge team={activeTeam} />;
+                })()}
+              </div>
+            )}
             {ruleNames.length > 0 && (
               <div className="rules-pills">
                 <svg className="rules-pills-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

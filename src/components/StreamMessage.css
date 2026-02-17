@@ -16,6 +16,11 @@
   align-items: flex-start;
 }
 
+/* Grouped consecutive messages - offset content to align with avatar'd messages */
+.stream-message.no-header .assistant-text {
+  margin-left: 44px; /* 32px avatar + 12px gap */
+}
+
 .assistant-avatar {
   width: 32px;
   height: 32px;

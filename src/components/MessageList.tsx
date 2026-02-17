@@ -242,7 +242,10 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
   return (
     <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
       <div className="message-list-content">
-        {messages.map((message, index) => (
+        {messages.map((message, index) => {
+          const prevMessage = index > 0 ? messages[index - 1] : null;
+          const showHeader = message.role === 'user' || !prevMessage || prevMessage.role !== 'assistant';
+          return (
             <div key={message.id} className="message-wrapper">
               <ChatMessage
                 message={message}
@@ -266,9 +269,11 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
                 pendingPlanApprovalIds={pendingPlanApprovalIds}
                 onPlanApprovalResponse={onPlanApprovalResponse}
                 onTeammateDrillDown={onTeammateDrillDown}
+                showHeader={showHeader}
               />
             </div>
-        ))}
+          );
+        })}
         {loading && <SkeletonMessage />}
       </div>
       {showScrollButton && (
