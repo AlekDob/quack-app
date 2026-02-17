@@ -161,8 +161,9 @@ export default function ChatInput({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-    el.style.overflowY = el.scrollHeight > 300 ? 'auto' : 'hidden';
+    const maxHeight = 194;
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [input]);
 
   // Wrapper to support both direct value and callback setter pattern
