@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef } from 'react';
+import { memo, useState, useEffect, useRef, Fragment } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import ToolCallMinimal from './ToolCallMinimal';
 import StreamMessage, { SPECIAL_WIDGET_TOOLS, SOLO_ROW_TOOLS, isImageRead } from './StreamMessage';
@@ -551,13 +551,25 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                     computeShowHeader(group.eventIndex, group.event)
                   );
                 }
-                // Grouped: wrap in a flex row. Only first item might show header.
+                // If the first item needs a header (avatar/name), render it
+                // standalone so the header stays on its own line above the group.
+                const firstNeedsHeader = computeShowHeader(group.items[0].eventIndex, group.items[0].event);
+                const headerItem = firstNeedsHeader ? group.items[0] : null;
+                const groupItems = firstNeedsHeader ? group.items.slice(1) : group.items;
+
                 return (
-                  <div key={`event-group-${group.items[0].eventIndex}`} className="tool-event-group-row">
-                    {group.items.map(({ event, eventIndex }, i) =>
-                      renderStreamMessage(event, eventIndex, i === 0 && computeShowHeader(eventIndex, event))
-                    )}
-                  </div>
+                  <Fragment key={`event-group-${group.items[0].eventIndex}`}>
+                    {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true)}
+                    {groupItems.length > 1 ? (
+                      <div className="tool-event-group-row">
+                        {groupItems.map(({ event, eventIndex }) =>
+                          renderStreamMessage(event, eventIndex, false)
+                        )}
+                      </div>
+                    ) : groupItems.length === 1 ? (
+                      renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false)
+                    ) : null}
+                  </Fragment>
                 );
               });
             })()}
