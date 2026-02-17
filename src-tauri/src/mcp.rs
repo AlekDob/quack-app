@@ -179,6 +179,14 @@ fn get_global_mcp_json_path() -> Result<PathBuf, String> {
     Ok(PathBuf::from(home_dir).join(".mcp.json"))
 }
 
+/// Get the path to ~/.claude/.mcp.json (Claude Code CLI global MCP servers)
+fn get_claude_dir_mcp_json_path() -> Result<PathBuf, String> {
+    let home_dir = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map_err(|_| "Failed to get home directory (neither USERPROFILE nor HOME set)".to_string())?;
+    Ok(PathBuf::from(home_dir).join(".claude").join(".mcp.json"))
+}
+
 /// Structure for reading ~/.claude.json which has a different format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ClaudeConfig {
@@ -558,6 +566,7 @@ async fn start_mcp_server(
                 // Emit to frontend for debugging
                 let _ = app_handle.emit("mcp-server-log", (server_id.clone(), line));
             }
+            log::info!("MCP[{}] stderr reader task ended", server_id);
         });
     }
 
@@ -633,6 +642,25 @@ pub async fn list_mcp_servers(
             }
         } else {
             log::warn!("⚠️ [MCP DEBUG] Failed to read ~/.mcp.json");
+        }
+    }
+
+    // 4. Also read from ~/.claude/.mcp.json (Claude Code CLI global MCP servers)
+    log::info!("📖 [MCP DEBUG] Step 4: Reading from ~/.claude/.mcp.json (Claude Code CLI)");
+    if let Ok(claude_dir_mcp_path) = get_claude_dir_mcp_json_path() {
+        if let Ok(claude_dir_config) = read_mcp_config(&claude_dir_mcp_path) {
+            let claude_dir_servers = config_to_servers(claude_dir_config, "global");
+            log::info!("✅ [MCP DEBUG] Loaded {} servers from ~/.claude/.mcp.json", claude_dir_servers.len());
+
+            for server in claude_dir_servers {
+                if !all_servers.iter().any(|s| s.id == server.id) {
+                    all_servers.push(server);
+                } else {
+                    log::info!("ℹ️ [MCP DEBUG] Skipping '{}' from ~/.claude/.mcp.json (already loaded)", server.id);
+                }
+            }
+        } else {
+            log::warn!("⚠️ [MCP DEBUG] Failed to read ~/.claude/.mcp.json");
         }
     }
 
@@ -903,7 +931,20 @@ pub async fn delete_mcp_server(
         }
     }
 
-    Err(format!("MCP server '{}' not found in .mcp.json, ~/.claude.json, or ~/.mcp.json", server_id))
+    // Not found in ~/.mcp.json either, try ~/.claude/.mcp.json
+    log::info!("🔍 [MCP DELETE] Server not in ~/.mcp.json, checking ~/.claude/.mcp.json");
+    if let Ok(claude_dir_mcp_path) = get_claude_dir_mcp_json_path() {
+        if claude_dir_mcp_path.exists() {
+            let mut claude_dir_config = read_mcp_config(&claude_dir_mcp_path)?;
+            if claude_dir_config.mcp_servers.remove(&server_id).is_some() {
+                write_mcp_config(&claude_dir_mcp_path, &claude_dir_config)?;
+                log::info!("✅ [MCP DELETE] Successfully deleted MCP server '{}' from ~/.claude/.mcp.json", server_id);
+                return Ok(());
+            }
+        }
+    }
+
+    Err(format!("MCP server '{}' not found in .mcp.json, ~/.claude.json, ~/.mcp.json, or ~/.claude/.mcp.json", server_id))
 }
 
 /// Get predefined MCP server templates

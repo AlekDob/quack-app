@@ -70,13 +70,14 @@ interface SortableRepositoryGroupProps {
   onGitOperation: (operation: string, terminal: TerminalInfo) => void;
   onOpenGitPanel?: () => void;
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
+  onOpenBrain?: (projectPath: string) => void; // Open Brain window for this project
   gitRefreshTrigger?: number;
   onCreateAgent?: (projectPath?: string) => void; // Create new agent, optionally with pre-selected project path
   onRemoveProject?: (projectPath: string) => void; // Remove project from sidebar
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
   // Kanban tab props
-  isKanbanTabActive?: boolean;
+  isKanbanViewActive?: boolean;
   onOpenKanbanTab?: () => void;
   // Chat loading state for task status indicators
   chatLoadingMap?: Map<string, boolean>;
@@ -251,6 +252,7 @@ interface TerminalSidebarProps {
   onOpenSettings?: () => void; // Open settings panel
   onOpenGitPanel?: () => void; // Open Git Panel drawer
   onOpenTerminalWindow?: (repoPath: string, repoName: string) => void; // Open terminal in Terminal Window
+  onOpenBrain?: (projectPath: string) => void; // Open Brain window for this project
   gitRefreshTrigger?: number; // Trigger to refresh git status after commit
   onOpenDashboard?: (projectPath: string, projectName: string) => void; // Open Project Dashboard tab
   onOpenClaudeAssets?: (projectPath: string) => void; // Open Claude Assets tab with project pre-selected
@@ -305,6 +307,7 @@ export default function TerminalSidebar({
   onOpenSettings,
   onOpenGitPanel,
   onOpenTerminalWindow,
+  onOpenBrain,
   gitRefreshTrigger,
   onOpenDashboard,
   onOpenClaudeAssets,
@@ -1003,12 +1006,13 @@ export default function TerminalSidebar({
                       onGitOperation={handleGitOperation}
                       onOpenGitPanel={onOpenGitPanel}
                       onOpenTerminalWindow={onOpenTerminalWindow}
+                      onOpenBrain={onOpenBrain}
                       gitRefreshTrigger={gitRefreshTrigger}
                       onCreateAgent={onCreateAgent}
                       onRemoveProject={onRemoveProject}
                       onOpenDashboard={onOpenDashboard}
                       onOpenClaudeAssets={onOpenClaudeAssets}
-                      isKanbanTabActive={isKanbanTabActive}
+                      isKanbanViewActive={isKanbanTabActive}
                       onOpenKanbanTab={onOpenKanbanTab}
                       chatLoadingMap={chatLoadingMap}
                       onSessionClick={onSessionClick}
@@ -1158,12 +1162,13 @@ export default function TerminalSidebar({
                           onGitOperation={handleGitOperation}
                           onOpenGitPanel={onOpenGitPanel}
                           onOpenTerminalWindow={onOpenTerminalWindow}
+                          onOpenBrain={onOpenBrain}
                           gitRefreshTrigger={gitRefreshTrigger}
                           onCreateAgent={onCreateAgent}
                           onRemoveProject={onRemoveProject}
                           onOpenDashboard={onOpenDashboard}
                           onOpenClaudeAssets={onOpenClaudeAssets}
-                          isKanbanTabActive={isKanbanTabActive}
+                          isKanbanViewActive={isKanbanTabActive}
                           onOpenKanbanTab={onOpenKanbanTab}
                           chatLoadingMap={chatLoadingMap}
                           onSessionClick={onSessionClick}

@@ -130,8 +130,6 @@ interface ChatViewProps {
   // File Checkpointing (SDK 0.2.7+)
   onRewindFiles?: (userMessageId: string) => void;
   onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
-  // Open file in Quack tab (for markdown files)
-  onOpenInQuack?: (filePath: string) => void;
   // Open Agent Personality panel in sidebar
   onOpenPersonality?: () => void;
   // Plan approval
@@ -164,7 +162,7 @@ export default function ChatView({
   // Agent Chat Settings - controlled from parent
   inputDraft = '',
   onInputDraftChange,
-  model = 'sonnet45',
+  model = 'opus46',
   onModelChange,
   thinkingMode = 'auto',
   onThinkingModeChange,
@@ -218,7 +216,6 @@ export default function ChatView({
   // File Checkpointing
   onOpenImageTab,
   onRewindFiles,
-  onOpenInQuack,
   onOpenPersonality,
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
@@ -302,7 +299,7 @@ export default function ChatView({
             description: prompt,
             agentId: agentName,
             prompt: prompt,
-            model: 'sonnet45',
+            model: 'opus46',
             workingDirectory: projectPath,
             notifyOnComplete: true,
             kanbanTaskId: newTask.id, // Link to Kanban for status sync
@@ -688,7 +685,6 @@ export default function ChatView({
           deletes={currentFileDeletes}
           onFileClick={onFilePathClick}
           onDiffClick={onDiffClick}
-          onOpenInQuack={onOpenInQuack}
           onClear={() => {
             // The edits are derived from messages, so to "clear" them
             // we would need to modify the messages array (not recommended)

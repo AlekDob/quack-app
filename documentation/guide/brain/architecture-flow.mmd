@@ -1,0 +1,81 @@
+graph TD
+    subgraph HUMAN["👤 Tu (Umano)"]
+        H1[Apri Brain UI]
+        H2[Leggi Guide]
+        H3[Esplora Graph]
+    end
+
+    subgraph AGENT["🤖 Agente AI"]
+        A1[Legge CLAUDE.md]
+        A2[Cerca in documentation/]
+        A3[Cerca in ~/.quack/brain/]
+        A4[Scrive nuovi entry]
+    end
+
+    subgraph BRAIN_PROJECT["📁 documentation/ — Progetto"]
+        direction TB
+        GUIDE["guide/{feature}/<br/>Guide per umani"]
+        GOTCHAS["gotchas/<br/>Errori subdoli"]
+        PATTERNS["patterns/<br/>Soluzioni riusabili"]
+        DECISIONS["decisions/<br/>Scelte architetturali"]
+        BUGS["bugs/<br/>Analisi bug fix"]
+        DIARY["diary/<br/>Diario giornaliero"]
+        MAP["map.md<br/>Indice architettura"]
+    end
+
+    subgraph BRAIN_GLOBAL["🌍 ~/.quack/brain/ — Globale"]
+        PREFS["preferences/"]
+        TOOLS["tools/"]
+        PEOPLE["people/"]
+        G_PATTERNS["patterns/"]
+    end
+
+    subgraph CLAUDEMD["📋 CLAUDE.md"]
+        KB["Knowledge Base<br/>Link ai file critici"]
+    end
+
+    subgraph UI["🖥️ Brain UI"]
+        TIMELINE["Timeline"]
+        KNOWLEDGE["Knowledge"]
+        GRAPH["Graph"]
+        GUIDE_VIEW["Human Guides"]
+        EDITOR["Editor / Mermaid Viewer"]
+    end
+
+    %% Agent Access Chain
+    A1 -->|"Livello 1: sempre caricato"| KB
+    KB -->|"link diretti"| GOTCHAS
+    KB -->|"link diretti"| PATTERNS
+    A2 -->|"Livello 2: cerca per keyword"| BRAIN_PROJECT
+    A3 -->|"Livello 3: cross-progetto"| BRAIN_GLOBAL
+    A4 -->|"Salva scoperte"| BRAIN_PROJECT
+
+    %% Human flow
+    H1 --> UI
+    H2 --> GUIDE_VIEW
+    H3 --> GRAPH
+    GUIDE_VIEW -->|"apre pagina"| EDITOR
+    KNOWLEDGE -->|"apre entry"| EDITOR
+    GRAPH -->|"click nodo"| EDITOR
+
+    %% Data flow to UI
+    BRAIN_PROJECT --> TIMELINE
+    BRAIN_PROJECT --> KNOWLEDGE
+    BRAIN_PROJECT --> GRAPH
+    GUIDE --> GUIDE_VIEW
+    BRAIN_GLOBAL --> KNOWLEDGE
+
+    %% Styling
+    classDef human fill:#22c55e,stroke:#16a34a,color:#fff
+    classDef ai fill:#a855f7,stroke:#7c3aed,color:#fff
+    classDef project fill:#2a2a30,stroke:#FF6B35,color:#e4e4e7
+    classDef global fill:#2a2a30,stroke:#3b82f6,color:#e4e4e7
+    classDef ui fill:#2a2a30,stroke:#06b6d4,color:#e4e4e7
+    classDef claude fill:#FF6B35,stroke:#e55a25,color:#fff
+
+    class H1,H2,H3 human
+    class A1,A2,A3,A4 ai
+    class GUIDE,GOTCHAS,PATTERNS,DECISIONS,BUGS,DIARY,MAP project
+    class PREFS,TOOLS,PEOPLE,G_PATTERNS global
+    class TIMELINE,KNOWLEDGE,GRAPH,GUIDE_VIEW,EDITOR ui
+    class KB claude

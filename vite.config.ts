@@ -115,6 +115,7 @@ export default defineConfig(({ mode }) => {
           pip: resolve(rootDir, 'pip.html'),
           browser: resolve(rootDir, 'browser.html'),
           'tab-popout': resolve(rootDir, 'tab-popout.html'),
+          brain: resolve(rootDir, 'brain.html'),
         },
 
         // External dependencies - only Claude Agent SDK runs in Node.js subprocess
@@ -165,38 +166,6 @@ export default defineConfig(({ mode }) => {
             // Tauri plugins
             if (id.includes('@tauri-apps/')) {
               return 'tauri-vendor';
-            }
-
-            // Settings and forms
-            if (id.includes('/components/settings/')) {
-              return 'settings';
-            }
-
-            // Drawers and modals (lazy loaded)
-            if (id.includes('/components/') && (
-              id.includes('Drawer') ||
-              id.includes('Modal') ||
-              id.includes('QuackAgency') ||
-              id.includes('Marketplace')
-            )) {
-              return 'drawers-modals';
-            }
-
-            // Git components
-            if (id.includes('/components/Git')) {
-              return 'git-components';
-            }
-
-            // AI Assistant components
-            if (id.includes('/components/AI') ||
-                id.includes('/components/Chat') ||
-                id.includes('/components/Stream')) {
-              return 'ai-assistant';
-            }
-
-            // Terminal components
-            if (id.includes('/components/Terminal')) {
-              return 'terminal-components';
             }
 
             // DND Kit - needs to be in same chunk as React

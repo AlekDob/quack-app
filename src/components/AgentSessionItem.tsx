@@ -269,7 +269,8 @@ function AgentSessionItem({
           fontSize: '10px',
           color: isActive ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.7)',
           transition: 'all 0.2s ease',
-          boxShadow: isActive ? `0 0 10px ${agentColor}60` : 'none',
+          border: isActive ? `1px solid ${agentColor}` : '1px solid transparent',
+          boxShadow: isActive ? `0 0 10px ${agentColor}60, inset 0 0 8px ${agentColor}20` : 'none',
         }}
         onMouseEnter={(e) => {
           if (!isActive) {

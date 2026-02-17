@@ -97,8 +97,9 @@ const calculateBreakdown = (
 };
 
 /**
- * Calculate total context usage including auto-compact reserve
- * inputTokens already includes overhead, so total = inputTokens + auto-compact reserve
+ * Calculate total context usage (matches Claude CLI `/context` output)
+ * inputTokens already includes overhead, so total = inputTokens (no auto-compact added)
+ * Auto-compact is shown separately in the breakdown as reserved space info
  */
 const calculateTotalContextUsage = (
   inputTokens: number,
@@ -106,8 +107,8 @@ const calculateTotalContextUsage = (
   _overhead: number = DEFAULT_OVERHEAD
 ): number => {
   // inputTokens = full context window fill (system + tools + messages)
-  // We add auto-compact reserve on top as "reserved" space
-  return inputTokens + AUTO_COMPACT_COST;
+  // Matches what CLI `/context` shows (e.g., 36k/200k)
+  return inputTokens;
 };
 
 export default function TokenUsageModal({
@@ -133,14 +134,18 @@ export default function TokenUsageModal({
   // Calculate context breakdown using dynamic overhead
   const breakdown = calculateBreakdown(inputTokens, outputTokens, overhead);
 
-  // Total context usage = messages + overhead + auto-compact reserve
+  // Total context usage = context fill only (matches CLI `/context`)
   const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens, overhead);
 
-  // Remaining tokens = max - total context usage (auto-compact already included)
-  const remainingTokens = Math.max(0, maxTokens - totalContextUsage);
+  // Free = max - context fill - auto-compact reserve (reserve is effectively unavailable)
+  const remainingTokens = Math.max(0, maxTokens - totalContextUsage - AUTO_COMPACT_COST);
 
   // INVERTED: Stamina percentage (100% = fresh, 0% = exhausted)
   const staminaPercentage = Math.max(0, 100 - percentage);
+
+  // Auto-compact zone: percentage of the total bar reserved for auto-compact
+  const autoCompactPercent = (AUTO_COMPACT_COST / maxTokens) * 100;
+  const autoCompactStartPercent = 100 - autoCompactPercent;
 
   const formatTokens = (tokens: number) => {
     return tokens.toLocaleString();
@@ -227,6 +232,16 @@ export default function TokenUsageModal({
               <div className="context-usage-section">
                 <div className="fallout-progress-bar-container">
                   <div className="fallout-progress-bar">
+                    {/* Auto-compact reserve zone (rightmost portion, always visible) */}
+                    <div
+                      className={`fallout-progress-autocompact${percentage >= autoCompactStartPercent ? ' fallout-autocompact-pulse' : ''}`}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        width: `${autoCompactPercent}%`,
+                        height: '100%',
+                      }}
+                    />
                     <div
                       className="fallout-progress-fill"
                       style={{

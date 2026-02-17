@@ -41,13 +41,14 @@ function StaminaBarBorder({
   const [showModal, setShowModal] = useState(false);
 
   // Calculate stamina
-  // inputTokens from SDK = full context window input (system + tools + CLAUDE.md + messages)
-  // Overhead is already INCLUDED in inputTokens, not added on top
+  // inputTokens from SDK = full context window fill (system + tools + CLAUDE.md + messages)
+  // This matches what Claude CLI `/context` reports (e.g., 36k/200k)
   const messageTokens = Math.max(0, inputTokens - overhead);
-  const totalContextUsage = inputTokens + AUTO_COMPACT_COST;
+  // Total = context fill only (no auto-compact reserve in percentage, to match CLI)
+  const totalContextUsage = inputTokens;
   const usagePercentage = (totalContextUsage / maxTokens) * 100;
 
-  // Stamina = how much usable space remains
+  // Stamina = how much usable space remains (accounts for auto-compact reserve)
   const maxUsableTokens = maxTokens - overhead - AUTO_COMPACT_COST;
   const remainingUsableTokens = Math.max(0, maxUsableTokens - messageTokens);
   const staminaPercentage = Math.max(0, Math.min(100, (remainingUsableTokens / maxUsableTokens) * 100));

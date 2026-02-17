@@ -26,12 +26,11 @@ interface EditSummaryBarProps {
   deletes?: FileDeleted[];
   onFileClick?: (filePath: string, lineChanges?: LineChange[]) => void;
   onDiffClick?: (filePath: string, status: FileStatus) => void; // NEW: Handler for diff button
-  onOpenInQuack?: (filePath: string) => void; // Handler for opening file in Quack tab
   onClear?: () => void;
   onClearEdits?: () => void; // Deprecated, use onClear
 }
 
-export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDiffClick, onOpenInQuack, onClear, onClearEdits }: EditSummaryBarProps) {
+export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDiffClick, onClear, onClearEdits }: EditSummaryBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOpeningAll, setIsOpeningAll] = useState(false);
 
@@ -193,6 +192,8 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                       <div
                         key={index}
                         className="edit-summary-bar-file"
+                        onClick={() => handleFileClick(edit.filePath, edit.lineChanges)}
+                        title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
                       >
                         <div className="edit-summary-bar-file-info">
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -208,16 +209,6 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                             filePath={edit.filePath}
                             onDiffClick={(path) => handleDiffClick(path, 'created')}
                           />
-                          <button
-                            className={`edit-summary-bar-open-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFileClick(edit.filePath, edit.lineChanges);
-                            }}
-                            title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
-                          >
-                            {hasPreferredIDE ? 'IDE' : 'Open'}
-                          </button>
                         </div>
                       </div>
                     );
@@ -239,6 +230,8 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                       <div
                         key={index}
                         className="edit-summary-bar-file"
+                        onClick={() => handleFileClick(edit.filePath, edit.lineChanges)}
+                        title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
                       >
                         <div className="edit-summary-bar-file-info">
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -257,16 +250,6 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                             filePath={edit.filePath}
                             onDiffClick={(path) => handleDiffClick(path, 'modified')}
                           />
-                          <button
-                            className={`edit-summary-bar-open-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFileClick(edit.filePath, edit.lineChanges);
-                            }}
-                            title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
-                          >
-                            {hasPreferredIDE ? 'IDE' : 'Open'}
-                          </button>
                         </div>
                       </div>
                     );
@@ -289,6 +272,8 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                       <div
                         key={index}
                         className="edit-summary-bar-file edit-summary-bar-file-markdown"
+                        onClick={() => handleFileClick(edit.filePath, edit.lineChanges)}
+                        title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
                       >
                         <div className="edit-summary-bar-file-info">
                           {/* Markdown file icon */}
@@ -309,37 +294,10 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                               {edit.editCount} {edit.editCount === 1 ? 'edit' : 'edits'}
                             </span>
                           )}
-                          {onOpenInQuack && (
-                            <button
-                              className="edit-summary-bar-open-btn edit-summary-bar-quack-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenInQuack(edit.filePath);
-                              }}
-                              title="Open in Quack"
-                            >
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M15 3h6v6" />
-                                <path d="M10 14L21 3" />
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                              </svg>
-                              <span className="hide-on-small">Quack</span>
-                            </button>
-                          )}
                           <FileDiffButton
                             filePath={edit.filePath}
                             onDiffClick={(path) => handleDiffClick(path, isNew ? 'created' : 'modified')}
                           />
-                          <button
-                            className={`edit-summary-bar-open-btn ${hasPreferredIDE ? 'ide-enabled' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFileClick(edit.filePath, edit.lineChanges);
-                            }}
-                            title={hasPreferredIDE ? 'Open in IDE' : 'Open file'}
-                          >
-                            {hasPreferredIDE ? 'IDE' : 'Open'}
-                          </button>
                         </div>
                       </div>
                     );

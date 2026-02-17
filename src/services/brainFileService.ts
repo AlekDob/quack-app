@@ -1,9 +1,9 @@
 /**
  * Brain File Service
  *
- * Lightweight file-based knowledge store.
- * Reads/writes markdown files in ~/.quack/brain/
- * No database, no MCP server, no corruption.
+ * Two-level knowledge store:
+ * - Global brain: ~/.quack/brain/ (personal, cross-project)
+ * - Project docs: {project}/documentation/ (universal, git-trackable)
  *
  * @module services/brainFileService
  */
@@ -11,7 +11,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { normalizePath } from '../utils/platform';
 
-const DEFAULT_BRAIN_DIR = '.quack/brain';
+const GLOBAL_BRAIN_DIR = '.quack/brain';
+const PROJECT_DOC_DIR = 'documentation';
 const BRAIN_PATH_KEY = 'quack-brain-path';
 const BRAIN_PATH_MARKER = '.quack/brain-path';
 
@@ -36,19 +37,24 @@ interface DirectoryListing {
 }
 
 /**
- * Get the brain root directory path.
- * Uses custom path from localStorage if set, otherwise defaults to ~/.quack/brain/
+ * Get the global brain path (~/.quack/brain/ or custom)
  */
-async function getBrainPath(): Promise<string> {
+async function getGlobalBrainPath(): Promise<string> {
   const customPath = localStorage.getItem(BRAIN_PATH_KEY);
   if (customPath) return customPath;
-
   const home = await invoke<string>('get_home_directory');
-  return normalizePath(`${home}/${DEFAULT_BRAIN_DIR}`);
+  return normalizePath(`${home}/${GLOBAL_BRAIN_DIR}`);
 }
 
 /**
- * Set a custom brain path (persisted in localStorage + marker file for AI access)
+ * Get the project documentation path
+ */
+export function getProjectDocPath(projectRoot: string): string {
+  return normalizePath(`${projectRoot}/${PROJECT_DOC_DIR}`);
+}
+
+/**
+ * Set a custom global brain path
  */
 export async function setBrainCustomPath(path: string | null): Promise<void> {
   if (path) {
@@ -56,50 +62,44 @@ export async function setBrainCustomPath(path: string | null): Promise<void> {
   } else {
     localStorage.removeItem(BRAIN_PATH_KEY);
   }
-  // Write marker file so AI agents can discover the brain path
   await writeBrainPathMarker(path);
 }
 
-/**
- * Write a marker file at ~/.quack/brain-path with the current brain location.
- * AI agents read this file to discover where the brain is stored.
- */
 async function writeBrainPathMarker(customPath: string | null): Promise<void> {
   try {
     const home = await invoke<string>('get_home_directory');
     const markerPath = normalizePath(`${home}/${BRAIN_PATH_MARKER}`);
-    const brainPath = customPath || normalizePath(`${home}/${DEFAULT_BRAIN_DIR}`);
+    const brainPath = customPath || normalizePath(`${home}/${GLOBAL_BRAIN_DIR}`);
     await invoke('write_file_content', { path: markerPath, content: brainPath });
   } catch (err) {
     console.error('Failed to write brain-path marker:', err);
   }
 }
 
-/**
- * Check if a custom brain path is configured
- */
 export function getCustomBrainPath(): string | null {
   return localStorage.getItem(BRAIN_PATH_KEY);
 }
 
 /**
- * Ensure brain directory structure exists and marker file is up to date
+ * Ensure brain directory structure exists
  */
-export async function initBrainStructure(projectName?: string): Promise<void> {
-  const brainPath = await getBrainPath();
-  // Sync marker file so AI agents can discover the brain path
+export async function initBrainStructure(projectRoot?: string): Promise<void> {
+  const globalPath = await getGlobalBrainPath();
   await writeBrainPathMarker(localStorage.getItem(BRAIN_PATH_KEY));
+
   const dirs = [
-    `${brainPath}/global/patterns`,
-    `${brainPath}/global/preferences`,
-    `${brainPath}/global/people`,
-    `${brainPath}/global/tools`,
+    `${globalPath}/patterns`,
+    `${globalPath}/preferences`,
+    `${globalPath}/people`,
+    `${globalPath}/tools`,
+    `${globalPath}/diary`,
   ];
 
-  if (projectName) {
-    const projectDirs = ['patterns', 'bugs', 'decisions', 'gotchas', 'diary'];
+  if (projectRoot) {
+    const docPath = getProjectDocPath(projectRoot);
+    const projectDirs = ['patterns', 'bugs', 'decisions', 'gotchas', 'diary', 'inbox'];
     for (const dir of projectDirs) {
-      dirs.push(`${brainPath}/projects/${projectName}/${dir}`);
+      dirs.push(`${docPath}/${dir}`);
     }
   }
 
@@ -118,21 +118,23 @@ export async function initBrainStructure(projectName?: string): Promise<void> {
 export async function saveBrainEntry(entry: {
   type: string;
   project?: string;
+  projectRoot?: string;
   tags: string[];
   title: string;
   content: string;
   slug: string;
 }): Promise<string> {
-  const brainPath = await getBrainPath();
   const date = new Date().toISOString().split('T')[0];
-
-  // Determine folder based on type and project
   const typeFolder = getTypeFolder(entry.type);
-  const basePath = entry.project
-    ? `${brainPath}/projects/${entry.project}/${typeFolder}`
-    : `${brainPath}/global/${typeFolder}`;
 
-  // Ensure directory exists
+  let basePath: string;
+  if (entry.projectRoot) {
+    basePath = `${getProjectDocPath(entry.projectRoot)}/${typeFolder}`;
+  } else {
+    const globalPath = await getGlobalBrainPath();
+    basePath = `${globalPath}/${typeFolder}`;
+  }
+
   try {
     await invoke('create_directory', { path: basePath });
   } catch {
@@ -141,7 +143,6 @@ export async function saveBrainEntry(entry: {
 
   const filePath = `${basePath}/${entry.slug}.md`;
   const fileContent = formatBrainFile(entry, date);
-
   await invoke('write_file_content', { path: filePath, content: fileContent });
   return filePath;
 }
@@ -150,12 +151,11 @@ export async function saveBrainEntry(entry: {
  * Append a diary entry for today
  */
 export async function appendDiaryEntry(
-  project: string,
+  projectRoot: string,
   content: string
 ): Promise<string> {
-  const brainPath = await getBrainPath();
   const date = new Date().toISOString().split('T')[0];
-  const diaryPath = `${brainPath}/projects/${project}/diary`;
+  const diaryPath = `${getProjectDocPath(projectRoot)}/diary`;
 
   try {
     await invoke('create_directory', { path: diaryPath });
@@ -169,37 +169,66 @@ export async function appendDiaryEntry(
   try {
     existing = await invoke<string>('read_file_content', { path: filePath });
   } catch {
-    // File doesn't exist yet, create with frontmatter
-    existing = `---\ntype: diary\nproject: ${project}\ndate: ${date}\n---\n`;
+    const projectName = projectRoot.split('/').pop() || 'unknown';
+    existing = `---\ntype: diary\nproject: ${projectName}\ndate: ${date}\n---\n`;
   }
 
-  const updated = `${existing}\n> ${content}\n`;
+  const updated = `${existing}\n- ${content}\n`;
   await invoke('write_file_content', { path: filePath, content: updated });
   return filePath;
 }
 
 /**
- * List brain entries for a project or globally
+ * List brain entries (project docs or global)
  */
 export async function listBrainEntries(
-  project?: string,
-  type?: string
+  options: {
+    projectRoot?: string;
+    type?: string;
+    global?: boolean;
+  } = {}
 ): Promise<string[]> {
-  const brainPath = await getBrainPath();
-  const searchPath = project
-    ? `${brainPath}/projects/${project}${type ? `/${getTypeFolder(type)}` : ''}`
-    : `${brainPath}/global${type ? `/${getTypeFolder(type)}` : ''}`;
+  let basePath: string;
 
+  if (options.global || !options.projectRoot) {
+    basePath = await getGlobalBrainPath();
+  } else {
+    basePath = getProjectDocPath(options.projectRoot);
+  }
+
+  if (options.type) {
+    const typeFolder = getTypeFolder(options.type);
+    // Scan all .md files recursively and filter by folder name in path
+    // Handles nested structures (e.g., global/bugs/) and singular/plural variants
+    const singularFolder = typeFolder.replace(/s$/, '');
+    const allFiles = await listMdFilesRecursive(basePath);
+    return allFiles.filter(f =>
+      f.includes(`/${typeFolder}/`) || f.includes(`/${singularFolder}/`)
+    );
+  }
+
+  return listMdFilesRecursive(basePath);
+}
+
+async function listMdFilesRecursive(dirPath: string): Promise<string[]> {
+  const allFiles: string[] = [];
   try {
     const listing = await invoke<DirectoryListing>('list_directory', {
-      path: searchPath,
+      path: dirPath,
     });
-    return listing.entries
-      .filter(e => !e.is_dir && e.name.endsWith('.md'))
-      .map(e => e.path);
+    for (const entry of listing.entries) {
+      if (!entry.is_dir && (entry.name.endsWith('.md') || entry.name.endsWith('.mmd'))) {
+        allFiles.push(entry.path);
+      }
+      if (entry.is_dir) {
+        const subFiles = await listMdFilesRecursive(entry.path);
+        allFiles.push(...subFiles);
+      }
+    }
   } catch {
-    return [];
+    // Directory doesn't exist
   }
+  return allFiles;
 }
 
 /**
@@ -218,9 +247,8 @@ export async function readBrainEntry(filePath: string): Promise<BrainEntry | nul
  * Open brain folder in system file manager or Obsidian
  */
 export async function openBrainFolder(inObsidian?: boolean): Promise<void> {
-  const brainPath = await getBrainPath();
+  const brainPath = await getGlobalBrainPath();
 
-  // Ensure the brain root directory exists before revealing
   try {
     await invoke('create_directory', { path: brainPath });
   } catch {
@@ -228,7 +256,6 @@ export async function openBrainFolder(inObsidian?: boolean): Promise<void> {
   }
 
   if (inObsidian) {
-    // Try to open via Obsidian URI scheme
     const uri = `obsidian://open?path=${encodeURIComponent(brainPath)}`;
     await invoke('open_external_url', { url: uri });
   } else {
@@ -237,10 +264,10 @@ export async function openBrainFolder(inObsidian?: boolean): Promise<void> {
 }
 
 /**
- * Get the brain root path (for external use)
+ * Get the global brain root path
  */
 export async function getBrainRootPath(): Promise<string> {
-  return getBrainPath();
+  return getGlobalBrainPath();
 }
 
 // --- Helpers ---
@@ -257,7 +284,7 @@ function getTypeFolder(type: string): string {
     tool: 'tools',
     diary: 'diary',
   };
-  return mapping[type] || 'notes';
+  return mapping[type] || 'patterns';
 }
 
 function formatBrainFile(
@@ -278,8 +305,44 @@ function formatBrainFile(
   return `${frontmatter}\n\n# ${entry.title}\n\n${entry.content}\n`;
 }
 
+function inferTypeFromPath(filePath: string): string {
+  const segments = filePath.split('/');
+  const folderMapping: Record<string, string> = {
+    bugs: 'bug_fix',
+    decisions: 'decision',
+    patterns: 'pattern',
+    pattern: 'pattern',
+    gotchas: 'gotcha',
+    diary: 'diary',
+    preferences: 'preference',
+    people: 'person',
+    tools: 'tool',
+  };
+  for (const seg of segments) {
+    const mapped = folderMapping[seg];
+    if (mapped) return mapped;
+  }
+  return '';
+}
 
 function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
+  // Normalize CRLF (Windows) to LF so regex patterns match consistently
+  raw = raw.replace(/\r\n/g, '\n');
+
+  // Handle .mmd files (Mermaid diagrams — no frontmatter)
+  if (filePath.endsWith('.mmd')) {
+    const fileName = filePath.split('/').pop()?.replace('.mmd', '') || 'Diagram';
+    const title = fileName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return {
+      type: 'diagram',
+      created: '',
+      tags: ['mermaid', 'diagram'],
+      title,
+      content: raw,
+      filePath,
+    };
+  }
+
   const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!fmMatch) return null;
 
@@ -298,8 +361,11 @@ function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
 
   const titleMatch = body.match(/^#\s+(.+)$/m);
 
+  const explicitType = getField('type');
+  const inferredType = explicitType || inferTypeFromPath(filePath);
+
   return {
-    type: getField('type'),
+    type: inferredType,
     project: getField('project') || undefined,
     created: getField('created'),
     tags,

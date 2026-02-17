@@ -1,5 +1,4 @@
 import { memo, useState, useRef, useEffect } from 'react';
-import { Brain } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import { useIDEStore } from '../stores/ideStore';
@@ -31,7 +30,6 @@ interface ActionIconsProps {
   sidePanelCollapsed: boolean;
   terminalWindowOpen?: boolean;
   claudeAssetsOpen?: boolean;
-  secondBrainOpen?: boolean;
   // Authentication status
   isAuthenticated?: boolean;
   onLoginClick?: () => void;
@@ -55,8 +53,6 @@ function ActionIcons({
   onToggleSidePanel,
   sidePanelCollapsed,
   terminalWindowOpen = false,
-  onSecondBrainClick,
-  secondBrainOpen = false,
   onKanbanClick,
   isKanbanActive = false,
   inProgressTaskCount = 0,
@@ -380,19 +376,6 @@ function ActionIcons({
           </svg>
         </button>
       </KeyboardShortcutTooltip>
-
-      {/* Brain Icon */}
-      {onSecondBrainClick && (
-        <button
-          type="button"
-          className={`action-icon ${secondBrainOpen ? 'active' : ''}`}
-          onClick={onSecondBrainClick}
-          aria-label="Open Brain folder"
-        >
-          <Brain size={14} />
-          <span className="action-icon-tooltip">Brain</span>
-        </button>
-      )}
 
       {/* Quack Store Icon */}
       {onStoreClick && (
