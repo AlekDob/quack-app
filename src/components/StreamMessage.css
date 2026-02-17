@@ -210,6 +210,7 @@
   gap: 4px 6px;
   align-items: flex-start;
   margin-left: 44px; /* Align with no-header content (32px avatar + 12px gap) */
+  margin-bottom: 16px; /* Match .stream-message spacing */
 }
 
 /* Flatten StreamMessage wrappers inside a group row so badges become flex items */
