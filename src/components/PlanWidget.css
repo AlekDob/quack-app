@@ -319,6 +319,15 @@
   color: #22c55e !important;
 }
 
+/* Rejected state */
+.plan-widget-rejected {
+  color: #f87171 !important;
+}
+
+.plan-widget-rejected svg {
+  color: #f87171 !important;
+}
+
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .plan-widget {

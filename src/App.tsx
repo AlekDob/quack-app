@@ -3947,6 +3947,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId, pendingUserQuestions]);
 
+  const updateAgentSettings = useCallback((updates: Partial<AgentChatSettings>) => {
+    // 🦆 SESSIONS-FIRST: Use sessionId for settings if available, fallback to agentId
+    const key = activeSessionId || activeId;
+    if (!key) return;
+
+    setAgentChatSettings((prev) => {
+      const newMap = new Map(prev);
+
+      // Get presets for fallback defaults
+      const presets = useSettingsStore.getState().agentModePresets;
+      const bypassPreset = presets.bypass;
+
+      const current = newMap.get(key) ?? {
+        inputDraft: '',
+        model: normalizeModelName(bypassPreset?.model || 'opus46'),
+        thinkingMode: bypassPreset?.thinkingMode || 'auto',
+        permissionMode: 'bypass',
+        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+      };
+
+      // Auto-switch settings based on permission mode using presets from settings
+      let finalUpdates = { ...updates };
+      if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
+        const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
+        if (preset) {
+          finalUpdates.model = normalizeModelName(preset.model);
+          finalUpdates.thinkingMode = preset.thinkingMode;
+          finalUpdates.effort = preset.effort;
+        }
+      }
+
+      newMap.set(key, { ...current, ...finalUpdates });
+      return newMap;
+    });
+  }, [activeSessionId, activeId]);
+
   // 📋 PlanApproval: Approve or reject a plan from ExitPlanMode
   // Reuses the same stdin communication as AskUserQuestion
   const respondToPlanApproval = useCallback(async (
@@ -4006,6 +4042,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       );
 
       console.log('[App] 📋 Plan approval response sent successfully');
+
+      // Auto-switch to Bypass mode after plan approval so the agent can execute
+      if (approved) {
+        updateAgentSettings({ permissionMode: 'bypass' });
+      }
     } catch (error) {
       console.error('[App] Failed to send plan approval response:', error);
       toast.error('Failed to send plan response. Please try again.');
@@ -4026,7 +4067,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         });
       }
     }
-  }, [activeId, pendingPlanApprovals]);
+  }, [activeId, pendingPlanApprovals, updateAgentSettings]);
 
   // Teammate stream drill-down: open a tab to view teammate's session stream
   const handleTeammateDrillDown = useCallback((sessionId: string, name: string) => {
@@ -4441,42 +4482,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     return defaultSettings;
   }, [settingsKey, agentChatSettings]);
-
-  const updateAgentSettings = useCallback((updates: Partial<AgentChatSettings>) => {
-    // 🦆 SESSIONS-FIRST: Use sessionId for settings if available, fallback to agentId
-    const key = activeSessionId || activeId;
-    if (!key) return;
-
-    setAgentChatSettings((prev) => {
-      const newMap = new Map(prev);
-
-      // Get presets for fallback defaults
-      const presets = useSettingsStore.getState().agentModePresets;
-      const bypassPreset = presets.bypass;
-
-      const current = newMap.get(key) ?? {
-        inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'opus46'),
-        thinkingMode: bypassPreset?.thinkingMode || 'auto',
-        permissionMode: 'bypass',
-        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
-      };
-
-      // Auto-switch settings based on permission mode using presets from settings
-      let finalUpdates = { ...updates };
-      if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
-        const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
-        if (preset) {
-          finalUpdates.model = normalizeModelName(preset.model);
-          finalUpdates.thinkingMode = preset.thinkingMode;
-          finalUpdates.effort = preset.effort;
-        }
-      }
-
-      newMap.set(key, { ...current, ...finalUpdates });
-      return newMap;
-    });
-  }, [activeSessionId, activeId]);
 
   const currentSettings = getCurrentAgentSettings();
 
