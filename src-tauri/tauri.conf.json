@@ -1,13 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Quack",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "identifier": "com.quack.terminal",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5174",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build",
+    "beforeBundleCommand": { "script": "bash scripts/sign-native-binaries.sh", "cwd": ".." }
   },
   "app": {
     "windows": [
