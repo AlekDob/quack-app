@@ -820,9 +820,6 @@ export default function ChatView({
           openaiApiKey={openaiApiKey}
           // Open Prompt Engineer
           onOpenPromptEngineer={onOpenPromptEngineer}
-          // Working on field
-          workingOn={workingOn}
-          onWorkingOnChange={onWorkingOnChange}
           // Initial attachments (from Kanban task) - fallback for uncontrolled mode
           initialAttachments={initialAttachments}
           // Agent toolkit for EquipBar
