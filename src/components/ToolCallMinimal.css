@@ -416,3 +416,21 @@
 .tool-minimal-open-file:active {
   transform: translateY(0);
 }
+
+/* Grouped tool row - consecutive same-type tools flow horizontally */
+.tool-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: flex-start;
+  margin: 3px 0;
+}
+
+.tool-group-row > .tool-minimal {
+  margin: 0;
+}
+
+/* Expanded badge in a group takes full width */
+.tool-group-row > .tool-minimal.tool-minimal--expanded {
+  flex-basis: 100%;
+}

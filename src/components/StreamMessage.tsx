@@ -90,6 +90,27 @@ const getToolColorMinimal = (name: string): string => {
   return '#6b7280'; // default gray
 };
 
+// Tools rendered as special widgets (never grouped into rows)
+export const SPECIAL_WIDGET_TOOLS = new Set([
+  'todowrite', 'exitplanmode', 'enterplanmode',
+  'askuserquestion', 'task', 'taskoutput',
+]);
+
+// Tools that always get their own row (expandable diffs/undo)
+export const SOLO_ROW_TOOLS = new Set(['edit', 'multiedit', 'write']);
+
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
+
+export function isImageRead(toolName: string, input: Record<string, unknown> | undefined): boolean {
+  if (toolName !== 'read' || !input?.file_path) return false;
+  return IMAGE_EXTENSIONS.some(ext => (input.file_path as string).toLowerCase().endsWith(ext));
+}
+
+// Grouping types for consecutive tool rendering
+type ToolGroup =
+  | { kind: 'standalone'; contentItem: any; index: number }
+  | { kind: 'group'; items: { contentItem: any; index: number }[] };
+
 // Extract target from tool input for minimal display
 const getToolTarget = (toolName: string, input: Record<string, unknown> | undefined): string => {
   if (!input) return '';
@@ -172,7 +193,7 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
   };
 
   return (
-    <div className="tool-minimal">
+    <div className={`tool-minimal${isExpanded ? ' tool-minimal--expanded' : ''}`}>
       <div
         className={`tool-minimal-line ${hasExpandableContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isLoading ? 'running' : ''}`}
         onClick={() => hasExpandableContent && setIsExpanded(!isExpanded)}
@@ -591,11 +612,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       }
 
       // Read tool - check for image files (special handling)
-      if (toolName === 'read' && input?.file_path) {
-        const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.ico'];
-        const isImageFile = imageExtensions.some(ext => input.file_path?.toLowerCase().endsWith(ext));
-
-        if (isImageFile && toolResult) {
+      if (isImageRead(toolName, input)) {
+        if (toolResult) {
           const imageContent = extractImageData(toolResult);
           if (imageContent) {
             return (
@@ -701,13 +719,57 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
                 <MarkdownText>{combinedText.trim()}</MarkdownText>
               </div>
             )}
-            {/* Tool uses - rendered inside the content block */}
-            {msg.content.map((content: any, idx: number) => {
-              if (content.type === 'tool_use') {
-                return renderToolContent(content, idx);
-              }
-              return null;
-            })}
+            {/* Tool uses - consecutive groupable tools flow horizontally */}
+            {(() => {
+              const groups: ToolGroup[] = [];
+              let currentGroup: { contentItem: any; index: number }[] | null = null;
+
+              const flushGroup = () => {
+                if (!currentGroup) return;
+                if (currentGroup.length === 1) {
+                  groups.push({ kind: 'standalone', contentItem: currentGroup[0].contentItem, index: currentGroup[0].index });
+                } else {
+                  groups.push({ kind: 'group', items: currentGroup });
+                }
+                currentGroup = null;
+              };
+
+              msg.content.forEach((content: any, idx: number) => {
+                if (content.type !== 'tool_use') {
+                  flushGroup();
+                  return;
+                }
+                const name = (content.name || '').toLowerCase();
+
+                // Special widgets, solo-row tools, and image reads always standalone
+                if (SPECIAL_WIDGET_TOOLS.has(name) || SOLO_ROW_TOOLS.has(name) || isImageRead(name, content.input)) {
+                  flushGroup();
+                  groups.push({ kind: 'standalone', contentItem: content, index: idx });
+                  return;
+                }
+
+                // Add to current group (any groupable tool type)
+                if (currentGroup) {
+                  currentGroup.push({ contentItem: content, index: idx });
+                } else {
+                  currentGroup = [{ contentItem: content, index: idx }];
+                }
+              });
+              flushGroup();
+
+              return groups.map((group) => {
+                if (group.kind === 'standalone') {
+                  return renderToolContent(group.contentItem, group.index);
+                }
+                return (
+                  <div key={`tool-group-${group.items[0].index}`} className="tool-group-row">
+                    {group.items.map(({ contentItem, index }) =>
+                      renderToolContent(contentItem, index)
+                    )}
+                  </div>
+                );
+              });
+            })()}
 
             {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
             {(() => {

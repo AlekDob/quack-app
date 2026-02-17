@@ -203,6 +203,41 @@
   font-weight: 500;
 }
 
+/* Grouped tool events row - consecutive tool events flow horizontally */
+.tool-event-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: flex-start;
+  margin-left: 44px; /* Align with no-header content (32px avatar + 12px gap) */
+}
+
+/* Flatten StreamMessage wrappers inside a group row so badges become flex items */
+.tool-event-group-row > .stream-message {
+  display: contents;
+}
+
+.tool-event-group-row .assistant-message {
+  display: contents;
+}
+
+.tool-event-group-row .assistant-text {
+  display: contents;
+}
+
+.tool-event-group-row .assistant-content {
+  display: contents;
+}
+
+.tool-event-group-row .tool-minimal {
+  margin: 0;
+}
+
+/* Expanded badge in a group row takes full width */
+.tool-event-group-row .tool-minimal.tool-minimal--expanded {
+  flex-basis: 100%;
+}
+
 /* Unknown Tool Widget */
 .unknown-tool-widget .tool-widget-header {
   cursor: default;

@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useRef } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import ToolCallMinimal from './ToolCallMinimal';
-import StreamMessage from './StreamMessage';
+import StreamMessage, { SPECIAL_WIDGET_TOOLS, SOLO_ROW_TOOLS, isImageRead } from './StreamMessage';
 import ThinkingBlock from './ThinkingBlock';
 import MessageSettingsBadges from './MessageSettingsBadges';
 import SessionIdDisplay from './SessionIdDisplay';
@@ -12,6 +12,26 @@ import { useAgentAvatar } from '../hooks/useAgentAvatar';
 import humanoidAvatar from '../../images/humanoid.jpeg';
 import './ChatMessage.css';
 import './StreamMessage.css';
+
+// Check if an event is a tool-only assistant event that can be grouped
+// into a horizontal row with other tool events (regardless of tool type).
+function isGroupableToolEvent(event: any): boolean {
+  if (event.type !== 'assistant' || !event.message?.content) return false;
+  const content = event.message.content;
+
+  // Must have at least one tool_use and no text content
+  const toolUses = content.filter((c: any) => c.type === 'tool_use');
+  const hasText = content.some((c: any) => c.type === 'text' && c.text?.trim());
+  if (toolUses.length === 0 || hasText) return false;
+
+  // All tool_uses must be groupable (not special widgets, solo-row, or image reads)
+  return toolUses.every((t: any) => {
+    const name = (t.name || '').toLowerCase();
+    if (SPECIAL_WIDGET_TOOLS.has(name) || SOLO_ROW_TOOLS.has(name)) return false;
+    if (isImageRead(name, t.input)) return false;
+    return true;
+  });
+}
 
 // System Message Component
 function SystemMessage({ agentName, content }: { agentName: string | null; content: string }) {
@@ -448,18 +468,58 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {message.events.map((event: any, eventIndex: number) => {
-              // Find previous visible event (user events are invisible — they return null in StreamMessage)
-              let prevVisibleType: string | null = null;
-              for (let i = eventIndex - 1; i >= 0; i--) {
-                const e = message.events![i];
-                if (e.type !== 'user') {
-                  prevVisibleType = e.type;
-                  break;
+            {(() => {
+              // Group consecutive groupable tool events into horizontal rows.
+              // User events are invisible and skipped when determining consecutive-ness.
+              // Groups across different tool types (e.g. WebSearch + Glob on same row).
+              type EventGroup =
+                | { kind: 'single'; event: any; eventIndex: number }
+                | { kind: 'group'; items: { event: any; eventIndex: number }[] };
+
+              const groups: EventGroup[] = [];
+              let currentGroup: { event: any; eventIndex: number }[] | null = null;
+
+              const flushGroup = () => {
+                if (!currentGroup) return;
+                if (currentGroup.length === 1) {
+                  groups.push({ kind: 'single', event: currentGroup[0].event, eventIndex: currentGroup[0].eventIndex });
+                } else {
+                  groups.push({ kind: 'group', items: currentGroup });
                 }
-              }
-              const eventShowHeader = event.type !== 'assistant' || prevVisibleType !== 'assistant';
-              return (
+                currentGroup = null;
+              };
+
+              message.events!.forEach((event: any, eventIndex: number) => {
+                // User events are invisible — skip them for grouping purposes
+                if (event.type === 'user') return;
+
+                if (isGroupableToolEvent(event)) {
+                  if (currentGroup) {
+                    currentGroup.push({ event, eventIndex });
+                  } else {
+                    currentGroup = [{ event, eventIndex }];
+                  }
+                } else {
+                  flushGroup();
+                  groups.push({ kind: 'single', event, eventIndex });
+                }
+              });
+              flushGroup();
+
+              // Helper to compute showHeader for an event
+              const computeShowHeader = (eventIndex: number, event: any): boolean => {
+                let prevVisibleType: string | null = null;
+                for (let i = eventIndex - 1; i >= 0; i--) {
+                  const e = message.events![i];
+                  if (e.type !== 'user') {
+                    prevVisibleType = e.type;
+                    break;
+                  }
+                }
+                return event.type !== 'assistant' || prevVisibleType !== 'assistant';
+              };
+
+              const renderStreamMessage = (event: any, eventIndex: number, showHeader: boolean) => (
                 <StreamMessage
                   key={getStableEventKey(event, eventIndex)}
                   message={event}
@@ -479,10 +539,28 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                   pendingPlanApprovalIds={pendingPlanApprovalIds}
                   onPlanApprovalResponse={onPlanApprovalResponse}
                   onTeammateDrillDown={onTeammateDrillDown}
-                  showHeader={eventShowHeader}
+                  showHeader={showHeader}
                 />
               );
-            })}
+
+              return groups.map((group) => {
+                if (group.kind === 'single') {
+                  return renderStreamMessage(
+                    group.event,
+                    group.eventIndex,
+                    computeShowHeader(group.eventIndex, group.event)
+                  );
+                }
+                // Grouped: wrap in a flex row. Only first item might show header.
+                return (
+                  <div key={`event-group-${group.items[0].eventIndex}`} className="tool-event-group-row">
+                    {group.items.map(({ event, eventIndex }, i) =>
+                      renderStreamMessage(event, eventIndex, i === 0 && computeShowHeader(eventIndex, event))
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>
