@@ -757,31 +757,12 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               });
               flushGroup();
 
-              return groups.map((group) => {
-                if (group.kind === 'standalone') {
-                  return renderToolContent(group.contentItem, group.index);
-                }
-                return (
-                  <div key={`tool-group-${group.items[0].index}`} className="tool-group-row">
-                    {group.items.map(({ contentItem, index }) =>
-                      renderToolContent(contentItem, index)
-                    )}
-                  </div>
-                );
-              });
-            })()}
-
-            {/* File Checkpointing Rewind Button (SDK 0.2.7+) */}
-            {(() => {
-              // Check if this message has file-modifying tools (Edit, Write, MultiEdit)
+              // Check if this message has file-modifying tools (for rewind button)
               const hasFileChanges = msg.content.some(
                 (c: any) => c.type === 'tool_use' && ['edit', 'write', 'multiedit'].includes(c.name?.toLowerCase())
               );
-
-              // Get the UUID from the preceding user message (required for rewind)
               const messageIndex = streamMessages.findIndex((m) => m === message);
               let precedingUserMessageUuid: string | undefined;
-
               if (messageIndex > 0) {
                 for (let i = messageIndex - 1; i >= 0; i--) {
                   const prevMsg = streamMessages[i];
@@ -791,55 +772,73 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
                   }
                 }
               }
+              const showRewind = hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid;
 
-              if (hasFileChanges && onRewindFiles && sessionId && precedingUserMessageUuid) {
+              const rewindButton = showRewind ? (
+                <button
+                  onClick={() => onRewindFiles(precedingUserMessageUuid!)}
+                  className="rewind-button"
+                  title="Undo all file changes from this response"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    background: 'transparent',
+                    border: '1px solid rgba(251, 146, 60, 0.25)',
+                    borderRadius: '4px',
+                    color: 'rgba(251, 191, 136, 0.7)',
+                    fontSize: '10px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    marginLeft: 'auto',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(251, 146, 60, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.4)';
+                    e.currentTarget.style.color = 'rgb(251, 191, 136)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.25)';
+                    e.currentTarget.style.color = 'rgba(251, 191, 136, 0.7)';
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                  </svg>
+                  Undo
+                </button>
+              ) : null;
+
+              // Find the last group index to attach the rewind button
+              const lastGroupIndex = groups.length - 1;
+
+              return groups.map((group, gi) => {
+                const isLast = gi === lastGroupIndex;
+                if (group.kind === 'standalone') {
+                  if (isLast && rewindButton) {
+                    return (
+                      <div key={`tool-rewind-${group.index}`} className="tool-rewind-row">
+                        {renderToolContent(group.contentItem, group.index)}
+                        {rewindButton}
+                      </div>
+                    );
+                  }
+                  return renderToolContent(group.contentItem, group.index);
+                }
                 return (
-                  <div className="rewind-files-action" style={{
-                    marginTop: '12px',
-                    paddingTop: '12px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                  }}>
-                    <button
-                      onClick={() => onRewindFiles(precedingUserMessageUuid!)}
-                      className="rewind-button"
-                      title="Undo all file changes from this response"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 8px',
-                        background: 'transparent',
-                        border: '1px solid rgba(251, 146, 60, 0.25)',
-                        borderRadius: '4px',
-                        color: 'rgba(251, 191, 136, 0.7)',
-                        fontSize: '10px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(251, 146, 60, 0.1)';
-                        e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.4)';
-                        e.currentTarget.style.color = 'rgb(251, 191, 136)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.borderColor = 'rgba(251, 146, 60, 0.25)';
-                        e.currentTarget.style.color = 'rgba(251, 191, 136, 0.7)';
-                      }}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                        <path d="M3 3v5h5"/>
-                      </svg>
-                      Undo
-                    </button>
+                  <div key={`tool-group-${group.items[0].index}`} className={`tool-group-row${isLast && rewindButton ? ' tool-rewind-row' : ''}`}>
+                    {group.items.map(({ contentItem, index }) =>
+                      renderToolContent(contentItem, index)
+                    )}
+                    {isLast && rewindButton}
                   </div>
                 );
-              }
-              return null;
+              });
             })()}
           </div>
         </div>

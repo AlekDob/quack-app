@@ -434,3 +434,16 @@
 .tool-group-row > .tool-minimal.tool-minimal--expanded {
   flex-basis: 100%;
 }
+
+/* Tool + rewind undo button on same row */
+.tool-rewind-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+
+.tool-rewind-row > .tool-minimal {
+  margin: 0;
+}
