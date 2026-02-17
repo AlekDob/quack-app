@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useRules } from '../hooks/useRules';
 import type { Rule } from '../types';
 import { RulesList } from './RulesList';
+import { ScopePickerModal } from './ScopePickerModal';
+import { ConfirmModal } from './ConfirmModal';
 
 interface RulesPanelProps {
   basePath: string;
@@ -18,6 +21,8 @@ export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
   } = useRules(basePath);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showScopeModal, setShowScopeModal] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<Rule | null>(null);
 
   // Filter rules based on search
   const filterRules = (ruleList: Rule[]) => {
@@ -32,11 +37,56 @@ export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
   const filteredProject = filterRules(rules.project);
   const filteredGlobal = filterRules(rules.global);
 
+  // Show scope picker modal for new rule
   const handleNewRule = () => {
-    // Open new rule tab with default scope 'project'
+    setShowScopeModal(true);
+  };
+
+  // Create draft rule file and open in IDE or internal tab
+  const handleCreateDraftRule = async (name: string, scope: 'global' | 'project') => {
+    const displayName = name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const draftContent = [
+      '---',
+      `description: "${displayName}"`,
+      'alwaysApply: false',
+      '# globs:',
+      '#   - "**/*.ts"',
+      '#   - "**/*.tsx"',
+      '---',
+      '',
+      `# ${displayName}`,
+      '',
+      '<!-- Delete the examples below and write your own rules. -->',
+      '',
+      '## Rules',
+      '',
+      '- Always use TypeScript strict mode with no `any` types',
+      '- Keep functions under 20 lines and files under 300 lines',
+      '- Use absolute imports with `@/` prefix',
+      '- Write self-documenting names: `verbNoun` for functions, `PascalCase` for components',
+      '- Handle errors with `try/catch` returning `{ success, data }` or `{ success, error }`',
+      '',
+      '## Examples',
+      '',
+      '```typescript',
+      '// Good',
+      'async function fetchUserProfile(userId: string): Promise<UserProfile> { ... }',
+      '',
+      '// Bad',
+      'async function getData(id: any) { ... }',
+      '```',
+      '',
+    ].join('\n');
+    const filePath = await invoke<string>('create_rule', {
+      basePath,
+      name,
+      content: draftContent,
+      scope,
+    });
     if (onSelectRule) {
-      onSelectRule('', 'project', true);
+      onSelectRule(name, scope, false, filePath);
     }
+    await loadRules();
   };
 
   const handleEditRule = (rule: Rule) => {
@@ -46,18 +96,19 @@ export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
     }
   };
 
-  const handleDeleteRule = async (rule: Rule) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the rule "${rule.name}"?`
-    );
-    if (!confirmed) return;
+  // Show confirm modal instead of window.confirm (broken in Tauri WebView)
+  const handleDeleteRule = (rule: Rule) => {
+    setRuleToDelete(rule);
+  };
 
+  const handleConfirmDeleteRule = async () => {
+    if (!ruleToDelete) return;
     try {
-      await deleteRule(rule.name, rule.scope);
+      await deleteRule(ruleToDelete.name, ruleToDelete.scope);
     } catch (err) {
       console.error('Failed to delete rule:', err);
-      alert('Failed to delete rule. Please try again.');
     }
+    setRuleToDelete(null);
   };
 
   return (
@@ -148,6 +199,23 @@ export function RulesPanel({ basePath, onSelectRule }: RulesPanelProps) {
           />
         )}
       </div>
+
+      {/* Confirm delete modal */}
+      <ConfirmModal
+        isOpen={ruleToDelete !== null}
+        title="Delete Rule"
+        message={`Are you sure you want to delete "${ruleToDelete?.name}"? This cannot be undone.`}
+        onConfirm={handleConfirmDeleteRule}
+        onCancel={() => setRuleToDelete(null)}
+      />
+
+      {/* Scope picker modal for new rule */}
+      <ScopePickerModal
+        isOpen={showScopeModal}
+        onClose={() => setShowScopeModal(false)}
+        title="New Rule"
+        onConfirm={handleCreateDraftRule}
+      />
     </div>
   );
 }

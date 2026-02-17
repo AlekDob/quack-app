@@ -33,10 +33,28 @@ Returns `true` if opened in IDE, `false` if fallback to internal UI needed.
 7. `handleFilePathClick` - Chat stream file path clicks (supports `:line` suffix)
 8. `handleOpenFileInTab` - Second Brain document nodes
 
+### New Item Creation Flow (Droids & Rules)
+
+"+ New Droid" and "+ New Rule" buttons open a `ScopePickerModal` that asks for name + scope (project/global). After confirmation:
+
+1. File is created on disk via Tauri command (`create_agent` / `create_rule`) with template content
+2. The handler calls `onSelectDroid(name, scope, false, filePath)` or `onSelectRule(name, scope, false, filePath)` — note `isNew=false` since the file already exists on disk
+3. `handleSelectDroid`/`handleSelectRule` in App.tsx then applies the standard IDE-or-fallback logic
+
+This avoids any special "new item" code path — the file is created first, then opened like any existing file.
+
+**Components:**
+- `ScopePickerModal` — reusable modal for name + scope selection
+- `ConfirmModal` — reusable modal for destructive confirmations (replaces `window.confirm`)
+
+### Delete Confirmation
+
+Both droids and rules use `ConfirmModal` instead of `window.confirm()`. See gotcha: `gotcha-window-confirm-tauri-webview.md`.
+
 ### Fallback Behavior
 
 - **No preferred IDE set** -> Falls back to internal tab/viewer
-- **New items** (+ New Rule, etc.) -> Always uses internal tab
+- **New items** -> `ScopePickerModal` → create file → IDE if set, internal tab if not
 - **Files with line annotations** (AI diff) -> Uses internal tab for diff view
 - **Hooks** -> Unchanged (modal-based, stored in settings.json)
 
@@ -47,3 +65,7 @@ Returns `true` if opened in IDE, `false` if fallback to internal UI needed.
 | `src/App.tsx` | All file-open handlers + `tryOpenInIDE` helper |
 | `src/stores/ideStore.ts` | IDE preference store + `openFileInIDE` implementation |
 | `src/components/settings/categories/IDESettings.tsx` | User preference UI selector |
+| `src/components/ScopePickerModal.tsx` | Name + scope picker for new droids/rules |
+| `src/components/ConfirmModal.tsx` | Reusable delete confirmation modal |
+| `src/components/AgentsPanel.tsx` | Droid list with Edit/Delete on hover + create draft |
+| `src/components/RulesPanel.tsx` | Rule list with delete via ConfirmModal + create draft |
