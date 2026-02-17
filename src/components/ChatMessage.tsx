@@ -68,9 +68,11 @@ interface ChatMessageProps {
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   // Teammate stream drill-down
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
+  // Whether to show the agent header (avatar, name, timestamp) — used for grouping consecutive messages
+  showHeader?: boolean;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown, showHeader = true }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isStreaming = message.status === 'streaming';
@@ -359,7 +361,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
   }
 
   return (
-    <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''}`}>
+    <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''} ${!isUser && !showHeader ? 'no-header' : ''}`}>
       <div
         className="chat-message-content"
         onMouseEnter={() => isLastUserMessage && isUser && setIsHovering(true)}
@@ -446,28 +448,41 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
         {/* If we have Claude events, show them using StreamMessage */}
         {message.events && message.events.length > 0 ? (
           <div className="chat-message-events">
-            {message.events.map((event: any, eventIndex: number) => (
-              <StreamMessage
-                key={getStableEventKey(event, eventIndex)}
-                message={event}
-                streamMessages={message.events || []}
-                onFilePathClick={onFilePathClick}
-                onOpenInIDE={onOpenInIDE}
-                agentName={agentName}
-                agentAvatar={agentAvatar}
-                workingDirectory={workingDirectory}
-                onUserQuestionAnswer={onUserQuestionAnswer}
-                pendingQuestionIds={pendingQuestionIds}
-                answeredQuestions={answeredQuestions}
-                showThinkingBlocks={showThinkingBlocks}
-                onOpenImageTab={onOpenImageTab}
-                sessionId={currentSessionId}
-                onRewindFiles={onRewindFiles}
-                pendingPlanApprovalIds={pendingPlanApprovalIds}
-                onPlanApprovalResponse={onPlanApprovalResponse}
-                onTeammateDrillDown={onTeammateDrillDown}
-              />
-            ))}
+            {message.events.map((event: any, eventIndex: number) => {
+              // Find previous visible event (user events are invisible — they return null in StreamMessage)
+              let prevVisibleType: string | null = null;
+              for (let i = eventIndex - 1; i >= 0; i--) {
+                const e = message.events![i];
+                if (e.type !== 'user') {
+                  prevVisibleType = e.type;
+                  break;
+                }
+              }
+              const eventShowHeader = event.type !== 'assistant' || prevVisibleType !== 'assistant';
+              return (
+                <StreamMessage
+                  key={getStableEventKey(event, eventIndex)}
+                  message={event}
+                  streamMessages={message.events || []}
+                  onFilePathClick={onFilePathClick}
+                  onOpenInIDE={onOpenInIDE}
+                  agentName={agentName}
+                  agentAvatar={agentAvatar}
+                  workingDirectory={workingDirectory}
+                  onUserQuestionAnswer={onUserQuestionAnswer}
+                  pendingQuestionIds={pendingQuestionIds}
+                  answeredQuestions={answeredQuestions}
+                  showThinkingBlocks={showThinkingBlocks}
+                  onOpenImageTab={onOpenImageTab}
+                  sessionId={currentSessionId}
+                  onRewindFiles={onRewindFiles}
+                  pendingPlanApprovalIds={pendingPlanApprovalIds}
+                  onPlanApprovalResponse={onPlanApprovalResponse}
+                  onTeammateDrillDown={onTeammateDrillDown}
+                  showHeader={eventShowHeader}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className={`chat-message-body ${isExpanded ? 'expanded' : ''}`}>

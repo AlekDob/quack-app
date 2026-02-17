@@ -70,6 +70,8 @@ const MessageRow = memo(({
   }
 
   const message = messages[index];
+  const prevMessage = index > 0 ? messages[index - 1] : null;
+  const showHeader = message.role === 'user' || !prevMessage || prevMessage.role !== 'assistant';
 
   return (
     <div style={style}>
@@ -82,6 +84,7 @@ const MessageRow = memo(({
         gitBranch={gitBranch}
         isLastUserMessage={index === lastUserMessageIndex}
         workingDirectory={workingDirectory}
+        showHeader={showHeader}
       />
     </div>
   );
