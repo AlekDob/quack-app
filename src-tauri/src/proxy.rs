@@ -4,7 +4,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct ProxyParams {

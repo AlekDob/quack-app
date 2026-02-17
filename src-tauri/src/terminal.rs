@@ -21,6 +21,7 @@ struct TerminalRegistry {
   counter: usize,
 }
 
+#[allow(dead_code)]
 struct TerminalSession {
   label: String,
   color: String,

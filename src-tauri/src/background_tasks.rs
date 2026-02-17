@@ -130,7 +130,7 @@ pub async fn execute_background_agent(
     prompt: String,
     model: Option<String>,
     working_directory: Option<String>,
-    agent_id: Option<String>,
+    _agent_id: Option<String>,
     timeout: Option<u64>,
 ) -> Result<BackgroundTaskResult, String> {
     let start_time = std::time::Instant::now();
@@ -188,7 +188,7 @@ pub async fn execute_background_agent(
     // Store process handle for pause/cancel
     let manager: tauri::State<BackgroundTaskManager> = app.state();
     {
-        let mut processes = manager.processes.lock().await;
+        let _processes = manager.processes.lock().await;
         // Note: We can't easily store the child for pause/resume with tokio::process
         // For now, we'll just track that a process is running
     }
@@ -200,8 +200,8 @@ pub async fn execute_background_agent(
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
 
-    let mut output_lines: Vec<String> = Vec::new();
-    let mut error_lines: Vec<String> = Vec::new();
+    let output_lines: Vec<String>;
+    let error_lines: Vec<String>;
 
     // Stream stdout
     let app_clone = app.clone();
@@ -314,7 +314,7 @@ pub async fn execute_background_command(
     app: AppHandle,
     task_id: String,
     command: String,
-    args: Option<Vec<String>>,
+    _args: Option<Vec<String>>,
     working_directory: Option<String>,
     env: Option<HashMap<String, String>>,
     timeout: Option<u64>,
@@ -484,8 +484,8 @@ pub async fn start_background_watcher(
     app: AppHandle,
     task_id: String,
     patterns: Vec<String>,
-    working_directory: Option<String>,
-    debounce_ms: Option<u64>,
+    _working_directory: Option<String>,
+    _debounce_ms: Option<u64>,
 ) -> Result<(), String> {
     log::info!(
         "[BackgroundTask:{}] Starting file watcher for patterns: {:?}",

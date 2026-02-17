@@ -502,7 +502,7 @@ pub fn git_init(path: String) -> Result<String, String> {
         add_cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let add_output = add_cmd.output()
+    let _add_output = add_cmd.output()
         .map_err(|e| format!("Failed to stage files: {}", e))?;
 
     // Create initial commit (allow empty if no files exist)
@@ -524,7 +524,7 @@ pub fn git_init(path: String) -> Result<String, String> {
         return Err(format!("Failed to create initial commit: {}", stderr));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let _stdout = String::from_utf8_lossy(&output.stdout);
     Ok(format!("Git repository initialized at: {}\nCreated initial commit on main branch", path))
 }
 
@@ -1019,7 +1019,7 @@ fn git_push_impl(
     }
 
     // Execute push
-    let output = run_git(&root, &args, false)?;
+    let _output = run_git(&root, &args, false)?;
 
     Ok(format!("Successfully pushed {} to origin", branch))
 }
@@ -1230,7 +1230,7 @@ fn git_add_worktree_impl(
     }
 
     // Execute worktree add
-    let output = run_git(&root, &args, false)?;
+    let _output = run_git(&root, &args, false)?;
 
     Ok(format!("Worktree created at: {}", path))
 }

@@ -13,6 +13,7 @@ use crate::preferences;
 // ========================================
 
 /// Telegram Update structure from getUpdates API
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramUpdate {
     pub update_id: i64,
@@ -20,6 +21,7 @@ pub struct TelegramUpdate {
     pub message: Option<TelegramMessage>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramMessage {
     pub message_id: i64,
@@ -29,6 +31,7 @@ pub struct TelegramMessage {
     pub text: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramUser {
     pub id: i64,
@@ -37,6 +40,7 @@ pub struct TelegramUser {
     pub username: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramChat {
     pub id: i64,

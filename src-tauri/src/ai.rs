@@ -65,6 +65,7 @@ pub struct AIPromptImprovement {
     pub confidence: f32,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum AIPromptEngineerResponse {

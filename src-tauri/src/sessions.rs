@@ -853,6 +853,7 @@ pub fn resume_session(session_id: String) -> Result<SessionDetails, String> {
 
 /// Get messages for an agent chat by agent ID and optional session ID
 /// This is used to load chat history when reopening an agent
+#[allow(dead_code)]
 #[command]
 pub fn get_agent_chat_messages(
     agent_id: String,
@@ -876,11 +877,12 @@ pub fn get_agent_chat_messages(
 
 /// Save agent chat messages to storage
 /// This creates/updates the session file with the provided messages
+#[allow(dead_code)]
 #[command]
 pub fn save_agent_chat_messages(
     agent_id: String,
     messages: Vec<SessionHistoryMessage>,
-    session_id: Option<String>,
+    _session_id: Option<String>,
 ) -> Result<(), String> {
     // For now, we don't save messages separately from sessions
     // The Claude Agent SDK handles saving to .jsonl files

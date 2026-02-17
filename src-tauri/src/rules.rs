@@ -96,21 +96,21 @@ fn read_rules_from_dir(dir_path: &PathBuf, scope: &str) -> Vec<Rule> {
 /// List all rules (global + project)
 #[tauri::command]
 pub fn list_rules(_app: AppHandle, base_path: String) -> Result<RulesResponse, String> {
-    let mut project_rules = Vec::new();
-    let mut global_rules = Vec::new();
-
     // Read GLOBAL rules from ~/.claude/rules/
-    if let Ok(home_dir) = get_home_dir() {
+    let global_rules = if let Ok(home_dir) = get_home_dir() {
         let global_rules_dir = PathBuf::from(home_dir).join(".claude/rules");
         log::info!("Reading global rules from: {:?}", global_rules_dir);
-        global_rules = read_rules_from_dir(&global_rules_dir, "global");
-        log::info!("Found {} global rules", global_rules.len());
-    }
+        let rules = read_rules_from_dir(&global_rules_dir, "global");
+        log::info!("Found {} global rules", rules.len());
+        rules
+    } else {
+        Vec::new()
+    };
 
     // Read PROJECT rules from .claude/rules/
     let project_rules_dir = PathBuf::from(&base_path).join(".claude/rules");
     log::info!("Reading project rules from: {:?}", project_rules_dir);
-    project_rules = read_rules_from_dir(&project_rules_dir, "project");
+    let project_rules = read_rules_from_dir(&project_rules_dir, "project");
     log::info!("Found {} project rules", project_rules.len());
 
     Ok(RulesResponse {

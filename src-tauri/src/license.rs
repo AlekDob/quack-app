@@ -248,7 +248,7 @@ pub async fn validate_license(
         });
     }
 
-    let product_id = product_id.unwrap();
+    let _product_id = product_id.unwrap();
     let supabase_url = supabase_url.unwrap();
     let supabase_key = supabase_key.unwrap();
 
@@ -459,7 +459,7 @@ pub async fn revalidate_license(
         }));
     }
 
-    let product_id = product_id.unwrap();
+    let _product_id = product_id.unwrap();
     let supabase_url = supabase_url.unwrap();
     let supabase_key = supabase_key.unwrap();
 
@@ -678,8 +678,6 @@ pub async fn get_license_devices(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     async fn test_license_validation() {
         // Add tests here

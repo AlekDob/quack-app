@@ -43,6 +43,7 @@ pub struct InstalledApp {
 }
 
 /// IDE Registry entry
+#[allow(dead_code)]
 struct IDEEntry {
     id: &'static str,
     name: &'static str,
@@ -60,6 +61,7 @@ struct IDEEntry {
     supports_diff: bool,
 }
 
+#[allow(dead_code)]
 impl IDEEntry {
     /// Get the app path for the current platform
     #[cfg(target_os = "macos")]

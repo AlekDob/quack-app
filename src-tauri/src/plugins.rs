@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::io::{Read, Write};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use reqwest;
 use zip::ZipArchive;
 
@@ -31,6 +30,7 @@ pub enum PluginScope {
     Project,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifest {
     pub name: String,
@@ -440,7 +440,7 @@ async fn fetch_marketplace_manifest(repo_url: &str) -> Result<Option<Marketplace
         .trim_end_matches('/')
         .to_string();
 
-    let manifest_url = format!("{}/.claude-plugin/marketplace.json", raw_url.replace("/main", ""));
+    let _manifest_url = format!("{}/.claude-plugin/marketplace.json", raw_url.replace("/main", ""));
     let manifest_url_main = format!("{}/main/.claude-plugin/marketplace.json", raw_url);
 
     // Try both URLs (some repos use main, others master)

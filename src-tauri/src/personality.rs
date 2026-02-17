@@ -142,6 +142,7 @@ fn load_agent_personality_impl(
 }
 
 /// Helper function to load agents from a directory
+#[allow(dead_code)]
 fn load_agents_from_dir(agents_dir: &Path) -> Vec<(String, String)> {
     let mut agents = Vec::new();
 
@@ -234,6 +235,7 @@ fn load_agents_from_dir(agents_dir: &Path) -> Vec<(String, String)> {
 
 /// Helper function to load skills from a directory
 /// Skills are in subdirectories, each containing a SKILL.md file
+#[allow(dead_code)]
 fn load_skills_from_dir(skills_dir: &Path) -> Vec<(String, String)> {
     let mut skills = Vec::new();
 

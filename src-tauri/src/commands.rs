@@ -16,6 +16,7 @@ pub struct SavedCommand {
     pub category: String, // "dev", "build", "test", "custom"
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessInfo {

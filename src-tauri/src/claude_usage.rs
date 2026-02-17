@@ -97,7 +97,7 @@ pub async fn open_claude_usage_in_terminal(cwd: String) -> Result<(), String> {
 
 fn parse_usage_output(output: &str) -> Result<PlanUsageData, String> {
     let mut current_session_percentage = 0.0;
-    let mut current_session_model: Option<String> = None;
+    let current_session_model: Option<String> = None;
     let mut weekly_all_models = 0.0;
     let mut weekly_opus: Option<f64> = None;
     let mut weekly_sonnet: Option<f64> = None;

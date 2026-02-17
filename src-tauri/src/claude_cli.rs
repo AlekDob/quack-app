@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::{Path, PathBuf}, process::Stdio, sync::Mutex};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}, process::Stdio};
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_shell::ShellExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, Command};
+use tokio::process::{ChildStdin, Command};
 use tokio::sync::Mutex as TokioMutex;
 use once_cell::sync::Lazy;
 
@@ -616,6 +615,7 @@ fn find_system_node_executable() -> Option<PathBuf> {
 }
 
 // Event payloads for tool tracking
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolStartEvent {
     pub tool_id: String,
@@ -623,6 +623,7 @@ pub struct ToolStartEvent {
     pub message_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolResultEvent {
     pub tool_id: String,
@@ -632,6 +633,7 @@ pub struct ToolResultEvent {
     pub status: String, // "completed" | "error"
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolDiffLine {
     #[serde(rename = "type")]
@@ -641,6 +643,7 @@ pub struct ToolDiffLine {
     pub line_number: Option<u32>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolDiffEvent {
     pub tool_id: String,
@@ -1022,6 +1025,7 @@ pub async fn send_message_via_cli(request: ClaudeCliRequest) -> Result<ClaudeCli
 }
 
 /// Parse tool usage from Claude CLI output line
+#[allow(dead_code)]
 fn parse_tool_from_line(line: &str) -> Option<(String, String)> {
     // Look for tool patterns in Claude Code output
     // Examples:
@@ -1265,7 +1269,7 @@ pub async fn send_message_via_sdk_streaming(
     app: AppHandle,
     agent_id: String,
     request: ClaudeCliRequest,
-    session_state: tauri::State<'_, crate::SessionState>,
+    _session_state: tauri::State<'_, crate::SessionState>,
 ) -> Result<ClaudeCliResponse, String> {
     // 🔍 DEBUG: Log every API call with full details
     let debug_timestamp = std::time::SystemTime::now()

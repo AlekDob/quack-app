@@ -705,7 +705,7 @@ pub async fn list_mcp_servers(
 /// Get a single MCP server by ID (searches both global and project configs)
 #[tauri::command]
 pub async fn get_mcp_server(
-    app: AppHandle,
+    _app: AppHandle,
     server_id: String,
     working_dir: Option<String>,
 ) -> Result<Option<MCPServer>, String> {

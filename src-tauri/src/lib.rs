@@ -1,3 +1,6 @@
+// Allow unexpected_cfgs from the old objc crate's msg_send! macro
+#![allow(unexpected_cfgs)]
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Mutex;
@@ -637,7 +640,7 @@ pub fn run() {
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
             {
-                use tauri::menu::{CheckMenuItemBuilder, MenuItemBuilder, SubmenuBuilder};
+                use tauri::menu::{CheckMenuItemBuilder, SubmenuBuilder};
 
                 let app_handle = app.handle().clone();
                 let toggle_perf_id = "toggle_performance_monitor";
@@ -789,23 +792,26 @@ pub fn run() {
 
                     #[cfg(target_os = "macos")]
                     {
-                        use cocoa::appkit::NSApp;
-                        use cocoa::base::{id, nil};
-                        use cocoa::foundation::{NSAutoreleasePool, NSString};
-                        use objc::{msg_send, sel, sel_impl};
+                        #[allow(deprecated, unexpected_cfgs)]
+                        {
+                            use cocoa::appkit::NSApp;
+                            use cocoa::base::{id, nil};
+                            use cocoa::foundation::{NSAutoreleasePool, NSString};
+                            use objc::{msg_send, sel, sel_impl};
 
-                        // Proteggiamo il codice unsafe con std::panic::catch_unwind
-                        let _ = std::panic::catch_unwind(|| unsafe {
-                            let _pool = NSAutoreleasePool::new(nil);
-                            let app: id = NSApp();
-                            if app != nil {
-                                let badge_text = NSString::alloc(nil).init_str("DEV");
-                                let dock_tile: id = msg_send![app, dockTile];
-                                if dock_tile != nil && badge_text as id != nil {
-                                    let _: () = msg_send![dock_tile, setBadgeLabel: badge_text];
+                            // Set DEV badge on Dock icon
+                            let _ = std::panic::catch_unwind(|| unsafe {
+                                let _pool = NSAutoreleasePool::new(nil);
+                                let app: id = NSApp();
+                                if app != nil {
+                                    let badge_text = NSString::alloc(nil).init_str("DEV");
+                                    let dock_tile: id = msg_send![app, dockTile];
+                                    if dock_tile != nil && badge_text as id != nil {
+                                        let _: () = msg_send![dock_tile, setBadgeLabel: badge_text];
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
                 }
             }

@@ -273,6 +273,7 @@ fn get_agent_details_impl(
 }
 
 /// Parse agent file and extract frontmatter + content
+#[allow(dead_code)]
 fn parse_agent_file(path: &PathBuf) -> Result<AgentInfo> {
     parse_agent_file_with_scope(path, "project")
 }

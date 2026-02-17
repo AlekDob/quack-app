@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 static PREVIEW_WEBVIEW_LABEL: &str = "preview-webview";
 static WEBVIEW_STATE: Lazy<Mutex<Option<WebviewState>>> = Lazy::new(|| Mutex::new(None));
 
+#[allow(dead_code)]
 #[derive(Clone)]
 struct WebviewState {
   label: String,

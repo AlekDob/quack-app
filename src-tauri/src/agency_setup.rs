@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 /// Setup wizard data from frontend
+#[allow(dead_code)]
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupWizardData {

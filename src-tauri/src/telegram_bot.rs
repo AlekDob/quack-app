@@ -8,11 +8,12 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 use crate::preferences;
 
 // Telegram Bot API types
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramUpdate {
     pub update_id: i64,
@@ -22,6 +23,7 @@ pub struct TelegramUpdate {
     pub callback_query: Option<TelegramCallbackQuery>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramMessage {
     pub message_id: i64,
@@ -31,6 +33,7 @@ pub struct TelegramMessage {
     pub text: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramUser {
     pub id: i64,
@@ -39,6 +42,7 @@ pub struct TelegramUser {
     pub username: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramChat {
     pub id: i64,
@@ -46,6 +50,7 @@ pub struct TelegramChat {
     pub chat_type: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct TelegramCallbackQuery {
     pub id: String,
@@ -119,12 +124,14 @@ impl BotCommand {
 }
 
 // Session tracking - maps Telegram message_thread_id to agent session_id
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct TelegramBotState {
     pub app: AppHandle,
     pub sessions: Arc<Mutex<HashMap<i64, String>>>, // thread_id -> session_id
 }
 
+#[allow(dead_code)]
 impl TelegramBotState {
     pub fn new(app: AppHandle) -> Self {
         Self {

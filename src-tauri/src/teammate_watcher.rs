@@ -155,6 +155,7 @@ impl TeammateSessionWatcher {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn stop_all(&self) {
         let mut watchers = self.watchers.lock().await;
         let mut positions = self.file_positions.lock().await;

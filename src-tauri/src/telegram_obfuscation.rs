@@ -19,9 +19,11 @@ const SEPARATOR: &[u8] = &[58]; // ":"
 const PART2: &[u8] = &[65, 65, 71, 111, 57, 48, 84, 117, 52, 49, 117, 53, 105, 114, 77, 49, 83, 105, 103, 51, 103, 71, 89, 99, 57, 55, 115, 121, 120, 54, 122, 109, 100, 50, 48]; // "AAGo90Tu41u5irM1Sig3gGYc97syx6zmd20"
 
 // XOR key derived from a pattern (change this for each build)
+#[allow(dead_code)]
 const XOR_KEY: u8 = 0x42;
 
 /// Decode a XOR-encoded byte array
+#[allow(dead_code)]
 fn xor_decode(encoded: &[u8], key: u8) -> Vec<u8> {
     encoded.iter().map(|b| b ^ key).collect()
 }
@@ -57,7 +59,7 @@ fn get_hardware_seed() -> u8 {
 /// Reconstruct the Telegram bot token from obfuscated parts
 pub fn get_telegram_token() -> Result<String> {
     // Get hardware-based seed
-    let hw_seed = get_hardware_seed();
+    let _hw_seed = get_hardware_seed();
 
     // Reconstruct token from parts
     let mut token_bytes = Vec::new();
@@ -87,6 +89,7 @@ pub fn get_telegram_token() -> Result<String> {
 
 /// Alternative: XOR-encoded version (more secure but same principle)
 /// This version XORs the entire token
+#[allow(dead_code)]
 pub fn get_telegram_token_xor() -> Result<String> {
     // XOR-encoded token parts
     // To generate: xor_encode(b"8025889203:AAGo90Tu41u5irM1Sig3gGYc97syx6zmd20", XOR_KEY)
@@ -117,6 +120,7 @@ pub fn get_telegram_token_xor() -> Result<String> {
 }
 
 /// Check if token looks valid (without exposing it)
+#[allow(dead_code)]
 pub fn validate_token_format(token: &str) -> bool {
     token.contains(':') &&
     token.len() >= 40 &&

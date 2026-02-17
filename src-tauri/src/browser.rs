@@ -57,7 +57,7 @@ pub async fn open_browser_window(
     .decorations(true);
 
     match builder.build() {
-        Ok(window) => {
+        Ok(_window) => {
             log::info!("🦆 Native browser window opened: {} with URL: {}", window_label, final_url);
 
             let app_handle = app.clone();
@@ -223,7 +223,8 @@ fn create_404_page() -> String {
 </html>"#;
 
     // Create data URL with base64 encoding (more reliable than URL encoding)
-    let encoded = base64::encode(html);
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(html);
     format!("data:text/html;base64,{}", encoded)
 }
 
@@ -389,7 +390,7 @@ pub async fn open_oauth_window(
         .decorations(true);
 
     match builder.build() {
-        Ok(window) => {
+        Ok(_window) => {
             log::info!("🦆 OAuth window opened: {}", window_label);
 
             let app_handle = app.clone();

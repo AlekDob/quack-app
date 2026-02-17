@@ -408,7 +408,7 @@ async fn execute_semantic_search_command(
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut child = cmd.spawn()
+    let child = cmd.spawn()
         .map_err(|e| format!("Failed to spawn node process: {}", e))?;
 
     // Wait for the command to finish

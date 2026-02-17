@@ -2,11 +2,11 @@
 // Manages .claude/ folder assets across multiple projects
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Asset types that can be managed
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ClaudeAssetType {

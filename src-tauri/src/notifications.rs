@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -9,6 +9,7 @@ struct TelegramMessage {
     parse_mode: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 struct NtfyMessage {
     topic: String,
@@ -178,7 +179,7 @@ pub async fn send_ai_completion_notification(
     let mut success_count = 0;
     let mut failure_count = 0;
 
-    for (service, handle) in results {
+    for (_service, handle) in results {
         match handle.await {
             Ok(Ok(_)) => {
                 success_count += 1;
