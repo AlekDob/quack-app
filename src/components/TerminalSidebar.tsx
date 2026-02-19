@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, type MouseEvent } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-shell';
 import { Store } from '@tauri-apps/plugin-store';
@@ -347,6 +347,9 @@ export default function TerminalSidebar({
     groupId: string;
     groupName: string;
   } | null>(null);
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
 
@@ -393,6 +396,28 @@ export default function TerminalSidebar({
       }
     }
   }, [groups, handleDisbandGroup, updateGroup]);
+
+  const handleStartRenameGroup = useCallback((groupId: string, currentName: string) => {
+    setRenamingGroupId(groupId);
+    setRenameValue(currentName);
+    setGroupContextMenu(null);
+    // Focus the input after render
+    setTimeout(() => renameInputRef.current?.focus(), 50);
+  }, []);
+
+  const handleConfirmRenameGroup = useCallback(async () => {
+    if (!renamingGroupId) return;
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== groups.find((g) => g.id === renamingGroupId)?.name) {
+      try {
+        await updateGroup(renamingGroupId, { name: trimmed });
+      } catch (error) {
+        console.error('[TerminalSidebar] Failed to rename group:', error);
+      }
+    }
+    setRenamingGroupId(null);
+    setRenameValue('');
+  }, [renamingGroupId, renameValue, groups, updateGroup]);
 
   // Metro style is now the only option (removed useMetroStyle state)
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
@@ -1097,7 +1122,31 @@ export default function TerminalSidebar({
                         width: '6px', height: '6px', borderRadius: '50%',
                         background: groupColor, flexShrink: 0,
                       }} />
-                      <span style={{ flex: 1, textAlign: 'left' }}>{grp.name}</span>
+                      {renamingGroupId === grp.id ? (
+                        <input
+                          ref={renameInputRef}
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleConfirmRenameGroup();
+                            if (e.key === 'Escape') { setRenamingGroupId(null); setRenameValue(''); }
+                          }}
+                          onBlur={handleConfirmRenameGroup}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            flex: 1, background: 'rgba(0, 0, 0, 0.3)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '3px', padding: '1px 4px',
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            fontSize: '10px', fontWeight: 600,
+                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                            outline: 'none',
+                          }}
+                        />
+                      ) : (
+                        <span style={{ flex: 1, textAlign: 'left' }}>{grp.name}</span>
+                      )}
                       <span style={{ fontSize: '9px', opacity: 0.5 }}>
                         {projects.length} projects
                       </span>
@@ -1368,6 +1417,29 @@ export default function TerminalSidebar({
             }}>
               {groupContextMenu.groupName}
             </div>
+
+            {/* Rename group */}
+            <button
+              onClick={() => handleStartRenameGroup(groupContextMenu.groupId, groupContextMenu.groupName)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                width: '100%', padding: '7px 10px', background: 'none',
+                border: 'none', cursor: 'pointer', borderRadius: '4px',
+                color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                <path d="M17 3a2.85 2.85 0 014 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+              Rename group
+            </button>
+
+            {/* Separator */}
+            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
 
             {/* Remove individual projects */}
             {(() => {
