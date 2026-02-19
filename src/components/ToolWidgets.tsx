@@ -683,8 +683,9 @@ export const GrepWidget: React.FC<{
 export const TodoWriteWidget: React.FC<{
   todos: TodoItem[];
   defaultExpanded?: boolean;
-}> = ({ todos, defaultExpanded = true }) => {
-  return <TodoWidget todos={todos} defaultExpanded={defaultExpanded} />;
+  isStale?: boolean;
+}> = ({ todos, defaultExpanded = true, isStale = false }) => {
+  return <TodoWidget todos={todos} defaultExpanded={defaultExpanded} isStale={isStale} />;
 };
 
 // ExitPlanMode widget

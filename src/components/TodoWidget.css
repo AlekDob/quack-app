@@ -245,6 +245,29 @@
   40% { opacity: 1; }
 }
 
+/* Stale state - disable animations on superseded TodoWrite sections */
+.todo-widget.stale .rotating-circle {
+  animation: none;
+}
+
+.todo-widget.stale .todo-pulse {
+  animation: none;
+  opacity: 0.3;
+}
+
+.todo-widget.stale .todo-item.in_progress {
+  border-color: rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.todo-widget.stale .todo-item.in_progress .todo-item-text {
+  color: rgba(96, 165, 250, 0.5);
+}
+
+.todo-widget.stale .todo-in-progress-badge {
+  opacity: 0.4;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .todo-widget-header {

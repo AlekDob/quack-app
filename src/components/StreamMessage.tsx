@@ -456,6 +456,22 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       return null;
     }
 
+    // Find the last TodoWrite tool_use ID across all stream events
+    // so earlier TodoWrite sections are marked stale (animations stopped)
+    const lastTodoWriteId = useMemo(() => {
+      let lastId: string | null = null;
+      streamMessages.forEach((evt: any) => {
+        if (evt.type === 'assistant' && evt.message?.content && Array.isArray(evt.message.content)) {
+          evt.message.content.forEach((c: any) => {
+            if (c.type === 'tool_use' && c.name?.toLowerCase() === 'todowrite' && c.id) {
+              lastId = c.id;
+            }
+          });
+        }
+      });
+      return lastId;
+    }, [streamMessages]);
+
     // Render tools separately (after the main avatar+text block)
     const renderToolContent = (content: any, idx: number) => {
       const toolName = content.name?.toLowerCase();
@@ -470,6 +486,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             key={idx}
             todos={input.todos}
             defaultExpanded={true}
+            isStale={toolId !== lastTodoWriteId}
           />
         );
       }

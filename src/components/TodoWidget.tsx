@@ -10,9 +10,10 @@ export interface TodoItem {
 interface TodoWidgetProps {
   todos: TodoItem[];
   defaultExpanded?: boolean;
+  isStale?: boolean;
 }
 
-const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }) => {
+const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true, isStale = false }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Count stats
@@ -60,7 +61,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, defaultExpanded = true }
   };
 
   return (
-    <div className="todo-widget">
+    <div className={`todo-widget${isStale ? ' stale' : ''}`}>
       <div className="todo-widget-header" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="todo-widget-title">
           {getToolIcon()}
