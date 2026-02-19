@@ -737,6 +737,7 @@ export default function ChatView({
           {isLoading && onAbortStream && (
             <button
               className="chat-stop-btn"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={onAbortStream}
               title="Stop Stream (ESC)"
             >
