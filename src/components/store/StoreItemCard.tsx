@@ -37,6 +37,9 @@ export default function StoreItemCard({
         <div className="store-item-meta">
           {resource.author} · v{resource.version}
         </div>
+        {resource.description && resource.description.length > 5 && !/from .+ plugin$/i.test(resource.description) && (
+          <div className="store-item-description">{resource.description}</div>
+        )}
         <div className="store-item-signals">
           {resource.verified && (
             <span className="store-item-verified">
@@ -49,6 +52,7 @@ export default function StoreItemCard({
             </span>
           )}
           {installed && <span className="store-installed-badge">Installed</span>}
+          <span className="store-item-more-info">More info</span>
         </div>
       </div>
 

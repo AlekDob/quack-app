@@ -456,3 +456,63 @@
   opacity: 0.3;
   cursor: not-allowed;
 }
+
+/* IDE Context section */
+.context-ide-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  padding-bottom: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.context-ide-section--disabled {
+  opacity: 0.5;
+}
+
+.context-ide-header {
+  margin-bottom: 6px;
+}
+
+.context-ide-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: rgba(74, 158, 255, 0.12);
+  border: 1px solid rgba(74, 158, 255, 0.25);
+  border-radius: 10px;
+  color: rgba(74, 158, 255, 0.9);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.context-ide-chip:hover {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: rgba(74, 158, 255, 0.4);
+}
+
+.context-ide-chip--disabled {
+  opacity: 0.5;
+}
+
+.context-ide-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.context-ide-source {
+  line-height: 1;
+}
+
+.context-ide-file {
+  display: block;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.35);
+  word-break: break-all;
+  line-height: 1.4;
+}

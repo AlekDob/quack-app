@@ -122,7 +122,7 @@ export default function ChatInput({
   onToggleFullscreen,
   agentToolkit,
 }: ChatInputProps) {
-  // IDE context state for indicator chip
+  // IDE context: icon in action bar, full detail in ProjectContextPanel
   const { previewFile, editorSelection, externalIdeContext, ideContextEnabled, toggleIdeContext } = useFileSystemStore();
 
   // Use local state as fallback if not controlled
@@ -2264,44 +2264,21 @@ export default function ChatInput({
               </button>
             </div>
           )}
-          {/* IDE context indicator chip */}
-          {(previewFile || editorSelection || externalIdeContext) && (() => {
-            let contextLabel = '';
-            if (editorSelection) {
-              const fileName = editorSelection.filePath.split('/').pop() || editorSelection.filePath;
-              contextLabel = `${fileName}:${editorSelection.startLine}-${editorSelection.endLine}`;
-            } else if (externalIdeContext?.selection) {
-              const fileName = externalIdeContext.selection.filePath.split('/').pop() || externalIdeContext.selection.filePath;
-              contextLabel = `${fileName}:${externalIdeContext.selection.startLine}-${externalIdeContext.selection.endLine}`;
-            } else if (externalIdeContext?.activeFile) {
-              contextLabel = externalIdeContext.activeFile.split('/').pop() || externalIdeContext.activeFile;
-            } else if (previewFile) {
-              contextLabel = previewFile.split('/').pop() || previewFile;
-            }
-
-            const isExternal = !editorSelection && !previewFile && !!externalIdeContext;
-            const sourceLabel = isExternal ? externalIdeContext.ideName : 'Quack';
-            const enabledTitle = `${contextLabel}\n${sourceLabel} context will be attached. Click to disable.`;
-            const disabledTitle = `${contextLabel}\nIDE context disabled. Click to enable.`;
-
-            const tooltipLabel = ideContextEnabled ? contextLabel : `${contextLabel} (disabled)`;
-
-            return (
-              <button
-                type="button"
-                className={`chat-input-context-chip ${!ideContextEnabled ? 'chat-input-context-chip--disabled' : ''}`}
-                onClick={toggleIdeContext}
-                data-tooltip={tooltipLabel}
-                aria-label={ideContextEnabled ? enabledTitle : disabledTitle}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="16 18 22 12 16 6" />
-                  <polyline points="8 6 2 12 8 18" />
-                </svg>
-                <span>{contextLabel}</span>
-              </button>
-            );
-          })()}
+          {/* IDE context icon — full detail in Context accordion panel */}
+          {(previewFile || editorSelection || externalIdeContext) && (
+            <button
+              type="button"
+              className={`chat-input-action-btn chat-input-ide-btn ${!ideContextEnabled ? 'chat-input-ide-btn--disabled' : ''}`}
+              onClick={toggleIdeContext}
+              data-tooltip={ideContextEnabled ? 'IDE context active' : 'IDE context disabled'}
+              aria-label="Toggle IDE context"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+            </button>
+          )}
           </div>
           {/* Send/Stop button - aligned to right */}
           <div className="chat-input-actions-right">

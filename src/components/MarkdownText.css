@@ -185,6 +185,20 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* Blockquotes */
+.md-blockquote {
+  margin: 6px 0;
+  padding: 4px 12px;
+  border-left: 3px solid rgba(242, 140, 82, 0.5);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 4px 4px 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.md-blockquote .md-paragraph {
+  margin: 3px 0;
+}
+
 /* Bold */
 strong {
   font-weight: 600;

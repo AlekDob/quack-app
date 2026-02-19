@@ -59,6 +59,8 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     let codeBlockKey = 0;
     let tableRows: string[][] | null = null;
     let tableKey = 0;
+    let blockquoteLines: string[] | null = null;
+    let blockquoteKey = 0;
 
     const flushList = () => {
       if (currentList && currentList.length > 0) {
@@ -118,6 +120,27 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       }
     };
 
+    const flushBlockquote = () => {
+      if (blockquoteLines && blockquoteLines.length > 0) {
+        elements.push(
+          <blockquote key={`bq-${blockquoteKey++}`} className="md-blockquote">
+            {blockquoteLines.map((bqLine, idx) =>
+              bqLine === '' ? (
+                <br key={idx} />
+              ) : (
+                <p
+                  key={idx}
+                  className="md-paragraph"
+                  dangerouslySetInnerHTML={{ __html: processInlineMarkdown(bqLine) }}
+                />
+              )
+            )}
+          </blockquote>
+        );
+        blockquoteLines = null;
+      }
+    };
+
     const processInlineMarkdown = (line: string): string => {
       // Bold: **text** or __text__ (must be processed BEFORE italic)
       line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -172,6 +195,22 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       // Flush table if we hit non-table content
       if (tableRows) {
         flushTable();
+      }
+
+      // Blockquote lines (> text)
+      const bqMatch = line.match(/^>\s?(.*)/);
+      if (bqMatch) {
+        if (!blockquoteLines) {
+          flushList();
+          blockquoteLines = [];
+        }
+        blockquoteLines.push(bqMatch[1]);
+        return;
+      }
+
+      // Flush blockquote if we hit non-blockquote content
+      if (blockquoteLines) {
+        flushBlockquote();
       }
 
       // Horizontal rule
@@ -236,10 +275,11 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       );
     });
 
-    // Flush any remaining list, code block, or table
+    // Flush any remaining list, code block, table, or blockquote
     flushList();
     flushCodeBlock();
     flushTable();
+    flushBlockquote();
 
     return elements;
   };

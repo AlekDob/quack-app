@@ -64,6 +64,8 @@ interface NewTerminalModalProps {
   onBrowse: () => void
   onCancel: () => void
   onConfirm: (agentData?: SavedAgent) => void
+  /** Open the Quack Store drawer to browse agent details */
+  onOpenStore?: () => void
   /** @deprecated Starter bundles now handled via Quack Store */
   isOnboarding?: boolean
   /** @deprecated Starter bundles now handled via Quack Store */
@@ -98,6 +100,7 @@ function NewTerminalModal({
   onBrowse,
   onCancel,
   onConfirm,
+  onOpenStore,
 }: NewTerminalModalProps) {
   // Marketplace for agent templates
   const { allResources, installResource } = useMarketplace();
@@ -737,6 +740,7 @@ function NewTerminalModal({
               fileInputRef={fileInputRef}
               onConfirm={handleInlineConfirm}
               onCancelEdit={handleCancelInlineEdit}
+              onOpenStore={onOpenStore}
             />
             {/* Back button only when not in inline editing mode */}
             {!inlineEditingMode && (

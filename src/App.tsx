@@ -95,7 +95,7 @@ import { useIDEStore } from "./stores/ideStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
 import { LicenseModal } from "./components/LicenseModal";
 import { UpgradeModal } from "./components/UpgradeModal";
-import { ProBanner } from "./components/ProBanner";
+// ProBanner removed — Quack is free forever, no upgrade banner needed
 import { ClaudeAuthBanner } from "./components/ClaudeAuthBanner";
 import { DroidFactoryDrawer } from "./components/droid-factory";
 import { useDroidFactory } from "./hooks/useDroidFactory";
@@ -103,7 +103,7 @@ import PrerequisitesCheck from "./components/settings/PrerequisitesCheck";
 import GitConfigOnboarding from "./components/settings/GitConfigOnboarding";
 import IDEOnboarding from "./components/settings/IDEOnboarding";
 import UpdateToast from "./components/UpdateToast";
-import { isPro, canCreateTerminal } from "./config/features";
+import { isPro } from "./config/features";
 import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
 import { buildContextPrefix } from "./utils/ideContextBuilder";
@@ -925,7 +925,6 @@ function AppContent() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeLimitType, setUpgradeLimitType] = useState<'terminals' | 'groups' | 'backgrounds' | 'agency' | 'sync'>('terminals');
   const [isProUser, setIsProUser] = useState(isPro());
-  const [proBannerExpanded, setProBannerExpanded] = useState(true);
   const [claudeCliAvailable, setClaudeCliAvailable] = useState<boolean | null>(null);
   const [claudeAuthBannerExpanded, setClaudeAuthBannerExpanded] = useState(true);
   const [claudeAuthBannerDismissed, setClaudeAuthBannerDismissed] = useState(false);
@@ -940,16 +939,6 @@ function AppContent() {
     }
   }, [claudeCliAvailabilityHook]);
 
-  // Auto-collapse ProBanner after 10 seconds
-  useEffect(() => {
-    if (!isProUser && proBannerExpanded) {
-      const timer = setTimeout(() => {
-        setProBannerExpanded(false);
-      }, 10000); // 10 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [isProUser, proBannerExpanded]);
 
   // Listen for license modal open event from settings
   useEffect(() => {
@@ -6133,14 +6122,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    // ✅ FREE TIER VALIDATION: Check terminal limit before creating (same as NewTerminalModal)
-    if (!canCreateTerminal(terminals.length)) {
-      toast.error('Free tier limited to 3 terminals', {
-        description: 'Upgrade to Pro for unlimited terminals',
-        duration: 5000,
-      });
-      return;
-    }
 
     try {
       const workingDir = getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
@@ -7517,12 +7498,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    // 💰 Check Pro limit before opening modal
-    if (!canCreateTerminal(terminals.length)) {
-      setUpgradeLimitType('terminals');
-      setShowUpgradeModal(true);
-      return;
-    }
     setEditingTerminal(null);
     setNewTerminalError(null);
     const index = terminals.length;
@@ -7559,13 +7534,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const handleOpenNewAgentForKanban = useCallback((projectPath: string) => {
     if (!tauriAvailable) {
       setExplorerError("Terminals available only via desktop app.");
-      return;
-    }
-
-    // 💰 Check Pro limit before opening modal
-    if (!canCreateTerminal(terminals.length)) {
-      setUpgradeLimitType('terminals');
-      setShowUpgradeModal(true);
       return;
     }
 
@@ -8197,7 +8165,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   const handleLicenseSuccess = useCallback(() => {
     setIsProUser(true);
-    toast.success('🎉 Quack Pro activated! Enjoy unlimited features!', {
+    toast.success('License activated! Thank you for supporting Quack!', {
       duration: 5000,
     });
   }, []);
@@ -10536,15 +10504,6 @@ You have access to all Bash tools to execute git commands like:
       return;
     }
 
-    // ✅ FREE TIER VALIDATION: Check terminal limit before resuming (creates new terminal)
-    if (!canCreateTerminal(terminals.length)) {
-      toast.error('Free tier limited to 3 terminals', {
-        description: 'Upgrade to Pro for unlimited terminals',
-        duration: 5000,
-      });
-      return;
-    }
-
     setCreatingTerminal(true);
 
     try {
@@ -10856,14 +10815,7 @@ You have access to all Bash tools to execute git commands like:
         />
       )}
 
-      {/* 💰 Pro Banner - Fixed at bottom with collapse to badge */}
-      {!isProUser && (
-        <ProBanner
-          onUpgrade={() => handleShowUpgrade('terminals')}
-          isExpanded={proBannerExpanded}
-          onToggle={() => setProBannerExpanded(!proBannerExpanded)}
-        />
-      )}
+      {/* ProBanner removed — Quack is free forever */}
 
       <div
         ref={appShellRef}
@@ -12098,6 +12050,10 @@ You have access to all Bash tools to execute git commands like:
           onBrowse={handleSelectDirectory}
           onCancel={handleCancelNewTerminal}
           onConfirm={handleConfirmNewTerminal}
+          onOpenStore={() => {
+            setShowNewTerminalModal(false);
+            setShowStoreDrawer(true);
+          }}
           isOnboarding={terminals.length === 0 && !hasSavedAgents}
           onInstallStarterBundles={handleInstallStarterBundles}
         />

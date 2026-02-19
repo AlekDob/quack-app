@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useProjectContext } from '../hooks/useProjectContext';
+import { useFileSystemStore } from '../stores/fileSystemStore';
 import './ProjectContextPanel.css';
 
 interface ProjectContextPanelProps {
@@ -22,10 +23,39 @@ export default function ProjectContextPanel({
     openBookmarkUrl,
   } = useProjectContext(rootPath);
 
+  const {
+    previewFile,
+    editorSelection,
+    externalIdeContext,
+    ideContextEnabled,
+    toggleIdeContext,
+  } = useFileSystemStore();
+
   const [isEditing, setIsEditing] = useState(false); // Start in preview mode
   const [newTitle, setNewTitle] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
+
+  // Build IDE context label
+  const hasIdeContext = !!(previewFile || editorSelection || externalIdeContext);
+  let ideContextLabel = '';
+  let ideSourceName = 'Quack';
+  if (editorSelection) {
+    const fileName = editorSelection.filePath.split('/').pop() || editorSelection.filePath;
+    ideContextLabel = `${fileName}:${editorSelection.startLine}-${editorSelection.endLine}`;
+  } else if (externalIdeContext?.selection) {
+    const fileName = externalIdeContext.selection.filePath.split('/').pop() || externalIdeContext.selection.filePath;
+    ideContextLabel = `${fileName}:${externalIdeContext.selection.startLine}-${externalIdeContext.selection.endLine}`;
+    ideSourceName = externalIdeContext.ideName || 'IDE';
+  } else if (externalIdeContext?.activeFile) {
+    ideContextLabel = externalIdeContext.activeFile.split('/').pop() || externalIdeContext.activeFile;
+    ideSourceName = externalIdeContext.ideName || 'IDE';
+  } else if (previewFile) {
+    ideContextLabel = previewFile.split('/').pop() || previewFile;
+  }
+  if (!editorSelection && !previewFile && externalIdeContext) {
+    ideSourceName = externalIdeContext.ideName || 'IDE';
+  }
 
   const handleAddBookmark = async () => {
     const trimmedTitle = newTitle.trim();
@@ -246,6 +276,27 @@ export default function ProjectContextPanel({
           </>
         )}
       </div>
+
+      {/* IDE Context — below bookmarks */}
+      {hasIdeContext && (
+        <div className={`context-section context-ide-section ${!ideContextEnabled ? 'context-ide-section--disabled' : ''}`}>
+          <div className="context-ide-header">
+            <button
+              type="button"
+              className={`context-ide-chip ${!ideContextEnabled ? 'context-ide-chip--disabled' : ''}`}
+              onClick={toggleIdeContext}
+              title={ideContextEnabled ? 'Click to disable IDE context' : 'Click to enable IDE context'}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              <span className="context-ide-source">From {ideSourceName}</span>
+            </button>
+          </div>
+          <span className="context-ide-file">{ideContextLabel}</span>
+        </div>
+      )}
     </div>
   );
 }

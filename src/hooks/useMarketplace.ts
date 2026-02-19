@@ -300,7 +300,7 @@ export function useMarketplace() {
         if (!res.ok) return;
         const content = await res.text();
         // Extract description from frontmatter
-        const fmDescMatch = content.match(/^---[\s\S]*?description:\s*(.+?)[\s\S]*?---/);
+        const fmDescMatch = content.match(/^---[\s\S]*?description:\s*([^\n]+)[\s\S]*?---/);
         if (fmDescMatch) {
           resource.description = fmDescMatch[1].trim().slice(0, 200);
         }

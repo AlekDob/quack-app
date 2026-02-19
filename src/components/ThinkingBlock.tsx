@@ -33,10 +33,8 @@ function ThinkingBlock({
   // Use controlled state if provided, otherwise use local state
   const expanded = controlledExpanded !== undefined ? controlledExpanded : localExpanded;
 
-  // Count lines for preview
-  const lines = content.split('\n');
-  const previewLines = lines.slice(0, 3).join('\n');
-  const hasMore = lines.length > 3;
+  // Inline preview for collapsed state (first line, truncated)
+  const inlinePreview = content.split('\n')[0]?.slice(0, 80) || '';
 
   // Handle toggle - update both controlled and uncontrolled
   const handleToggle = () => {
@@ -68,21 +66,19 @@ function ThinkingBlock({
           )}
         </span>
         <span className="thinking-block-label">Thinking</span>
+        {!expanded && (
+          <span className="thinking-block-inline-preview">{inlinePreview}</span>
+        )}
         <span className="thinking-block-hint">
-          {expanded ? 'click to collapse' : 'click to expand'}
+          {expanded ? 'collapse' : 'expand'}
         </span>
       </button>
 
-      <div className="thinking-block-content">
-        {expanded ? (
+      {expanded && (
+        <div className="thinking-block-content">
           <pre className="thinking-block-text">{content}</pre>
-        ) : (
-          <pre className="thinking-block-preview">
-            {previewLines}
-            {hasMore && <span className="thinking-block-more">...</span>}
-          </pre>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

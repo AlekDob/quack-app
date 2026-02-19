@@ -43,6 +43,30 @@ Agent-bundles show duck avatars instead of generic category icons. Resolved from
 
 Detail modal renders `longDescription` as rich markdown using `MarkdownText` component.
 
+## Item Card Descriptions (2026-02-19)
+
+Store item cards now show a **description subtitle** (2-line clamp) parsed from the resource's YAML frontmatter `description:` field. A "More info" pill opens the `MarketplaceInstallModal` detail overlay.
+
+- **StoreItemCard**: description shown if > 5 chars and not generic. "More info" span in signals row.
+- **AgentSelector**: marketplace template cards also show description (2-line clamp, 10px) + "More info" pill that opens `MarketplaceInstallModal` inline (no drawer needed).
+- **Regex gotcha**: See `documentation/bugs/bug-marketplace-description-lazy-regex.md` — lazy `.+?` in frontmatter parsing captured only 1 char.
+
+## Category Grouping in Discover View (2026-02-19)
+
+When the "Discover" tab is active with no search query, items are grouped by category with section headers:
+
+- `GroupedItems` component in `StoreMainContent.tsx`
+- `CATEGORY_GROUP_ORDER` constant defines display order: Skills > Agents > Droids > Rules > Commands > MCP Servers > Hooks
+- Each group has: icon + label + count header, divider line between groups
+- CSS classes: `.store-grouped-items`, `.store-category-group`, `.store-category-header`, `.store-category-divider`
+- When searching or filtering by specific tab, falls back to flat sorted list.
+
+## "More info" → Detail Modal (2026-02-19)
+
+"More info" on store cards and AgentSelector marketplace cards opens `MarketplaceInstallModal` as an overlay:
+- **StoreItemCard**: click on card opens detail (existing behavior), "More info" is an additional visual cue
+- **AgentSelector**: `detailResource` state + inline `<MarketplaceInstallModal>` render — works standalone without the store drawer
+
 ## CSS Naming Convention
 
 `.quack-store-*` (drawer-level), `.store-sidebar-*`, `.store-hero-*`, `.store-featured-*`, `.store-item-*`, `.store-detail-*`

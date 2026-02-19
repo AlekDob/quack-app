@@ -571,28 +571,93 @@ fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process
     cmd.spawn()
 }
 
-/// Spawn a CLI command - on non-Windows use sh -c with proper quoting.
-/// Many IDE CLIs (Cursor, VS Code, Windsurf) use bash wrapper scripts with `eval`
-/// which breaks word splitting for paths containing spaces.
-/// Using sh -c with shell-escaped arguments ensures correct quoting.
+/// Spawn a CLI command - on non-Windows, call the binary directly.
+///
+/// VS Code-family CLIs (Cursor, VS Code, Windsurf, Athas) use bash wrapper
+/// scripts that internally call `eval "$CLI" "$@"`. The `eval` re-parses all
+/// arguments as a single string, breaking paths that contain spaces
+/// (e.g. "Obsidian Vault/6 - Projects/file.md" becomes multiple args).
+///
+/// To avoid this, we resolve the Electron binary and cli.js from the .app
+/// bundle and invoke them directly — bypassing the wrapper script entirely.
 #[cfg(not(target_os = "windows"))]
 fn spawn_cli_command(cli: &str, args: &[String]) -> std::io::Result<std::process::Child> {
-    let mut cmd_parts = vec![shell_escape(cli)];
-    for arg in args {
-        cmd_parts.push(shell_escape(arg));
+    // Try to resolve direct Electron binary for vscode-family CLIs (macOS)
+    #[cfg(target_os = "macos")]
+    if let Some((electron, cli_js)) = resolve_vscode_electron(cli) {
+        log::info!(
+            "[IDE] spawn_cli_command: bypassing wrapper, using electron directly: {} {}",
+            electron, cli_js
+        );
+        return Command::new(&electron)
+            .env("ELECTRON_RUN_AS_NODE", "1")
+            .env("VSCODE_NODE_OPTIONS", std::env::var("NODE_OPTIONS").unwrap_or_default())
+            .arg(&cli_js)
+            .args(args)
+            .spawn();
     }
-    let full_cmd = cmd_parts.join(" ");
-    log::info!("[IDE] spawn_cli_command via sh -c: {}", full_cmd);
-    Command::new("sh")
-        .arg("-c")
-        .arg(&full_cmd)
+
+    // Fallback: direct Command::new (no sh -c to avoid eval issues)
+    log::info!("[IDE] spawn_cli_command direct: {} {:?}", cli, args);
+    Command::new(cli)
+        .args(args)
         .spawn()
 }
 
-/// Shell-escape a string by wrapping it in single quotes.
-/// Any single quotes within the string are escaped as '\'' (end quote, escaped quote, start quote).
-fn shell_escape(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
+/// Resolve the Electron binary and cli.js from a VS Code-family .app bundle.
+/// Returns Some((electron_path, cli_js_path)) if found, None otherwise.
+#[cfg(target_os = "macos")]
+fn resolve_vscode_electron(cli: &str) -> Option<(String, String)> {
+    // Map CLI names to their .app paths
+    let app_path = IDE_REGISTRY.iter()
+        .find(|e| e.cli == cli && e.cli_style == "vscode")
+        .map(|e| e.app_path)?;
+
+    let contents = format!("{}/Contents", app_path);
+    let cli_js = format!("{}/Resources/app/out/cli.js", contents);
+
+    // cli.js must exist
+    if !Path::new(&cli_js).exists() {
+        return None;
+    }
+
+    // Resolve the binary name from CFBundleExecutable in Info.plist
+    let macos_dir = format!("{}/MacOS", contents);
+    let binary_name = Command::new("defaults")
+        .arg("read")
+        .arg(format!("{}/Info.plist", contents))
+        .arg("CFBundleExecutable")
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+
+    let electron = if let Some(name) = binary_name {
+        format!("{}/{}", macos_dir, name)
+    } else {
+        // Fallback: find the first executable in MacOS dir
+        if let Ok(entries) = std::fs::read_dir(&macos_dir) {
+            entries
+                .filter_map(|e| e.ok())
+                .find(|e| {
+                    e.file_type().map(|ft| ft.is_file()).unwrap_or(false)
+                })
+                .map(|e| e.path().to_string_lossy().to_string())?
+        } else {
+            return None;
+        }
+    };
+
+    if Path::new(&electron).exists() {
+        Some((electron, cli_js))
+    } else {
+        None
+    }
 }
 
 /// Detect all installed IDEs on the system
@@ -1433,27 +1498,20 @@ pub fn open_multiple_files_in_ide(ide_id: String, file_paths: Vec<String>) -> Re
     // Find project root from first file
     let project_root = file_paths.first().and_then(|p| find_project_root(p));
 
-    // Build shell command with properly quoted paths (single-quote escaping)
-    let mut cmd_parts = vec![shell_escape(entry.cli)];
+    // Build args: project folder first, then all file paths
+    let mut args: Vec<String> = Vec::new();
 
-    // Add project folder first
     if let Some(ref root) = project_root {
-        cmd_parts.push(shell_escape(root));
+        args.push(root.clone());
     }
 
-    // Add all file paths quoted
     for path in &file_paths {
-        cmd_parts.push(shell_escape(path));
+        args.push(path.clone());
     }
 
-    let cmd = cmd_parts.join(" ");
+    log::info!("[IDE] Opening multiple files with CLI '{}': {:?}", entry.cli, args);
 
-    log::info!("[IDE] Running shell command: {}", cmd);
-
-    let result = Command::new("sh")
-        .arg("-c")
-        .arg(&cmd)
-        .spawn();
+    let result = spawn_cli_command(entry.cli, &args);
 
     match result {
         Ok(_) => Ok(format!("Opened {} files in {}", file_paths.len(), entry.name)),

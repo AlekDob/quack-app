@@ -1,15 +1,15 @@
 ---
 name: claude-agent-sdk
 description: |
-  Build autonomous AI agents with Claude Agent SDK. Structured outputs guarantee JSON schema validation, with plugins system and hooks for event-driven workflows. Prevents 14 documented errors.
+  Build autonomous AI agents with Claude Agent SDK v0.2.47. Structured outputs, 14 hook events (incl. TeammateIdle/TaskCompleted), MCP tool annotations, Task System, prompt suggestions. Prevents 14 documented errors.
 
-  Use when: building coding agents, SRE systems, security auditors, or troubleshooting CLI not found, structured output validation, session forking errors, MCP config issues, subagent cleanup.
+  Use when: building coding agents, SRE systems, security auditors, or troubleshooting CLI not found, structured output validation, session forking errors, MCP config issues, subagent cleanup, task system setup.
 user-invocable: true
 ---
 
-# Claude Agent SDK - Structured Outputs & Error Prevention Guide
+# Claude Agent SDK - Complete Reference & Error Prevention Guide
 
-**Package**: @anthropic-ai/claude-agent-sdk@0.2.12
+**Package**: @anthropic-ai/claude-agent-sdk@0.2.47
 **Breaking Changes**: v0.1.45 - Structured outputs (Nov 2025), v0.1.0 - No default system prompt, settingSources required
 
 ---
@@ -69,7 +69,7 @@ for await (const message of response) {
 
 ### 3. Hooks System (v0.1.0+)
 
-**All 12 Hook Events:**
+**All 14 Hook Events:**
 
 | Hook | When Fired | Use Case |
 |------|------------|----------|
@@ -85,6 +85,8 @@ for await (const message of response) {
 | `SessionStart` | Session begins | Initialize state |
 | `SessionEnd` | Session ends | Persist state, cleanup |
 | `Error` | Error occurred | Custom error handling |
+| `TeammateIdle` | Teammate goes idle (v0.2.33+) | Reassign work, monitor team health |
+| `TaskCompleted` | Task finished (v0.2.33+) | Aggregate results, trigger next steps |
 
 **Hook Configuration:**
 ```typescript
@@ -110,6 +112,16 @@ const response = query({
 - **`strictMcpConfig`** - Strict MCP configuration validation
 - **`continue`** - Resume with new prompt (differs from `resume`)
 - **`permissionMode: 'plan'`** - New permission mode for planning workflows
+
+### 5. Task System (v0.2.19+)
+- **`CLAUDE_CODE_ENABLE_TASKS=true`** - Opt into the new task system via env var
+- Enables structured task management within agent sessions
+- Use via `env` option: `env: { CLAUDE_CODE_ENABLE_TASKS: "true" }`
+
+### 6. Model Support (v0.2.45+)
+- **Claude Sonnet 4.6** added as supported model
+- Available models: `claude-opus-4-5`, `claude-sonnet-4-5`, `claude-sonnet-4-6`, `claude-haiku-4-5`
+- AgentDefinition `model` field: `'sonnet' | 'opus' | 'haiku' | 'inherit'`
 
 📚 **Docs**: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
 
@@ -154,6 +166,9 @@ query(prompt: string | AsyncIterable<SDKUserMessage>, options?: Options)
 - `sandbox` - Sandbox settings for secure execution
 - `enableFileCheckpointing` - Enable file state snapshots
 - `systemPrompt` - System prompt (string or preset object)
+- `sessionId` - Custom UUID for conversations instead of auto-generated (v0.2.33+)
+- `debug` / `debugFile` - Programmatic debug logging control (v0.2.30+)
+- `additionalDirectories` - Load CLAUDE.md from extra directories (v0.2.20+, requires `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` in `env`)
 
 ### Extended Context (1M Tokens)
 
@@ -247,6 +262,18 @@ tools: { type: 'preset', preset: 'claude_code' }
 **Tool Definition:**
 ```typescript
 tool(name: string, description: string, zodSchema, handler)
+```
+
+**Tool Annotations (v0.2.27+):**
+```typescript
+tool("read_data", "Read data from source", schema, handler, {
+  annotations: {
+    readOnlyHint: true,       // Tool only reads, doesn't modify
+    destructiveHint: false,   // Tool is not destructive
+    openWorldHint: true,      // Tool accesses external resources
+    idempotentHint: true      // Safe to retry without side effects
+  }
+})
 ```
 
 **Handler Return:**
@@ -709,9 +736,17 @@ const models = await q.supportedModels();     // List available models
 const commands = await q.supportedCommands(); // List available commands
 const account = await q.accountInfo();        // Get account details
 
-// MCP status
+// MCP server management
 const status = await q.mcpServerStatus();     // Check MCP server status
-// Returns: { [serverName]: { status: 'connected' | 'failed', error?: string } }
+// Returns: { [serverName]: { status: 'connected' | 'failed' | 'disabled', config?, scope?, tools?, error? } }
+await q.reconnectMcpServer("server-name");    // Reconnect a failed MCP server (v0.2.21+)
+await q.toggleMcpServer("server-name", true); // Enable/disable MCP server (v0.2.21+)
+
+// Prompt suggestions (v0.2.47+)
+const suggestions = await q.promptSuggestion(); // Get prompt suggestions based on conversation context
+
+// Lifecycle control
+await q.close();                               // Forcefully terminate running query (v0.2.15+)
 
 // File operations (requires enableFileCheckpointing)
 await q.rewindFiles(userMessageUuid);         // Rewind to checkpoint
@@ -719,8 +754,10 @@ await q.rewindFiles(userMessageUuid);         // Rewind to checkpoint
 
 **Use cases:**
 - Dynamic model switching based on task complexity
-- Monitoring MCP server health
+- Monitoring and managing MCP server health at runtime
 - Adjusting thinking budget for reasoning tasks
+- Generating follow-up prompt suggestions for users
+- Gracefully terminating long-running queries
 
 ---
 
@@ -728,11 +765,23 @@ await q.rewindFiles(userMessageUuid);         // Rewind to checkpoint
 
 **Message Types:**
 - `system` - Session init/completion (includes `session_id`)
+- `system` (subtype `task_started`) - Subagent task registered (v0.2.45+)
 - `assistant` - Agent responses
 - `tool_call` - Tool execution requests
 - `tool_result` - Tool execution results
+- `task_notification` - Task completion with `tool_use_id` for correlation (v0.2.47+)
 - `error` - Error messages
-- `result` - Final result (includes `structured_output` for v0.1.45+)
+- `result` - Final result (includes `structured_output` for v0.1.45+, `stop_reason` for v0.2.31+)
+
+**Result Stop Reasons (v0.2.31+):**
+
+`SDKResultSuccess` and `SDKResultError` now include a `stop_reason` field:
+```typescript
+if (message.type === 'result') {
+  console.log(message.stop_reason);
+  // "end_turn" | "max_tokens" | "stop_sequence" | "tool_use" | etc.
+}
+```
 
 **Streaming Pattern:**
 ```typescript
@@ -740,9 +789,12 @@ for await (const message of response) {
   if (message.type === 'system' && message.subtype === 'init') {
     sessionId = message.session_id;  // Capture for resume/fork
   }
+  if (message.type === 'system' && message.subtype === 'task_started') {
+    console.log("Subagent task registered");  // v0.2.45+
+  }
   if (message.type === 'result' && message.structured_output) {
-    // Structured output available (v0.1.45+)
     const validated = schema.parse(message.structured_output);
+    console.log(`Stop reason: ${message.stop_reason}`);  // v0.2.31+
   }
 }
 ```
@@ -947,8 +999,8 @@ tool("fetch_content", "Fetch text content", {}, async (args) => {
 - **Savings**: ~70% (~10,500 tokens)
 
 **Errors prevented**: 14 documented issues with exact solutions (including 2 community-sourced gotchas)
-**Key value**: V2 Session APIs, Sandbox Settings, File Checkpointing, Query methods, AskUserQuestion tool, structured outputs (v0.1.45+), session forking, canUseTool patterns, complete hooks system (12 events), Zod v4 support, subagent cleanup patterns
+**Key value**: V2 Session APIs, Sandbox Settings, File Checkpointing, Query methods (close, reconnectMcpServer, toggleMcpServer, promptSuggestion), AskUserQuestion tool, structured outputs (v0.1.45+), session forking, canUseTool patterns, complete hooks system (14 events incl. TeammateIdle/TaskCompleted), Zod v4 support, subagent cleanup patterns, MCP tool annotations, Task System, stop_reason, debug logging, Sonnet 4.6 support
 
 ---
 
-**Last verified**: 2026-01-20 | **Skill version**: 3.1.0 | **Changes**: Added Issue #13 (MCP type field), Issue #14 (Unicode U+2028/U+2029), expanded Issue #4 (session-breaking), added subagent cleanup warning with Stop hook pattern
+**Last verified**: 2026-02-19 | **Skill version**: 4.0.0 | **Changes**: Updated to SDK v0.2.47 — added 4 new Query methods (close, reconnectMcpServer, toggleMcpServer, promptSuggestion), 2 new hook events (TeammateIdle, TaskCompleted → 14 total), MCP tool annotations, Task System (CLAUDE_CODE_ENABLE_TASKS), stop_reason on results, task_started/task_notification message types, debug/debugFile options, sessionId option, additionalDirectories, Sonnet 4.6 model support

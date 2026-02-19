@@ -194,3 +194,31 @@
 .repo-action-btn:active {
   transform: scale(0.95);
 }
+
+/* Always-visible "New Agent" button next to project name */
+.repo-new-agent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 8px;
+  background: rgba(255, 107, 53, 0.12);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  color: rgba(255, 107, 53, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.repo-new-agent-btn:hover {
+  background: rgba(255, 107, 53, 0.2);
+  border-color: rgba(255, 107, 53, 0.4);
+  color: #FF6B35;
+}
+
+.repo-new-agent-btn:active {
+  transform: scale(0.96);
+}

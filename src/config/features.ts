@@ -7,14 +7,15 @@
 const LICENSE_KEY_STORAGE = 'quack_license_key';
 const LICENSE_DATA_STORAGE = 'quack_license_data';
 
-// Free tier limits
+// Free tier limits — Quack is now FREE FOREVER with no limits
+// Kept for backwards compatibility but everything is unlocked
 export const FREE_LIMITS = {
-  maxTerminals: 3,
-  maxGroups: 1,
-  cloudSync: false,
-  premiumBackgrounds: false,
-  advancedAgency: false,
-  savedCommandsSync: false,
+  maxTerminals: Infinity,
+  maxGroups: Infinity,
+  cloudSync: true,
+  premiumBackgrounds: true,
+  advancedAgency: true,
+  savedCommandsSync: true,
   prioritySupport: false,
 } as const;
 
@@ -152,13 +153,13 @@ export const canCreateGroup = (currentCount: number): boolean => {
  */
 export const getUpgradeMessage = (limitType: string): string => {
   const messages: Record<string, string> = {
-    terminals: `You've reached the free tier limit of ${FREE_LIMITS.maxTerminals} terminals. Upgrade to Pro for unlimited terminals!`,
-    groups: `You've reached the free tier limit of ${FREE_LIMITS.maxGroups} group. Upgrade to Pro for unlimited groups!`,
-    backgrounds: 'Premium backgrounds are available in Pro. Upgrade to unlock beautiful terminal themes!',
-    agency: 'Advanced Quack Agency features require Pro. Upgrade for the full experience!',
-    sync: 'Cloud sync is a Pro feature. Upgrade to sync your settings across devices!',
+    terminals: 'Quack is free with unlimited agents! Need help setting up? Check out our Setup & Expert plans.',
+    groups: 'Quack is free with unlimited groups! Need help setting up? Check out our Setup & Expert plans.',
+    backgrounds: 'All backgrounds are free! Need a custom setup? Check out our consulting services.',
+    agency: 'All Quack features are free! Need help getting started? Book a setup session.',
+    sync: 'Cloud sync is coming soon! Join our Discord for updates.',
   };
-  return messages[limitType] || 'This feature requires Quack Pro. Upgrade to unlock!';
+  return messages[limitType] || 'Quack is free forever! Visit quack.build for consulting and expert services.';
 };
 
 /**

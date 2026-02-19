@@ -1,10 +1,14 @@
 .thinking-block {
-  margin: 8px 0;
-  border-radius: 8px;
+  margin: 4px 0;
+  border-radius: 6px;
   background: rgba(168, 85, 247, 0.08);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.15);
   overflow: hidden;
   font-size: 13px;
+}
+
+.thinking-block.collapsed {
+  margin: 2px 0;
 }
 
 .thinking-block.expanded {
@@ -14,15 +18,19 @@
 .thinking-block-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: transparent;
   border: none;
   color: rgba(168, 85, 247, 0.9);
   cursor: pointer;
   text-align: left;
   transition: background 0.15s ease;
+}
+
+.thinking-block.collapsed .thinking-block-header {
+  padding: 4px 10px;
 }
 
 .thinking-block-header:hover {
@@ -38,24 +46,39 @@
 
 .thinking-block-label {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
+.thinking-block.collapsed .thinking-block-label {
+  font-size: 10px;
+}
+
 .thinking-block-hint {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 10px;
   opacity: 0.5;
   font-weight: 400;
+  flex-shrink: 0;
+}
+
+.thinking-block-inline-preview {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .thinking-block-content {
   padding: 0 12px 12px 12px;
 }
 
-.thinking-block-text,
-.thinking-block-preview {
+.thinking-block-text {
   margin: 0;
   padding: 12px;
   background: rgba(0, 0, 0, 0.2);
@@ -67,17 +90,6 @@
   white-space: pre-wrap;
   word-break: break-word;
   overflow-x: auto;
-}
-
-.thinking-block-preview {
-  max-height: 72px;
-  overflow: hidden;
-  position: relative;
-}
-
-.thinking-block-more {
-  color: rgba(168, 85, 247, 0.7);
-  font-weight: 600;
 }
 
 /* Animation for expand/collapse */

@@ -605,6 +605,35 @@
   text-overflow: ellipsis;
 }
 
+p.agent-card-description {
+  font-size: 10px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 3px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agent-card-more-info {
+  display: inline-block;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 1px 6px;
+  margin-top: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+
+.agent-card-more-info:hover {
+  color: #00D9FF;
+  border-color: rgba(0, 217, 255, 0.3);
+  background: rgba(0, 217, 255, 0.06);
+}
+
 /* Marketplace Use Button */
 .marketplace-use-btn {
   background: rgba(99, 179, 237, 0.08);

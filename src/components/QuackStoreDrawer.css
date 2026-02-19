@@ -336,6 +336,54 @@
   overflow: hidden;
 }
 
+/* === Grouped Items (Discover view) === */
+.store-grouped-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.store-category-group {
+  padding-top: 4px;
+}
+
+.store-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  margin-bottom: 4px;
+}
+
+.store-category-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.store-category-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.store-category-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+
+.store-category-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 12px 0 8px;
+}
+
 /* === Item Grid === */
 .store-item-grid {
   display: grid;
@@ -406,7 +454,7 @@
 
 .store-item-description {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin-top: 3px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -433,6 +481,22 @@
 .store-item-installs {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.3);
+}
+
+.store-item-more-info {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+
+.store-item-more-info:hover {
+  color: #00D9FF;
+  border-color: rgba(0, 217, 255, 0.3);
+  background: rgba(0, 217, 255, 0.06);
 }
 
 /* === Get / Remove Buttons === */

@@ -1531,6 +1531,46 @@ export default function TerminalSidebar({
             </svg>
             <span>Docs</span>
           </button>
+
+          {/* Setup — Gumroad */}
+          <button
+            type="button"
+            className="sidebar-footer-link sidebar-footer-setup"
+            onClick={() => open('https://alekdob.gumroad.com/l/tsvgt')}
+            title="Setup & onboarding — €79"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            <span>Setup</span>
+          </button>
+
+          {/* Experts */}
+          <button
+            type="button"
+            className="sidebar-footer-link sidebar-footer-experts"
+            onClick={() => open('https://quack.build/experts')}
+            title="Meet our Quack Experts"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span>Experts</span>
+          </button>
+
+          {/* Buy us a pizza (icon only) */}
+          <button
+            type="button"
+            className="sidebar-footer-link sidebar-footer-pizza"
+            onClick={() => open('https://alekdob.gumroad.com/l/obgae')}
+            title="Buy us a pizza!"
+          >
+            <span style={{ fontSize: '12px' }}>🍕</span>
+          </button>
         </div>
 
         {/* Right side: Version Tag */}
@@ -1538,7 +1578,7 @@ export default function TerminalSidebar({
           className={`sidebar-footer-version ${import.meta.env.DEV ? 'sidebar-footer-version-dev' : 'sidebar-footer-version-prod'}`}
           title={`Version ${appVersion}${import.meta.env.DEV ? ' (DEV)' : ''}`}
         >
-          {appVersion.startsWith('v') ? appVersion : `v${appVersion}`}
+          {appVersion.replace(/^v/, '')}
           {import.meta.env.DEV && <span className="sidebar-footer-dev">DEV</span>}
           {updateAvailable && latestRelease && (
             <span className="sidebar-footer-update" title={`Update to ${latestRelease.tag_name}`}>

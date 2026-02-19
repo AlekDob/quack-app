@@ -20,6 +20,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
 import type { CustomAvatarInfo } from '../utils/customAvatarStorage';
 import SkillSelector from './SkillSelector';
+import MarketplaceInstallModal from './MarketplaceInstallModal';
 import { useMarketplace } from '../hooks/useMarketplace';
 import { useBundleOperations } from '../hooks/useBundleOperations';
 import './AgentSelector.css';
@@ -72,6 +73,8 @@ interface AgentSelectorProps {
   fileInputRef?: React.RefObject<HTMLInputElement | null>;
   onConfirm?: () => void;
   onCancelEdit?: () => void;
+  /** Open the Quack Store drawer to browse details */
+  onOpenStore?: () => void;
 }
 
 type SortMode = 'recent' | 'frequent' | 'alphabetical';
@@ -106,14 +109,16 @@ export default function AgentSelector({
   fileInputRef,
   onConfirm,
   onCancelEdit,
+  onOpenStore,
 }: AgentSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Force re-render after delete
+  const [detailResource, setDetailResource] = useState<MarketplaceResource | null>(null);
 
   // Load marketplace agent bundles
-  const { allResources, loading: marketplaceLoading } = useMarketplace();
+  const { allResources, loading: marketplaceLoading, installResource } = useMarketplace();
 
   // Bundle import operations
   const {
@@ -832,6 +837,18 @@ export default function AgentSelector({
                           );
                         })()}
                       </p>
+                      {bundle.description && (
+                        <p className="agent-card-description">{bundle.description}</p>
+                      )}
+                      <span
+                        className="agent-card-more-info"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailResource(bundle);
+                        }}
+                      >
+                        More info
+                      </span>
                     </div>
 
                     {/* Action Buttons */}
@@ -847,7 +864,7 @@ export default function AgentSelector({
                           <polyline points="7 10 12 15 17 10"></polyline>
                           <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        Use Template
+                        Add to Your Agents
                       </button>
                     </div>
                   </div>
@@ -856,6 +873,19 @@ export default function AgentSelector({
             </div>
           )}
         </>
+      )}
+
+      {/* Detail modal overlay for "More info" */}
+      {detailResource && (
+        <MarketplaceInstallModal
+          resource={detailResource}
+          installed={false}
+          onClose={() => setDetailResource(null)}
+          onInstall={async (r, scope) => {
+            const ok = await installResource(r, scope);
+            return ok;
+          }}
+        />
       )}
     </div>
   );
