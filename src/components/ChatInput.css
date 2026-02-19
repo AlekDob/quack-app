@@ -5,6 +5,8 @@
   backdrop-filter: blur(10px);
   overflow: visible; /* Allow tooltips to escape */
   transition: all 0.2s ease;
+  container-type: inline-size;
+  container-name: chat-input;
 }
 
 /* Focused state styling */
@@ -286,22 +288,27 @@
   flex-shrink: 0;
 }
 
-/* IDE context chip */
+/* IDE context chip — always icon-only, label in tooltip */
 .chat-input-context-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   background: rgba(74, 158, 255, 0.12);
   border: 1px solid rgba(74, 158, 255, 0.25);
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
+  border-radius: 6px;
   color: rgba(74, 158, 255, 0.9);
   cursor: pointer;
   transition: all 0.15s ease;
-  line-height: 1;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Hide the text label — shown via tooltip instead */
+.chat-input-context-chip span {
+  display: none;
 }
 
 .chat-input-context-chip:hover {
@@ -311,7 +318,6 @@
 
 .chat-input-context-chip--disabled {
   opacity: 0.45;
-  text-decoration: line-through;
 }
 
 .chat-input-context-chip--disabled:hover {
@@ -319,9 +325,56 @@
 }
 
 .chat-input-context-chip svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
+}
+
+/* Instant tooltip — same style as other action buttons */
+.chat-input-context-chip[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.95);
+  color: rgba(255, 255, 255, 1);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  z-index: 10000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-input-context-chip[data-tooltip]::after {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 10000;
+}
+
+.chat-input-context-chip[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.chat-input-context-chip[data-tooltip]:hover::after {
+  opacity: 1;
 }
 
 /* Loading state */
