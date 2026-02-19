@@ -736,27 +736,43 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     console.error(`[MCP] resolvedMcpServers: ${resolvedMcpServers ? JSON.stringify(Object.keys(resolvedMcpServers)) : 'null'}`);
     console.error(`[MCP] === END MCP SERVER LOADING ===`);
 
-    // Add IDE Tools MCP server (stdio-based for reliability)
+    // Add built-in MCP servers (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
+    const quackMcpServerPath = join(__dirname, 'quack-mcp-server.js');
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
+    console.error(`[MCP] Quack MCP server path: ${quackMcpServerPath}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (ide)
-    options.mcpServers = {
-      ...(resolvedMcpServers || {}),
+    // Merge MCP servers: file-based servers + built-in Quack servers
+    // Skip quack-tools in child sessions to prevent recursive spawning
+    const isChildSession = process.env.QUACK_MCP_CHILD === '1';
+    const builtInServers = {
       'ide-tools': {
         command: 'node',
         args: [ideMcpServerPath],
       },
     };
+    if (!isChildSession) {
+      builtInServers['quack-tools'] = {
+        command: 'node',
+        args: [quackMcpServerPath],
+      };
+    } else {
+      console.error(`[MCP] Skipping quack-tools in child session (QUACK_MCP_CHILD=1)`);
+    }
 
-    const builtInServerCount = 1; // ide-tools
+    options.mcpServers = {
+      ...(resolvedMcpServers || {}),
+      ...builtInServers,
+    };
+
+    const builtInServerCount = Object.keys(builtInServers).length;
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (ide-tools)`);
+      console.error(`[MCP] Using built-in MCP servers only (${Object.keys(builtInServers).join(', ')})`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

@@ -11,6 +11,3 @@
 - drag and drop agent order
 - new quack brain siystem and ui inteface
 - maggiore velocità e leggerezza app
-
-## cose da fare
-- stamina issue 
