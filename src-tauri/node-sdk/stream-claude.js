@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// Brain: sdk-requires-node22-disposable
+// Polyfill Symbol.dispose for Node.js < 22 (Explicit Resource Management)
+// Claude Agent SDK v0.2.47+ uses Symbol.dispose internally. Without this
+// polyfill, Node 18-21 crash with "TypeError: Object not disposable".
+Symbol.dispose ??= Symbol('Symbol.dispose');
+Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
+
 /**
  * Node.js script that uses Claude Agent SDK for real-time streaming
  * Called by Rust backend via subprocess

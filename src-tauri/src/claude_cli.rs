@@ -287,8 +287,9 @@ const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
 /// Minimum supported Node.js version (major)
 // Brain: sdk-requires-node22-disposable
 // Claude Agent SDK v0.2.47+ uses Symbol.dispose (Explicit Resource Management)
-// which requires Node.js 22+. Node 18 will crash with "Object not disposable".
-const MIN_NODE_VERSION: u32 = 22;
+// which requires Node.js 22+. We polyfill Symbol.dispose in stream-claude.js
+// so Node 18+ works fine. Keep MIN at 18 for maximum compatibility.
+const MIN_NODE_VERSION: u32 = 18;
 
 /// Get home directory robustly (works even when $HOME is not set)
 /// This is important for apps launched from Finder which don't inherit shell environment
@@ -1522,9 +1523,9 @@ pub async fn send_message_via_sdk_streaming(
             log::error!("[SDK] Production mode: {}", is_production);
             log::error!("[SDK] Target architecture: {}", target_arch);
             if is_production {
-                "Node.js executable not found. The bundled Node.js sidecar could not be located. Please reinstall the application.".to_string()
+                format!("Node.js {} or later is required but was not found. Please install it from https://nodejs.org (LTS recommended) and restart Quack.", MIN_NODE_VERSION)
             } else {
-                "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
+                format!("Node.js {} or later is required but was not found. Please install it or ensure it's in your PATH.", MIN_NODE_VERSION)
             }
         })?;
 
