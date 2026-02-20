@@ -61,8 +61,21 @@ cd "$PROJECT_ROOT"
 
 # ==== STEP 1: Build (Universal Binary) ====
 echo -e "${YELLOW}[1/6] Building universal app with Tauri (arm64 + x86_64)...${NC}"
-# Note: Using --bundles app to skip Tauri's DMG creation (we create our own DMG later)
+# --bundles app: skip Tauri's DMG creation (we create our own DMG later)
+# Temporarily unset signing env vars so Tauri doesn't auto-sign/notarize
+# (we handle signing manually in steps 3-5)
+# Temporarily unset Apple signing env vars so Tauri doesn't auto-sign/notarize
+_SAVED_APPLE_ID="$APPLE_ID"
+_SAVED_APPLE_PASSWORD="$APPLE_PASSWORD"
+_SAVED_APPLE_TEAM_ID="$APPLE_TEAM_ID"
+_SAVED_APPLE_SIGNING_IDENTITY="$APPLE_SIGNING_IDENTITY"
+unset APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
 npm run tauri build -- --target universal-apple-darwin --bundles app
+# Restore all Apple env vars for manual signing/notarization (steps 3-5)
+export APPLE_SIGNING_IDENTITY="$_SAVED_APPLE_SIGNING_IDENTITY"
+export APPLE_ID="$_SAVED_APPLE_ID"
+export APPLE_PASSWORD="$_SAVED_APPLE_PASSWORD"
+export APPLE_TEAM_ID="$_SAVED_APPLE_TEAM_ID"
 
 if [ ! -d "$APP_PATH" ]; then
     echo -e "${RED}ERROR: Build failed - Quack.app not found${NC}"
@@ -82,6 +95,10 @@ fi
 
 # ==== STEP 3: Sign all binaries (OPTIMIZED - PARALLEL) ====
 echo -e "${YELLOW}[3/6] Signing all binaries (parallel, $PARALLEL_JOBS jobs)...${NC}"
+
+# Strip extended attributes (resource forks, Finder info) that block codesign
+echo "  Stripping extended attributes..."
+xattr -cr "$APP_PATH"
 
 # Note: Keychain should already be unlocked when logged in
 # If signing fails, run manually: security unlock-keychain ~/Library/Keychains/login.keychain-db
