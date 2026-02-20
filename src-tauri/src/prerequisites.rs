@@ -5,7 +5,8 @@ use anyhow::{Result, Context};
 use serde::Serialize;
 
 /// Minimum supported Node.js version (major)
-const MIN_NODE_VERSION: u32 = 18;
+/// Claude Agent SDK v0.2.47+ requires Node.js 22+ (Symbol.dispose support)
+const MIN_NODE_VERSION: u32 = 22;
 
 #[derive(Serialize, Clone)]
 pub struct PrerequisiteStatus {

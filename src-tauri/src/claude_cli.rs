@@ -285,7 +285,10 @@ const MAX_ATTACHMENTS: usize = 6;
 const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
 
 /// Minimum supported Node.js version (major)
-const MIN_NODE_VERSION: u32 = 18;
+// Brain: sdk-requires-node22-disposable
+// Claude Agent SDK v0.2.47+ uses Symbol.dispose (Explicit Resource Management)
+// which requires Node.js 22+. Node 18 will crash with "Object not disposable".
+const MIN_NODE_VERSION: u32 = 22;
 
 /// Get home directory robustly (works even when $HOME is not set)
 /// This is important for apps launched from Finder which don't inherit shell environment
