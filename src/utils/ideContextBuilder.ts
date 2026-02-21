@@ -14,6 +14,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { useFileSystemStore } from '../stores/fileSystemStore';
+import { isMacOS } from './platform';
 import type { GitStatusSummary } from '../types';
 
 const MAX_SELECTION_LINES = 200;
@@ -41,6 +42,8 @@ export interface ExternalIdeContext {
     text: string;
     start_line: number;
     end_line: number;
+    start_char: number;
+    end_char: number;
   } | null;
   open_tabs: string[];
   diagnostics: {
@@ -162,7 +165,7 @@ function formatExternalContextPrefix(
   if (ctx.selection && ctx.selection.text.trim()) {
     const truncated = truncateSelection(ctx.selection.text);
     parts.push(
-      `<ide_selection file_path="${ctx.selection.file_path}" language="${ctx.selection.language}" start_line="${ctx.selection.start_line}" end_line="${ctx.selection.end_line}">`,
+      `<ide_selection file_path="${ctx.selection.file_path}" language="${ctx.selection.language}" start_line="${ctx.selection.start_line}" start_char="${ctx.selection.start_char}" end_line="${ctx.selection.end_line}" end_char="${ctx.selection.end_char}">`,
       truncated,
       `</ide_selection>`
     );
@@ -214,6 +217,11 @@ export async function buildContextPrefix(
   // Check if IDE context injection is enabled
   const { ideContextEnabled } = useFileSystemStore.getState();
   if (!ideContextEnabled) return '';
+
+  // External IDE context is Mac-only
+  if (!isMacOS()) {
+    return buildInternalContextPrefix(gitSummary);
+  }
 
   // Try external IDE context first
   if (workspacePath) {
