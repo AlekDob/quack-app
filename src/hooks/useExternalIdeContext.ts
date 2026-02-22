@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useFileSystemStore } from '../stores/fileSystemStore';
+import { isMacOS } from '../utils/platform';
 import type { ExternalIdeContext } from '../utils/ideContextBuilder';
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 5000;
 
 /**
  * Polls the external IDE (VS Code, Cursor, etc.) for context via the
@@ -14,6 +15,11 @@ export function useExternalIdeContext(workspacePath: string | null) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!isMacOS()) {
+      useFileSystemStore.getState().setExternalIdeContext(null);
+      return;
+    }
+
     if (!workspacePath) {
       useFileSystemStore.getState().setExternalIdeContext(null);
       return;
@@ -36,6 +42,8 @@ export function useExternalIdeContext(workspacePath: string | null) {
                   text: ctx.selection.text,
                   startLine: ctx.selection.start_line,
                   endLine: ctx.selection.end_line,
+                  startChar: ctx.selection.start_char,
+                  endChar: ctx.selection.end_char,
                 }
               : null,
             ideName: ctx.ide_name,

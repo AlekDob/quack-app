@@ -1446,7 +1446,7 @@ export default function TerminalSidebar({
               const grp = groups.find((g) => g.id === groupContextMenu.groupId);
               if (!grp) return null;
               return grp.projects.map((p) => {
-                const projectName = p.path.split('/').pop() || p.path;
+                const projectName = p.label || p.path.replace(/^[\\/]{2}\?[\\/]/, '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p.path;
                 return (
                   <button
                     key={p.path}

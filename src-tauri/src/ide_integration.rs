@@ -1965,6 +1965,8 @@ pub struct IdeSelectionContext {
     pub text: String,
     pub start_line: u32,
     pub end_line: u32,
+    pub start_char: u32,
+    pub end_char: u32,
 }
 
 /// A diagnostic (error/warning) from the IDE
@@ -2096,7 +2098,7 @@ fn discover_lock_files() -> Vec<IdeLockFile> {
 #[tauri::command]
 pub fn discover_ide_instances() -> Vec<IdeLockFile> {
     let instances = discover_lock_files();
-    log::info!("[IDE-WS] Discovered {} IDE instances", instances.len());
+    log::debug!("[IDE-WS] Discovered {} IDE instances", instances.len());
     for inst in &instances {
         log::info!(
             "[IDE-WS]   - {} on port {} (pid {}), workspaces: {:?}",
@@ -2137,7 +2139,7 @@ pub async fn get_ide_context(workspace_path: String) -> Option<ExternalIdeContex
         }
     };
 
-    log::info!(
+    log::debug!(
         "[IDE-WS] Connecting to {} on port {} for workspace context",
         lock_file.ide_name,
         lock_file.port
@@ -2257,7 +2259,7 @@ async fn query_ide_context(lock_file: &IdeLockFile) -> Result<ExternalIdeContext
     .map_err(|_| "WebSocket connection timeout".to_string())?
     .map_err(|e| format!("WebSocket connection failed: {}", e))?;
 
-    log::info!("[IDE-WS] Connected to {} on port {}", lock_file.ide_name, lock_file.port);
+    log::debug!("[IDE-WS] Connected to {} on port {}", lock_file.ide_name, lock_file.port);
 
     // MCP Initialize handshake
     let init_response = ws_request(
@@ -2275,7 +2277,7 @@ async fn query_ide_context(lock_file: &IdeLockFile) -> Result<ExternalIdeContext
     )
     .await?;
 
-    log::info!("[IDE-WS] Initialize response received");
+    log::debug!("[IDE-WS] Initialize response received");
     log::debug!("[IDE-WS] Init details: {}", init_response);
 
     // Send initialized notification
@@ -2294,7 +2296,7 @@ async fn query_ide_context(lock_file: &IdeLockFile) -> Result<ExternalIdeContext
         })
         .unwrap_or_default();
 
-    log::info!("[IDE-WS] Available tools: {:?}", tool_names);
+    log::debug!("[IDE-WS] Available tools: {:?}", tool_names);
 
     // Build context by calling available tools
     let mut context = ExternalIdeContext {
@@ -2310,7 +2312,7 @@ async fn query_ide_context(lock_file: &IdeLockFile) -> Result<ExternalIdeContext
     for tool_name in &tool_names {
         match tool_name.as_str() {
             // Selection tools
-            "getCurrentSelection" | "getSelection" => {
+            "getCurrentSelection" | "getLatestSelection" | "getSelection" => {
                 if let Ok(result) = ws_request(
                     &mut ws,
                     request_id,
@@ -2374,7 +2376,7 @@ async fn query_ide_context(lock_file: &IdeLockFile) -> Result<ExternalIdeContext
     // Close WebSocket gracefully
     let _ = ws.close(None).await;
 
-    log::info!(
+    log::debug!(
         "[IDE-WS] Context retrieved: active_file={:?}, selection={}, open_tabs={}, diagnostics={}",
         context.active_file,
         context.selection.is_some(),
@@ -2417,10 +2419,22 @@ fn parse_selection_result(result: &serde_json::Value, ctx: &mut ExternalIdeConte
                 start_line: sel["startLine"]
                     .as_u64()
                     .or(sel["start_line"].as_u64())
+                    .or(sel["selection"]["start"]["line"].as_u64())
                     .unwrap_or(0) as u32,
                 end_line: sel["endLine"]
                     .as_u64()
                     .or(sel["end_line"].as_u64())
+                    .or(sel["selection"]["end"]["line"].as_u64())
+                    .unwrap_or(0) as u32,
+                start_char: sel["startCharacter"]
+                    .as_u64()
+                    .or(sel["start_character"].as_u64())
+                    .or(sel["selection"]["start"]["character"].as_u64())
+                    .unwrap_or(0) as u32,
+                end_char: sel["endCharacter"]
+                    .as_u64()
+                    .or(sel["end_character"].as_u64())
+                    .or(sel["selection"]["end"]["character"].as_u64())
                     .unwrap_or(0) as u32,
             });
 

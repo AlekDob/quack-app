@@ -15,6 +15,50 @@ fn hide_console_window(cmd: &mut std::process::Command) {
 }
 
 // =============================================================================
+// WINDOWS PATH SANITIZATION
+// =============================================================================
+
+/// Sanitize a Windows path for Node.js compatibility.
+/// Strips the `\\?\` extended-length path prefix that Tauri/Windows APIs produce,
+/// because Node.js (especially non-LTS versions like v24/v25) fails to resolve
+/// these paths correctly — `Module._findPath` traverses up to bare `C:` (missing `\`)
+/// and crashes with `EISDIR: illegal operation on a directory, lstat 'C:'`.
+// Brain: fix-nodejs-eisdir-windows-path
+#[cfg(target_os = "windows")]
+fn sanitize_path_for_node(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    if path_str.starts_with(r"\\?\") {
+        let stripped = &path_str[4..];
+        log::debug!("[Path] Stripped \\\\?\\ prefix: {} -> {}", path_str, stripped);
+        PathBuf::from(stripped)
+    } else {
+        path.to_path_buf()
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn sanitize_path_for_node(path: &Path) -> PathBuf {
+    path.to_path_buf()
+}
+
+/// Sanitize a Windows path string (for cwd passed as JSON config value).
+#[cfg(target_os = "windows")]
+fn sanitize_path_string_for_node(path: &str) -> String {
+    if path.starts_with(r"\\?\") {
+        let stripped = &path[4..];
+        log::debug!("[Path] Stripped \\\\?\\ prefix from string: {} -> {}", path, stripped);
+        stripped.to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn sanitize_path_string_for_node(path: &str) -> String {
+    path.to_string()
+}
+
+// =============================================================================
 // ACTIVE PROCESS MANAGEMENT (for bidirectional communication)
 // =============================================================================
 
@@ -344,6 +388,14 @@ fn is_node_version_compatible(node_path: &Path) -> bool {
             if let Ok(version_str) = String::from_utf8(output.stdout) {
                 if let Some(major) = parse_node_major_version(&version_str) {
                     let compatible = major >= MIN_NODE_VERSION;
+                    // Warn about odd-numbered (non-LTS) Node.js versions which have
+                    // known issues on Windows (EISDIR lstat 'C:' crash in v24/v25)
+                    if major % 2 != 0 {
+                        log::warn!("[Node.js] ⚠️ Non-LTS version detected: {} (v{}). \
+                            Odd-numbered Node.js releases are development versions and may \
+                            have compatibility issues. Recommended: use LTS (v22.x).",
+                            version_str.trim(), major);
+                    }
                     log::info!("[Node.js] Version check: {} (major: {}, compatible: {})",
                         version_str.trim(), major, compatible);
                     return compatible;
@@ -1310,11 +1362,12 @@ pub async fn send_message_via_sdk_streaming(
     };
 
     // Use provided cwd or fallback to current directory
+    // Sanitize to strip \\?\ prefix that breaks Node.js on Windows (EISDIR lstat 'C:' bug)
     let working_dir = cwd.or_else(|| {
         std::env::current_dir()
             .ok()
             .and_then(|p| p.to_str().map(|s| s.to_string()))
-    });
+    }).map(|p| sanitize_path_string_for_node(&p));
 
     // 🦆 SESSIONS-FIRST: Use ONLY the session_id from request
     // DO NOT fallback to agent_id - each AgentSession must have its own Claude session
@@ -1443,9 +1496,13 @@ pub async fn send_message_via_sdk_streaming(
 
     log::info!("[SDK DEBUG] Script found successfully");
 
+    // Sanitize paths for Node.js (strip \\?\ prefix on Windows that causes EISDIR crash)
+    let script_path = sanitize_path_for_node(&script_path);
+
     // Get the node-sdk directory (parent of the script) for node_modules resolution
     let node_sdk_dir = script_path.parent()
-        .ok_or("Failed to get node-sdk directory".to_string())?;
+        .ok_or("Failed to get node-sdk directory".to_string())?
+        .to_path_buf();
 
     // Determine Node.js executable path
     // Strategy:
@@ -1539,7 +1596,7 @@ pub async fn send_message_via_sdk_streaming(
     command
         .arg(&script_path)
         .arg(&config_str)
-        .current_dir(node_sdk_dir)
+        .current_dir(&node_sdk_dir)
         .stdin(Stdio::piped())   // Enable stdin for bidirectional communication (AskUserQuestion)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -1564,15 +1621,16 @@ pub async fn send_message_via_sdk_streaming(
 
         // Set a clean PATH that doesn't include NVM/Volta bin directories
         if let Ok(current_path) = std::env::var("PATH") {
+            let path_separator = if cfg!(target_os = "windows") { ";" } else { ":" };
             let clean_path: Vec<&str> = current_path
-                .split(':')
+                .split(path_separator)
                 .filter(|p| {
-                    !p.contains(".nvm/") &&
-                    !p.contains(".volta/") &&
-                    !p.contains("nvm/versions/")
+                    !p.contains(".nvm/") && !p.contains(".nvm\\") &&
+                    !p.contains(".volta/") && !p.contains(".volta\\") &&
+                    !p.contains("nvm/versions/") && !p.contains("nvm\\versions\\")
                 })
                 .collect();
-            let new_path = clean_path.join(":");
+            let new_path = clean_path.join(path_separator);
             log::info!("[SDK] 🧹 Cleaned PATH (removed NVM/Volta): {} entries", clean_path.len());
             command.env("PATH", new_path);
         }
@@ -1628,10 +1686,11 @@ pub async fn send_message_via_sdk_streaming(
         if let Some(node_dir) = node_path.parent() {
             let current_path = std::env::var("PATH").unwrap_or_default();
             let node_dir_str = node_dir.to_string_lossy();
+            let path_separator = if cfg!(target_os = "windows") { ";" } else { ":" };
             let new_path = if current_path.is_empty() {
                 node_dir_str.to_string()
             } else {
-                format!("{}:{}", node_dir_str, current_path)
+                format!("{}{}{}", node_dir_str, path_separator, current_path)
             };
             log::info!("[SDK DEBUG] Setting PATH with node directory: {}", new_path);
             command.env("PATH", new_path);
@@ -1942,6 +2001,9 @@ pub async fn send_tool_result_to_sdk(
     // Get the Node.js script path
     let script_path = get_sdk_script_path(&app)?;
 
+    // Sanitize working directory for Node.js (strip \\?\ prefix on Windows)
+    let working_directory = working_directory.map(|p| sanitize_path_string_for_node(&p));
+
     // Build the tool result config
     let config = serde_json::json!({
         "toolResult": {
@@ -1958,8 +2020,9 @@ pub async fn send_tool_result_to_sdk(
 
     log::info!("[SDK] 🗣️ Tool result config: {}", config_json);
 
-    // Spawn Node.js process to send the tool result
-    let mut command = Command::new("node");
+    // Spawn Node.js process to send the tool result (use same node resolution as main flow)
+    let node_path = get_bundled_node_path(&app)?;
+    let mut command = Command::new(&node_path);
     command
         .arg(&script_path)
         .arg("--tool-result")
@@ -2029,7 +2092,7 @@ fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
 
     let script_path = resource_path.join("node-sdk").join("stream-claude.js");
     if script_path.exists() {
-        return Ok(script_path);
+        return Ok(sanitize_path_for_node(&script_path));
     }
 
     // Fallback to development path
@@ -2038,7 +2101,7 @@ fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
         .join("stream-claude.js");
 
     if dev_path.exists() {
-        return Ok(dev_path);
+        return Ok(sanitize_path_for_node(&dev_path));
     }
 
     Err("Could not find stream-claude.js script".to_string())
@@ -2052,7 +2115,7 @@ fn get_rewind_script_path(app: &AppHandle) -> Result<PathBuf, String> {
 
     let script_path = resource_path.join("node-sdk").join("rewind-files.js");
     if script_path.exists() {
-        return Ok(script_path);
+        return Ok(sanitize_path_for_node(&script_path));
     }
 
     // Fallback to development path
@@ -2061,7 +2124,7 @@ fn get_rewind_script_path(app: &AppHandle) -> Result<PathBuf, String> {
         .join("rewind-files.js");
 
     if dev_path.exists() {
-        return Ok(dev_path);
+        return Ok(sanitize_path_for_node(&dev_path));
     }
 
     Err("Could not find rewind-files.js script".to_string())
@@ -2109,9 +2172,11 @@ fn get_bundled_node_path(app: &AppHandle) -> Result<PathBuf, String> {
         find_system_node_executable()
     };
 
-    node_path.ok_or_else(|| {
-        "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
-    })
+    node_path
+        .map(|p| sanitize_path_for_node(&p))
+        .ok_or_else(|| {
+            "Node.js executable not found. Please install Node.js or ensure it's in your PATH.".to_string()
+        })
 }
 
 /// Rewind files to a previous state using SDK file checkpointing
@@ -2147,10 +2212,14 @@ pub async fn rewind_files(
     let node_path = get_bundled_node_path(&app)?;
     log::info!("[SDK REWIND] Node path: {:?}", node_path);
 
-    // Spawn the rewind process
+    // Spawn the rewind process with sanitized current_dir to prevent EISDIR on Windows
+    let rewind_cwd = sanitize_path_for_node(
+        &std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    );
     let mut cmd = Command::new(&node_path);
     cmd.arg(&script_path)
         .arg(&config_str)
+        .current_dir(&rewind_cwd)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 

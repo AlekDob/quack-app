@@ -24,6 +24,7 @@ import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
 import { useFileSystemStore } from '../stores/fileSystemStore';
 import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
+import { isMacOS } from '../utils/platform';
 import {
   compressImage,
   blobToBase64,
@@ -2265,12 +2266,22 @@ export default function ChatInput({
             </div>
           )}
           {/* IDE context icon — full detail in Context accordion panel */}
-          {(previewFile || editorSelection || externalIdeContext) && (
+          {isMacOS() && (previewFile || editorSelection || externalIdeContext) && (
             <button
               type="button"
               className={`chat-input-action-btn chat-input-ide-btn ${!ideContextEnabled ? 'chat-input-ide-btn--disabled' : ''}`}
               onClick={toggleIdeContext}
-              data-tooltip={ideContextEnabled ? 'IDE context active' : 'IDE context disabled'}
+              data-tooltip={(() => {
+                if (!ideContextEnabled) return 'IDE context disabled';
+                if (!externalIdeContext?.activeFile) return 'IDE context active';
+                const name = externalIdeContext.activeFile.split('/').pop() ?? externalIdeContext.activeFile;
+                const sel = externalIdeContext.selection;
+                const hasSelection = sel && (sel.startLine !== sel.endLine || sel.startChar !== sel.endChar);
+                if (hasSelection) {
+                  return `${name} · L${sel.startLine}:${sel.startChar} → L${sel.endLine}:${sel.endChar}`;
+                }
+                return `IDE context: ${name}`;
+              })()}
               aria-label="Toggle IDE context"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

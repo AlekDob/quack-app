@@ -62,6 +62,8 @@ interface FileSystemState {
       text: string;
       startLine: number;
       endLine: number;
+      startChar: number;
+      endChar: number;
     } | null;
     ideName: string;
   } | null;

@@ -141,10 +141,10 @@ Write-Host "[4/4] Building Tauri application..." -ForegroundColor Yellow
 
 if ($Debug) {
     Write-Host "  Building in DEBUG mode..." -ForegroundColor Yellow
-    cargo tauri build --debug
+    cargo tauri build --debug --config '{\"build\":{\"beforeBundleCommand\":\"\"}}'
 } else {
     Write-Host "  Building in RELEASE mode..." -ForegroundColor Yellow
-    cargo tauri build
+    cargo tauri build --config '{\"build\":{\"beforeBundleCommand\":\"\"}}'
 }
 
 Write-Host "  Done" -ForegroundColor Green
