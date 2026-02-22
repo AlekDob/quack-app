@@ -116,6 +116,7 @@ export default function ChatSettingsMenu({
       low: '#22c55e',     // Green - fast/cheap
       medium: '#eab308',  // Yellow - balanced
       high: '#a855f7',    // Purple - quality
+      max: '#ef4444',     // Red - maximum effort
     };
     return colors[effort] || '#eab308';
   };

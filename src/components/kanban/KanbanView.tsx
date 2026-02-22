@@ -29,7 +29,7 @@ import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal, { type KanbanTaskInitialValues, type KanbanTaskDraft } from './AddKanbanTaskModal';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import { useChatStore } from '../../stores/chatStore';
-import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment } from '../../types';
+import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment, EffortLevel } from '../../types';
 import type { ChatSendOptions } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
 import { confirm } from '@tauri-apps/plugin-dialog';
@@ -53,7 +53,7 @@ interface KanbanViewProps {
   defaultModel?: string;
   defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
   defaultPermissionMode?: 'plan' | 'bypass';
-  defaultEffort?: 'low' | 'medium' | 'high';
+  defaultEffort?: EffortLevel;
   // 🦆 Load saved chat sessions from sessionIds
   onLoadChatSessions?: () => Promise<void>;
   // Diff drawer handler (passed to ChatView via task tab)

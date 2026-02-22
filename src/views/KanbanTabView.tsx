@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { Tab } from '../components/TabBar';
 import KanbanView from '../components/kanban/KanbanView';
-import type { TerminalInfo, ChatMessage, ChatAttachment, KanbanTask } from '../types';
+import type { TerminalInfo, ChatMessage, ChatAttachment, KanbanTask, EffortLevel } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 
 interface KanbanTabViewProps {
@@ -21,7 +21,7 @@ interface KanbanTabViewProps {
   defaultModel?: string;
   defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
   defaultPermissionMode?: 'plan' | 'bypass';
-  defaultEffort?: 'low' | 'medium' | 'high';
+  defaultEffort?: EffortLevel;
   onLoadChatSessions?: () => Promise<void>;
   onDiffClick?: (filePath: string, status: 'created' | 'modified' | 'deleted') => void;
   onOpenSessionInTerminal?: (taskId: string) => void;
