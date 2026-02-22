@@ -285,8 +285,12 @@ export async function* streamClaudeMessage(
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - sdkOptions.model AFTER assignment:`, sdkOptions.model);
     console.log(`[claudeSDK:${streamId}] 🔍 MODEL DEBUG - Full sdkOptions object:`, JSON.stringify(sdkOptions, null, 2));
 
-    if (thinkingMode) {
-      sdkOptions.thinkingMode = thinkingMode;
+    // Map thinkingMode to new SDK thinking config (SDK 0.2.48+)
+    // Brain: sdk-thinking-mode-migration
+    if (thinkingMode === 'disabled') {
+      sdkOptions.thinking = { type: 'disabled' };
+    } else if (thinkingMode && thinkingMode !== 'auto') {
+      sdkOptions.thinking = { type: 'adaptive' };
     }
 
     if (sessionId) {

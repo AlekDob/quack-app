@@ -113,12 +113,52 @@ const response = query({
 - **`continue`** - Resume with new prompt (differs from `resume`)
 - **`permissionMode: 'plan'`** - New permission mode for planning workflows
 
-### 5. Task System (v0.2.19+)
+### 5. New Thinking API (v0.2.48+)
+
+The `thinkingMode` option has been **removed** from the SDK. Replace it with the new `thinking` config:
+
+**Old API (deprecated):**
+```typescript
+options.thinkingMode = 'auto'; // No longer exists
+```
+
+**New API:**
+```typescript
+// Adaptive thinking - Claude decides when and how much to think (default for Opus 4.6)
+options.thinking = { type: 'adaptive' };
+
+// Fixed thinking budget (older models)
+options.thinking = { type: 'enabled', budgetTokens: 10000 };
+
+// Disable extended thinking entirely
+options.thinking = { type: 'disabled' };
+
+// Control thinking depth with effort levels
+options.effort = 'low' | 'medium' | 'high' | 'max'; // 'max' is Opus 4.6 only
+```
+
+**ThinkingConfig Type:**
+```typescript
+type ThinkingConfig =
+  | { type: 'adaptive' }                              // Claude decides (Opus 4.6+ default)
+  | { type: 'enabled', budgetTokens?: number }        // Fixed budget
+  | { type: 'disabled' };                             // No thinking
+```
+
+**Model Discovery (v0.2.49+):**
+```typescript
+// SDK model info now includes:
+// - supportsEffort: boolean
+// - supportedEffortLevels: string[]
+// - supportsAdaptiveThinking: boolean
+```
+
+### 6. Task System (v0.2.19+)
 - **`CLAUDE_CODE_ENABLE_TASKS=true`** - Opt into the new task system via env var
 - Enables structured task management within agent sessions
 - Use via `env` option: `env: { CLAUDE_CODE_ENABLE_TASKS: "true" }`
 
-### 6. Model Support (v0.2.45+)
+### 7. Model Support (v0.2.45+)
 - **Claude Sonnet 4.6** added as supported model
 - Available models: `claude-opus-4-5`, `claude-sonnet-4-5`, `claude-sonnet-4-6`, `claude-haiku-4-5`
 - AgentDefinition `model` field: `'sonnet' | 'opus' | 'haiku' | 'inherit'`
@@ -1003,4 +1043,4 @@ tool("fetch_content", "Fetch text content", {}, async (args) => {
 
 ---
 
-**Last verified**: 2026-02-19 | **Skill version**: 4.0.0 | **Changes**: Updated to SDK v0.2.47 — added 4 new Query methods (close, reconnectMcpServer, toggleMcpServer, promptSuggestion), 2 new hook events (TeammateIdle, TaskCompleted → 14 total), MCP tool annotations, Task System (CLAUDE_CODE_ENABLE_TASKS), stop_reason on results, task_started/task_notification message types, debug/debugFile options, sessionId option, additionalDirectories, Sonnet 4.6 model support
+**Last verified**: 2026-02-22 | **Skill version**: 4.1.0 | **Changes**: Updated to SDK v0.2.48+ — added New Thinking API section: `thinkingMode` removed, replaced by `thinking` config (`adaptive`/`enabled`/`disabled`), `effort` levels (`low`/`medium`/`high`/`max`), model discovery fields for thinking support (v0.2.49+)

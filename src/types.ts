@@ -519,10 +519,14 @@ export interface StructuredOutputFormat {
 }
 
 // Effort parameter for controlling response quality vs speed/cost tradeoff
-export type EffortLevel = 'low' | 'medium' | 'high';
+// SDK 0.2.48+: 'max' available for Opus 4.6 only
+export type EffortLevel = 'low' | 'medium' | 'high' | 'max';
 
 // Thinking mode for controlling reasoning depth
-export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
+// 'disabled' = no extended thinking (SDK thinking: { type: 'disabled' })
+// 'auto' = adaptive thinking (SDK default for Opus 4.6)
+// 'think'/'hard'/'harder'/'ultra' = force thinking ON, maps to effort levels
+export type ThinkingMode = 'disabled' | 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
 
 // Mode preset configuration for Bypass/Plan modes
 export interface ModePreset {

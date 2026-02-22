@@ -642,8 +642,34 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
       console.error(`[DEBUG] permissionMode not set - SDK will use default (auto-approve)`);
     }
 
-    if (thinkingMode) {
-      options.thinkingMode = thinkingMode;
+    // Map thinkingMode to new SDK thinking config (SDK 0.2.48+)
+    // Old: options.thinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra'
+    // New: options.thinking = { type: 'adaptive' | 'enabled' | 'disabled' }
+    //      options.effort = 'low' | 'medium' | 'high' | 'max'
+    // Brain: sdk-thinking-mode-migration
+    if (thinkingMode === 'disabled') {
+      options.thinking = { type: 'disabled' };
+      console.error(`[DEBUG] Thinking DISABLED`);
+    } else if (thinkingMode && thinkingMode !== 'auto') {
+      // Explicit thinking modes ('think', 'hard', 'harder', 'ultra') → ensure adaptive + map to effort
+      options.thinking = { type: 'adaptive' };
+      // Map thinking mode to effort if effort not explicitly set
+      if (!effort) {
+        const thinkingToEffort = {
+          'think': 'medium',
+          'hard': 'high',
+          'harder': 'max',
+          'ultra': 'max',
+        };
+        const mappedEffort = thinkingToEffort[thinkingMode];
+        if (mappedEffort) {
+          options.effort = mappedEffort;
+          console.error(`[DEBUG] Thinking mode '${thinkingMode}' → effort '${mappedEffort}'`);
+        }
+      }
+    } else {
+      // 'auto' or undefined → let SDK use its default (adaptive for Opus 4.6)
+      console.error(`[DEBUG] Thinking mode: default (adaptive)`);
     }
 
     if (cwd) {
@@ -719,11 +745,11 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     options.enableFileCheckpointing = true;
     console.error(`[DEBUG] File checkpointing ENABLED (replay-user-messages disabled to save tokens)`);
 
-    // Add effort parameter if provided (SDK 0.1.54+)
-    // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high'
+    // Add effort parameter if provided explicitly (takes precedence over thinkingMode mapping)
+    // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high', 'max'
     if (effort) {
       options.effort = effort;
-      console.error(`[DEBUG] Using effort level: ${effort}`);
+      console.error(`[DEBUG] Using explicit effort level: ${effort}`);
     }
 
     // Load MCP servers: priority is passed config > .mcp.json file

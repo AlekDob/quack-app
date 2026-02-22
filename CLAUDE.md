@@ -45,6 +45,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Token tracking: `documentation/gotchas/gotcha-branch-display-race-condition.md`
 - Tauri commands: `documentation/gotchas/gotcha-tauri-execute-command-parsing.md`
 - MCP timeouts: `documentation/gotchas/gotcha-mcp-server-timeout-slow-startup.md`
+- SDK thinking: `documentation/gotchas/gotcha-sdk-thinking-mode-removed.md`
 - LocalStorage: `documentation/gotchas/gotcha-localstorage-cache-stale-config.md`
 - Memory leaks: `documentation/bugs/bug-webkit-memory-leaks-high-cpu.md`
 - window.confirm: `documentation/gotchas/gotcha-window-confirm-tauri-webview.md`
