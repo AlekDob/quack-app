@@ -8,8 +8,11 @@ interface MessageSettingsBadgesProps {
 
 const modelLabels: Record<string, string> = {
   opus: 'Opus',
+  opus46: 'Opus 4.6',
   sonnet: 'Sonnet',
+  sonnet45: 'Sonnet 4.5',
   haiku: 'Haiku',
+  haiku45: 'Haiku 4.5',
 };
 
 const effortIcons: Record<string, string> = {

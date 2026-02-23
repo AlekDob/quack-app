@@ -112,6 +112,7 @@ import type { ChatSendOptions } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
 import { getModelId } from "./services/modelService";
+import { getProviderRequestFields, getActiveModelName } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
@@ -2368,7 +2369,7 @@ function AppContent() {
       status: 'streaming',
       // Store settings used for this message (for UI display)
       settings: {
-        model: options?.model || 'opus46',
+        model: getActiveModelName(options?.model),
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -2456,14 +2457,15 @@ function AppContent() {
         }>('send_message_via_sdk_streaming', {
           // 🦆 RACE CONDITION FIX: Use capturedAgentId
           agentId: capturedAgentId,
-          request: {
+          request: (() => {
+            const prf = getProviderRequestFields(remoteModels);
+            return {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
             model: (() => {
               const friendlyName = options?.model || 'opus46';
-              const resolvedId = getModelId(friendlyName, remoteModels);
-              console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, remoteModels=${remoteModels?.length ?? 0}, resolvedId=${resolvedId}`);
-              console.log(`🦆 [MODEL DEBUG] remoteModels:`, remoteModels?.map(m => `${m.id}→${m.modelId}`).join(', ') || 'EMPTY');
+              const resolvedId = prf.resolveModel(friendlyName);
+              console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, resolvedId=${resolvedId}`);
               return resolvedId;
             })(),
             thinkingMode: options?.thinkingMode,
@@ -2508,7 +2510,12 @@ function AppContent() {
                 })),
               };
             })(),
-          },
+            // 🦆 LLM Provider fields (Ollama/custom support)
+            provider: prf.provider,
+            providerBaseUrl: prf.providerBaseUrl,
+            providerApiKey: prf.providerApiKey,
+          };
+          })(),
         }),
         abortPromise,
       ]);
@@ -3084,7 +3091,7 @@ function AppContent() {
       timestamp: 0,
       status: 'streaming',
       settings: {
-        model: options?.model || 'opus46',
+        model: getActiveModelName(options?.model),
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
@@ -3152,30 +3159,32 @@ function AppContent() {
           usage: UsageStats;
         }>('send_message_via_sdk_streaming', {
           agentId: targetAgentId,
-          request: {
+          request: (() => {
+            const prf = getProviderRequestFields(remoteModels);
+            return {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
-            model: getModelId(options?.model || 'opus46', remoteModels),
+            model: prf.resolveModel(options?.model || 'opus46'),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
             attachments: (options?.attachments || []).map(att => att.path).filter(Boolean),
             // 🦆 WORKTREE ISOLATION: Use effectiveWorkingDirectory which prioritizes worktreePath
             cwd: effectiveWorkingDirectory,
-            sessionId: existingSessionId, // 🦆 Pass existing sessionId for conversation continuity
+            sessionId: existingSessionId,
             effort: options?.effort,
-            // 🗣️ Enable interactive tools like AskUserQuestion (SDK v0.1.71+)
-            // NOTE: Must use camelCase because Rust struct uses #[serde(rename_all = "camelCase")]
             allowedTools: [
               'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
               'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
               'AskUserQuestion',
             ],
-            // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
-            // This ensures ask-user-question events are emitted with the same key
-            // that the frontend uses to identify the session (targetAgentId)
             sessionKey: targetAgentId,
-          },
+            // 🦆 LLM Provider fields (Ollama/custom support)
+            provider: prf.provider,
+            providerBaseUrl: prf.providerBaseUrl,
+            providerApiKey: prf.providerApiKey,
+          };
+          })(),
         }),
         abortPromise,
       ]);
@@ -3435,10 +3444,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         usage: UsageStats;
       }>('send_message_via_sdk_streaming', {
         agentId: targetAgentId,
-        request: {
+        request: (() => {
+          const prf = getProviderRequestFields(remoteModels);
+          return {
           prompt: compactPrompt,
-          // 🦆 MODEL FIX: Map friendly name to API model ID
-          model: getModelId('haiku', remoteModels), // Use faster model for summaries
+          model: prf.resolveModel('haiku'),
           permissionMode: 'bypass',
           cwd: workingDir,
           allowedTools: [
@@ -3446,9 +3456,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
             'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
             'AskUserQuestion',
           ],
-          // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
           sessionKey: targetAgentId,
-        },
+          provider: prf.provider,
+          providerBaseUrl: prf.providerBaseUrl,
+          providerApiKey: prf.providerApiKey,
+        };
+        })(),
       });
 
       // Create a system message with the summary
@@ -3583,22 +3596,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         usage: UsageStats;
       }>('send_message_via_sdk_streaming', {
         agentId: activeId,
-        request: {
+        request: (() => {
+          const prf = getProviderRequestFields(remoteModels);
+          return {
           prompt: compactPrompt,
-          // 🦆 MODEL FIX: Map friendly name to API model ID
-          model: getModelId('haiku', remoteModels), // Use faster model for summaries
+          model: prf.resolveModel('haiku'),
           permissionMode: 'bypass',
           cwd: activeTerminal?.cwd ?? explorerPath,
-          // 🗣️ Enable interactive tools (SDK v0.1.71+) - though AskUserQuestion unlikely for /compact
-          // NOTE: Must use camelCase because Rust struct uses #[serde(rename_all = "camelCase")]
           allowedTools: [
             'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
             'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
             'AskUserQuestion',
           ],
-          // 🦆 FIX: Pass sessionKey for AskUserQuestion event routing
           sessionKey: activeId,
-        },
+          provider: prf.provider,
+          providerBaseUrl: prf.providerBaseUrl,
+          providerApiKey: prf.providerApiKey,
+        };
+        })(),
       });
 
       // Create a system message with the summary

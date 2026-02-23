@@ -255,6 +255,32 @@
   color: #E97940 !important;
 }
 
+/* Brain Read - knowledge path access indicator */
+.tool-minimal-line.brain-read {
+  background: rgba(232, 74, 127, 0.08);
+  border-color: rgba(232, 74, 127, 0.25);
+}
+
+.tool-minimal-line.brain-read:hover {
+  background: rgba(232, 74, 127, 0.13);
+}
+
+.tool-brain-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin-left: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #E84A7F;
+  background: rgba(232, 74, 127, 0.15);
+  border: 1px solid rgba(232, 74, 127, 0.3);
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
 /* Chevron for expandable */
 .tool-minimal-chevron {
   color: rgba(255, 255, 255, 0.3);

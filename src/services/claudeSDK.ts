@@ -1,8 +1,33 @@
 // TEMPORARY: Commented out to fix build - Claude SDK should run only in backend
 // import { query } from '@anthropic-ai/claude-agent-sdk';
 import { invoke } from '@tauri-apps/api/core';
-import type { ClaudeEvent, MCPServer, StructuredOutputFormat, EffortLevel } from '../types';
+import type { ClaudeEvent, MCPServer, StructuredOutputFormat, EffortLevel, LLMProviderType } from '../types';
 import { getModelId, type ModelConfig } from './modelService';
+import { useSettingsStore } from '../stores/settingsStore';
+
+/** Get the display-friendly model name for the active provider */
+export function getActiveModelName(fallback?: string): string {
+  const { provider, ollamaModel } = useSettingsStore.getState().claude;
+  if (provider !== 'anthropic') return ollamaModel || provider;
+  return fallback || 'opus46';
+}
+
+/** Get provider fields for SDK invoke calls */
+export function getProviderRequestFields(remoteModels?: ModelConfig[], modelOverride?: string) {
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel } = useSettingsStore.getState().claude;
+  const isAnthropic = provider === 'anthropic';
+
+  return {
+    provider: isAnthropic ? undefined : provider,
+    providerBaseUrl: !isAnthropic && providerBaseUrl ? providerBaseUrl : undefined,
+    providerApiKey: provider === 'custom' && providerApiKey ? providerApiKey : undefined,
+    /** Resolve model: Anthropic uses Supabase mapping, others use ollamaModel */
+    resolveModel: (friendlyName: string) => {
+      if (!isAnthropic) return modelOverride || ollamaModel || friendlyName;
+      return getModelId(friendlyName, remoteModels);
+    },
+  };
+}
 
 export interface ClaudeSDKOptions {
   model?: string;

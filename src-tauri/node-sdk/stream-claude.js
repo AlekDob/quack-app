@@ -344,6 +344,12 @@ async function* generateMessages() {
  * Returns: { hasAuth: boolean, authMethod: string, error?: string }
  */
 function checkAuthentication() {
+  // Priority 0: Custom provider (Ollama, OpenAI-compatible) — ANTHROPIC_BASE_URL set by Rust
+  if (process.env.ANTHROPIC_BASE_URL) {
+    console.error(`[Auth] Custom provider at: ${process.env.ANTHROPIC_BASE_URL}`);
+    return { hasAuth: true, authMethod: 'Custom Provider' };
+  }
+
   // Priority 1: Check for ANTHROPIC_API_KEY
   if (process.env.ANTHROPIC_API_KEY) {
     const keyPreview = process.env.ANTHROPIC_API_KEY.substring(0, 8) + '...';

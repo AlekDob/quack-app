@@ -23,6 +23,7 @@ import { TeammateWidget } from './TeammateWidget';
 import { useTeamStore } from '../stores/teamStore';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
 import type { TeamConfig } from '../types';
+import { isBrainRead, BRAIN_COLOR } from '../utils/brainPathDetection';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
@@ -170,7 +171,8 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
   onUndoEdit,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const toolColor = getToolColorMinimal(toolName);
+  const isBrain = isBrainRead(toolName, input);
+  const toolColor = isBrain ? BRAIN_COLOR : getToolColorMinimal(toolName);
   const toolTarget = getToolTarget(toolName, input);
   const name = toolName.toLowerCase();
 
@@ -195,7 +197,7 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
   return (
     <div className={`tool-minimal${isExpanded ? ' tool-minimal--expanded' : ''}`}>
       <div
-        className={`tool-minimal-line ${hasExpandableContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isLoading ? 'running' : ''}`}
+        className={`tool-minimal-line ${hasExpandableContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isLoading ? 'running' : ''} ${isBrain ? 'brain-read' : ''}`}
         onClick={() => hasExpandableContent && setIsExpanded(!isExpanded)}
       >
         <span className="tool-minimal-text">
@@ -203,6 +205,7 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
           <span className="tool-minimal-name" style={{ color: toolColor }}>
             {toolName}
           </span>
+          {isBrain && <span className="tool-brain-badge">Brain</span>}
           {toolTarget && (
             <>
               <span className="tool-minimal-on">on</span>

@@ -535,6 +535,16 @@ export interface ModePreset {
   effort: EffortLevel;
 }
 
+// LLM Provider types for multi-provider support (Anthropic, Ollama, Custom)
+export type LLMProviderType = 'anthropic' | 'ollama' | 'custom';
+
+// Ollama model from /api/tags endpoint
+export interface OllamaModel {
+  name: string;
+  size: number;
+  modified_at: string;
+}
+
 // Agent mode presets stored in settings
 export interface AgentModePresets {
   bypass: ModePreset;

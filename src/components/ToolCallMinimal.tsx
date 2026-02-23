@@ -3,6 +3,7 @@ import type { ChatToolCall, TodoItem } from '../types';
 import DiffViewer from './DiffViewer';
 import TodoWidget from './TodoWidget';
 import './ToolCallMinimal.css';
+import { isBrainRead, BRAIN_COLOR } from '../utils/brainPathDetection';
 
 interface ToolCallMinimalProps {
   tool: ChatToolCall;
@@ -103,6 +104,8 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
   };
 
   const toolColor = getToolColor(tool.name);
+  const isBrain = isBrainRead(tool.name, tool.input as Record<string, unknown>);
+  const finalToolColor = isBrain ? BRAIN_COLOR : toolColor;
   const toolTarget = getToolTarget();
   const fullTarget = getFullTarget();
   const [copied, setCopied] = useState(false);
@@ -153,14 +156,15 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
   return (
     <div className="tool-minimal">
       <div
-        className={`tool-minimal-line ${hasContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isRunning ? 'running' : ''} ${isSkill ? 'skill' : ''}`}
+        className={`tool-minimal-line ${hasContent ? 'expandable' : ''} ${isExpanded ? 'expanded' : ''} ${isRunning ? 'running' : ''} ${isSkill ? 'skill' : ''} ${isBrain ? 'brain-read' : ''}`}
         onClick={() => hasContent && setIsExpanded(!isExpanded)}
       >
         <span className="tool-minimal-text">
           <span className="tool-minimal-prefix">using</span>
-          <span className="tool-minimal-name" style={{ color: toolColor }}>
+          <span className="tool-minimal-name" style={{ color: finalToolColor }}>
             {tool.name}
           </span>
+          {isBrain && <span className="tool-brain-badge">Brain</span>}
           {toolTarget && (
             <>
               <span className="tool-minimal-on">on</span>

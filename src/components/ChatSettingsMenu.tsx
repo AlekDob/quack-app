@@ -4,6 +4,7 @@ import type { EffortLevel } from '../types';
 import type { ModelConfig } from '../services/modelService';
 import { getModelOptions, getModelLabel } from '../services/modelService';
 import { useModelsConfig } from '../hooks/useAppConfig';
+import { useSettingsStore } from '../stores/settingsStore';
 import './ChatSettingsMenu.css';
 
 interface ChatSettingsMenuProps {
@@ -88,6 +89,8 @@ export default function ChatSettingsMenu({
   }, [isOpen]);
 
   const getModelLabelText = () => {
+    const { provider, ollamaModel } = useSettingsStore.getState().claude;
+    if (provider !== 'anthropic') return ollamaModel || provider;
     return getModelLabel(model, remoteModels);
   };
 
@@ -148,17 +151,28 @@ export default function ChatSettingsMenu({
           <div className="chat-settings-section">
             <label className="chat-settings-label">
               <span className="chat-settings-label-text">Model</span>
-              <select
-                value={model}
-                onChange={(e) => onModelChange(e.target.value)}
-                className="chat-settings-select"
-              >
-                {modelOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              {useSettingsStore.getState().claude.provider === 'anthropic' ? (
+                <select
+                  value={model}
+                  onChange={(e) => onModelChange(e.target.value)}
+                  className="chat-settings-select"
+                >
+                  {modelOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="chat-settings-provider-model" style={{
+                  fontSize: 13, color: 'var(--text-secondary)', padding: '4px 0',
+                }}>
+                  {useSettingsStore.getState().claude.ollamaModel || 'Not configured'}
+                  <span style={{ fontSize: 11, marginLeft: 6, opacity: 0.7 }}>
+                    ({useSettingsStore.getState().claude.provider})
+                  </span>
+                </span>
+              )}
             </label>
           </div>
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { EffortLevel, ModePreset, AgentModePresets } from '../types';
+import type { EffortLevel, ModePreset, AgentModePresets, LLMProviderType } from '../types';
 
 /**
  * Normalize legacy model short names to Supabase IDs.
@@ -24,6 +24,11 @@ interface ClaudeSettings {
   maxTokens: number;
   temperature: number;
   effort: EffortLevel; // SDK 0.1.54+ - Controls quality vs speed/cost tradeoff
+  // LLM Provider settings (Anthropic, Ollama, Custom)
+  provider: LLMProviderType;
+  providerBaseUrl: string;  // Custom endpoint (e.g., http://localhost:11434 for Ollama)
+  providerApiKey: string;   // API key for custom providers
+  ollamaModel: string;      // Model name for Ollama/custom (e.g., 'qwen3-coder')
 }
 
 interface TerminalSettings {
@@ -136,6 +141,10 @@ const defaultClaudeSettings: ClaudeSettings = {
   maxTokens: 4096,
   temperature: 0.7,
   effort: 'medium', // SDK 0.1.54+ - Default balanced effort
+  provider: 'anthropic',
+  providerBaseUrl: '',
+  providerApiKey: '',
+  ollamaModel: '',
 };
 
 // Anthropic recommended defaults for agent modes

@@ -54,8 +54,10 @@ Read `documentation/map.md` for full architecture overview before making changes
 - LocalStorage: `documentation/gotchas/gotcha-localstorage-cache-stale-config.md`
 - Memory leaks: `documentation/bugs/bug-webkit-memory-leaks-high-cpu.md`
 - window.confirm: `documentation/gotchas/gotcha-window-confirm-tauri-webview.md`
+- Model name display: `documentation/gotchas/gotcha-model-name-non-anthropic-provider.md`
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
+- Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

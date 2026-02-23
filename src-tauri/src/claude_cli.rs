@@ -322,6 +322,10 @@ pub struct ClaudeCliRequest {
     pub session_key: Option<String>,
     // 🦆 Agent Teams context (team name + members for prompt augmentation)
     pub team_context: Option<TeamContext>,
+    // 🦆 LLM Provider support (Ollama, custom OpenAI-compatible endpoints)
+    pub provider: Option<String>,           // 'anthropic' | 'ollama' | 'custom'
+    pub provider_base_url: Option<String>,  // Base URL for non-Anthropic providers
+    pub provider_api_key: Option<String>,   // API key for custom providers
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -1269,6 +1273,9 @@ pub async fn send_message_via_sdk_streaming(
         allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
         session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
         team_context, // 🦆 Agent Teams context
+        provider, // 🦆 LLM Provider (anthropic/ollama/custom)
+        provider_base_url,
+        provider_api_key,
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
@@ -1572,47 +1579,58 @@ pub async fn send_message_via_sdk_streaming(
         }
     }
 
-    // ✅ Try to read Claude Code credentials and pass to Node.js SDK (optional)
-    // The SDK can also use ANTHROPIC_API_KEY from environment if already set
-    use crate::claude_auth;
+    // 🦆 LLM Provider-based authentication
+    let active_provider = provider.as_deref().unwrap_or("anthropic");
 
-    // Check if ANTHROPIC_API_KEY is already in environment (user-provided)
-    let has_env_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
-
-    if has_env_key {
-        log::info!("[SDK] ✅ ANTHROPIC_API_KEY found in environment, using it");
-        // Pass through existing environment variable
-        if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-            command.env("ANTHROPIC_API_KEY", key);
+    match active_provider {
+        "ollama" => {
+            let base_url = provider_base_url.as_deref().unwrap_or("http://localhost:11434");
+            command.env("ANTHROPIC_BASE_URL", base_url);
+            command.env("ANTHROPIC_API_KEY", "ollama");
+            command.env("ANTHROPIC_AUTH_TOKEN", "ollama");
+            log::info!("[SDK] 🦙 Provider: Ollama at {}", base_url);
         }
-    } else {
-        // Try to read from Claude Code credentials
-        match claude_auth::get_claude_credentials() {
-            Ok(Some(credentials)) => {
-                log::info!("[SDK] ✅ Found Claude Code credentials (type: {:?})", credentials.auth_type);
+        "custom" => {
+            if let Some(ref url) = provider_base_url {
+                command.env("ANTHROPIC_BASE_URL", url);
+                log::info!("[SDK] 🔧 Provider: Custom at {}", url);
+            }
+            if let Some(ref key) = provider_api_key {
+                command.env("ANTHROPIC_API_KEY", key);
+            }
+        }
+        _ => {
+            // Anthropic: original credential resolution logic
+            use crate::claude_auth;
 
-                // Only set ANTHROPIC_API_KEY for API key authentication
-                // For OAuth, the SDK will read credentials from ~/.claude.json automatically
-                match credentials.auth_type {
-                    crate::claude_auth::AuthType::ApiKey => {
-                        log::info!("[SDK] Setting ANTHROPIC_API_KEY from credentials file");
-                        command.env("ANTHROPIC_API_KEY", &credentials.token);
+            let has_env_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
+
+            if has_env_key {
+                log::info!("[SDK] ✅ ANTHROPIC_API_KEY found in environment, using it");
+                if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+                    command.env("ANTHROPIC_API_KEY", key);
+                }
+            } else {
+                match claude_auth::get_claude_credentials() {
+                    Ok(Some(credentials)) => {
+                        log::info!("[SDK] ✅ Found Claude Code credentials (type: {:?})", credentials.auth_type);
+                        match credentials.auth_type {
+                            crate::claude_auth::AuthType::ApiKey => {
+                                log::info!("[SDK] Setting ANTHROPIC_API_KEY from credentials file");
+                                command.env("ANTHROPIC_API_KEY", &credentials.token);
+                            }
+                            crate::claude_auth::AuthType::OAuth => {
+                                log::info!("[SDK] OAuth detected - SDK will use ~/.claude.json automatically");
+                            }
+                        }
                     }
-                    crate::claude_auth::AuthType::OAuth => {
-                        log::info!("[SDK] OAuth authentication detected - SDK will use ~/.claude.json automatically");
-                        // Don't set ANTHROPIC_API_KEY for OAuth - let SDK handle it
+                    Ok(None) => {
+                        log::warn!("[SDK] ⚠️ No Claude Code credentials found");
+                    }
+                    Err(e) => {
+                        log::warn!("[SDK] ⚠️ Failed to read Claude Code credentials: {}", e);
                     }
                 }
-            }
-            Ok(None) => {
-                log::warn!("[SDK] ⚠️ No Claude Code credentials found");
-                log::warn!("[SDK] SDK will attempt to use default credentials or fail with helpful error");
-                // Don't block - let SDK handle it and provide error
-            }
-            Err(e) => {
-                log::warn!("[SDK] ⚠️ Failed to read Claude Code credentials: {}", e);
-                log::warn!("[SDK] SDK will attempt to use default credentials or fail with helpful error");
-                // Don't block - let SDK handle it
             }
         }
     }
