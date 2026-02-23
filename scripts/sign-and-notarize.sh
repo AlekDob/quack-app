@@ -41,7 +41,9 @@ fi
 
 # Validate required variables
 SIGNING_IDENTITY="${APPLE_SIGNING_IDENTITY:?ERROR: APPLE_SIGNING_IDENTITY not set in .env}"
-KEYCHAIN_PROFILE="${APPLE_KEYCHAIN_PROFILE:-QuackNotarization}"
+NOTARY_APPLE_ID="${APPLE_ID:?ERROR: APPLE_ID not set in .env}"
+NOTARY_PASSWORD="${APPLE_PASSWORD:?ERROR: APPLE_PASSWORD not set in .env}"
+NOTARY_TEAM_ID="${APPLE_TEAM_ID:?ERROR: APPLE_TEAM_ID not set in .env}"
 ENTITLEMENTS="$PROJECT_ROOT/src-tauri/Entitlements.plist"
 PARALLEL_JOBS=8
 
@@ -155,7 +157,7 @@ echo "  Creating ZIP..."
 ditto -c -k --keepParent Quack.app Quack.zip
 
 echo "  Submitting to Apple (this may take several minutes)..."
-xcrun notarytool submit Quack.zip --keychain-profile "$KEYCHAIN_PROFILE" --wait
+xcrun notarytool submit Quack.zip --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
 
 echo "  Stapling ticket to .app..."
 xcrun stapler staple "$APP_PATH"
@@ -206,7 +208,7 @@ echo "  Signing DMG..."
 codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
 
 echo "  Submitting DMG to Apple..."
-xcrun notarytool submit "$DMG_PATH" --keychain-profile "$KEYCHAIN_PROFILE" --wait
+xcrun notarytool submit "$DMG_PATH" --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
 
 echo "  Stapling ticket to DMG..."
 xcrun stapler staple "$DMG_PATH"

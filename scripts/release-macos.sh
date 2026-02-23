@@ -33,7 +33,9 @@ fi
 
 # Validate required variables
 SIGNING_IDENTITY="${APPLE_SIGNING_IDENTITY:?ERROR: APPLE_SIGNING_IDENTITY not set in .env}"
-KEYCHAIN_PROFILE="${APPLE_KEYCHAIN_PROFILE:-QuackNotarization}"
+NOTARY_APPLE_ID="${APPLE_ID:?ERROR: APPLE_ID not set in .env}"
+NOTARY_PASSWORD="${APPLE_PASSWORD:?ERROR: APPLE_PASSWORD not set in .env}"
+NOTARY_TEAM_ID="${APPLE_TEAM_ID:?ERROR: APPLE_TEAM_ID not set in .env}"
 
 # Configuration (derived from project root)
 APP_PATH="$PROJECT_ROOT/src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.app"
@@ -58,6 +60,18 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 
 cd "$PROJECT_ROOT"
+
+# ==== STEP 0: Clean stale node-sdk from previous builds ====
+echo -e "${YELLOW}[0] Cleaning stale node-sdk from bundle caches...${NC}"
+for target_dir in "$PROJECT_ROOT/src-tauri/target"/*/release/bundle/macos/Quack.app/Contents/Resources/node-sdk \
+                  "$PROJECT_ROOT/src-tauri/target/release/bundle/macos/Quack.app/Contents/Resources/node-sdk" \
+                  "$PROJECT_ROOT/src-tauri/target/debug/bundle/macos/Quack.app/Contents/Resources/node-sdk"; do
+    if [ -d "$target_dir" ]; then
+        rm -rf "$target_dir"
+        echo -e "  Removed: $target_dir"
+    fi
+done
+echo -e "${GREEN}✓ Bundle caches cleaned${NC}"
 
 # ==== STEP 1: Build (Universal Binary) ====
 echo -e "${YELLOW}[1/6] Building universal app with Tauri (arm64 + x86_64)...${NC}"
@@ -191,7 +205,7 @@ ditto -c -k --keepParent Quack.app Quack.zip
 
 # Submit for notarization
 echo "  Submitting to Apple (please wait)..."
-xcrun notarytool submit Quack.zip --keychain-profile "$KEYCHAIN_PROFILE" --wait
+xcrun notarytool submit Quack.zip --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
 
 # Staple the ticket
 echo "  Stapling ticket..."
@@ -238,7 +252,7 @@ codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
 
 # Notarize DMG
 echo "  Notarizing DMG..."
-xcrun notarytool submit "$DMG_PATH" --keychain-profile "$KEYCHAIN_PROFILE" --wait
+xcrun notarytool submit "$DMG_PATH" --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
 
 # Staple DMG
 xcrun stapler staple "$DMG_PATH"
