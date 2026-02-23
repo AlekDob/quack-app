@@ -5,8 +5,9 @@ use anyhow::{Result, Context};
 use serde::Serialize;
 
 /// Minimum supported Node.js version (major)
-/// Symbol.dispose polyfill in stream-claude.js enables Node 18+ support
-const MIN_NODE_VERSION: u32 = 18;
+/// Node 20+ required for Claude Agent SDK ESM compatibility.
+/// Symbol.dispose polyfill handles Node 20-21; Node 22+ has native support.
+const MIN_NODE_VERSION: u32 = 20;
 
 #[derive(Serialize, Clone)]
 pub struct PrerequisiteStatus {

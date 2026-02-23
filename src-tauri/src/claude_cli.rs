@@ -331,9 +331,9 @@ const MAX_ATTACHMENT_SIZE: u64 = 15 * 1024 * 1024;
 /// Minimum supported Node.js version (major)
 // Brain: sdk-requires-node22-disposable
 // Claude Agent SDK v0.2.47+ uses Symbol.dispose (Explicit Resource Management)
-// which requires Node.js 22+. We polyfill Symbol.dispose in stream-claude.js
-// so Node 18+ works fine. Keep MIN at 18 for maximum compatibility.
-const MIN_NODE_VERSION: u32 = 18;
+// which requires Node.js 22+. We polyfill via --require for Node 20-21.
+// Node 20+ required for ESM compatibility with the SDK.
+const MIN_NODE_VERSION: u32 = 20;
 
 /// Get home directory robustly (works even when $HOME is not set)
 /// This is important for apps launched from Finder which don't inherit shell environment
@@ -371,8 +371,8 @@ fn parse_node_major_version(version_str: &str) -> Option<u32> {
     trimmed.split('.').next()?.parse().ok()
 }
 
-/// Check if Node.js version is compatible (>= MIN_NODE_VERSION)
-fn is_node_version_compatible(node_path: &Path) -> bool {
+/// Get Node.js major version from executable path (e.g., 22 for v22.8.0)
+fn get_node_major_version(node_path: &Path) -> Option<u32> {
     let mut cmd = std::process::Command::new(node_path);
     cmd.arg("--version");
 
@@ -386,39 +386,41 @@ fn is_node_version_compatible(node_path: &Path) -> bool {
     if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(version_str) = String::from_utf8(output.stdout) {
-                if let Some(major) = parse_node_major_version(&version_str) {
-                    let compatible = major >= MIN_NODE_VERSION;
-                    // Warn about odd-numbered (non-LTS) Node.js versions which have
-                    // known issues on Windows (EISDIR lstat 'C:' crash in v24/v25)
-                    if major % 2 != 0 {
-                        log::warn!("[Node.js] ⚠️ Non-LTS version detected: {} (v{}). \
-                            Odd-numbered Node.js releases are development versions and may \
-                            have compatibility issues. Recommended: use LTS (v22.x).",
-                            version_str.trim(), major);
-                    }
-                    log::info!("[Node.js] Version check: {} (major: {}, compatible: {})",
-                        version_str.trim(), major, compatible);
-                    return compatible;
+                return parse_node_major_version(&version_str);
+            }
+        }
+    }
+    None
+}
+
+/// Find system Node.js executable (fallback when sidecar is not available)
+/// This searches common Node.js installation paths with robust home directory detection.
+/// Brain: fix-node-resolution-prefer-newest
+/// Collects ALL compatible candidates and returns the one with the highest major version.
+/// This ensures nvm v22 is preferred over /usr/local/bin/node v18.
+fn find_system_node_executable() -> Option<PathBuf> {
+    log::info!("[Node.js] Searching for system Node.js installation...");
+
+    // Collect all compatible candidates as (path, major_version)
+    let mut candidates: Vec<(PathBuf, u32)> = Vec::new();
+
+    /// Helper: add a candidate if it exists and is compatible
+    fn try_add_candidate(candidates: &mut Vec<(PathBuf, u32)>, path: PathBuf) {
+        if path.exists() {
+            if let Some(major) = get_node_major_version(&path) {
+                if major >= MIN_NODE_VERSION {
+                    log::info!("[Node.js] 📋 Candidate: {:?} (v{})", path, major);
+                    candidates.push((path, major));
                 }
             }
         }
     }
-    // If we can't determine version, assume compatible
-    log::warn!("[Node.js] Could not determine version for {:?}, assuming compatible", node_path);
-    true
-}
-
-/// Find system Node.js executable (fallback when sidecar is not available)
-/// This searches common Node.js installation paths with robust home directory detection
-fn find_system_node_executable() -> Option<PathBuf> {
-    log::info!("[Node.js] Searching for system Node.js installation...");
 
     // Get home directory robustly (works even when launched from Finder)
     let home_dir = get_home_dir();
     log::info!("[Node.js] Home directory: {:?}", home_dir);
 
-    // 🎯 PRIORITY 1: Try Volta's which command (if Volta is available)
-    // Volta respects the toolchain and version management even from Finder
+    // 🔍 SOURCE 1: Try Volta's which command (if Volta is available)
     let mut cmd = std::process::Command::new("volta");
     cmd.args(["which", "node"]);
     #[cfg(target_os = "windows")]
@@ -427,32 +429,24 @@ fn find_system_node_executable() -> Option<PathBuf> {
     if let Ok(output) = cmd.output() {
         if output.status.success() {
             if let Ok(path_str) = String::from_utf8(output.stdout) {
-                let path = PathBuf::from(path_str.trim());
-                if path.exists() && is_node_version_compatible(&path) {
-                    log::info!("[Node.js] ✅ Found via Volta: {:?}", path);
-                    return Some(path);
-                }
+                try_add_candidate(&mut candidates, PathBuf::from(path_str.trim()));
             }
         }
     }
 
-    // 🎯 PRIORITY 2: Check Volta directory directly (for Finder/Explorer launch)
+    // 🔍 SOURCE 2: Check Volta directory directly (for Finder/Explorer launch)
     if let Some(ref home) = home_dir {
         #[cfg(target_os = "windows")]
         let volta_node = home.join(".volta").join("bin").join("node.exe");
         #[cfg(not(target_os = "windows"))]
         let volta_node = home.join(".volta/bin/node");
 
-        if volta_node.exists() && is_node_version_compatible(&volta_node) {
-            log::info!("[Node.js] ✅ Found Volta Node.js at: {:?}", volta_node);
-            return Some(volta_node);
-        }
+        try_add_candidate(&mut candidates, volta_node);
     }
 
-    // 🎯 PRIORITY 3: Try standard PATH (works for dev mode and Terminal launch)
+    // 🔍 SOURCE 3: Try standard PATH
     #[cfg(target_os = "windows")]
     {
-        // On Windows, use 'where' command instead of 'which'
         let mut cmd = std::process::Command::new("where");
         cmd.arg("node");
         hide_console_window(&mut cmd);
@@ -460,13 +454,8 @@ fn find_system_node_executable() -> Option<PathBuf> {
         if let Ok(output) = cmd.output() {
             if output.status.success() {
                 if let Ok(path_str) = String::from_utf8(output.stdout) {
-                    // 'where' can return multiple lines, take the first one
-                    if let Some(first_line) = path_str.lines().next() {
-                        let path = PathBuf::from(first_line.trim());
-                        if path.exists() && is_node_version_compatible(&path) {
-                            log::info!("[Node.js] ✅ Found via PATH (where): {:?}", path);
-                            return Some(path);
-                        }
+                    for line in path_str.lines() {
+                        try_add_candidate(&mut candidates, PathBuf::from(line.trim()));
                     }
                 }
             }
@@ -478,42 +467,34 @@ fn find_system_node_executable() -> Option<PathBuf> {
         if let Ok(output) = std::process::Command::new("which").arg("node").output() {
             if output.status.success() {
                 if let Ok(path_str) = String::from_utf8(output.stdout) {
-                    let path = PathBuf::from(path_str.trim());
-                    if path.exists() && is_node_version_compatible(&path) {
-                        log::info!("[Node.js] ✅ Found via PATH: {:?}", path);
-                        return Some(path);
-                    }
+                    try_add_candidate(&mut candidates, PathBuf::from(path_str.trim()));
                 }
             }
         }
     }
 
-    // 🎯 PRIORITY 4: Common installation paths
+    // 🔍 SOURCE 4: Common installation paths
     #[cfg(target_os = "windows")]
     let common_paths: Vec<PathBuf> = vec![
-        PathBuf::from(r"C:\Program Files\nodejs\node.exe"),      // Standard Node.js installer
-        PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"), // 32-bit Node.js
-        PathBuf::from(r"C:\nodejs\node.exe"),                     // Custom install location
+        PathBuf::from(r"C:\Program Files\nodejs\node.exe"),
+        PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"),
+        PathBuf::from(r"C:\nodejs\node.exe"),
     ];
 
     #[cfg(not(target_os = "windows"))]
     let common_paths: Vec<PathBuf> = vec![
-        PathBuf::from("/opt/homebrew/bin/node"),        // Homebrew ARM Mac (most common now)
-        PathBuf::from("/usr/local/bin/node"),           // Homebrew Intel Mac
-        PathBuf::from("/usr/bin/node"),                 // System package managers
-        PathBuf::from("/opt/local/bin/node"),           // MacPorts
+        PathBuf::from("/opt/homebrew/bin/node"),
+        PathBuf::from("/usr/local/bin/node"),
+        PathBuf::from("/usr/bin/node"),
+        PathBuf::from("/opt/local/bin/node"),
     ];
 
     for path in &common_paths {
-        if path.exists() && is_node_version_compatible(path) {
-            log::info!("[Node.js] ✅ Found at common path: {:?}", path);
-            return Some(path.clone());
-        }
+        try_add_candidate(&mut candidates, path.clone());
     }
 
-    // 🎯 PRIORITY 5: Check NVM installations
+    // 🔍 SOURCE 5: Check NVM installations
     if let Some(ref home) = home_dir {
-        // Windows: Check nvm-windows at %APPDATA%\nvm
         #[cfg(target_os = "windows")]
         {
             if let Ok(appdata) = std::env::var("APPDATA") {
@@ -521,91 +502,32 @@ fn find_system_node_executable() -> Option<PathBuf> {
                 if nvm_dir.exists() {
                     log::info!("[Node.js] Found nvm-windows directory, scanning versions...");
                     if let Ok(entries) = fs::read_dir(&nvm_dir) {
-                        let mut versions: Vec<_> = entries
-                            .filter_map(|e| e.ok())
-                            .filter(|e| e.path().is_dir())
-                            .filter(|e| e.file_name().to_string_lossy().starts_with('v'))
-                            .collect();
-
-                        // Sort by version number descending
-                        versions.sort_by(|a, b| {
-                            let a_ver = a.file_name().to_string_lossy()
-                                .trim_start_matches('v')
-                                .split('.')
-                                .next()
-                                .and_then(|s| s.parse::<u32>().ok())
-                                .unwrap_or(0);
-                            let b_ver = b.file_name().to_string_lossy()
-                                .trim_start_matches('v')
-                                .split('.')
-                                .next()
-                                .and_then(|s| s.parse::<u32>().ok())
-                                .unwrap_or(0);
-                            b_ver.cmp(&a_ver)
-                        });
-
-                        for entry in versions {
-                            let node_path = entry.path().join("node.exe");
-                            if node_path.exists() && is_node_version_compatible(&node_path) {
-                                log::info!("[Node.js] ✅ Found nvm-windows version: {:?}", node_path);
-                                return Some(node_path);
+                        for entry in entries.filter_map(|e| e.ok()) {
+                            if entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with('v') {
+                                try_add_candidate(&mut candidates, entry.path().join("node.exe"));
                             }
                         }
                     }
                 }
             }
-
-            // Also check Volta on Windows
-            let volta_node = home.join(".volta").join("bin").join("node.exe");
-            if volta_node.exists() && is_node_version_compatible(&volta_node) {
-                log::info!("[Node.js] ✅ Found Volta Node.js (Windows) at: {:?}", volta_node);
-                return Some(volta_node);
-            }
         }
 
-        // macOS/Linux: Check NVM at ~/.nvm/versions/node
         #[cfg(not(target_os = "windows"))]
         {
+            // NVM at ~/.nvm/versions/node
             let nvm_dir = home.join(".nvm/versions/node");
-
             if nvm_dir.exists() {
                 log::info!("[Node.js] Found NVM directory, scanning versions...");
                 if let Ok(entries) = fs::read_dir(&nvm_dir) {
-                    let mut versions: Vec<_> = entries
-                        .filter_map(|e| e.ok())
-                        .filter(|e| e.path().is_dir())
-                        .collect();
-
-                    // Sort by version number (extract from dir name like "v20.18.0")
-                    versions.sort_by(|a, b| {
-                        let a_ver = a.file_name().to_string_lossy()
-                            .trim_start_matches('v')
-                            .split('.')
-                            .next()
-                            .and_then(|s| s.parse::<u32>().ok())
-                            .unwrap_or(0);
-                        let b_ver = b.file_name().to_string_lossy()
-                            .trim_start_matches('v')
-                            .split('.')
-                            .next()
-                            .and_then(|s| s.parse::<u32>().ok())
-                            .unwrap_or(0);
-                        b_ver.cmp(&a_ver) // Descending order (latest first)
-                    });
-
-                    // Try each version, latest first, but only compatible ones
-                    for entry in versions {
-                        let node_path = entry.path().join("bin/node");
-                        if node_path.exists() && is_node_version_compatible(&node_path) {
-                            log::info!("[Node.js] ✅ Found NVM version: {:?}", node_path);
-                            return Some(node_path);
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        if entry.path().is_dir() {
+                            try_add_candidate(&mut candidates, entry.path().join("bin/node"));
                         }
                     }
                 }
             }
 
-            // 🎯 PRIORITY 6: Check fnm installations (Unix only)
-            // fnm stores versions in ~/.local/share/fnm/node-versions/ or ~/.fnm/node-versions/
+            // 🔍 SOURCE 6: Check fnm installations (Unix only)
             let fnm_dirs = vec![
                 home.join(".local/share/fnm/node-versions"),
                 home.join(".fnm/node-versions"),
@@ -615,59 +537,56 @@ fn find_system_node_executable() -> Option<PathBuf> {
                 if fnm_dir.exists() {
                     log::info!("[Node.js] Found fnm directory at: {:?}, scanning versions...", fnm_dir);
                     if let Ok(entries) = fs::read_dir(fnm_dir) {
-                        let mut versions: Vec<_> = entries
-                            .filter_map(|e| e.ok())
-                            .filter(|e| e.path().is_dir())
-                            .collect();
-
-                        // Sort by version number descending
-                        versions.sort_by(|a, b| {
-                            let a_ver = a.file_name().to_string_lossy()
-                                .trim_start_matches('v')
-                                .split('.')
-                                .next()
-                                .and_then(|s| s.parse::<u32>().ok())
-                                .unwrap_or(0);
-                            let b_ver = b.file_name().to_string_lossy()
-                                .trim_start_matches('v')
-                                .split('.')
-                                .next()
-                                .and_then(|s| s.parse::<u32>().ok())
-                                .unwrap_or(0);
-                            b_ver.cmp(&a_ver)
-                        });
-
-                        for entry in versions {
-                            // fnm uses installation/bin/node inside each version dir
-                            let node_path = entry.path().join("installation/bin/node");
-                            if node_path.exists() && is_node_version_compatible(&node_path) {
-                                log::info!("[Node.js] ✅ Found fnm version: {:?}", node_path);
-                                return Some(node_path);
+                        for entry in entries.filter_map(|e| e.ok()) {
+                            if entry.path().is_dir() {
+                                try_add_candidate(&mut candidates, entry.path().join("installation/bin/node"));
                             }
                         }
                     }
                 }
             }
 
-            // Check user-specific paths (Unix only)
+            // User-specific paths (Unix only)
             let user_paths = vec![
                 home.join(".local/bin/node"),
                 home.join("bin/node"),
             ];
-
             for path in user_paths {
-                if path.exists() && is_node_version_compatible(&path) {
-                    log::info!("[Node.js] ✅ Found in user directory: {:?}", path);
-                    return Some(path);
-                }
+                try_add_candidate(&mut candidates, path);
             }
         }
     }
 
-    log::warn!("[Node.js] ❌ System Node.js executable not found in any common location");
-    log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, fnm, user directories");
-    log::warn!("[Node.js] Minimum required version: Node.js {}", MIN_NODE_VERSION);
-    None
+    // 🏆 Select the candidate with the highest major version
+    if candidates.is_empty() {
+        log::warn!("[Node.js] ❌ No compatible Node.js found (minimum: v{})", MIN_NODE_VERSION);
+        log::warn!("[Node.js] Searched: Volta, PATH, common paths, NVM, fnm, user directories");
+        return None;
+    }
+
+    // Deduplicate by canonical path
+    candidates.dedup_by(|a, b| a.0 == b.0);
+
+    // Sort by major version descending
+    candidates.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let (ref best_path, best_version) = candidates[0];
+    log::info!("[Node.js] ✅ Selected: {:?} (v{})", best_path, best_version);
+
+    // Warn about odd-numbered (non-LTS) Node.js versions
+    if best_version % 2 != 0 {
+        log::warn!("[Node.js] ⚠️ Non-LTS version v{} selected. \
+            Odd-numbered Node.js releases may have compatibility issues. \
+            Recommended: use LTS (v22.x).", best_version);
+    }
+
+    // Log skipped lower versions
+    if candidates.len() > 1 {
+        log::info!("[Node.js] Skipped lower versions: {:?}",
+            candidates[1..].iter().map(|(p, v)| format!("{:?} (v{})", p, v)).collect::<Vec<_>>());
+    }
+
+    Some(best_path.clone())
 }
 
 // Event payloads for tool tracking
@@ -1593,6 +1512,23 @@ pub async fn send_message_via_sdk_streaming(
 
     // Create the command with the resolved Node.js path
     let mut command = Command::new(&node_path);
+
+    // Brain: sdk-requires-node22-disposable
+    // For Node < 22, inject CJS polyfill via --require BEFORE ESM loads.
+    // This ensures Symbol.dispose is defined before the SDK captures it at module level.
+    let node_major = get_node_major_version(&node_path).unwrap_or(0);
+    if node_major > 0 && node_major < 22 {
+        let polyfill_path = node_sdk_dir.join("disposable-polyfill.cjs");
+        if polyfill_path.exists() {
+            log::info!("[SDK] Node v{} < 22 — injecting --require {:?}", node_major, polyfill_path);
+            command.arg("--require").arg(&polyfill_path);
+        } else {
+            log::warn!("[SDK] ⚠️ Node v{} < 22 but polyfill not found at {:?}", node_major, polyfill_path);
+        }
+    } else {
+        log::info!("[SDK] Node v{} >= 22 — Symbol.dispose is native, no polyfill needed", node_major);
+    }
+
     command
         .arg(&script_path)
         .arg(&config_str)
@@ -2022,6 +1958,7 @@ pub async fn send_tool_result_to_sdk(
 
     // Spawn Node.js process to send the tool result (use same node resolution as main flow)
     let node_path = get_bundled_node_path(&app)?;
+
     let mut command = Command::new(&node_path);
     command
         .arg(&script_path)
