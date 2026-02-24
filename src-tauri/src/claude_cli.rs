@@ -908,6 +908,9 @@ pub struct ClaudeCliRequest {
     pub provider: Option<String>,           // 'anthropic' | 'ollama' | 'custom'
     pub provider_base_url: Option<String>,  // Base URL for non-Anthropic providers
     pub provider_api_key: Option<String>,   // API key for custom providers
+    // 🖥️ IDE context (open file, selection, diagnostics, git status)
+    // Injected into system prompt by Node.js — kept separate from user message
+    pub ide_context: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -1922,6 +1925,9 @@ async fn send_message_via_daemon(
     if let Some(ref tools) = request.allowed_tools {
         query_cmd["allowedTools"] = serde_json::json!(tools);
     }
+    if let Some(ref ide_ctx) = request.ide_context {
+        query_cmd["ideContext"] = serde_json::Value::String(ide_ctx.clone());
+    }
 
     // Send query to daemon
     let cmd_str = query_cmd.to_string();
@@ -1992,6 +1998,7 @@ async fn send_message_via_sdk_streaming_legacy(
         provider, // 🦆 LLM Provider (anthropic/ollama/custom)
         provider_base_url,
         provider_api_key,
+        ide_context, // 🖥️ IDE context (injected into system prompt by Node.js)
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
@@ -2078,6 +2085,11 @@ async fn send_message_via_sdk_streaming_legacy(
     if let Some(tc) = &team_context {
         config["teamContext"] = serde_json::json!(tc);
         log::info!("[SDK] Adding teamContext: team={}, {} members", tc.team_name, tc.members.len());
+    }
+
+    // Add IDE context if provided (injected into system prompt by Node.js)
+    if let Some(ref ide_ctx) = ide_context {
+        config["ideContext"] = serde_json::Value::String(ide_ctx.clone());
     }
 
     // Add attachments if provided (for image support)

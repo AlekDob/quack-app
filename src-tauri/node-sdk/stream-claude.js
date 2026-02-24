@@ -142,6 +142,7 @@ const {
   mcpServers, // MCP servers configuration (passed from Rust backend or loaded from .mcp.json)
   allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
   teamContext, // Agent Teams context (team name + members for prompt augmentation)
+  ideContext, // IDE context (open file, selection, diagnostics, git status)
 } = config;
 
 // DEBUG: Log what we received from Rust
@@ -545,7 +546,8 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
-        + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
+        + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
+        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
       },
 
       // =============================================================================

@@ -2449,12 +2449,9 @@ function AppContent() {
         ? sessionWorktreePath
         : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
-      const ideContextPrefix = await buildContextPrefix(gitSummary, workingDir ?? null);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
+      // Build IDE context (open file, selection, git status) as a separate field
+      // Injected into system prompt by Node.js — not concatenated into user message
+      const ideContext = await buildContextPrefix(gitSummary, workingDir ?? null);
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -2536,6 +2533,8 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // IDE context: injected into system prompt by Node.js, not into user message
+            ideContext: ideContext || undefined,
           };
           })(),
         });
@@ -3160,12 +3159,9 @@ function AppContent() {
         prompt = `${history}\n\nUser: ${content}`;
       }
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
-      const ideContextPrefix = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
+      // Build IDE context (open file, selection, git status) as a separate field
+      // Injected into system prompt by Node.js — not concatenated into user message
+      const ideContext = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
 
       // Create abort promise
       const abortPromise = new Promise<never>((_, reject) => {
@@ -3210,6 +3206,8 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // IDE context: injected into system prompt by Node.js, not into user message
+            ideContext: ideContext || undefined,
           };
           })(),
         }),
