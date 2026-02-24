@@ -193,6 +193,90 @@ body {
 .ws-dot.connected { background: var(--success); }
 .ws-dot.disconnected { background: var(--danger); }
 
+/* ── Project Groups ── */
+.project-group { margin-bottom: 20px; }
+.project-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 4px; margin-bottom: 8px;
+}
+.project-name {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-secondary);
+}
+.project-count {
+  font-size: 11px; color: var(--text-muted); background: var(--card);
+  padding: 2px 8px; border-radius: 10px;
+}
+
+/* ── Agent Cards ── */
+.agent-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; margin-bottom: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); cursor: pointer;
+  transition: background 0.15s;
+}
+.agent-card:active { background: var(--card-hover); }
+.agent-card-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.agent-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+}
+.agent-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: white;
+}
+.agent-card-info { flex: 1; min-width: 0; }
+.agent-name {
+  font-size: 14px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.agent-role {
+  font-size: 12px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Agent Detail View ── */
+.detail-view { padding-bottom: 40px; }
+.detail-back {
+  background: none; border: none; color: var(--accent);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  padding: 8px 0; margin-bottom: 12px; font-family: inherit;
+}
+.detail-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 16px;
+}
+.detail-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+}
+.detail-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: white;
+}
+.detail-info { flex: 1; min-width: 0; }
+.detail-name { font-size: 18px; font-weight: 700; }
+.detail-role { font-size: 13px; color: var(--text-secondary); }
+.detail-project { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.detail-working {
+  font-size: 13px; color: var(--text-secondary);
+  padding: 10px 14px; background: var(--card);
+  border-radius: 10px; margin-bottom: 12px;
+}
+.detail-branch {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 16px;
+}
+.detail-section-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-secondary);
+  margin-bottom: 10px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.empty-inline {
+  font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px;
+}
+
 /* ── Safe area (iPhone notch) ── */
 @supports (padding: env(safe-area-inset-top)) {
   .app { padding-top: calc(16px + env(safe-area-inset-top)); }

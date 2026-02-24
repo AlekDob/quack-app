@@ -5,12 +5,13 @@
 
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
 use crate::remote_auth::RemoteAuthState;
@@ -68,11 +69,18 @@ struct StatusResponse {
 #[serde(rename_all = "camelCase")]
 struct AgentSummary {
     id: String,
-    label: String,
+    name: String,
     status: String,
-    cwd: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     working_on: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -149,6 +157,7 @@ pub fn create_api_router(app: AppHandle, auth: RemoteAuthState) -> Router {
         .route("/jobs/:id/fire", post(handle_fire_job))
         .route("/jobs/:id/toggle", post(handle_toggle_job))
         .route("/execute", post(handle_execute))
+        .route("/avatars/:filename", get(handle_avatar))
         .with_state(state)
 }
 
@@ -259,14 +268,25 @@ async fn handle_list_agents(
         .and_then(|a| a.as_array())
         .map(|arr| {
             arr.iter()
-                .map(|a| AgentSummary {
-                    id: a.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    label: a.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    status: a.get("status").and_then(|v| v.as_str()).unwrap_or("idle").to_string(),
-                    cwd: a.get("cwd").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    avatar: a.get("avatar").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                    working_on: a.get("workingOn").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                    branch: a.get("branch").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                .map(|a| {
+                    let role = a.get("personality")
+                        .and_then(|p| p.get("role"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    AgentSummary {
+                        id: a.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        name: a.get("name").and_then(|v| v.as_str())
+                            .or_else(|| a.get("label").and_then(|v| v.as_str()))
+                            .unwrap_or("Agent").to_string(),
+                        status: a.get("status").and_then(|v| v.as_str()).unwrap_or("idle").to_string(),
+                        avatar: a.get("avatar").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        color: a.get("color").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        role,
+                        project_name: a.get("projectName").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        project_path: a.get("projectPath").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        working_on: a.get("workingOn").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        branch: a.get("branch").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                    }
                 })
                 .collect()
         })
@@ -533,4 +553,48 @@ async fn handle_execute(
         session_id: Some(session_id),
         error: None,
     }))
+}
+
+// ─── Avatar Endpoint ──────────────────────────────────────────────
+
+async fn handle_avatar(
+    Path(filename): Path<String>,
+    State(state): State<ApiState>,
+) -> Response {
+    // Sanitize: only allow alphanumeric + dash + dot, must end in .jpeg/.png
+    if !filename.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_')
+        || !(filename.ends_with(".jpeg") || filename.ends_with(".jpg") || filename.ends_with(".png"))
+    {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+
+    // Try resource path (production bundle), then fallback to public/ (dev)
+    let paths_to_try = vec![
+        state.app.path().resource_dir()
+            .ok()
+            .map(|r| r.join("images/ducks/new-avatars").join(&filename)),
+        Some(std::path::PathBuf::from(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../public/images/ducks/new-avatars")
+        ).join(&filename)),
+    ];
+
+    for maybe_path in paths_to_try.into_iter().flatten() {
+        if let Ok(bytes) = std::fs::read(&maybe_path) {
+            let content_type = if filename.ends_with(".png") {
+                "image/png"
+            } else {
+                "image/jpeg"
+            };
+            return (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, content_type),
+                    (header::CACHE_CONTROL, "public, max-age=86400"),
+                ],
+                bytes,
+            ).into_response();
+        }
+    }
+
+    StatusCode::NOT_FOUND.into_response()
 }

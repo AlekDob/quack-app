@@ -1,5 +1,5 @@
 // Quack Remote Dashboard — Vanilla JS SPA
-// No build step, no dependencies. ~300 lines.
+// No build step, no dependencies.
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -15,6 +15,7 @@ const state = {
   ws: null,
   wsConnected: false,
   loading: true,
+  selectedAgent: null, // agent detail view
 };
 
 // ── API Client ─────────────────────────────────────────────────
@@ -43,6 +44,10 @@ const api = {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
   },
+
+  avatarUrl(filename) {
+    return `${this.base()}/avatars/${encodeURIComponent(filename)}`;
+  },
 };
 
 // ── WebSocket ──────────────────────────────────────────────────
@@ -62,7 +67,6 @@ function connectWs() {
     state.ws.onclose = () => {
       state.wsConnected = false;
       render();
-      // Reconnect after 3s
       setTimeout(connectWs, 3000);
     };
 
@@ -78,7 +82,7 @@ function connectWs() {
 function handleWsEvent(event) {
   switch (event.type) {
     case 'agent_status': {
-      const agent = state.agents.find(a => a.id === event.agentId || a.label === event.label);
+      const agent = state.agents.find(a => a.id === event.agentId || a.name === event.label);
       if (agent) {
         agent.status = event.status;
         render();
@@ -145,6 +149,13 @@ function render() {
   }
   if (state.loading) {
     app.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+    return;
+  }
+
+  // Agent detail view
+  if (state.selectedAgent) {
+    app.innerHTML = renderAgentDetail(state.selectedAgent);
+    bindEvents();
     return;
   }
 
@@ -236,24 +247,97 @@ function renderContent() {
   }
 }
 
-// ── Agents Tab ─────────────────────────────────────────────────
+// ── Agents Tab — Grouped by Project ───────────────────────────
 function renderAgents() {
   if (!state.agents.length) {
     return '<div class="empty"><div class="empty-icon">🦆</div><div class="empty-text">No agents configured</div></div>';
   }
-  return state.agents.map(a => `
-    <div class="card">
-      <div class="card-header">
-        <div class="card-avatar">${a.avatar ? '' : '🦆'}</div>
-        <div class="card-info">
-          <div class="card-name">${esc(a.label || a.id)}</div>
-          <div class="card-meta">${esc(a.workingOn || a.cwd || '')}</div>
-        </div>
-        <span class="badge badge-${a.status || 'idle'}">${a.status || 'idle'}</span>
+
+  // Group agents by projectName
+  const groups = {};
+  state.agents.forEach(a => {
+    const project = a.projectName || 'Unassigned';
+    if (!groups[project]) groups[project] = [];
+    groups[project].push(a);
+  });
+
+  // Sort groups: most agents first
+  const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+
+  return sorted.map(([project, agents]) => `
+    <div class="project-group">
+      <div class="project-header">
+        <span class="project-name">${esc(project)}</span>
+        <span class="project-count">${agents.length}</span>
       </div>
-      ${a.branch ? `<div class="card-meta" style="margin-top:4px">🔀 ${esc(a.branch)}</div>` : ''}
+      ${agents.map(a => renderAgentCard(a)).join('')}
     </div>
   `).join('');
+}
+
+function renderAgentCard(a) {
+  const avatarHtml = a.avatar
+    ? `<img class="agent-avatar" src="${api.avatarUrl(a.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      + `<div class="agent-avatar agent-avatar-fallback" style="display:none;background:${a.color || 'var(--accent)'}">🦆</div>`
+    : `<div class="agent-avatar agent-avatar-fallback" style="background:${a.color || 'var(--accent)'}">🦆</div>`;
+
+  const statusClass = a.status === 'running' ? 'running' : a.status === 'error' ? 'error' : 'idle';
+
+  return `
+    <div class="agent-card" data-agent-id="${a.id}">
+      <div class="agent-card-left">
+        ${avatarHtml}
+        <div class="agent-card-info">
+          <div class="agent-name">${esc(a.name || 'Agent')}</div>
+          <div class="agent-role">${esc(a.role || '')}</div>
+        </div>
+      </div>
+      <span class="badge badge-${statusClass}">${a.status || 'idle'}</span>
+    </div>
+  `;
+}
+
+// ── Agent Detail View ─────────────────────────────────────────
+function renderAgentDetail(agent) {
+  const avatarHtml = agent.avatar
+    ? `<img class="detail-avatar" src="${api.avatarUrl(agent.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      + `<div class="detail-avatar detail-avatar-fallback" style="display:none;background:${agent.color || 'var(--accent)'}">🦆</div>`
+    : `<div class="detail-avatar detail-avatar-fallback" style="background:${agent.color || 'var(--accent)'}">🦆</div>`;
+
+  // Find sessions for this agent
+  const agentSessions = state.sessions.filter(s => s.agentId === agent.id);
+
+  return `
+    <div class="detail-view">
+      <button class="detail-back" id="back-btn">← Back</button>
+      <div class="detail-header">
+        ${avatarHtml}
+        <div class="detail-info">
+          <div class="detail-name">${esc(agent.name || 'Agent')}</div>
+          <div class="detail-role">${esc(agent.role || '')}</div>
+          <div class="detail-project">${esc(agent.projectName || '')}</div>
+        </div>
+        <span class="badge badge-${agent.status === 'running' ? 'running' : 'idle'}">${agent.status || 'idle'}</span>
+      </div>
+      ${agent.workingOn ? `<div class="detail-working">${esc(agent.workingOn)}</div>` : ''}
+      ${agent.branch ? `<div class="detail-branch">🔀 ${esc(agent.branch)}</div>` : ''}
+
+      <div class="detail-section-title">Recent Sessions</div>
+      ${agentSessions.length ? agentSessions.slice(0, 20).map(s => `
+        <div class="card session-item">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="session-title">${esc(s.title || 'Untitled')}</span>
+            <span class="badge badge-${s.status === 'in_progress' ? 'running' : s.status === 'done' ? 'done' : 'idle'}">${s.status}</span>
+          </div>
+          <div class="session-meta">${timeAgo(s.createdAt)}${s.messageCount ? ` · ${s.messageCount} msgs` : ''}</div>
+        </div>
+      `).join('') : '<div class="empty-inline">No sessions yet</div>'}
+
+      <button class="btn btn-primary btn-block" style="margin-top:16px" data-exec-agent="${agent.id}">
+        Execute on this agent
+      </button>
+    </div>
+  `;
 }
 
 // ── Sessions Tab ───────────────────────────────────────────────
@@ -262,15 +346,20 @@ function renderSessions() {
     return '<div class="empty"><div class="empty-icon">💬</div><div class="empty-text">No sessions yet</div></div>';
   }
   return `<div class="card">${
-    state.sessions.slice(0, 30).map(s => `
-      <div class="session-item">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="session-title">${esc(s.title || 'Untitled')}</span>
-          <span class="badge badge-${s.status === 'in_progress' ? 'running' : s.status === 'done' ? 'done' : 'idle'}">${s.status}</span>
+    state.sessions.slice(0, 30).map(s => {
+      const agent = state.agents.find(a => a.id === s.agentId);
+      return `
+        <div class="session-item">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="session-title">${esc(s.title || 'Untitled')}</span>
+            <span class="badge badge-${s.status === 'in_progress' ? 'running' : s.status === 'done' ? 'done' : 'idle'}">${s.status}</span>
+          </div>
+          <div class="session-meta">
+            ${agent ? esc(agent.name) + ' · ' : ''}${timeAgo(s.createdAt)}${s.messageCount ? ` · ${s.messageCount} msgs` : ''}
+          </div>
         </div>
-        <div class="session-meta">${timeAgo(s.createdAt)}${s.messageCount ? ` · ${s.messageCount} msgs` : ''}</div>
-      </div>
-    `).join('')
+      `;
+    }).join('')
   }</div>`;
 }
 
@@ -303,7 +392,7 @@ function renderExecute() {
       <div class="execute-form">
         <select id="exec-agent" class="select">
           <option value="">Select an agent...</option>
-          ${state.agents.map(a => `<option value="${a.id}">${esc(a.label || a.id)}</option>`).join('')}
+          ${state.agents.map(a => `<option value="${a.id}">${esc(a.name || a.id)}</option>`).join('')}
         </select>
         <textarea id="exec-prompt" class="textarea" placeholder="What should the agent do?"></textarea>
         <button id="exec-btn" class="btn btn-primary btn-block">Execute</button>
@@ -335,6 +424,20 @@ function bindEvents() {
     return;
   }
 
+  // Back button (agent detail)
+  const backBtn = $('#back-btn');
+  if (backBtn) {
+    backBtn.onclick = () => { state.selectedAgent = null; render(); };
+  }
+
+  // Agent cards — open detail
+  $$('.agent-card').forEach(card => {
+    card.onclick = () => {
+      const agent = state.agents.find(a => a.id === card.dataset.agentId);
+      if (agent) { state.selectedAgent = agent; render(); }
+    };
+  });
+
   // Tabs
   $$('.tab-btn').forEach(btn => {
     btn.onclick = () => { state.tab = btn.dataset.tab; render(); };
@@ -351,6 +454,17 @@ function bindEvents() {
         toast(`Error: ${err.message}`, 'error');
       }
       btn.disabled = false;
+    };
+  });
+
+  // Execute from detail view
+  $$('[data-exec-agent]').forEach(btn => {
+    btn.onclick = () => {
+      state.selectedAgent = null;
+      state.tab = 'execute';
+      render();
+      const select = $('#exec-agent');
+      if (select) select.value = btn.dataset.execAgent;
     };
   });
 
