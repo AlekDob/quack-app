@@ -10,6 +10,7 @@ import SecondBrainSettings from './categories/SecondBrainSettings';
 import IDESettings from './categories/IDESettings';
 import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
+import RemoteApiSettings from './categories/RemoteApiSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
 import KeyboardShortcutsSettings from './categories/KeyboardShortcutsSettings';
 import DebugSettings from './categories/DebugSettings';
@@ -59,6 +60,8 @@ export default function UnifiedSettings({
         return <LicenseSettings />;
       case 'notifications':
         return <NotificationSettings onOpenTelegramSetup={onOpenTelegramSetup} />;
+      case 'remote-api':
+        return <RemoteApiSettings />;
       case 'appearance':
         return <AppearanceSettings />;
       case 'keyboard-shortcuts':

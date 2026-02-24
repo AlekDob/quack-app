@@ -1885,3 +1885,11 @@ export interface TeamContextMember {
 }
 
 export type TeammateStatus = 'spawning' | 'active' | 'idle' | 'stopped';
+
+// ─── Remote API ────────────────────────────────────────────────────
+
+export interface RemoteApiConfig {
+  enabled: boolean;
+  token: string | null;
+  port: number;
+}

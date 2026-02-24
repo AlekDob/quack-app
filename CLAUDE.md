@@ -58,13 +58,23 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Memory leaks: `documentation/bugs/bug-webkit-memory-leaks-high-cpu.md`
 - window.confirm: `documentation/gotchas/gotcha-window-confirm-tauri-webview.md`
 - Model name display: `documentation/gotchas/gotcha-model-name-non-anthropic-provider.md`
+- Notifications: `documentation/gotchas/gotcha-macos-native-notification-focus.md`
+- TerminalInfo fields: `documentation/gotchas/gotcha-terminal-info-field-names.md`
+- Session creation: `documentation/gotchas/gotcha-programmatic-session-creation.md`
+
+**Architecture decisions**: `documentation/decisions/` — read before starting related work.
+- Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
+- Automation layer: `documentation/patterns/pattern-automation-layer.md`
+- Tab system: `documentation/patterns/pattern-tab-system-singleton.md`
+- Dark theme CSS: `documentation/patterns/pattern-dark-theme-css-values.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)
 - Kanban board: `documentation/guide/kanban/` (Human Review column, flow diagram)
+- Automations: `documentation/guide/automations/` (overview, screenshots, cron presets, how jobs fire)
 - Memory leaks: `documentation/guide/memory-leak-prevention.md` (5 rules, bounded collections, how to spot leaks)
 
 **Brain breadcrumbs in code**: When writing code related to a Brain entry (bug fix, pattern, gotcha), add `// Brain: {slug}` above the relevant block. This links code back to its documentation. Example: `// Brain: fix-stamina-bar-prompt-caching`. See quack-brain skill for full rules.

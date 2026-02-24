@@ -1,7 +1,7 @@
 ---
 type: map
 project: quack-app
-updated: 2026-02-14
+updated: 2026-02-24
 ---
 
 # Quack - Architecture Map
@@ -17,6 +17,8 @@ updated: 2026-02-14
 | Activity Log Service | src/services/activityLogService.ts | JSONL activity event log |
 | Claude SDK | src-tauri/node-sdk/stream-claude.js | AI streaming via Agent SDK |
 | Unified Agent Storage | src/services/unifiedAgentStorage.ts | Agent + session persistence |
+| Automation Storage | src/services/automationStorage.ts | Cron job persistence |
+| Cron Utils | src/services/cronUtils.ts | Cron expression parsing + next-run calc |
 
 ## Key Stores (Zustand)
 
@@ -25,6 +27,7 @@ updated: 2026-02-14
 | Settings | src/stores/settingsStore.ts | App preferences |
 | Session | src/stores/sessionStore.ts | Active agent sessions |
 | Kanban | src/stores/kanbanStore.ts | Task board state |
+| Automation | src/stores/automationStore.ts | Scheduled job state |
 | Popout Window | src/stores/popoutWindowStore.ts | Tab popout windows |
 | UI | src/stores/uiStore.ts | Sidebar, panels, theme |
 
@@ -37,6 +40,7 @@ updated: 2026-02-14
 | Brain | src/components/brain/ | BrainApp, Timeline, Knowledge, Graph |
 | Settings | src/components/settings/ | SettingsDrawer + categories/ |
 | Terminal | src/components/Terminal* | TerminalComponent, TerminalSidebar |
+| Automation | src/components/automation/ | AutomationView, AutomationJobCard, AutomationJobForm |
 
 ## Backend (Rust)
 
@@ -48,6 +52,7 @@ updated: 2026-02-14
 | File System | src-tauri/src/fs.rs | File I/O commands |
 | Git | src-tauri/src/git.rs | Git operations |
 | Claude CLI | src-tauri/src/claude_cli.rs | SDK process + event parsing |
+| Automation | src-tauri/src/automation.rs | Cron scheduler + tick events |
 
 ## Entry Points
 

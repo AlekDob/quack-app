@@ -9,6 +9,7 @@ export type SettingsCategory =
   | 'ide'
   | 'license'
   | 'notifications'
+  | 'remote-api'
   | 'appearance'
   | 'keyboard-shortcuts'
   | 'debug'
@@ -33,6 +34,7 @@ const categories: CategoryItem[] = [
   { id: 'ide', label: 'External IDE' },
   { id: 'license', label: 'License' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'remote-api', label: 'Remote API' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'keyboard-shortcuts', label: 'Keyboard' },
   { id: 'debug', label: 'Debug' },

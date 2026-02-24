@@ -55,6 +55,9 @@ mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetB
 mod semantic_search; // 🔍 Semantic code search file watcher
 mod git_watcher; // 🔀 Git branch change watcher
 mod teammate_watcher; // 👥 Teammate session stream watcher
+mod remote_api; // 🌐 Remote REST API for external tools and mobile dashboard
+mod remote_auth; // 🔐 Remote API Bearer token authentication
+mod remote_config; // ⚙️ Remote API configuration (enable/disable, token, port)
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -582,6 +585,7 @@ pub fn run() {
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
         .manage(git_watcher::GitBranchWatcherManager::new()) // Register git branch watcher manager
         .manage(teammate_watcher::TeammateSessionWatcher::new()) // Register teammate session watcher
+        .manage(remote_auth::RemoteAuthState::new()) // Register remote API auth state
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -618,6 +622,26 @@ pub fn run() {
             // Initialize Telegram Central Polling State
             let telegram_state = telegram_central::TelegramPollingState::new(app.handle().clone());
             app.manage(telegram_state);
+
+            // 🌐 Initialize Remote API config and auth state
+            {
+                let remote_cfg = remote_config::load_config(app.handle());
+                let auth_state: tauri::State<remote_auth::RemoteAuthState> = app.state();
+                if let Some(token) = &remote_cfg.token {
+                    let auth = auth_state.inner().clone();
+                    let token = token.clone();
+                    let enabled = remote_cfg.enabled;
+                    tauri::async_runtime::spawn(async move {
+                        auth.set_token(token).await;
+                        auth.set_enabled(enabled).await;
+                    });
+                }
+                log::info!(
+                    "🌐 Remote API initialized (enabled: {}, port: {})",
+                    remote_cfg.enabled,
+                    remote_cfg.port
+                );
+            }
 
             // 🔐 Migrate API keys from preferences to keychain on first run
             let app_handle = app.handle().clone();
@@ -819,12 +843,20 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            // Load remote config for binding decision
+            let remote_cfg = remote_config::load_config(app.handle());
+            let auth_state: tauri::State<remote_auth::RemoteAuthState> = app.state();
+            let auth_for_server = auth_state.inner().clone();
+
             tauri::async_runtime::spawn(async move {
                 let state = HookState { app: app_handle.clone() };
 
-                // Create combined router with terminal hooks, Telegram webhook, and proxy
+                // Initialize uptime tracker
+                remote_api::init_uptime();
+
+                // Legacy routes (terminal hooks, session management, telegram, proxy)
                 let telegram_router = telegram_bot::create_telegram_router(app_handle.clone());
-                let router = Router::new()
+                let legacy_router = Router::new()
                     .route("/terminal/status", post(handle_status_update))
                     .route("/session/create", post(handle_create_session))
                     .route("/session/message", post(handle_add_message))
@@ -833,20 +865,40 @@ pub fn run() {
                     .with_state(state)
                     .merge(telegram_router);
 
-                let addr: SocketAddr = ([127, 0, 0, 1], 6768).into();
+                // Remote API routes (auth-protected, nested under /api)
+                let api_router = remote_api::create_api_router(
+                    app_handle.clone(),
+                    auth_for_server,
+                );
+
+                // Combine: legacy routes + API routes nested under /api
+                let router = legacy_router.nest("/api", api_router);
+
+                // Bind: 0.0.0.0 if remote enabled, 127.0.0.1 otherwise
+                let bind_addr: [u8; 4] = if remote_cfg.enabled {
+                    [0, 0, 0, 0]
+                } else {
+                    [127, 0, 0, 1]
+                };
+                let addr: SocketAddr = (bind_addr, remote_cfg.port).into();
 
                 match tokio::net::TcpListener::bind(addr).await {
                     Ok(listener) => {
-                        log::info!("🦆 HTTP server started on http://127.0.0.1:6768");
-                        log::info!("🦆 Telegram webhook available at: http://127.0.0.1:6768/telegram/webhook");
-                        log::info!("🦆 Proxy server available at: http://127.0.0.1:6768/proxy?url=...");
+                        log::info!("🦆 HTTP server started on http://{}", addr);
+                        if remote_cfg.enabled {
+                            if let Some(ip) = remote_config::get_local_ip_address() {
+                                log::info!("🌐 Remote API available at: http://{}:{}/api/status", ip, remote_cfg.port);
+                            }
+                        }
+                        log::info!("🦆 Telegram webhook available at: http://{}/telegram/webhook", addr);
+                        log::info!("🦆 Proxy server available at: http://{}/proxy?url=...", addr);
                         if let Err(error) = axum::serve(listener, router.into_make_service()).await
                         {
                             log::error!("HTTP hook server error: {error}");
                         }
                     }
                     Err(error) => {
-                        log::error!("Impossibile aprire la porta del server hook: {error}");
+                        log::error!("Failed to bind HTTP server on {}: {error}", addr);
                     }
                 }
             });
@@ -1174,6 +1226,11 @@ pub fn run() {
             teammate_watcher::start_teammate_watcher,
             teammate_watcher::stop_teammate_watcher,
             teammate_watcher::read_teammate_session,
+            // 🌐 Remote API commands
+            remote_config::get_remote_config,
+            remote_config::set_remote_enabled,
+            remote_config::regenerate_remote_token,
+            remote_config::get_local_ip,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
