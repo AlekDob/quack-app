@@ -140,6 +140,7 @@ function render() {
   const app = $('#app');
   if (!state.token) {
     app.innerHTML = renderLogin();
+    bindEvents();
     return;
   }
   if (state.loading) {
