@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use axum::{extract::State, http::StatusCode, routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
-use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Manager, image::Image};
+use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Listener, Manager, image::Image};
 
 mod agency;
 mod agency_setup;
@@ -58,6 +58,7 @@ mod teammate_watcher; // 👥 Teammate session stream watcher
 mod remote_api; // 🌐 Remote REST API for external tools and mobile dashboard
 mod remote_auth; // 🔐 Remote API Bearer token authentication
 mod remote_config; // ⚙️ Remote API configuration (enable/disable, token, port)
+mod remote_ws; // 📡 WebSocket real-time push for mobile clients
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -848,6 +849,64 @@ pub fn run() {
             let auth_state: tauri::State<remote_auth::RemoteAuthState> = app.state();
             let auth_for_server = auth_state.inner().clone();
 
+            // 📡 Create WebSocket broadcast hub (capacity 64 events)
+            let ws_broadcast = remote_ws::WsBroadcast::new(64);
+
+            // 📡 Bridge Tauri events → WebSocket broadcast for mobile clients
+            {
+                let bc = ws_broadcast.clone();
+                app.listen("external-terminal-status", move |event| {
+                    if let Ok(payload) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                        let agent_id = payload.get("id")
+                            .or_else(|| payload.get("label"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let status = payload.get("status")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+                        let label = payload.get("label")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        bc.send(remote_ws::WsEvent::AgentStatus { agent_id, status, label });
+                    }
+                });
+
+                let bc = ws_broadcast.clone();
+                app.listen("sessions-updated", move |event| {
+                    if let Ok(payload) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                        let action = payload.get("action").and_then(|v| v.as_str()).unwrap_or("");
+                        match action {
+                            "created" => {
+                                bc.send(remote_ws::WsEvent::SessionCreated {
+                                    session_id: payload.get("sessionId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                                    agent_id: payload.get("agentId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                                    title: payload.get("title").and_then(|v| v.as_str()).unwrap_or("New session").to_string(),
+                                });
+                            }
+                            "completed" | "done" => {
+                                bc.send(remote_ws::WsEvent::SessionCompleted {
+                                    session_id: payload.get("sessionId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                                    status: payload.get("status").and_then(|v| v.as_str()).unwrap_or("done").to_string(),
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                });
+
+                let bc = ws_broadcast.clone();
+                app.listen("automation-fire-job", move |event| {
+                    if let Ok(payload) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                        bc.send(remote_ws::WsEvent::JobFired {
+                            job_id: payload.get("jobId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                            job_name: payload.get("jobName").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        });
+                    }
+                });
+            }
+
             tauri::async_runtime::spawn(async move {
                 let state = HookState { app: app_handle.clone() };
 
@@ -868,11 +927,22 @@ pub fn run() {
                 // Remote API routes (auth-protected, nested under /api)
                 let api_router = remote_api::create_api_router(
                     app_handle.clone(),
-                    auth_for_server,
+                    auth_for_server.clone(),
                 );
 
-                // Combine: legacy routes + API routes nested under /api
-                let router = legacy_router.nest("/api", api_router);
+                // 📡 WebSocket route (auth via query param)
+                let ws_state = remote_ws::WsState {
+                    auth: auth_for_server,
+                    broadcast: ws_broadcast,
+                };
+                let ws_router = Router::new()
+                    .route("/ws", get(remote_ws::handle_ws_upgrade))
+                    .with_state(ws_state);
+
+                // Combine: legacy + /api/* + /ws
+                let router = legacy_router
+                    .nest("/api", api_router)
+                    .merge(ws_router);
 
                 // Bind: 0.0.0.0 if remote enabled, 127.0.0.1 otherwise
                 let bind_addr: [u8; 4] = if remote_cfg.enabled {
@@ -888,6 +958,7 @@ pub fn run() {
                         if remote_cfg.enabled {
                             if let Some(ip) = remote_config::get_local_ip_address() {
                                 log::info!("🌐 Remote API available at: http://{}:{}/api/status", ip, remote_cfg.port);
+                                log::info!("📡 WebSocket available at: ws://{}:{}/ws?token=...", ip, remote_cfg.port);
                             }
                         }
                         log::info!("🦆 Telegram webhook available at: http://{}/telegram/webhook", addr);
