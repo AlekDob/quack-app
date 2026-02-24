@@ -980,6 +980,8 @@ function AppContent() {
   // Key format: `${activeId}-${messageId}` to prevent race conditions between concurrent streams
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const lastPromptsRef = useRef<Map<string, string>>(new Map());
+  // Track which sessions are resuming (have an existing claudeSessionId) to hide redundant init widgets
+  const resumingSessionsRef = useRef<Set<string>>(new Set());
   // Track active streams per SESSION (not per agent) to prevent concurrency issues
   // Key is sessionKey (activeSessionId || activeId), Value is Set of streamKeys
   // This allows different sessions of the same agent to be stopped independently
@@ -1218,6 +1220,12 @@ function AppContent() {
       return; // REJECT event - do not write to any session
     }
     const messageKey = sessionKey;
+
+    // Tag system/init events as resumed to hide redundant header + init widget
+    if (evt.type === 'system' && evt.subtype === 'init' && resumingSessionsRef.current.has(messageKey)) {
+      evt.isResumed = true;
+      resumingSessionsRef.current.delete(messageKey);
+    }
 
     console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
@@ -2192,6 +2200,11 @@ function AppContent() {
 
     console.log(`🦆 [SESSION-FIRST] Sending message to session: ${messageKey}, agentId: ${capturedAgentId}, claudeSessionId: ${capturedClaudeSessionId?.slice(0, 8) || 'NEW'}`);
 
+    // Track resuming sessions so handleClaudeEvent can tag system/init as isResumed
+    if (capturedClaudeSessionId) {
+      resumingSessionsRef.current.add(messageKey);
+    }
+
     // 🦆 AUTO-PROGRESS: Move session to 'in_progress' when first message is sent
     // This automatically transitions TODO tasks to In Progress in Kanban
     const currentSession = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
@@ -2379,6 +2392,8 @@ function AppContent() {
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
+      // Hide header + init widget on resumed sessions (known at message creation time)
+      metadata: capturedClaudeSessionId ? { isResumed: true } : undefined,
     };
 
     // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)

@@ -438,8 +438,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   }, []);
 
 
-  // System initialization message
+  // System initialization message (skip on resumed sessions)
   if (message.type === 'system' && message.subtype === 'init') {
+    if (message.isResumed) return null;
     return (
       <SystemInitializedWidget
         sessionId={message.session_id}
