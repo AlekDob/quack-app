@@ -5,6 +5,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::Mutex as TokioMutex;
 use once_cell::sync::Lazy;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // Windows-specific helper to hide console windows
 #[cfg(target_os = "windows")]
@@ -67,6 +68,55 @@ fn sanitize_path_string_for_node(path: &str) -> String {
 static ACTIVE_PROCESSES: Lazy<TokioMutex<HashMap<String, ChildStdin>>> =
     Lazy::new(|| TokioMutex::new(HashMap::new()));
 
+/// Store running child processes (stdin/stdout/stderr already taken) for abort/kill support
+/// Key: event_session_key, Value: Child handle
+static RUNNING_CHILD_PROCESSES: Lazy<TokioMutex<HashMap<String, tokio::process::Child>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
+// =============================================================================
+// PERSISTENT DAEMON MODE
+// Brain: persistent-daemon-architecture
+// Instead of spawning a new Node.js process per message (20+ sec overhead),
+// keep a single long-lived daemon that handles queries via stdin/stdout IPC.
+//
+// Lock ordering (to prevent deadlocks):
+//   1. DAEMON_PROCESS
+//   2. DAEMON_QUERIES
+//   3. DAEMON_QUERY_RESULTS
+//   4. DAEMON_READY_TX
+// Never acquire a lower-numbered lock while holding a higher-numbered one.
+// =============================================================================
+
+/// The persistent daemon process (singleton)
+static DAEMON_PROCESS: Lazy<TokioMutex<Option<DaemonProcess>>> =
+    Lazy::new(|| TokioMutex::new(None));
+
+/// Active daemon queries: queryId → completion channel + metadata
+static DAEMON_QUERIES: Lazy<TokioMutex<HashMap<String, DaemonQueryState>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
+/// Last Result event per query (captured so we can return usage data on completion)
+static DAEMON_QUERY_RESULTS: Lazy<TokioMutex<HashMap<String, ClaudeCliResponse>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
+/// Whether daemon mode is enabled (feature flag)
+static DAEMON_MODE_ENABLED: AtomicBool = AtomicBool::new(true);
+
+struct DaemonProcess {
+    stdin: ChildStdin,
+    #[allow(dead_code)]
+    child_pid: u32,
+    ready: bool,
+}
+
+struct DaemonQueryState {
+    agent_id: String,
+    session_key: String,
+    app: AppHandle,
+    /// Used to signal the awaiting send_message_via_sdk_streaming call
+    completion_tx: tokio::sync::oneshot::Sender<Result<ClaudeCliResponse, String>>,
+}
+
 /// Send a message to an active SDK process via stdin
 /// Send message to a running process via stdin
 /// 🦆 FIX: Now uses process_key (sessionKey) instead of agent_id to support concurrent sessions
@@ -119,6 +169,538 @@ async fn unregister_process(process_key: &str) {
     let mut processes = ACTIVE_PROCESSES.lock().await;
     processes.remove(process_key);
     log::info!("[SDK] 🗑️ Unregistered stdin for process: {}", process_key);
+}
+
+/// Abort a running SDK stream.
+/// In daemon mode: sends abort command (doesn't kill daemon).
+/// In legacy mode: kills the Node.js process.
+#[tauri::command]
+pub async fn abort_sdk_stream(session_key: String) -> Result<(), String> {
+    // Try daemon mode first: find a query matching this session key
+    {
+        let queries = DAEMON_QUERIES.lock().await;
+        let matching_query = queries.iter()
+            .find(|(_, state)| state.session_key == session_key)
+            .map(|(qid, _)| qid.clone());
+
+        if let Some(query_id) = matching_query {
+            log::info!("[DAEMON:ABORT] Sending abort for daemon query={} session={}", query_id, session_key);
+            let cmd = serde_json::json!({"type": "abort", "queryId": query_id});
+            return send_to_daemon(&cmd.to_string()).await;
+        }
+    }
+
+    // Fall back to legacy kill
+    let child_opt = {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.remove(&session_key)
+    };
+
+    if let Some(mut child) = child_opt {
+        child.kill().await
+            .map_err(|e| format!("Failed to kill Node.js process: {}", e))?;
+        log::info!("[SDK] 🛑 Killed Node.js process for session: {}", session_key);
+    } else {
+        log::warn!("[SDK] ⚠️ abort_sdk_stream: no running process or daemon query found for session: {}", session_key);
+    }
+    Ok(())
+}
+
+// =============================================================================
+// DAEMON LIFECYCLE MANAGEMENT
+// =============================================================================
+
+/// Ensure the daemon process is running. If not, spawn it.
+async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
+    let mut daemon_guard = DAEMON_PROCESS.lock().await;
+
+    if let Some(ref d) = *daemon_guard {
+        if d.ready {
+            log::debug!("[DAEMON:LIFECYCLE] Daemon already running and ready (pid={})", d.child_pid);
+            return Ok(());
+        }
+        log::warn!("[DAEMON:LIFECYCLE] Daemon exists but not ready (pid={}) — clearing stale state", d.child_pid);
+    }
+    // Clear any stale daemon state before spawning
+    *daemon_guard = None;
+
+    log::info!("[DAEMON:LIFECYCLE] Spawning persistent Node.js daemon...");
+
+    let script_path = app
+        .path()
+        .resolve("node-sdk/stream-daemon.js", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve daemon script path: {}", e))?;
+
+    if !script_path.exists() {
+        return Err(format!("Daemon script not found at: {:?}", script_path));
+    }
+
+    let script_path = sanitize_path_for_node(&script_path);
+    let node_sdk_dir = script_path.parent()
+        .ok_or("Failed to get node-sdk directory")?
+        .to_path_buf();
+
+    // Resolve Node.js executable (same logic as send_message_via_sdk_streaming)
+    let is_production = !cfg!(debug_assertions);
+    let node_path = if is_production {
+        let sidecar_name = "node-sidecar";
+        let sidecar_path = app.path().resolve(sidecar_name, tauri::path::BaseDirectory::Resource).ok()
+            .or_else(|| {
+                std::env::current_exe().ok().and_then(|exe| {
+                    exe.parent().map(|dir| dir.join(sidecar_name))
+                }).filter(|p| p.exists())
+            });
+        match sidecar_path {
+            Some(path) if path.exists() => Some(path),
+            _ => find_system_node_executable(),
+        }
+    } else {
+        find_system_node_executable()
+    };
+
+    let node_path = node_path.ok_or_else(|| {
+        format!("Node.js {} or later is required but was not found.", MIN_NODE_VERSION)
+    })?;
+
+    let mut command = Command::new(&node_path);
+
+    // Polyfill for Node < 22
+    let node_major = get_node_major_version(&node_path).unwrap_or(0);
+    if node_major > 0 && node_major < 22 {
+        let polyfill_path = node_sdk_dir.join("disposable-polyfill.cjs");
+        if polyfill_path.exists() {
+            command.arg("--require").arg(&polyfill_path);
+        }
+    }
+
+    command
+        .arg(&script_path)
+        .current_dir(&node_sdk_dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    // Environment setup — authentication
+    // Set up provider auth from environment (daemon gets env from process)
+    // Individual query auth is handled per-query via env vars set before daemon spawn
+    // For now, inherit process env (ANTHROPIC_API_KEY, OAuth, etc.)
+
+    let using_sidecar = node_path.to_string_lossy().contains("node-sidecar");
+    if using_sidecar {
+        command.env_remove("NVM_DIR");
+        command.env_remove("NVM_BIN");
+        command.env_remove("NVM_INC");
+        command.env_remove("VOLTA_HOME");
+        command.env_remove("NODE_PATH");
+        if let Ok(current_path) = std::env::var("PATH") {
+            let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+            let clean: Vec<&str> = current_path.split(sep)
+                .filter(|p| !p.contains(".nvm/") && !p.contains(".volta/"))
+                .collect();
+            command.env("PATH", clean.join(sep));
+        }
+    } else if let Some(node_dir) = node_path.parent() {
+        let current_path = std::env::var("PATH").unwrap_or_default();
+        let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+        command.env("PATH", format!("{}{}{}", node_dir.to_string_lossy(), sep, current_path));
+    }
+
+    // Set Anthropic credentials from environment or credential files
+    let has_env_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
+    if has_env_key {
+        if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+            command.env("ANTHROPIC_API_KEY", key);
+        }
+    } else {
+        use crate::claude_auth;
+        if let Ok(Some(credentials)) = claude_auth::get_claude_credentials() {
+            if let crate::claude_auth::AuthType::ApiKey = credentials.auth_type {
+                command.env("ANTHROPIC_API_KEY", &credentials.token);
+            }
+        }
+    }
+
+    command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = command.spawn()
+        .map_err(|e| format!("Failed to spawn daemon: {}", e))?;
+
+    let child_pid = child.id().unwrap_or(0);
+    log::info!("[DAEMON:LIFECYCLE] Spawned daemon process (pid={}, node={:?})", child_pid, node_path);
+
+    let stdin = child.stdin.take()
+        .ok_or("Failed to capture daemon stdin")?;
+    let stdout = child.stdout.take()
+        .ok_or("Failed to capture daemon stdout")?;
+
+    // Capture stderr for logging
+    if let Some(stderr) = child.stderr.take() {
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                let upper = line.to_uppercase();
+                if upper.contains("[ERROR]") || upper.contains("FATAL") {
+                    log::error!("[Daemon stderr] {}", line);
+                } else if upper.contains("[WARN]") {
+                    log::warn!("[Daemon stderr] {}", line);
+                } else {
+                    log::debug!("[Daemon stderr] {}", line);
+                }
+            }
+        });
+    }
+
+    // Store the child so it doesn't get dropped (which would kill it)
+    // We store it in RUNNING_CHILD_PROCESSES with a special key
+    {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.insert("__daemon__".to_string(), child);
+    }
+
+    // Spawn background stdout reader task
+    let app_clone = app.clone();
+    tokio::spawn(async move {
+        daemon_stdout_reader(stdout, app_clone).await;
+    });
+
+    // Wait for daemon_ready signal (with timeout)
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel::<()>();
+
+    // Store the ready channel globally so the reader can signal it
+    {
+        let mut guard = DAEMON_READY_TX.lock().await;
+        *guard = Some(ready_tx);
+    }
+
+    *daemon_guard = Some(DaemonProcess {
+        stdin,
+        child_pid,
+        ready: false,
+    });
+
+    // Drop the daemon lock before waiting for ready signal
+    drop(daemon_guard);
+
+    // Wait for ready with timeout
+    match tokio::time::timeout(std::time::Duration::from_secs(30), ready_rx).await {
+        Ok(Ok(())) => {
+            let mut daemon_guard = DAEMON_PROCESS.lock().await;
+            if let Some(ref mut d) = *daemon_guard {
+                d.ready = true;
+            }
+            log::info!("[DAEMON:LIFECYCLE] Daemon is ready! Startup complete.");
+            Ok(())
+        }
+        Ok(Err(_)) => {
+            log::error!("[DAEMON:LIFECYCLE] Ready channel was dropped — daemon may have crashed during startup");
+            // Clear stale daemon state so next call can retry
+            let mut daemon_guard = DAEMON_PROCESS.lock().await;
+            *daemon_guard = None;
+            Err("Daemon ready channel was dropped".to_string())
+        }
+        Err(_) => {
+            log::error!("[DAEMON:LIFECYCLE] Timed out waiting for daemon ready signal (30s)");
+            // Clear stale daemon state and kill the process
+            {
+                let mut daemon_guard = DAEMON_PROCESS.lock().await;
+                *daemon_guard = None;
+            }
+            {
+                let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+                if let Some(mut child) = procs.remove("__daemon__") {
+                    let _ = child.kill().await;
+                }
+            }
+            Err("Daemon startup timed out after 30 seconds".to_string())
+        }
+    }
+}
+
+/// One-shot channel for daemon ready signal
+/// Lock ordering: always acquire DAEMON_READY_TX before DAEMON_PROCESS when both needed
+static DAEMON_READY_TX: Lazy<TokioMutex<Option<tokio::sync::oneshot::Sender<()>>>> =
+    Lazy::new(|| TokioMutex::new(None));
+
+/// Background task that reads daemon stdout and routes events to the correct query
+async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHandle) {
+    let mut reader = BufReader::new(stdout).lines();
+
+    while let Ok(Some(line)) = reader.next_line().await {
+        // Parse the daemon message
+        let msg: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("[DAEMON:IPC] Failed to parse stdout line: {} — raw: {}", e, &line[..std::cmp::min(200, line.len())]);
+                continue;
+            }
+        };
+
+        let msg_type = msg.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        let query_id = msg.get("queryId").and_then(|q| q.as_str()).map(String::from);
+
+        match msg_type {
+            "daemon_ready" => {
+                log::info!("[DAEMON:LIFECYCLE] Received daemon_ready signal from Node.js");
+                let mut guard = DAEMON_READY_TX.lock().await;
+                if let Some(tx) = guard.take() {
+                    let _ = tx.send(());
+                }
+            }
+
+            "pong" => {
+                log::debug!("[DAEMON:IPC] Received pong from daemon");
+            }
+
+            "event" => {
+                // Route SDK event to the correct frontend listener
+                // Lock ordering: acquire DAEMON_QUERIES briefly, clone needed data, release,
+                // then acquire DAEMON_QUERY_RESULTS if needed
+                if let (Some(ref qid), Some(event)) = (&query_id, msg.get("event")) {
+                    let emit_info = {
+                        let queries = DAEMON_QUERIES.lock().await;
+                        queries.get(qid.as_str()).map(|state| {
+                            (state.agent_id.clone(), state.session_key.clone(), state.app.clone())
+                        })
+                    };
+
+                    if let Some((agent_id, session_key, app_handle)) = emit_info {
+                        let sdk_event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
+                        log::debug!("[DAEMON:ROUTE] query={} event_type={} -> agent={}", qid, sdk_event_type, agent_id);
+
+                        let event_name = format!("claude-event:{}", agent_id);
+                        let wrapped = serde_json::json!({
+                            "sessionKey": session_key,
+                            "event": event
+                        });
+                        let _ = app_handle.emit(&event_name, &wrapped);
+
+                        // Capture Result events for usage data
+                        if let Some(event_type) = event.get("type").and_then(|t| t.as_str()) {
+                            if event_type == "result" {
+                                log::info!("[DAEMON:QUERY] query={} received Result event — capturing usage data", qid);
+                                if let Ok(result_event) = serde_json::from_value::<ClaudeEvent>(event.clone()) {
+                                    if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = result_event {
+                                        let response = ClaudeCliResponse {
+                                            result, session_id, total_cost_usd, usage,
+                                        };
+                                        let mut results = DAEMON_QUERY_RESULTS.lock().await;
+                                        results.insert(qid.clone(), response);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            "ask_user_question" => {
+                // Daemon forwarded an AskUserQuestion from canUseTool
+                if let Some(ref qid) = query_id {
+                    let queries = DAEMON_QUERIES.lock().await;
+                    if let Some(state) = queries.get(qid.as_str()) {
+                        let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                        log::info!("[DAEMON:INTERACT] AskUserQuestion query={} requestId={} -> emitting to frontend", qid, request_id);
+                        let questions = msg.get("questions").cloned().unwrap_or(serde_json::Value::Array(vec![]));
+
+                        let payload = serde_json::json!({
+                            "requestId": request_id,
+                            "questions": questions,
+                            "agentId": state.agent_id,
+                            "sessionKey": state.session_key,
+                            "queryId": qid
+                        });
+
+                        let ask_event = format!("ask-user-question:{}", state.agent_id);
+                        let _ = state.app.emit(&ask_event, payload.clone());
+                        let _ = state.app.emit("ask-user-question", payload);
+                    }
+                }
+            }
+
+            "plan_approval_request" => {
+                if let Some(ref qid) = query_id {
+                    let queries = DAEMON_QUERIES.lock().await;
+                    if let Some(state) = queries.get(qid.as_str()) {
+                        let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                        log::info!("[DAEMON:INTERACT] PlanApprovalRequest query={} requestId={} -> emitting to frontend", qid, request_id);
+                        let plan = msg.get("plan").cloned().unwrap_or(serde_json::Value::Null);
+
+                        let payload = serde_json::json!({
+                            "requestId": request_id,
+                            "plan": plan,
+                            "agentId": state.agent_id,
+                            "sessionKey": state.session_key,
+                            "queryId": qid
+                        });
+                        let _ = state.app.emit("plan-approval-request", payload);
+                    }
+                }
+            }
+
+            "query_complete" => {
+                if let Some(ref qid) = query_id {
+                    log::info!("[DAEMON:QUERY] query={} completed — resolving completion channel", qid);
+
+                    // Get the captured Result event data (if any)
+                    let stored_result = {
+                        let mut results = DAEMON_QUERY_RESULTS.lock().await;
+                        results.remove(qid.as_str())
+                    };
+
+                    let response = stored_result.unwrap_or_else(|| ClaudeCliResponse {
+                        result: String::new(),
+                        session_id: String::new(),
+                        total_cost_usd: 0.0,
+                        usage: Usage {
+                            input_tokens: 0, output_tokens: 0,
+                            cache_read_input_tokens: 0, cache_creation_input_tokens: 0,
+                            extra: None,
+                        },
+                    });
+
+                    let mut queries = DAEMON_QUERIES.lock().await;
+                    if let Some(state) = queries.remove(qid.as_str()) {
+                        let _ = state.completion_tx.send(Ok(response));
+                    }
+                }
+            }
+
+            "query_error" => {
+                if let Some(ref qid) = query_id {
+                    let error_msg = msg.get("error").and_then(|e| e.as_str()).unwrap_or("Unknown daemon error");
+                    log::error!("[DAEMON:QUERY] query={} error: {}", qid, error_msg);
+
+                    // Clean up stored result
+                    {
+                        let mut results = DAEMON_QUERY_RESULTS.lock().await;
+                        results.remove(qid.as_str());
+                    }
+
+                    let mut queries = DAEMON_QUERIES.lock().await;
+                    if let Some(state) = queries.remove(qid.as_str()) {
+                        let _ = state.completion_tx.send(Err(error_msg.to_string()));
+                    }
+                }
+            }
+
+            _ => {
+                log::debug!("[DAEMON:IPC] Unknown message type from daemon: {}", msg_type);
+            }
+        }
+    }
+
+    // stdout closed — daemon died
+    log::error!("[DAEMON:LIFECYCLE] Daemon stdout closed — process likely crashed");
+
+    // Clear daemon state
+    {
+        let mut daemon_guard = DAEMON_PROCESS.lock().await;
+        *daemon_guard = None;
+    }
+
+    // Clean up the daemon child process entry
+    {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.remove("__daemon__");
+    }
+
+    // Fail all active queries
+    let mut queries = DAEMON_QUERIES.lock().await;
+    let query_ids: Vec<String> = queries.keys().cloned().collect();
+    for qid in query_ids {
+        if let Some(state) = queries.remove(&qid) {
+            let _ = state.completion_tx.send(Err("Daemon process crashed unexpectedly".to_string()));
+        }
+    }
+
+    log::info!("[DAEMON:LIFECYCLE] Daemon cleanup complete — will auto-restart on next query");
+}
+
+/// Send a JSON command to the daemon via stdin
+async fn send_to_daemon(message: &str) -> Result<(), String> {
+    let msg_type = serde_json::from_str::<serde_json::Value>(message)
+        .ok()
+        .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(String::from))
+        .unwrap_or_else(|| "unknown".to_string());
+    log::debug!("[DAEMON:IPC] Sending to daemon stdin: type={} ({}B)", msg_type, message.len());
+
+    let mut daemon_guard = DAEMON_PROCESS.lock().await;
+    if let Some(ref mut daemon) = *daemon_guard {
+        let line = format!("{}\n", message);
+        daemon.stdin.write_all(line.as_bytes()).await
+            .map_err(|e| {
+                log::error!("[DAEMON:IPC] Failed to write to daemon stdin: {}", e);
+                format!("Failed to write to daemon stdin: {}", e)
+            })?;
+        daemon.stdin.flush().await
+            .map_err(|e| {
+                log::error!("[DAEMON:IPC] Failed to flush daemon stdin: {}", e);
+                format!("Failed to flush daemon stdin: {}", e)
+            })?;
+        Ok(())
+    } else {
+        log::error!("[DAEMON:IPC] Cannot send — daemon is not running");
+        Err("Daemon is not running".to_string())
+    }
+}
+
+/// Restart daemon command (for dev/debug)
+#[tauri::command]
+pub async fn restart_daemon(app: AppHandle) -> Result<(), String> {
+    log::info!("[DAEMON:LIFECYCLE] Restart requested");
+
+    // Drain in-flight queries first — signal them all as errors
+    {
+        let mut queries = DAEMON_QUERIES.lock().await;
+        let query_ids: Vec<String> = queries.keys().cloned().collect();
+        if !query_ids.is_empty() {
+            log::warn!("[DAEMON:LIFECYCLE] Draining {} in-flight queries before restart", query_ids.len());
+        }
+        for qid in query_ids {
+            if let Some(state) = queries.remove(&qid) {
+                let _ = state.completion_tx.send(Err("Daemon restarting".to_string()));
+            }
+        }
+    }
+
+    // Clean up stored results
+    {
+        let mut results = DAEMON_QUERY_RESULTS.lock().await;
+        results.clear();
+    }
+
+    // Send shutdown command (best-effort)
+    let _ = send_to_daemon(&serde_json::json!({"type": "shutdown"}).to_string()).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    // Clear daemon state and kill process if still alive
+    {
+        let mut daemon_guard = DAEMON_PROCESS.lock().await;
+        *daemon_guard = None;
+    }
+    {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        if let Some(mut child) = procs.remove("__daemon__") {
+            let _ = child.kill().await;
+        }
+    }
+
+    // Spawn fresh daemon
+    ensure_daemon(&app).await
+}
+
+/// Reload MCP server configuration
+#[tauri::command]
+pub async fn reload_mcp_servers() -> Result<(), String> {
+    let cmd = serde_json::json!({"type": "mcp_reload"});
+    send_to_daemon(&cmd.to_string()).await
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -326,6 +908,9 @@ pub struct ClaudeCliRequest {
     pub provider: Option<String>,           // 'anthropic' | 'ollama' | 'custom'
     pub provider_base_url: Option<String>,  // Base URL for non-Anthropic providers
     pub provider_api_key: Option<String>,   // API key for custom providers
+    // 🖥️ IDE context (open file, selection, diagnostics, git status)
+    // Injected into system prompt by Node.js — kept separate from user message
+    pub ide_context: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -1242,7 +1827,9 @@ pub async fn send_message_via_cli_streaming(
     Ok(result_event)
 }
 
-/// Send a message to Claude via Node.js SDK with real-time streaming
+/// Send a message to Claude via Node.js SDK with real-time streaming.
+/// Uses persistent daemon mode when enabled (default), falling back to
+/// per-process mode if daemon is unavailable.
 #[tauri::command]
 pub async fn send_message_via_sdk_streaming(
     app: AppHandle,
@@ -1250,13 +1837,148 @@ pub async fn send_message_via_sdk_streaming(
     request: ClaudeCliRequest,
     _session_state: tauri::State<'_, crate::SessionState>,
 ) -> Result<ClaudeCliResponse, String> {
-    // 🔍 DEBUG: Log every API call with full details
     let debug_timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    log::info!("[SDK DEBUG WARMUP] 🚀 send_message_via_sdk_streaming CALLED at {}", debug_timestamp);
-    log::info!("[SDK DEBUG WARMUP] agent_id={}, prompt={}", agent_id, request.prompt.chars().take(100).collect::<String>());
+    log::info!("[DAEMON:QUERY] send_message_via_sdk_streaming at {} (daemon_enabled={})", debug_timestamp,
+        DAEMON_MODE_ENABLED.load(Ordering::Relaxed));
+
+    // Try daemon mode first
+    if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
+        match send_message_via_daemon(&app, &agent_id, &request).await {
+            Ok(response) => return Ok(response),
+            Err(e) => {
+                log::warn!("[DAEMON:FALLBACK] Daemon mode failed: {} — falling back to legacy per-process mode", e);
+                // Fall through to legacy mode
+            }
+        }
+    }
+
+    // Legacy per-process mode (fallback)
+    send_message_via_sdk_streaming_legacy(app, agent_id, request).await
+}
+
+/// Send message via the persistent daemon process
+async fn send_message_via_daemon(
+    app: &AppHandle,
+    agent_id: &str,
+    request: &ClaudeCliRequest,
+) -> Result<ClaudeCliResponse, String> {
+    // Ensure daemon is running
+    ensure_daemon(app).await?;
+
+    let event_session_key = request.session_key.as_deref().unwrap_or(agent_id).to_string();
+    let query_id = format!("q_{}_{}", event_session_key, uuid::Uuid::new_v4());
+
+    // Create completion channel
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    // Register query
+    {
+        let mut queries = DAEMON_QUERIES.lock().await;
+        queries.insert(query_id.clone(), DaemonQueryState {
+            agent_id: agent_id.to_string(),
+            session_key: event_session_key.clone(),
+            app: app.clone(),
+            completion_tx: tx,
+        });
+    }
+
+    // Build permission mode value
+    let permission_value = request.permission_mode.as_ref().and_then(|mode| match mode.as_str() {
+        "bypass" => Some("bypassPermissions".to_string()),
+        "plan" => Some("plan".to_string()),
+        "act" => None,
+        _ => None,
+    });
+
+    // Build query command
+    let mut query_cmd = serde_json::json!({
+        "type": "query",
+        "queryId": query_id,
+        "prompt": request.prompt,
+        "model": request.model.as_deref().unwrap_or(DEFAULT_MODEL),
+        "thinkingMode": request.thinking_mode,
+        "cwd": request.cwd.as_ref().map(|p| sanitize_path_string_for_node(p)),
+        "sessionId": request.session_id,
+    });
+
+    if let Some(perm) = permission_value {
+        query_cmd["permissionMode"] = serde_json::Value::String(perm);
+    }
+    if let Some(ref agents) = request.agents {
+        query_cmd["agents"] = serde_json::json!(agents);
+    }
+    if let Some(ref tc) = request.team_context {
+        query_cmd["teamContext"] = serde_json::json!(tc);
+    }
+    if let Some(ref attachments) = request.attachments {
+        query_cmd["attachments"] = serde_json::json!(attachments);
+    }
+    if let Some(ref fmt) = request.output_format {
+        query_cmd["outputFormat"] = fmt.clone();
+    }
+    if let Some(ref effort) = request.effort {
+        query_cmd["effort"] = serde_json::Value::String(effort.clone());
+    }
+    if let Some(ref tools) = request.allowed_tools {
+        query_cmd["allowedTools"] = serde_json::json!(tools);
+    }
+    if let Some(ref ide_ctx) = request.ide_context {
+        query_cmd["ideContext"] = serde_json::Value::String(ide_ctx.clone());
+    }
+
+    // Send query to daemon
+    let cmd_str = query_cmd.to_string();
+    log::info!("[DAEMON:QUERY] Sending query={} session={} model={} resume={} prompt={}...",
+        query_id, event_session_key,
+        request.model.as_deref().unwrap_or(DEFAULT_MODEL),
+        request.session_id.as_deref().unwrap_or("(new)"),
+        &request.prompt[..std::cmp::min(80, request.prompt.len())]);
+
+    send_to_daemon(&cmd_str).await.map_err(|e| {
+        // Remove query from tracking on send failure
+        let query_id_clone = query_id.clone();
+        tokio::spawn(async move {
+            let mut queries = DAEMON_QUERIES.lock().await;
+            queries.remove(&query_id_clone);
+        });
+        e
+    })?;
+
+    // Wait for completion with timeout (10 minutes max per query)
+    match tokio::time::timeout(std::time::Duration::from_secs(600), rx).await {
+        Ok(Ok(result)) => {
+            log::info!("[DAEMON:QUERY] query={} finished successfully", query_id);
+            result
+        }
+        Ok(Err(_)) => {
+            log::error!("[DAEMON:QUERY] query={} completion channel dropped", query_id);
+            // Clean up orphaned query state
+            let mut queries = DAEMON_QUERIES.lock().await;
+            queries.remove(&query_id);
+            Err("Query completion channel was dropped unexpectedly".to_string())
+        }
+        Err(_) => {
+            log::error!("[DAEMON:QUERY] query={} timed out after 600s", query_id);
+            // Send abort to daemon and clean up
+            let abort_cmd = serde_json::json!({"type": "abort", "queryId": query_id});
+            let _ = send_to_daemon(&abort_cmd.to_string()).await;
+            let mut queries = DAEMON_QUERIES.lock().await;
+            queries.remove(&query_id);
+            Err("Query timed out after 10 minutes".to_string())
+        }
+    }
+}
+
+/// Legacy: Send a message to Claude via Node.js SDK with per-process spawning
+async fn send_message_via_sdk_streaming_legacy(
+    app: AppHandle,
+    agent_id: String,
+    request: ClaudeCliRequest,
+) -> Result<ClaudeCliResponse, String> {
+    log::info!("[SDK LEGACY] Using per-process mode for agent_id={}", agent_id);
     
     let ClaudeCliRequest {
         prompt,
@@ -1276,6 +1998,7 @@ pub async fn send_message_via_sdk_streaming(
         provider, // 🦆 LLM Provider (anthropic/ollama/custom)
         provider_base_url,
         provider_api_key,
+        ide_context, // 🖥️ IDE context (injected into system prompt by Node.js)
     } = request;
 
     // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
@@ -1362,6 +2085,11 @@ pub async fn send_message_via_sdk_streaming(
     if let Some(tc) = &team_context {
         config["teamContext"] = serde_json::json!(tc);
         log::info!("[SDK] Adding teamContext: team={}, {} members", tc.team_name, tc.members.len());
+    }
+
+    // Add IDE context if provided (injected into system prompt by Node.js)
+    if let Some(ref ide_ctx) = ide_context {
+        config["ideContext"] = serde_json::Value::String(ide_ctx.clone());
     }
 
     // Add attachments if provided (for image support)
@@ -1724,6 +2452,13 @@ pub async fn send_message_via_sdk_streaming(
         None
     };
 
+    // Store child in running processes map for abort support
+    // All I/O handles (stdin/stdout/stderr) are already taken above
+    {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.insert(event_session_key.clone(), child);
+    }
+
     // Track final response
     let mut final_result: Option<ClaudeCliResponse> = None;
 
@@ -1891,9 +2626,22 @@ pub async fn send_message_via_sdk_streaming(
         }
     }
 
-    // Wait for process to complete
-    let status = child.wait().await
-        .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?;
+    // Take child back from running processes map (may be None if abort_sdk_stream already removed and killed it)
+    let child_for_wait = {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.remove(&event_session_key)
+    };
+
+    let status = match child_for_wait {
+        Some(mut c) => c.wait().await
+            .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?,
+        None => {
+            // Child was already removed and killed by abort_sdk_stream
+            log::info!("[SDK] Process was aborted for session: {}", event_session_key);
+            unregister_process(&event_session_key).await;
+            return Err("Cancelled by user".to_string());
+        }
+    };
 
     // Cleanup: unregister the process stdin
     // 🦆 FIX: Use event_session_key instead of agent_id to match registration
@@ -2010,33 +2758,41 @@ pub async fn send_tool_result_to_sdk(
     Ok(())
 }
 
-/// Send answers to an AskUserQuestion request via stdin to the active SDK process
-/// This uses the bidirectional communication system to respond to the Node.js process
-/// 🦆 FIX: Now uses agent_id as process_key (sessionKey) to support concurrent sessions
+/// Send answers to an AskUserQuestion request via stdin.
+/// Routes through daemon if in daemon mode, otherwise uses legacy per-process stdin.
 #[tauri::command]
 pub async fn answer_user_question(
-    agent_id: String,  // Note: This is actually the processKey (sessionKey or agentId)
+    agent_id: String,  // Actually the processKey (sessionKey or agentId)
     request_id: String,
     answers: serde_json::Value,
 ) -> Result<(), String> {
-    // Note: agent_id parameter name kept for backwards compatibility, but it's actually the process_key
-    log::info!("[SDK] 🗣️ Answering user question for process: {}, requestId: {}", agent_id, request_id);
-    log::info!("[SDK] 🗣️ Answers: {:?}", answers);
+    log::info!("[DAEMON:INTERACT] answer_user_question process={} requestId={}", agent_id, request_id);
 
-    // Build the response message
+    // Try daemon mode first
+    if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
+        let daemon_guard = DAEMON_PROCESS.lock().await;
+        if daemon_guard.is_some() {
+            drop(daemon_guard);
+            log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={}", request_id);
+
+            let cmd = serde_json::json!({
+                "type": "response",
+                "requestId": request_id,
+                "answers": answers,
+            });
+            return send_to_daemon(&cmd.to_string()).await;
+        }
+    }
+
+    // Legacy mode: send to per-process stdin
+    log::info!("[DAEMON:FALLBACK] Routing answer via legacy process for requestId={}", request_id);
     let response = serde_json::json!({
         "requestId": request_id,
         "answers": answers,
     });
-
     let message = serde_json::to_string(&response)
         .map_err(|e| format!("Failed to serialize answer: {}", e))?;
-
-    // Send to the active process via stdin (agent_id is actually the process_key/sessionKey)
-    send_to_process(&agent_id, &message).await?;
-
-    log::info!("[SDK] 🗣️ Answer sent successfully");
-    Ok(())
+    send_to_process(&agent_id, &message).await
 }
 
 /// Helper to get the SDK script path

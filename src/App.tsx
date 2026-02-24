@@ -969,7 +969,6 @@ function AppContent() {
   // Multi-Chat state - one chat session per agent
   const [chatSessions, setChatSessions] = useState<Map<string, ChatMessage[]>>(new Map());
   const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
-  const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
   // Agent metadata (name, cwd) for Telegram notifications
   const agentMetadataRef = useRef<Map<string, { name: string; cwd: string }>>(new Map());
   // Last response text per agent for Telegram notifications
@@ -980,6 +979,8 @@ function AppContent() {
   // Key format: `${activeId}-${messageId}` to prevent race conditions between concurrent streams
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const lastPromptsRef = useRef<Map<string, string>>(new Map());
+  // Track which sessions are resuming (have an existing claudeSessionId) to hide redundant init widgets
+  const resumingSessionsRef = useRef<Set<string>>(new Set());
   // Track active streams per SESSION (not per agent) to prevent concurrency issues
   // Key is sessionKey (activeSessionId || activeId), Value is Set of streamKeys
   // This allows different sessions of the same agent to be stopped independently
@@ -1218,6 +1219,12 @@ function AppContent() {
       return; // REJECT event - do not write to any session
     }
     const messageKey = sessionKey;
+
+    // Tag system/init events as resumed to hide redundant header + init widget
+    if (evt.type === 'system' && evt.subtype === 'init' && resumingSessionsRef.current.has(messageKey)) {
+      evt.isResumed = true;
+      resumingSessionsRef.current.delete(messageKey);
+    }
 
     console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
@@ -2192,6 +2199,11 @@ function AppContent() {
 
     console.log(`🦆 [SESSION-FIRST] Sending message to session: ${messageKey}, agentId: ${capturedAgentId}, claudeSessionId: ${capturedClaudeSessionId?.slice(0, 8) || 'NEW'}`);
 
+    // Track resuming sessions so handleClaudeEvent can tag system/init as isResumed
+    if (capturedClaudeSessionId) {
+      resumingSessionsRef.current.add(messageKey);
+    }
+
     // 🦆 AUTO-PROGRESS: Move session to 'in_progress' when first message is sent
     // This automatically transitions TODO tasks to In Progress in Kanban
     const currentSession = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
@@ -2379,6 +2391,8 @@ function AppContent() {
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
+      // Hide header + init widget on resumed sessions (known at message creation time)
+      metadata: capturedClaudeSessionId ? { isResumed: true } : undefined,
     };
 
     // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)
@@ -2415,16 +2429,7 @@ function AppContent() {
     });
 
     try {
-      // Build context from SESSION's conversation history (not agent!)
-      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so sessions don't share history
-      const agentHistory = chatConversationHistoryRef.current.get(messageKey) ?? [];
       let prompt = contentWithAttachments;
-      if (agentHistory.length > 0) {
-        const history = agentHistory
-          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n');
-        prompt = `${history}\n\nUser: ${contentWithAttachments}`;
-      }
 
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
@@ -2434,12 +2439,9 @@ function AppContent() {
         ? sessionWorktreePath
         : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
-      const ideContextPrefix = await buildContextPrefix(gitSummary, workingDir ?? null);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
+      // Build IDE context (open file, selection, git status) as a separate field
+      // Injected into system prompt by Node.js — not concatenated into user message
+      const ideContext = await buildContextPrefix(gitSummary, workingDir ?? null);
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -2454,13 +2456,14 @@ function AppContent() {
       // 🦆 SIMPLIFIED: Always start fresh conversation
       // Users can resume sessions via Sessions panel -> "Resume Session" button
       // Race between invoke and abort
-      const response = await Promise.race([
-        invoke<{
-          result: string;
-          session_id: string;
-          total_cost_usd: number;
-          usage: UsageStats;
-        }>('send_message_via_sdk_streaming', {
+      // Note: sdkInvokePromise is captured separately so we can suppress the
+      // unhandled rejection that occurs when abort fires before the backend returns.
+      const sdkInvokePromise = invoke<{
+        result: string;
+        session_id: string;
+        total_cost_usd: number;
+        usage: UsageStats;
+      }>('send_message_via_sdk_streaming', {
           // 🦆 RACE CONDITION FIX: Use capturedAgentId
           agentId: capturedAgentId,
           request: (() => {
@@ -2520,11 +2523,13 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // IDE context: injected into system prompt by Node.js, not into user message
+            ideContext: ideContext || undefined,
           };
           })(),
-        }),
-        abortPromise,
-      ]);
+        });
+      sdkInvokePromise.catch(() => {}); // Suppress unhandled rejection when abort fires first
+      const response = await Promise.race([sdkInvokePromise, abortPromise]);
 
       // 🦆 SESSION-FIRST: Update message with final result using messageKey
       setChatSessions((prev) => {
@@ -2544,22 +2549,6 @@ function AppContent() {
         );
         return newSessions;
       });
-
-      // Add to agent's conversation history
-      const updatedHistory = [
-        ...agentHistory,
-        {
-          role: 'user' as const,
-          content: contentWithAttachments,
-        },
-        {
-          role: 'assistant' as const,
-          content: response.result,
-        },
-      ];
-      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so each session has its own history
-      chatConversationHistoryRef.current.set(messageKey, updatedHistory);
-
 
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
       // Each session has its own claudeSessionId for independent conversations
@@ -2781,6 +2770,11 @@ function AppContent() {
         console.log(`[abortStreamForSession] Aborting stream: ${streamKey}`);
         abortController.abort();
       }
+    });
+
+    // Kill the backend Node.js process so it stops immediately
+    invoke('abort_sdk_stream', { sessionKey: messageKey }).catch((err) => {
+      console.warn('[abortStreamForSession] Failed to kill backend process:', err);
     });
   }, [activeId, activeSessionId]);
 
@@ -3129,22 +3123,11 @@ function AppContent() {
       await ensureListenerReady(targetAgentId);
       await new Promise(resolve => setTimeout(resolve, 150));
 
-      // Build context from conversation history
-      const agentHistory = chatConversationHistoryRef.current.get(targetAgentId) ?? [];
       let prompt = content;
-      if (agentHistory.length > 0) {
-        const history = agentHistory
-          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n');
-        prompt = `${history}\n\nUser: ${content}`;
-      }
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
-      const ideContextPrefix = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
+      // Build IDE context (open file, selection, git status) as a separate field
+      // Injected into system prompt by Node.js — not concatenated into user message
+      const ideContext = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
 
       // Create abort promise
       const abortPromise = new Promise<never>((_, reject) => {
@@ -3189,6 +3172,8 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // IDE context: injected into system prompt by Node.js, not into user message
+            ideContext: ideContext || undefined,
           };
           })(),
         }),
@@ -3213,14 +3198,6 @@ function AppContent() {
         );
         return newSessions;
       });
-
-      // Add to conversation history
-      const updatedHistory = [
-        ...agentHistory,
-        { role: 'user' as const, content },
-        { role: 'assistant' as const, content: response.result },
-      ];
-      chatConversationHistoryRef.current.set(targetAgentId, updatedHistory);
 
       // Update tokens
       setChatTokensMap((prev) => {
@@ -3346,6 +3323,11 @@ function AppContent() {
         abortController.abort();
       }
     });
+
+    // Kill the backend Node.js process so it stops immediately
+    invoke('abort_sdk_stream', { sessionKey: targetAgentId }).catch((err) => {
+      console.warn('[abortStreamForTargetAgent] Failed to kill backend process:', err);
+    });
   }, []);
 
   // Clear conversation for a specific agent (used by Kanban)
@@ -3356,9 +3338,6 @@ function AppContent() {
       newSessions.set(targetAgentId, []);
       return newSessions;
     });
-
-    // Clear conversation history
-    chatConversationHistoryRef.current.delete(targetAgentId);
 
     // Clear last prompt
     lastPromptsRef.current.delete(targetAgentId);
@@ -3697,10 +3676,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         newSessions.set(activeId, []);
         return newSessions;
       });
-
-      // Clear conversation history (keyed by sessionId)
-      const sessionToClear = activeSessionId || activeId;
-      chatConversationHistoryRef.current.set(sessionToClear, []);
 
       // Clear last prompt
       lastPromptsRef.current.delete(activeId);

@@ -95,13 +95,18 @@ interface ChatMessageProps {
 function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown, showHeader = true }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
-  const isStreaming = message.status === 'streaming';
   const hasError = message.status === 'error';
   const attachments = message.attachments ?? [];
 
   // Check if this is a resume session message
   const isResumeMessage = message.metadata?.isResumeMessage === true;
   const sessionId = message.metadata?.sessionId as string | undefined;
+
+  // Check if this message is from a resumed session (hide header + init widget)
+  // metadata.isResumed is set at message creation (instant), events check is fallback
+  const isResumedSession = message.metadata?.isResumed === true || message.events?.some(
+    (e: any) => e.type === 'system' && e.subtype === 'init' && e.isResumed
+  );
 
   // Use cached avatar hook - much faster than manual loading
   const avatarUrl = useAgentAvatar(agentName, agentAvatar);
@@ -381,7 +386,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
   }
 
   return (
-    <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''} ${!isUser && !showHeader ? 'no-header' : ''}`}>
+    <div className={`chat-message ${isUser ? 'user' : 'assistant'} ${hasError ? 'error' : ''} ${isLastUserMessage && isUser ? 'sticky-user-message' : ''} ${!isUser && (!showHeader || isResumedSession) ? 'no-header' : ''}`}>
       <div
         className="chat-message-content"
         onMouseEnter={() => isLastUserMessage && isUser && setIsHovering(true)}
@@ -598,7 +603,6 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 <MarkdownText>{message.content}</MarkdownText>
               </div>
             )}
-            {isStreaming && <span className="streaming-cursor">▊</span>}
           </div>
         )}
         {attachments.length > 0 && (
@@ -627,7 +631,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
         )}
         {hasError && message.error && (
           <div className="chat-message-error">
-            Error: {message.error}
+            {message.error === 'Aborted' ? 'Aborted' : `Error: ${message.error}`}
           </div>
         )}
         {message.toolCalls && message.toolCalls.length > 0 && (
