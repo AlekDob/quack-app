@@ -480,6 +480,38 @@
   font-style: italic;
 }
 
+/* ─── Provider Toggle ────────────────────────────────────────────── */
+
+.automation-provider-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px;
+  width: fit-content;
+}
+
+.automation-provider-btn {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.automation-provider-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.automation-provider-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
 /* ─── Form Actions ───────────────────────────────────────────────── */
 
 .automation-form-actions {

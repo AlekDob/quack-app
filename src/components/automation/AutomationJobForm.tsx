@@ -1,10 +1,14 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAutomationStore } from '../../stores/automationStore';
 import CronPresetInput from './CronPresetInput';
 import { AgentAvatar } from '../AgentAvatar';
 import { isValidCron } from '../../services/cronUtils';
 import { extractProjectId } from '../../utils/projectUtils';
-import type { TerminalInfo, AutomationJob } from '../../types';
+import { useModelsConfig } from '../../hooks/useAppConfig';
+import { getModelOptions } from '../../services/modelService';
+import { fetchOllamaModels, getOllamaModelOptions } from '../../services/ollamaService';
+import { useSettingsStore } from '../../stores/settingsStore';
+import type { TerminalInfo, AutomationJob, LLMProviderType } from '../../types';
 
 interface AutomationJobFormProps {
   terminals: TerminalInfo[];
@@ -18,6 +22,30 @@ export default function AutomationJobForm({
   onClose,
 }: AutomationJobFormProps) {
   const { addJob, updateJob } = useAutomationStore();
+  const { models: remoteModels } = useModelsConfig();
+  const anthropicOptions = getModelOptions(remoteModels);
+  const { providerBaseUrl } = useSettingsStore(s => s.claude);
+  const [ollamaOptions, setOllamaOptions] = useState<{ value: string; label: string }[]>([]);
+  const [ollamaLoading, setOllamaLoading] = useState(false);
+
+  // Per-job provider toggle (independent from global setting)
+  const [jobProvider, setJobProvider] = useState<LLMProviderType>(
+    editingJob?.model && !['sonnet', 'opus', 'haiku'].some(m => editingJob.model?.includes(m))
+      ? 'ollama'
+      : 'anthropic'
+  );
+
+  // Fetch Ollama models when switching to ollama
+  useEffect(() => {
+    if (jobProvider === 'ollama' && ollamaOptions.length === 0) {
+      setOllamaLoading(true);
+      const url = providerBaseUrl || 'http://localhost:11434';
+      fetchOllamaModels(url).then(models => {
+        setOllamaOptions(getOllamaModelOptions(models));
+        setOllamaLoading(false);
+      });
+    }
+  }, [jobProvider, providerBaseUrl, ollamaOptions.length]);
 
   const [name, setName] = useState(editingJob?.name ?? '');
   const [cronExpression, setCronExpression] = useState(editingJob?.cronExpression ?? '0 9 * * *');
@@ -162,21 +190,50 @@ export default function AutomationJobForm({
           />
         </div>
 
-        {/* Advanced Options */}
-        <div className="automation-form-field" style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ flex: 1 }}>
-            <label className="automation-form-label">Model (optional)</label>
-            <select
-              className="automation-form-select"
-              value={model}
-              onChange={e => setModel(e.target.value)}
+        {/* Model Selection with Provider Toggle */}
+        <div className="automation-form-field">
+          <label className="automation-form-label">Model (optional)</label>
+          <div className="automation-provider-toggle">
+            <button
+              type="button"
+              className={`automation-provider-btn ${jobProvider === 'anthropic' ? 'active' : ''}`}
+              onClick={() => { setJobProvider('anthropic'); setModel(''); }}
             >
-              <option value="">Agent default</option>
-              <option value="sonnet">Sonnet</option>
-              <option value="opus">Opus</option>
-              <option value="haiku">Haiku</option>
-            </select>
+              Claude
+            </button>
+            <button
+              type="button"
+              className={`automation-provider-btn ${jobProvider === 'ollama' ? 'active' : ''}`}
+              onClick={() => { setJobProvider('ollama'); setModel(''); }}
+            >
+              Ollama
+            </button>
           </div>
+          <select
+            className="automation-form-select"
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            style={{ marginTop: '6px' }}
+          >
+            <option value="">Agent default</option>
+            {jobProvider === 'ollama' ? (
+              ollamaLoading ? (
+                <option disabled>Loading models...</option>
+              ) : (
+                ollamaOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))
+              )
+            ) : (
+              anthropicOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))
+            )}
+          </select>
+        </div>
+
+        {/* Timeout */}
+        <div className="automation-form-field" style={{ display: 'flex', gap: '12px' }}>
           <div style={{ flex: 1 }}>
             <label className="automation-form-label">Timeout (min)</label>
             <input
