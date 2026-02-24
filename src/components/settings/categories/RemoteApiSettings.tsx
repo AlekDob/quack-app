@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
-import type { RemoteApiConfig } from '@/types';
+import type { RemoteApiConfig } from '../../../types';
 
 export default function RemoteApiSettings() {
   const [config, setConfig] = useState<RemoteApiConfig | null>(null);

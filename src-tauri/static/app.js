@@ -19,6 +19,8 @@ const state = {
   chatMessages: [],    // messages in current chat
   chatLoading: false,
   chatSending: false,
+  chatPollTimer: null, // polling timer for live updates
+  drawer: null,        // { agentId, agentName } when execute drawer is open
 };
 
 // ── API Client ─────────────────────────────────────────────────
@@ -82,6 +84,10 @@ function handleWsEvent(event) {
     case 'session_completed':
       toast('Session completed', 'success');
       loadData();
+      // If watching this session, refresh messages
+      if (state.chatSession && state.chatSession.id === event.sessionId) {
+        pollChatMessages();
+      }
       break;
     case 'job_fired':
       toast(`Job fired: ${event.jobName}`, 'success');
@@ -116,10 +122,12 @@ async function loadData() {
   render();
 }
 
+// ── Chat ───────────────────────────────────────────────────────
 async function openChat(session) {
   state.chatSession = session;
   state.chatMessages = [];
   state.chatLoading = true;
+  state.drawer = null; // close drawer if open
   render();
   try {
     const messages = await api.get(`/sessions/${session.id}/messages`);
@@ -131,6 +139,32 @@ async function openChat(session) {
   }
   render();
   scrollChatToBottom();
+  startChatPolling();
+}
+
+async function pollChatMessages() {
+  if (!state.chatSession) return;
+  try {
+    const messages = await api.get(`/sessions/${state.chatSession.id}/messages`);
+    const hadMessages = state.chatMessages.length;
+    state.chatMessages = messages;
+    if (messages.length > hadMessages) {
+      render();
+      scrollChatToBottom();
+    }
+  } catch {}
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  state.chatPollTimer = setInterval(pollChatMessages, 3000);
+}
+
+function stopChatPolling() {
+  if (state.chatPollTimer) {
+    clearInterval(state.chatPollTimer);
+    state.chatPollTimer = null;
+  }
 }
 
 async function sendMessage() {
@@ -147,7 +181,6 @@ async function sendMessage() {
 
   try {
     await api.post(`/sessions/${state.chatSession.id}/send`, { message });
-    toast('Message sent', 'success');
   } catch (err) {
     toast(`Send failed: ${err.message}`, 'error');
   }
@@ -160,6 +193,35 @@ function scrollChatToBottom() {
     const container = $('#chat-messages');
     if (container) container.scrollTop = container.scrollHeight;
   });
+}
+
+// ── Execute (via drawer) ──────────────────────────────────────
+async function executeFromDrawer() {
+  const prompt = $('#drawer-prompt')?.value?.trim();
+  if (!prompt || !state.drawer) return;
+
+  const { agentId } = state.drawer;
+  const sendBtn = $('#drawer-send');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const res = await api.post('/execute', { agentId, prompt });
+    if (res.success && res.sessionId) {
+      state.drawer = null;
+      toast('Agent started!', 'success');
+      // Reload sessions then open the chat for the new session
+      await loadData();
+      const newSession = state.sessions.find(s => s.id === res.sessionId);
+      if (newSession) {
+        openChat(newSession);
+      }
+    } else {
+      toast(res.error || 'Execute failed', 'error');
+    }
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+  if (sendBtn) sendBtn.disabled = false;
 }
 
 // ── Toast ──────────────────────────────────────────────────────
@@ -183,7 +245,7 @@ function render() {
     app.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
     return;
   }
-  // Chat view
+  // Chat view (full screen)
   if (state.chatSession) {
     app.innerHTML = renderChat();
     bindEvents();
@@ -195,6 +257,7 @@ function render() {
     ${renderStats()}
     ${renderTabs()}
     ${renderContent()}
+    ${state.drawer ? renderDrawer() : ''}
   `;
   bindEvents();
 }
@@ -255,7 +318,6 @@ function renderTabs() {
     { id: 'agents', label: 'Agents' },
     { id: 'sessions', label: 'Sessions' },
     { id: 'jobs', label: 'Jobs' },
-    { id: 'execute', label: 'Execute' },
   ];
   return `
     <div class="tab-nav">
@@ -273,7 +335,6 @@ function renderContent() {
     case 'agents': return renderAgents();
     case 'sessions': return renderSessions();
     case 'jobs': return renderJobs();
-    case 'execute': return renderExecute();
     default: return '';
   }
 }
@@ -305,7 +366,6 @@ function renderAgents() {
 }
 
 function renderAgentWithSessions(a) {
-  // Find active sessions for this agent (not done)
   const activeSessions = state.sessions.filter(
     s => s.agentId === a.id && s.status !== 'done'
   );
@@ -329,7 +389,7 @@ function renderAgentWithSessions(a) {
         </div>
         <div class="agent-card-right">
           <span class="badge badge-${statusClass}">${a.status || 'idle'}</span>
-          <button class="btn-icon btn-new-session" data-new-session="${a.id}" title="New session">+</button>
+          <button class="btn-icon btn-new-session" data-open-drawer="${a.id}" title="New session">+</button>
         </div>
       </div>
       ${activeSessions.length ? `
@@ -347,6 +407,28 @@ function renderAgentWithSessions(a) {
   `;
 }
 
+// ── Execute Drawer (bottom sheet) ─────────────────────────────
+function renderDrawer() {
+  const agent = state.agents.find(a => a.id === state.drawer.agentId);
+  const agentName = agent ? agent.name : 'Agent';
+  return `
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <div class="drawer" id="drawer">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <span class="drawer-title">New session</span>
+        <span class="drawer-agent">${esc(agentName)}</span>
+      </div>
+      <div class="drawer-body">
+        <textarea id="drawer-prompt" class="textarea" placeholder="What should the agent do?" rows="3" autofocus></textarea>
+        <button id="drawer-send" class="btn btn-primary btn-block">
+          Send
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 // ── Chat View ─────────────────────────────────────────────────
 function renderChat() {
   const s = state.chatSession;
@@ -356,10 +438,13 @@ function renderChat() {
   return `
     <div class="chat-view">
       <div class="chat-header">
-        <button class="detail-back" id="back-btn">←</button>
+        <button class="chat-back" id="back-btn">←</button>
         <div class="chat-header-info">
           <div class="chat-header-title">${esc(s.title || 'Untitled')}</div>
           <div class="chat-header-agent">${esc(agentName)}</div>
+        </div>
+        <div class="chat-header-live">
+          <span class="ws-dot ${state.wsConnected ? 'connected' : 'disconnected'}"></span>
         </div>
       </div>
       <div class="chat-messages" id="chat-messages">
@@ -371,7 +456,7 @@ function renderChat() {
                   <div class="chat-bubble-content">${formatMessage(m.content)}</div>
                 </div>
               `).join('')
-            : '<div class="empty-inline">No messages yet</div>'
+            : '<div class="empty-inline">Waiting for agent response...</div>'
         }
       </div>
       <div class="chat-input-bar">
@@ -388,7 +473,6 @@ function renderChat() {
 
 function formatMessage(content) {
   if (!content) return '';
-  // Basic markdown-like formatting: code blocks, bold, newlines
   return esc(content)
     .replace(/\n/g, '<br>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -439,22 +523,6 @@ function renderJobs() {
   `).join('');
 }
 
-// ── Execute Tab ────────────────────────────────────────────────
-function renderExecute() {
-  return `
-    <div class="card">
-      <div class="execute-form">
-        <select id="exec-agent" class="select">
-          <option value="">Select an agent...</option>
-          ${state.agents.map(a => `<option value="${a.id}">${esc(a.name || a.id)}</option>`).join('')}
-        </select>
-        <textarea id="exec-prompt" class="textarea" placeholder="What should the agent do?"></textarea>
-        <button id="exec-btn" class="btn btn-primary btn-block">Execute</button>
-      </div>
-    </div>
-  `;
-}
-
 // ── Event Binding ──────────────────────────────────────────────
 function bindEvents() {
   // Login
@@ -478,10 +546,11 @@ function bindEvents() {
     return;
   }
 
-  // Back button (chat view)
+  // Back button (chat view → main)
   const backBtn = $('#back-btn');
   if (backBtn) {
     backBtn.onclick = () => {
+      stopChatPolling();
       state.chatSession = null;
       state.chatMessages = [];
       render();
@@ -495,7 +564,6 @@ function bindEvents() {
     const chatInput = $('#chat-input');
     if (chatInput) {
       chatInput.onkeydown = (e) => { if (e.key === 'Enter') sendMessage(); };
-      // Auto-focus input
       chatInput.focus();
     }
   }
@@ -509,21 +577,40 @@ function bindEvents() {
     };
   });
 
-  // New session button
-  $$('[data-new-session]').forEach(btn => {
+  // Open drawer (+ button on agent)
+  $$('[data-open-drawer]').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
-      const agentId = btn.dataset.newSession;
+      const agentId = btn.dataset.openDrawer;
       const agent = state.agents.find(a => a.id === agentId);
-      // Switch to execute tab with agent pre-selected
-      state.tab = 'execute';
+      state.drawer = { agentId, agentName: agent?.name || 'Agent' };
       render();
-      const select = $('#exec-agent');
-      if (select) select.value = agentId;
-      const textarea = $('#exec-prompt');
-      if (textarea) textarea.focus();
+      // Focus textarea after render
+      requestAnimationFrame(() => {
+        const textarea = $('#drawer-prompt');
+        if (textarea) textarea.focus();
+      });
     };
   });
+
+  // Drawer overlay (close on tap)
+  const overlay = $('#drawer-overlay');
+  if (overlay) {
+    overlay.onclick = () => { state.drawer = null; render(); };
+  }
+
+  // Drawer send button
+  const drawerSend = $('#drawer-send');
+  if (drawerSend) {
+    drawerSend.onclick = executeFromDrawer;
+    const drawerPrompt = $('#drawer-prompt');
+    if (drawerPrompt) {
+      // Cmd+Enter or Ctrl+Enter to send
+      drawerPrompt.onkeydown = (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) executeFromDrawer();
+      };
+    }
+  }
 
   // Tabs
   $$('.tab-btn').forEach(btn => {
@@ -543,29 +630,6 @@ function bindEvents() {
       btn.disabled = false;
     };
   });
-
-  // Execute
-  const execBtn = $('#exec-btn');
-  if (execBtn) {
-    execBtn.onclick = async () => {
-      const agentId = $('#exec-agent')?.value;
-      const prompt = $('#exec-prompt')?.value?.trim();
-      if (!agentId || !prompt) { toast('Select agent and enter prompt', 'error'); return; }
-      execBtn.disabled = true;
-      try {
-        const res = await api.post('/execute', { agentId, prompt });
-        if (res.success) {
-          toast('Agent executing!', 'success');
-          $('#exec-prompt').value = '';
-        } else {
-          toast(res.error || 'Failed', 'error');
-        }
-      } catch (err) {
-        toast(`Error: ${err.message}`, 'error');
-      }
-      execBtn.disabled = false;
-    };
-  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────

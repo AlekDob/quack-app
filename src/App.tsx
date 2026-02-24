@@ -4932,6 +4932,99 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     });
 
+    // 📱 Remote API: Execute command from mobile dashboard
+    // Creates a session for the agent and sends the prompt
+    const unlistenRemoteExecutePromise = listen<{
+      sessionId: string;
+      agentId: string;
+      agentName: string;
+      projectPath: string;
+      projectName: string;
+      prompt: string;
+      source: string;
+      autoSend: boolean;
+    }>("remote-execute", async (event) => {
+      console.log("📱 [Remote Execute] Request:", event.payload);
+      const { agentId, prompt, projectPath, projectName } = event.payload;
+
+      // Find the terminal for this agent
+      const agent = terminalsRef.current.find(t => t.id === agentId);
+      if (!agent) {
+        console.error(`📱 [Remote Execute] Agent not found: ${agentId}`);
+        return;
+      }
+
+      try {
+        // Create a new session
+        const newSession = await useSessionStore.getState().createSession({
+          title: `[Remote] ${prompt.slice(0, 50)}...`,
+          agentId,
+          projectPath: projectPath || agent.cwd,
+          projectName: projectName || extractProjectId(agent.cwd) || 'project',
+          status: 'in_progress',
+          messageCount: 0,
+          initialPrompt: prompt,
+        });
+
+        console.log(`📱 [Remote Execute] Session created: ${newSession.id}`);
+
+        // Set active and send
+        setActiveId(agentId);
+        setActiveSessionIdExclusive(newSession.id);
+
+        // Use pendingAutoStart to send the prompt once the session is active
+        pendingAutoStartRef.current = { prompt, sessionId: newSession.id };
+
+        // Fallback: if activeSessionId was already set, send directly
+        setTimeout(() => {
+          if (pendingAutoStartRef.current?.sessionId === newSession.id) {
+            console.log(`📱 [Remote Execute] Fallback: sending directly`);
+            pendingAutoStartRef.current = null;
+            if (sendMessageForAgentRef.current) {
+              sendMessageForAgentRef.current(prompt);
+            }
+          }
+        }, 2000);
+      } catch (err) {
+        console.error(`📱 [Remote Execute] Failed:`, err);
+      }
+    });
+
+    // 📱 Remote API: Send message to existing session from mobile dashboard
+    const unlistenRemoteSendMessagePromise = listen<{
+      sessionId: string;
+      message: string;
+      source: string;
+    }>("remote-send-message", async (event) => {
+      console.log("📱 [Remote SendMessage] Request:", event.payload);
+      const { sessionId, message } = event.payload;
+
+      // Find the session to get the agentId
+      const sessions = useSessionStore.getState().sessions;
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) {
+        console.error(`📱 [Remote SendMessage] Session not found: ${sessionId}`);
+        return;
+      }
+
+      // Set the agent and session active, then send
+      setActiveId(session.agentId);
+      setActiveSessionIdExclusive(sessionId);
+
+      // Use pendingAutoStart to send the message
+      pendingAutoStartRef.current = { prompt: message, sessionId };
+
+      setTimeout(() => {
+        if (pendingAutoStartRef.current?.sessionId === sessionId) {
+          console.log(`📱 [Remote SendMessage] Fallback: sending directly`);
+          pendingAutoStartRef.current = null;
+          if (sendMessageForAgentRef.current) {
+            sendMessageForAgentRef.current(message);
+          }
+        }
+      }, 2000);
+    });
+
     return () => {
       unlistenPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAISettingsPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -4943,6 +5036,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenPlanApprovalGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionAutoStartPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenRemoteExecutePromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenRemoteSendMessagePromise.then(unlisten => unlisten()).catch(() => undefined);
     };
   }, [loadSavedCommands, showIntroReplay, tauriAvailable, togglePipWindow, loadKanbanTasks, setActiveSessionIdExclusive]);
 
