@@ -485,6 +485,11 @@ async function main() {
 
     console.error(`[DEBUG] Using ${resolvedAllowedTools.length} allowed tools:`, resolvedAllowedTools.slice(0, 5).join(', ') + '...');
 
+    // Track whether the plan has been approved in this session to prevent
+    // duplicate approval requests when SDK re-enters plan mode
+    // Brain: fix-duplicate-plan-approval
+    let planAlreadyApproved = false;
+
     const options = {
       model: modelId,
       // Enable automatic reading of CLAUDE.md and project settings
@@ -591,7 +596,19 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
 
         // Handle ExitPlanMode - requires user approval before proceeding
         // Without this, plans get auto-approved without user interaction
+        // Brain: fix-duplicate-plan-approval
         if (toolName === 'ExitPlanMode') {
+          // If plan was already approved in this session, auto-approve subsequent calls.
+          // The SDK may re-enter plan mode even after approval because the process
+          // permissionMode stays 'plan' for the entire session lifetime.
+          if (planAlreadyApproved) {
+            console.error(`[canUseTool] ExitPlanMode detected but plan already approved — auto-allowing`);
+            return {
+              behavior: 'allow',
+              updatedInput: input,
+            };
+          }
+
           console.error(`[canUseTool] ExitPlanMode detected, requesting user approval`);
           console.error(`[canUseTool] Plan:`, JSON.stringify(input, null, 2).substring(0, 1000));
 
@@ -608,6 +625,8 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
             const isApproved = answers.approved === 'true' || answers.approved === true;
 
             if (isApproved) {
+              // Mark as approved so subsequent ExitPlanMode calls are auto-approved
+              planAlreadyApproved = true;
               // User approved the plan - allow ExitPlanMode to proceed
               return {
                 behavior: 'allow',
@@ -615,6 +634,7 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
               };
             } else {
               // User rejected the plan - deny ExitPlanMode
+              // Do NOT set planAlreadyApproved — agent can revise and resubmit
               const feedback = answers.feedback || 'User rejected the plan';
               return {
                 behavior: 'deny',
