@@ -38,8 +38,8 @@ function emit(obj) {
   process.stdout.write(JSON.stringify(obj) + '\n');
 }
 
-function log(...args) {
-  console.error('[DAEMON]', ...args);
+function log(tag, ...args) {
+  console.error(`[DAEMON:${tag}]`, ...args);
 }
 
 // =============================================================================
@@ -78,10 +78,10 @@ function loadGlobalMCPServers() {
         servers[name] = { command: config.command, args: config.args || [], env: config.env };
       }
     }
-    log(`Loaded ${Object.keys(servers).length} global MCP servers`);
+    log('MCP', `Loaded ${Object.keys(servers).length} global MCP servers`);
     return servers;
   } catch (error) {
-    log(`Error reading global .mcp.json: ${error.message}`);
+    log('MCP', `Error reading global .mcp.json: ${error.message}`);
     return {};
   }
 }
@@ -110,7 +110,7 @@ function loadMCPServersFromFile(workingDir) {
     }
     return Object.keys(servers).length > 0 ? servers : undefined;
   } catch (error) {
-    log(`Error reading project .mcp.json: ${error.message}`);
+    log('MCP', `Error reading project .mcp.json: ${error.message}`);
     return Object.keys(globalServers).length > 0 ? globalServers : undefined;
   }
 }
@@ -144,7 +144,7 @@ function fileToImageBlock(filePath) {
     const data = readFileSync(filePath, 'base64');
     return { type: 'image', source: { type: 'base64', media_type: mediaType, data } };
   } catch (error) {
-    log(`Failed to read image file ${filePath}: ${error.message}`);
+    log('QUERY', `Failed to read image file ${filePath}: ${error.message}`);
     return null;
   }
 }
@@ -198,7 +198,7 @@ async function handleQuery(cmd) {
   let planAlreadyApproved = false;
 
   activeQueries.set(queryId, { abortController });
-  log(`Starting query ${queryId} (model=${model}, cwd=${cwd || 'default'})`);
+  log('QUERY', `Starting query=${queryId} model=${model} cwd=${cwd || 'default'} resume=${sessionId || '(new)'} activeQueries=${activeQueries.size}`);
 
   try {
     // --- Build SDK options (same logic as stream-claude.js) ---
@@ -250,7 +250,7 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
         if (toolName === 'AskUserQuestion') {
-          log(`[canUseTool] AskUserQuestion for query ${queryId}`);
+          log('INTERACT', `AskUserQuestion canUseTool triggered for query=${queryId}`);
           try {
             const response = await requestFromFrontend(queryId, 'ask_user_question', {
               questions: input.questions,
@@ -269,7 +269,7 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
           if (planAlreadyApproved) {
             return { behavior: 'allow', updatedInput: input };
           }
-          log(`[canUseTool] ExitPlanMode for query ${queryId}`);
+          log('INTERACT', `ExitPlanMode canUseTool triggered for query=${queryId}`);
           try {
             const response = await requestFromFrontend(queryId, 'plan_approval_request', { plan: input });
             const answers = response.answers || response;
@@ -341,6 +341,9 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
       'ide-tools': { command: 'node', args: [ideMcpServerPath] },
     };
 
+    const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
+    log('MCP', `query=${queryId} resolved ${mcpCount} MCP servers: [${Object.keys(options.mcpServers || {}).join(', ')}]`);
+
     // --- Build message generator ---
     async function* generateMessages() {
       const content = createMessageContent(prompt, attachments);
@@ -354,22 +357,28 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
     const useStreamingInput = hasMcpServers || (attachments && attachments.length > 0);
 
+    const queryStartTime = Date.now();
+    log('QUERY', `query=${queryId} calling SDK query() (streamingInput=${useStreamingInput})`);
+
     const stream = query({
       prompt: useStreamingInput ? generateMessages() : prompt,
       options,
     });
 
+    let eventCount = 0;
     for await (const event of stream) {
+      eventCount++;
       // Emit each SDK event tagged with queryId
       emit({ type: 'event', queryId, event });
     }
 
+    const elapsedMs = Date.now() - queryStartTime;
     emit({ type: 'query_complete', queryId });
-    log(`Query ${queryId} completed successfully`);
+    log('QUERY', `query=${queryId} completed successfully (${eventCount} events, ${elapsedMs}ms)`);
 
   } catch (err) {
     if (abortController.signal.aborted) {
-      log(`Query ${queryId} was aborted`);
+      log('ABORT', `query=${queryId} was aborted`);
       emit({ type: 'query_complete', queryId });
     } else {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -383,7 +392,7 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
         errorMsg.includes('Stream closed');
 
       if (isSubagentCrash) {
-        log(`Query ${queryId} subagent crash: ${errorMsg}`);
+        log('QUERY', `query=${queryId} subagent crash: ${errorMsg}`);
         emit({
           type: 'event', queryId,
           event: {
@@ -398,19 +407,22 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
         });
         emit({ type: 'query_complete', queryId });
       } else {
-        log(`Query ${queryId} error: ${errorMsg}`);
+        log('QUERY', `query=${queryId} error: ${errorMsg}`);
         emit({ type: 'query_error', queryId, error: errorMsg, stack: errorStack });
       }
     }
   } finally {
     // Clean up pending requests for this query
+    let cleanedRequests = 0;
     for (const [reqId, req] of pendingRequests.entries()) {
       if (req.queryId === queryId) {
         clearTimeout(req.timeout);
         pendingRequests.delete(reqId);
+        cleanedRequests++;
       }
     }
     activeQueries.delete(queryId);
+    log('QUERY', `query=${queryId} cleanup done (cleaned ${cleanedRequests} pending requests, remaining active=${activeQueries.size})`);
   }
 }
 
@@ -442,7 +454,7 @@ async function requestFromFrontend(queryId, type, data, timeoutMs = 0) {
 
     // Emit the request tagged with queryId so Rust can route the event
     emit({ type, queryId, requestId, ...data });
-    log(`Sent ${type} request ${requestId} for query ${queryId}`);
+    log('IPC', `Sent ${type} requestId=${requestId} query=${queryId}`);
   });
 }
 
@@ -463,9 +475,9 @@ function handleAbort(cmd) {
       }
     }
     queryState.abortController.abort();
-    log(`Aborted query ${queryId}`);
+    log('ABORT', `query=${queryId} aborted successfully`);
   } else {
-    log(`No active query found for abort: ${queryId}`);
+    log('ABORT', `No active query found for abort: ${queryId}`);
   }
 }
 
@@ -476,27 +488,27 @@ function handleResponse(cmd) {
     clearTimeout(timeout);
     pendingRequests.delete(requestId);
     resolve({ requestId, answers });
-    log(`Resolved response for request ${requestId}`);
+    log('INTERACT', `Resolved response for requestId=${requestId}`);
   } else {
-    log(`No pending request found for: ${requestId}`);
+    log('INTERACT', `No pending request found for requestId=${requestId}`);
   }
 }
 
 function handleMcpReload(cmd) {
   // MCP config will be picked up by the next query.
   // Active queries continue with their current MCP connections.
-  log(`MCP reload requested — will apply to next query`);
+  log('MCP', `Reload requested — will apply to next query`);
 }
 
 async function handleShutdown() {
-  log('Shutdown requested — closing all active queries');
+  log('LIFECYCLE', `Shutdown requested — closing ${activeQueries.size} active queries`);
   for (const [queryId, state] of activeQueries.entries()) {
     state.abortController.abort();
-    log(`Aborted query ${queryId} during shutdown`);
+    log('LIFECYCLE', `Aborted query=${queryId} during shutdown`);
   }
   // Give queries a moment to clean up
   await new Promise(resolve => setTimeout(resolve, 1000));
-  log('Daemon shutting down');
+  log('LIFECYCLE', 'Daemon shutting down');
   process.exit(0);
 }
 
@@ -505,7 +517,7 @@ async function handleShutdown() {
 // =============================================================================
 
 async function main() {
-  log('Starting persistent daemon...');
+  log('LIFECYCLE', `Starting persistent daemon (pid=${process.pid}, node=${process.version})`);
 
   const stdinReader = createInterface({
     input: process.stdin,
@@ -514,17 +526,18 @@ async function main() {
 
   // Signal readiness to Rust
   emit({ type: 'daemon_ready' });
-  log('Daemon ready, waiting for commands');
+  log('LIFECYCLE', 'Daemon ready — emitted daemon_ready, waiting for commands');
 
   stdinReader.on('line', async (line) => {
     try {
       const cmd = JSON.parse(line);
+      log('IPC', `Received command type=${cmd.type}${cmd.queryId ? ` query=${cmd.queryId}` : ''}${cmd.requestId ? ` requestId=${cmd.requestId}` : ''}`);
 
       switch (cmd.type) {
         case 'query':
           // Run query in background (don't await — allows concurrent queries)
           handleQuery(cmd).catch(err => {
-            log(`Unhandled query error: ${err.message}`);
+            log('QUERY', `Unhandled query error: ${err.message}`);
             emit({ type: 'query_error', queryId: cmd.queryId, error: err.message });
           });
           break;
@@ -550,15 +563,15 @@ async function main() {
           break;
 
         default:
-          log(`Unknown command type: ${cmd.type}`);
+          log('IPC', `Unknown command type: ${cmd.type}`);
       }
     } catch (err) {
-      log(`Error processing command: ${err.message}`);
+      log('IPC', `Error processing command: ${err.message}`);
     }
   });
 
   stdinReader.on('close', () => {
-    log('stdin closed — Rust process likely exited, shutting down');
+    log('LIFECYCLE', 'stdin closed — Rust process likely exited, shutting down');
     process.exit(0);
   });
 
@@ -568,6 +581,6 @@ async function main() {
 }
 
 main().catch(err => {
-  log(`Fatal daemon error: ${err.message}`);
+  log('LIFECYCLE', `Fatal daemon error: ${err.message}`);
   process.exit(1);
 });

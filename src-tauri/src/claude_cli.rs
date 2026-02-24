@@ -184,7 +184,7 @@ pub async fn abort_sdk_stream(session_key: String) -> Result<(), String> {
             .map(|(qid, _)| qid.clone());
 
         if let Some(query_id) = matching_query {
-            log::info!("[SDK] 🛑 Sending abort for daemon query: {} (session: {})", query_id, session_key);
+            log::info!("[DAEMON:ABORT] Sending abort for daemon query={} session={}", query_id, session_key);
             let cmd = serde_json::json!({"type": "abort", "queryId": query_id});
             return send_to_daemon(&cmd.to_string()).await;
         }
@@ -216,17 +216,15 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
 
     if let Some(ref d) = *daemon_guard {
         if d.ready {
-            // Daemon exists and is ready
+            log::debug!("[DAEMON:LIFECYCLE] Daemon already running and ready (pid={})", d.child_pid);
             return Ok(());
         }
-        // Daemon exists but never reached ready state — clear it and re-spawn
-        log::warn!("[DAEMON] Daemon exists but not ready — clearing stale state");
+        log::warn!("[DAEMON:LIFECYCLE] Daemon exists but not ready (pid={}) — clearing stale state", d.child_pid);
     }
     // Clear any stale daemon state before spawning
     *daemon_guard = None;
 
-    // Need to spawn a new daemon
-    log::info!("[DAEMON] Spawning persistent Node.js daemon...");
+    log::info!("[DAEMON:LIFECYCLE] Spawning persistent Node.js daemon...");
 
     let script_path = app
         .path()
@@ -335,7 +333,7 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to spawn daemon: {}", e))?;
 
     let child_pid = child.id().unwrap_or(0);
-    log::info!("[DAEMON] Spawned daemon process (pid={})", child_pid);
+    log::info!("[DAEMON:LIFECYCLE] Spawned daemon process (pid={}, node={:?})", child_pid, node_path);
 
     let stdin = child.stdin.take()
         .ok_or("Failed to capture daemon stdin")?;
@@ -397,18 +395,18 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
             if let Some(ref mut d) = *daemon_guard {
                 d.ready = true;
             }
-            log::info!("[DAEMON] Daemon is ready!");
+            log::info!("[DAEMON:LIFECYCLE] Daemon is ready! Startup complete.");
             Ok(())
         }
         Ok(Err(_)) => {
-            log::error!("[DAEMON] Ready channel was dropped");
+            log::error!("[DAEMON:LIFECYCLE] Ready channel was dropped — daemon may have crashed during startup");
             // Clear stale daemon state so next call can retry
             let mut daemon_guard = DAEMON_PROCESS.lock().await;
             *daemon_guard = None;
             Err("Daemon ready channel was dropped".to_string())
         }
         Err(_) => {
-            log::error!("[DAEMON] Timed out waiting for daemon ready signal");
+            log::error!("[DAEMON:LIFECYCLE] Timed out waiting for daemon ready signal (30s)");
             // Clear stale daemon state and kill the process
             {
                 let mut daemon_guard = DAEMON_PROCESS.lock().await;
@@ -439,7 +437,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
         let msg: serde_json::Value = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(e) => {
-                log::warn!("[DAEMON reader] Failed to parse: {} — line: {}", e, &line[..std::cmp::min(200, line.len())]);
+                log::warn!("[DAEMON:IPC] Failed to parse stdout line: {} — raw: {}", e, &line[..std::cmp::min(200, line.len())]);
                 continue;
             }
         };
@@ -449,7 +447,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
 
         match msg_type {
             "daemon_ready" => {
-                log::info!("[DAEMON reader] Received daemon_ready signal");
+                log::info!("[DAEMON:LIFECYCLE] Received daemon_ready signal from Node.js");
                 let mut guard = DAEMON_READY_TX.lock().await;
                 if let Some(tx) = guard.take() {
                     let _ = tx.send(());
@@ -457,7 +455,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
             }
 
             "pong" => {
-                log::debug!("[DAEMON reader] Received pong");
+                log::debug!("[DAEMON:IPC] Received pong from daemon");
             }
 
             "event" => {
@@ -473,6 +471,9 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     };
 
                     if let Some((agent_id, session_key, app_handle)) = emit_info {
+                        let sdk_event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
+                        log::debug!("[DAEMON:ROUTE] query={} event_type={} -> agent={}", qid, sdk_event_type, agent_id);
+
                         let event_name = format!("claude-event:{}", agent_id);
                         let wrapped = serde_json::json!({
                             "sessionKey": session_key,
@@ -483,6 +484,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                         // Capture Result events for usage data
                         if let Some(event_type) = event.get("type").and_then(|t| t.as_str()) {
                             if event_type == "result" {
+                                log::info!("[DAEMON:QUERY] query={} received Result event — capturing usage data", qid);
                                 if let Ok(result_event) = serde_json::from_value::<ClaudeEvent>(event.clone()) {
                                     if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = result_event {
                                         let response = ClaudeCliResponse {
@@ -504,6 +506,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     let queries = DAEMON_QUERIES.lock().await;
                     if let Some(state) = queries.get(qid.as_str()) {
                         let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                        log::info!("[DAEMON:INTERACT] AskUserQuestion query={} requestId={} -> emitting to frontend", qid, request_id);
                         let questions = msg.get("questions").cloned().unwrap_or(serde_json::Value::Array(vec![]));
 
                         let payload = serde_json::json!({
@@ -526,6 +529,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     let queries = DAEMON_QUERIES.lock().await;
                     if let Some(state) = queries.get(qid.as_str()) {
                         let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                        log::info!("[DAEMON:INTERACT] PlanApprovalRequest query={} requestId={} -> emitting to frontend", qid, request_id);
                         let plan = msg.get("plan").cloned().unwrap_or(serde_json::Value::Null);
 
                         let payload = serde_json::json!({
@@ -542,7 +546,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
 
             "query_complete" => {
                 if let Some(ref qid) = query_id {
-                    log::info!("[DAEMON reader] Query {} completed", qid);
+                    log::info!("[DAEMON:QUERY] query={} completed — resolving completion channel", qid);
 
                     // Get the captured Result event data (if any)
                     let stored_result = {
@@ -571,7 +575,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
             "query_error" => {
                 if let Some(ref qid) = query_id {
                     let error_msg = msg.get("error").and_then(|e| e.as_str()).unwrap_or("Unknown daemon error");
-                    log::error!("[DAEMON reader] Query {} error: {}", qid, error_msg);
+                    log::error!("[DAEMON:QUERY] query={} error: {}", qid, error_msg);
 
                     // Clean up stored result
                     {
@@ -587,13 +591,13 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
             }
 
             _ => {
-                log::debug!("[DAEMON reader] Unknown message type: {}", msg_type);
+                log::debug!("[DAEMON:IPC] Unknown message type from daemon: {}", msg_type);
             }
         }
     }
 
     // stdout closed — daemon died
-    log::error!("[DAEMON reader] Daemon stdout closed — process likely crashed");
+    log::error!("[DAEMON:LIFECYCLE] Daemon stdout closed — process likely crashed");
 
     // Clear daemon state
     {
@@ -616,20 +620,33 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
         }
     }
 
-    log::info!("[DAEMON reader] Daemon cleanup complete — will restart on next query");
+    log::info!("[DAEMON:LIFECYCLE] Daemon cleanup complete — will auto-restart on next query");
 }
 
 /// Send a JSON command to the daemon via stdin
 async fn send_to_daemon(message: &str) -> Result<(), String> {
+    let msg_type = serde_json::from_str::<serde_json::Value>(message)
+        .ok()
+        .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(String::from))
+        .unwrap_or_else(|| "unknown".to_string());
+    log::debug!("[DAEMON:IPC] Sending to daemon stdin: type={} ({}B)", msg_type, message.len());
+
     let mut daemon_guard = DAEMON_PROCESS.lock().await;
     if let Some(ref mut daemon) = *daemon_guard {
         let line = format!("{}\n", message);
         daemon.stdin.write_all(line.as_bytes()).await
-            .map_err(|e| format!("Failed to write to daemon stdin: {}", e))?;
+            .map_err(|e| {
+                log::error!("[DAEMON:IPC] Failed to write to daemon stdin: {}", e);
+                format!("Failed to write to daemon stdin: {}", e)
+            })?;
         daemon.stdin.flush().await
-            .map_err(|e| format!("Failed to flush daemon stdin: {}", e))?;
+            .map_err(|e| {
+                log::error!("[DAEMON:IPC] Failed to flush daemon stdin: {}", e);
+                format!("Failed to flush daemon stdin: {}", e)
+            })?;
         Ok(())
     } else {
+        log::error!("[DAEMON:IPC] Cannot send — daemon is not running");
         Err("Daemon is not running".to_string())
     }
 }
@@ -637,12 +654,15 @@ async fn send_to_daemon(message: &str) -> Result<(), String> {
 /// Restart daemon command (for dev/debug)
 #[tauri::command]
 pub async fn restart_daemon(app: AppHandle) -> Result<(), String> {
-    log::info!("[DAEMON] Restart requested");
+    log::info!("[DAEMON:LIFECYCLE] Restart requested");
 
     // Drain in-flight queries first — signal them all as errors
     {
         let mut queries = DAEMON_QUERIES.lock().await;
         let query_ids: Vec<String> = queries.keys().cloned().collect();
+        if !query_ids.is_empty() {
+            log::warn!("[DAEMON:LIFECYCLE] Draining {} in-flight queries before restart", query_ids.len());
+        }
         for qid in query_ids {
             if let Some(state) = queries.remove(&qid) {
                 let _ = state.completion_tx.send(Err("Daemon restarting".to_string()));
@@ -1818,7 +1838,7 @@ pub async fn send_message_via_sdk_streaming(
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    log::info!("[SDK] 🚀 send_message_via_sdk_streaming at {} (daemon={})", debug_timestamp,
+    log::info!("[DAEMON:QUERY] send_message_via_sdk_streaming at {} (daemon_enabled={})", debug_timestamp,
         DAEMON_MODE_ENABLED.load(Ordering::Relaxed));
 
     // Try daemon mode first
@@ -1826,7 +1846,7 @@ pub async fn send_message_via_sdk_streaming(
         match send_message_via_daemon(&app, &agent_id, &request).await {
             Ok(response) => return Ok(response),
             Err(e) => {
-                log::warn!("[SDK] Daemon mode failed: {} — falling back to legacy per-process mode", e);
+                log::warn!("[DAEMON:FALLBACK] Daemon mode failed: {} — falling back to legacy per-process mode", e);
                 // Fall through to legacy mode
             }
         }
@@ -1905,7 +1925,11 @@ async fn send_message_via_daemon(
 
     // Send query to daemon
     let cmd_str = query_cmd.to_string();
-    log::info!("[SDK DAEMON] Sending query {} (prompt={}...)", query_id, &request.prompt[..std::cmp::min(80, request.prompt.len())]);
+    log::info!("[DAEMON:QUERY] Sending query={} session={} model={} resume={} prompt={}...",
+        query_id, event_session_key,
+        request.model.as_deref().unwrap_or(DEFAULT_MODEL),
+        request.session_id.as_deref().unwrap_or("(new)"),
+        &request.prompt[..std::cmp::min(80, request.prompt.len())]);
 
     send_to_daemon(&cmd_str).await.map_err(|e| {
         // Remove query from tracking on send failure
@@ -1919,16 +1943,19 @@ async fn send_message_via_daemon(
 
     // Wait for completion with timeout (10 minutes max per query)
     match tokio::time::timeout(std::time::Duration::from_secs(600), rx).await {
-        Ok(Ok(result)) => result,
+        Ok(Ok(result)) => {
+            log::info!("[DAEMON:QUERY] query={} finished successfully", query_id);
+            result
+        }
         Ok(Err(_)) => {
-            log::error!("[SDK DAEMON] Query {} completion channel dropped", query_id);
+            log::error!("[DAEMON:QUERY] query={} completion channel dropped", query_id);
             // Clean up orphaned query state
             let mut queries = DAEMON_QUERIES.lock().await;
             queries.remove(&query_id);
             Err("Query completion channel was dropped unexpectedly".to_string())
         }
         Err(_) => {
-            log::error!("[SDK DAEMON] Query {} timed out after 600s", query_id);
+            log::error!("[DAEMON:QUERY] query={} timed out after 600s", query_id);
             // Send abort to daemon and clean up
             let abort_cmd = serde_json::json!({"type": "abort", "queryId": query_id});
             let _ = send_to_daemon(&abort_cmd.to_string()).await;
@@ -2727,13 +2754,14 @@ pub async fn answer_user_question(
     request_id: String,
     answers: serde_json::Value,
 ) -> Result<(), String> {
-    log::info!("[SDK] 🗣️ Answering user question for process: {}, requestId: {}", agent_id, request_id);
+    log::info!("[DAEMON:INTERACT] answer_user_question process={} requestId={}", agent_id, request_id);
 
     // Try daemon mode first
     if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
         let daemon_guard = DAEMON_PROCESS.lock().await;
         if daemon_guard.is_some() {
             drop(daemon_guard);
+            log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={}", request_id);
 
             let cmd = serde_json::json!({
                 "type": "response",
@@ -2745,6 +2773,7 @@ pub async fn answer_user_question(
     }
 
     // Legacy mode: send to per-process stdin
+    log::info!("[DAEMON:FALLBACK] Routing answer via legacy process for requestId={}", request_id);
     let response = serde_json::json!({
         "requestId": request_id,
         "answers": answers,
