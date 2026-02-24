@@ -59,6 +59,7 @@ mod remote_api; // 🌐 Remote REST API for external tools and mobile dashboard
 mod remote_auth; // 🔐 Remote API Bearer token authentication
 mod remote_config; // ⚙️ Remote API configuration (enable/disable, token, port)
 mod remote_ws; // 📡 WebSocket real-time push for mobile clients
+mod remote_dashboard; // 📱 Mobile PWA dashboard served at /dashboard
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -939,9 +940,13 @@ pub fn run() {
                     .route("/ws", get(remote_ws::handle_ws_upgrade))
                     .with_state(ws_state);
 
-                // Combine: legacy + /api/* + /ws
+                // Dashboard router (PWA mobile UI)
+                let dashboard_router = remote_dashboard::create_dashboard_router();
+
+                // Combine: legacy + /api/* + /ws + /dashboard/*
                 let router = legacy_router
                     .nest("/api", api_router)
+                    .nest("/dashboard", dashboard_router)
                     .merge(ws_router);
 
                 // Bind: 0.0.0.0 if remote enabled, 127.0.0.1 otherwise
