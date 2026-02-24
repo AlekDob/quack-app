@@ -45,6 +45,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: buildShortcut("K"),
       currentKeys: buildShortcut("K"),
     },
+    toggleAutomation: {
+      id: "toggleAutomation" as const,
+      label: "Toggle Automation",
+      description: "Open or close the Automation scheduler view",
+      defaultKeys: buildShortcut("J"),
+      currentKeys: buildShortcut("J"),
+    },
     openTerminalWindow: {
       id: "openTerminalWindow" as const,
       label: "Terminal Window",

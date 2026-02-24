@@ -48,6 +48,7 @@ mod telegram_bot;
 mod telegram_central;
 mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security)
 mod terminal;
+mod automation; // 🤖 Cron-based automation scheduler for agent sessions
 mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
@@ -576,6 +577,7 @@ pub fn run() {
         .manage(SessionState::new()) // Register global session state
         .manage(license::LicenseState::default()) // Register license state
         .manage(mcp::MCPProcessManager::new()) // Register MCP process manager
+        .manage(automation::AutomationScheduler::new()) // Register automation scheduler state
         .manage(background_tasks::BackgroundTaskManager::new()) // Register background task manager
         .manage(semantic_search::SemanticWatcherManager::new()) // Register semantic search watcher manager
         .manage(git_watcher::GitBranchWatcherManager::new()) // Register git branch watcher manager
@@ -1132,6 +1134,15 @@ pub fn run() {
             snippets::search_snippets,
             snippets::import_snippets,
             snippets::export_snippets,
+            // Automation scheduler commands
+            automation::start_automation_scheduler,
+            automation::stop_automation_scheduler,
+            automation::validate_cron_expression,
+            automation::get_cron_next_fires,
+            automation::mark_automation_job_running,
+            automation::mark_automation_job_completed,
+            automation::is_automation_job_running,
+            automation::fire_automation_job,
             // Background tasks commands
             background_tasks::execute_background_agent,
             background_tasks::execute_background_command,

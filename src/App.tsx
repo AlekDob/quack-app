@@ -75,12 +75,14 @@ import BrowserManager from "./components/BrowserManager";
 import { useDocsTab } from "./hooks/useDocsTab";
 import { useGlobalKeyboardShortcuts } from "./hooks/useGlobalKeyboardShortcuts";
 import { useKanbanTab } from "./hooks/useKanbanTab";
+import { useAutomationTab } from "./hooks/useAutomationTab";
 import { useKanbanChatSync } from "./hooks/useKanbanChatSync";
 import { useSessionMessageSync } from "./hooks/useSessionMessageSync";
 import { useProjectDashboardTab } from "./hooks/useProjectDashboardTab";
 import DocsTabView from "./views/DocsTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
+import AutomationTabView from "./views/AutomationTabView";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import ImageTabView from "./views/ImageTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
@@ -189,6 +191,7 @@ import type {
   KanbanTask,
   KanbanTaskInitialValues,
   AskUserQuestionAnswers,
+  AutomationJob,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
 
@@ -420,6 +423,9 @@ function AppContent() {
 
   // Kanban tab management
   const { openKanbanTab } = useKanbanTab();
+
+  // Automation tab management
+  const { openAutomationTab } = useAutomationTab();
 
   // Project Dashboard tab management
   const { openProjectDashboardTab } = useProjectDashboardTab();
@@ -4748,14 +4754,37 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
 
-      // 🔔 Send desktop notification when agent needs user input
+      // 🔔 Send in-app toast + native notification when agent needs user input
       try {
-        // Get agent name for the notification
-        const agentChat = agentChats.find((a) => a.id === agentId);
-        const agentName = agentChat?.name || 'Agent';
+        // Use terminalsRef (always current) instead of stale agentChats closure
+        const terminal = terminalsRef.current.find((t) => t.id === agentId);
+        const agentName = terminal?.label || 'Agent';
         const questionCount = Array.isArray(questions) ? questions.length : 1;
 
+        // Extract project name from cwd
+        let projectName = 'Quack';
+        if (terminal?.cwd) {
+          const pathParts = terminal.cwd.split(/[/\\]/);
+          projectName = pathParts.filter(Boolean).pop() || 'Quack';
+        }
+
+        // In-app toast (always visible, even when app is in focus)
+        const avatarResult = getAgentAvatar(agentName, terminal?.avatar);
+        const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
+        showProjectToast({
+          projectName,
+          projectColor: '#FF6B35',
+          agentName,
+          agentAvatar,
+          message: questionCount === 1
+            ? 'Needs your input — answer the question'
+            : `Has ${questionCount} questions for you`,
+          type: 'warning',
+        }, 8000);
+
+        // Native notification (visible when app is NOT in focus)
         await sendNotification({
+          id: Number(Date.now() % 2147483647),
           title: `${agentName} needs your input`,
           body: questionCount === 1
             ? 'The agent has a question for you'
@@ -4794,11 +4823,34 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return newMap;
       });
 
-      // Send desktop notification
+      // 🔔 Send in-app toast + native notification for plan approval
       try {
-        const agentChat = agentChats.find((a: { id: string }) => a.id === agentId);
-        const agentName = agentChat?.name || 'Agent';
+        // Use terminalsRef (always current) instead of stale agentChats closure
+        const terminal = terminalsRef.current.find((t) => t.id === agentId);
+        const agentName = terminal?.label || 'Agent';
+
+        // Extract project name from cwd
+        let projectName = 'Quack';
+        if (terminal?.cwd) {
+          const pathParts = terminal.cwd.split(/[/\\]/);
+          projectName = pathParts.filter(Boolean).pop() || 'Quack';
+        }
+
+        // In-app toast (always visible, even when app is in focus)
+        const avatarResult = getAgentAvatar(agentName, terminal?.avatar);
+        const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
+        showProjectToast({
+          projectName,
+          projectColor: '#FF6B35',
+          agentName,
+          agentAvatar,
+          message: 'Needs plan approval — review and approve',
+          type: 'warning',
+        }, 8000);
+
+        // Native notification (visible when app is NOT in focus)
         await sendNotification({
+          id: Number(Date.now() % 2147483647),
           title: `${agentName} needs plan approval`,
           body: 'Review and approve the plan to proceed',
         });
@@ -9015,6 +9067,59 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openKanbanTab, activeTabId, tabs, isTabPoppedOut]);
 
+  // Handler for opening/focusing Automation tab (toggle with Cmd+J)
+  const handleOpenAutomationTab = useCallback(() => {
+    if (activeTabId === 'automation-board') {
+      setActiveTabId('chat');
+      return;
+    }
+    const existingTab = tabs.find(t => t.type === 'automation');
+    if (existingTab) {
+      setActiveTabId('automation-board');
+    } else {
+      const newTab = openAutomationTab();
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId('automation-board');
+    }
+  }, [openAutomationTab, activeTabId, tabs]);
+
+  // Handler for firing an automation job — creates a session and sends the prompt
+  const handleAutomationFireJob = useCallback(async (job: AutomationJob) => {
+    console.log('[Automation] Firing job:', job.name, 'agent:', job.agentId);
+
+    const agent = terminals.find(t => t.id === job.agentId);
+    if (!agent) {
+      console.error('[Automation] Agent not found:', job.agentId);
+      toast.error(`Agent "${job.agentName}" not found — cannot fire job "${job.name}"`);
+      return;
+    }
+
+    try {
+      // 1. Create a new AgentSession for this automation run
+      const newSession = await createSession({
+        title: `[Auto] ${job.name}`,
+        agentId: job.agentId,
+        projectPath: job.projectPath || agent.cwd,
+        projectName: job.projectName || extractProjectId(agent.cwd) || 'project',
+        status: 'in_progress',
+        messageCount: 0,
+        initialPrompt: job.promptTemplate,
+      });
+
+      console.log('[Automation] Session created:', newSession.id);
+
+      // 2. Send the prompt to the agent via the session
+      await sendMessageForTargetAgent(newSession.id, job.promptTemplate, {
+        workingDirectory: job.projectPath || agent.cwd,
+      });
+
+      toast.success(`Job "${job.name}" fired — session created under ${job.agentName}`);
+    } catch (err) {
+      console.error('[Automation] Failed to fire job:', err);
+      toast.error(`Failed to fire job "${job.name}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [terminals, createSession, sendMessageForTargetAgent]);
+
   // Handler for opening Git Drawer with fullscreen loader
   const handleOpenGitDrawer = useCallback(() => {
     // Show fullscreen loader immediately if we don't have data yet
@@ -9414,6 +9519,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
     toggleKanban: handleOpenKanbanTab,
+    toggleAutomation: handleOpenAutomationTab,
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
     toggleSidePanel: useCallback(() => {
@@ -11224,6 +11330,8 @@ You have access to all Bash tools to execute git commands like:
               onKanbanClick={handleOpenKanbanTab}
               isKanbanActive={tabs.some(t => t.type === 'kanban' && t.id === activeTabId)}
               inProgressTaskCount={inProgressTaskCount}
+              onAutomationClick={handleOpenAutomationTab}
+              isAutomationActive={tabs.some(t => t.type === 'automation' && t.id === activeTabId)}
               onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
               isStoreOpen={showStoreDrawer}
             />
@@ -11310,6 +11418,24 @@ You have access to all Bash tools to execute git commands like:
                   onDismiss={dismissNotification}
                 />
               )}
+
+              {/* Automation Tab View - shown when automation tab is active */}
+              {activeTabId === 'automation-board' && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'automation') {
+                  return (
+                    <AutomationTabView
+                      tab={activeTab}
+                      isActive={true}
+                      terminals={terminals}
+                      onSessionClick={handleSessionClick}
+                      onExitAutomation={() => setActiveTabId('chat')}
+                      onFireJob={handleAutomationFireJob}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* NOTE: Task tabs removed - tasks now open in agent's main Chat tab via activeTaskPerAgent state */}
 

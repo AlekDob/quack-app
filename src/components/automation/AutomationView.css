@@ -1,0 +1,671 @@
+/* ─── Automation View ─────────────────────────────────────────────── */
+/* Colors aligned with KanbanView.css dark theme */
+
+.automation-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  padding: 20px 24px;
+  flex: 1;
+  min-height: 0;
+}
+
+.automation-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────── */
+
+.automation-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.automation-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.automation-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.automation-running-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 217, 255, 0.15);
+  color: #00D9FF;
+  font-weight: 500;
+}
+
+.automation-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Tab Switcher ───────────────────────────────────────────────── */
+
+.automation-tab-switcher {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.automation-tab-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.automation-tab-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.automation-tab-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ─── Add Button ─────────────────────────────────────────────────── */
+
+.automation-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: #f28c52;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.automation-add-btn:hover {
+  background: #e07a42;
+  transform: translateY(-1px);
+}
+
+.automation-add-btn:active {
+  transform: translateY(0);
+}
+
+/* ─── Content ────────────────────────────────────────────────────── */
+
+.automation-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ─── Empty State ────────────────────────────────────────────────── */
+
+.automation-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.automation-empty-icon {
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.automation-empty p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+}
+
+.automation-empty-hint {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  max-width: 320px;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
+.automation-empty .automation-add-btn {
+  margin-top: 20px;
+}
+
+/* ─── Job Cards List ─────────────────────────────────────────────── */
+
+.automation-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── Job Card ───────────────────────────────────────────────────── */
+
+.automation-job-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: all 0.15s ease;
+}
+
+.automation-job-card:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.automation-job-card.disabled {
+  opacity: 0.5;
+}
+
+.automation-job-card.running {
+  border-color: rgba(0, 217, 255, 0.3);
+  background: rgba(0, 217, 255, 0.05);
+}
+
+.automation-job-card-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Toggle Switch ──────────────────────────────────────────────── */
+
+.automation-toggle {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.automation-toggle.on {
+  background: #f28c52;
+}
+
+.automation-toggle.off {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.automation-toggle-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  position: absolute;
+  top: 2px;
+  transition: left 0.2s ease;
+}
+
+.automation-toggle.on .automation-toggle-thumb {
+  left: 16px;
+}
+
+.automation-toggle.off .automation-toggle-thumb {
+  left: 2px;
+}
+
+/* ─── Job Info ───────────────────────────────────────────────────── */
+
+.automation-job-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.automation-job-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automation-job-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.automation-job-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+/* ─── Status Badge ───────────────────────────────────────────────── */
+
+.automation-status-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.automation-status-badge.running {
+  background: rgba(0, 217, 255, 0.15);
+  color: #00D9FF;
+}
+
+.automation-status-badge.success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.automation-status-badge.failed {
+  background: rgba(244, 67, 54, 0.15);
+  color: #F44336;
+}
+
+/* ─── Job Card Footer ────────────────────────────────────────────── */
+
+.automation-job-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.automation-job-times {
+  display: flex;
+  gap: 16px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.automation-job-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.automation-job-action {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.automation-job-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.automation-job-action.delete:hover {
+  background: rgba(244, 67, 54, 0.1);
+  color: #F44336;
+}
+
+/* ─── Form Modal Overlay ─────────────────────────────────────────── */
+
+.automation-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.automation-form-modal {
+  background: #141620;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.automation-form-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 20px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ─── Form Fields ────────────────────────────────────────────────── */
+
+.automation-form-field {
+  margin-bottom: 16px;
+}
+
+.automation-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+}
+
+.automation-form-input,
+.automation-form-select,
+.automation-form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.automation-form-input:focus,
+.automation-form-select:focus,
+.automation-form-textarea:focus {
+  border-color: rgba(242, 140, 82, 0.5);
+}
+
+.automation-form-textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.automation-form-select {
+  appearance: none;
+  cursor: pointer;
+}
+
+/* ─── Cron Preset Input ──────────────────────────────────────────── */
+
+.cron-preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cron-preset-btn {
+  padding: 8px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.cron-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.cron-preset-btn.active {
+  background: rgba(242, 140, 82, 0.1);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.cron-preset-label {
+  font-weight: 600;
+  display: block;
+}
+
+.cron-preset-desc {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 2px;
+  display: block;
+}
+
+.cron-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cron-preview {
+  font-size: 11px;
+  color: rgba(242, 140, 82, 0.8);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* ─── Form Actions ───────────────────────────────────────────────── */
+
+.automation-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.automation-form-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.automation-form-btn.cancel {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.automation-form-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.automation-form-btn.save {
+  background: #f28c52;
+  color: #fff;
+}
+
+.automation-form-btn.save:hover {
+  background: #e07a42;
+}
+
+.automation-form-btn.save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── History List ───────────────────────────────────────────────── */
+
+.automation-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.automation-history-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
+
+.automation-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+
+.automation-history-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.automation-history-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.automation-history-status.running { background: #00D9FF; }
+.automation-history-status.success { background: #22c55e; }
+.automation-history-status.failed { background: #F44336; }
+.automation-history-status.cancelled { background: #FF9800; }
+.automation-history-status.timeout { background: #FF9800; }
+
+.automation-history-name {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automation-history-time {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.automation-history-duration {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.automation-history-session-link {
+  font-size: 11px;
+  color: #f28c52;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.automation-history-session-link:hover {
+  background: rgba(242, 140, 82, 0.1);
+}
+
+/* ─── Agent Selection List ───────────────────────────────────────── */
+
+.automation-agent-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.automation-agent-group {
+  padding: 4px 0;
+}
+
+.automation-agent-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 12px 2px;
+}
+
+.automation-agent-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.automation-agent-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.automation-agent-option.selected {
+  background: rgba(242, 140, 82, 0.1);
+  color: #f28c52;
+}
+
+.automation-agent-option-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.automation-agent-option-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.automation-agent-option-role {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.automation-selected-summary {
+  font-size: 11px;
+  color: rgba(242, 140, 82, 0.7);
+  margin-top: 6px;
+  font-style: italic;
+}

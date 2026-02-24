@@ -459,6 +459,48 @@ export interface AgentSession {
 
 export type AgentSessionStatus = 'todo' | 'in_progress' | 'done';
 
+// ─── Automation ─────────────────────────────────────────────────────
+
+/**
+ * AutomationJob - A scheduled cron job that fires agent sessions automatically
+ */
+export interface AutomationJob {
+  id: string;                              // "auto-{timestamp}-{random}"
+  name: string;                            // User-given name, e.g. "Reddit Digest"
+  cronExpression: string;                  // Standard cron: "0 9 * * *"
+  agentId: string;                         // TerminalInfo.id of target agent
+  agentName: string;                       // Display name snapshot
+  projectPath: string;                     // Working directory for session
+  projectName: string;                     // Display name snapshot
+  promptTemplate: string;                  // Prompt sent when job fires
+  model?: string;                          // Model override (default: agent's default)
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+  lastRunAt?: number;
+  lastRunStatus?: AutomationRunStatus;
+  nextRunAt?: number;                      // Pre-calculated next fire timestamp
+  timeoutMinutes?: number;                 // Default: 10
+  skipIfRunning?: boolean;                 // Prevent overlapping runs
+}
+
+export type AutomationRunStatus = 'running' | 'success' | 'failed' | 'cancelled' | 'timeout';
+
+/**
+ * AutomationRunHistory - Record of a single job execution
+ */
+export interface AutomationRunHistory {
+  id: string;                              // "run-{timestamp}-{random}"
+  jobId: string;
+  jobName: string;                         // Snapshot (survives job deletion)
+  startedAt: number;
+  completedAt?: number;
+  status: AutomationRunStatus;
+  durationMs?: number;
+  sessionId?: string;                      // AgentSession created by this run
+  error?: string;
+}
+
 // ─── Project Grouping ───────────────────────────────────────────────
 
 export interface ProjectGroupMember {
@@ -1589,6 +1631,7 @@ export interface KanbanTask {
  */
 export type ShortcutActionId =
   | 'toggleKanban'
+  | 'toggleAutomation'
   | 'openTerminalWindow'
   | 'toggleSidePanel'
   | 'newAgent'

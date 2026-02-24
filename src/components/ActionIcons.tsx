@@ -40,6 +40,10 @@ interface ActionIconsProps {
   onKanbanClick?: () => void;
   isKanbanActive?: boolean;
   inProgressTaskCount?: number;
+  // Automation
+  onAutomationClick?: () => void;
+  isAutomationActive?: boolean;
+  runningAutomationCount?: number;
   // Quack Store
   onStoreClick?: () => void;
   isStoreOpen?: boolean;
@@ -56,6 +60,9 @@ function ActionIcons({
   onKanbanClick,
   isKanbanActive = false,
   inProgressTaskCount = 0,
+  onAutomationClick,
+  isAutomationActive = false,
+  runningAutomationCount = 0,
   onStoreClick,
   isStoreOpen = false,
 }: ActionIconsProps) {
@@ -319,6 +326,44 @@ function ActionIcons({
                 }}
               >
                 {inProgressTaskCount}
+              </span>
+            )}
+          </button>
+        </KeyboardShortcutTooltip>
+      )}
+
+      {/* Automation Icon */}
+      {onAutomationClick && (
+        <KeyboardShortcutTooltip label="Automation" shortcut={formatShortcut("⌘J")}>
+          <button
+            type="button"
+            className={`action-icon ${isAutomationActive ? 'active' : ''}`}
+            onClick={onAutomationClick}
+            aria-label={`Open Automation (${formatShortcut("⌘J")})`}
+            style={{ position: 'relative' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            {runningAutomationCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  background: '#00D9FF',
+                  color: '#000',
+                  fontSize: '8px',
+                  fontWeight: 600,
+                  padding: '1px 3px',
+                  borderRadius: '6px',
+                  minWidth: '12px',
+                  textAlign: 'center' as const,
+                  lineHeight: '1.2',
+                }}
+              >
+                {runningAutomationCount}
               </span>
             )}
           </button>

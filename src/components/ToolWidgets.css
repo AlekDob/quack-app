@@ -794,6 +794,24 @@
   transform: scale(1.05);
 }
 
+.image-preview-widget .image-preview-finder-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.2s ease, background 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.image-preview-widget .image-preview-finder-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Teammate Widget pulse animation */
 @keyframes teammate-pulse {
   0%, 100% { opacity: 1; }

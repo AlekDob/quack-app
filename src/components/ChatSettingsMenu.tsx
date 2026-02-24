@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ThinkingMode, PermissionMode } from '../hooks/useClaudeChat';
-import type { EffortLevel } from '../types';
+import type { EffortLevel, LLMProviderType } from '../types';
 import type { ModelConfig } from '../services/modelService';
 import { getModelOptions, getModelLabel } from '../services/modelService';
 import { useModelsConfig } from '../hooks/useAppConfig';
 import { useSettingsStore } from '../stores/settingsStore';
+import { fetchOllamaModels, getOllamaModelOptions } from '../services/ollamaService';
 import './ChatSettingsMenu.css';
 
 interface ChatSettingsMenuProps {
@@ -45,15 +46,27 @@ export default function ChatSettingsMenu({
 }: ChatSettingsMenuProps) {
   const { models: remoteModels, loading: modelsLoading } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
-
-  // Debug: log what models are being used
-  useEffect(() => {
-    console.log('[ChatSettingsMenu] remoteModels:', remoteModels, 'loading:', modelsLoading, 'options:', modelOptions);
-  }, [remoteModels, modelsLoading]);
+  const { provider, providerBaseUrl, ollamaModel } = useSettingsStore(s => s.claude);
+  const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [ollamaModelOptions, setOllamaModelOptions] = useState<{ value: string; label: string }[]>([]);
+  const [providerSwitched, setProviderSwitched] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Fetch Ollama models when popover opens and provider is ollama
+  const refreshOllamaModels = useCallback(async () => {
+    const url = providerBaseUrl || 'http://localhost:11434';
+    const models = await fetchOllamaModels(url);
+    setOllamaModelOptions(getOllamaModelOptions(models));
+  }, [providerBaseUrl]);
+
+  useEffect(() => {
+    if (isOpen && provider === 'ollama') {
+      refreshOllamaModels();
+    }
+  }, [isOpen, provider, refreshOllamaModels]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -89,7 +102,6 @@ export default function ChatSettingsMenu({
   }, [isOpen]);
 
   const getModelLabelText = () => {
-    const { provider, ollamaModel } = useSettingsStore.getState().claude;
     if (provider !== 'anthropic') return ollamaModel || provider;
     return getModelLabel(model, remoteModels);
   };
@@ -148,10 +160,58 @@ export default function ChatSettingsMenu({
 
       {isOpen && (
         <div ref={menuRef} className="chat-settings-popover">
+          {/* Provider quick-switch tabs */}
+          <div className="chat-settings-section">
+            <span className="chat-settings-label-text">Provider</span>
+            <div style={{
+              display: 'flex', gap: 4, marginTop: 4,
+              padding: 2, borderRadius: 6,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+            }}>
+              {([
+                { value: 'anthropic' as LLMProviderType, label: 'Claude' },
+                { value: 'ollama' as LLMProviderType, label: 'Ollama' },
+              ]).map(tab => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    if (tab.value !== provider) {
+                      updateClaude({ provider: tab.value });
+                      setProviderSwitched(true);
+                    }
+                    if (tab.value === 'ollama' && !providerBaseUrl) {
+                      updateClaude({ providerBaseUrl: 'http://localhost:11434' });
+                    }
+                  }}
+                  style={{
+                    flex: 1, padding: '4px 8px', fontSize: 12, fontWeight: 500,
+                    border: 'none', borderRadius: 4, cursor: 'pointer',
+                    backgroundColor: provider === tab.value ? 'rgba(242, 140, 82, 0.2)' : 'transparent',
+                    color: provider === tab.value ? '#f28c52' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {providerSwitched && (
+            <div style={{
+              fontSize: 11, color: '#f28c52', opacity: 0.85,
+              padding: '4px 0 0', lineHeight: 1.4,
+            }}>
+              Start a new chat for the switch to take effect
+            </div>
+          )}
+
+          {/* Model dropdown - adapts to provider */}
           <div className="chat-settings-section">
             <label className="chat-settings-label">
               <span className="chat-settings-label-text">Model</span>
-              {useSettingsStore.getState().claude.provider === 'anthropic' ? (
+              {provider === 'anthropic' ? (
                 <select
                   value={model}
                   onChange={(e) => onModelChange(e.target.value)}
@@ -164,14 +224,27 @@ export default function ChatSettingsMenu({
                   ))}
                 </select>
               ) : (
-                <span className="chat-settings-provider-model" style={{
-                  fontSize: 13, color: 'var(--text-secondary)', padding: '4px 0',
-                }}>
-                  {useSettingsStore.getState().claude.ollamaModel || 'Not configured'}
-                  <span style={{ fontSize: 11, marginLeft: 6, opacity: 0.7 }}>
-                    ({useSettingsStore.getState().claude.provider})
-                  </span>
-                </span>
+                ollamaModelOptions.length > 0 ? (
+                  <select
+                    value={ollamaModel}
+                    onChange={(e) => updateClaude({ ollamaModel: e.target.value })}
+                    className="chat-settings-select"
+                  >
+                    <option value="">-- Select model --</option>
+                    {ollamaModelOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={ollamaModel}
+                    onChange={(e) => updateClaude({ ollamaModel: e.target.value })}
+                    placeholder="e.g. qwen3-coder"
+                    className="chat-settings-select"
+                    style={{ border: '1px solid rgba(128,132,150,0.32)' }}
+                  />
+                )
               )}
             </label>
           </div>
