@@ -97,6 +97,15 @@ struct SessionSummary {
     created_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     message_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    claude_session_id: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChatMessage {
+    role: String,
+    content: String,
 }
 
 #[derive(Serialize)]
@@ -157,6 +166,8 @@ pub fn create_api_router(app: AppHandle, auth: RemoteAuthState) -> Router {
         .route("/jobs/:id/fire", post(handle_fire_job))
         .route("/jobs/:id/toggle", post(handle_toggle_job))
         .route("/execute", post(handle_execute))
+        .route("/sessions/:id/messages", get(handle_session_messages))
+        .route("/sessions/:id/send", post(handle_send_message))
         .route("/avatars/:filename", get(handle_avatar))
         .with_state(state)
 }
@@ -342,6 +353,7 @@ async fn handle_list_sessions(
                     status: s.get("status").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
                     created_at: s.get("createdAt").and_then(|v| v.as_i64()).unwrap_or(0),
                     message_count: s.get("messageCount").and_then(|v| v.as_i64()),
+                    claude_session_id: s.get("claudeSessionId").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 })
                 .collect()
         })
@@ -375,6 +387,72 @@ async fn handle_get_session(
             Json(ApiError { error: format!("Session not found: {}", session_id) }),
         )),
     }
+}
+
+// ─── Session Messages ─────────────────────────────────────────────
+
+async fn handle_session_messages(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+    Path(session_id): Path<String>,
+) -> ApiResult<Vec<ChatMessage>> {
+    state.check_auth(&headers).await?;
+
+    // Find the claudeSessionId from the Quack session
+    let storage = read_agents_storage().map_err(err)?;
+    let claude_id = storage
+        .get("sessions")
+        .and_then(|s| s.as_array())
+        .and_then(|arr| {
+            arr.iter().find(|s| {
+                s.get("id").and_then(|v| v.as_str()) == Some(&session_id)
+            })
+        })
+        .and_then(|s| s.get("claudeSessionId").and_then(|v| v.as_str()))
+        .map(|s| s.to_string())
+        .ok_or_else(|| err("Session not found or has no Claude session ID".to_string()))?;
+
+    // Use the existing get_session_details function
+    let details = crate::sessions::get_session_details(claude_id)
+        .map_err(|e| err(format!("Failed to read messages: {}", e)))?;
+
+    let messages: Vec<ChatMessage> = details
+        .messages
+        .into_iter()
+        .map(|m| ChatMessage {
+            role: m.role,
+            content: m.content,
+        })
+        .collect();
+
+    Ok(Json(messages))
+}
+
+#[derive(Deserialize)]
+struct SendMessageRequest {
+    message: String,
+}
+
+async fn handle_send_message(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<SendMessageRequest>,
+) -> ApiResult<serde_json::Value> {
+    state.check_auth(&headers).await?;
+
+    // Emit event for the frontend to pick up and send to the session
+    let event_data = serde_json::json!({
+        "sessionId": session_id,
+        "message": payload.message,
+        "source": "remote-dashboard",
+    });
+
+    state.app.emit("remote-send-message", &event_data).map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiError { error: format!("Failed to emit: {}", e) }))
+    })?;
+
+    Ok(Json(serde_json::json!({ "success": true })))
 }
 
 async fn handle_list_jobs(

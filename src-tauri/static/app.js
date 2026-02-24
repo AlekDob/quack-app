@@ -15,7 +15,10 @@ const state = {
   ws: null,
   wsConnected: false,
   loading: true,
-  selectedAgent: null, // agent detail view
+  chatSession: null,   // session object for chat view
+  chatMessages: [],    // messages in current chat
+  chatLoading: false,
+  chatSending: false,
 };
 
 // ── API Client ─────────────────────────────────────────────────
@@ -23,20 +26,17 @@ const api = {
   base() {
     return `${location.protocol}//${location.host}/api`;
   },
-
   headers() {
     return {
       'Authorization': `Bearer ${state.token}`,
       'Content-Type': 'application/json',
     };
   },
-
   async get(path) {
     const res = await fetch(`${this.base()}${path}`, { headers: this.headers() });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
   },
-
   async post(path, body) {
     const res = await fetch(`${this.base()}${path}`, {
       method: 'POST', headers: this.headers(), body: JSON.stringify(body),
@@ -44,7 +44,6 @@ const api = {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
   },
-
   avatarUrl(filename) {
     return `${this.base()}/avatars/${encodeURIComponent(filename)}`;
   },
@@ -55,38 +54,25 @@ function connectWs() {
   if (!state.token) return;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = `${proto}//${location.host}/ws?token=${state.token}`;
-
   try {
     state.ws = new WebSocket(url);
-
-    state.ws.onopen = () => {
-      state.wsConnected = true;
-      render();
-    };
-
+    state.ws.onopen = () => { state.wsConnected = true; render(); };
     state.ws.onclose = () => {
       state.wsConnected = false;
       render();
       setTimeout(connectWs, 3000);
     };
-
     state.ws.onmessage = (evt) => {
-      try {
-        const event = JSON.parse(evt.data);
-        handleWsEvent(event);
-      } catch { /* ignore parse errors */ }
+      try { handleWsEvent(JSON.parse(evt.data)); } catch {}
     };
-  } catch { /* ignore connection errors, will retry */ }
+  } catch {}
 }
 
 function handleWsEvent(event) {
   switch (event.type) {
     case 'agent_status': {
       const agent = state.agents.find(a => a.id === event.agentId || a.name === event.label);
-      if (agent) {
-        agent.status = event.status;
-        render();
-      }
+      if (agent) { agent.status = event.status; render(); }
       break;
     }
     case 'session_created':
@@ -117,7 +103,7 @@ async function loadData() {
     ]);
     state.status = statusData;
     state.agents = agents;
-    state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 50);
+    state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
     state.jobs = jobs;
     state.loading = false;
   } catch (err) {
@@ -128,6 +114,52 @@ async function loadData() {
     }
   }
   render();
+}
+
+async function openChat(session) {
+  state.chatSession = session;
+  state.chatMessages = [];
+  state.chatLoading = true;
+  render();
+  try {
+    const messages = await api.get(`/sessions/${session.id}/messages`);
+    state.chatMessages = messages;
+    state.chatLoading = false;
+  } catch (err) {
+    state.chatLoading = false;
+    toast(`Failed to load chat: ${err.message}`, 'error');
+  }
+  render();
+  scrollChatToBottom();
+}
+
+async function sendMessage() {
+  const input = $('#chat-input');
+  if (!input || !input.value.trim() || state.chatSending) return;
+  const message = input.value.trim();
+  input.value = '';
+  state.chatSending = true;
+
+  // Optimistic: add to UI immediately
+  state.chatMessages.push({ role: 'user', content: message });
+  render();
+  scrollChatToBottom();
+
+  try {
+    await api.post(`/sessions/${state.chatSession.id}/send`, { message });
+    toast('Message sent', 'success');
+  } catch (err) {
+    toast(`Send failed: ${err.message}`, 'error');
+  }
+  state.chatSending = false;
+  render();
+}
+
+function scrollChatToBottom() {
+  requestAnimationFrame(() => {
+    const container = $('#chat-messages');
+    if (container) container.scrollTop = container.scrollHeight;
+  });
 }
 
 // ── Toast ──────────────────────────────────────────────────────
@@ -151,10 +183,9 @@ function render() {
     app.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
     return;
   }
-
-  // Agent detail view
-  if (state.selectedAgent) {
-    app.innerHTML = renderAgentDetail(state.selectedAgent);
+  // Chat view
+  if (state.chatSession) {
+    app.innerHTML = renderChat();
     bindEvents();
     return;
   }
@@ -247,13 +278,12 @@ function renderContent() {
   }
 }
 
-// ── Agents Tab — Grouped by Project ───────────────────────────
+// ── Agents Tab — Grouped by Project with Active Sessions ──────
 function renderAgents() {
   if (!state.agents.length) {
     return '<div class="empty"><div class="empty-icon">🦆</div><div class="empty-text">No agents configured</div></div>';
   }
 
-  // Group agents by projectName
   const groups = {};
   state.agents.forEach(a => {
     const project = a.projectName || 'Unassigned';
@@ -261,7 +291,6 @@ function renderAgents() {
     groups[project].push(a);
   });
 
-  // Sort groups: most agents first
   const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
 
   return sorted.map(([project, agents]) => `
@@ -270,12 +299,17 @@ function renderAgents() {
         <span class="project-name">${esc(project)}</span>
         <span class="project-count">${agents.length}</span>
       </div>
-      ${agents.map(a => renderAgentCard(a)).join('')}
+      ${agents.map(a => renderAgentWithSessions(a)).join('')}
     </div>
   `).join('');
 }
 
-function renderAgentCard(a) {
+function renderAgentWithSessions(a) {
+  // Find active sessions for this agent (not done)
+  const activeSessions = state.sessions.filter(
+    s => s.agentId === a.id && s.status !== 'done'
+  );
+
   const avatarHtml = a.avatar
     ? `<img class="agent-avatar" src="${api.avatarUrl(a.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       + `<div class="agent-avatar agent-avatar-fallback" style="display:none;background:${a.color || 'var(--accent)'}">🦆</div>`
@@ -284,60 +318,80 @@ function renderAgentCard(a) {
   const statusClass = a.status === 'running' ? 'running' : a.status === 'error' ? 'error' : 'idle';
 
   return `
-    <div class="agent-card" data-agent-id="${a.id}">
-      <div class="agent-card-left">
-        ${avatarHtml}
-        <div class="agent-card-info">
-          <div class="agent-name">${esc(a.name || 'Agent')}</div>
-          <div class="agent-role">${esc(a.role || '')}</div>
+    <div class="agent-block">
+      <div class="agent-card">
+        <div class="agent-card-left">
+          ${avatarHtml}
+          <div class="agent-card-info">
+            <div class="agent-name">${esc(a.name || 'Agent')}</div>
+            <div class="agent-role">${esc(a.role || '')}</div>
+          </div>
+        </div>
+        <div class="agent-card-right">
+          <span class="badge badge-${statusClass}">${a.status || 'idle'}</span>
+          <button class="btn-icon btn-new-session" data-new-session="${a.id}" title="New session">+</button>
         </div>
       </div>
-      <span class="badge badge-${statusClass}">${a.status || 'idle'}</span>
+      ${activeSessions.length ? `
+        <div class="agent-sessions">
+          ${activeSessions.map(s => `
+            <div class="agent-session-item" data-open-chat="${s.id}">
+              <span class="session-dot ${s.status === 'in_progress' ? 'active' : ''}"></span>
+              <span class="session-title-inline">${esc(s.title || 'Untitled')}</span>
+              <span class="session-time-inline">${timeAgo(s.createdAt)}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
     </div>
   `;
 }
 
-// ── Agent Detail View ─────────────────────────────────────────
-function renderAgentDetail(agent) {
-  const avatarHtml = agent.avatar
-    ? `<img class="detail-avatar" src="${api.avatarUrl(agent.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-      + `<div class="detail-avatar detail-avatar-fallback" style="display:none;background:${agent.color || 'var(--accent)'}">🦆</div>`
-    : `<div class="detail-avatar detail-avatar-fallback" style="background:${agent.color || 'var(--accent)'}">🦆</div>`;
-
-  // Find sessions for this agent
-  const agentSessions = state.sessions.filter(s => s.agentId === agent.id);
+// ── Chat View ─────────────────────────────────────────────────
+function renderChat() {
+  const s = state.chatSession;
+  const agent = state.agents.find(a => a.id === s.agentId);
+  const agentName = agent ? agent.name : 'Agent';
 
   return `
-    <div class="detail-view">
-      <button class="detail-back" id="back-btn">← Back</button>
-      <div class="detail-header">
-        ${avatarHtml}
-        <div class="detail-info">
-          <div class="detail-name">${esc(agent.name || 'Agent')}</div>
-          <div class="detail-role">${esc(agent.role || '')}</div>
-          <div class="detail-project">${esc(agent.projectName || '')}</div>
+    <div class="chat-view">
+      <div class="chat-header">
+        <button class="detail-back" id="back-btn">←</button>
+        <div class="chat-header-info">
+          <div class="chat-header-title">${esc(s.title || 'Untitled')}</div>
+          <div class="chat-header-agent">${esc(agentName)}</div>
         </div>
-        <span class="badge badge-${agent.status === 'running' ? 'running' : 'idle'}">${agent.status || 'idle'}</span>
       </div>
-      ${agent.workingOn ? `<div class="detail-working">${esc(agent.workingOn)}</div>` : ''}
-      ${agent.branch ? `<div class="detail-branch">🔀 ${esc(agent.branch)}</div>` : ''}
-
-      <div class="detail-section-title">Recent Sessions</div>
-      ${agentSessions.length ? agentSessions.slice(0, 20).map(s => `
-        <div class="card session-item">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span class="session-title">${esc(s.title || 'Untitled')}</span>
-            <span class="badge badge-${s.status === 'in_progress' ? 'running' : s.status === 'done' ? 'done' : 'idle'}">${s.status}</span>
-          </div>
-          <div class="session-meta">${timeAgo(s.createdAt)}${s.messageCount ? ` · ${s.messageCount} msgs` : ''}</div>
-        </div>
-      `).join('') : '<div class="empty-inline">No sessions yet</div>'}
-
-      <button class="btn btn-primary btn-block" style="margin-top:16px" data-exec-agent="${agent.id}">
-        Execute on this agent
-      </button>
+      <div class="chat-messages" id="chat-messages">
+        ${state.chatLoading
+          ? '<div class="loading-center"><div class="spinner"></div></div>'
+          : state.chatMessages.length
+            ? state.chatMessages.map(m => `
+                <div class="chat-bubble ${m.role}">
+                  <div class="chat-bubble-content">${formatMessage(m.content)}</div>
+                </div>
+              `).join('')
+            : '<div class="empty-inline">No messages yet</div>'
+        }
+      </div>
+      <div class="chat-input-bar">
+        <input id="chat-input" type="text" class="chat-input" placeholder="Type a message..."
+          ${state.chatSending ? 'disabled' : ''}>
+        <button id="chat-send" class="btn btn-primary btn-send"
+          ${state.chatSending ? 'disabled' : ''}>
+          ${state.chatSending ? '...' : '→'}
+        </button>
+      </div>
     </div>
   `;
+}
+
+function formatMessage(content) {
+  if (!content) return '';
+  // Basic markdown-like formatting: code blocks, bold, newlines
+  return esc(content)
+    .replace(/\n/g, '<br>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
 // ── Sessions Tab ───────────────────────────────────────────────
@@ -349,7 +403,7 @@ function renderSessions() {
     state.sessions.slice(0, 30).map(s => {
       const agent = state.agents.find(a => a.id === s.agentId);
       return `
-        <div class="session-item">
+        <div class="session-item" data-open-chat="${s.id}" style="cursor:pointer">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span class="session-title">${esc(s.title || 'Untitled')}</span>
             <span class="badge badge-${s.status === 'in_progress' ? 'running' : s.status === 'done' ? 'done' : 'idle'}">${s.status}</span>
@@ -424,17 +478,50 @@ function bindEvents() {
     return;
   }
 
-  // Back button (agent detail)
+  // Back button (chat view)
   const backBtn = $('#back-btn');
   if (backBtn) {
-    backBtn.onclick = () => { state.selectedAgent = null; render(); };
+    backBtn.onclick = () => {
+      state.chatSession = null;
+      state.chatMessages = [];
+      render();
+    };
   }
 
-  // Agent cards — open detail
-  $$('.agent-card').forEach(card => {
-    card.onclick = () => {
-      const agent = state.agents.find(a => a.id === card.dataset.agentId);
-      if (agent) { state.selectedAgent = agent; render(); }
+  // Chat send
+  const chatSend = $('#chat-send');
+  if (chatSend) {
+    chatSend.onclick = sendMessage;
+    const chatInput = $('#chat-input');
+    if (chatInput) {
+      chatInput.onkeydown = (e) => { if (e.key === 'Enter') sendMessage(); };
+      // Auto-focus input
+      chatInput.focus();
+    }
+  }
+
+  // Open chat from session items
+  $$('[data-open-chat]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const session = state.sessions.find(s => s.id === el.dataset.openChat);
+      if (session) openChat(session);
+    };
+  });
+
+  // New session button
+  $$('[data-new-session]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const agentId = btn.dataset.newSession;
+      const agent = state.agents.find(a => a.id === agentId);
+      // Switch to execute tab with agent pre-selected
+      state.tab = 'execute';
+      render();
+      const select = $('#exec-agent');
+      if (select) select.value = agentId;
+      const textarea = $('#exec-prompt');
+      if (textarea) textarea.focus();
     };
   });
 
@@ -454,17 +541,6 @@ function bindEvents() {
         toast(`Error: ${err.message}`, 'error');
       }
       btn.disabled = false;
-    };
-  });
-
-  // Execute from detail view
-  $$('[data-exec-agent]').forEach(btn => {
-    btn.onclick = () => {
-      state.selectedAgent = null;
-      state.tab = 'execute';
-      render();
-      const select = $('#exec-agent');
-      if (select) select.value = btn.dataset.execAgent;
     };
   });
 
@@ -503,12 +579,12 @@ function timeAgo(ts) {
   if (!ts) return '';
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}d`;
 }
 
 // ── Init ───────────────────────────────────────────────────────
