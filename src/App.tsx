@@ -2454,13 +2454,14 @@ function AppContent() {
       // 🦆 SIMPLIFIED: Always start fresh conversation
       // Users can resume sessions via Sessions panel -> "Resume Session" button
       // Race between invoke and abort
-      const response = await Promise.race([
-        invoke<{
-          result: string;
-          session_id: string;
-          total_cost_usd: number;
-          usage: UsageStats;
-        }>('send_message_via_sdk_streaming', {
+      // Note: sdkInvokePromise is captured separately so we can suppress the
+      // unhandled rejection that occurs when abort fires before the backend returns.
+      const sdkInvokePromise = invoke<{
+        result: string;
+        session_id: string;
+        total_cost_usd: number;
+        usage: UsageStats;
+      }>('send_message_via_sdk_streaming', {
           // 🦆 RACE CONDITION FIX: Use capturedAgentId
           agentId: capturedAgentId,
           request: (() => {
@@ -2522,9 +2523,9 @@ function AppContent() {
             providerApiKey: prf.providerApiKey,
           };
           })(),
-        }),
-        abortPromise,
-      ]);
+        });
+      sdkInvokePromise.catch(() => {}); // Suppress unhandled rejection when abort fires first
+      const response = await Promise.race([sdkInvokePromise, abortPromise]);
 
       // 🦆 SESSION-FIRST: Update message with final result using messageKey
       setChatSessions((prev) => {
@@ -2781,6 +2782,11 @@ function AppContent() {
         console.log(`[abortStreamForSession] Aborting stream: ${streamKey}`);
         abortController.abort();
       }
+    });
+
+    // Kill the backend Node.js process so it stops immediately
+    invoke('abort_sdk_stream', { sessionKey: messageKey }).catch((err) => {
+      console.warn('[abortStreamForSession] Failed to kill backend process:', err);
     });
   }, [activeId, activeSessionId]);
 
@@ -3345,6 +3351,11 @@ function AppContent() {
       if (abortController && !abortController.signal.aborted) {
         abortController.abort();
       }
+    });
+
+    // Kill the backend Node.js process so it stops immediately
+    invoke('abort_sdk_stream', { sessionKey: targetAgentId }).catch((err) => {
+      console.warn('[abortStreamForTargetAgent] Failed to kill backend process:', err);
     });
   }, []);
 

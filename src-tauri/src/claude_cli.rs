@@ -67,6 +67,11 @@ fn sanitize_path_string_for_node(path: &str) -> String {
 static ACTIVE_PROCESSES: Lazy<TokioMutex<HashMap<String, ChildStdin>>> =
     Lazy::new(|| TokioMutex::new(HashMap::new()));
 
+/// Store running child processes (stdin/stdout/stderr already taken) for abort/kill support
+/// Key: event_session_key, Value: Child handle
+static RUNNING_CHILD_PROCESSES: Lazy<TokioMutex<HashMap<String, tokio::process::Child>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
 /// Send a message to an active SDK process via stdin
 /// Send message to a running process via stdin
 /// 🦆 FIX: Now uses process_key (sessionKey) instead of agent_id to support concurrent sessions
@@ -119,6 +124,25 @@ async fn unregister_process(process_key: &str) {
     let mut processes = ACTIVE_PROCESSES.lock().await;
     processes.remove(process_key);
     log::info!("[SDK] 🗑️ Unregistered stdin for process: {}", process_key);
+}
+
+/// Kill the running Node.js process for a given session key.
+/// Called by the frontend when the user clicks Stop.
+#[tauri::command]
+pub async fn abort_sdk_stream(session_key: String) -> Result<(), String> {
+    let child_opt = {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.remove(&session_key)
+    };
+
+    if let Some(mut child) = child_opt {
+        child.kill().await
+            .map_err(|e| format!("Failed to kill Node.js process: {}", e))?;
+        log::info!("[SDK] 🛑 Killed Node.js process for session: {}", session_key);
+    } else {
+        log::warn!("[SDK] ⚠️ abort_sdk_stream: no running process found for session: {}", session_key);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1724,6 +1748,13 @@ pub async fn send_message_via_sdk_streaming(
         None
     };
 
+    // Store child in running processes map for abort support
+    // All I/O handles (stdin/stdout/stderr) are already taken above
+    {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.insert(event_session_key.clone(), child);
+    }
+
     // Track final response
     let mut final_result: Option<ClaudeCliResponse> = None;
 
@@ -1891,9 +1922,22 @@ pub async fn send_message_via_sdk_streaming(
         }
     }
 
-    // Wait for process to complete
-    let status = child.wait().await
-        .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?;
+    // Take child back from running processes map (may be None if abort_sdk_stream already removed and killed it)
+    let child_for_wait = {
+        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
+        procs.remove(&event_session_key)
+    };
+
+    let status = match child_for_wait {
+        Some(mut c) => c.wait().await
+            .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?,
+        None => {
+            // Child was already removed and killed by abort_sdk_stream
+            log::info!("[SDK] Process was aborted for session: {}", event_session_key);
+            unregister_process(&event_session_key).await;
+            return Err("Cancelled by user".to_string());
+        }
+    };
 
     // Cleanup: unregister the process stdin
     // 🦆 FIX: Use event_session_key instead of agent_id to match registration

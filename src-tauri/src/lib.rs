@@ -1037,6 +1037,7 @@ pub fn run() {
             claude_cli::send_message_via_cli,
             claude_cli::send_message_via_cli_streaming,
             claude_cli::send_message_via_sdk_streaming,
+            claude_cli::abort_sdk_stream,         // 🛑 Stop button: kill Node.js process
             claude_cli::send_tool_result_to_sdk, // 🗣️ AskUserQuestion support (legacy)
             claude_cli::answer_user_question,    // 🗣️ AskUserQuestion via stdin (new)
             claude_cli::rewind_files,            // ⏪ File Checkpointing rewind (SDK 0.2.7+)
