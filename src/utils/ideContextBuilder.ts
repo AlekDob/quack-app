@@ -17,8 +17,6 @@ import { useFileSystemStore } from '../stores/fileSystemStore';
 import { isMacOS } from './platform';
 import type { GitStatusSummary } from '../types';
 
-const MAX_SELECTION_LINES = 200;
-const MAX_SELECTION_CHARS = 8000;
 const MAX_GIT_CHANGED_FILES = 20;
 
 export interface IdeContext {
@@ -70,22 +68,6 @@ export function gatherInternalContext(
 }
 
 /**
- * Truncate selection text if it exceeds limits.
- */
-function truncateSelection(text: string): string {
-  const lines = text.split('\n');
-  if (lines.length > MAX_SELECTION_LINES) {
-    return lines.slice(0, MAX_SELECTION_LINES).join('\n')
-      + `\n... (truncated, ${lines.length - MAX_SELECTION_LINES} more lines)`;
-  }
-  if (text.length > MAX_SELECTION_CHARS) {
-    return text.slice(0, MAX_SELECTION_CHARS)
-      + `\n... (truncated, ${text.length - MAX_SELECTION_CHARS} more characters)`;
-  }
-  return text;
-}
-
-/**
  * Format git status as a string block.
  */
 function formatGitStatus(gs: GitStatusSummary): string {
@@ -128,11 +110,8 @@ export function formatContextPrefix(ctx: IdeContext): string {
   }
 
   if (ctx.selection && ctx.selection.selectedText.trim()) {
-    const truncated = truncateSelection(ctx.selection.selectedText);
     parts.push(
-      `<ide_selection file_path="${ctx.selection.filePath}" language="${ctx.selection.language}" start_line="${ctx.selection.startLine}" end_line="${ctx.selection.endLine}">`,
-      truncated,
-      `</ide_selection>`
+      `<ide_selection file_path="${ctx.selection.filePath}" language="${ctx.selection.language}" start_line="${ctx.selection.startLine}" end_line="${ctx.selection.endLine}" />`
     );
   }
 
@@ -163,11 +142,8 @@ function formatExternalContextPrefix(
   }
 
   if (ctx.selection && ctx.selection.text.trim()) {
-    const truncated = truncateSelection(ctx.selection.text);
     parts.push(
-      `<ide_selection file_path="${ctx.selection.file_path}" language="${ctx.selection.language}" start_line="${ctx.selection.start_line}" start_char="${ctx.selection.start_char}" end_line="${ctx.selection.end_line}" end_char="${ctx.selection.end_char}">`,
-      truncated,
-      `</ide_selection>`
+      `<ide_selection file_path="${ctx.selection.file_path}" language="${ctx.selection.language}" start_line="${ctx.selection.start_line}" start_char="${ctx.selection.start_char}" end_line="${ctx.selection.end_line}" end_char="${ctx.selection.end_char}" />`
     );
   }
 

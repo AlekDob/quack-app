@@ -969,7 +969,6 @@ function AppContent() {
   // Multi-Chat state - one chat session per agent
   const [chatSessions, setChatSessions] = useState<Map<string, ChatMessage[]>>(new Map());
   const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
-  const chatConversationHistoryRef = useRef<Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>>(new Map());
   // Agent metadata (name, cwd) for Telegram notifications
   const agentMetadataRef = useRef<Map<string, { name: string; cwd: string }>>(new Map());
   // Last response text per agent for Telegram notifications
@@ -2430,16 +2429,7 @@ function AppContent() {
     });
 
     try {
-      // Build context from SESSION's conversation history (not agent!)
-      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so sessions don't share history
-      const agentHistory = chatConversationHistoryRef.current.get(messageKey) ?? [];
       let prompt = contentWithAttachments;
-      if (agentHistory.length > 0) {
-        const history = agentHistory
-          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n');
-        prompt = `${history}\n\nUser: ${contentWithAttachments}`;
-      }
 
       // Call Rust backend for SDK streaming
       // Events are received via the claude-event listener above
@@ -2449,12 +2439,9 @@ function AppContent() {
         ? sessionWorktreePath
         : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
-      const ideContextPrefix = await buildContextPrefix(gitSummary, workingDir ?? null);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
+      // Build IDE context (open file, selection, git status) as a separate field
+      // Injected into system prompt by Node.js — not concatenated into user message
+      const ideContext = await buildContextPrefix(gitSummary, workingDir ?? null);
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -2536,6 +2523,8 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // IDE context: injected into system prompt by Node.js, not into user message
+            ideContext: ideContext || undefined,
           };
           })(),
         });
@@ -2560,22 +2549,6 @@ function AppContent() {
         );
         return newSessions;
       });
-
-      // Add to agent's conversation history
-      const updatedHistory = [
-        ...agentHistory,
-        {
-          role: 'user' as const,
-          content: contentWithAttachments,
-        },
-        {
-          role: 'assistant' as const,
-          content: response.result,
-        },
-      ];
-      // 🦆 SESSION ISOLATION FIX: Use messageKey (sessionId) so each session has its own history
-      chatConversationHistoryRef.current.set(messageKey, updatedHistory);
-
 
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
       // Each session has its own claudeSessionId for independent conversations
@@ -3150,22 +3123,11 @@ function AppContent() {
       await ensureListenerReady(targetAgentId);
       await new Promise(resolve => setTimeout(resolve, 150));
 
-      // Build context from conversation history
-      const agentHistory = chatConversationHistoryRef.current.get(targetAgentId) ?? [];
       let prompt = content;
-      if (agentHistory.length > 0) {
-        const history = agentHistory
-          .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n');
-        prompt = `${history}\n\nUser: ${content}`;
-      }
 
-      // Inject IDE context (open file, selection, git status) into prompt
-      // Tries external IDE (Claude Code extension WebSocket) first, falls back to internal
-      const ideContextPrefix = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
-      if (ideContextPrefix) {
-        prompt = ideContextPrefix + prompt;
-      }
+      // Build IDE context (open file, selection, git status) as a separate field
+      // Injected into system prompt by Node.js — not concatenated into user message
+      const ideContext = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
 
       // Create abort promise
       const abortPromise = new Promise<never>((_, reject) => {
@@ -3210,6 +3172,8 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // IDE context: injected into system prompt by Node.js, not into user message
+            ideContext: ideContext || undefined,
           };
           })(),
         }),
@@ -3234,14 +3198,6 @@ function AppContent() {
         );
         return newSessions;
       });
-
-      // Add to conversation history
-      const updatedHistory = [
-        ...agentHistory,
-        { role: 'user' as const, content },
-        { role: 'assistant' as const, content: response.result },
-      ];
-      chatConversationHistoryRef.current.set(targetAgentId, updatedHistory);
 
       // Update tokens
       setChatTokensMap((prev) => {
@@ -3382,9 +3338,6 @@ function AppContent() {
       newSessions.set(targetAgentId, []);
       return newSessions;
     });
-
-    // Clear conversation history
-    chatConversationHistoryRef.current.delete(targetAgentId);
 
     // Clear last prompt
     lastPromptsRef.current.delete(targetAgentId);
@@ -3723,10 +3676,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         newSessions.set(activeId, []);
         return newSessions;
       });
-
-      // Clear conversation history (keyed by sessionId)
-      const sessionToClear = activeSessionId || activeId;
-      chatConversationHistoryRef.current.set(sessionToClear, []);
 
       // Clear last prompt
       lastPromptsRef.current.delete(activeId);

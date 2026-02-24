@@ -189,7 +189,7 @@ async function handleQuery(cmd) {
   const {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
-    mcpServers: passedMcpServers, allowedTools, teamContext,
+    mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
   } = cmd;
 
   const abortController = new AbortController();
@@ -245,7 +245,8 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
-          + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
+          + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
+          + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
       },
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
