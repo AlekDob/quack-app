@@ -61,6 +61,8 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Notifications: `documentation/gotchas/gotcha-macos-native-notification-focus.md`
 - TerminalInfo fields: `documentation/gotchas/gotcha-terminal-info-field-names.md`
 - Session creation: `documentation/gotchas/gotcha-programmatic-session-creation.md`
+- axum nest + state: `documentation/gotchas/gotcha-axum-nest-state-types.md`
+- Remote execute: `documentation/gotchas/gotcha-remote-execute-needs-react-listener.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -70,6 +72,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Automation layer: `documentation/patterns/pattern-automation-layer.md`
 - Tab system: `documentation/patterns/pattern-tab-system-singleton.md`
 - Dark theme CSS: `documentation/patterns/pattern-dark-theme-css-values.md`
+- Remote API architecture: `documentation/patterns/pattern-remote-api-architecture.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

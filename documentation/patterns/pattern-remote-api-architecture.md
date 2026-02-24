@@ -114,4 +114,44 @@ All under `/api/`, all require `Authorization: Bearer <token>`:
 | POST | `/api/jobs/:id/toggle` | Toggle job enabled/disabled |
 | POST | `/api/execute` | Start a new agent session |
 
+| GET | `/api/sessions/:id/messages` | Chat messages for a session |
+| POST | `/api/sessions/:id/send` | Send message to active session |
+| GET | `/api/avatars/:filename` | Serve agent duck avatar images |
+
 Note: path params use `:id` syntax (axum 0.7). Axum 0.8+ uses `{id}`.
+
+## Execute Flow (Rust → React)
+
+The `/api/execute` endpoint does NOT directly create a session. It emits a Tauri event that the React frontend handles:
+
+```
+Mobile Dashboard → POST /api/execute → Rust emits "remote-execute" → React listener in App.tsx
+                                                                        ↓
+                                                                   sessionStore.createSession()
+                                                                        ↓
+                                                                   setActiveId + setActiveSessionIdExclusive
+                                                                        ↓
+                                                                   pendingAutoStartRef → sendMessageForAgent
+```
+
+The React listener uses the same `pendingAutoStartRef` pattern as `session-auto-start` (WhatsApp) and automation jobs. This ensures the session is properly initialized in the React state before sending the first message.
+
+Similarly, `POST /sessions/:id/send` emits `remote-send-message` → React listener finds the session and sends via the same mechanism.
+
+**Critical**: Both events MUST have React listeners in `App.tsx`. Without them, the Rust emit succeeds but nothing happens (the toast appears on mobile but the agent never starts).
+
+## Mobile Dashboard
+
+Served at `/dashboard?token=xxx` via `remote_dashboard.rs` using `include_str!()` to embed static files. Token is injected into HTML via `%%INJECT_TOKEN%%` placeholder.
+
+**Architecture**: 3-tab vanilla JS SPA (Agents, Sessions, Jobs) with:
+- Bottom drawer for execute (replaces the old Execute tab)
+- Full-screen chat view with 3s polling for live updates
+- WebSocket for status events (agent status, session created/completed)
+
+## WebSocket
+
+`GET /ws?token=xxx` — real-time push via `tokio::sync::broadcast`. Events:
+- `agent_status` — agent busy/idle changes
+- `session_created` / `session_completed` — session lifecycle
+- `job_fired` — automation job triggered
